@@ -86,7 +86,8 @@ class DetachedShortcutsTest {
             owner.installRootBindings(mainRoot);
             DetachedToolWindows windows = owner.detachedWindows();
             windows.ready = () -> true;
-            windows.displays = () -> List.of(new Rectangle(0, 0, 1920, 1080));
+            var screen = new Rectangle(0, 0, 1920, 1080);
+            windows.displays = () -> List.of(new WindowPlacement.Display(screen, screen));
             owner.detachedShells((opening, events) -> {
                 this.opening = opening;
                 return new DetachedToolWindows.Shell(() -> shells.add("show"), () -> shells.add("toFront"), () -> shells.add("dispose"),

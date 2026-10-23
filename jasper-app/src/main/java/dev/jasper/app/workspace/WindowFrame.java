@@ -227,15 +227,23 @@ public final class WindowFrame {
      * others; empty without a display (headless).
      */
     static java.util.List<Rectangle> usableDisplays() {
+        return displays().stream().map(WindowPlacement.Display::usable).distinct().toList();
+    }
+
+    /** Today's displays, whole and usable: the default display first, then the others; empty without a display (headless). */
+    static java.util.List<WindowPlacement.Display> displays() {
         if (GraphicsEnvironment.isHeadless()) return java.util.List.of();
-        var screens = new java.util.ArrayList<Rectangle>();
         var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        screens.add(usableBounds(environment.getDefaultScreenDevice().getDefaultConfiguration()));
-        for (var device : environment.getScreenDevices()) {
-            Rectangle bounds = usableBounds(device.getDefaultConfiguration());
-            if (!screens.contains(bounds)) screens.add(bounds);
-        }
-        return screens;
+        var first = environment.getDefaultScreenDevice();
+        var displays = new java.util.ArrayList<WindowPlacement.Display>();
+        displays.add(display(first.getDefaultConfiguration()));
+        for (var device : environment.getScreenDevices())
+            if (!device.equals(first)) displays.add(display(device.getDefaultConfiguration()));
+        return displays;
+    }
+
+    private static WindowPlacement.Display display(java.awt.GraphicsConfiguration graphics) {
+        return new WindowPlacement.Display(graphics.getBounds(), usableBounds(graphics));
     }
 
     private static Rectangle usableBounds(java.awt.GraphicsConfiguration graphics) {

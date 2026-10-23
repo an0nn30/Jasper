@@ -110,7 +110,7 @@ class DetachedToolWindowsTest {
         TabDragTestSupport.frame(owner, MAIN.x, MAIN.y, MAIN.width, MAIN.height);
         DetachedToolWindows windows = owner.detachedWindows();
         windows.ready = () -> true;
-        windows.displays = () -> List.of(SCREEN);
+        windows.displays = () -> List.of(new WindowPlacement.Display(SCREEN, SCREEN));
         return owner;
     }
 

@@ -465,7 +465,8 @@ class WindowManagerTest {
             MainWindow main = manager.main().orElseThrow();
             var windows = main.content().detachedWindows();
             windows.ready = () -> true;
-            windows.displays = () -> List.of(new Rectangle(0, 0, 1920, 1080));
+            var screen = new Rectangle(0, 0, 1920, 1080);
+            windows.displays = () -> List.of(new WindowPlacement.Display(screen, screen));
             main.content().detachedShells((opening, heard) -> new DetachedToolWindows.Shell(() -> events.add("show panel window"),
                 () -> events.add("front panel window"), () -> events.add("dispose panel window"), () -> false, bounds -> { }, frame -> { }));
             main.content().dock().setBounds("test.panel", new Rectangle(100, 100, 400, 300));

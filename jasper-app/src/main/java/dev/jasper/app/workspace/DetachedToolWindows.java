@@ -103,8 +103,8 @@ final class DetachedToolWindows implements AutoCloseable {
     BiFunction<Opening, Events, Shell> shells;
     /** Whether windows may open: by default, while the main window's content is showing, which a Float needs for its owner. */
     BooleanSupplier ready;
-    /** The usable bounds of today's displays, the default display first; empty when none is known (headless). */
-    Supplier<List<Rectangle>> displays = WindowFrame::usableDisplays;
+    /** Today's displays, whole and usable, the default display first; empty when none is known (headless). */
+    Supplier<List<WindowPlacement.Display>> displays = WindowFrame::displays;
 
     private final WindowContent owner;
     private final DockState dock;
@@ -187,7 +187,7 @@ final class DetachedToolWindows implements AutoCloseable {
     /**
      * Where a tool window's own window first opens when it has never had one: its docked frame's place and size on
      * screen, or while it is hidden the size it would dock at centred on the main window; at least the minimum, and kept
-     * on the display holding its centre (the default display when none does).
+     * on the usable part of the display holding its centre (the default display when none does).
      */
     Rectangle initialBounds(String id) {
         Optional<Rectangle> docked = area.frameOnScreen(id);
@@ -203,7 +203,8 @@ final class DetachedToolWindows implements AutoCloseable {
     /**
      * Where a tool window's own window goes for a dock drag released on Detach (floating tool windows spec, The drag
      * out): at the size it opens at, with the point the press held under the pointer (that point kept inside the
-     * window), and kept on the display under the pointer, the default display when it is on none.
+     * window), and kept on the usable part of the display under the pointer, its menu bar, Dock or taskbar included; the
+     * default display when the pointer is on none.
      *
      * @param screen the release point on screen
      * @param grab where the press held the dragged stripe button or header, in its coordinates
@@ -225,11 +226,15 @@ final class DetachedToolWindows implements AutoCloseable {
         return new Dimension(Math.max(minimum.width, size.width), Math.max(minimum.height, size.height));
     }
 
-    /** {@code bounds} kept on the display holding {@code point}, else the default display; as they are with none known. */
+    /**
+     * {@code bounds} kept on the usable part of the display whose whole bounds hold {@code point}, as a torn-out tab's
+     * window is ({@code WindowFrame}), else of the default display; as they are with none known.
+     */
     private Rectangle onDisplay(Rectangle bounds, Point point) {
-        List<Rectangle> screens = displays.get();
+        List<WindowPlacement.Display> screens = displays.get();
         if (screens.isEmpty()) return bounds;
-        return WindowPlacement.fitted(bounds, screens.get(WindowPlacement.displayFor(point, screens).orElse(0)));
+        int index = WindowPlacement.displayFor(point, screens.stream().map(WindowPlacement.Display::bounds).toList()).orElse(0);
+        return WindowPlacement.fitted(bounds, screens.get(index).usable());
     }
 
     /** Disposes every window, each whether or not another fails to; nothing opens afterwards. */
@@ -247,7 +252,7 @@ final class DetachedToolWindows implements AutoCloseable {
     private void open(String id, JComponent frame) {
         Rectangle bounds = dock.bounds(id).orElseGet(() -> initialBounds(id));
         bounds = new WindowPlacement(Optional.of(new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height)), Frame.NORMAL)
-            .restore(minimumSize(), displays.get()).orElse(bounds);
+            .restore(minimumSize(), displays.get().stream().map(WindowPlacement.Display::usable).toList()).orElse(bounds);
         dock.setBounds(id, bounds);
         var window = new Open(dock.mode(id), frame, bounds);
         var events = new Events(() -> { if (open.get(id) == window) hide.accept(id); }, moved -> {

@@ -7,6 +7,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -18,6 +19,21 @@ import java.util.OptionalInt;
 final class WindowPlacement {
     private Rectangle normal;
     private final int restoredState;
+
+    /**
+     * One of today's displays on screen. A window goes to the display whose bounds hold the cursor, the menu bar, Dock
+     * and taskbar included, and is kept on its usable part.
+     *
+     * @param bounds the whole display
+     * @param usable the display less the menu bar, Dock or taskbar
+     */
+    record Display(Rectangle bounds, Rectangle usable) {
+        /** Requires both, and copies them. */
+        Display {
+            bounds = new Rectangle(Objects.requireNonNull(bounds, "bounds"));
+            usable = new Rectangle(Objects.requireNonNull(usable, "usable"));
+        }
+    }
 
     /**
      * A window that was saved at {@code saved} with {@code extendedState}, or a new one.

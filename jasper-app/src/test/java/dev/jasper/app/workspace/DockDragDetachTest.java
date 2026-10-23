@@ -113,7 +113,7 @@ class DockDragDetachTest {
             frame = TabDragTestSupport.frame(content, 100, 100, 1000, 700);
             DetachedToolWindows windows = content.detachedWindows();
             windows.ready = () -> true;
-            windows.displays = () -> List.of(SCREEN);
+            windows.displays = () -> List.of(whole(SCREEN));
             content.detachedShells(shells);
             DockDrag drag = content.dockDrag();
             var apply = drag.onDrop;
@@ -177,6 +177,14 @@ class DockDragDetachTest {
     }
 
     private static String open(ToolWindowMode mode, Rectangle bounds) { return "open " + A + " " + mode + " " + text(bounds); }
+
+    /** A display with no menu bar, Dock or taskbar: all of it is usable. */
+    private static WindowPlacement.Display whole(Rectangle bounds) { return new WindowPlacement.Display(bounds, bounds); }
+
+    /** A display whose top 25 px (a menu bar) and bottom 40 px (a taskbar or the Dock) are not usable. */
+    private static WindowPlacement.Display withBars(Rectangle bounds) {
+        return new WindowPlacement.Display(bounds, new Rectangle(bounds.x, bounds.y + 25, bounds.width, bounds.height - 65));
+    }
 
     private static Point labelAt(Point screen) {
         int offset = UIScale.scale(TabDrag.LABEL_OFFSET);
@@ -350,7 +358,8 @@ class DockDragDetachTest {
             assertThat(f.content.dock().mode(A)).isEqualTo(ToolWindowMode.FLOAT);
             assertThat(f.content.dock().bounds(A)).hasValue(opened);
             assertThat(f.content.dock().slot(A)).as("its stripe button stays in its slot").hasValue(Slot.LEFT_TOP);
-            assertThat(f.content.leftStripe().buttons()).contains(f.button("Alpha"));
+            assertThat(f.content.leftStripe().buttons()).extracting(AbstractButton::getToolTipText)
+                .as("first in its group on the left stripe, as before").containsExactly("Alpha", "Beta");
             assertThat(f.button("Alpha").isSelected()).as("selected while its window shows").isTrue();
         });
     }
@@ -398,7 +407,7 @@ class DockDragDetachTest {
         edt(() -> {
             var f = fixture();
             var right = new Rectangle(1920, 0, 1920, 1080);
-            f.content.detachedWindows().displays = () -> List.of(SCREEN, right);
+            f.content.detachedWindows().displays = () -> List.of(whole(SCREEN), whole(right));
             Dimension size = f.landing();
             var corner = new Point(3830, 1070);
             AbstractButton button = f.button("Alpha");
@@ -409,6 +418,46 @@ class DockDragDetachTest {
             assertThat(f.content.dock().bounds(A)).hasValue(fitted);
             assertThat(right.contains(fitted)).as("wholly on the display under the pointer").isTrue();
             assertThat(f.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, fitted), "show " + A, "toFront " + A);
+        });
+    }
+
+    /**
+     * Fix round 1: the display under the pointer is the one whose whole bounds hold it, its menu bar, Dock or taskbar
+     * included, and the window is kept on its usable part, as a torn-out tab's window is; on no display, the default one.
+     */
+    @Test void aDropOverADisplaysMenuBarOrTaskbarOpensOnThatDisplay() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            WindowPlacement.Display left = withBars(SCREEN), right = withBars(new Rectangle(1920, 0, 1920, 1080));
+            f.content.detachedWindows().displays = () -> List.of(left, right);
+            Dimension size = f.landing();
+            Rectangle usable = right.usable();
+
+            var menuBar = new Point(2500, 10);
+            AbstractButton button = f.button("Alpha");
+            f.startAt(button, new Point(6, 9), menuBar);
+            mouse(button, MouseEvent.MOUSE_RELEASED, menuBar);
+            var below = new Rectangle(menuBar.x - 6, usable.y, size.width, size.height);
+            assertThat(f.content.dock().bounds(A)).as("just below the menu bar it was dropped on").hasValue(below);
+            assertThat(usable.contains(below)).isTrue();
+            assertThat(f.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, below), "show " + A, "toFront " + A);
+
+            var taskbar = new Point(2500, 1060);
+            f.startAt(f.button("Alpha"), new Point(6, 9), taskbar);
+            mouse(f.button("Alpha"), MouseEvent.MOUSE_RELEASED, taskbar);
+            var above = new Rectangle(taskbar.x - 6, usable.y + usable.height - size.height, size.width, size.height);
+            assertThat(f.content.dock().bounds(A)).as("just above the taskbar it was dropped on").hasValue(above);
+            assertThat(usable.contains(above)).isTrue();
+            assertThat(f.shells.take()).containsExactly("place " + A + " " + text(above), "toFront " + A);
+
+            var nowhere = new Point(5000, 500);
+            f.startAt(f.button("Alpha"), new Point(6, 9), nowhere);
+            mouse(f.button("Alpha"), MouseEvent.MOUSE_RELEASED, nowhere);
+            Rectangle home = left.usable();
+            var fallback = new Rectangle(home.x + home.width - size.width,
+                Math.min(nowhere.y - 9, home.y + home.height - size.height), size.width, size.height);
+            assertThat(f.content.dock().bounds(A)).as("on no display: the default one").hasValue(fallback);
+            assertThat(home.contains(fallback)).isTrue();
         });
     }
 
