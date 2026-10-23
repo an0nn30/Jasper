@@ -713,12 +713,13 @@ you turned it off).
   area's own [editing keys](#commands-and-shortcuts): Shift+Tab and, on Linux and Windows, Alt+Up flash the Vim bar
   and change nothing. The Editor's commands, Jasper's window shortcuts (such as Ctrl+Shift+T on Linux and Windows) and
   keys a `sethandler` entry gives the Editor still work; a key nothing takes flashes the Vim bar.
-- On Linux and Windows several of the Editor's and the window's shortcuts are Vim keys, and Vim reads Ctrl+Shift with a
-  letter as Ctrl with that letter: in Normal mode Ctrl+F scrolls, Ctrl+Shift+G (the window's Find Next) shows the file's
-  position, Ctrl+L does nothing (Vim's redraw), Ctrl+N moves down and Ctrl+V starts blockwise Visual mode; in Insert
-  mode Ctrl+Shift+W (the window's Close Pane) deletes a word, Ctrl+V inserts the next key literally and Ctrl+C returns
-  to Normal mode, so neither Ctrl+V nor Ctrl+Shift+V pastes there. Ctrl+S and Ctrl+Shift+S still save (Vim has no
-  `<C-s>`). Use the tab's menu, `:action find` or a `sethandler` entry such as `sethandler <C-f> n:ide` for the others.
+- On Linux and Windows several of the Editor's and the window's shortcuts are Vim keys: in Normal mode Ctrl+F scrolls,
+  Ctrl+L does nothing (Vim's redraw), Ctrl+N moves down and Ctrl+V starts blockwise Visual mode; in Insert mode Ctrl+V
+  inserts the next key literally and Ctrl+C returns to Normal mode, so Ctrl+V does not paste there. Ctrl+S still saves
+  (Vim has no `<C-s>`). Ctrl+Shift with a letter is its own key (`<C-S-v>`), which Vim leaves to the Editor and the
+  window unless a mapping or `sethandler` names it: Ctrl+Shift+G is Find Next, Ctrl+Shift+W closes the pane in Insert
+  mode and Ctrl+Shift+V pastes from the list in every mode. Use the tab's menu, `:action find` or a `sethandler` entry
+  such as `sethandler <C-f> n:ide` for the Ctrl keys.
 - `sethandler <C-f> n:vim i:ide` decides who gets a key in each mode (`n i v x o c`, or `a` for all, joined by `-`), as
   in IdeaVim.
 

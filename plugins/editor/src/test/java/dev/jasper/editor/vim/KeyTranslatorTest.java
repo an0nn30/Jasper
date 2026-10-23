@@ -18,9 +18,15 @@ class KeyTranslatorTest {
 
     @Test void ctrlCombinationsComeFromKeyPressed() {
         assertThat(KeyTranslator.pressed(KeyEvent.VK_W, CTRL, true)).contains(new KeyInput("w", KeyInput.CTRL));
-        assertThat(KeyTranslator.pressed(KeyEvent.VK_W, CTRL | SHIFT, false)).contains(new KeyInput("w", KeyInput.CTRL));
         assertThat(KeyTranslator.pressed(KeyEvent.VK_OPEN_BRACKET, CTRL, true)).contains(KeyInput.named("Esc"));
         assertThat(KeyTranslator.pressed(KeyEvent.VK_6, CTRL, false)).contains(new KeyInput("^", KeyInput.CTRL));
+    }
+
+    @Test void ctrlShiftLetter() {
+        assertThat(KeyTranslator.pressed(KeyEvent.VK_V, CTRL | SHIFT, false)).hasValueSatisfying(key -> {
+            assertThat(key.notation()).isEqualTo("<C-S-v>");
+            assertThat(key).isNotEqualTo(new KeyInput("v", KeyInput.CTRL));
+        });
     }
 
     @Test void plainLettersArriveAsTypedCharacters() {

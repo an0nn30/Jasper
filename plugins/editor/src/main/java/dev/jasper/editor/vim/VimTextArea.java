@@ -13,6 +13,7 @@ import javax.swing.JViewport;
 import javax.swing.KeyStroke;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rtextarea.ClipboardHistory;
+import org.fife.ui.rtextarea.RTextAreaEditorKit;
 import org.fife.ui.rtextarea.RTextAreaUI;
 import org.fife.ui.rtextarea.RUndoManager;
 
@@ -37,7 +38,10 @@ public class VimTextArea extends RSyntaxTextArea {
     private boolean followsFocus;
 
     /** An empty text area. */
-    public VimTextArea() { }
+    public VimTextArea() {
+        // Paste from a list is an Editor command: Ctrl+Shift+V reaches it in Normal and Visual mode.
+        allowInNormalMode(RTextAreaEditorKit.clipboardHistoryAction);
+    }
 
     /**
      * The area keeps one history: the superclass constructor asks for it, and {@code discardAllEdits} asks again after

@@ -83,8 +83,8 @@ public record KeyInput(String key, int modifiers) {
         if (modifiers == 0 && isChar()) return key.equals("<") ? "<lt>" : key;
         if (isAction(key)) return "<Action>(" + actionId() + ")";
         StringBuilder out = new StringBuilder("<");
-        if ((modifiers & SHIFT) != 0) out.append("S-");
         if ((modifiers & CTRL) != 0) out.append("C-");
+        if ((modifiers & SHIFT) != 0) out.append("S-");
         if ((modifiers & ALT) != 0) out.append("M-");
         if ((modifiers & META) != 0) out.append("D-");
         out.append(switch (key) {
@@ -210,11 +210,13 @@ public record KeyInput(String key, int modifiers) {
     /**
      * @param key a character or a name from {@link #NAMES}
      * @param modifiers the modifiers held
-     * @return the key as Vim sees it: Shift folded into characters, Ctrl letters lower case, and {@code <C-[>},
+     * @return the key as Vim sees it: Shift folded into characters (except Ctrl+Shift with a letter, its own key), Ctrl letters lower case, and {@code <C-[>},
      *     {@code <C-i>} and {@code <C-m>} read as {@code <Esc>}, {@code <Tab>} and {@code <CR>}
      */
     static KeyInput normalize(String key, int modifiers) {
         if (key.codePointCount(0, key.length()) == 1) {
+            if ((modifiers & (CTRL | SHIFT | ALT | META)) == (CTRL | SHIFT) && Character.isLetter(key.codePointAt(0)))
+                return new KeyInput(key.toLowerCase(Locale.ROOT), CTRL | SHIFT);
             if ((modifiers & SHIFT) != 0) {
                 key = key.toUpperCase(Locale.ROOT);
                 modifiers &= ~SHIFT;

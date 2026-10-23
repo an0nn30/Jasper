@@ -311,6 +311,54 @@ class VimEditorTest {
         return runs;
     }
 
+    @Test void ctrlShiftMappingsAreVimKeys() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "one\ntwo\n");
+            editor.vim().mappings().add(Mappings.NORMAL, KeyInput.parse("<C-S-j>"), KeyInput.parse("dd"), true, false);
+            assertThat(editor.offer(KeyInput.parse("<C-S-J>").getFirst())).isTrue();
+            assertThat(area.getText()).isEqualTo("two\n");
+            editor.offer(KeyInput.parse("<S-C-j>").getFirst());
+            assertThat(area.getText()).isEmpty();
+            var plain = editor(new VimTextArea(), "abc\n");
+            var ctrlShiftV = KeyInput.parse("<C-S-v>").getFirst();
+            assertThat(plain.offer(ctrlShiftV)).as("Normal").isFalse();
+            type(plain, "v");
+            assertThat(plain.offer(ctrlShiftV)).as("Visual").isFalse();
+            type(plain, "<Esc>i");
+            assertThat(plain.offer(ctrlShiftV)).as("Insert").isFalse();
+        });
+    }
+
+    @Test void ctrlShiftVReachesPasteFromAListAndCtrlShiftWInInsertModeLeavesVim() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc def\n");
+            int ctrlShift = InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
+            var pasted = new AtomicInteger();
+            area.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_V, ctrlShift), org.fife.ui.rtextarea.RTextAreaEditorKit.clipboardHistoryAction);
+            area.getActionMap().put(org.fife.ui.rtextarea.RTextAreaEditorKit.clipboardHistoryAction, new AbstractAction() {
+                @Override public void actionPerformed(ActionEvent event) { pasted.incrementAndGet(); }
+            });
+            area.processKeyEvent(pressed(area, ctrlShift, KeyEvent.VK_V));
+            assertThat(pasted).as("Normal mode").hasValue(1);
+            type(editor, "v");
+            area.processKeyEvent(pressed(area, ctrlShift, KeyEvent.VK_V));
+            assertThat(pasted).as("Visual mode").hasValue(2);
+            type(editor, "<Esc>$a");
+            var parent = new javax.swing.JPanel();
+            parent.add(area);
+            var closed = new AtomicInteger();
+            parent.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_W, ctrlShift), "close");
+            parent.getActionMap().put("close", new AbstractAction() {
+                @Override public void actionPerformed(ActionEvent event) { closed.incrementAndGet(); }
+            });
+            area.processKeyEvent(pressed(area, ctrlShift, KeyEvent.VK_W));
+            assertThat(closed).as("Ctrl+Shift+W in Insert mode is not Vim's").hasValue(1);
+            assertThat(area.getText()).isEqualTo("abc def\n");
+        });
+    }
+
     @Test void aKeyVimDeclinesInNormalModeRingsTheBellInsteadOfEditing() throws Exception {
         onEdt(() -> {
             var area = new VimTextArea();
