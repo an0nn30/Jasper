@@ -47,6 +47,15 @@ public interface Appearance {
      */
     SyntaxPalette syntaxPalette();
 
+    /** The editor schemes of every installed theme, built in, imported or provided by a plugin: for each theme in the
+     * order Settings lists them, its Dark scheme and then its Light scheme, for the variants it has. A plugin that lets
+     * its users pick one keeps the scheme's {@link EditorScheme#id() id}. A change to the installed themes is reported
+     * through {@link #onWorkspaceChanged}. UI thread only.
+     * @return the installed editor schemes, each id once
+     * @since 0.21.0
+     */
+    java.util.List<EditorScheme> editorSchemes();
+
     /** How opaque the workspace behind {@code component} is: 1 unless the component is in the workspace area of a
      * translucent window (where terminals and hosted content tabs live), in which case paint the component's own
      * background with this alpha (the window shows the desktop through it). Chrome, tool windows and side panels stay

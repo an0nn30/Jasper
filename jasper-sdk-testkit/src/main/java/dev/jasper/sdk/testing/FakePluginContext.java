@@ -250,6 +250,9 @@ public final class FakePluginContext implements PluginContext {
             @Override public dev.jasper.sdk.ui.SyntaxPalette syntaxPalette() {
                 host.requireAppearanceThread(); return host.workspaceAppearance().syntax();
             }
+            @Override public java.util.List<dev.jasper.sdk.ui.EditorScheme> editorSchemes() {
+                host.requireAppearanceThread(); return host.editorSchemes();
+            }
             @Override public double workspaceOpacity(java.awt.Component component) {
                 host.requireAppearanceThread();
                 java.util.Objects.requireNonNull(component, "component");

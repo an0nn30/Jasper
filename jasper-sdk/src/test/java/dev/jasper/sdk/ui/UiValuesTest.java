@@ -7,6 +7,23 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class UiValuesTest {
+    /** The Editor's Color scheme setting: an editor scheme's id is its theme's id and its variant. */
+    @Test void editorSchemeChecksItsId() {
+        var c = java.awt.Color.GRAY;
+        var editor = new EditorPalette(c, c, c, c, c, c, c);
+        var styles = new java.util.EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
+        for (var role : SyntaxRole.values()) styles.put(role, new SyntaxStyle(c, false, false));
+        var syntax = new SyntaxPalette(styles);
+        var scheme = new EditorScheme("jasper-meadow/dark", "Jasper Meadow", dev.jasper.sdk.Variant.DARK, editor, syntax);
+        assertThat(scheme.id()).isEqualTo("jasper-meadow/dark");
+        assertThat(new EditorScheme("catppuccin-latte/light", "Latte", dev.jasper.sdk.Variant.LIGHT, editor, syntax).variant())
+            .isEqualTo(dev.jasper.sdk.Variant.LIGHT);
+        for (String id : new String[]{"jasper-meadow/light", "Meadow/dark", "jasper-meadow", "/dark", "a/dark/x"})
+            assertThatIllegalArgumentException().as(id).isThrownBy(() -> new EditorScheme(id, "Meadow", dev.jasper.sdk.Variant.DARK, editor, syntax));
+        assertThatIllegalArgumentException().isThrownBy(() -> new EditorScheme("a/dark", " ", dev.jasper.sdk.Variant.DARK, editor, syntax));
+        assertThatNullPointerException().isThrownBy(() -> new EditorScheme("a/dark", "A", dev.jasper.sdk.Variant.DARK, null, syntax));
+    }
+
     /** Workspace tabs spec 14: the Tab menu holds what the Pane menu held. */
     @Test void theStandardMenusAreFileEditViewTabAndThePluginOnes() {
         assertThat(StandardMenu.values()).containsExactly(StandardMenu.FILE, StandardMenu.EDIT, StandardMenu.VIEW, StandardMenu.TAB,

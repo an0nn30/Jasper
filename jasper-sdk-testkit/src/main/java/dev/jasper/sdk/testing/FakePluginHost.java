@@ -173,6 +173,35 @@ public final class FakePluginHost implements AutoCloseable {
         publishWorkspace(next, requestedOpacity);
     }
 
+    private volatile List<dev.jasper.sdk.ui.EditorScheme> editorSchemes = List.of();
+    private List<dev.jasper.sdk.ui.EditorScheme> requestedSchemes = List.of();
+    List<dev.jasper.sdk.ui.EditorScheme> editorSchemes() { return editorSchemes; }
+
+    /** Queues the installed editor schemes {@code Appearance.editorSchemes} lists, which start empty. The next
+     * {@link #flush()} publishes them and, when they differ from the current ones, announces a workspace change, as
+     * importing or removing a theme does.
+     * @param schemes the schemes, each id once
+     * @throws IllegalArgumentException when two schemes share an id
+     * @since 0.21.0
+     */
+    public void setEditorSchemes(List<dev.jasper.sdk.ui.EditorScheme> schemes) {
+        requireAppearanceThread();
+        var copy = List.copyOf(schemes);
+        if (copy.stream().map(dev.jasper.sdk.ui.EditorScheme::id).distinct().count() != copy.size())
+            throw new IllegalArgumentException("Editor scheme ids must be unique");
+        if (requestedSchemes.equals(copy)) return;
+        requestedSchemes = copy;
+        events.add(() -> {
+            editorSchemes = copy;
+            for (var entry : workspaceHandlers) {
+                if (!entry.closed().get()) {
+                    try { entry.handler().accept(appearance.variant()); }
+                    catch (RuntimeException | LinkageError failure) { recordFailure(entry.pluginId() + " workspace appearance: " + failure); }
+                }
+            }
+        });
+    }
+
     /** Sets the opacity every component reports through {@code Appearance.workspaceOpacity} and announces it as a
      * workspace change on the next {@link #flush()} (no announcement when unchanged). Like the other workspace values,
      * components report the last flushed opacity until then.

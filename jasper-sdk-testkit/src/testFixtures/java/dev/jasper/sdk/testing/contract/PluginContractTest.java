@@ -724,6 +724,19 @@ public abstract class PluginContractTest {
         assertThat(h.status()).hasSize(1);
     }
 
+    @Test void editorSchemesAreUiThreadValuesWithUniqueIds() {
+        var a = started("test.schemes", Set.of()).appearance();
+        h.ui(() -> {
+            var schemes = a.editorSchemes();
+            assertThat(schemes).extracting(dev.jasper.sdk.ui.EditorScheme::id).doesNotHaveDuplicates();
+            for (var scheme : schemes)
+                assertThat(scheme.id()).endsWith(scheme.variant() == Variant.DARK ? "/dark" : "/light");
+            assertThatThrownBy(schemes::clear).as("unmodifiable").isInstanceOf(UnsupportedOperationException.class);
+        });
+        assertThatThrownBy(() -> java.util.concurrent.CompletableFuture.runAsync(a::editorSchemes).join())
+            .hasCauseInstanceOf(IllegalStateException.class);
+    }
+
     @Test void independentWorkspaceChangesExposeValuesInsideCallbacksAndRespectLifetime() {
         var context = started("test.workspace", Set.of());
         var a = context.appearance();
