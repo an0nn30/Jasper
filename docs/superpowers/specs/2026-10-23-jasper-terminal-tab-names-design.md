@@ -1,6 +1,6 @@
 # Jasper terminal tab names: a pattern setting and plugin pieces
 
-Status: **Draft, 2026-10-23.** Not yet approved by the user. Planned as two plans:
+Status: **Approved by the user on 2026-10-23** ("approved, write the plans"). Planned as two plans:
 - **A:** the pattern, the setting and its live preview (sections 3 to 5);
 - **B:** the plugin API and Remote's `{host}` (sections 6 and 7).
 
