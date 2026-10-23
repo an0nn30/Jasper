@@ -79,7 +79,8 @@ Open items, as the entries below record them:
   theirs. The workspace tabs series awaits the checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only
   tab, plans 7a to 8c, 6a, 6b, 9a and 9b; plan 2 had none), and so do its merge entries ("local main merged in",
   2026-10-19, the second sync, 2026-10-21, and the side branches with the third sync, 2026-10-22). One AOT training run
-  should confirm the seeded `workspace.toml` (2026-10-21).
+  should confirm the seeded `workspace.toml` (2026-10-21). Floating tool windows plan 1 awaits the checks its entry
+  lists (2026-10-23).
 - **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
   one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
   fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
@@ -185,14 +186,11 @@ Deferred, worth knowing:
   owner's Close Pane.
 - A detached tool window saved as showing whose window has not opened yet toggles to hidden on a click instead of
   raising; a plain `SHOW` or `TOGGLE` routed from a child window raises nothing for an open detached window.
-- View Mode › Docked under flush frames (Enterprise), replacing another docked window, still calls `focusSelected`
-  (`setMode`'s change has no shown ids), so the activation can be undone by the terminal's focus.
 - A window's title is fixed when it opens; a maximised Window reopens at its normal bounds; under Enterprise's classic
   title bar a Float on macOS gets IntelliJ Classic's band, not the system bar auxiliary dialogs keep; the unified bar's
-  controls follow the chrome's darkness (`NativeShells`' rule) where `mountChild` uses `TitleBarTheme`; `dispose` closes
-  the theme subscription, keys, bar and band in sequence, so an early throw would skip the rest; ⌘W resolves to Close
-  Pane, which hides the tool window before File › Close Window's item can fire.
-- `ToolWindowArea` is 930 lines and `DetachedToolWindowsTest` 882.
+  controls follow the chrome's darkness (`NativeShells`' rule) where `mountChild` uses `TitleBarTheme`; ⌘W resolves to
+  Close Pane, which hides the tool window before File › Close Window's item can fire.
+- `ToolWindowArea` is 930 lines and `DetachedToolWindowsTest` 1,020.
 
 Check: `./gradlew check --continue` (BUILD SUCCESSFUL in 18m 59s; `:jasper-buddy:test` and `checkThemeTool` were up to
 date): **12,946 tests, 0 failures, 0 errors, 29 skipped** (this run's XML holds 12,792; the up-to-date Buddy tests are

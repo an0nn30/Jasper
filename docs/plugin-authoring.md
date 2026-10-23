@@ -388,8 +388,9 @@ built-in names and the artwork rules.
 
 ## Tool windows
 
-A tool window is a view of the plugin's docked in the main window, the only window with tool windows, as in IntelliJ.
-Register it once with `context.panels().register(new PanelSpec(id, title, icon, Anchor.LEFT), factory)`. Jasper asks
+A tool window is a view of the plugin's in the main window's dock or, when the user gives it one (View Mode › Float or
+Window), in a window of its own, as in IntelliJ; a child window has none. Register it once with
+`context.panels().register(new PanelSpec(id, title, icon, Anchor.LEFT), factory)`. Jasper asks
 the factory for it on the UI thread the first time the tool window is shown (a toggle from a child window shows it in
 the main window), and again after the main window closed and opened anew; the factory returns a view made
 with the plugin's kit, and one that throws shows "This panel could not be loaded." Jasper adds:
