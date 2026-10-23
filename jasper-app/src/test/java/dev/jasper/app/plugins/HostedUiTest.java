@@ -644,11 +644,6 @@ class HostedUiTest {
         ui.closeAll();
     }
 
-    /**
-     * Workspace plan 8b Task 4 review: Terminal Right beside a content tab is audited once its window opened it, as
-     * {@code Terminals.split} is once its target resolves, and a split its window did not open (the final review) or a
-     * closed tab's is not; with no gate set, as before its context sets one, the split is refused before anything opens.
-     */
     /** Vim IdeaVim keys spec 4: a status item's icon resolves through the kit, and its menu's runs are contained. */
     @Test void contentStatusResolvesItsIconAndContainsItsMenuRuns() {
         UUID window = terminalFixture.addWindow();
@@ -678,6 +673,11 @@ class HostedUiTest {
             new dev.jasper.sdk.ui.ContentStatus("NORMAL", "Vim mode", null, "dev.x.tool:missing", false, List.of()))));
     }
 
+    /**
+     * Workspace plan 8b Task 4 review: Terminal Right beside a content tab is audited once its window opened it, as
+     * {@code Terminals.split} is once its target resolves, and a split its window did not open (the final review) or a
+     * closed tab's is not; with no gate set, as before its context sets one, the split is refused before anything opens.
+     */
     @Test void aContentTabsTerminalSplitIsAuditedOnlyWhenItOpens() {
         UUID window = terminalFixture.addWindow();
         List<String> heard = new ArrayList<>();

@@ -168,6 +168,22 @@ class WindowStatusBarContributionsTest {
         } finally { ThemeTestSupport.controller(true); }
     }
 
+    /** A content item's menu opens as the kit's menu buttons do: aligned to the item's nearer edge, kept in the window. */
+    @Test void aContentItemsMenuAlignsToItsNearerEdgeAndStaysInTheWindow() {
+        var window = new java.awt.Rectangle(0, 0, 1000, 600);
+        var menu = new java.awt.Dimension(200, 120);
+        assertThat(WindowStatusBar.menuPoint(new java.awt.Rectangle(100, 580, 60, 20), menu, window))
+            .as("left half, bottom edge: left-aligned, above").isEqualTo(new java.awt.Point(100, 460));
+        assertThat(WindowStatusBar.menuPoint(new java.awt.Rectangle(900, 580, 80, 20), menu, window))
+            .as("right half: right-aligned").isEqualTo(new java.awt.Point(780, 460));
+        assertThat(WindowStatusBar.menuPoint(new java.awt.Rectangle(100, 100, 60, 20), menu, window))
+            .as("room below: below").isEqualTo(new java.awt.Point(100, 120));
+        assertThat(WindowStatusBar.menuPoint(new java.awt.Rectangle(960, 0, 300, 20), menu, window))
+            .as("clamped to the window").isEqualTo(new java.awt.Point(800, 20));
+        assertThat(WindowStatusBar.menuPoint(new java.awt.Rectangle(10, 50, 20, 20), new java.awt.Dimension(200, 700), window))
+            .as("taller than the window: clamped to its top").isEqualTo(new java.awt.Point(10, 0));
+    }
+
     @Test void theConfigurationSegmentKeepsItsFullWidthWhenSpaceIsTight() {
         var model = new Contributions();
         for (int i = 0; i < 6; i++) model.addStatus("dev.x.item" + i, i % 2 == 0, i).setText("A fairly long status item " + i);

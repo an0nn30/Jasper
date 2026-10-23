@@ -1250,8 +1250,8 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
   panel lives as long as the plugin, so Settings calls `reset` before `dispose` whenever it closes a page without a
   successful Apply, as on Cancel. Compose the page as the generated ones are
   ([Building plugin UI](plugin-ui.md#settings-pages)); the Sample's `SampleSettingsPanel` is a complete example.
-- **Opening Settings.** `context.settings().show()` opens Settings at the plugin's page over the active window, from
-  the UI thread, as a status item's menu does with "Settings…".
+- **Opening Settings.** [`context.settings().show()`](sdk-reference.html#dev.jasper.sdk.settings.PluginSettings.show())
+  opens Settings at the plugin's page over the active window; UI thread.
 - Keep state that is not a setting under `context.dataDirectory()`.
 
 ## Services and other plugins' APIs

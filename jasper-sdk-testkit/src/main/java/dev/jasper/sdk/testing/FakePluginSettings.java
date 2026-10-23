@@ -28,7 +28,7 @@ final class FakePluginSettings implements PluginSettings {
     }
     private boolean open = true;
     private volatile boolean closed;
-    private int shown;
+    private final java.util.concurrent.atomic.AtomicInteger shown = new java.util.concurrent.atomic.AtomicInteger();
     private dev.jasper.sdk.settings.SettingsPanel panel;
 
     FakePluginSettings(FakePluginHost host, String pluginId, Path file) {
@@ -71,11 +71,11 @@ final class FakePluginSettings implements PluginSettings {
     @Override public void show() {
         if (closed) throw new IllegalStateException("Plugin context is closed: " + pluginId);
         if (!java.awt.EventQueue.isDispatchThread()) throw new IllegalStateException("Settings.show must be called on the UI thread: " + pluginId);
-        shown++;
+        shown.incrementAndGet();
     }
 
     /** How often the plugin opened Settings at its page. */
-    int shown() { return shown; }
+    int shown() { return shown.get(); }
 
     java.util.Optional<dev.jasper.sdk.settings.SettingsPanel> panel() {
         return java.util.Optional.ofNullable(panel);

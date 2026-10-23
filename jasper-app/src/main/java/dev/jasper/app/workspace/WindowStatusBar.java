@@ -142,16 +142,31 @@ final class WindowStatusBar extends JPanel {
     private static final String DIMMED = "Jasper.status.dimmed";
 
     /**
-     * How a content item shows its menu, as the kit places a menu button's: below the item, or above it when the window
-     * has no room below. A headless test, where nothing shows, records what a click would show instead.
+     * How a content item shows its menu, at {@link #menuPoint} in its root pane. A headless test, where nothing shows,
+     * records what a click would show instead.
      */
     java.util.function.BiConsumer<JComponent, JPopupMenu> contentMenuPopup = (invoker, menu) -> {
         if (!invoker.isShowing()) return;
-        int height = menu.getPreferredSize().height;
         var root = SwingUtilities.getRootPane(invoker);
-        boolean above = root != null && SwingUtilities.convertPoint(invoker, 0, invoker.getHeight(), root).y + height > root.getHeight();
-        menu.show(invoker, 0, above ? -height : invoker.getHeight());
+        if (root == null) { menu.show(invoker, 0, invoker.getHeight()); return; }
+        Rectangle anchor = SwingUtilities.convertRectangle(invoker.getParent(), invoker.getBounds(), root);
+        Point at = SwingUtilities.convertPoint(root, menuPoint(anchor, menu.getPreferredSize(), new Rectangle(0, 0, root.getWidth(), root.getHeight())), invoker);
+        menu.show(invoker, at.x, at.y);
     };
+
+    /**
+     * Where a menu of {@code menu}'s size opens for {@code anchor}, as the kit places a menu button's: right-aligned
+     * with an anchor right of the centre, else left-aligned; below it, or above when there is no room below; kept inside
+     * {@code available}.
+     */
+    static Point menuPoint(Rectangle anchor, Dimension menu, Rectangle available) {
+        boolean right = anchor.getCenterX() > available.getCenterX();
+        int x = right ? anchor.x + anchor.width - menu.width : anchor.x, y = anchor.y + anchor.height;
+        if (y + menu.height > available.y + available.height) y = anchor.y - menu.height;
+        x = Math.max(available.x, Math.min(x, available.x + available.width - menu.width));
+        y = Math.max(available.y, Math.min(y, available.y + available.height - menu.height));
+        return new Point(x, y);
+    }
 
     /** A content item's menu in the themed popup the window's other menus use. */
     private static JPopupMenu contentMenu(List<dev.jasper.app.contributions.ContentStatus.MenuEntry> entries) {
