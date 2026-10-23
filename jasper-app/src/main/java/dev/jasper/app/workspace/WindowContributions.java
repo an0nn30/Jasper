@@ -512,10 +512,19 @@ final class WindowContributions implements AutoCloseable {
         }
     }
 
-    /** Panel content that is not showing is outside the window's component tree and must be updated by hand. */
+    /**
+     * Panel content outside every window's component tree must be updated by hand: a hidden panel's, and a shown detached
+     * one's whose own window has not opened (no shells yet, or the main window not showing). A docked panel that shows is
+     * updated with this window, and a detached one in its own window with that window ({@link DetachedFrame}).
+     */
     void refreshTheme() {
-        for (PanelInstance panel : panels.values())
-            if (panel.component != null && !dock.visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
+        for (PanelInstance panel : panels.values()) {
+            JComponent component = panel.component;
+            if (component == null) continue;
+            boolean outside = !dock.visible(panel.entry.id())
+                || !SwingUtilities.isDescendingFrom(component, owner) && SwingUtilities.getWindowAncestor(component) == null;
+            if (outside) SwingUtilities.updateComponentTreeUI(component);
+        }
     }
 
     private void changed(Contributions.Kind kind) {

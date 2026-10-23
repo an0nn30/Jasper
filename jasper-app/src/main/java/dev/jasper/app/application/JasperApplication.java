@@ -37,6 +37,7 @@ import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.startup.WindowTrace;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.windows.NativeShells;
+import dev.jasper.app.workspace.DetachedFrame;
 import dev.jasper.app.workspace.JasperWindow;
 import dev.jasper.app.workspace.MainWindow;
 import dev.jasper.app.workspace.TerminalPane;
@@ -190,6 +191,11 @@ public final class JasperApplication {
     private final dev.jasper.app.contributions.Contributions contributions = new dev.jasper.app.contributions.Contributions();
     /** Test seam: how a window's native frame is made. Production builds a {@link WindowFrame}. Before the manager, which reads it. */
     Function<JasperWindow, WindowShell> frames = this::frameOnScreen;
+    /**
+     * Test seam: whether the main window's detached tool windows get native windows ({@link DetachedFrame}): only where
+     * windows can be made, as nothing native is made headless.
+     */
+    boolean nativeToolWindows = !GraphicsEnvironment.isHeadless();
     /**
      * Every window: the main window and the child windows (workspace tabs spec 6.1). EDT. Its closing hooks are empty: no
      * frame keeps where its window was, the window does (workspace plan 6a Rulings 7 and 10).
@@ -563,6 +569,8 @@ public final class JasperApplication {
             boolean main = opening.role() == WindowRole.MAIN;
             // A child window has no dock or Zen of its own: its layout state is never saved (workspace tabs spec 6.3).
             content.connectContributions(contributions, main ? uiState : UiState.inMemory());
+            // The main window's Float and Window tool windows open native windows of their own (floating tool windows spec).
+            if (main && nativeToolWindows) content.detachedShells(DetachedFrame.shells(themes, windowLook()));
             if (WINDOWS) content.onManageCygwinPackages = cygwin::manage;
             UUID windowId = content.id();
             content.onError = (title, details) -> notificationViews.error(title, details, windowId);

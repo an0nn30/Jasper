@@ -135,7 +135,7 @@ public final class WindowFrame {
     }
 
     /** Whether macOS shows this process's menus in the screen menu bar, as the look committed before AWT started. */
-    private static boolean screenMenuBar() {
+    static boolean screenMenuBar() {
         return SystemInfo.isMacOS && Boolean.getBoolean("apple.laf.useScreenMenuBar");
     }
 

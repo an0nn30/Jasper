@@ -444,6 +444,38 @@ class DetachedToolWindowsTest {
         });
     }
 
+    /** A label that counts its look-and-feel updates. */
+    private static final class CountedLabel extends JLabel {
+        int updates;
+
+        CountedLabel(String text) { super(text); }
+
+        @Override public void updateUI() { super.updateUI(); updates++; }
+    }
+
+    /**
+     * Task 8: a theme change reaches a shown detached tool window whose own window has not opened (no shells yet, or the
+     * main window not showing), which is in no window's component tree; a docked one that shows is updated with its window,
+     * once.
+     */
+    @Test void aShownDetachedToolWindowWithoutItsWindowFollowsTheTheme() throws Exception {
+        edt(() -> {
+            var view = new CountedLabel("alpha");
+            var fixture = new Fixture(UiState.inMemory(), view, false);
+            fixture.toggle();
+            boolean dark = fixture.owner.theme().chrome().dark();
+            int before = view.updates;
+            fixture.owner.selectVariant(!dark);
+            assertThat(view.updates).as("docked and shown, it is updated with its window, once").isEqualTo(before + 1);
+
+            fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
+            assertThat(fixture.windows().showing(A)).isFalse();
+            before = view.updates;
+            fixture.owner.selectVariant(dark);
+            assertThat(view.updates).as("shown detached, with no window of its own yet").isEqualTo(before + 1);
+        });
+    }
+
     @Test void shellsGivenBeforeContributionsConnectAreUsedAndAChildWindowHasNone() throws Exception {
         edt(() -> {
             var shells = new Shells();

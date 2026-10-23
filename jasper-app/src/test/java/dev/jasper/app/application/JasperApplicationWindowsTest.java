@@ -70,6 +70,32 @@ class JasperApplicationWindowsTest {
     }
 
     /**
+     * Floating tool windows plan 1 Task 8: the main window's detached tool windows get native windows only where windows
+     * can be made; headless they get none and wait, and a child window has no detached tool windows.
+     */
+    @Test void onlyTheMainWindowsDetachedToolWindowsGetNativeWindowsAndNoneHeadless() throws Exception {
+        JasperApplication application = application(() -> { });
+        try {
+            edt(() -> {
+                application.residency(true);
+                application.open(List.of(), JasperApplication.HANDOFF);
+                assertThat(DesktopTestSupport.detachedShells(application.windows().main().orElseThrow().content()))
+                    .as("headless, nothing native is made").isFalse();
+                application.windows().closeAll();
+                application.nativeToolWindows = true;
+                application.open(List.of(), JasperApplication.HANDOFF);
+                assertThat(DesktopTestSupport.detachedShells(application.windows().main().orElseThrow().content()))
+                    .as("where windows can be made, the main window's detached tool windows get them").isTrue();
+                application.windows().openTerminalWindow(null);
+                JasperWindow child = application.windows().windows().stream().filter(window -> !window.isMain()).findFirst().orElseThrow();
+                assertThat(DesktopTestSupport.detachedShells(child.content())).as("a child window docks nothing").isFalse();
+            });
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    /**
      * Workspace tabs spec 6.1, one main window per process: the main window, its manager and the native frames are made
      * only where the application says, each with an explicit {@code new} (a constructor reference would hide the site).
      * {@code verifyApplicationArchitecture} checks the same with javap.

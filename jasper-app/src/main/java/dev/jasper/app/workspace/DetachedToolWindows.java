@@ -28,14 +28,18 @@ import javax.swing.SwingUtilities;
  * The main window's detached tool windows' own windows (floating tool windows spec, The detached window): one native
  * window per shown detached tool window that has a frame in the window's {@link ToolWindowArea}, opened, moved, reopened
  * in its other mode and disposed so that they match the area after each dock change ({@link #sync}). The native windows
- * are {@link Shell}s that {@link #shells} makes, as {@link WindowShell} is for workspace windows; without shells (headless)
- * or before the main window shows ({@link #ready}) windows wait, and open on the next sync. A window opens at the bounds
- * its tool window has in the dock, kept on today's displays by {@link WindowPlacement#restore}'s rule, and reports moves
- * back to the dock, which saves them with its next change. EDT only.
+ * are {@link Shell}s that {@link #shells} makes ({@link DetachedFrame} in the application), as {@link WindowShell} is
+ * for workspace windows; without shells (headless) or before the main window shows ({@link #ready}) windows wait, and
+ * open on the next sync. A window opens at the bounds its tool window has in the dock, kept on today's displays by
+ * {@link WindowPlacement#restore}'s rule, and reports moves back to the dock, which saves them with its next change. EDT
+ * only.
  */
 final class DetachedToolWindows implements AutoCloseable {
     /** The smallest size a detached tool window's window opens at, in logical pixels. */
     private static final int MINIMUM_WIDTH = 240, MINIMUM_HEIGHT = 160;
+
+    /** The smallest size of a detached tool window's window, scaled: it opens at least this large and never shrinks below it. */
+    static Dimension minimumSize() { return new Dimension(UIScale.scale(MINIMUM_WIDTH), UIScale.scale(MINIMUM_HEIGHT)); }
 
     /**
      * What a detached tool window's native window opens with.
@@ -207,9 +211,8 @@ final class DetachedToolWindows implements AutoCloseable {
     /** Opens the tool window's window at its dock bounds (or its first ones) on today's displays, which the dock keeps. */
     private void open(String id, JComponent frame) {
         Rectangle bounds = dock.bounds(id).orElseGet(() -> initialBounds(id));
-        Dimension minimum = new Dimension(UIScale.scale(MINIMUM_WIDTH), UIScale.scale(MINIMUM_HEIGHT));
         bounds = new WindowPlacement(Optional.of(new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height)), Frame.NORMAL)
-            .restore(minimum, displays.get()).orElse(bounds);
+            .restore(minimumSize(), displays.get()).orElse(bounds);
         dock.setBounds(id, bounds);
         var window = new Open(dock.mode(id), frame, bounds);
         var events = new Events(() -> { if (open.get(id) == window) hide.accept(id); }, moved -> {
