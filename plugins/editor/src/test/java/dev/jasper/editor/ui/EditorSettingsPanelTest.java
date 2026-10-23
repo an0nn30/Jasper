@@ -64,7 +64,8 @@ class EditorSettingsPanelTest {
         FakeKitView view = page(Map.of());
         var page = (Nodes.Stack) view.spec().root();
         assertThat(page.role()).isEqualTo(Nodes.LayoutRole.SETTINGS_PAGE);
-        assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title()).containsExactly("Font", "Editing", "Markdown", "Files", "Default editor");
+        assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title()).containsExactly("Font", "Colors", "Editing", "Markdown", "Files", "Default editor");
+        assertThat(rows(view, EditorSettingsPanel.COLORS)).containsExactly(EditorSettingsPanel.SCHEME + ":row");
         assertThat(rows(view, EditorSettingsPanel.FONT)).containsExactly("settings:follow_terminal_font:row", "settings:font_family:row", "settings:font_size:row",
             "settings:font_fallback:row", "settings:font_ligatures:row", "settings:font_line_height:row");
         assertThat(rows(view, EditorSettingsPanel.EDITING)).containsExactly("settings:tab_size:row", "settings:soft_wrap:row", "settings:vim:row");
@@ -72,7 +73,7 @@ class EditorSettingsPanelTest {
         assertThat(rows(view, EditorSettingsPanel.FILES)).containsExactly("settings:max_file_mib:row", "settings:recent_files_days:row");
         assertThat(rows(view, EditorSettingsPanel.DEFAULT))
             .containsExactly(EditorSettingsPanel.CHOICE + ":row", "settings:keep_environment_editor:row", EditorSettingsPanel.ENVIRONMENT);
-        for (String section : List.of(EditorSettingsPanel.FONT, EditorSettingsPanel.EDITING, EditorSettingsPanel.MARKDOWN, EditorSettingsPanel.FILES, EditorSettingsPanel.DEFAULT))
+        for (String section : List.of(EditorSettingsPanel.FONT, EditorSettingsPanel.COLORS, EditorSettingsPanel.EDITING, EditorSettingsPanel.MARKDOWN, EditorSettingsPanel.FILES, EditorSettingsPanel.DEFAULT))
             assertThat(node(view, section + ".card", Nodes.Card.class).kind()).as(section).isEqualTo(Nodes.CardKind.SETTINGS);
         assertThat(node(view, "settings:font_family", Nodes.Choice.class).kind()).as("the font picker, as on the generated page")
             .isEqualTo(Nodes.ChoiceKind.SEARCHABLE);
@@ -129,6 +130,43 @@ class EditorSettingsPanelTest {
         view.emit(new UiEvent.Action(EditorSettingsPanel.CHOICE + ":reset"));
         assertThat(choice(view).selectedId()).as("Reset").isEqualTo("jasper");
         assertThat(host.failures()).isEmpty();
+    }
+
+    @Test void colorSchemeDropdownListsWorkspaceThenEverySchemeVariant() {
+        host.setEditorSchemes(List.of(scheme("ash/dark", "Ash", dev.jasper.sdk.Variant.DARK), scheme("ash/light", "Ash", dev.jasper.sdk.Variant.LIGHT),
+            scheme("birch/light", "Birch", dev.jasper.sdk.Variant.LIGHT)));
+        host.flush();
+        FakeKitView view = page(Map.of());
+        var dropdown = node(view, EditorSettingsPanel.SCHEME, Nodes.Choice.class);
+        assertThat(dropdown.kind()).isEqualTo(Nodes.ChoiceKind.DROPDOWN);
+        assertThat(dropdown.options().stream().map(option -> option.id() + "=" + option.label()).toList()).containsExactly(
+            "workspace=Follow Workspace Scheme", "ash/dark=Ash (Dark)", "ash/light=Ash (Light)", "birch/light=Birch (Light)");
+        assertThat(dropdown.selectedId()).isEqualTo("workspace");
+        assertThat(node(view, EditorSettingsPanel.SCHEME + ":row", Nodes.SettingRow.class).title()).isEqualTo("Color scheme");
+        view.emit(new UiEvent.Selected(EditorSettingsPanel.SCHEME, Set.of("ash/light")));
+        assertThat(host.pendingSettings(ID)).containsEntry("color_scheme", "ash/light");
+        assertThat(node(view, EditorSettingsPanel.SCHEME, Nodes.Choice.class).selectedId()).isEqualTo("ash/light");
+        view.emit(new UiEvent.Action(EditorSettingsPanel.SCHEME + ":reset"));
+        assertThat(host.pendingSettings(ID)).doesNotContainKey("color_scheme");
+        assertThat(node(view, EditorSettingsPanel.SCHEME, Nodes.Choice.class).selectedId()).as("Reset").isEqualTo("workspace");
+        assertThat(host.failures()).isEmpty();
+    }
+
+    @Test void aSavedSchemeThatIsNotInstalledIsListedAsNotFound() {
+        host.setSetting(ID, "color_scheme", "gone/dark");
+        FakeKitView view = page(Map.of());
+        var dropdown = node(view, EditorSettingsPanel.SCHEME, Nodes.Choice.class);
+        assertThat(dropdown.options().stream().map(option -> option.id() + "=" + option.label()).toList())
+            .containsExactly("workspace=Follow Workspace Scheme", "gone/dark=gone/dark (not found)");
+        assertThat(dropdown.selectedId()).isEqualTo("gone/dark");
+    }
+
+    private static dev.jasper.sdk.ui.EditorScheme scheme(String id, String name, dev.jasper.sdk.Variant variant) {
+        var color = java.awt.Color.DARK_GRAY;
+        var styles = new java.util.EnumMap<dev.jasper.sdk.ui.SyntaxRole, dev.jasper.sdk.ui.SyntaxStyle>(dev.jasper.sdk.ui.SyntaxRole.class);
+        for (var role : dev.jasper.sdk.ui.SyntaxRole.values()) styles.put(role, new dev.jasper.sdk.ui.SyntaxStyle(color, false, false));
+        return new dev.jasper.sdk.ui.EditorScheme(id, name, variant, new dev.jasper.sdk.ui.EditorPalette(color, color, color, color, color, color, color),
+            new dev.jasper.sdk.ui.SyntaxPalette(styles));
     }
 
     @Test void theNoticeSaysWhatJaspersEnvironmentHolds() {

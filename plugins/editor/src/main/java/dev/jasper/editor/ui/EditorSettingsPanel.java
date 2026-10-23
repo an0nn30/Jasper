@@ -24,14 +24,15 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The Editor's page in Settings > Tools > Editor: Font, Editing, Markdown and Files as Settings' standard rows, grouped as the
- * generated page grouped them, then Default editor: a dropdown of the Jasper Editor, the editors detection found, the
+ * The Editor's page in Settings > Tools > Editor: Font, Colors (a dropdown of the workspace's editor scheme and every installed
+ * scheme), Editing, Markdown and Files as Settings' standard rows, grouped as the generated page grouped them, then Default editor: a dropdown of the Jasper Editor, the editors detection found, the
  * system's default app and a custom command, the custom command's rows while it is chosen, and what Jasper's own
  * environment holds for {@code EDITOR} and {@code VISUAL}. Detection runs again each time the page opens, and the page
  * follows it. UI thread.
  */
 public final class EditorSettingsPanel implements SettingsPanel {
-    static final String PAGE = "editor.settings", FONT = "editor.settings.font", EDITING = "editor.settings.editing",
+    static final String PAGE = "editor.settings", FONT = "editor.settings.font", COLORS = "editor.settings.colors",
+        SCHEME = "editor.color-scheme", EDITING = "editor.settings.editing",
         MARKDOWN = "editor.settings.markdown", FILES = "editor.settings.files", DEFAULT = "editor.settings.default", CHOICE = "editor.default-editor",
         COMMAND = "editor.custom-command", ENVIRONMENT = "editor.environment";
     /** The note under what Jasper's environment holds. */
@@ -48,6 +49,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
     private UiView view;
     private Subscription detecting = () -> { };
     private Subscription typography = () -> { };
+    private Subscription schemes = () -> { };
     private String query = "";
 
     /**
@@ -70,6 +72,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
         view = kit.create(new ViewSpec(node()), this::event);
         detecting = defaults.onDetected(this::render);
         typography = appearance.onTerminalTypographyChanged(value -> render());
+        schemes = appearance.onWorkspaceChanged(value -> render());
         defaults.detect();
         return view;
     }
@@ -88,6 +91,8 @@ public final class EditorSettingsPanel implements SettingsPanel {
     @Override public void dispose() {
         typography.close();
         typography = () -> { };
+        schemes.close();
+        schemes = () -> { };
         detecting.close();
         detecting = () -> { };
         view = null;
@@ -97,6 +102,9 @@ public final class EditorSettingsPanel implements SettingsPanel {
     private void event(UiEvent event) {
         if (view == null) return;
         switch (event) {
+            case UiEvent.Selected selected when selected.id().equals(SCHEME) ->
+                selected.ids().stream().findFirst().ifPresent(id -> stage(settings.colorScheme, id));
+            case UiEvent.Action action when action.id().equals(SCHEME + ":reset") -> stage(settings.colorScheme, EditorSettings.Declared.WORKSPACE);
             case UiEvent.Selected selected when selected.id().equals(CHOICE) ->
                 selected.ids().stream().findFirst().ifPresent(id -> stage(settings.defaultEditor, id));
             case UiEvent.Action action when action.id().equals(CHOICE + ":reset") -> stage(settings.defaultEditor, EditorSettings.Declared.JASPER);
@@ -126,6 +134,7 @@ public final class EditorSettingsPanel implements SettingsPanel {
         defaultEditor.add(environmentRow());
         return new Nodes.Stack(PAGE, ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, List.of(
             section(FONT, "Font", fontRows()),
+            section(COLORS, "Colors", List.of(schemeRow(host.pending(settings.colorScheme)))),
             section(EDITING, "Editing", List.of(host.row(settings.tabSize), host.row(settings.softWrap), host.row(settings.vim))),
             section(MARKDOWN, "Markdown", List.of(host.row(settings.markdownViewMode))),
             section(FILES, "Files", List.of(host.row(settings.maxFileMib), host.row(settings.recentFilesDays))),
@@ -166,6 +175,21 @@ public final class EditorSettingsPanel implements SettingsPanel {
 
     private static String number(double value) {
         return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
+    }
+
+    /** The color scheme dropdown: the workspace's, then each installed scheme; a saved scheme not installed is its own option, "(not found)". */
+    private Nodes.SettingRow schemeRow(String chosen) {
+        var options = new ArrayList<Option>();
+        options.add(new Option(EditorSettings.Declared.WORKSPACE, "Follow Workspace Scheme", Optional.empty()));
+        var installed = appearance.editorSchemes();
+        for (var scheme : installed)
+            options.add(new Option(scheme.id(), scheme.name() + (scheme.variant() == dev.jasper.sdk.Variant.DARK ? " (Dark)" : " (Light)"), Optional.empty()));
+        if (!chosen.equals(EditorSettings.Declared.WORKSPACE) && EditorSettings.scheme(installed, chosen).isEmpty())
+            options.add(new Option(chosen, chosen + " (not found)", Optional.empty()));
+        var choice = new Nodes.Choice(SCHEME, ControlState.READY, Nodes.ChoiceKind.DROPDOWN, options, chosen,
+            EditorSettings.Declared.SCHEME_LABEL, SCHEME);
+        return row(SCHEME, EditorSettings.Declared.SCHEME_LABEL, EditorSettings.Declared.SCHEME_DESCRIPTION, choice,
+            !chosen.equals(EditorSettings.Declared.WORKSPACE), false);
     }
 
     /** The dropdown; a saved editor detection did not find is its own option, "(not found)". */

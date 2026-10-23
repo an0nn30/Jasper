@@ -15,6 +15,11 @@
 # Follow saved terminal typography across windows, preserving the independent values above.
 # follow_terminal_font = false
 
+# The Editor's colours: workspace (the editor scheme of the theme the workspace shows, Dark or Light), or one
+# installed theme's scheme whatever the appearance, as <theme id>/dark or <theme id>/light, such as
+# "catppuccin-mocha/dark". A scheme that is not installed shows the workspace's.
+# color_scheme = "workspace"
+
 # Initial mode for new Markdown tabs: source, split, preview. Explicit toolbar choices update this value.
 # markdown_view_mode = "source"
 

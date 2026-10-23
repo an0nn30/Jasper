@@ -752,6 +752,90 @@ class EditorPluginTest {
         }
     }
 
+    /** The Color scheme setting's palettes: every colour distinct from the fake workspace's. */
+    private static dev.jasper.sdk.ui.EditorScheme ember() {
+        var styles = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
+        for (var role : SyntaxRole.values()) styles.put(role, new SyntaxStyle(new Color(0x551100 + role.ordinal()), false, false));
+        return new dev.jasper.sdk.ui.EditorScheme("ember/light", "Ember", dev.jasper.sdk.Variant.LIGHT, new EditorPalette(new Color(0xfff4e8),
+            new Color(0x301000), new Color(0x902000), new Color(0xf0c090), new Color(0xfae6d0), new Color(0xf6ead8), new Color(0x806040)),
+            new SyntaxPalette(styles));
+    }
+
+    /** Opens a JSON file in the Editor and returns its text area, the consumer's context in {@code consumer}. */
+    private RSyntaxTextArea openArea(FakePluginHost host, EditorPlugin plugin, AtomicReference<PluginContext> consumer) throws Exception {
+        host.start(INFO, Set.of(), Set.of(), plugin);
+        host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+        consumer.get().services().require(Editor.class).open(Files.writeString(home.resolve("a.json"), "{\"a\": true}\n"));
+        while (host.runBackground() > 0) { }
+        var windowField = EditorPlugin.class.getDeclaredField("window"); windowField.setAccessible(true);
+        return ((EditorWindow) windowField.get(plugin)).selected().orElseThrow().area();
+    }
+
+    @Test void fixedSchemeIgnoresTheWorkspace() throws Exception {
+        try (var host = host()) {
+            var scheme = ember();
+            host.setEditorSchemes(List.of(scheme));
+            host.flush();
+            host.setSetting("dev.jasper.editor", "color_scheme", "ember/light");
+            var consumer = new AtomicReference<PluginContext>();
+            RSyntaxTextArea area = openArea(host, plugin(), consumer);
+            assertThat(area.getBackground()).isEqualTo(scheme.editor().background());
+            assertThat(area.getSyntaxScheme().getStyle(TokenTypes.RESERVED_WORD).foreground).isEqualTo(scheme.syntax().style(SyntaxRole.KEYWORD).color());
+            var appearance = consumer.get().appearance();
+            var other = new EditorPalette(new Color(0x101010), Color.WHITE, Color.YELLOW, Color.BLUE, Color.GRAY, Color.BLACK, Color.LIGHT_GRAY);
+            host.setWorkspace(dev.jasper.sdk.Variant.DARK, appearance.workspacePalette(), other, appearance.syntaxPalette());
+            host.flush();
+            assertThat(area.getBackground()).as("a Dark workspace change").isEqualTo(scheme.editor().background());
+        }
+    }
+
+    @Test void missingSchemeFallsBackToWorkspace() throws Exception {
+        try (var host = host()) {
+            var scheme = ember();
+            host.setEditorSchemes(List.of(scheme));
+            host.flush();
+            host.setSetting("dev.jasper.editor", "color_scheme", "ember/light");
+            var consumer = new AtomicReference<PluginContext>();
+            RSyntaxTextArea area = openArea(host, plugin(), consumer);
+            host.setEditorSchemes(List.of());
+            host.flush();
+            assertThat(area.getBackground()).as("the theme was removed").isEqualTo(consumer.get().appearance().editorPalette().background());
+        }
+    }
+
+    @Test void settingChangeReappliesScheme() throws Exception {
+        try (var host = host()) {
+            var scheme = ember();
+            host.setEditorSchemes(List.of(scheme));
+            host.flush();
+            var consumer = new AtomicReference<PluginContext>();
+            RSyntaxTextArea area = openArea(host, plugin(), consumer);
+            var workspace = consumer.get().appearance().editorPalette().background();
+            assertThat(area.getBackground()).isEqualTo(workspace);
+            host.setSetting("dev.jasper.editor", "color_scheme", "ember/light");
+            host.flush();
+            assertThat(area.getBackground()).isEqualTo(scheme.editor().background());
+            host.setSetting("dev.jasper.editor", "color_scheme", "workspace");
+            host.flush();
+            assertThat(area.getBackground()).isEqualTo(workspace);
+        }
+    }
+
+    @Test void fixedSchemeAppliesToGlass() throws Exception {
+        try (var host = host()) {
+            var scheme = ember();
+            host.setEditorSchemes(List.of(scheme));
+            host.flush();
+            host.setSetting("dev.jasper.editor", "color_scheme", "ember/light");
+            RSyntaxTextArea area = openArea(host, plugin(), new AtomicReference<>());
+            host.setWorkspaceOpacity(0.5);
+            host.flush();
+            var line = area.getCurrentLineHighlightColor();
+            assertThat(line.getRGB() & 0xffffff).isEqualTo(scheme.editor().currentLine().getRGB() & 0xffffff);
+            assertThat(line.getAlpha()).isEqualTo(128);
+        }
+    }
+
     @Test void savedTerminalTypographyFollowsAcrossTabsWithoutSavingIndependentSettingsAndStopsOnShutdown() throws Exception {
         try (var host = host()) {
             var reads = new java.util.concurrent.atomic.AtomicInteger();

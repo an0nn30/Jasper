@@ -235,7 +235,9 @@ final class DocumentArea extends JComponent implements AutoCloseable {
 
     private void refreshAppearance() {
         if (!closed && appearance != null && settings != null)
-            { apply(settings, theme, appearance.editorPalette(), appearance.syntaxPalette(), appearance.workspaceOpacity(this));
+            { var chosen = EditorSettings.scheme(appearance.editorSchemes(), settings.colorScheme());
+                apply(settings, theme, chosen.map(dev.jasper.sdk.ui.EditorScheme::editor).orElseGet(appearance::editorPalette),
+                    chosen.map(dev.jasper.sdk.ui.EditorScheme::syntax).orElseGet(appearance::syntaxPalette), appearance.workspaceOpacity(this));
                 if(typography!=null)previewStyle(typography,appearance.workspacePalette(),appearance.syntaxPalette()); }
     }
 

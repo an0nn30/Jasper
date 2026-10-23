@@ -6,6 +6,7 @@ import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.SettingSpec;
+import dev.jasper.sdk.ui.EditorScheme;
 import java.awt.Font;
 import java.util.List;
 import java.util.Set;
@@ -24,10 +25,30 @@ import java.util.concurrent.CompletableFuture;
  * @param softWrap whether new tabs wrap long lines
  * @param maxFileMib the largest file opened, 1 to 256 MiB
  * @param vim whether Vim mode is on (Vim spec 9)
+ * @param colorScheme {@code workspace} or an installed editor scheme's id, {@code <theme id>/dark} or {@code <theme id>/light}
  */
 public record EditorSettings(String fontFamily, double fontSize, List<String> fontFallback, boolean fontLigatures,
-                             double fontLineHeight, boolean followTerminalFont, int tabSize, boolean softWrap, int maxFileMib, boolean vim) {
-    public EditorSettings { fontFallback = List.copyOf(fontFallback); }
+                             double fontLineHeight, boolean followTerminalFont, int tabSize, boolean softWrap, int maxFileMib, boolean vim,
+                             String colorScheme) {
+    public EditorSettings { fontFallback = List.copyOf(fontFallback); java.util.Objects.requireNonNull(colorScheme, "colorScheme"); }
+
+    /** Settings that follow the workspace's editor scheme. */
+    public EditorSettings(String fontFamily, double fontSize, List<String> fontFallback, boolean fontLigatures, double fontLineHeight,
+                          boolean followTerminalFont, int tabSize, boolean softWrap, int maxFileMib, boolean vim) {
+        this(fontFamily, fontSize, fontFallback, fontLigatures, fontLineHeight, followTerminalFont, tabSize, softWrap, maxFileMib, vim,
+            Declared.WORKSPACE);
+    }
+
+    /**
+     * The installed scheme {@code chosen} names.
+     *
+     * @param installed the installed editor schemes ({@link dev.jasper.sdk.ui.Appearance#editorSchemes()})
+     * @param chosen {@link #colorScheme()}
+     * @return the scheme, or empty for {@code workspace} and for a scheme that is not installed: the workspace's then applies
+     */
+    public static java.util.Optional<EditorScheme> scheme(List<EditorScheme> installed, String chosen) {
+        return installed.stream().filter(scheme -> scheme.id().equals(chosen)).findFirst();
+    }
 
     /** Tried in order for the default font. */
     public static final List<String> PREFERRED_FONTS = List.of("JetBrains Mono", "Menlo", "Consolas", "DejaVu Sans Mono");
@@ -47,9 +68,17 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
         final Setting<Double> fontSize, fontLineHeight;
         final Setting<List<String>> fontFallback;
         final Setting<Boolean> fontLigatures, followTerminalFont;
+        final Setting<String> colorScheme;
         final Setting<Boolean> softWrap, vim;
         final Setting<String> defaultEditor, customCommand;
         final Setting<Boolean> customInTerminal, keepEnvironmentEditor;
+
+        /** {@code color_scheme}'s default: the workspace's editor scheme. */
+        public static final String WORKSPACE = "workspace";
+        static final String SCHEME_LABEL = "Color scheme";
+        static final String SCHEME_DESCRIPTION = "The Editor's colors: the workspace's editor scheme, or one theme's Dark or Light scheme "
+            + "whatever the appearance.";
+        private static final java.util.regex.Pattern SCHEME = java.util.regex.Pattern.compile("[a-z0-9]+(-[a-z0-9]+)*/(dark|light)");
 
         /** {@code default_editor}'s default: the Jasper Editor. */
         static final String JASPER = "jasper";
@@ -85,6 +114,11 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
             followTerminalFont = settings.declare(SettingSpec.of("follow_terminal_font", SettingKind.bool(), false)
                 .label("Follow terminal font").description("Use the saved terminal font settings in every Editor tab.")
                 .section("Font").keywords("editor", "font", "terminal"));
+            colorScheme = settings.declare(SettingSpec.of("color_scheme",
+                    SettingKind.text(value -> value.equals(WORKSPACE) || SCHEME.matcher(value).matches(),
+                        "Use workspace or a theme's id and variant, such as jasper-meadow/dark."), WORKSPACE)
+                .label(SCHEME_LABEL).description(SCHEME_DESCRIPTION).section("Colors")
+                .keywords("editor", "color", "colour", "scheme", "theme"));
             markdownViewMode = settings.declare(SettingSpec.of("markdown_view_mode", SettingKind.choice(List.of(
                 dev.jasper.sdk.settings.Choice.of("source", "Source", dev.jasper.editor.markdown.MarkdownMode.SOURCE),
                 dev.jasper.sdk.settings.Choice.of("split", "Source and preview", dev.jasper.editor.markdown.MarkdownMode.SPLIT),
@@ -126,7 +160,7 @@ public record EditorSettings(String fontFamily, double fontSize, List<String> fo
         /** @return the current values */
         public EditorSettings current() {
             return new EditorSettings(fontFamily.get(), fontSize.get(), fontFallback.get(), fontLigatures.get(), fontLineHeight.get(),
-                followTerminalFont.get(), tabSize.get(), softWrap.get(), maxFileMib.get(), vim.get());
+                followTerminalFont.get(), tabSize.get(), softWrap.get(), maxFileMib.get(), vim.get(), colorScheme.get());
         }
 
         /** @return how many days the Recent files list keeps a file it has not seen opened, 0 to 365; 0 keeps none */
