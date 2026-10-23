@@ -85,8 +85,7 @@ final class WindowContributions implements AutoCloseable {
         // A child window takes the actions, the menus and the palette scopes; panels and status entries are the main
         // window's (workspace tabs spec 6.3).
         docks = owner.isMain();
-        // Task 7 binds Jasper's shortcuts on a detached window's root pane here (WindowContent.bindDetachedRoot).
-        detached = docks ? new DetachedToolWindows(owner, this::title, this::hidePanel, (root, hide) -> () -> { }) : null;
+        detached = docks ? new DetachedToolWindows(owner, this::title, this::hidePanel, owner::bindDetachedRoot) : null;
         syncActions();
         owner.chrome().connect(this);
         if (docks) {
