@@ -130,8 +130,12 @@ window that was visible reopens in its window after the main window shows, its b
 ### Stripe buttons and requests
 
 - A detached tool window's stripe button stays in its slot; selected while its window is shown.
-- Toggle semantics (stripe click, View › Tool Windows, `<id>.toggle`): hidden → show and focus; shown but not the active
-  window → raise and focus; shown and active → hide (`ACTIVATING_TOGGLE`, as flush frames have it).
+- A stripe click toggles, as it does for a docked tool window: hidden → show, raise and focus; shown → hide. (*Ruling,
+  after Task 6's review:* a click on the main window's stripe makes the main window the active one, so "hide only when
+  its window is active" could never hide from the stripe.)
+- The activating toggles (View › Tool Windows, `<id>.toggle`, `ACTIVATING_TOGGLE`, as flush frames have it): hidden →
+  show and focus; shown but its window not the active one → raise and focus; shown and active → hide — a shortcut
+  pressed in the detached window itself reaches that last case.
 - A child window's panel request (routed to the main window today, which comes to the front) raises the detached
   window instead of the main window.
 
