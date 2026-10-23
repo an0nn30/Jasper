@@ -1284,6 +1284,7 @@ public final class JasperApplication {
         }) : dev.jasper.app.plugins.GlassSource.NONE);
         plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
         plugins.animations(themes::animationsEnabled);
+        plugins.themes(themes::library);
         // The kit the controller installed and the look plugins read: the presentation's, or the fallback when the kit was blamed (spec 4.7).
         plugins.presentation(themes.kit(), presentation.projections().plugins(), presentation.defaults());
         plugins.terminalTypography((configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).font());

@@ -89,6 +89,32 @@ class HostedUiTest {
         assertThat(seen).hasSize(1);
     }
 
+    /** Importing or removing a theme changes the editor schemes plugins list: a workspace change even when the shown theme stays. */
+    @Test void libraryChangeIsAWorkspaceChange(@org.junit.jupiter.api.io.TempDir java.nio.file.Path folder) throws java.io.IOException {
+        var themes = new WorkspaceAppearanceFixture();
+        var hosted = new HostedUi("dev.x.tool", model, containment, Runnable::run,
+            javax.swing.SwingUtilities::isEventDispatchThread, open::get, getClass().getClassLoader(), () -> Variant.DARK,
+            handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary, terminals,
+            themes::current, themes::subscribe);
+        var bundled = dev.jasper.app.appearance.ThemeLibrary.bundledOnly();
+        var library = new java.util.concurrent.atomic.AtomicReference<>(bundled);
+        hosted.themes(library::get);
+        var appearance = hosted.appearance();
+        assertThat(appearance.editorSchemes()).isEqualTo(HostedPalettes.editorSchemes(bundled));
+        var seen = new java.util.concurrent.atomic.AtomicInteger();
+        appearance.onWorkspaceChanged(value -> seen.incrementAndGet());
+        themes.setPair(themes.current());
+        assertThat(seen).as("the same theme and library").hasValue(0);
+        java.nio.file.Files.writeString(folder.resolve("ocean.json"), dev.jasper.app.appearance.ThemeTestSupport.uiThemeJson("Ocean"));
+        var imported = dev.jasper.app.appearance.ThemeLibrary.read(folder, bundled);
+        library.set(imported);
+        themes.setPair(themes.current());
+        assertThat(seen).hasValue(1);
+        assertThat(appearance.editorSchemes()).isEqualTo(HostedPalettes.editorSchemes(imported))
+            .extracting(dev.jasper.sdk.ui.EditorScheme::id).contains("ocean/dark");
+        hosted.closeAll();
+    }
+
     @Test void workspaceOpacityFollowsTheGlassSourceAndItsChangesAreWorkspaceChanges() {
         var themes = ThemeTestSupport.controller(true);
         double[] value = {0.6};

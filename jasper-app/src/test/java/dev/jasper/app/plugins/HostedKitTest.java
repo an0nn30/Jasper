@@ -218,6 +218,7 @@ class HostedKitTest {
    public WorkspacePalette workspacePalette(){return source.workspacePalette();}
    public EditorPalette editorPalette(){return source.editorPalette();}
    public SyntaxPalette syntaxPalette(){return source.syntaxPalette();}
+   public java.util.List<dev.jasper.sdk.ui.EditorScheme> editorSchemes(){return source.editorSchemes();}
    public dev.jasper.sdk.ui.TerminalTypography terminalTypography(){return source.terminalTypography();}
    public dev.jasper.sdk.Subscription onTerminalTypographyChanged(java.util.function.Consumer<dev.jasper.sdk.ui.TerminalTypography> handler){return source.onTerminalTypographyChanged(handler);}
    public dev.jasper.sdk.ui.Presentation presentation(){return HostedPresentation.standard();}

@@ -91,6 +91,7 @@ final class HostedContext implements PluginContext {
             host.environment.windows(), terminals, host.environment.appearance(), host.environment.appearanceSubscriber(),
             host.environment.glass(), host.typography);
         ui.presentation(() -> host.presentation);
+        ui.themes(() -> host.themes.get());
         this.kit = new HostedKit(id, () -> state != State.CLOSED, ui::kitThemes, ui.appearance(), host.containment, () -> host.animations.getAsBoolean(), action -> host.shortcuts.apply(action), () -> host.kit.get());
         ui.kit(kit);
         ui.bundled = () -> host.fileEditors.bundled(id);

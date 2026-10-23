@@ -31,6 +31,24 @@ class HostedPalettesTest {
             new java.awt.Color(19, 20, 21)));
     }
 
+    /** The Editor's Color scheme setting: each installed theme's Dark and then Light editor scheme, for the variants it has. */
+    @Test void editorSchemesListEachInstalledVariant() {
+        var library = dev.jasper.app.appearance.ThemeLibrary.bundledOnly();
+        var expected = new java.util.ArrayList<String>();
+        for (var theme : library.themes()) {
+            if (theme.has(true)) expected.add(theme.id() + "/dark");
+            if (theme.has(false)) expected.add(theme.id() + "/light");
+        }
+        var schemes = HostedPalettes.editorSchemes(library);
+        assertThat(schemes).extracting(dev.jasper.sdk.ui.EditorScheme::id).containsExactlyElementsOf(expected).contains("jasper-meadow/dark");
+        var meadow = library.theme("jasper-meadow").orElseThrow();
+        var dark = schemes.stream().filter(scheme -> scheme.id().equals("jasper-meadow/dark")).findFirst().orElseThrow();
+        assertThat(dark.name()).isEqualTo(library.label(meadow));
+        assertThat(dark.variant()).isEqualTo(dev.jasper.sdk.Variant.DARK);
+        assertThat(dark.editor()).isEqualTo(HostedPalettes.editor(meadow.generated(true)));
+        assertThat(dark.syntax()).isEqualTo(HostedPalettes.syntax(meadow.generated(true)));
+    }
+
     @Test void thePalettesAreTheVariantsRolesAndEditorScheme() {
         for (boolean dark : new boolean[]{true, false}) {
             var theme = JasperTheme.bundled().generated(dark);

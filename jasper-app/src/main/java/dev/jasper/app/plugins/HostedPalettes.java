@@ -30,4 +30,17 @@ final class HostedPalettes {
             new SyntaxStyle(value.color(), value.bold(), value.italic())));
         return new SyntaxPalette(styles);
     }
+    /** Each of {@code library}'s themes in order, its Dark and then its Light editor scheme, for the variants it has. */
+    static java.util.List<dev.jasper.sdk.ui.EditorScheme> editorSchemes(dev.jasper.app.appearance.ThemeLibrary library) {
+        var schemes = new java.util.ArrayList<dev.jasper.sdk.ui.EditorScheme>();
+        for (var theme : library.themes()) {
+            for (boolean dark : new boolean[]{true, false}) {
+                if (!theme.has(dark)) continue;
+                var generated = theme.generated(dark);
+                schemes.add(new dev.jasper.sdk.ui.EditorScheme(theme.id() + (dark ? "/dark" : "/light"), library.label(theme),
+                    dark ? dev.jasper.sdk.Variant.DARK : dev.jasper.sdk.Variant.LIGHT, editor(generated), syntax(generated)));
+            }
+        }
+        return java.util.List.copyOf(schemes);
+    }
 }

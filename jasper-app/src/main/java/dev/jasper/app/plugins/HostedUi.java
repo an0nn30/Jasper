@@ -76,6 +76,31 @@ final class HostedUi {
     /** Where this plugin's appearance reads the presentation, on each call and from any thread. */
     private volatile Supplier<dev.jasper.sdk.ui.Presentation> presentation = HostedPresentation::standard;
     void presentation(Supplier<dev.jasper.sdk.ui.Presentation> source) { presentation = java.util.Objects.requireNonNull(source, "source"); }
+    /** The installed themes, read on the UI thread; the bundled ones until the host gives its own. */
+    private Supplier<dev.jasper.app.appearance.ThemeLibrary> themes = dev.jasper.app.appearance.ThemeLibrary::bundledOnly;
+    /** The library the schemes were converted from, and the one the last appearance publication found. */
+    private dev.jasper.app.appearance.ThemeLibrary schemesFrom, seenLibrary;
+    private List<dev.jasper.sdk.ui.EditorScheme> schemes = List.of();
+    void themes(Supplier<dev.jasper.app.appearance.ThemeLibrary> source) {
+        themes = java.util.Objects.requireNonNull(source, "source");
+        seenLibrary = null;
+    }
+
+    /** The installed editor schemes, converted again only when the library changes. */
+    private List<dev.jasper.sdk.ui.EditorScheme> editorSchemes() {
+        var library = themes.get();
+        if (seenLibrary == null) seenLibrary = library;
+        if (library != schemesFrom) { schemes = HostedPalettes.editorSchemes(library); schemesFrom = library; }
+        return schemes;
+    }
+
+    /** Whether the installed themes changed since the last publication or read. */
+    private boolean libraryChanged() {
+        var library = themes.get();
+        boolean changed = seenLibrary != null && library != seenLibrary;
+        seenLibrary = library;
+        return changed;
+    }
     private final String pluginId;
     private final Contributions model;
     private final Containment containment;
@@ -154,7 +179,9 @@ final class HostedUi {
                 var previous = appearanceSnapshot;
                 appearanceSnapshot = next;
                 if (!previous.equals(next)) for(var handler:List.copyOf(themeHandlers)) if(themeHandlers.contains(handler) && open.getAsBoolean()) containment.run(pluginId,"appearance",() -> handler.accept(next.chrome().dark()?Variant.DARK:Variant.LIGHT));
-                if (!previous.workspace().equals(next.workspace())) announceWorkspace();
+                // An imported or removed theme changes the editor schemes, so it is a workspace change too.
+                boolean library = libraryChanged();
+                if (!previous.workspace().equals(next.workspace()) || library) announceWorkspace();
             });
             closers.add(registration::close);
         }
@@ -413,6 +440,10 @@ final class HostedUi {
             @Override public dev.jasper.sdk.ui.SyntaxPalette syntaxPalette() {
                 requireUi("syntaxPalette");
                 return HostedPalettes.syntax(kitThemes().workspace());
+            }
+            @Override public List<dev.jasper.sdk.ui.EditorScheme> editorSchemes() {
+                requireUi("editorSchemes");
+                return HostedUi.this.editorSchemes();
             }
             @Override public double workspaceOpacity(java.awt.Component component) {
                 requireUi("workspaceOpacity");

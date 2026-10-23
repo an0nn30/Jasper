@@ -415,6 +415,12 @@ public final class PluginRuntime {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         given = new Given(Objects.requireNonNull(kit, "kit"), Objects.requireNonNull(look, "look"), Objects.requireNonNull(defaults, "defaults"));
     }
+    private java.util.function.Supplier<dev.jasper.app.appearance.ThemeLibrary> themes = dev.jasper.app.appearance.ThemeLibrary::bundledOnly;
+    /** Supplies the installed themes, read on the UI thread, before plugin startup: plugins list their editor schemes. */
+    public void themes(java.util.function.Supplier<dev.jasper.app.appearance.ThemeLibrary> library) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        themes = Objects.requireNonNull(library);
+    }
     /** Supplies the live application motion policy before plugin startup. */
     public void animations(java.util.function.BooleanSupplier enabled) {
         if(host!=null)throw new IllegalStateException("Plugins have already started");
@@ -732,6 +738,7 @@ public final class PluginRuntime {
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
             dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass), typography);
         created.animations = animations;
+        created.themes = themes;
         if (given != null) {
             var chosen = given;
             created.kit = chosen::kit;

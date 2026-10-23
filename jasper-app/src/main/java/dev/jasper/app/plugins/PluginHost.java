@@ -98,6 +98,8 @@ final class PluginHost {
     record Outcome(PluginStatus.State state, String reason) { }
 
     java.util.function.BooleanSupplier animations = () -> true;
+    /** The installed themes, whose editor schemes every plugin's appearance lists; read on the UI thread. */
+    java.util.function.Supplier<dev.jasper.app.appearance.ThemeLibrary> themes = dev.jasper.app.appearance.ThemeLibrary::bundledOnly;
     /** The look every plugin's appearance reports; set before plugins start. */
     volatile dev.jasper.sdk.ui.Presentation presentation = HostedPresentation.standard();
     /** The look's defaults, whose table for a plugin defaults its declared settings (spec 5.8); set before plugins start. */
