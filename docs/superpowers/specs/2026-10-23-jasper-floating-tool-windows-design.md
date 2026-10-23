@@ -109,9 +109,9 @@ window that was visible reopens in its window after the main window shows, its b
 - Title: the tool window's title. Chrome follows the platform rules auxiliary windows use (`NativeShells`): on macOS the
   `MacTitleBar` (Float uses the dialog style), on Windows and Linux FlatLaf's title pane in the theme's colours, the
   application icon, and theme changes applied to the window and its decorations.
-- Closing it with the OS close button, the keys of Close Tab or Close Window (the platform's keymap; auxiliary windows
-  bind Close Window the same way) or the header's Hide hides the tool window: it stays detached and keeps its stripe
-  button. Those keys never close a tab of the main window from a detached window.
+- Closing it with the OS close button, the keys of Close Pane, Close Tab or Close Window (the platform's keymap; on
+  macOS Close Pane is ⌘W) or the header's Hide hides the tool window: it stays detached and keeps its stripe button.
+  Those keys never close a pane, tab or window of the main window from a detached window.
 - Size: the bounds it last had; otherwise the size of its docked frame (or of the frame it would get, from
   `DockGeometry.landing`), at least the tool window minimum. Placement for View Mode ▸ Float/Window: where its docked
   frame is on screen, or centred on the main window when hidden; fitted to that display.
