@@ -1,5 +1,7 @@
 # Vim mode: IdeaVim's clipboard, conflicts, Ctrl+Shift keys and status widget — Implementation Plan
 
+**Status:** done 2026-10-23 on `claude/vim-ideavim-keys`. Deviations: `ContentStatus.MenuEntry.separatorLine()` (a static `separator()` clashes with the record component); the status popup uses the window menus' `PlainText`/`NativeStyles.menuTree` path; the final review and its fixes ran before Task 6; text-navigation bindings do not count as conflicts.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** In the Editor's Vim mode, Copy/Cut/Paste act on the Visual area, Ctrl+Shift+letter is its own key, Vim keys that clash with Editor or window shortcuts post IdeaVim's one-time notification, and a "V" status widget with a menu replaces `Vim: On/Off`.

@@ -109,6 +109,22 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Vim mode mirrors IdeaVim — 2026-10-23** (`claude/vim-ideavim-keys`, worktree `.claude/worktrees/vim-ideavim-keys`,
+from local `main` at `5db3524b4`; not merged or pushed): in Visual mode Copy, Cut, Paste, Delete and Paste from a list
+act on the Visual area through the system clipboard (registers untouched; the Find bar's Replace still replaces
+matches). Ctrl+Shift+letter is its own key, `<C-S-v>`, so Ctrl+Shift+V pastes from the list in Normal, Visual and Insert
+mode and the window's Ctrl+Shift shortcuts reach the window even in Insert mode. A Vim key that is also an Editor or
+window shortcut posts a one-time conflict notification (Use as Editor shortcut appends `sethandler <key> a:ide` to the
+vimrc and reloads it; Configure… opens the vimrc; the answer is remembered in `data/shortcut-conflicts`; RSTA
+text-navigation bindings and plain keys do not count). A Vim status widget (a V icon and the mode, dimmed when Vim is
+off; menu Enabled, Open vimrc, Reload vimrc, Settings…) replaces `Vim: On/Off`. SDK 0.21.0 (unreleased) gives
+`ContentStatus` an icon, a dimmed state and a menu (`ContentStatus.MenuEntry`) and adds `PluginSettings.show()`. Known
+limits: a blockwise Paste on a short top line does not pad with spaces; Visual Cut and Paste are not `.`-repeatable; the
+Editor tests dispose the window before closing the fake host because the testkit closes the kit before tabs. Plan:
+`docs/superpowers/plans/2026-10-23-vim-ideavim-keys.md` (subagent-driven). GUI checks pending on macOS, Windows and
+Linux: Cmd/Ctrl+C/X/V in Visual mode; the conflict notification and both actions; Ctrl+Shift+V paste list in Normal
+mode; Ctrl+Shift+W in Insert mode; the widget's look, dimmed state and menu placement in light and dark themes.
+
 **Editor Color scheme setting — 2026-10-23** (`claude/editor-color-scheme`, worktree
 `.claude/worktrees/editor-color-scheme`, from local `main` at `f30067a2d`; not merged or pushed): the Editor's
 `color_scheme` (Settings › Tools › Editor › Colors) is `"workspace"` (the default: the shown UI theme's editor scheme,
