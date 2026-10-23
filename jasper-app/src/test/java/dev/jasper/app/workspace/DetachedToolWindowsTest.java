@@ -177,12 +177,12 @@ class DetachedToolWindowsTest {
             relayout(owner);
         }
 
-        /** Shows the panel docked, then floats it from its header: its window opens where its frame was. */
+        /** Shows the panel docked, then floats it from its header: its window opens where its frame was, and is raised. */
         Rectangle floated() {
             toggle();
             Rectangle docked = owner.area().frameOnScreen(A).orElseThrow();
             choose(owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
-            assertThat(shells.take()).containsExactly(open(ToolWindowMode.FLOAT, docked), "show " + A);
+            assertThat(shells.take()).containsExactly(open(ToolWindowMode.FLOAT, docked), "show " + A, "toFront " + A);
             return docked;
         }
     }
@@ -197,7 +197,7 @@ class DetachedToolWindowsTest {
             assertThat(SCREEN.contains(docked)).as("and on the display, so fitting keeps it").isTrue();
 
             fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
-            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, docked), "show " + A);
+            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, docked), "show " + A, "toFront " + A);
             assertThat(fixture.owner.area().content(Slot.LEFT_TOP)).as("the slot shows nothing").isNull();
             assertThat(fixture.owner.dock().visible(A)).isTrue();
             assertThat(fixture.owner.dock().bounds(A)).hasValue(docked);
@@ -216,9 +216,80 @@ class DetachedToolWindowsTest {
             var fixture = new Fixture();
             Rectangle bounds = fixture.floated();
             fixture.choose(fixture.detachedMenu(), "Window");
-            assertThat(fixture.shells.take()).containsExactly("dispose " + A, open(ToolWindowMode.WINDOW, bounds), "show " + A);
+            assertThat(fixture.shells.take()).containsExactly("dispose " + A, open(ToolWindowMode.WINDOW, bounds), "show " + A, "toFront " + A);
             assertThat(fixture.owner.dock().mode(A)).isEqualTo(ToolWindowMode.WINDOW);
             assertThat(fixture.owner.dock().visible(A)).isTrue();
+        });
+    }
+
+    /**
+     * Fix round 2: View Mode \u203a Float or Window chosen from a menu (the header's, the stripe button's) is a user gesture
+     * that ends with the shown tool window's own window raised and the keyboard in its frame, as IntelliJ keeps a tool
+     * window active through a view-mode change; switching between Float and Window does too.
+     */
+    @Test void viewModeFloatOrWindowFromAMenuFocusesTheWindow() throws Exception {
+        edt(() -> {
+            var list = new JList<>(new String[] {"Mac"});
+            var fixture = new Fixture(UiState.inMemory(), list, true);
+            var focused = new ArrayList<Component>();
+            fixture.owner.area().focuser = focused::add;
+            fixture.toggle();
+            Rectangle docked = fixture.owner.area().frameOnScreen(A).orElseThrow();
+            PressedFrameTest.flushEdt();
+            focused.clear();
+
+            fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
+            assertThat(fixture.shells.take()).as("opened, shown, then raised")
+                .containsExactly(open(ToolWindowMode.FLOAT, docked), "show " + A, "toFront " + A);
+            PressedFrameTest.flushEdt();
+            assertThat(focused).as("the keyboard goes into its frame").containsExactly(list);
+
+            focused.clear();
+            fixture.choose(fixture.detachedMenu(), "Window");
+            assertThat(fixture.shells.take()).containsExactly("dispose " + A, open(ToolWindowMode.WINDOW, docked), "show " + A, "toFront " + A);
+            PressedFrameTest.flushEdt();
+            assertThat(focused).containsExactly(list);
+
+            focused.clear();
+            fixture.choose(fixture.stripeMenu(), "Float");
+            assertThat(fixture.shells.take()).as("from the stripe button's menu too")
+                .containsExactly("dispose " + A, open(ToolWindowMode.FLOAT, docked), "show " + A, "toFront " + A);
+            PressedFrameTest.flushEdt();
+            assertThat(focused).containsExactly(list);
+        });
+    }
+
+    /** Fix round 2: a hidden tool window floated from its stripe button's menu stays hidden: nothing opens or is activated. */
+    @Test void viewModeFloatOnAHiddenToolWindowOpensAndActivatesNothing() throws Exception {
+        edt(() -> {
+            var list = new JList<>(new String[] {"Mac"});
+            var fixture = new Fixture(UiState.inMemory(), list, true);
+            var focused = new ArrayList<Component>();
+            fixture.owner.area().focuser = focused::add;
+            fixture.choose(fixture.stripeMenu(), "Float");
+            assertThat(fixture.shells.take()).isEmpty();
+            PressedFrameTest.flushEdt();
+            assertThat(focused).isEmpty();
+            assertThat(fixture.owner.dock().mode(A)).isEqualTo(ToolWindowMode.FLOAT);
+            assertThat(fixture.owner.dock().visible(A)).isFalse();
+        });
+    }
+
+    /** Fix round 2: a detached tool window restored from the saved state opens and shows, and is neither raised nor focused. */
+    @Test void aRestoredDetachedToolWindowOpensWithoutBeingActivated() throws Exception {
+        edt(() -> {
+            var state = UiState.inMemory();
+            var saved = new Rectangle(200, 150, 400, 300);
+            state.putPanel(A, new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.FLOAT,
+                Optional.of(new UiState.Bounds(saved.x, saved.y, saved.width, saved.height))));
+            var list = new JList<>(new String[] {"Mac"});
+            var fixture = new Fixture(state, list, false);
+            var focused = new ArrayList<Component>();
+            fixture.owner.area().focuser = focused::add;
+            fixture.owner.detachedShells(fixture.shells);
+            assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, saved), "show " + A);
+            PressedFrameTest.flushEdt();
+            assertThat(focused).isEmpty();
         });
     }
 
@@ -339,8 +410,9 @@ class DetachedToolWindowsTest {
                 fixture.toggle();
                 fixture.choose(fixture.stripeMenu(), "Float");
                 List<String> opened = fixture.shells.take();
-                assertThat(opened).hasSize(2);
+                assertThat(opened).hasSize(3);
                 assertThat(opened.getFirst()).startsWith("open " + A + " FLOAT");
+                assertThat(opened.subList(1, 3)).as("a menu's View Mode activates it").containsExactly("show " + A, "toFront " + A);
                 JComponent first = fixture.shells.openings.get(A).frame();
 
                 view.update(spec("replacement", "replacement-header"));

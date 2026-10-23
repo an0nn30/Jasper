@@ -302,14 +302,17 @@ final class WindowContributions implements AutoCloseable {
     }
 
     /**
-     * From a View Mode choice: docks the window or detaches it, keeping its slot. Detached for the first time, its own
-     * window opens where its docked frame is, or centred on this window while it is hidden; detached before, where its
-     * window last was.
+     * From a View Mode choice in a menu (the header's Options, a kit header's, a stripe button's): docks the window or
+     * detaches it, keeping its slot. Detached for the first time, its own window opens where its docked frame is, or
+     * centred on this window while it is hidden; detached before, where its window last was. A user gesture, it activates
+     * a tool window that shows, as IntelliJ keeps one active through a view-mode change: a detached one's window comes
+     * forward with the keyboard in its frame, and a docked one is activated as a stripe click activates it (under flush
+     * frames only). A restore or any other mode change leaves the focus alone.
      */
     private void setMode(String id, ToolWindowMode mode) {
         if (!panels.containsKey(id)) return;
         if (mode.detached() && dock.bounds(id).isEmpty()) dock.setBounds(id, detached.initialBounds(id));
-        dock.setMode(id, mode);
+        changeAndActivate(id, () -> dock.setMode(id, mode));
     }
 
     /**
