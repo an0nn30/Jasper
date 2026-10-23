@@ -148,12 +148,27 @@ public class VimTextArea extends RSyntaxTextArea {
         history.leave(this, () -> setDocument(createDefaultModel()));
     }
 
-    /** In Vim's Visual mode, Paste from a list (and the Editor's Delete) replaces the Visual area. */
+    /**
+     * In Vim's Visual mode, Paste from a list replaces the Visual area and the Editor's Delete (empty text) deletes it.
+     * A selection of the text area's own, which Vim's Visual mode never makes, is the Find bar's match: Visual mode ends
+     * and the match is replaced.
+     */
     @Override public void replaceSelection(String text) {
         edits();
         Optional<VimEditor> visual = visualVim();
-        if (visual.isPresent()) visual.get().replaceVisual(text == null ? "" : text);
-        else super.replaceSelection(text);
+        if (visual.isPresent()) {
+            if (text == null || text.isEmpty()) visual.get().deleteVisual();
+            else visual.get().replaceVisual(text);
+            return;
+        }
+        if (vim != null && vim.visual()) {
+            int dot = getCaretPosition(), mark = getCaret().getMark();
+            vim.endVisual();
+            // Visual mode moves the caret as it ends; the selection to replace comes back as it was.
+            setCaretPosition(mark);
+            moveCaretPosition(dot);
+        }
+        super.replaceSelection(text);
     }
 
     /** In Vim's Visual mode, Copy puts the Visual area's text on the clipboard and Visual mode stays (IdeaVim). */
@@ -192,8 +207,13 @@ public class VimTextArea extends RSyntaxTextArea {
         else editor.endVisual();
     }
 
-    /** @return the attached Vim editor while it is in a Visual mode */
-    private Optional<VimEditor> visualVim() { return vim().filter(VimEditor::visual); }
+    /**
+     * @return the attached Vim editor while the Editor's Copy, Cut and Paste act on its Visual area: in a Visual mode,
+     *     while the text area has no selection of its own (the Find bar's match is one)
+     */
+    private Optional<VimEditor> visualVim() {
+        return vim().filter(editor -> editor.visual() && getSelectionStart() == getSelectionEnd());
+    }
 
     @Override public void beginAtomicEdit() {
         edits();
@@ -391,8 +411,23 @@ public class VimTextArea extends RSyntaxTextArea {
 
     private void reportConflict(VimEditor editor, KeyInput key, KeyEvent event) {
         if ((key.modifiers() & (KeyInput.CTRL | KeyInput.ALT | KeyInput.META)) == 0 || editor.vim().handlers().has(key)) return;
-        if (bound(event) != null) conflicts.accept(key, true);
+        Object name = bound(event);
+        if (name != null && !navigation(name)) conflicts.accept(key, true);
         else if (boundOutside(KeyStroke.getKeyStrokeForEvent(event))) conflicts.accept(key, false);
+    }
+
+    /** RSyntaxTextArea's scrolling and page-selecting actions, which name no {@code caret-} or {@code selection-} prefix. */
+    private static final Set<String> SCROLLING = Set.of(RTextAreaEditorKit.rtaScrollUpAction, RTextAreaEditorKit.rtaScrollDownAction,
+        RTextAreaEditorKit.rtaSelectionPageUpAction, RTextAreaEditorKit.rtaSelectionPageDownAction,
+        RTextAreaEditorKit.rtaSelectionPageLeftAction, RTextAreaEditorKit.rtaSelectionPageRightAction);
+
+    /**
+     * @return whether the text area's action only moves the caret, selects or breaks the line (macOS binds Ctrl+F, Ctrl+A
+     *     and Ctrl+O so, Windows and Linux Ctrl with the arrows): no shortcut Vim's key would take from the Editor
+     */
+    private static boolean navigation(Object name) {
+        return name instanceof String action && (action.startsWith("caret-") || action.startsWith("selection-")
+            || action.equals(javax.swing.text.DefaultEditorKit.insertBreakAction) || SCROLLING.contains(action));
     }
 
     /** @return whether an ancestor's map, the window's or a menu accelerator binds the stroke */

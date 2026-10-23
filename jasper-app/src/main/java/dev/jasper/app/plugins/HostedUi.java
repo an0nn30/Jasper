@@ -628,7 +628,7 @@ final class HostedUi {
         public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) { requireUi("content presentation"); if(entry.closed())return; entry.presentation(v.title(), v.detail(), icon(v.icon()), v.dirty(), v.location(), v.host()); }
         public void setCommands(List<dev.jasper.sdk.ui.ContentCommand> values) { requireUi("content commands"); entry.commands(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentCommand(v.id(), v.title(), v.shortcut(), v.enabled(), () -> containment.run(pluginId, "content command", v.run()))).toList()); }
-        public void setStatus(List<dev.jasper.sdk.ui.ContentStatus> values) { requireUi("content status"); entry.status(values.stream().map(v ->
+        public void setStatus(List<dev.jasper.sdk.ui.ContentStatus> values) { requireUi("content status"); if(entry.closed())return; entry.status(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentStatus(v.text(), v.tooltip(), contained(v.run()), v.icon().isEmpty() ? null : icon(v.icon()), v.dimmed(),
                 v.menu().stream().map(e -> new dev.jasper.app.contributions.ContentStatus.MenuEntry(e.label(), contained(e.run()), e.checkable(), e.checked(), e.separator())).toList())).toList()); }
         private Runnable contained(Runnable run) { return run == null ? null : () -> containment.run(pluginId, "content status", run); }

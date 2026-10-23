@@ -521,6 +521,45 @@ class VimEditorTest {
         });
     }
 
+    @Test void textNavigationBindingsAreNotConflicts() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "1\n2\n3\n4\n5\n6\n7\n8\n9\n");
+            var reports = new java.util.ArrayList<String>();
+            area.onConflict((key, editorBinds) -> reports.add(key.notation() + " " + editorBinds));
+            // RSyntaxTextArea's macOS map binds Ctrl+F, Ctrl+A and Ctrl+O to caret moves and a line break; on Windows
+            // and Linux Ctrl+Shift+Left selects by word.
+            var map = area.getInputMap(JComponent.WHEN_FOCUSED);
+            int ctrl = InputEvent.CTRL_DOWN_MASK;
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_F, ctrl), javax.swing.text.DefaultEditorKit.forwardAction);
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, ctrl), javax.swing.text.DefaultEditorKit.beginLineAction);
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_O, ctrl), javax.swing.text.DefaultEditorKit.insertBreakAction);
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_E, ctrl), javax.swing.text.DefaultEditorKit.selectionEndLineAction);
+            for (int code : new int[] {KeyEvent.VK_F, KeyEvent.VK_A, KeyEvent.VK_O, KeyEvent.VK_E}) {
+                area.processKeyEvent(pressed(area, ctrl, code));
+                type(editor, "<Esc>");
+            }
+            assertThat(reports).as("navigation is not a shortcut").isEmpty();
+
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_B, ctrl), javax.swing.text.DefaultEditorKit.copyAction);
+            area.processKeyEvent(pressed(area, ctrl, KeyEvent.VK_B));
+            assertThat(reports).as("Copy is").containsExactly("<C-b> true");
+
+            reports.clear();
+            bindInAncestor(area, KeyStroke.getKeyStroke(KeyEvent.VK_F, ctrl), "app.find");
+            area.processKeyEvent(pressed(area, ctrl, KeyEvent.VK_F));
+            assertThat(reports).as("a navigation key the window binds is judged by the window").containsExactly("<C-f> false");
+
+            reports.clear();
+            type(editor, ":nnoremap <lt>D-j> j<CR>");
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_J, InputEvent.META_DOWN_MASK), "rsta-delete-line");
+            var command = pressed(area, InputEvent.META_DOWN_MASK, KeyEvent.VK_J);
+            area.processKeyEvent(command);
+            assertThat(command.isConsumed()).as("the mapping takes it").isTrue();
+            assertThat(reports).as("a mapped ⌘ key the Editor binds").containsExactly("<D-j> true");
+        });
+    }
+
     @Test void theAppsShortcutsOnAncestorsStillFireInNormalMode() throws Exception {
         onEdt(() -> {
             var area = new VimTextArea();

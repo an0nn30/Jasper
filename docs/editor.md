@@ -686,8 +686,8 @@ recorded corpus.
 
 ### Turning Vim mode on
 
-Set `vim = true`, turn on **Vim mode** in Settings › Tools › Editor, choose **Enabled** in the status bar's Vim menu, or choose
-**Toggle Vim Mode** in an Editor tab's menu. Every Editor tab switches at once, and each keeps its text and undo
+Set `vim = true`, turn on **Vim mode** in Settings › Tools › Editor, choose **Enabled** in the status bar's Vim menu, or
+choose **Toggle Vim Mode** in an Editor tab's menu. Every Editor tab switches at once, and each keeps its text and undo
 history. Toggling saves `vim` in the settings file; when that fails, Vim mode stays as toggled until the Editor closes
 and a dialog says "Vim mode is on until the Editor closes: the setting could not be saved (*reason*)." ("off" when
 you turned it off).
@@ -719,8 +719,8 @@ you turned it off).
   inserts the next key literally and Ctrl+C returns to Normal mode, so Ctrl+V does not paste there. Ctrl+S still saves
   (Vim has no `<C-s>`). Ctrl+Shift with a letter is its own key (`<C-S-v>`), which Vim leaves to the Editor and the
   window unless a mapping or `sethandler` names it: Ctrl+Shift+G is Find Next, Ctrl+Shift+W closes the pane in Insert
-  mode and Ctrl+Shift+V pastes from the list in every mode. Use the tab's menu, `:action find` or a `sethandler` entry
-  such as `sethandler <C-f> n:ide` for the Ctrl keys.
+  mode too and Ctrl+Shift+V pastes from the list in Normal, Visual and Insert mode. Use the tab's menu, `:action find`
+  or a `sethandler` entry such as `sethandler <C-f> n:ide` for the Ctrl keys.
 - `sethandler <C-f> n:vim i:ide` decides who gets a key in each mode (`n i v x o c`, or `a` for all, joined by `-`), as
   in IdeaVim.
 - The first time Vim takes a Ctrl, Alt or Cmd key that is also a shortcut of the Editor or of Jasper and no `sethandler`
@@ -784,8 +784,9 @@ you turned it off).
 ### The vimrc
 
 The vimrc is `plugins/dev.jasper.editor/data/vimrc` in Jasper home, in UTF-8. Jasper reads it the first time a tab has
-Vim mode on, running its lines in that tab, and again on **Reload vimrc** (an Editor tab's menu, the status bar's Vim menu, the command
-palette, or `:action reload-vimrc`), which first puts mappings, options, `sethandler` entries and variables back to their defaults;
+Vim mode on, running its lines in that tab, and again on **Reload vimrc** (an Editor tab's menu, the status bar's Vim
+menu, the command palette, or `:action reload-vimrc`), which first puts mappings, options, `sethandler` entries and
+variables back to their defaults;
 registers and marks stay. It holds command lines, as a Vim or IdeaVim vimrc does: `set`, `let mapleader = ","`, the
 mapping commands, `sethandler`, `"` comments, lines continued with a leading `\`, `source ~/.vimrc` (relative names
 start from the sourcing file's folder; ten levels deep at most), `finish`, and `if` … `elseif` … `else` … `endif`

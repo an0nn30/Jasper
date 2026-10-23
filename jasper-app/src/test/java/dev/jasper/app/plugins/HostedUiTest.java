@@ -658,6 +658,9 @@ class HostedUiTest {
             dev.jasper.sdk.ui.ContentStatus.MenuEntry.item("Settings\u2026", boom)))));
         var status = model.tabs().inWindow(window).getFirst().status().getFirst();
         assertThat(status.icon()).isInstanceOf(dev.jasper.app.platform.PresentationIcon.class);
+        notes.setStatus(List.of(new dev.jasper.sdk.ui.ContentStatus("INSERT", "Vim mode", null, "dev.x.tool:v", false, List.of())));
+        assertThat(model.tabs().inWindow(window).getFirst().status().getFirst().icon()).as("an icon resolves once")
+            .isSameAs(status.icon());
         assertThat(status.dimmed()).isTrue();
         assertThat(status.menu()).extracting(dev.jasper.app.contributions.ContentStatus.MenuEntry::label).containsExactly("Enabled", "", "Settings\u2026");
         assertThat(status.menu().getFirst().checkable()).isTrue();
@@ -671,6 +674,20 @@ class HostedUiTest {
         assertThat(model.tabs().inWindow(window).getFirst().status().getFirst().icon()).isNull();
         assertThatIllegalArgumentException().isThrownBy(() -> notes.setStatus(List.of(
             new dev.jasper.sdk.ui.ContentStatus("NORMAL", "Vim mode", null, "dev.x.tool:missing", false, List.of()))));
+    }
+
+    /** A closed content tab's status, as its presentation, changes nothing, even with an icon no longer registered. */
+    @Test void aClosedContentTabsStatusChangesNothing() {
+        UUID window = terminalFixture.addWindow();
+        model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(window, tab -> { }, tab -> { }, tab -> { }, () -> { },
+            tab -> Optional.empty(), (tab, group, side) -> { }, (tab, side) -> false, tab -> false, tab -> { }, tab -> java.util.List.of(),
+            (tab, number) -> { }));
+        var notes = ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), terminals.windowHandle(window), view());
+        notes.close();
+        assertThat(notes.isClosed()).isTrue();
+        assertThatCode(() -> notes.setStatus(List.of(
+            new dev.jasper.sdk.ui.ContentStatus("NORMAL", "Vim mode", null, "dev.x.tool:missing", false, List.of()))))
+            .doesNotThrowAnyException();
     }
 
     /**

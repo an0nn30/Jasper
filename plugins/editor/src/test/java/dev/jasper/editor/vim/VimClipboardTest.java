@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.Optional;
 import javax.swing.SwingUtilities;
 import org.fife.ui.rtextarea.ClipboardHistory;
+import org.fife.ui.rtextarea.SearchContext;
+import org.fife.ui.rtextarea.SearchEngine;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -158,6 +160,46 @@ class VimClipboardTest {
             area.replaceSelection("Q");
             assertThat(area.getText()).isEqualTo("Qc def\n");
             assertThat(editor.mode()).isEqualTo(Mode.NORMAL);
+        });
+    }
+
+    @Test void deleteInLinewiseVisualRemovesTheLines() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "one\ntwo\nthree\n");
+            type(editor, "Vj");
+            area.replaceSelection("");
+            assertThat(area.getText()).as("as Cut, without the copy").isEqualTo("three\n");
+            assertThat(editor.mode()).isEqualTo(Mode.NORMAL);
+            assertThat(clipboard).as("Delete copies nothing").doesNotContainKey('+');
+            type(editor, "u");
+            assertThat(area.getText()).isEqualTo("one\ntwo\nthree\n");
+        });
+    }
+
+    @Test void findBarReplaceReplacesTheMatchNotTheVisualArea() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc\nfoo x foo\n");
+            type(editor, "vl");
+            var context = new SearchContext("foo");
+            context.setReplaceWith("bar");
+            var result = SearchEngine.replace(area, context);
+            assertThat(result.getCount()).isEqualTo(1);
+            assertThat(area.getText()).isEqualTo("abc\nbar x foo\n");
+            assertThat(editor.mode()).as("the Visual area the replace took over is gone").isEqualTo(Mode.NORMAL);
+        });
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc\nfoo x foo\n");
+            type(editor, "jV");
+            var context = new SearchContext("foo");
+            context.setReplaceWith("barbaz");
+            var result = SearchEngine.replaceAll(area, context);
+            assertThat(result.getCount()).isEqualTo(2);
+            assertThat(area.getText()).isEqualTo("abc\nbarbaz x barbaz\n");
+            type(editor, "u");
+            assertThat(area.getText()).as("one undo step").isEqualTo("abc\nfoo x foo\n");
         });
     }
 

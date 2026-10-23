@@ -589,13 +589,18 @@ public final class VimEditor {
     }
 
     /**
-     * The Editor's Cut in Visual mode: {@link #copyVisual}, then the area goes as {@code "_d} deletes it, in one undo
-     * step, and Normal mode follows.
+     * The Editor's Cut in Visual mode: {@link #copyVisual}, then {@link #deleteVisual}.
      *
      * @return the text copied
      */
     String cutVisual() {
         String text = copyVisual();
+        deleteVisual();
+        return text;
+    }
+
+    /** The Editor's Delete in Visual mode: the area goes as {@code "_d} deletes it, in one undo step, and Normal mode follows. */
+    void deleteVisual() {
         command(() -> {
             Context c = new Context(this);
             c.register = '_';
@@ -604,7 +609,6 @@ public final class VimEditor {
             try { Operators.delete(c, span, false); }
             finally { endUndoStep(); }
         });
-        return text;
     }
 
     /**
