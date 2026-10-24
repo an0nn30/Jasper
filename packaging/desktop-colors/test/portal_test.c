@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <glib/gstdio.h>
 #include "fake_portal.c"
 
 void dc_portal_start(GDBusConnection *, FILE *);
@@ -197,6 +199,89 @@ static void read_timeout(void) {
     drain(fake->connection); drain(observer); expect("\"appearance\":\"dark\"");
     teardown(); fake_free(fake);
 }
+static void iterate_for(gint64 microseconds) {
+    gint64 deadline = g_get_monotonic_time() + microseconds;
+    while (g_get_monotonic_time() < deadline) {
+        while (g_main_context_iteration(NULL, FALSE)) { }
+        g_usleep(1000);
+    }
+}
+static void stop_acquisition(void) {
+    struct fake_portal *fake = fake_new(); observer = new_connection();
+    output = tmpfile(); g_assert_nonnull(output);
+    dc_portal_start(NULL, output); dc_portal_stop();
+    fclose(output); iterate_for(100000);
+    g_assert_cmpuint(fake->reads, ==, 0);
+    output = tmpfile(); g_assert_nonnull(output);
+    dc_portal_start(observer, output); wait_reads(fake, 1);
+    fake_reply(fake, g_variant_new_uint32(2), NULL, NULL);
+    drain(fake->connection); drain(observer); expect("\"appearance\":\"light\"");
+    teardown(); fake_free(fake);
+}
+static void fail_read(struct fake_portal *fake) {
+    GDBusMethodInvocation *call = g_queue_pop_head(&fake->pending);
+    g_dbus_method_invocation_return_dbus_error(call, "org.example.Temporary", "temporarily unavailable");
+    g_object_unref(call); drain(fake->connection); drain(observer);
+}
+static void stop_retry(void) {
+    struct fake_portal *fake = fake_new(); setup(); wait_reads(fake, 1); fail_read(fake);
+    expect("preferences unavailable");
+    dc_portal_stop(); long before = ftell(output);
+    iterate_for(1200000);
+    g_assert_cmpuint(fake->reads, ==, 1); g_assert_cmpint(ftell(output), ==, before);
+    teardown(); fake_free(fake);
+}
+static void retried_owner_reply(void) {
+    struct fake_portal *a = fake_new(); setup(); wait_reads(a, 1); fail_read(a);
+    wait_reads(a, 2); fake_release(a);
+    struct fake_portal *b = fake_new(); wait_reads(b, 1);
+    fake_reply(b, g_variant_new_uint32(2), NULL, NULL); drain(b->connection); drain(observer);
+    fake_reply(a, g_variant_new_uint32(1), NULL, NULL); drain(a->connection); drain(observer);
+    expect("\"appearance\":\"light\""); expect("\"owner\":2");
+    teardown(); fake_free(a); fake_free(b);
+}
+static void read_failure_recovers(void) {
+    struct fake_portal *fake = fake_new(); setup(); wait_reads(fake, 1);
+    GDBusMethodInvocation *call = g_queue_pop_head(&fake->pending);
+    g_dbus_method_invocation_return_dbus_error(call, "org.example.Temporary", "temporarily unavailable");
+    g_object_unref(call); drain(fake->connection); drain(observer);
+    expect("preferences unavailable");
+    wait_reads(fake, 2);
+    fake_reply(fake, g_variant_new_uint32(2), NULL, g_variant_new_uint32(1));
+    drain(fake->connection); drain(observer);
+    expect("\"appearance\":\"light\""); expect("\"owner\":1"); expect("\"highContrast\":true");
+    teardown(); fake_free(fake);
+}
+static void read_timeout_recovers(void) {
+    struct fake_portal *fake = fake_new(); setup(); wait_reads(fake, 1);
+    /* Retain the timed-out invocation until the successful retry has completed. */
+    GDBusMethodInvocation *late = g_queue_pop_head(&fake->pending);
+    gint64 deadline = g_get_monotonic_time() + 5000000;
+    while (fake->reads < 2 && g_get_monotonic_time() < deadline) {
+        while (g_main_context_iteration(NULL, FALSE)) { }
+        g_usleep(1000);
+    }
+    g_assert_cmpuint(fake->reads, ==, 2);
+    fake_reply(fake, g_variant_new_uint32(2), NULL, NULL);
+    drain(fake->connection); drain(observer); expect("\"appearance\":\"light\"");
+    g_queue_push_tail(&fake->pending, late);
+    fake_reply(fake, g_variant_new_uint32(1), NULL, NULL);
+    drain(fake->connection); drain(observer); expect("\"appearance\":\"light\"");
+    teardown(); fake_free(fake);
+}
+static void closed_bus_recovers(void) {
+    struct fake_portal *fake = fake_new(); setup(); wait_reads(fake, 1);
+    GDBusMethodInvocation *late = g_queue_pop_head(&fake->pending);
+    g_dbus_connection_close_sync(observer, NULL, NULL);
+    wait_reads(fake, 2);
+    fake_reply(fake, g_variant_new_uint32(2), NULL, NULL);
+    drain(fake->connection);
+    expect("\"appearance\":\"light\""); expect("\"owner\":2");
+    g_queue_push_tail(&fake->pending, late);
+    fake_reply(fake, g_variant_new_uint32(1), NULL, NULL); drain(fake->connection);
+    expect("\"appearance\":\"light\""); expect("\"owner\":2");
+    dc_portal_stop(); g_object_unref(observer); fclose(output); fake_free(fake);
+}
 struct communication { gboolean done; GError *error; gchar *out, *err; };
 static void communicated(GObject *object, GAsyncResult *result, gpointer data) {
     struct communication *communication = data;
@@ -236,11 +321,78 @@ static void helper_commands(gboolean missing_bus) {
     g_free(communication.out); g_free(communication.err);
     g_string_free(input, TRUE); g_object_unref(child);
 }
+struct line_read { gboolean done; char *line; GError *error; };
+static void line_ready(GObject *object, GAsyncResult *result, gpointer data) {
+    struct line_read *read = data;
+    read->line = g_data_input_stream_read_line_finish(G_DATA_INPUT_STREAM(object), result, NULL, &read->error);
+    read->done = TRUE;
+}
+static char *helper_line(GDataInputStream *stream) {
+    struct line_read read = {0};
+    GCancellable *cancel = g_cancellable_new();
+    g_data_input_stream_read_line_async(stream, G_PRIORITY_DEFAULT, cancel, line_ready, &read);
+    gint64 deadline = g_get_monotonic_time() + 3000000;
+    while (!read.done && g_get_monotonic_time() < deadline) {
+        while (g_main_context_iteration(NULL, FALSE)) { }
+        g_usleep(1000);
+    }
+    if (!read.done) {
+        g_cancellable_cancel(cancel);
+        while (!read.done) g_main_context_iteration(NULL, TRUE);
+    }
+    g_object_unref(cancel);
+    g_assert_no_error(read.error); g_assert_nonnull(read.line);
+    return read.line;
+}
+static void acquisition_recovers(void) {
+    struct fake_portal *fake = fake_new();
+    GError *error = NULL;
+    char *directory = g_dir_make_tmp("jasper-portal-XXXXXX", &error); g_assert_no_error(error);
+    char *socket = g_build_filename(directory, "bus", NULL);
+    char *address = g_strconcat("unix:path=", socket, NULL);
+    GSubprocessLauncher *launcher = g_subprocess_launcher_new(
+        G_SUBPROCESS_FLAGS_STDIN_PIPE | G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE);
+    g_subprocess_launcher_setenv(launcher, "DBUS_SESSION_BUS_ADDRESS", address, TRUE);
+    GSubprocess *child = g_subprocess_launcher_spawn(launcher, &error, g_getenv("DC_PORTAL_TEST_HELPER"), "--protocol=1", NULL);
+    g_assert_no_error(error); g_object_unref(launcher);
+    GDataInputStream *stream = g_data_input_stream_new(g_subprocess_get_stdout_pipe(child));
+    g_filter_input_stream_set_close_base_stream(G_FILTER_INPUT_STREAM(stream), FALSE);
+    /* The first envelope is the pending initial state; the next proves acquisition failed. */
+    char *line = helper_line(stream); g_assert_nonnull(strstr(line, "session bus unavailable")); g_free(line);
+    line = helper_line(stream); g_assert_nonnull(strstr(line, "session bus unavailable")); g_free(line);
+    g_assert_cmpuint(fake->reads, ==, 0);
+    const char *private_address = g_getenv("DBUS_SESSION_BUS_ADDRESS");
+    g_assert_true(g_str_has_prefix(private_address, "unix:path="));
+    char *target = g_strdup(private_address + strlen("unix:path="));
+    char *comma = strchr(target, ','); if (comma) *comma = '\0';
+    g_assert_cmpint(symlink(target, socket), ==, 0);
+    wait_reads(fake, 1); fake_reply(fake, g_variant_new_uint32(2), NULL, NULL); drain(fake->connection);
+    gboolean recovered = FALSE;
+    for (int i = 0; i < 4 && !recovered; i++) {
+        line = helper_line(stream); recovered = strstr(line, "\"appearance\":\"light\"") != NULL; g_free(line);
+    }
+    g_assert_true(recovered);
+    g_object_unref(stream);
+    struct communication communication = {0};
+    guint deadline = g_timeout_add(5000, force_exit, child);
+    g_subprocess_communicate_utf8_async(child, NULL, NULL, communicated, &communication);
+    while (!communication.done) g_main_context_iteration(NULL, TRUE);
+    GSource *timer = g_main_context_find_source_by_id(NULL, deadline); if (timer) g_source_destroy(timer);
+    g_assert_no_error(communication.error); g_assert_true(g_subprocess_get_successful(child));
+    g_assert_cmpstr(communication.err, ==, "");
+    g_free(communication.out); g_free(communication.err); g_object_unref(child);
+    g_assert_cmpint(g_unlink(socket), ==, 0); g_assert_cmpint(g_rmdir(directory), ==, 0);
+    g_free(target); g_free(address); g_free(socket); g_free(directory); fake_free(fake);
+}
 static void helper_ping_eof(void) { helper_commands(FALSE); }
 static void helper_missing_bus(void) { helper_commands(TRUE); }
 int main(int argc, char **argv) {
     g_test_init(&argc, &argv, NULL);
     g_assert_nonnull(g_getenv("DBUS_SESSION_BUS_ADDRESS"));
+    g_test_add_func("/portal/bus-acquisition-recovers", acquisition_recovers);
+    g_test_add_func("/portal/stop-acquisition", stop_acquisition);
+    g_test_add_func("/portal/stop-retry", stop_retry);
+    g_test_add_func("/portal/retried-owner-reply", retried_owner_reply);
     g_test_add_func("/portal/delayed-read-after-newer-signal", delayed_read_after_signal);
     g_test_add_func("/portal/out-of-order-key-changes", out_of_order_keys);
     g_test_add_func("/portal/retired-owner-reply", retired_owner_reply);
@@ -251,6 +403,9 @@ int main(int argc, char **argv) {
     g_test_add_func("/portal/invalid-accent-independent", invalid_accent_independent);
     g_test_add_func("/portal/stop-pending-read", stop_pending);
     g_test_add_func("/portal/read-timeout", read_timeout);
+    g_test_add_func("/portal/read-failure-recovers", read_failure_recovers);
+    g_test_add_func("/portal/read-timeout-recovers", read_timeout_recovers);
+    g_test_add_func("/portal/closed-bus-recovers", closed_bus_recovers);
     g_test_add_func("/helper/ping-and-eof", helper_ping_eof);
     g_test_add_func("/helper/no-session-bus", helper_missing_bus);
     int result = g_test_run();

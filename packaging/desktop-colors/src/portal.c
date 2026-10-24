@@ -16,8 +16,9 @@ struct observer {
     gboolean alive;
     GDBusConnection *connection;
     FILE *output;
-    guint watch, subscription;
-    GCancellable *read;
+    guint watch, subscription, retry, acquisition_deadline, attempt;
+    gulong closed;
+    GCancellable *read, *acquisition;
     gchar *owner;
     guint64 serial, changed[3];
     struct dc_portal value;
@@ -27,6 +28,9 @@ static struct observer *active;
 
 void dc_portal_start(GDBusConnection *connection, FILE *output);
 void dc_portal_stop(void);
+static void snapshot(struct observer *observer);
+static void acquire(struct observer *observer);
+static void attach(struct observer *observer, GDBusConnection *connection);
 
 static void release(struct observer *observer) {
     if (--observer->references) return;
@@ -37,6 +41,26 @@ static void release(struct observer *observer) {
 static void publish(struct observer *observer) {
     if (observer->alive && dc_write_portal(observer->output, &observer->value) != 0)
         g_warning("desktop portal output failed");
+}
+static void cancel_retry(struct observer *observer) {
+    if (observer->retry) g_source_remove(observer->retry);
+    observer->retry = 0;
+}
+static gboolean retry(gpointer data) {
+    struct observer *observer = data;
+    observer->retry = 0;
+    if (observer->alive) {
+        if (!observer->connection) acquire(observer);
+        else if (observer->owner) snapshot(observer);
+    }
+    return G_SOURCE_REMOVE;
+}
+static void schedule_retry(struct observer *observer) {
+    static const guint seconds[] = {1, 2, 4, 8, 16, 30};
+    if (!observer->alive || observer->retry) return;
+    guint delay = seconds[observer->attempt];
+    if (observer->attempt + 1 < G_N_ELEMENTS(seconds)) observer->attempt++;
+    observer->retry = g_timeout_add(delay * 1000, retry, observer);
 }
 static int key_index(const char *key) {
     if (strcmp(key, "color-scheme") == 0) return 0;
@@ -98,6 +122,7 @@ static void read_complete(GObject *object, GAsyncResult *result, gpointer data) 
     GVariant *reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(object), result, &error);
     if (observer->alive && observer->value.owner == pending->generation
         && g_strcmp0(observer->owner, pending->owner) == 0) {
+        g_clear_object(&observer->read);
         if (reply && g_variant_is_of_type(reply, G_VARIANT_TYPE("(a{sa{sv}})"))) {
             GVariant *namespaces = g_variant_get_child_value(reply, 0);
             GVariant *keys = g_variant_lookup_value(namespaces, APPEARANCE, G_VARIANT_TYPE("a{sv}"));
@@ -111,8 +136,10 @@ static void read_complete(GObject *object, GAsyncResult *result, gpointer data) 
             if (keys) g_variant_unref(keys);
             g_variant_unref(namespaces);
             observer->value.reason = "";
+            observer->attempt = 0;
         } else {
             observer->value.reason = "portal preferences unavailable";
+            schedule_retry(observer);
         }
         publish(observer);
     }
@@ -123,6 +150,7 @@ static void read_complete(GObject *object, GAsyncResult *result, gpointer data) 
     release(observer);
 }
 static void retire(struct observer *observer) {
+    cancel_retry(observer);
     if (observer->subscription) g_dbus_connection_signal_unsubscribe(observer->connection, observer->subscription);
     observer->subscription = 0;
     if (observer->read) g_cancellable_cancel(observer->read);
@@ -132,9 +160,10 @@ static void retire(struct observer *observer) {
 static void appeared(GDBusConnection *connection, const gchar *name, const gchar *owner, gpointer data) {
     (void) name;
     struct observer *observer = data;
-    if (!observer->alive || g_strcmp0(owner, observer->owner) == 0) return;
+    if (!observer->alive || connection != observer->connection || g_strcmp0(owner, observer->owner) == 0) return;
     retire(observer);
     observer->owner = g_strdup(owner);
+    observer->attempt = 0;
     /* Exhausting a signed 64-bit owner generation cannot happen in a helper lifetime. */
     observer->value = (struct dc_portal) { .owner = observer->value.owner + 1,
         .appearance = DC_UNKNOWN, .reason = "portal preferences pending" };
@@ -143,47 +172,109 @@ static void appeared(GDBusConnection *connection, const gchar *name, const gchar
     observer->subscription = g_dbus_connection_signal_subscribe(connection, owner, SETTINGS,
         "SettingChanged", PORTAL_PATH, APPEARANCE, G_DBUS_SIGNAL_FLAGS_NONE, setting_changed, observer, NULL);
     publish(observer);
+    snapshot(observer);
+}
+static void snapshot(struct observer *observer) {
     struct pending_read *pending = g_new0(struct pending_read, 1);
     pending->observer = observer;
     observer->references++;
-    pending->owner = g_strdup(owner);
+    pending->owner = g_strdup(observer->owner);
     pending->generation = observer->value.owner;
     pending->serial = observer->serial;
     observer->read = g_cancellable_new();
     const gchar *namespaces[] = {APPEARANCE, NULL};
-    g_dbus_connection_call(connection, owner, PORTAL_PATH, SETTINGS, "ReadAll",
+    g_dbus_connection_call(observer->connection, observer->owner, PORTAL_PATH, SETTINGS, "ReadAll",
         g_variant_new("(^as)", namespaces), G_VARIANT_TYPE("(a{sa{sv}})"),
         G_DBUS_CALL_FLAGS_NONE, 2000, observer->read, read_complete, pending);
 }
 static void vanished(GDBusConnection *connection, const gchar *name, gpointer data) {
     (void) connection; (void) name;
     struct observer *observer = data;
-    if (!observer->alive) return;
+    if (!observer->alive || connection != observer->connection) return;
     retire(observer);
     observer->value = (struct dc_portal) { .owner = observer->value.owner,
         .appearance = DC_UNKNOWN, .reason = "portal unavailable" };
     publish(observer);
 }
+static void detach(struct observer *observer) {
+    if (observer->watch) g_bus_unwatch_name(observer->watch);
+    observer->watch = 0;
+    if (observer->closed) g_signal_handler_disconnect(observer->connection, observer->closed);
+    observer->closed = 0;
+    retire(observer);
+    g_clear_object(&observer->connection);
+}
+static void bus_closed(GDBusConnection *connection, gboolean remote, GError *error, gpointer data) {
+    (void) remote; (void) error;
+    struct observer *observer = data;
+    if (!observer->alive || observer->connection != connection) return;
+    detach(observer);
+    observer->value = (struct dc_portal) { .owner = observer->value.owner,
+        .appearance = DC_UNKNOWN, .reason = "session bus unavailable" };
+    publish(observer);
+    schedule_retry(observer);
+}
+static void attach(struct observer *observer, GDBusConnection *connection) {
+    observer->connection = g_object_ref(connection);
+    g_dbus_connection_set_exit_on_close(connection, FALSE);
+    observer->closed = g_signal_connect(connection, "closed", G_CALLBACK(bus_closed), observer);
+    observer->watch = g_bus_watch_name_on_connection(connection, PORTAL_NAME,
+        G_BUS_NAME_WATCHER_FLAGS_NONE, appeared, vanished, observer, NULL);
+    if (g_dbus_connection_is_closed(connection)) bus_closed(connection, TRUE, NULL, observer);
+}
+static gboolean acquisition_timeout(gpointer data) {
+    struct observer *observer = data;
+    observer->acquisition_deadline = 0;
+    g_cancellable_cancel(observer->acquisition);
+    return G_SOURCE_REMOVE;
+}
+static void acquired(GObject *object, GAsyncResult *result, gpointer data) {
+    (void) object;
+    struct observer *observer = data;
+    GError *error = NULL;
+    GDBusConnection *connection = g_bus_get_finish(result, &error);
+    if (observer->acquisition_deadline) g_source_remove(observer->acquisition_deadline);
+    observer->acquisition_deadline = 0;
+    g_clear_object(&observer->acquisition);
+    if (observer->alive) {
+        if (connection) attach(observer, connection);
+        else {
+            observer->value.reason = "session bus unavailable";
+            publish(observer);
+            schedule_retry(observer);
+        }
+    }
+    g_clear_object(&connection);
+    g_clear_error(&error);
+    release(observer);
+}
+static void acquire(struct observer *observer) {
+    observer->acquisition = g_cancellable_new();
+    observer->references++;
+    observer->acquisition_deadline = g_timeout_add(2000, acquisition_timeout, observer);
+    g_bus_get(G_BUS_TYPE_SESSION, observer->acquisition, acquired, observer);
+}
 void dc_portal_start(GDBusConnection *connection, FILE *output) {
     dc_portal_stop();
-    g_return_if_fail(G_IS_DBUS_CONNECTION(connection) && output);
+    g_return_if_fail((!connection || G_IS_DBUS_CONNECTION(connection)) && output);
     struct observer *observer = g_new0(struct observer, 1);
     observer->references = 1;
     observer->alive = TRUE;
-    observer->connection = g_object_ref(connection);
     observer->output = output;
-    observer->value = (struct dc_portal) { .appearance = DC_UNKNOWN, .reason = "portal unavailable" };
+    observer->value = (struct dc_portal) { .appearance = DC_UNKNOWN, .reason = "session bus unavailable" };
     active = observer;
-    observer->watch = g_bus_watch_name_on_connection(connection, PORTAL_NAME,
-        G_BUS_NAME_WATCHER_FLAGS_NONE, appeared, vanished, observer, NULL);
+    if (connection) attach(observer, connection);
+    else { publish(observer); acquire(observer); }
 }
 void dc_portal_stop(void) {
     struct observer *observer = active;
     if (!observer) return;
     active = NULL;
     observer->alive = FALSE;
-    g_bus_unwatch_name(observer->watch);
-    retire(observer);
+    detach(observer);
+    if (observer->acquisition_deadline) g_source_remove(observer->acquisition_deadline);
+    observer->acquisition_deadline = 0;
+    if (observer->acquisition) g_cancellable_cancel(observer->acquisition);
     release(observer);
 }
 
@@ -220,18 +311,11 @@ int main(int argc, char **argv) {
         fprintf(stderr, "usage: jasper-desktop-portal --protocol=1\n");
         return 2;
     }
-    GError *error = NULL;
-    GDBusConnection *connection = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &error);
-    if (connection) dc_portal_start(connection, stdout);
-    else {
-        struct dc_portal unavailable = { .appearance = DC_UNKNOWN, .reason = "session bus unavailable" };
-        if (dc_write_portal(stdout, &unavailable) != 0) { g_clear_error(&error); return 1; }
-    }
-    g_clear_error(&error);
+    dc_portal_start(NULL, stdout);
     GMainLoop *loop = g_main_loop_new(NULL, FALSE);
     int flags = fcntl(STDIN_FILENO, F_GETFL);
     if (flags < 0 || fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK) < 0) {
-        dc_portal_stop(); g_clear_object(&connection); g_main_loop_unref(loop); return 1;
+        dc_portal_stop(); g_main_loop_unref(loop); return 1;
     }
     struct input input = { .loop = loop };
     guint source = g_unix_fd_add(STDIN_FILENO, G_IO_IN | G_IO_HUP | G_IO_ERR, stdin_ready, &input);
@@ -241,7 +325,6 @@ int main(int argc, char **argv) {
     if (remaining) g_source_destroy(remaining);
     dc_portal_stop();
     while (g_main_context_iteration(NULL, FALSE)) { }
-    g_clear_object(&connection);
     g_main_loop_unref(loop);
     fcntl(STDIN_FILENO, F_SETFL, flags);
     return 0;

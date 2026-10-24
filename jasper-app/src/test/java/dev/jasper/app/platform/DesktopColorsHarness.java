@@ -47,6 +47,18 @@ public final class DesktopColorsHarness implements AutoCloseable {
             && service.current().palettes().get(source).reason().equals(reason));
         publish();
     }
+    public void unavailable(Source source, String implementation, String version, String reason) {
+        pump();
+        var process = processes.get("jasper-desktop-" + source.name().toLowerCase(Locale.ROOT));
+        fixture.await(() -> process.commands().contains("sample"));
+        String last = process.commands().lines().filter(line -> line.contains("sample")).reduce((a, b) -> b).orElseThrow();
+        long generation = Long.parseLong(last.replaceAll(".*\"generation\":([0-9]+).*", "$1"));
+        emit(source.name().toLowerCase(Locale.ROOT), "{\"v\":1,\"kind\":\"palette\",\"generation\":" + generation
+            + ",\"source\":\"" + source.name().toLowerCase(Locale.ROOT) + "\",\"appearance\":\"unknown\",\"implementation\":\""
+            + implementation + "\",\"libraryVersion\":\"" + version + "\",\"reason\":\"" + reason + "\"}");
+        fixture.await(() -> service.current().palettes().containsKey(source) && service.current().palettes().get(source).reason().equals(reason));
+        publish();
+    }
     public void fail(Source source) {
         pump(); processes.get("jasper-desktop-" + source.name().toLowerCase(Locale.ROOT)).destroy();
         fixture.await(() -> service.current().palettes().containsKey(source) && !service.current().palettes().get(source).reason().isBlank());

@@ -10,6 +10,17 @@ import static dev.jasper.ui.theme.SemanticColor.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DesktopPaletteTest {
+    @Test void statusIdentifiesTheActualImplementationAndItsVersion() {
+        for (var implementation : List.of("gtk4", "libadwaita")) {
+            String version = implementation.equals("gtk4") ? "4.22.4" : "1.9.1 (GTK 4.22.4)";
+            var palette = new Palette(1, Source.GTK4, Polarity.DARK,
+                Map.of(Pair.WINDOW, colors(0x111111, 0xffffff)), implementation, version, "");
+            var result = DesktopPalette.resolve(true, DesktopPalette.SourceMode.GTK4, "GNOME", input(false, Map.of(Source.GTK4, palette), Optional.empty()));
+            assertThat(result.status()).contains(version, implementation.equals("gtk4") ? "GTK 4" : "libadwaita");
+            if (implementation.equals("gtk4")) assertThat(result.status()).doesNotContain("libadwaita");
+        }
+    }
+
     @Test void automaticUsesDesktopTokensAndExplicitSelectionStaysExplicit() {
         assertThat(DesktopPalette.preferredSources(DesktopPalette.SourceMode.AUTO, "ubuntu:GNOME"))
             .containsExactly(DesktopObservation.Source.GTK4, DesktopObservation.Source.GTK3);

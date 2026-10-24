@@ -14,6 +14,7 @@ void assert_plain_native(const char *);
 static const char *program;
 void assert_bounded_dispatch(void);
 void assert_burst_or_eof(struct dc_gtk_api *,GtkCssProvider *,bool);
+void assert_window_alpha(struct dc_gtk_api *,GtkCssProvider *);
 static struct dc_gtk_api api;
 static GtkCssProvider *provider;
 static struct dc_palette modern_palette(void) {
@@ -79,6 +80,7 @@ static void close_idempotent(void) {struct dc_gtk_api absent={0};dc_gtk_api_clos
 static void notification(void) {assert_notifications(&api,provider,api.variables);}
 static void burst(void) {assert_burst_or_eof(&api,provider,false);}
 static void eof_during_sample(void) {assert_burst_or_eof(&api,provider,true);}
+static void window_alpha(void) {assert_window_alpha(&api,provider);}
 int main(int argc,char **argv) {
     program=argv[0];g_test_init(&argc,&argv,NULL);g_assert_true(dc_gtk_api_open(4,&api));g_assert_true(api.init4());
     if(api.adw) api.adw_init();
@@ -103,5 +105,6 @@ int main(int argc,char **argv) {
     if(!api.adw) g_test_add_func("/gtk4/plain-named-native",plain_named_native);
     g_test_add_func("/gtk4/bounded-input-dispatch",assert_bounded_dispatch);
     g_test_add_func("/gtk4/burst-backpressure",burst);g_test_add_func("/gtk4/eof-during-sample",eof_during_sample);
+    g_test_add_func("/gtk4/window-foreground-alpha",window_alpha);
     int status=g_test_run();api.remove_provider(fixture_target(&api),provider);g_object_unref(provider);dc_gtk_shutdown();return status;
 }

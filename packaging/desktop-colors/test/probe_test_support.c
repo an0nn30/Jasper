@@ -144,6 +144,28 @@ void helper_contract(const char *helper,const char *mode) {
 #endif
 
 #if !defined(DC_GTK_ABI) && !defined(DC_TEST_SHIM)
+void assert_window_alpha(struct dc_gtk_api *api,GtkCssProvider *provider) {
+    for(int dark=0;dark<2;dark++) for(int readable=0;readable<2;readable++) {
+        const char *background=dark?"black":"white";
+        const char *ink=dark?(readable?"rgba(255,255,255,0.8)":"rgba(255,255,255,0.1)")
+            :(readable?"rgba(0,0,0,0.8)":"rgba(0,0,0,0.1)");
+        char *css=api->variables?g_strdup_printf("window { --window-bg-color: %s; --window-fg-color: %s; }",background,ink)
+            :g_strdup_printf("@define-color theme_bg_color %s; @define-color theme_fg_color %s; @define-color window_bg_color %s; @define-color window_fg_color %s;",background,ink,background,ink);
+        fixture_load(api,provider,css);g_free(css);
+        struct dc_palette p;
+        bool accepted=dc_gtk_sample(api->major==3?NULL:dc_gtk4_api(),dark,71,&p);
+        g_assert_cmpint(accepted,==,readable);
+        if(readable) {g_assert_cmpint(p.appearance,==,dark?DC_DARK:DC_LIGHT);g_assert_cmpfloat_with_epsilon(p.colors[DC_WINDOW].foreground.alpha,.8,.00001);}
+        else g_assert_false(p.colors[DC_WINDOW].present);
+        assert_unmapped(api);
+    }
+    const char *css=api->variables?"window { --window-bg-color: rgba(0,0,0,0.5); --window-fg-color: white; }"
+        :"@define-color theme_bg_color rgba(0,0,0,0.5); @define-color theme_fg_color white; @define-color window_bg_color rgba(0,0,0,0.5); @define-color window_fg_color white;";
+    fixture_load(api,provider,css);struct dc_palette p;
+    g_assert_false(dc_gtk_sample(api->major==3?NULL:dc_gtk4_api(),true,72,&p));
+    g_assert_false(p.colors[DC_WINDOW].present);
+}
+
 void assert_notifications(struct dc_gtk_api *api,GtkCssProvider *provider,bool modern) {
     FILE *output=tmpfile();g_assert_nonnull(output);
     struct worker worker={.loop=g_main_loop_new(NULL,FALSE),.output=output,.api=api->major==3?&api3:&api4,

@@ -140,7 +140,7 @@ public final class DesktopColors implements AutoCloseable {
             if (palette.source() != slot.source || !palette.colors().containsKey(Pair.WINDOW)
                 || palette.appearance() != (latest.dark() ? Polarity.DARK : Polarity.LIGHT)) {
                 process.close();
-                failed(slot, process, palette.reason().isBlank() ? "Desktop toolkit did not provide a compatible window pair" : palette.reason());
+                failed(slot, process, palette.reason().isBlank() ? "Desktop toolkit did not provide a compatible window pair" : palette.reason(), palette);
                 return;
             }
             slot.attempt = 0;
@@ -149,6 +149,9 @@ public final class DesktopColors implements AutoCloseable {
         }
     }
     private void failed(Slot slot, DesktopProcess process, String reason) {
+        failed(slot, process, reason, null);
+    }
+    private void failed(Slot slot, DesktopProcess process, String reason, Palette capability) {
         if (closed.get() || slot.process != process || !active(slot)) return;
         slot.process = null;
         if (slot.source == null) {
@@ -157,8 +160,9 @@ public final class DesktopColors implements AutoCloseable {
             var palettes = new EnumMap<Source, Palette>(Source.class); palettes.putAll(current.palettes());
             Palette prior = palettes.get(slot.source);
             boolean compatible = prior != null && prior.appearance() == polarity();
+            Palette metadata = capability != null ? capability : prior;
             palettes.put(slot.source, new Palette(demand.generation(), slot.source, polarity(), compatible ? prior.colors() : Map.of(),
-                compatible ? prior.implementation() : "", compatible ? prior.version() : "", reason));
+                metadata == null ? "" : metadata.implementation(), metadata == null ? "" : metadata.version(), reason));
             update(new DesktopObservation(current.portal(), palettes));
         }
         long retryToken = ++slot.retryToken;

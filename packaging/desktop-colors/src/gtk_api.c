@@ -115,6 +115,7 @@ bool dc_gtk_sample(struct dc_gtk_api *requested, bool dark, uint64_t generation,
     if (!*tried) { *tried=true; if (!dc_gtk_api_open(api==&api3?3:4,api)) return false; }
     if (!api->gtk) return false;
     out->version=api->version;
+    out->implementation=api->adw?"libadwaita":api->major==3?"gtk3":"gtk4";
     bool *init_attempted=api==&api3?&init_attempted3:&init_attempted4;
     if (!*init_attempted) {
         *init_attempted=true;
@@ -122,7 +123,6 @@ bool dc_gtk_sample(struct dc_gtk_api *requested, bool dark, uint64_t generation,
         if (*initialized && api->adw) api->adw_init();
     }
     if (!*initialized) { out->reason="display unavailable"; return false; }
-    out->implementation=api->adw?"libadwaita":api->major==3?"gtk3":"gtk4";
     sampling=true;
     if (api->adw) api->color_scheme(api->style_manager(),dark?4:1); /* FORCE_DARK / FORCE_LIGHT */
     else g_object_set(api->settings(),"gtk-application-prefer-dark-theme",dark,NULL);
@@ -130,10 +130,14 @@ bool dc_gtk_sample(struct dc_gtk_api *requested, bool dark, uint64_t generation,
     dc_gtk_extract(api,root,out);
     sampling=false;
     struct dc_colors window=out->colors[DC_WINDOW];
-    if (!window.present || window.background.alpha!=1 || window.foreground.alpha!=1) {
+    if (!window.present || window.background.alpha!=1) {
         out->colors[DC_WINDOW].present=0; out->reason="window pair unavailable"; return false;
     }
-    double bg=luminance(window.background), fg=luminance(window.foreground);
+    struct dc_rgba ink=window.foreground;
+    ink.red=ink.red*ink.alpha+window.background.red*(1-ink.alpha);
+    ink.green=ink.green*ink.alpha+window.background.green*(1-ink.alpha);
+    ink.blue=ink.blue*ink.alpha+window.background.blue*(1-ink.alpha);
+    double bg=luminance(window.background), fg=luminance(ink);
     out->appearance=bg<fg?DC_DARK:DC_LIGHT;
     if ((fmax(bg,fg)+.05)/(fmin(bg,fg)+.05)<4.5 || (out->appearance==DC_DARK)!=dark) {
         memset(out->colors,0,sizeof out->colors); out->reason="requested appearance unsupported"; return false;

@@ -10,6 +10,7 @@ void assert_notifications(struct dc_gtk_api *,GtkCssProvider *,bool);
 void assert_nested_requests(struct dc_gtk_api *,GtkCssProvider *,bool);
 void assert_bounded_dispatch(void);
 void assert_burst_or_eof(struct dc_gtk_api *,GtkCssProvider *,bool);
+void assert_window_alpha(struct dc_gtk_api *,GtkCssProvider *);
 static struct dc_gtk_api api;
 static GtkCssProvider *provider;
 static void named_colors(void) {
@@ -27,6 +28,7 @@ static void during_notification(void) {assert_nested_requests(&api,provider,true
 static void during_timer(void) {assert_nested_requests(&api,provider,false);}
 static void burst(void) {assert_burst_or_eof(&api,provider,false);}
 static void eof_during_sample(void) {assert_burst_or_eof(&api,provider,true);}
+static void window_alpha(void) {assert_window_alpha(&api,provider);}
 int main(int argc,char **argv) {
     g_test_init(&argc,&argv,NULL);g_assert_true(dc_gtk_api_open(3,&api));g_assert_true(api.init3(NULL,NULL));
     g_print("GTK %s\n",api.version);provider=api.provider();api.add_provider(fixture_target(&api),provider,800);
@@ -37,5 +39,6 @@ int main(int argc,char **argv) {
     g_test_add_func("/gtk3/request-during-timer-sample",during_timer);
     g_test_add_func("/gtk3/bounded-input-dispatch",assert_bounded_dispatch);
     g_test_add_func("/gtk3/burst-backpressure",burst);g_test_add_func("/gtk3/eof-during-sample",eof_during_sample);
+    g_test_add_func("/gtk3/window-foreground-alpha",window_alpha);
     int status=g_test_run();api.remove_provider(fixture_target(&api),provider);g_object_unref(provider);dc_gtk_shutdown();return status;
 }

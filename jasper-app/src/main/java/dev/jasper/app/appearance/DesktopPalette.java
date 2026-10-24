@@ -56,7 +56,13 @@ public final class DesktopPalette {
         colors.put(ACCENT_HOVER, ColorMath.mix(colors.get(TEXT_PRIMARY), accent, .08));
         var overrides = new EnumMap<DerivedColor, Color>(DerivedColor.class);
         boolean repaired = repair(base, colors, overrides, high);
-        String status = selected == null ? "Desktop palette unavailable; using Slate Cobalt" : selected.source() + " desktop palette";
+        String status = selected == null ? "Desktop palette unavailable; using Slate Cobalt" : capability(selected) + " desktop palette";
+        if (selected != null && !selected.reason().isBlank()) status += "; using last good palette; " + selected.reason();
+        if (selected == null) for (Source source : preferredSources(mode, currentDesktop)) {
+            Palette candidate = input.palettes().get(source);
+            if (candidate != null) status += "; " + capability(candidate) + " unavailable"
+                + (candidate.reason().isBlank() ? "" : ": " + candidate.reason());
+        }
         if (!repaired) {
             // A native family that cannot share Jasper's inks is replaced together, never mixed with another toolkit.
             var bundled = copy(base);
@@ -82,6 +88,12 @@ public final class DesktopPalette {
         var failures = DesktopPaintPairs.validate(theme, high);
         if (!failures.isEmpty()) throw new IllegalStateException("Unrepresentable desktop paint pairs: " + failures);
         return new Result(theme, Optional.ofNullable(selected).map(Palette::source), status);
+    }
+
+    private static String capability(Palette palette) {
+        String label = palette.source() == Source.GTK3 ? "GTK 3"
+            : palette.implementation().equalsIgnoreCase("libadwaita") ? "libadwaita" : "GTK 4";
+        return label + (palette.version().isBlank() ? "" : " " + palette.version());
     }
 
     private record OpaquePair(Color background, Color foreground) { }

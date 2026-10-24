@@ -26,6 +26,7 @@ final class DesktopAppearance implements AutoCloseable {
     private final Executor worker, edt;
     private final Runnable unsubscribe, unsubscribeResample;
     private final Map<Key, Palette> cache = new HashMap<>();
+    private final Map<Key, Palette> capabilities = new HashMap<>();
     private final List<Preview> previews = new ArrayList<>();
     private final Set<Runnable> listeners = new LinkedHashSet<>();
     private DesktopObservation observation;
@@ -42,11 +43,17 @@ final class DesktopAppearance implements AutoCloseable {
         this(themes, desktop, currentDesktop, worker, SwingUtilities::invokeLater);
     }
     DesktopAppearance(ThemeController themes, DesktopColors desktop, String currentDesktop, Executor worker, Executor edt) {
+        this(themes, desktop, currentDesktop, worker, edt, desktop::current);
+    }
+    DesktopAppearance(ThemeController themes, DesktopColors desktop, String currentDesktop, Executor worker, Executor edt,
+            java.util.function.Supplier<DesktopObservation> initial) {
         this.themes = Objects.requireNonNull(themes); this.desktop = Objects.requireNonNull(desktop);
         this.currentDesktop = currentDesktop; this.worker = Objects.requireNonNull(worker); this.edt = Objects.requireNonNull(edt);
-        observation = desktop.current();
         current = new DesktopPalette.Result(themes.current().chrome(), Optional.empty(), "Desktop palette pending");
-        unsubscribe = desktop.subscribe(value -> edt.execute(() -> observed(value)));
+        // Read the latest snapshot when the EDT handles a notification: a callback queued
+        // during initialization must not replace a newer opening snapshot.
+        unsubscribe = desktop.subscribe(value -> edt.execute(() -> observed(desktop.current())));
+        observation = initial.get();
         unsubscribeResample = desktop.subscribeResample(() -> edt.execute(this::resamplePreviews));
     }
     void onFailure(Consumer<ThemeController.InstallationFailure> listener) { failure = Objects.requireNonNull(listener); }
@@ -103,6 +110,7 @@ final class DesktopAppearance implements AutoCloseable {
         boolean portalChanged = !observation.portal().equals(value.portal());
         observation = value;
         for (Palette palette : value.palettes().values()) {
+            if (palette.generation() == generation) capabilities.put(new Key(palette.source(), palette.appearance()), palette);
             if (palette.generation() == generation && DesktopPalette.usable(palette.appearance() == Polarity.DARK, palette)) {
                 Palette previous = cache.put(new Key(palette.source(), palette.appearance()), palette);
                 boolean changed = previous == null || !previous.colors().equals(palette.colors())
@@ -143,12 +151,13 @@ final class DesktopAppearance implements AutoCloseable {
         for (Source source : Source.values()) {
             Palette cached = cache.get(new Key(source, polarity));
             if (cached != null) palettes.put(source, cached);
-            Palette latest = observation.palettes().get(source);
-            if (latest != null && latest.appearance() == polarity && latest.generation() == generation
-                    && DesktopPalette.usable(dark, latest)) palettes.put(source, latest);
-            else if (latest != null && latest.appearance() == polarity && latest.generation() == generation && cached != null)
-                palettes.put(source, new Palette(cached.generation(), source, polarity, cached.colors(), cached.implementation(),
-                    cached.version(), latest.reason().isBlank() ? "Desktop toolkit palette unavailable; using last good palette" : latest.reason()));
+            Palette latest = capabilities.get(new Key(source, polarity));
+            if (latest != null && DesktopPalette.usable(dark, latest)) palettes.put(source, latest);
+            else if (latest != null) {
+                if (cached == null) palettes.put(source, latest);
+                else palettes.put(source, new Palette(cached.generation(), source, polarity, cached.colors(), cached.implementation(),
+                    cached.version(), latest.reason().isBlank() ? "Desktop toolkit palette unavailable" : latest.reason()));
+            }
         }
         return new DesktopObservation(observation.portal(), palettes);
     }
@@ -195,10 +204,6 @@ final class DesktopAppearance implements AutoCloseable {
     private DesktopPalette.Result resolved(boolean dark, DesktopPalette.SourceMode source, DesktopObservation input) {
         var result = DesktopPalette.resolve(dark, source, currentDesktop, input);
         String status = result.status();
-        if (result.source().isPresent()) {
-            var palette = input.palettes().get(result.source().get());
-            if (!palette.reason().isBlank()) status += "; " + palette.reason();
-        }
         if (!input.portal().reason().isBlank()) status += "; " + input.portal().reason();
         return new DesktopPalette.Result(result.theme(), result.source(), status);
     }
@@ -208,7 +213,7 @@ final class DesktopAppearance implements AutoCloseable {
     }
     @Override public void close() {
         requireEdt(); if (closed) return;
-        closed = true; revision++; unsubscribe.run(); unsubscribeResample.run(); previews.clear(); listeners.clear(); cache.clear(); desktop.close();
+        closed = true; revision++; unsubscribe.run(); unsubscribeResample.run(); previews.clear(); listeners.clear(); cache.clear(); capabilities.clear(); desktop.close();
         if (worker instanceof ExecutorService service) service.shutdown();
     }
     private static void requireEdt() {

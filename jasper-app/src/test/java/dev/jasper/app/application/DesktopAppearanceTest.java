@@ -15,6 +15,44 @@ import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class DesktopAppearanceTest {
+    @Test void publicationDuringInitializationReachesAuthoredMatchSystem() {
+        openingPublication(false);
+    }
+    @Test void anOlderQueuedCallbackCannotReplaceTheNewerInitialSnapshot() {
+        openingPublication(true);
+    }
+    private static void openingPublication(boolean newerSnapshot) {
+        try (var input = new DesktopColorsHarness(); var themes = ThemeController.start(true,
+                ThemeSelection.slateCobalt(TerminalSchemeChoice.MATCH), Kit.DEFAULT,
+                kit -> theme -> true, failure -> { throw failure; }).controller()) {
+            input.portal(1, true, "");
+            var dispatch = new ArrayDeque<Runnable>();
+            try (var owner = new DesktopAppearance(themes, input.service, "GNOME", Runnable::run, dispatch::add, () -> {
+                var before = input.service.current();
+                input.portal(2, newerSnapshot, "");
+                if (newerSnapshot) input.portal(3, false, "");
+                return newerSnapshot ? input.service.current() : before;
+            })) {
+                owner.update(ConfigSnapshot.defaults().toBuilder().appearance(AppearanceMode.SYSTEM).build());
+                while (!dispatch.isEmpty()) {
+                    dispatch.remove().run();
+                    if (newerSnapshot) assertThat(themes.current().chrome().dark()).isFalse();
+                }
+                assertThat(themes.current().chrome().dark()).isFalse();
+                assertThat(input.launches()).containsExactly("jasper-desktop-portal");
+            }
+        }
+    }
+
+    @Test void initialUnavailablePaletteRetainsCapabilityAndReason() {
+        try (var f = new Fixture()) {
+            f.owner.update(config("gtk4", true)); f.drain();
+            f.nativeInput.unavailable(Source.GTK4, "libadwaita", "1.9.1 (GTK 4.22.4)", "display unavailable"); f.drain();
+            assertThat(f.owner.current().source()).isEmpty();
+            assertThat(f.owner.current().status()).contains("libadwaita", "1.9.1 (GTK 4.22.4)", "display unavailable", "Slate Cobalt");
+        }
+    }
+
     @Test void authoredOnlyConfigStartsNoToolkitAndDesktopDemandStopsAfterSwitchingBack() {
         try (var f = new Fixture()) {
             f.owner.update(ConfigSnapshot.defaults()); f.drain();
@@ -60,7 +98,7 @@ class DesktopAppearanceTest {
             var before = f.owner.current(); int installs = f.installs.get();
             f.nativeInput.fail(Source.GTK3); f.drain();
             assertThat(f.owner.current().theme()).isEqualTo(before.theme());
-            assertThat(f.owner.current().status()).isNotEqualTo(before.status());
+            assertThat(f.owner.current().status()).isNotEqualTo(before.status()).contains("last good");
             assertThat(f.installs.get()).isEqualTo(installs);
             f.nativeInput.portal(2, true, ",\"accent\":\"0.8,0.2,0.4,1\",\"highContrast\":true"); f.drain();
             assertThat(f.owner.current().theme().semantic().color(SemanticColor.ACCENT))
