@@ -32,7 +32,7 @@ public final class FontSet {
         this(family, size, fallbackFamilies, ligatures, 1f);
     }
 
-    /** Creates EDT-owned font variants and metrics with a line-height multiplier. Use validated TerminalOptions values. */
+    /** Creates EDT-owned font variants and metrics with a line-height multiplier and an effective point size, including any host user scale. */
     public FontSet(String family, float size, List<String> fallbackFamilies, boolean ligatures, float lineHeight) {
         this.ligatures = ligatures;
         List<String> families = new ArrayList<>();

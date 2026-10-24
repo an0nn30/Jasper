@@ -13,8 +13,8 @@ final class InitialWindowSize {
     static Dimension terminalArea(ConfigSnapshot snapshot) {
         dev.jasper.app.platform.BundledFonts.register();
         FontConfig f = snapshot.font();
-        FontSet fonts = new FontSet(f.family(), f.size(), f.fallback(), f.ligatures(), f.lineHeight());
-        int panePadding = TerminalPane.PADDING * 2;
+        FontSet fonts = new FontSet(f.family(), com.formdev.flatlaf.util.UIScale.scale(f.size()), f.fallback(), f.ligatures(), f.lineHeight());
+        int panePadding = com.formdev.flatlaf.util.UIScale.scale(TerminalPane.PADDING) * 2;
         return new Dimension(snapshot.columns() * fonts.cellWidth() + panePadding,
             snapshot.lines() * fonts.cellHeight() + panePadding);
     }

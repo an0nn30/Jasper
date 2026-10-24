@@ -72,6 +72,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     private boolean jobQueryPending;
     private final Timer jobTimer = new Timer(500, event -> refreshJob());
     private TerminalView view;
+    private final AutoCloseable scaleSubscription;
     private FindBar findBar;
     private boolean closed;
     private boolean active;
@@ -237,6 +238,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         noticeSecondary.addActionListener(event -> secondaryAction.run());
         droppedTimer.setRepeats(false);
         setActive(false);
+        scaleSubscription = NativeStyles.installed().observeTypography(this::updateUserScale);
     }
 
     /**
@@ -299,6 +301,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         if (session != null) session.removeListener(listener);
         session = created;
         view = new TerminalView(session, applicationOptions());
+        view.setUserScaleFactor(com.formdev.flatlaf.util.UIScale.getUserScaleFactor());
         view.setBackgroundOpacity(backgroundOpacity);
         setFocusable(false);
         findBar = new FindBar(view);
@@ -562,8 +565,14 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     void focusTerminal() { if (!closed) (view == null ? this : view).requestFocusInWindow(); }
     void setActive(boolean selected) {
         active = selected;
-        setBorder(BorderFactory.createEmptyBorder(PADDING, PADDING, PADDING, PADDING));
+        updateUserScale();
         if (view != null) view.setInactiveDim(selected ? 0 : configuredDim);
+    }
+
+    private void updateUserScale() {
+        int padding = com.formdev.flatlaf.util.UIScale.scale(PADDING);
+        setBorder(BorderFactory.createEmptyBorder(padding, padding, padding, padding));
+        if (view != null) view.setUserScaleFactor(com.formdev.flatlaf.util.UIScale.getUserScaleFactor());
     }
 
     /**
@@ -616,6 +625,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        try { scaleSubscription.close(); }
+        catch (Exception failure) { LOG.log(System.Logger.Level.WARNING, "Could not remove terminal scale listener", failure); }
         jobTimer.stop();
         Runnable closedHook = onClosed;
         onClosed = () -> {};

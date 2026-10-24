@@ -143,8 +143,14 @@ public final class FlatLafInstaller {
             this.platform = platform; this.body = body; this.sized = sized;
         }
         @Override public synchronized Object createValue(javax.swing.UIDefaults table) {
-            if (SwingTypography.userFont()) return platform.createValue(table);
-            var next = new javax.swing.plaf.FontUIResource(sized.apply(com.formdev.flatlaf.util.UIScale.scale(body)));
+            var user = SwingTypography.user();
+            javax.swing.plaf.FontUIResource next;
+            if (user.size().isPresent()) {
+                // defaultFont retains the desktop size for FlatLaf's scale calculation; the host's form override
+                // carries the look's body size (or the exact configured points) for native component text.
+                var base = (java.awt.Font) platform.createValue(table);
+                next = new javax.swing.plaf.FontUIResource(base.deriveFont(user.size().get()));
+            } else next = new javax.swing.plaf.FontUIResource(sized.apply(com.formdev.flatlaf.util.UIScale.scale(body)));
             if (!next.equals(last)) last = next;
             return last;
         }

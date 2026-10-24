@@ -109,6 +109,16 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Shared display scaling — 2026-10-24** (`codex/shared-display-scaling`; merged into `main` for Linux testing): terminal fonts,
+initial window geometry and pane padding follow FlatLaf's user scale while font settings and per-pane zoom stay in
+logical points (6–72, with rendered sizes allowed above 72). Scale changes refit the existing PTY and closing a pane
+releases its observer. Enterprise family-only UI font changes retain the desktop font size used for scale derivation.
+The [plan](superpowers/plans/2026-10-24-shared-display-scaling.md) left the precise control fix to investigation, a
+deviation from the complete-code planning convention. Independent task and whole-branch reviews found no issues;
+focused and fresh 1.25/1.5/2 scale checks passed. `./gradlew check --continue` with Python 3.13 passed: 12,847 tests,
+zero failures/errors, 29 skips. The first run found the corrected source-inventory omission for the two new app tests.
+Native GNOME Wayland and KDE acceptance remains pending. No GUI or AOT run.
+
 **Buddy translucent Linux rendering — 2026-10-24** (`codex/buddy-wayland-rendering`; Ubuntu fix verified by the user, approved for merge):
 all four Buddy windows compose complete frames in reusable device-resolution ARGB buffers, then replace native
 pixels in one clipped blit. This avoids X11 Swing's opaque backbuffer and the native background clear between
