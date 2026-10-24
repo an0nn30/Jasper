@@ -18,21 +18,50 @@ class SettingsAppearanceTest {
 
     @Test void desktopMetadataIsApplicationOwnedAndFollowsTheAuthoredBuiltIns() throws Exception {
         try (var f = new DesktopAppearanceTest.Fixture(); var system = dev.jasper.app.platform.SystemAppearance.open()) {
-            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner);
+            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner, true);
             assertThat(choices.desktop().available()).isTrue();
             assertThat(choices.themes().get().dark()).extracting(InstalledThemes.ThemeOption::id)
                 .endsWith("jasper-meadow", "desktop-colors");
             assertThat(dev.jasper.ui.theme.JasperTheme.builtIns()).extracting(dev.jasper.ui.theme.JasperTheme::id)
                 .doesNotContain("desktop-colors");
-            var unavailable = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), null);
+            var unavailable = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), null, false);
             assertThat(unavailable.themes().get().dark()).extracting(InstalledThemes.ThemeOption::id).doesNotContain("desktop-colors");
+        }
+    }
+
+    @Test void linuxWithoutHelperDirectoryStillOffersDesktopColorsAndRetainsTheSavedSource() {
+        try (var system = dev.jasper.app.platform.SystemAppearance.open()) {
+            // Missing helper discovery supplies no DesktopAppearance owner; Linux eligibility remains independent.
+            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), null, true);
+            assertThat(choices.desktop().available()).isTrue();
+            assertThat(choices.themes().get().dark()).extracting(InstalledThemes.ThemeOption::id).endsWith("desktop-colors");
+            assertThat(choices.themes().get().light()).extracting(InstalledThemes.ThemeOption::id).endsWith("desktop-colors");
+            for (String text : java.util.List.of("", "[ui.theme]\ndark='desktop-colors'\ndesktop_source='gtk4'\n")) {
+                var draft = draft(text); var page = page(choices, draft);
+                try {
+                    page.component();
+                    var dark = dev.jasper.app.testsupport.KitTestSupport.require(page.component(), "ui.appearance:dark-theme.input", javax.swing.JComboBox.class);
+                    for (int i = 0; i < dark.getItemCount(); i++) {
+                        var option = (dev.jasper.ui.model.Option)dark.getItemAt(i);
+                        if (option.id().equals("desktop-colors")) assertThat(option.label()).isEqualTo("Desktop colors");
+                    }
+                    assertThat(draft.modified()).isFalse();
+                    pick(page, "dark-theme", "desktop-colors");
+                    assertThat(dev.jasper.app.settingsui.DesktopPageProbe.status(page)).contains("helpers unavailable", "bundled colors")
+                        .doesNotContain("unavailable on this platform");
+                    assertThat(dev.jasper.app.settingsui.DesktopPageProbe.preview(page, true).control()).isEqualTo(
+                        dev.jasper.ui.theme.JasperTheme.builtIn("slate-cobalt").orElseThrow().palette(true)
+                            .color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB());
+                    assertThat(draft.value(dev.jasper.app.config.CoreSettings.UI_THEME_DESKTOP_SOURCE)).isEqualTo(text.isEmpty() ? "auto" : "gtk4");
+                } finally { page.dispose(); }
+            }
         }
     }
 
     @Test void renderedPageStartsOnlyStagedToolkitDemandAndClosingThenReopeningReleasesIt() throws Exception {
         try (var f = new DesktopAppearanceTest.Fixture(); var system = dev.jasper.app.platform.SystemAppearance.open()) {
             f.owner.update(dev.jasper.app.config.ConfigSnapshot.defaults()); f.drain();
-            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner);
+            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner, true);
             var draft = draft("");
             var page = page(choices, draft); page.component(); f.drain();
             assertThat(f.nativeInput.launches()).containsExactly("jasper-desktop-portal");
@@ -54,7 +83,7 @@ class SettingsAppearanceTest {
     @Test void retiredPreviewCompletionsCannotRefreshClosedPageOrReplaceNewSourceCache() throws Exception {
         try (var f = new DesktopAppearanceTest.Fixture(); var system = dev.jasper.app.platform.SystemAppearance.open()) {
             f.owner.update(dev.jasper.app.config.ConfigSnapshot.defaults()); f.drain();
-            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner);
+            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner, true);
             var page = page(choices, draft("[ui.theme]\ndark='desktop-colors'\ndesktop_source='gtk3'\n"));
             page.component(); f.drain();
             var before = f.themes.current();
@@ -74,7 +103,7 @@ class SettingsAppearanceTest {
     @Test void renderedTilesReceiveNativePreviewColorsForTheirOwnPolarityWithoutInstallingThem() throws Exception {
         try (var f = new DesktopAppearanceTest.Fixture(); var system = dev.jasper.app.platform.SystemAppearance.open()) {
             f.owner.update(dev.jasper.app.config.ConfigSnapshot.defaults()); f.drain();
-            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner);
+            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner, true);
             var page = page(choices, draft("[ui.theme]\ndark='desktop-colors'\nlight='desktop-colors'\ndesktop_source='gtk4'\n"));
             try {
                 page.component(); f.drain();
@@ -93,7 +122,7 @@ class SettingsAppearanceTest {
     @Test void missingToolkitStatusRemainsAppliedWhileDraftSourceIsPending() throws Exception {
         try (var f = new DesktopAppearanceTest.Fixture(); var system = dev.jasper.app.platform.SystemAppearance.open()) {
             f.owner.update(DesktopAppearanceTest.config("gtk4", true)); f.drain();
-            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner);
+            var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner, true);
             var draft = draft("[ui.theme]\ndark='desktop-colors'\ndesktop_source='gtk4'\n");
             var page = page(choices, draft);
             try {

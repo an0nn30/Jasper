@@ -39,7 +39,16 @@ final class SettingsAppearance {
     /** Adds Linux's runtime source and retains preview requests only while an Appearance page needs them. */
     static AppearanceChoices choices(SystemAppearance system, Supplier<ThemeLibrary> library, Optional<ThemeImports> imports,
                                      DesktopAppearance desktop) {
-        var desktopChoices = desktop == null ? DesktopChoices.UNAVAILABLE : desktopChoices(desktop);
+        return choices(system, library, imports, desktop, System.getProperty("os.name", "").startsWith("Linux"));
+    }
+
+    /** Choices for a known platform; helper availability is supplied independently. */
+    static AppearanceChoices choices(SystemAppearance system, Supplier<ThemeLibrary> library, Optional<ThemeImports> imports,
+                                     DesktopAppearance desktop, boolean linux) {
+        var unavailable = DesktopChoices.UNAVAILABLE;
+        var desktopChoices = !linux ? unavailable : desktop != null ? desktopChoices(desktop)
+            : new DesktopChoices(true, () -> "Desktop color helpers unavailable; using bundled colors",
+                unavailable.preview(), unavailable.onChanged(), unavailable.acquire());
         var glass = JasperTheme.bundled().generated(true).glass();
         var cache = new Object() { ThemeLibrary from; InstalledThemes themes; };
         return new AppearanceChoices((float) (glass.opacity() * 100), glass.blur(),
