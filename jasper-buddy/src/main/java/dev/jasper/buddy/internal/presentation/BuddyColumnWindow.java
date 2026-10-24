@@ -19,7 +19,7 @@ import javax.swing.Timer;
 /** The window the thought column lives in: translucent, always on top, never focused. */
 final class BuddyColumnWindow {
     static final int BUBBLE_GAP = 30;
-    private final JWindow window = new JWindow();
+    private final JWindow window = new BuddySurfaceWindow();
     private final BuddyDeck deck;
     private final BuddyColumnPanel panel;
     /** Animate placement and running-text shimmer at 60 Hz; other live detail ticks once a second. */

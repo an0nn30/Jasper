@@ -62,7 +62,8 @@ child surfaces. First realization creates the drawer and column; the right-click
 bubble is created on demand. These are nonfocusable, translucent, always-on-top utility
 windows. Initial coordinates are monitor-clamped once. Later option application updates
 fonts, notice-card colours and callbacks without restoring those initial coordinates.
-The menu bubble keeps its fixed dark material.
+The menu bubble keeps its fixed dark material. All four surfaces compose complete frames in reusable
+device-resolution ARGB buffers before copying them to their native windows.
 
 | Surface/owner | Responsibility and lifecycle |
 | --- | --- |

@@ -109,6 +109,15 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Buddy translucent Linux rendering — 2026-10-24** (`codex/buddy-wayland-rendering`; not merged or pushed):
+all four Buddy windows compose complete frames in reusable device-resolution ARGB buffers, then replace native
+pixels in one clipped blit. This avoids X11 Swing's opaque backbuffer and the native background clear between
+frames. Headless pixel tests cover transparency, old-frame erasure, clipping, resize, disposal and 1×, 2× and
+1.25× scaling; `:jasper-buddy:test` passed (162 tests, zero failures, errors or skips). Full `check` and independent
+review are pending. The [plan](superpowers/plans/2026-10-24-buddy-wayland-rendering.md) records the implementation;
+its scope grew by one architecture-guide sentence. Ubuntu GNOME Wayland acceptance remains user-run: capsules,
+sprite animation, dragging, repeated hide/show, menu/drawer and display scaling.
+
 **Editor Color scheme setting — 2026-10-23** (`claude/editor-color-scheme`, worktree
 `.claude/worktrees/editor-color-scheme`, from local `main` at `f30067a2d`; not merged or pushed): the Editor's
 `color_scheme` (Settings › Tools › Editor › Colors) is `"workspace"` (the default: the shown UI theme's editor scheme,

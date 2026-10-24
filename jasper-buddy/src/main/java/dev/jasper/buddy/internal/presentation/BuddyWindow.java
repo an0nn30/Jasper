@@ -32,7 +32,7 @@ public final class BuddyWindow {
     private static final double SCALE = 2.5;
     private static final int DRAG_THRESHOLD = 3;
 
-    private final JWindow window = new JWindow();
+    private final JWindow window = new BuddySurfaceWindow();
     private final BuddySprite sprite;
     private final BuddyAnimator animator = new BuddyAnimator(new Random());
     private BuddyOptions options;
