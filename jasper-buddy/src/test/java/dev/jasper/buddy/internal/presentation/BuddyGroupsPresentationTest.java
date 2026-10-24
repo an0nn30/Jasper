@@ -73,6 +73,25 @@ class BuddyGroupsPresentationTest {
         panel.setGroupFilter(null);
         assertThat(panel.displayed()).hasSize(1);
     }
+    @Test void ownerLayoutReconcilesScrolledFilteredDrawerAfterExternalShrink() {
+        var deck = new BuddyDeck();
+        for (int i = 0; i < 8; i++) deck.post(notice("pane" + i, "pane " + i, "a"));
+        deck.post(notice("unrelated", "other", "b"));
+        var panel = new BuddyDeckPanel(BuddyTestAppearance.options(), deck, () -> {});
+        panel.setGroupFilter(new BuddyNoticeId("test", "a"));
+        panel.setMaxListHeight(() -> 160);
+        panel.setSize(panel.getPreferredSize());
+        panel.handleWheel(100);
+        assertThat(panel.scroll()).isPositive();
+        for (int i = 0; i < 7; i++) deck.dismiss(new BuddyNoticeId("test", "pane" + i));
+        // Same headless seam used by the window for showBeside and model refresh layout.
+        panel.setSize(BuddyDeckWindow.reconcilePanel(panel));
+        assertThat(panel.scroll()).isZero();
+        assertThat(panel.displayed()).hasSize(1);
+        panel.handleMove(new Point(BuddyDeckPanel.MOTION_MARGIN + 40,
+            BuddyDeckPanel.MOTION_MARGIN + panel.headerHeight() + 20));
+        assertThat(panel.hovered()).isZero();
+    }
     @Test void filteredDrawerClearDismissesOnlyVisibleMembersAndKeepsHiddenWork() {
         var deck = new BuddyDeck();
         deck.post(notice("1", "same", "a")); deck.post(notice("2", "same", "a"));

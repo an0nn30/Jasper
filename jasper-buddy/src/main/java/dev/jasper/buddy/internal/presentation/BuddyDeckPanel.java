@@ -130,9 +130,17 @@ final class BuddyDeckPanel extends JComponent {
 
     /** A notice was posted, dismissed or cleared: re-size around the new list. */
     void refresh() {
-        scroll = BuddyDeckLayout.clampScroll(scroll, contentHeight(), viewportHeight());
+        reconcileSize();
         hovered = -1; leaving = -1;
         changed();
+    }
+
+    /** Reconcile external membership changes against the viewport the owner is about to install. */
+    Dimension reconcileSize() {
+        Dimension size = getPreferredSize();
+        int nextViewport = Math.max(0, size.height - 2 * MOTION_MARGIN - headerHeight());
+        scroll = BuddyDeckLayout.clampScroll(scroll, contentHeight(), nextViewport);
+        return size;
     }
 
     @Override public Dimension getPreferredSize() {

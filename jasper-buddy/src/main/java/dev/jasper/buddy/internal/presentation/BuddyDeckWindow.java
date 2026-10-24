@@ -125,9 +125,12 @@ final class BuddyDeckWindow {
         return !disposed && anchor != null && !deckEmpty && size.width > 0 && size.height > 0;
     }
 
+    /** Shared by model refresh and anchor placement; headless-testable without constructing a window. */
+    static Dimension reconcilePanel(BuddyDeckPanel panel) { return panel.reconcileSize(); }
+
     private void layout() {
         if (disposed || anchor == null) return;
-        Dimension size = panel.getPreferredSize();
+        Dimension size = reconcilePanel(panel);
         if (!shows(false, anchor, panel.displayed().isEmpty(), size)) { frames.stop(); window.setVisible(false); return; }
         if (!size.equals(window.getSize())) window.setSize(size);
         Point next = BuddyBubblePlacement.beside(anchor, size, screenFor(anchor));
