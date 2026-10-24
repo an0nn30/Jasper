@@ -38,7 +38,7 @@ public record ActionSpec(String id, String title, Optional<String> icon, List<St
     }
 
     /**
-     * A Global action whose default, if any, applies on every platform: the form SDK 0.10 had.
+     * A global action whose default, if any, applies on every platform.
      *
      * @param id namespaced id
      * @param title non-blank title
@@ -105,8 +105,7 @@ public record ActionSpec(String id, String title, Optional<String> icon, List<St
     }
 
     /**
-     * A copy whose shortcut applies only in a context. Panel and window contexts must name the plugin's own panel or
-     * window.
+     * A copy whose shortcut applies only in a context. A panel context must name one of the plugin's own panels.
      *
      * @param value where the shortcut applies
      * @return the copy

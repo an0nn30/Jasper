@@ -35,6 +35,23 @@ class ShellIntegrationScriptTest {
         return at + needle.length();
     }
 
+    @Test void cygwinConvertsMountedDirectoryAndPreservesFailedCommandStatus() throws Exception {
+        Path home = Files.createDirectories(dir.resolve("cygwin home"));
+        Path work = Files.createDirectories(dir.resolve("cygwin work"));
+        Path converter = dir.resolve("cygpath");
+        Files.writeString(converter, "#!/bin/sh\nprintf 'C:/mapped space/dir\\n'\n");
+        assertThat(converter.toFile().setExecutable(true)).isTrue();
+        Path integration = scripts();
+        Files.writeString(home.resolve(".bash_profile"), "cd -- \"$HOME\"\n");
+        var env = environment(home);
+        env.put("JASPER_CYGWIN", "1"); env.put("JASPER_CYGWIN_CYGPATH", converter.toString());
+        env.put("JASPER_CYGWIN_CWD", work.toRealPath().toString()); env.put("JASPER_CYGWIN_MODE", "auto");
+        env.put("JASPER_SHELL_INTEGRATION", integration.toString());
+        String output = ShellRun.run(List.of("/bin/bash", "--noprofile", "--rcfile", integration.resolve("bash/cygwin.bash").toString(), "-i"),
+            env, home, "pwd\nfalse\nprintf 'status:%s\\n' \"$?\"\nexit\n");
+        assertThat(output).contains(work.toRealPath().toString(), "status:1", "\033]7;file://localhost/C%3A/mapped%20space/dir\007");
+    }
+
     @Test void zshEmitsMarksDirectoryAndTheExactCommandLine() throws Exception {
         Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/zsh")));
         Path home = Files.createDirectories(dir.resolve("home with space"));

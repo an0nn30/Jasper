@@ -30,4 +30,14 @@ class TabStateTest {
         tab.rename(null);
         assertThat(tab.title(null, Path.of("/different/path"))).isEqualTo("path");
     }
+
+    @Test
+    void theNameTheUserGaveIsKeptApartFromTheAutomaticTitle() {
+        TabState tab = new TabState();
+        assertThat(tab.renamed()).isEmpty();
+        tab.rename("build");
+        assertThat(tab.renamed()).contains("build");
+        tab.rename(" ");
+        assertThat(tab.renamed()).isEmpty();
+    }
 }

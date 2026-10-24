@@ -23,16 +23,16 @@ class PluginPaneAppearanceTest {
             panel.addPropertyChangeListener("Jasper.zone", event -> {
                 if (fail[0]) { fail[0] = false; throw new IllegalStateException("fixture zone failure"); }
             });
-            int tabs = owner.tabStrip().getTabCount();
+            int tabs = owner.tabCount();
             org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-                contributions.content().open("fixture", "failed-zone", "Failed", owner.id(), panel))
+                contributions.tabs().open("fixture", "failed-zone", "Failed", owner.id(), panel))
                 .isInstanceOf(IllegalStateException.class).hasMessage("fixture zone failure");
             assertThat(panel.getClientProperty("Jasper.zone")).isNull();
             assertThat(panel.getClientProperty("Jasper.workspaceStylerRoot")).isNull();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(tabs);
-            assertThat(contributions.content().entries()).isEmpty();
-            var retry = contributions.content().open("fixture", "failed-zone", "Recovered", owner.id(), panel);
-            assertThat(contributions.content().entries()).containsExactly(retry);
+            assertThat(owner.tabCount()).isEqualTo(tabs);
+            assertThat(contributions.tabs().hosted()).isEmpty();
+            var retry = contributions.tabs().open("fixture", "failed-zone", "Recovered", owner.id(), panel);
+            assertThat(contributions.tabs().hosted()).containsExactly(retry);
         });
     }
 
@@ -43,10 +43,10 @@ class PluginPaneAppearanceTest {
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
-            var entry = contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
+            var entry = contributions.tabs().open("fixture", "pane", "Pane", owner.id(), panel);
             assertThat(dev.jasper.app.platform.ThemeZone.theme(list)).isSameAs(themes.current().workspace());
             assertThat(list.getClientProperty("FlatLaf.style")).isNull();
-            contributions.content().remove(entry);
+            contributions.tabs().remove(entry);
             assertThat(list.getClientProperty("Jasper.workspaceStyle")).isNull();
             assertThat(panel.getClientProperty("Jasper.zone")).isNull();
         });
@@ -58,7 +58,7 @@ class PluginPaneAppearanceTest {
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
-            contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
+            contributions.tabs().open("fixture", "pane", "Pane", owner.id(), panel);
             themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             assertThat(dev.jasper.app.platform.ThemeZone.theme(list)).isSameAs(themes.current().workspace());
             themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
@@ -75,17 +75,17 @@ class PluginPaneAppearanceTest {
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var removed = new JPanel(); var removedList = new JList<>(new String[] {"remove"}); removed.add(removedList);
-            var entry = contributions.content().open("fixture", "remove", "Remove", owner.id(), removed);
+            var entry = contributions.tabs().open("fixture", "remove", "Remove", owner.id(), removed);
             var retained = new JPanel(); var retainedList = new JList<>(new String[] {"keep"}); retained.add(retainedList);
-            contributions.content().open("fixture", "keep", "Keep", owner.id(), retained);
+            contributions.tabs().open("fixture", "keep", "Keep", owner.id(), retained);
             var armed = new boolean[] {true};
             removed.addPropertyChangeListener("Jasper.workspaceTheme", event -> {
-                if (armed[0]) { armed[0] = false; contributions.content().remove(entry); }
+                if (armed[0]) { armed[0] = false; contributions.tabs().remove(entry); }
             });
             // A light workspace inside the dark chrome, as hosting code may receive any pair (Decision 5).
             var split = ThemeTestSupport.mixed(ThemeTestSupport.generated(true), ThemeTestSupport.generated(false));
             owner.applyTheme(split, true);
-            assertThat(contributions.content().entries()).doesNotContain(entry);
+            assertThat(contributions.tabs().hosted()).doesNotContain(entry);
             assertThat(removed.getClientProperty("Jasper.zone")).isNull();
             assertThat(removed.getClientProperty("Jasper.workspaceTheme")).isNull();
             assertThat(removed.getClientProperty("Jasper.workspace.dark")).isNull();
@@ -104,14 +104,15 @@ class PluginPaneAppearanceTest {
                 ThemeTestSupport.controller(true));
             var contributions = new Contributions(); owner.connectContributions(contributions);
             detached.connectContributions(contributions);
-            contributions.content().setFactory(separate -> detached.id());
+            contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(owner::id, owner.id()::equals,
+                tab -> contributions.tabs().move(tab, detached.id())));
             var moved = new JPanel(); var movedList = new JList<>(new String[] {"move"}); moved.add(movedList);
-            var entry = contributions.content().open("fixture", "move", "Move", owner.id(), moved);
+            var entry = contributions.tabs().open("fixture", "move", "Move", owner.id(), moved);
             var retained = new JPanel(); var retainedList = new JList<>(new String[] {"keep"}); retained.add(retainedList);
-            contributions.content().open("fixture", "keep", "Keep", owner.id(), retained);
+            contributions.tabs().open("fixture", "keep", "Keep", owner.id(), retained);
             var armed = new boolean[] {true};
             moved.addPropertyChangeListener("Jasper.workspaceTheme", event -> {
-                if (armed[0]) { armed[0] = false; contributions.content().move(entry, true); }
+                if (armed[0]) { armed[0] = false; contributions.tabs().moveToNewWindow(entry); }
             });
             // A light workspace inside the dark chrome, as hosting code may receive any pair (Decision 5).
             var split = ThemeTestSupport.mixed(ThemeTestSupport.generated(true), ThemeTestSupport.generated(false));
@@ -136,18 +137,19 @@ class PluginPaneAppearanceTest {
                 // One installed look per process: the second window shows the same variant.
                 ThemeTestSupport.controller(true));
             var contributions = new Contributions(); first.connectContributions(contributions); second.connectContributions(contributions);
-            contributions.content().setFactory(separate -> second.id());
+            contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(first::id, first.id()::equals,
+                tab -> contributions.tabs().move(tab, second.id())));
             var text = new JTextArea("before"); var document = text.getDocument();
             var undo = new javax.swing.undo.UndoManager(); document.addUndoableEditListener(undo);
             text.append(" after"); text.select(1, 4);
-            var entry = contributions.content().open("fixture", "pane", "Pane", first.id(), text);
+            var entry = contributions.tabs().open("fixture", "pane", "Pane", first.id(), text);
             assertThat(dev.jasper.app.platform.ThemeZone.theme(text)).isSameAs(firstTheme.current().workspace());
-            contributions.content().move(entry, true);
+            contributions.tabs().moveToNewWindow(entry);
             assertThat(text.getClientProperty("Jasper.workspaceStyle")).isNull();
             assertThat(text.getDocument()).isSameAs(document);
             assertThat(undo.canUndo()).isTrue();
             assertThat(text.getSelectedText()).isEqualTo("efo");
-            contributions.content().move(entry, false);
+            contributions.tabs().moveToMainWindow(entry);
             assertThat(dev.jasper.app.platform.ThemeZone.theme(text)).isSameAs(firstTheme.current().workspace());
             assertThat(text.getDocument()).isSameAs(document);
             assertThat(undo.canUndo()).isTrue();
@@ -162,10 +164,10 @@ class PluginPaneAppearanceTest {
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
-            var entry = contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
-            contributions.content().remove(entry);
+            var entry = contributions.tabs().open("fixture", "pane", "Pane", owner.id(), panel);
+            contributions.tabs().remove(entry);
             assertThat(list.getClientProperty("Jasper.workspaceStyle")).isNull();
-            var next = contributions.content().open("fixture", "pane2", "Pane", owner.id(), panel);
+            var next = contributions.tabs().open("fixture", "pane2", "Pane", owner.id(), panel);
             owner.close();
             assertThat(panel.getClientProperty("Jasper.zone")).isNull();
             assertThat(list.getClientProperty("Jasper.workspaceStyle")).isNull();
@@ -180,7 +182,7 @@ class PluginPaneAppearanceTest {
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var contributions = new Contributions(); owner.connectContributions(contributions);
             var panel = new JPanel(); var list = new JList<>(new String[] {"entry"}); panel.add(list);
-            contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
+            contributions.tabs().open("fixture", "pane", "Pane", owner.id(), panel);
             themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
@@ -217,7 +219,7 @@ class PluginPaneAppearanceTest {
             var root = new JPanel(); var editor = new JPanel(); editor.putClientProperty("Jasper.workspace.exempt", true);
             var area = new JTextArea(); editor.add(area);
             var nearby = new JList<>(new String[] {"entry"}); root.add(editor); root.add(nearby);
-            contributions.content().open("fixture", "editor", "Editor", owner.id(), root);
+            contributions.tabs().open("fixture", "editor", "Editor", owner.id(), root);
             assertThat(area.getClientProperty("Jasper.workspaceStyle")).isNull();
             assertThat(dev.jasper.app.platform.ThemeZone.theme(nearby)).isSameAs(themes.current().workspace());
             assertThat(nearby.getClientProperty("FlatLaf.style")).isNull();

@@ -3,14 +3,13 @@ package dev.jasper.app.workspace;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.formdev.flatlaf.util.SystemInfo;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeSelection;
 import dev.jasper.app.config.TerminalSchemeChoice;
+import dev.jasper.app.platform.MacTitleBand;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.presentation.ChromeSpec;
 import dev.jasper.app.presentation.DesktopFlags;
-import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.presentation.Projections;
 import dev.jasper.app.presentation.WorkspaceLook;
 import dev.jasper.app.testsupport.EnterpriseLook;
@@ -22,11 +21,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Supplier;
 import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
@@ -35,12 +32,13 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Spec 16.1.4, as JUnit and headless: a window's chrome under the default, Enterprise and complement kits, the fallback
- * combination and a strength-2 covering array of the nine chrome points, mounted as TerminalWindow mounts it and printed
+ * combination and a strength-2 covering array of the nine chrome points, mounted as WindowFrame mounts it and printed
  * at 2× into jasper-app/build/chrome-renders/. Plans 6b to 9 extend {@link #check}.
  */
 class ChromeRenderTest {
-    static final Projections.Host HOST = new Projections.Host(SystemInfo.isMacOS, MacTitleBar.isSupported());
-    static final Set<Presentation.Landed> ALL = EnumSet.allOf(Presentation.Landed.class);
+    static final Projections.Host HOST = new Projections.Host(Projections.Platform.of(System.getProperty("os.name", "")), MacTitleBar.isSupported());
+    /** The Enterprise mocks' host (plan 14 Rulings 21): the system title bar and the in-window menu row. */
+    static final Projections.Host LINUX = new Projections.Host(Projections.Platform.LINUX, false);
     static final String[] KEYS = {"title_bar", "menu_bar", "window_title", "tool_windows", "editor_tabs", "status_bar", "palette", "dialogs", "motion"};
 
     /**
@@ -49,8 +47,11 @@ class ChromeRenderTest {
      * @param name the image's name
      * @param themes makes the theme controller (and so the kit) the window runs under
      * @param projections the look's projections
+     * @param platform the platform the window is built for
      */
-    record Case(String name, Supplier<ThemeController> themes, Projections projections) { }
+    record Case(String name, Supplier<ThemeController> themes, Projections projections, Projections.Platform platform) {
+        Case(String name, Supplier<ThemeController> themes, Projections projections) { this(name, themes, projections, HOST.platform()); }
+    }
 
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
@@ -69,7 +70,9 @@ class ChromeRenderTest {
                 rows.add(new ChromeSpec(ChromeSpec.TitleBar.valueOf(v[0].toUpperCase()), ChromeSpec.MenuBar.valueOf(v[1].toUpperCase()), v[2],
                     ChromeSpec.ToolWindows.valueOf(v[3].toUpperCase()), ChromeSpec.EditorTabs.valueOf(v[4].toUpperCase()),
                     ChromeSpec.StatusBar.valueOf(v[5].toUpperCase()), ChromeSpec.PaletteKind.valueOf(v[6].toUpperCase()),
-                    ChromeSpec.DialogKind.valueOf(v[7].toUpperCase()), ChromeSpec.MotionKind.valueOf(v[8].toUpperCase())));
+                    ChromeSpec.DialogKind.valueOf(v[7].toUpperCase()), ChromeSpec.MotionKind.valueOf(v[8].toUpperCase()),
+                    // Held at classic and field: ChromeArtworkTest covers the icons, ClassicHeaderTest the search icon (plan 15b Rulings 8).
+                    ChromeSpec.Icons.CLASSIC, ChromeSpec.ToolbarSearch.FIELD));
             }
             return rows;
         } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
@@ -78,14 +81,29 @@ class ChromeRenderTest {
     /** Every case of spec 16.1.4 this plan renders. */
     static List<Case> cases() {
         var cases = new ArrayList<Case>();
-        cases.add(new Case("default", () -> slateCobalt(Kit.DEFAULT), Projections.of(ChromeSpec.DEFAULT, false, false, "", HOST, ALL)));
+        cases.add(new Case("default", () -> slateCobalt(Kit.DEFAULT), Projections.of(ChromeSpec.DEFAULT, false, false, "", HOST)));
         cases.add(new Case("enterprise", () -> EnterpriseLook.controller(false),
-            Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", HOST, ALL)));
-        cases.add(new Case("complement", () -> slateCobalt(KitFixtures.complement()), Projections.of(ChromeSpec.DEFAULT, true, true, "dev.example", HOST, ALL)));
+            Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", LINUX)));
+        // Plan 14: IntelliJ Classic's frame on macOS (the band) and Windows (FlatLaf's title pane with the menus); no mock shows them.
+        cases.add(new Case("enterprise-mac", () -> EnterpriseLook.controller(false),
+            Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.MAC, true)), Projections.Platform.MAC));
+        cases.add(new Case("enterprise-windows", () -> EnterpriseLook.controller(false),
+            Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.WINDOWS, false)), Projections.Platform.WINDOWS));
+        cases.add(new Case("complement", () -> slateCobalt(KitFixtures.complement()), Projections.of(ChromeSpec.DEFAULT, true, true, "dev.example", HOST)));
         cases.add(new Case("fallback", () -> slateCobalt(Kit.DEFAULT), Projections.fallback(new DesktopFlags(false, true), HOST)));
         var rows = covering();
-        for (int i = 0; i < rows.size(); i++)
-            cases.add(new Case("covering-" + i, () -> EnterpriseLook.controller(false), Projections.of(rows.get(i), true, true, "dev.jasper.enterprise", HOST, ALL)));
+        for (int i = 0; i < rows.size(); i++) {
+            var row = rows.get(i);
+            if (row.titleBar() != ChromeSpec.TitleBar.CLASSIC) {
+                cases.add(new Case("covering-" + i, () -> EnterpriseLook.controller(false), Projections.of(row, true, true, "dev.jasper.enterprise", HOST)));
+                continue;
+            }
+            // A classic title is the system's on Linux (a native row there), so its rows render as macOS and Windows on every host.
+            cases.add(new Case("covering-" + i + "-mac", () -> EnterpriseLook.controller(false),
+                Projections.of(row, true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.MAC, true)), Projections.Platform.MAC));
+            cases.add(new Case("covering-" + i + "-windows", () -> EnterpriseLook.controller(false),
+                Projections.of(row, true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.WINDOWS, false)), Projections.Platform.WINDOWS));
+        }
         return cases;
     }
 
@@ -102,21 +120,30 @@ class ChromeRenderTest {
         if (bar == null) {
             assertThat(root.getJMenuBar()).as(look.name() + ": the menus are a row of the window").isSameAs(owner.menuBar());
             int contentTop = SwingUtilities.convertPoint(owner, 0, 0, root).y;
-            assertThat(contentTop).as(look.name() + ": the content meets the menu row flush").isEqualTo(root.getJMenuBar().getHeight());
+            // FlatLaf's Windows window border puts the layered pane, where the inset is measured, 1 px into the root.
+            int expected = !window.classicTitle() ? root.getJMenuBar().getHeight()
+                : owner.titleBand() != null ? MacTitleBand.HEIGHT : SwingUtilities.convertPoint(root.getContentPane(), 0, 0, root).y;
+            assertThat(contentTop).as(look.name() + ": the content meets the title chrome flush").isEqualTo(expected);
+            if (window.classicTitle()) {
+                assertThat(contentTop).as(look.name() + ": a classic title takes room").isPositive();
+                assertThat(dev.jasper.app.platform.TitleInset.of(root)).as(look.name() + ": the classic title's inset")
+                    .isEqualTo(contentTop - root.getLayeredPane().getY());
+            }
             var header = owner.chrome().header();
             if (header.getParent() == owner) assertThat(header.getY()).as(look.name() + ": no gutter above the header").isZero();
         }
         var titles = WindowChromeMenusTest.titles(owner);
         if (look.projections().workspace().menus() == WorkspaceLook.Menus.CLASSIC)
-            assertThat(titles).as(look.name()).contains("Window").doesNotContain("Pane", "Tab");
-        else assertThat(titles).as(look.name()).contains("Pane", "Tab").doesNotContain("Window");
+            assertThat(titles).as(look.name()).contains("Window").doesNotContain("Tab");
+        else assertThat(titles).as(look.name()).contains("Tab").doesNotContain("Window");
         assertThat(titles.getLast()).as(look.name() + ": Help is last").isEqualTo("Help");
         // Plan 6b: the header, tabs, status cells and run item the look names.
         var workspace = look.projections().workspace();
         assertThat(owner.chrome().composition() instanceof ClassicHeader).as(look.name() + ": the header")
             .isEqualTo(workspace.header() == WorkspaceLook.Header.CLASSIC);
         assertThat(owner.tabBar() instanceof ClassicTabs).as(look.name() + ": the tabs").isEqualTo(workspace.tabs() == WorkspaceLook.Tabs.CLASSIC);
-        assertThat(owner.tabBar().component().isVisible() || workspace.tabs() == WorkspaceLook.Tabs.EQUAL).as(look.name() + ": classic tabs always show").isTrue();
+        assertThat(owner.tabBar().component().isVisible()).as(look.name() + ": a window's only tab shows the classic tabs, not the equal tabs")
+            .isEqualTo(workspace.tabs() == WorkspaceLook.Tabs.CLASSIC);
         assertThat(owner.status().cells() instanceof RuledCells).as(look.name() + ": the status cells")
             .isEqualTo(workspace.status() == WorkspaceLook.Status.RULED);
         assertThat(owner.status().runItem() != null).as(look.name() + ": the run item").isEqualTo(workspace.runItem());
@@ -164,10 +191,17 @@ class ChromeRenderTest {
                 MacTitleBar bar = null;
                 try {
                     var window = WindowLook.of(look.projections());
-                    var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, window.chrome());
+                    var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, window.chrome(),
+                        look.platform() == Projections.Platform.MAC);
                     owner.connectContributions(WindowChromeMenusTest.model(false));
                     var root = new JRootPane();
+                    if (window.classicTitle() && look.platform() == Projections.Platform.WINDOWS) {
+                        root.setWindowDecorationStyle(JRootPane.FRAME);
+                        root.updateUI();
+                    }
                     bar = WindowContent.mount(root, owner, window, title -> { });
+                    // macOS shows the root's menus in the screen menu bar, not in the window.
+                    if (window.classicTitle() && look.platform() == Projections.Platform.MAC) root.getJMenuBar().setVisible(false);
                     MockProfile.write(MockProfile.print(root, 1200, 700), "chrome-" + look.name());
                     check(look, owner, root, bar);
                 } finally {
@@ -200,22 +234,35 @@ class ChromeRenderTest {
 
     @Test void theCoveringArrayHasStrengthTwoOverTheChromePoints() {
         var rows = covering();
-        assertThat(rows).hasSize(8);
-        assertThat(rows.getFirst()).as("row 0 is the default look").isEqualTo(ChromeSpec.DEFAULT);
+        assertThat(rows).hasSize(10);
+        // Plan 12 E5: every row renders the classic icon set, so row 0 is the default look in its nine table points.
+        assertThat(rows.getFirst()).as("row 0 is the default look").usingRecursiveComparison().ignoringFields("icons")
+            .isEqualTo(ChromeSpec.DEFAULT);
         var seen = new HashSet<String>();
         for (var row : rows) {
-            boolean[] values = flags(row);
+            String[] values = values(row);
             for (int i = 0; i < KEYS.length; i++) for (int j = i + 1; j < KEYS.length; j++) seen.add(i + ":" + j + ":" + values[i] + ":" + values[j]);
         }
-        for (int i = 0; i < KEYS.length; i++) for (int j = i + 1; j < KEYS.length; j++) for (boolean a : new boolean[] {false, true}) for (boolean b : new boolean[] {false, true}) {
-            if (i == 0 && j == 1 && !a && b) continue; // spec 5.3: window menus need a native title
+        String[][] domains = new String[KEYS.length][];
+        for (int i = 0; i < KEYS.length; i++) domains[i] = i == 0 ? new String[] {"UNIFIED", "NATIVE", "CLASSIC"} : new String[] {"false", "true"};
+        for (int i = 0; i < KEYS.length; i++) for (int j = i + 1; j < KEYS.length; j++) for (String a : domains[i]) for (String b : domains[j]) {
+            if (i == 0 && j == 1 && a.equals("UNIFIED") && b.equals("true")) continue; // spec 5.3: window menus need a native or classic title
             assertThat(seen).as(KEYS[i] + "=" + a + " with " + KEYS[j] + "=" + b).contains(i + ":" + j + ":" + a + ":" + b);
         }
     }
 
-    /** A row's points as "is the Enterprise value". */
+    /** A row's points: title_bar by its value, the others as "is the Enterprise value". */
+    static String[] values(ChromeSpec row) {
+        boolean[] flags = flags(row);
+        String[] values = new String[KEYS.length];
+        values[0] = row.titleBar().name();
+        for (int i = 1; i < KEYS.length; i++) values[i] = String.valueOf(flags[i]);
+        return values;
+    }
+
+    /** A row's points as "is the Enterprise value"; {@link #values} reads title_bar by its value instead. */
     static boolean[] flags(ChromeSpec row) {
-        return new boolean[] {row.titleBar() == ChromeSpec.TitleBar.NATIVE, row.menuBar() == ChromeSpec.MenuBar.WINDOW,
+        return new boolean[] {row.titleBar() == ChromeSpec.TitleBar.CLASSIC, row.menuBar() == ChromeSpec.MenuBar.WINDOW,
             !row.windowTitle().equals("{context}"), row.toolWindows() == ChromeSpec.ToolWindows.STRIPES, row.editorTabs() == ChromeSpec.EditorTabs.CLASSIC,
             row.statusBar() == ChromeSpec.StatusBar.CELLS, row.palette() == ChromeSpec.PaletteKind.RUN_WINDOW,
             row.dialogs() == ChromeSpec.DialogKind.CLASSIC, row.motion() == ChromeSpec.MotionKind.NONE};

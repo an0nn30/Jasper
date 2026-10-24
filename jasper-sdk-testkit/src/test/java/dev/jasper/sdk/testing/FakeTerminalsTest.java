@@ -86,6 +86,120 @@ class FakeTerminalsTest {
         }
     }
 
+    /** Workspace tabs spec 9.4: a terminal tab holds one pane, and a split is a terminal tab of its own. */
+    @Test void aTerminalTabHoldsOnePaneAndASplitOpensATabOfItsOwn() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "build"), pane = host.addTerminalPane(tab, info("make"));
+            assertThatIllegalStateException().isThrownBy(() -> host.addTerminalPane(tab, info("top"))).withMessageContaining("one pane");
+            var context = host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OPEN)), Set.of(), Set.of(), plugin -> { });
+            var terminals = context.terminals();
+            var tabHandle = terminals.tab(tab).orElseThrow();
+            assertThat(tabHandle.kind()).isEqualTo(dev.jasper.sdk.terminal.TabHandle.Kind.TERMINAL);
+            assertThat(tabHandle.terminal().map(PaneHandle::id)).contains(pane);
+            PaneHandle split = terminals.split(terminals.pane(pane).orElseThrow(), dev.jasper.sdk.terminal.Direction.RIGHT,
+                OpenRequest.local()).orElseThrow();
+            assertThat(split.tab().id()).as("a split is a terminal tab of its own").isNotEqualTo(tab);
+            assertThat(split.tab().window().id()).isEqualTo(window);
+            assertThat(terminals.window(window).orElseThrow().tabs()).extracting(dev.jasper.sdk.terminal.TabHandle::id)
+                .containsExactly(tab, split.tab().id());
+            assertThat(terminals.window(window).orElseThrow().activeTab()).as("and it is selected").contains(split.tab());
+            assertThat(host.openRequests()).containsExactly("split|" + pane + "|RIGHT|-");
+            host.closeTerminalPane(pane);
+            assertThat(tabHandle.isOpen()).as("a pane closes with its tab").isFalse();
+            assertThat(tabHandle.terminal()).isEmpty();
+            assertThat(tabHandle.kind()).as("a closed tab keeps its kind").isEqualTo(dev.jasper.sdk.terminal.TabHandle.Kind.TERMINAL);
+        }
+    }
+
+    /** Workspace tabs spec 14: scripted content tabs and moves are tabs of their windows, announced on the tab topics. */
+    @Test void scriptedContentTabsAndMovesAreTabsOfTheirWindows() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow(), shell = host.addTerminalTab(window, "zsh"), pane = host.addTerminalPane(shell, info("zsh"));
+            var heard = new java.util.ArrayList<Object>();
+            var context = host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OBSERVE)), Set.of(), Set.of(), plugin -> {
+                plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.TAB_OPENED, heard::add);
+                plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.TAB_MOVED, heard::add);
+            });
+            host.flush();
+            heard.clear();
+            UUID notes = host.addContentTab(window, "notes.txt");
+            UUID other = host.addTerminalWindow();
+            host.moveTab(shell, other);
+            host.flush();
+            assertThat(heard).containsExactly(new dev.jasper.sdk.terminal.TerminalEvents.TabEvent(window, notes),
+                new dev.jasper.sdk.terminal.TerminalEvents.TabMoved(shell, window, other));
+            var terminals = context.terminals();
+            assertThat(terminals.window(window).orElseThrow().tabs()).extracting(dev.jasper.sdk.terminal.TabHandle::id).containsExactly(notes);
+            assertThat(terminals.tab(notes).orElseThrow().kind()).isEqualTo(dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT);
+            assertThat(terminals.tab(notes).orElseThrow().terminal()).isEmpty();
+            assertThat(terminals.pane(pane).orElseThrow().tab().window().id()).as("the pane follows its tab").isEqualTo(other);
+            assertThatIllegalArgumentException().isThrownBy(() -> host.addTerminalPane(notes, info("pane")));
+        }
+    }
+
+    /**
+     * A move that empties the active window reports no active pane as that window lets the tab go, then the move, the
+     * arrival's selection and, last, the window's close: the order the application's WindowManagerTest pins on real windows.
+     */
+    @Test void aMoveThatEmptiesTheActiveWindowReportsNoActivePaneThenClosesItAfterTheMove() {
+        try (var host = new FakePluginHost()) {
+            // The main window outlives its last tab: the window the move empties is a child window.
+            host.addTerminalWindow();
+            UUID first = host.addTerminalWindow(), moving = host.addTerminalTab(first, "build");
+            host.addTerminalPane(moving, info("make"));
+            UUID second = host.addTerminalWindow(), other = host.addTerminalTab(second, "zsh");
+            host.addTerminalPane(other, info("zsh"));
+            host.activateTerminalWindow(first);
+            var heard = new java.util.ArrayList<Object>();
+            host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OBSERVE)), Set.of(), Set.of(), plugin -> {
+                for (var topic : List.of(dev.jasper.sdk.terminal.TerminalEvents.WINDOW_CLOSED, dev.jasper.sdk.terminal.TerminalEvents.TAB_MOVED,
+                        dev.jasper.sdk.terminal.TerminalEvents.TAB_SELECTED, dev.jasper.sdk.terminal.TerminalEvents.ACTIVE_PANE_CHANGED))
+                    plugin.events().subscribe(topic, heard::add);
+            });
+            host.flush();
+            heard.clear();
+            host.moveTab(moving, second);
+            host.flush();
+            assertThat(heard).containsExactly(new dev.jasper.sdk.terminal.TerminalEvents.ActivePaneChanged(Optional.empty()),
+                new dev.jasper.sdk.terminal.TerminalEvents.TabMoved(moving, first, second),
+                new dev.jasper.sdk.terminal.TerminalEvents.TabEvent(second, moving),
+                new dev.jasper.sdk.terminal.TerminalEvents.WindowEvent(first));
+        }
+    }
+
+    /** As the application's window does on every selection: a content tab is active while it is its window's selected tab. */
+    @Test void aContentTabIsActiveWhileItIsItsWindowsSelectedTab() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var host = new FakePluginHost()) {
+                UUID window = host.addTerminalWindow(), shell = host.addTerminalTab(window, "zsh"), pane = host.addTerminalPane(shell, info("zsh"));
+                var context = host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OPEN)), Set.of(), Set.of(), plugin -> { });
+                var terminals = context.terminals();
+                var view = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body", dev.jasper.sdk.ui.ControlState.READY,
+                    "Notes", dev.jasper.sdk.ui.Nodes.TextRole.BODY)), event -> { });
+                var notes = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), terminals.window(window).orElseThrow(), view);
+                var tab = terminals.window(window).orElseThrow().activeTab().orElseThrow();
+                var heard = new java.util.ArrayList<Boolean>();
+                notes.onActive(heard::add);
+                assertThat(notes.isActive()).as("it opens selected").isTrue();
+                terminals.tab(shell).orElseThrow().select();
+                assertThat(notes.isActive()).as("selecting a terminal tab deactivates it").isFalse();
+                assertThat(heard).containsExactly(false);
+                tab.select();
+                assertThat(notes.isActive()).as("selecting its tab activates it").isTrue();
+                assertThat(heard).containsExactly(false, true);
+                host.focusTerminalPane(pane);
+                assertThat(notes.isActive()).as("focusing a pane selects its tab").isFalse();
+                notes.select();
+                terminals.split(terminals.pane(pane).orElseThrow(), dev.jasper.sdk.terminal.Direction.RIGHT, OpenRequest.local());
+                assertThat(notes.isActive()).as("a split's tab opens selected").isFalse();
+                notes.select();
+                host.addTerminalTab(window, "top");
+                assertThat(notes.isActive()).as("so does a scripted tab").isFalse();
+                assertThat(heard).containsExactly(false, true, false, true, false, true, false);
+            }
+        });
+    }
+
     @Test void profilesAreScriptedAndOnlyListedOnesOpen() {
         try (var host = new FakePluginHost()) {
             var ubuntu = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));

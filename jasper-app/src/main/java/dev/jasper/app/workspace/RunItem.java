@@ -6,7 +6,6 @@ import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.FlatLafInstaller;
-import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
@@ -30,7 +29,8 @@ import javax.swing.UIManager;
 
 /**
  * The status bar's leading "▶ Run…" (Enterprise presentation spec 10.6): an accent item that opens the palette's current
- * view, shown as an active toggle on {@code surface.control.selected} while the palette is open.
+ * view, shown as an active toggle while the palette is open: on {@code surface.header.active} under ruled cells (the 06
+ * Run Dialog mocks), on {@code surface.control.selected} on slash segments.
  */
 final class RunItem extends JComponent {
     static final String LABEL = "Run…";
@@ -105,9 +105,11 @@ final class RunItem extends JComponent {
             boolean shown = active.getAsBoolean();
             // Idle, the item lies on its bar: surface.app under ruled cells, surface.status in the slash layout.
             boolean slash = getParent() instanceof WindowStatusBar bar && bar.cells() instanceof SlashSegments, ruled = !slash;
-            SemanticColor ground = shown ? SemanticColor.SURFACE_CONTROL_SELECTED : ruled ? SemanticColor.SURFACE_APP : SemanticColor.SURFACE_STATUS;
             int top = ruled && getParent() instanceof WindowStatusBar ? metric(DesignMetrics.Role.HAIRLINE) : 0;
-            if (shown) { g.setColor(theme.semantic().color(ground)); g.fillRect(0, top, getWidth(), getHeight() - top); }
+            if (shown) {
+                g.setColor(WindowPairs.run(true, ruled).against().color(theme));
+                g.fillRect(0, top, getWidth(), getHeight() - top);
+            }
             g.setColor(SurfaceContrast.painted(theme, WindowPairs.run(shown, ruled)));
             int x = metric(DesignMetrics.Role.STATUS_CELL_PADDING), size = metric(DesignMetrics.Role.CHROME_GLYPH), middle = top + (getHeight() - top) / 2;
             g.fill(new Polygon(new int[] {x, x + size, x}, new int[] {middle - size / 2, middle, middle + size / 2}, 3));

@@ -7,14 +7,11 @@ import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.List;
@@ -80,9 +77,10 @@ public final class CommandListener implements AutoCloseable {
     }
 
     /**
-     * Binds the socket, or returns null when another process already serves it or it is unavailable here: the
-     * {@code jasper} command is a convenience, so failing to bind is never fatal. The token is written before the
-     * socket appears, so a client that finds the socket can read it.
+     * Binds the socket, or returns null when it is unavailable here: the {@code jasper} command is a convenience, so
+     * failing to bind is never fatal. Only the home's owner binds (workspace-tabs spec 5.3), so whatever is at the path
+     * was left by a process that has gone, and is replaced. The token is written before the socket appears, so a client
+     * that finds the socket can read it.
      */
     public static CommandListener bind(Path socket, CommandDispatcher dispatcher) {
         Objects.requireNonNull(dispatcher, "dispatcher");
@@ -95,21 +93,14 @@ public final class CommandListener implements AutoCloseable {
         try {
             Files.createDirectories(socket.getParent());
             OwnerOnlyFiles.restrict(socket.getParent(), "rwx------");
-            try (FileChannel lockChannel = FileChannel.open(lockFile(socket), StandardOpenOption.CREATE,
-                    StandardOpenOption.READ, StandardOpenOption.WRITE);
-                 FileLock ignored = lockChannel.lock()) {
-                if (Files.exists(socket)) {
-                    if (live(socket)) return null;
-                    Files.deleteIfExists(socket);
-                }
-                String token = OwnerOnlyFiles.writeToken(tokenFile(socket));
-                OwnerOnlyFiles.writeProcessId(ownerFile(socket));
-                opened = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
-                opened.bind(UnixDomainSocketAddress.of(socket));
-                var listener = new CommandListener(opened, socket, token, dispatcher);
-                listener.acceptor.start();
-                return listener;
-            }
+            Files.deleteIfExists(socket);
+            String token = OwnerOnlyFiles.writeToken(tokenFile(socket));
+            OwnerOnlyFiles.writeProcessId(ownerFile(socket));
+            opened = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
+            opened.bind(UnixDomainSocketAddress.of(socket));
+            var listener = new CommandListener(opened, socket, token, dispatcher);
+            listener.acceptor.start();
+            return listener;
         } catch (IOException | RuntimeException failure) {
             // A bind that got as far as the socket file but no further must not leave it behind.
             if (opened != null) {
@@ -121,22 +112,11 @@ public final class CommandListener implements AutoCloseable {
         }
     }
 
-    /** True while some process accepts connections on the socket. */
-    public static boolean live(Path socket) {
-        try (SocketChannel probe = SocketChannel.open(UnixDomainSocketAddress.of(socket))) {
-            return true;
-        } catch (IOException | RuntimeException gone) {
-            return false;
-        }
-    }
-
     /** The token file beside a socket, which the client sends back. */
     public static Path tokenFile(Path socket) { return socket.resolveSibling(socket.getFileName() + ".token"); }
 
     /** The owner's process id beside its token; a Windows client passes it the right to come to the front. */
     static Path ownerFile(Path socket) { return socket.resolveSibling(socket.getFileName() + ".token.pid"); }
-
-    static Path lockFile(Path socket) { return socket.resolveSibling(socket.getFileName() + ".lock"); }
 
     /** The socket this listener serves. */
     public Path socket() { return socket; }
@@ -370,20 +350,13 @@ public final class CommandListener implements AutoCloseable {
         }
         awaitExitFrames();
         for (SocketChannel connection : List.copyOf(connections)) closeQuietly(connection);
-        try (FileChannel lockChannel = FileChannel.open(lockFile(socket), StandardOpenOption.CREATE,
-                StandardOpenOption.READ, StandardOpenOption.WRITE);
-             FileLock ignored = lockChannel.lock()) {
-            if (live(socket)) return;
+        // Only the owner binds here, and it holds the instance lock until it exits: these files are this listener's.
+        try {
             Files.deleteIfExists(socket);
             Files.deleteIfExists(tokenFile(socket));
             Files.deleteIfExists(ownerFile(socket));
-        } catch (IOException | RuntimeException unavailable) {
-            // Including OverlappingFileLockException: leave the files rather than risk a successor's.
-            return;
-        }
-        // A private launch's socket is named for its process, so nothing else ever takes its lock.
-        if (socket.getFileName().toString().startsWith("commands-")) {
-            try { Files.deleteIfExists(lockFile(socket)); } catch (IOException ignored) { }
+        } catch (IOException unavailable) {
+            // Left behind; the next owner replaces them.
         }
     }
 

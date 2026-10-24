@@ -31,7 +31,7 @@ class ViewModeChromeTest {
             assertThat(owner.paletteAnchor(owner)).isNull();
             assertThat(titles).isNotEmpty();
             assertThat(titles.getLast()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
-            var first = owner.currentTab();
+            var first = owner.currentTerminal();
             owner.newTab(DesktopTestSupport.HOME.resolve("projects/jasper")); owner.update();
             assertThat(titles.getLast()).isEqualTo(System.getProperty("user.name") + "@~/projects/jasper : sh");
             owner.selectTab(first); owner.update();

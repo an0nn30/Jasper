@@ -85,6 +85,31 @@ class HostedTitleTest {
         });
     }
 
+    /** Spec 10.8's last sentence (plan 10b): a WINDOW form's footer is the band too, its geometry the window footer's. */
+    @Test void aWindowFormsBandKeepsTheWindowFooterGeometry() {
+        Edt.run(() -> {
+            var theme = KitFixtures.enterpriseLight();
+            var context = KitFixtures.context(theme, KitFixtures.enterprise());
+            var form = new Nodes.Form("form", ControlState.READY, FormKind.WINDOW, "Credential Vault", Optional.empty(),
+                List.of(new Nodes.Text("body", ControlState.READY, "Body", Nodes.TextRole.BODY)),
+                Optional.of(new Nodes.Text("path", ControlState.READY, "/synthetic/vault.jv", Nodes.TextRole.MONO_CAPTION)),
+                List.of(new Nodes.Button("done", ControlState.READY, "Done", "", Nodes.ButtonKind.PRIMARY, "close", "")), "close");
+            try (var view = new KitView(context, new ViewSpec(form), e -> { })) {
+                var before = KitFixtures.render(view, 600, 300, 1);
+                var done = find(view, "done", javax.swing.JComponent.class);
+                var was = javax.swing.SwingUtilities.convertPoint(done.getParent(), done.getLocation(), view);
+                view.dialogBand(true);
+                var image = KitFixtures.render(view, 600, 300, 1);
+                done = find(view, "done", javax.swing.JComponent.class);
+                var at = javax.swing.SwingUtilities.convertPoint(done.getParent(), done.getLocation(), view);
+                assertThat(at).as("the window footer's geometry").isEqualTo(was);
+                int y = at.y + done.getHeight() / 2;
+                assertThat(new java.awt.Color(image.getRGB(at.x - 4, y) & 0xFFFFFF)).isEqualTo(DerivedColor.SURFACE_FOOTER.color(theme));
+                assertThat(image.getRGB(at.x - 4, y)).as("the band is new").isNotEqualTo(before.getRGB(at.x - 4, y));
+            } finally { release(context); }
+        });
+    }
+
     static List<java.awt.Component> descendants(java.awt.Container root) {
         var all = new java.util.ArrayList<java.awt.Component>();
         for (var child : root.getComponents()) { all.add(child); if (child instanceof java.awt.Container nested) all.addAll(descendants(nested)); }

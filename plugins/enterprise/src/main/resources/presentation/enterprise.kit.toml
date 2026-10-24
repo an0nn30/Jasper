@@ -2,7 +2,7 @@ kit = 1
 base = "classic"
 
 [chrome]
-title_bar = "native"
+title_bar = "classic"
 menu_bar = "window"
 window_title = "Workstation — {session} — {directory}"
 tool_windows = "stripes"
@@ -11,6 +11,8 @@ status_bar = "cells"
 palette = "run_window"
 dialogs = "classic"
 motion = "none"
+icons = "classic"
+toolbar_search = "icon"
 
 [controls]
 toggle = "checkbox"
@@ -59,13 +61,12 @@ medium = "fonts/ibm-plex-mono-medium.ttf"
 dialog_surface = "surface.app"
 navigation_surface = "surface.card"
 
-[branding]
-product = "JasperOps"
-icons = "icons"
-splash_art = "splash/art.svg"
-
 [defaults]
-"ui.theme.light" = "enterprise"
-"ui.theme.dark" = "enterprise"
+"ui.theme.light" = "jasper-meadow"
+"ui.theme.dark" = "jasper-meadow"
 "palette.visible_rows" = 8
-"window.toolbar_height" = 34
+"window.toolbar_height" = 28
+"window.toolbar" = "icons"
+
+[defaults."dev.jasper.editor"]
+font_family = "IBM Plex Mono"

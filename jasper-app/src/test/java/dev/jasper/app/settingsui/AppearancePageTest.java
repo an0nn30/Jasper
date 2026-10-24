@@ -45,14 +45,16 @@ class AppearancePageTest {
     }
     private static String selected(JComboBox<?> box) { return ((dev.jasper.ui.model.Option) box.getSelectedItem()).label(); }
     private static void pick(JComboBox<?> box, String label) { box.setSelectedIndex(items(box).indexOf(label)); }
-    /** Slate Cobalt, with Ocean as a second Dark theme and Dawn as a second Light theme, so a pick other than Slate Cobalt is installed. */
+    /** Slate Cobalt and Meadow pairs, with Ocean and Dawn as alternative Dark and Light themes. */
     private static final InstalledThemes TWO_EACH = new InstalledThemes(
         List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", AppearanceFixtures.preview(true)),
+            new InstalledThemes.ThemeOption("jasper-meadow", "Jasper Meadow", AppearanceFixtures.preview(true)),
             new InstalledThemes.ThemeOption("ocean", "Ocean", AppearanceFixtures.preview(true))),
         List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", AppearanceFixtures.preview(false)),
+            new InstalledThemes.ThemeOption("jasper-meadow", "Jasper Meadow", AppearanceFixtures.preview(false)),
             new InstalledThemes.ThemeOption("dawn", "Dawn", AppearanceFixtures.preview(false))),
         InstalledThemes.slateCobalt(AppearanceFixtures.preview(true), AppearanceFixtures.preview(false)).schemes(),
-        java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "dawn", "Dawn"));
+        java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "dawn", "Dawn", "jasper-meadow", "Jasper Meadow"));
     /** The Appearance page over {@code themes}, built on the test's draft. */
     private SchemaPage pageWith(InstalledThemes themes) {
         var choices = new AppearanceChoices(100f, false, Optional::empty, ignored -> new Subscription(() -> { }), () -> themes, Optional.empty());
@@ -155,16 +157,19 @@ class AppearancePageTest {
         assertThat(page.modified()).isTrue();
     }
 
-    @Test void pickingADarkThemeStagesItForApplyAndResetReturnsToSlateCobalt() {
+    @Test void pickingADarkThemeStagesItForApplyAndResetReturnsToMeadow() {
+        var defaults = new InstalledThemes(TWO_EACH.dark().subList(0, 2), TWO_EACH.light().subList(0, 2),
+            TWO_EACH.schemes(), java.util.Map.of("slate-cobalt", "Slate Cobalt", "jasper-meadow", "Jasper Meadow"));
+        var page = pageWith(defaults);
         page.component();
         var box = kit(page, "ui.appearance:dark-theme.input", JComboBox.class);
-        assertThat(items(box)).containsExactly("Slate Cobalt");
-        assertThat(selected(box)).isEqualTo("Slate Cobalt");
+        assertThat(items(box)).containsExactly("Slate Cobalt", "Jasper Meadow");
+        assertThat(selected(box)).isEqualTo("Jasper Meadow");
         draft.rebase(ConfigLoader.parse(Path.of("config.toml"), "[ui.theme]\ndark = 'ocean'\n", true).values());
         page.refresh();
-        assertThat(items(kit(page, "ui.appearance:dark-theme.input", JComboBox.class))).containsExactly("Slate Cobalt", "ocean (not installed)");
-        pick(kit(page, "ui.appearance:dark-theme.input", JComboBox.class), "Slate Cobalt");
-        assertThat(draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("slate-cobalt");
+        assertThat(items(kit(page, "ui.appearance:dark-theme.input", JComboBox.class))).containsExactly("Slate Cobalt", "Jasper Meadow", "ocean (not installed)");
+        pick(kit(page, "ui.appearance:dark-theme.input", JComboBox.class), "Jasper Meadow");
+        assertThat(draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("jasper-meadow");
         assertThat(draft.edit().changes()).containsEntry(CoreSettings.UI_THEME_DARK, Optional.empty());
         assertThat(page.modified()).isTrue();
     }
@@ -189,11 +194,11 @@ class AppearancePageTest {
         assertThat(reset.isVisible()).isTrue();
         reset.doClick();
         assertThat(draft.value(CoreSettings.UI_APPEARANCE)).isEqualTo(CoreSettings.UI_APPEARANCE.defaultValue());
-        assertThat(draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("slate-cobalt");
-        assertThat(draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("slate-cobalt");
+        assertThat(draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("jasper-meadow");
+        assertThat(draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("jasper-meadow");
         assertThat(draft.modified()).isFalse();
-        assertThat(selected(kit(page, "ui.appearance:dark-theme.input", JComboBox.class))).isEqualTo("Slate Cobalt");
-        assertThat(selected(kit(page, "ui.appearance:light-theme.input", JComboBox.class))).isEqualTo("Slate Cobalt");
+        assertThat(selected(kit(page, "ui.appearance:dark-theme.input", JComboBox.class))).isEqualTo("Jasper Meadow");
+        assertThat(selected(kit(page, "ui.appearance:light-theme.input", JComboBox.class))).isEqualTo("Jasper Meadow");
     }
 
     @Test void theTerminalSchemeIsADropdownOfTheFourSchemes() {

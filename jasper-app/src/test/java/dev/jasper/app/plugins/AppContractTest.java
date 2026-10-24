@@ -112,7 +112,7 @@ class AppContractTest extends PluginContractTest {
             () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()), chooser);
     }
 
-    /** UI thread: plugin windows over shells that touch no native window. */
+    /** UI thread: plugin dialogs over shells that touch no native window. */
     static AuxiliaryWindows headlessWindows(UiState state) {
         return new AuxiliaryWindows(state, surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
             () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()));
@@ -137,14 +137,66 @@ class AppContractTest extends PluginContractTest {
         var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
         AuxiliaryWindows auxiliary = onEdtValue(AppContractTest::headlessWindows);
         TerminalFixture terminalFixture = onEdtValue(TerminalFixture::new);
-        onEdt(() -> contributions.content().setFactory(separate -> {
-            UUID id = terminalFixture.addWindow();
-            contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(id, separate,
-                entry -> {}, entry -> {}, entry -> {
-                    for (var other : contributions.content().inWindow(id)) other.active(other == entry);
-                }, () -> {}));
+        // Every window is a workspace, as every application window is (workspace plan 3b Rulings 15): a plugin's tab is a
+        // content tab of the window that shows it, the window it moves to reports the move, and a window whose last tab
+        // left closes, taking its workspace with it.
+        // The window manager's part (workspace plan 4a): the window added while none is open is the main window, which
+        // outlives its last tab; every other window is a child window, whose only tab stays where it is.
+        UUID[] main = new UUID[1];
+        java.util.function.Supplier<UUID> workspace = () -> {
+            boolean first = main[0] == null;
+            UUID id = first ? terminalFixture.addMainWindow() : terminalFixture.addWindow();
+            if (first) main[0] = id;
+            var tabs = contributions.tabs();
+            var registration = tabs.addHost(new dev.jasper.app.contributions.WorkspaceHost(id,
+                tab -> tab.movingFrom().ifPresentOrElse(from -> terminalFixture.moveTab(tab.id().value(), id),
+                    () -> terminalFixture.addContentTab(id, tab.id().value(), tab::title)),
+                tab -> { if (!tab.moving()) terminalFixture.closeTab(tab.id().value()); },
+                entry -> {
+                    for (var other : tabs.inWindow(id)) other.active(other == entry);
+                    terminalFixture.selectTab(entry.id().value());
+                }, () -> {}, tab -> Optional.empty(),
+                (tab, group, side) -> terminalFixture.addContentTab(id, tab.id().value(), tab::title, true),
+                (tab, side) -> terminalFixture.splitBeside(tab.id().value(), side),
+                tab -> terminalFixture.mayMoveToNewTab(tab.id().value()),
+                tab -> {
+                    terminalFixture.moveToNewTab(tab.id().value());
+                    for (var other : tabs.inWindow(id)) other.active(other == tab);
+                },
+                tab -> terminalFixture.tabChoices(tab.id().value()),
+                (tab, number) -> {
+                    if (terminalFixture.moveToTab(tab.id().value(), number))
+                        for (var other : tabs.inWindow(id)) other.active(other == tab);
+                }));
+            terminalFixture.onWindowClosed(id, () -> {
+                registration.close();
+                if (id.equals(main[0])) main[0] = null;
+            });
             return id;
-        }));
+        };
+        onEdt(() -> contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(
+            () -> main[0] != null ? main[0] : workspace.get(), id -> id.equals(main[0]),
+            tab -> {
+                boolean only = terminalFixture.registry.window(tab.window()).map(window -> window.tabs().get().size() == 1).orElse(false);
+                if (!tab.window().equals(main[0]) && only) return;
+                contributions.tabs().move(tab, workspace.get());
+            }, window -> { }, () -> {
+                // A tab placed in a new window while none is open: the main window first, then the tab's own, as the window
+                // manager's emptyWindow does (workspace plan 6b Rulings 25).
+                if (main[0] == null) workspace.get();
+                return workspace.get();
+            })));
+        // A restorer's session takes the saved tab's id in the window being restored, as WindowContent.openTerminal takes it
+        // (workspace tabs spec 13): registered under that id, it is the tab the restore hands back.
+        onEdt(() -> terminalFixture.restoringSessions(
+            (provider, window) -> contributions.tabs().slot(provider, window).map(dev.jasper.app.layout.TabId::value),
+            (tab, window) -> contributions.tabs().restored(contributions.tabs().add(new dev.jasper.app.layout.TabId(tab),
+                dev.jasper.app.contributions.Tab.Kind.TERMINAL, new dev.jasper.app.contributions.TabContent() {
+                    private final javax.swing.JComponent view = new javax.swing.JPanel();
+                    @Override public javax.swing.JComponent component() { return view; }
+                    @Override public void dispose() { }
+                }, window)),
+            tab -> contributions.tabs().tab(new dev.jasper.app.layout.TabId(tab)).ifPresent(contributions.tabs()::remove)));
         var notifications = new NotificationsFixture();
         List<Path> edited = new CopyOnWriteArrayList<>();
         TestShellProfiles shells = new TestShellProfiles();
@@ -180,7 +232,22 @@ class AppContractTest extends PluginContractTest {
         Map<String, Map<String, dev.jasper.app.palette.PaletteRow>> lastRows = new java.util.HashMap<>();
         List<Subcommands.Owner> declared = new java.util.concurrent.CopyOnWriteArrayList<>();
         Set<String> bundled = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        List<String> lookProblems = new CopyOnWriteArrayList<>();
+        onEdt(() -> host.lookDefaultProblem = lookProblems::add);
         return new ContractHarness() {
+            @Override public void setKitDefault(String pluginId, String key, Object rawValue) {
+                Object raw = org.tomlj.Toml.parse("v = " + literal(rawValue)).get("v");
+                onEdt(() -> {
+                    var tables = new java.util.HashMap<String, Map<String, Object>>(host.defaults.plugins());
+                    var table = new java.util.LinkedHashMap<String, Object>(host.defaults.plugin(pluginId));
+                    table.put(key, raw);
+                    tables.put(pluginId, table);
+                    host.defaults = new dev.jasper.app.config.DefaultSource(host.defaults.overrides(), tables);
+                });
+            }
+            @Override public List<String> lookDefaultProblems(String pluginId) {
+                return lookProblems.stream().filter(line -> line.startsWith(pluginId + ": ")).toList();
+            }
             @Override public void setSetting(String pluginId, String key, Object rawValue) {
                 Path file = files.file(pluginId);
                 try {
@@ -278,38 +345,43 @@ class AppContractTest extends PluginContractTest {
                         + (panel.defaultSlot().split() ? "+split" : "")
                         + (panel.namedToggle() ? "|" + panel.toggleActionId() : "")).toList());
             }
-            /** Open instances' sites and the header metadata each last published, keyed by panel id and window, as a window keeps them. */
+            /** Open panels' sites, components and the header metadata each last published, keyed by panel id, as the main window keeps them. */
             final java.util.Map<String, dev.jasper.app.contributions.PanelSite> sites = new java.util.HashMap<>();
+            final java.util.Map<String, javax.swing.JComponent> components = new java.util.HashMap<>();
             final java.util.Map<String, dev.jasper.app.contributions.PanelHeaderState> headers = new java.util.HashMap<>();
-            @Override public javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId) {
-                String key = panelId + "|" + windowId;
-                return onEdtValue(() -> contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
-                    .map(panel -> {
-                        var site = new dev.jasper.app.contributions.PanelSite(windowId, () -> { }, () -> { }, () -> true, header -> headers.put(key, header));
-                        var built = panel.factory().apply(site);
-                        if (built != null) sites.put(key, site);
-                        return built;
-                    })
-                    .orElse(null));
-            }
-            @Override public String panelHeader(String panelId, java.util.UUID windowId) {
+            @Override public javax.swing.JComponent openPanel(String panelId) {
                 return onEdtValue(() -> {
-                    var header = headers.getOrDefault(panelId + "|" + windowId, dev.jasper.app.contributions.PanelHeaderState.EMPTY);
+                    UUID window = main[0];
+                    if (window == null) return null;
+                    if (components.containsKey(panelId)) return components.get(panelId);
+                    return contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
+                        .map(panel -> {
+                            var site = new dev.jasper.app.contributions.PanelSite(window, () -> { }, () -> { }, () -> true, header -> headers.put(panelId, header));
+                            var built = panel.factory().apply(site);
+                            if (built != null) { sites.put(panelId, site); components.put(panelId, built); }
+                            return built;
+                        })
+                        .orElse(null);
+                });
+            }
+            @Override public String panelHeader(String panelId) {
+                return onEdtValue(() -> {
+                    var header = headers.getOrDefault(panelId, dev.jasper.app.contributions.PanelHeaderState.EMPTY);
                     var labels = header.actions().stream().map(dev.jasper.app.contributions.PanelHeaderState.Action::label).toList();
                     return header.detail() + "|" + header.active() + "|" + (labels.isEmpty() ? "-" : String.join(";", labels));
                 });
             }
-            @Override public boolean runPanelHeaderAction(String panelId, java.util.UUID windowId, String label) {
+            @Override public boolean runPanelHeaderAction(String panelId, String label) {
                 return onEdtValue(() -> {
-                    var action = headers.getOrDefault(panelId + "|" + windowId, dev.jasper.app.contributions.PanelHeaderState.EMPTY)
+                    var action = headers.getOrDefault(panelId, dev.jasper.app.contributions.PanelHeaderState.EMPTY)
                         .actions().stream().filter(a -> a.label().equals(label)).findFirst();
                     action.ifPresent(a -> a.invoke().run());
                     return action.isPresent();
                 });
             }
             @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((HostedKitView) view).component().route().name(); }
-            @Override public void closePanel(String panelId, java.util.UUID windowId) {
-                onEdt(() -> { var site = sites.remove(panelId + "|" + windowId); if (site != null) site.notifyClosed(); });
+            @Override public void closePanel(String panelId) {
+                onEdt(() -> { components.remove(panelId); var site = sites.remove(panelId); if (site != null) site.notifyClosed(); });
             }
             /** Each toolbar view's instance per window, built once as a window builds it when it opens; empty when it failed. */
             final java.util.Map<dev.jasper.app.contributions.ToolbarEntry.View, java.util.Map<UUID, Optional<dev.jasper.app.contributions.ToolbarEntry.Mounted>>> toolbarViews =
@@ -359,28 +431,49 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public List<String> windows() {
                 return onEdtValue(() -> auxiliary.open().stream()
-                    .map(surface -> (switch (surface.kind()) { case DIALOG -> "dialog"; case OVERLAY -> "overlay"; case WINDOW -> surface.id(); })
+                    .map(surface -> (surface.kind() == AuxiliarySurface.Kind.OVERLAY ? "overlay" : "dialog")
                         + "|" + surface.title() + "|" + surface.shown()).toList());
             }
             @Override public String dialogSwatch(String pluginId, String title) {
                 return onEdtValue(() -> auxiliary.open().stream()
-                    .filter(surface -> surface.kind() != AuxiliarySurface.Kind.WINDOW && surface.title().equals(title))
+                    .filter(surface -> surface.title().equals(title))
                     .findFirst().map(surface -> surface.swatch().name()).orElse("-"));
             }
             @Override public boolean requestClose(String windowId) {
-                return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
-                    .map(dev.jasper.app.windows.AuxiliarySurface::requestClose).orElse(false));
+                return onEdtValue(() -> auxiliary.open().stream()
+                    .filter(surface -> (surface.kind() == AuxiliarySurface.Kind.OVERLAY ? "overlay" : "dialog").equals(windowId)).findFirst()
+                    .map(surface -> surface.kind() != AuxiliarySurface.Kind.OVERLAY && surface.requestClose()).orElse(false));
             }
-            @Override public boolean closeCommand(String windowId) {
-                return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
-                    .map(dev.jasper.app.windows.AuxiliarySurface::closeCommand).orElse(false));
+            @Override public boolean requestQuit() { return onEdtValue(() -> contributions.tabs().mayClose(contributions.tabs().hosted()) && contributions.quitGuards().mayQuit()); }
+            @Override public UUID addTerminalWindow() { return onEdtValue(workspace); }
+            @Override public UUID addContentTab(UUID windowId, String title) {
+                return onEdtValue(() -> { UUID id = UUID.randomUUID(); terminalFixture.addContentTab(windowId, id, () -> title); return id; });
             }
-            @Override public boolean requestQuit() { return onEdtValue(() -> contributions.content().mayClose(contributions.content().entries()) && auxiliary.mayQuit() && contributions.quitGuards().mayQuit()); }
-            @Override public UUID addTerminalWindow() { return onEdtValue(terminalFixture::addWindow); }
+            @Override public void moveTab(UUID tabId, UUID windowId) { onEdt(() -> terminalFixture.moveTab(tabId, windowId)); }
+            @Override public Optional<UUID> restoreTab(String pluginId, UUID windowId, String title, dev.jasper.sdk.RestoreState state) {
+                return onEdtValue(() -> {
+                    var restored = contributions.tabs().restore(dev.jasper.app.layout.TabId.random(), pluginId,
+                        new dev.jasper.app.contributions.TabRegistry.Restoring(windowId, title,
+                            new dev.jasper.app.layout.TabRestore(state.kind(), state.values())));
+                    // The window being restored places the tab; here the scripted workspace shows it in that window. A
+                    // session's terminal tab is already there, as the window opened it itself.
+                    restored.tab().filter(tab -> tab.kind() != dev.jasper.app.contributions.Tab.Kind.TERMINAL)
+                        .ifPresent(tab -> terminalFixture.addContentTab(windowId, tab.id().value(), tab::title));
+                    return restored.tab().map(tab -> tab.id().value());
+                });
+            }
+            @Override public Optional<dev.jasper.sdk.RestoreState> restoreState(UUID tabId) {
+                return onEdtValue(() -> contributions.tabs().tab(new dev.jasper.app.layout.TabId(tabId))
+                    .flatMap(dev.jasper.app.contributions.Tab::restore).or(() -> terminalFixture.sessionRestore(tabId))
+                    .map(saved -> new dev.jasper.sdk.RestoreState(saved.kind(), saved.state())));
+            }
+            @Override public void closeTab(UUID tabId) { onEdt(() -> terminalFixture.closeTab(tabId)); }
+            @Override public List<List<UUID>> windowTabs(UUID windowId) { return onEdtValue(() -> terminalFixture.windowTabs(windowId)); }
             @Override public UUID addTerminalTab(UUID windowId, String title) { return onEdtValue(() -> terminalFixture.addTab(windowId, title)); }
             @Override public UUID addTerminalPane(UUID tabId, String title, java.nio.file.Path directory) {
                 return onEdtValue(() -> terminalFixture.addPane(tabId, title, directory));
             }
+            @Override public void holdTerminalPane(UUID paneId) { onEdt(() -> terminalFixture.holdPane(paneId)); }
             @Override public void activateTerminalWindow(UUID windowId) { onEdt(() -> terminalFixture.activateWindow(windowId)); }
             @Override public void focusTerminalPane(UUID paneId) { onEdt(() -> terminalFixture.focusPane(paneId)); }
             @Override public void closeTerminalPane(UUID paneId) { onEdt(() -> terminalFixture.closePane(paneId)); }
@@ -416,6 +509,8 @@ class AppContractTest extends PluginContractTest {
                 dark.set(variant == dev.jasper.sdk.Variant.DARK);
                 host.bus.publish(EventBus.APP, dev.jasper.sdk.events.AppEvents.THEME_CHANGED, new dev.jasper.sdk.events.AppEvents.ThemeChanged(variant));
             }
+            @Override public void setTerminalTypography(dev.jasper.sdk.ui.TerminalTypography typography) { onEdt(() -> host.typography.publish(typography)); }
+            @Override public void setPresentation(dev.jasper.sdk.ui.Presentation presentation) { onEdt(() -> host.presentation = presentation); }
             @Override public void stopAll() {
                 var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
                 onEdt(() -> pending.set(host.stop()));
@@ -534,6 +629,78 @@ class AppContractTest extends PluginContractTest {
             @Override public void commandClient(Path client) { onEdt(() -> host.commandClient = Optional.of(client)); }
             @Override public void close() { stopAll(); flush(); }
         };
+    }
+
+    /**
+     * Workspace plan 8b's final review, the application alone: Terminal Right beside a content tab, through a real
+     * {@code HostedContext}, writes exactly one audit line, naming the content tab.
+     */
+    @org.junit.jupiter.api.Test void aContentTabsTerminalSplitWritesOneAuditLine() {
+        ContractHarness harness = newHarness();
+        try {
+            UUID main = harness.addTerminalWindow(), shell = harness.addTerminalTab(main, "zsh");
+            harness.addTerminalPane(shell, "zsh", Path.of("/"));
+            var alpha = new AtomicReference<dev.jasper.sdk.plugin.PluginContext>();
+            harness.start(new PluginInfo("test.alpha", "test.alpha", "1.0.0",
+                Set.of(dev.jasper.sdk.Capabilities.TERMINAL_OBSERVE, dev.jasper.sdk.Capabilities.TERMINAL_OPEN)), Set.of(), Set.of(), alpha::set);
+            var notes = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            var note = new AtomicReference<UUID>();
+            harness.ui(() -> {
+                var owner = alpha.get().terminals().window(main).orElseThrow();
+                var view = alpha.get().kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",
+                    dev.jasper.sdk.ui.ControlState.READY, "Content", dev.jasper.sdk.ui.Nodes.TextRole.BODY)), event -> { });
+                notes.set(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), owner, view));
+                note.set(owner.activeTab().orElseThrow().id());
+            });
+            List<String> lines = HostedTerminalsTest.audited(() -> harness.ui(() ->
+                notes.get().split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.RIGHT)));
+            org.assertj.core.api.Assertions.assertThat(lines).as("one line, for the terminal that opened")
+                .containsExactly("Plugin test.alpha used terminal.open: opened a terminal beside content tab " + note.get());
+            org.assertj.core.api.Assertions.assertThat(harness.openRequests()).containsExactly("beside|" + note.get() + "|RIGHT");
+        } finally {
+            harness.close();
+        }
+    }
+
+    /**
+     * Pane flexibility spec 4, the application alone: a plugin that holds {@code terminal.observe} reads other tabs' titles
+     * through its content tab's choices, and its first such answer is audited once, as its subscription is; a plugin that
+     * does not read none, and writes none.
+     */
+    @org.junit.jupiter.api.Test void aPluginsFirstTitledTabChoicesAreAuditedOnce() {
+        ContractHarness harness = newHarness();
+        try {
+            UUID main = harness.addTerminalWindow(), shell = harness.addTerminalTab(main, "zsh");
+            harness.addTerminalPane(shell, "zsh", Path.of("/"));
+            var alpha = new AtomicReference<dev.jasper.sdk.plugin.PluginContext>();
+            var beta = new AtomicReference<dev.jasper.sdk.plugin.PluginContext>();
+            harness.start(new PluginInfo("test.alpha", "test.alpha", "1.0.0", Set.of(dev.jasper.sdk.Capabilities.TERMINAL_OBSERVE)),
+                Set.of(), Set.of(), alpha::set);
+            harness.start(new PluginInfo("test.beta", "test.beta", "1.0.0", Set.of()), Set.of(), Set.of(), beta::set);
+            var notes = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            var sketch = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+            harness.ui(() -> {
+                for (var context : List.of(alpha.get(), beta.get())) {
+                    var owner = context.terminals().window(main).orElseThrow();
+                    var view = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",
+                        dev.jasper.sdk.ui.ControlState.READY, "Content", dev.jasper.sdk.ui.Nodes.TextRole.BODY)), event -> { });
+                    boolean first = context == alpha.get();
+                    (first ? notes : sketch).set(context.windows().openTab(
+                        new dev.jasper.sdk.ui.ContentSpec(first ? "notes" : "sketch", first ? "Notes" : "Sketch"), owner, view));
+                }
+            });
+            List<String> lines = HostedTerminalsTest.audited(() -> harness.ui(() -> {
+                org.assertj.core.api.Assertions.assertThat(sketch.get().tabChoices()).extracting(dev.jasper.sdk.ui.TabChoice::title)
+                    .as("without the capability").containsOnly("");
+                org.assertj.core.api.Assertions.assertThat(notes.get().tabChoices()).extracting(dev.jasper.sdk.ui.TabChoice::title)
+                    .as("with it").contains("zsh");
+                notes.get().tabChoices();
+            }));
+            org.assertj.core.api.Assertions.assertThat(lines).as("one line, for the plugin that read titles")
+                .containsExactly("Plugin test.alpha used terminal.observe: read tab titles");
+        } finally {
+            harness.close();
+        }
     }
 
     private static void render(Contributions contributions, List<dev.jasper.app.contributions.MenuEntry> entries, String indent, List<String> lines) {

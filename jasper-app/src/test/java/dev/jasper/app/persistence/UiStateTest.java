@@ -61,6 +61,16 @@ class UiStateTest {
         assertThat(again.window("dev.x.manager")).hasValue(new UiState.Bounds(-20, 40, 800, 600));
     }
 
+    /** Workspace tabs spec 8: the main window's bounds live in workspace.toml; a [main_window] table is dropped on the next save. */
+    @Test void aMainWindowTableIsNeitherReadNorWritten() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, "version = 2\nrail_visible = false\n[main_window]\nx = 10\ny = 20\nwidth = 800\nheight = 700\nextended_state = 6\n");
+        UiState state = UiState.load(file);
+        assertThat(state.railVisible()).as("the rest still reads").isFalse();
+        state.save();
+        assertThat(Files.readString(file)).doesNotContain("main_window").contains("rail_visible = false");
+    }
+
     @Test void aVersionOneFileMigratesRegionsSizesAndVisibilityAndKeepsTheOtherSections() throws Exception {
         Path file = dir.resolve("ui-state.toml");
         Files.writeString(file, """
@@ -340,6 +350,35 @@ class UiStateTest {
         assertThat(state.window("dev.x.manager")).hasValue(new UiState.Bounds(-30, 40, 800, 600));
         assertThat(state.window("dev.x.flat")).isEmpty();
         assertThat(state.window("dev.x.lost")).isEmpty();
+    }
+
+    /** A window-sized plugin dialog remembers its bounds under its plugin id and title, which TOML quotes. */
+    @Test void aPluginDialogsKeyWithItsTitleRoundTrips() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        UiState state = UiState.load(file);
+        String key = "dev.jasper.vault|Credential \"Vault\"";
+        state.putWindow(key, new UiState.Bounds(10, 20, 900, 583));
+        state.putWindow("bad\nkey", new UiState.Bounds(10, 20, 900, 583));
+        state.putWindow("", new UiState.Bounds(10, 20, 900, 583));
+        state.save();
+        assertThat(Files.readString(file)).contains("[windows.\"dev.jasper.vault|Credential \\\"Vault\\\"\"]");
+        UiState again = UiState.load(file);
+        assertThat(again.window(key)).hasValue(new UiState.Bounds(10, 20, 900, 583));
+        assertThat(again.window("bad\nkey")).as("a control character").isEmpty();
+        assertThat(again.window("")).isEmpty();
+    }
+
+    /** Review fix round 1 (M3): a key with half a surrogate pair, which TOML cannot write, and one past the limit are refused. */
+    @Test void aWindowKeyWithALoneSurrogateOrPastItsLengthIsRefused() throws Exception {
+        UiState state = UiState.inMemory();
+        var bounds = new UiState.Bounds(10, 20, 900, 583);
+        String lone = "dev.x|" + (char) 0xD83D, pair = "dev.x|" + new String(new char[] {(char) 0xD83D, (char) 0xDE00});
+        String longest = "d" + "x".repeat(UiState.WINDOW_KEY_LENGTH - 1);
+        for (String key : List.of(lone, pair, longest, longest + "x")) state.putWindow(key, bounds);
+        assertThat(state.window(lone)).as("a lone surrogate").isEmpty();
+        assertThat(state.window(pair)).as("a whole pair").hasValue(bounds);
+        assertThat(state.window(longest)).as("the longest key").hasValue(bounds);
+        assertThat(state.window(longest + "x")).as("one past it").isEmpty();
     }
 
     @Test void invalidValuesAreRejectedAndInvalidFilesFallBackToDefaults() throws Exception {

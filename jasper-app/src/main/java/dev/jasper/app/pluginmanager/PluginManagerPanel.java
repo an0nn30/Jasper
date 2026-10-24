@@ -20,7 +20,7 @@ import javax.swing.JPanel;
 import javax.swing.JSplitPane;
 
 /**
- * The Plugins page's passive view: a search field and gear menu, the restart banner and notice, the plugin rows and the
+ * The Plugins page's passive view: a search field and gear menu, the restart banner, the plugin rows and the
  * selected plugin's details, and a message line. It is an app-owned arrangement (Plan 3 recomposes it) of kit views on
  * the chrome context; it renders a snapshot and reports what the user asks for; it decides nothing. EDT only; close it
  * with the page.
@@ -47,7 +47,7 @@ final class PluginManagerPanel extends JPanel {
     private final AutoCloseable theme;
     private String bannerText = "";
     private List<BannerAction> bannerActions = List.of();
-    private String notice = "", message = "";
+    private String message = "";
     private boolean error, busy, closed;
     private final PluginShape shape;
 
@@ -139,8 +139,8 @@ final class PluginManagerPanel extends JPanel {
         }
         ((BorderLayout) getLayout()).setVgap(gap);
         ((BorderLayout) bar.getLayout()).setHgap(metric(DesignMetrics.Role.PLUGIN_SEARCH_GAP));
-        top.setVisible(!bannerText.isEmpty() || !notice.isEmpty());
-        headerView.setBorder(BorderFactory.createEmptyBorder(bannerText.isEmpty() && notice.isEmpty() ? 0 : pad, 0, 0, 0));
+        top.setVisible(!bannerText.isEmpty());
+        headerView.setBorder(BorderFactory.createEmptyBorder(bannerText.isEmpty() ? 0 : pad, 0, 0, 0));
         messageView.setVisible(!message.isEmpty());
         messageView.setBorder(BorderFactory.createEmptyBorder(0, 0, pad, 0));
         split.setDividerSize(metric(DesignMetrics.Role.WORKSPACE_GUTTER));
@@ -200,8 +200,7 @@ final class PluginManagerPanel extends JPanel {
         var banner = new Nodes.Card("banner", bannerText.isEmpty() ? hidden : ControlState.READY, Nodes.CardKind.MIXED, List.of(
             new Nodes.Text("banner-text", ControlState.READY, bannerText.isEmpty() ? " " : bannerText, Nodes.TextRole.BODY_STRONG),
             new Nodes.Stack("banner-actions", buttons.isEmpty() ? hidden : ControlState.READY, Nodes.LayoutRole.ACTIONS, buttons)));
-        return new ViewSpec(new Nodes.Stack("plugins-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(banner,
-            new Nodes.Text("notice", notice.isEmpty() ? hidden : ControlState.READY, notice.isEmpty() ? " " : notice, Nodes.TextRole.DESCRIPTION))));
+        return new ViewSpec(new Nodes.Stack("plugins-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(banner)));
     }
 
     private ViewSpec messageSpec() {
@@ -229,8 +228,6 @@ final class PluginManagerPanel extends JPanel {
         render(headerView, headerSpec());
         restyle();
     }
-
-    void notice(String text) { notice = text; render(headerView, headerSpec()); restyle(); }
 
     void message(String text, boolean error) {
         message = text;
@@ -285,7 +282,6 @@ final class PluginManagerPanel extends JPanel {
     String details() { return list.selectedRow() == null ? list.emptyText() : details.text(); }
 
     String bannerText() { return bannerText; }
-    String noticeText() { return notice; }
     String messageText() { return message.strip(); }
     boolean messageIsError() { return error && !message.isEmpty(); }
     List<String> bannerLabels() { return bannerActions.stream().map(BannerAction::label).toList(); }

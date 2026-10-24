@@ -43,7 +43,7 @@ class EditorDocumentPreservationTest {
             var invocation = new dev.jasper.app.commandline.Invocation(List.of("editor", "--wait", file.toString()), root,
                 Optional.empty(), text -> { }, err::append);
             exit = editor.host.commands.dispatch(invocation).toCompletableFuture();
-            StagedVaultHost.await(() -> onEdtValue(() -> editor.contributions.content().entries().size() == 1), "the file's tab");
+            StagedVaultHost.await(() -> onEdtValue(() -> editor.contributions.tabs().hosted().size() == 1), "the file's tab");
             StagedVaultHost.await(() -> onEdtValue(() -> editor.documentText().getText().equals("message\n")), "the file's text");
             assertThat(exit).as("waiting for the tab to close").isNotDone();
         }
@@ -65,10 +65,11 @@ class EditorDocumentPreservationTest {
                 area.setText("int foo = 42;\nfoo += 1;\n");
                 call(call(editor.selectedTab(),"session"),"setStyle",new Class<?>[]{String.class},"text/java");
                 area.append("// edit\n"); area.select(4,7);
-                var tab=editor.contentTab(); var entry=editor.contributions.content().entries().getFirst();
+                var tab=editor.contentTab(); var entry=editor.contributions.tabs().hosted().getFirst();
                 assertThat(entry.commands()).extracting(dev.jasper.app.contributions.ContentCommand::title)
-                    .contains("Save", "Save As…", "Save All", "Open…", "New File", "Close Tab", "Find…", "Replace…", "Go to Line…",
-                        "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap", "Toggle Vim Mode");
+                    .contains("Save", "Save As…", "Save All", "Open…", "New File", "Find…", "Replace…", "Go to Line…",
+                        "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap", "Toggle Vim Mode")
+                    .as("the host's tab menu has its own Close Pane and Close Tab").doesNotContain("Close Tab", "Close Pane");
                 var view=(KitView)entry.component();
                 assertThat(view.route()).isEqualTo(ThemeRoute.WORKSPACE);
                 assertThat(view.isOpaque()).isTrue();
@@ -88,8 +89,8 @@ class EditorDocumentPreservationTest {
                 var syntax=editor.context.appearance().syntaxPalette();
                 assertThat(keyword).isEqualTo(syntax.style(dev.jasper.sdk.ui.SyntaxRole.KEYWORD).color());
                 assertThat(opacity(editor)).isEqualTo(.8);
-                var pin=entry.pin();tab.move(true);assertThat(tab.isSeparate()).isFalse();pin.close();tab.move(true);
-                assertThat(tab.isSeparate()).isTrue();assertThat(entry.component()).isSameAs(view);
+                var pin=entry.pin();tab.moveToNewWindow();assertThat(tab.window().isMain()).isTrue();pin.close();tab.moveToNewWindow();
+                assertThat(tab.window().isMain()).isFalse();assertThat(entry.component()).isSameAs(view);
                 assertThat(opacity(editor)).as("destination opacity resampled").isEqualTo(.45);
                 assertThat(area.getBackground().getAlpha()).isZero();
                 assertThat(editor.context.appearance().variant()).isEqualTo(dev.jasper.sdk.Variant.LIGHT);
@@ -114,7 +115,7 @@ class EditorDocumentPreservationTest {
                 for(var id:List.of("find.case","find.word","find.regex"))assertThat(named(view,id,AbstractButton.class).isSelected()).isTrue();
                 assertThat(named(view,"find.bar",javax.swing.JComponent.class).isVisible()).isTrue();
                 assertThat(named(view,"find.status",JLabel.class).getForeground()).as("a caption").isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
-                tab.move(false);assertThat(opacity(editor)).isEqualTo(.8);
+                tab.moveToMainWindow();assertThat(opacity(editor)).isEqualTo(.8);
                 call(area,"undoLastAction");assertThat(area.getText()).isEqualTo("int foo = 42;\nfoo += 1;\n");
                 call(area,"redoLastAction");
                 measure(area);
@@ -174,7 +175,7 @@ class EditorDocumentPreservationTest {
                 assertThat(area.getFont().getSize()).isEqualTo(size);
                 assertThat(java.nio.file.Files.exists(editor.host.environment.settingsFiles().file("dev.jasper.editor"))).isFalse();
                 var reopened=(PluginPanelPage)editor.host.settingsPages(pageContext).getFirst();
-                assertThat(named(reopened.component(),"settings:font_size.input",JTextComponent.class).getText()).isEqualTo(Integer.toString(size));
+                assertThat(Double.parseDouble(named(reopened.component(),"settings:font_size.input",JTextComponent.class).getText())).isEqualTo((double)size);
                 assertThat(reopened.modified()).isFalse();reopened.dispose();
                 editor.contentTab().close();
             });
@@ -197,7 +198,7 @@ class EditorDocumentPreservationTest {
                 var surface=(javax.swing.JComponent)call(editor.selectedTab(),"surface");
                 Integer nativeTrack = null;
                 for(var detached:List.of(false,true)) {
-                    editor.contentTab().move(detached);
+                    if (detached) editor.contentTab().moveToNewWindow(); else editor.contentTab().moveToMainWindow();
                     String state=detached ? "document-scroll-moved" : "document-scroll-main";
                     dev.jasper.sdk.contracts.ThemeMigrationCapture.save("editor-hosted","mixed",state,surface,600,300);
                     var image=new java.awt.image.BufferedImage(600,300,java.awt.image.BufferedImage.TYPE_INT_ARGB);
@@ -236,7 +237,7 @@ class EditorDocumentPreservationTest {
                 area.setCaretPosition(0); measure(area);
                 call(editor.editorWindow(),"toggleVim");
                 var vim=((Optional<?>)call(editor.selectedTab(),"vimEditor")).orElseThrow();
-                var view=(KitView)editor.contributions.content().entries().getFirst().component();
+                var view=(KitView)editor.contributions.tabs().hosted().getFirst().component();
                 feed(editor,vim,"/line<Left>");
                 var status=named(view,"vim.status",JLabel.class);
                 assertThat(status.getText()).isEqualTo("/line");
@@ -264,7 +265,7 @@ class EditorDocumentPreservationTest {
                 assertThat(editor.documentText().getDocument()).isSameAs(state[2]);
                 assertThat(named(view,"vim.status",JLabel.class).getForeground()).isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
                 assertThat(output.getViewport().getViewPosition().y).isZero();
-                editor.contentTab().move(true);
+                editor.contentTab().moveToNewWindow();
                 assertThat(editor.documentText().getDocument()).isSameAs(state[2]);
                 assertThat(output.getViewport().getViewPosition().y).as("moving preserves output scroll").isZero();
                 feed(editor,state[0],"<CR>\"qp");

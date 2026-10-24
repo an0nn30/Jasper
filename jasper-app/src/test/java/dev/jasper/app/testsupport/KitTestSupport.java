@@ -25,6 +25,13 @@ public final class KitTestSupport {
         return shared.context(ThemeRoute.CHROME);
     }
 
+    /** A workspace context over Slate Cobalt Dark, as a content tab paints from, shared by the test JVM; EDT only. */
+    public static KitContext workspaceContext() {
+        if (!EventQueue.isDispatchThread()) throw new IllegalStateException("Kit contexts are EDT confined");
+        if (shared == null) shared = bindings(true);
+        return shared.context(ThemeRoute.WORKSPACE);
+    }
+
     /** Fresh bindings a test owns and closes, for example to publish a theme switch; EDT only. */
     public static AppearanceBindings bindings(boolean dark) {
         return new AppearanceBindings(ThemeTestSupport.pair(dark), failure -> { throw new AssertionError(failure); }, () -> false);

@@ -4,6 +4,10 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.contributions.TabRegistry;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.app.presentation.TitleFormat;
 import dev.jasper.app.presentation.WorkspaceLook;
@@ -15,12 +19,16 @@ import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Component;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
 import javax.accessibility.AccessibleRole;
 import javax.accessibility.AccessibleState;
+import javax.swing.AbstractButton;
 import javax.swing.JMenuItem;
+import javax.swing.JPanel;
 import javax.swing.JToolTip;
 import javax.swing.plaf.basic.BasicHTML;
 import org.junit.jupiter.api.AfterEach;
@@ -32,7 +40,8 @@ class ClassicTabsTest {
 
     static WorkspaceChrome classic() {
         return WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.CLASSIC, WorkspaceLook.Stripes.RAILS,
-            WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD), new TitleFormat("{context}"));
+            WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD,
+            WorkspaceLook.Icons.NEW_UI), new TitleFormat("{context}"));
     }
 
     static ClassicTabs tabs(WindowContent owner, int width) {
@@ -40,6 +49,22 @@ class ClassicTabsTest {
         strip.setSize(width, strip.getPreferredSize().height);
         LayoutTestSupport.layoutTree(strip);
         return strip;
+    }
+
+    /** Tabs and panes spec 5: no pane shows a strip, and the window's classic strip lists a split tab once. */
+    @Test void aSplitTabIsOneEntryOfTheWindowsStrip() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.split(Side.RIGHT);
+                assertThat(owner.workspace().groupViews()).hasSize(2);
+                var strip = (ClassicTabs) owner.tabBar();
+                assertThat(strip.isVisible()).isTrue();
+                assertThat(strip.entries()).as("one tab, two panes: one entry").hasSize(1);
+                assertThat(WindowTabsTest.named(owner.workspace(), "classicTabs")).as("no pane shows a strip").isNull();
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
     }
 
     @Test void oneTabStillShowsTheStrip() throws Exception {
@@ -51,11 +76,15 @@ class ClassicTabsTest {
                 owner.setSize(800, 600);
                 LayoutTestSupport.layoutTree(owner);
                 var strip = (ClassicTabs) owner.tabBar();
+                assertThat(strip.isVisible()).as("the classic tabs show for a window's only tab").isTrue();
                 assertThat(strip.entries()).hasSize(1);
                 assertThat(owner.tabBar().component().getHeight()).as("the mounted strip at one tab: window.tab_height with its rule")
                     .isEqualTo(owner.tabHeight());
                 assertThat(strip.getWidth()).as("across the terminal column").isPositive();
                 assertThat(strip.entries().getFirst().getWidth()).as("its one tab laid out").isPositive();
+                owner.newTab(DesktopTestSupport.HOME);
+                owner.closeTab(owner.selectedTab());
+                assertThat(strip.isVisible()).as("and again when the count drops back to one").isTrue();
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -68,9 +97,9 @@ class ClassicTabsTest {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
-                owner.currentTab().rename("Local: ~");
+                owner.currentTerminal().rename("Local: ~");
                 owner.newTab(DesktopTestSupport.HOME);
-                owner.currentTab().rename(title);
+                owner.currentTerminal().rename(title);
                 owner.update();
                 var strip = tabs(owner, 800);
                 assertThat(strip.entries().get(0).getFont().getFontName(java.util.Locale.ROOT)).as("a Latin title").startsWith("IBM Plex Sans");
@@ -85,9 +114,9 @@ class ClassicTabsTest {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
-                owner.currentTab().rename("Local: ~");
+                owner.currentTerminal().rename("Local: ~");
                 owner.newTab(DesktopTestSupport.HOME);
-                owner.currentTab().rename("Mac: ~");
+                owner.currentTerminal().rename("Mac: ~");
                 owner.update();
                 var strip = tabs(owner, 800);
                 var first = strip.entries().get(0);
@@ -118,7 +147,7 @@ class ClassicTabsTest {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
-                for (int i = 0; i < 5; i++) { owner.newTab(DesktopTestSupport.HOME); owner.currentTab().rename("ssh build-" + i + " tail -f /var/log/app.log"); }
+                for (int i = 0; i < 5; i++) { owner.newTab(DesktopTestSupport.HOME); owner.currentTerminal().rename("ssh build-" + i + " tail -f /var/log/app.log"); }
                 owner.update();
                 var strip = tabs(owner, 600);
                 var last = strip.entries().getLast();
@@ -132,13 +161,13 @@ class ClassicTabsTest {
                 assertThat(last.getWidth()).as("a long label is drawn shortened").isLessThan(last.chromeWidth() + last.labelWidth());
                 assertThat(ClassicTabs.cap(new int[] {40, 200, 200}, 300, 24)).as("the long labels shorten first").isEqualTo(130);
                 assertThat(ClassicTabs.cap(new int[] {40, 200, 200}, 30, 24)).as("never below the minimum").isEqualTo(24);
-                int before = owner.tabStrip().getTabCount();
+                int before = owner.tabCount();
                 strip.entries().get(0).closeClicked();
-                assertThat(owner.tabStrip().getTabCount()).isEqualTo(before - 1);
+                assertThat(owner.tabCount()).isEqualTo(before - 1);
 
                 // Past the minimum the strip clips its last tabs, and the + stays at its trailing edge, over them.
-                for (int i = owner.tabStrip().getTabCount(); i < 15; i++) {
-                    owner.newTab(DesktopTestSupport.HOME); owner.currentTab().rename("ssh build-" + i + " tail -f /var/log/app.log");
+                for (int i = owner.tabCount(); i < 15; i++) {
+                    owner.newTab(DesktopTestSupport.HOME); owner.currentTerminal().rename("ssh build-" + i + " tail -f /var/log/app.log");
                 }
                 owner.update();
                 tabs(owner, 600);
@@ -154,7 +183,7 @@ class ClassicTabsTest {
                         .as("a whole tab's x takes the mouse").isSameAs(entry);
                 }
                 var under = strip.entries().stream().filter(entry -> entry.getBounds().contains(plus.getX() + 3, 4)).findFirst().orElseThrow();
-                owner.selectTab(owner.tabStrip().getComponentAt(strip.entries().indexOf(under)));
+                owner.selectTab(owner.tabs().get(strip.entries().indexOf(under)));
                 owner.update();
                 BufferedImage image = MockProfile.print(strip, 600, owner.tabHeight());
                 var palette = themes.current().chrome().semantic();
@@ -180,24 +209,24 @@ class ClassicTabsTest {
                 // A press and a release a pixel apart make no MOUSE_CLICKED; the + still acts.
                 mouse(plus, MouseEvent.MOUSE_PRESSED, 5, 5);
                 mouse(plus, MouseEvent.MOUSE_RELEASED, 6, 5);
-                assertThat(owner.tabStrip().getTabCount()).as("the + acts on its release").isEqualTo(2);
+                assertThat(owner.tabCount()).as("the + acts on its release").isEqualTo(2);
                 owner.update();
                 tabs(owner, 800);
                 var first = strip.entries().get(0);
                 var close = first.closeBounds();
                 int x = close.x + close.width / 2, y = close.y + close.height / 2;
                 mouse(first, MouseEvent.MOUSE_PRESSED, x, y);
-                assertThat(owner.tabStrip().getTabCount()).as("a press on the x closes nothing yet").isEqualTo(2);
-                assertThat(owner.selectedComponent()).as("nor selects its tab").isSameAs(owner.tabStrip().getComponentAt(1));
+                assertThat(owner.tabCount()).as("a press on the x closes nothing yet").isEqualTo(2);
+                assertThat(owner.selectedTab()).as("nor selects its tab").isSameAs(owner.tabs().get(1));
                 mouse(first, MouseEvent.MOUSE_RELEASED, 2, y);
-                assertThat(owner.tabStrip().getTabCount()).as("dragged off the x before the release, nothing closes").isEqualTo(2);
+                assertThat(owner.tabCount()).as("dragged off the x before the release, nothing closes").isEqualTo(2);
                 mouse(first, MouseEvent.MOUSE_PRESSED, x, y);
                 mouse(first, MouseEvent.MOUSE_RELEASED, x + 1, y);
-                assertThat(owner.tabStrip().getTabCount()).as("released over the x, its tab closes").isEqualTo(1);
+                assertThat(owner.tabCount()).as("released over the x, its tab closes").isEqualTo(1);
                 // The x takes the pointer in a square larger than its 7 px glyph, inside its tab.
                 owner.newTab(DesktopTestSupport.HOME);
                 owner.update();
-                tabs(owner, 800);
+                strip = tabs(owner, 800);
                 var tab = strip.entries().get(0);
                 var glyph = tab.closeBounds();
                 var target = tab.closeTarget();
@@ -207,21 +236,36 @@ class ClassicTabsTest {
                 int beside = glyph.x + glyph.width + 3;
                 mouse(tab, MouseEvent.MOUSE_PRESSED, beside, glyph.y - 3);
                 mouse(tab, MouseEvent.MOUSE_RELEASED, beside, glyph.y - 3);
-                assertThat(owner.tabStrip().getTabCount()).as("a click just beside the glyph closes its tab").isEqualTo(1);
+                assertThat(owner.tabCount()).as("a click just beside the glyph closes its tab").isEqualTo(1);
 
                 owner.newTab(DesktopTestSupport.HOME);
                 owner.update();
                 var action = strip.entries().get(0).getAccessibleContext().getAccessibleAction();
                 assertThat(action.getAccessibleActionCount()).isEqualTo(2);
-                assertThat(action.getAccessibleActionDescription(1)).isEqualTo("Close tab");
+                assertThat(action.getAccessibleActionDescription(1)).isEqualTo("Close Tab");
                 assertThat(action.doAccessibleAction(0)).isTrue();
-                assertThat(owner.selectedComponent()).as("the first action selects the tab").isSameAs(owner.tabStrip().getComponentAt(0));
+                assertThat(owner.selectedTab()).as("the first action selects the tab").isSameAs(owner.tabs().get(0));
                 assertThat(action.doAccessibleAction(1)).isTrue();
-                assertThat(owner.tabStrip().getTabCount()).as("the second is the x").isEqualTo(1);
+                assertThat(owner.tabCount()).as("the second is the x").isEqualTo(1);
                 var button = plus.getAccessibleContext();
                 assertThat(button.getAccessibleRole()).isEqualTo(AccessibleRole.PUSH_BUTTON);
-                assertThat(button.getAccessibleName()).isEqualTo("New Tab");
+                assertThat(button.getAccessibleName()).as("the + opens a new tab").isEqualTo("New Tab");
                 assertThat(button.getAccessibleAction().getAccessibleActionCount()).as("the + can be pressed").isEqualTo(1);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** Tabs and panes spec 5 and workspace plan 8a Rulings 11: the strip's "+" is New Tab, a new terminal tab. */
+    @Test void thePlusOpensANewTab() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                Tab first = owner.selectedTab();
+                ((AbstractButton) ((ClassicTabs) owner.tabBar()).add()).doClick();
+                assertThat(owner.parentTabCount()).as("a new tab").isEqualTo(2);
+                assertThat(owner.selectedTab()).as("it shows").isNotSameAs(first);
+                assertThat(owner.workspace().tabs()).as("holding one terminal").containsExactly(owner.selectedTab());
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -232,7 +276,7 @@ class ClassicTabsTest {
             try {
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
                 String title = "<html><img src=http://example.invalid/x.png>" + "x".repeat(1000);
-                owner.currentTab().rename(title);
+                owner.currentTerminal().rename(title);
                 owner.update();
                 var strip = tabs(owner, 800);
                 var entry = strip.entries().get(0);
@@ -244,7 +288,8 @@ class ClassicTabsTest {
                     .isEqualTo(entry.getFontMetrics(entry.getFont()).stringWidth(WindowTabs.capped(title)));
                 var item = (JMenuItem) strip.tabList().getComponent(0);
                 assertThat(item.getText()).hasSizeLessThanOrEqualTo(201).startsWith("<html><img").endsWith("\u2026");
-                owner.currentTab().rename("short");
+                assertThat(item.getClientProperty(BasicHTML.propertyKey)).as("the tab list renders the title literally").isNull();
+                owner.currentTerminal().rename("short");
                 owner.update();
                 String shortcut = owner.tabShortcut(0);
                 assertThat(entry.getToolTipText()).as("the tip carries the shortcut")
@@ -262,13 +307,114 @@ class ClassicTabsTest {
         });
     }
 
+    /**
+     * Workspace plan 8c Rulings 3: the "+" and the room after the last tab are the strip's end, a tab's outer quarters the
+     * places before and after it; a crowded strip's end is from its "+" on.
+     */
+    @Test void thePlusTheRoomAfterTheTabsAndATabsOuterQuartersAreNewTabPlaces() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                var strip = tabs(owner, 800);
+                var first = strip.entries().getFirst().getBounds();
+                var plus = strip.add().getBounds();
+                assertThat(strip.newTabPlace(new java.awt.Point(plus.x + plus.width / 2, plus.height / 2))).as("the +").hasValue(2);
+                assertThat(strip.newTabPlace(new java.awt.Point(790, 5))).as("the room after it").hasValue(2);
+                assertThat(strip.newTabPlace(new java.awt.Point(first.x + 1, first.height / 2))).as("a tab's leading quarter").hasValue(0);
+                assertThat(strip.newTabPlace(new java.awt.Point(first.x + first.width / 2, first.height / 2))).as("its middle").isEmpty();
+                assertThat(strip.newTabPlace(new java.awt.Point(900, 5))).as("off the strip").isEmpty();
+                for (int i = owner.tabCount(); i < 15; i++) owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                tabs(owner, 600);
+                var crowded = strip.add().getBounds();
+                assertThat(strip.entries().getLast().getX()).as("crowded: the last tabs clip").isGreaterThan(600);
+                assertThat(strip.newTabPlace(new java.awt.Point(crowded.x + crowded.width / 2, crowded.height / 2)))
+                    .as("the +, over the clipped tabs").hasValue(15);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /**
+     * Workspace plan 8c's final review (M-e): the classic strip has no dead zone for a dragged pane. A divider is the place
+     * between the tabs either side of it, the strip's bottom row below the tabs is theirs, the last tab's trailing quarter
+     * is the end, and a crowded strip's end starts at its "+".
+     */
+    @Test void theClassicStripHasNoDeadZoneForANewTab() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                var strip = tabs(owner, 800);
+                var first = strip.entries().getFirst().getBounds();
+                var last = strip.entries().getLast().getBounds();
+                int bottom = strip.getHeight() - 1;
+                assertThat(first.height).as("the tabs stop above the strip's rule").isLessThan(strip.getHeight());
+                assertThat(last.x).as("a divider between the tabs").isGreaterThan(first.x + first.width);
+                assertThat(strip.newTabPlace(new Point(first.x + first.width, 5))).as("the divider").hasValue(1);
+                assertThat(strip.newTabPlace(new Point(last.x - 1, 5))).as("its last pixel").hasValue(1);
+                assertThat(strip.newTabPlace(new Point(first.x + 1, bottom))).as("the bottom row of a leading quarter").hasValue(0);
+                assertThat(strip.newTabPlace(new Point(first.x + first.width / 2, bottom))).as("of a middle").isEmpty();
+                assertThat(strip.newTabPlace(new Point(last.x + last.width - 1, last.height / 2))).as("the last tab's trailing quarter")
+                    .hasValue(2);
+                for (int i = owner.tabCount(); i < 15; i++) owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                tabs(owner, 600);
+                var crowded = strip.add().getBounds();
+                assertThat(strip.newTabPlace(new Point(crowded.x, bottom))).as("the crowded +'s first pixel").hasValue(15);
+                assertThat(strip.newTabPlace(new Point(crowded.x - 1, 5))).as("a clipped tab's, just before it")
+                    .isNotEqualTo(java.util.OptionalInt.of(15));
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /**
+     * Workspace plan 8c Rulings 4 and its final review (M-e): a dragged pane over the strip's bottom row, below a tab's
+     * middle, shows that tab, as over the tab itself; it gives way when the drag ends there.
+     */
+    @Test void aDraggedPaneOverTheBottomRowBelowATabsMiddleShowsItsTab() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var model = new Contributions();
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.connectContributions(model);
+                Tab notes = model.tabs().open("dev.example.notes", "notes", "notes", owner.id(), new JPanel(),
+                    TabRegistry.Placement.SPLIT_RIGHT);
+                var shown = owner.activeParentTab();
+                owner.newTab(DesktopTestSupport.HOME);
+                var other = owner.activeParentTab();
+                owner.selectParentTab(shown);
+                TabDragTestSupport.frame(owner, 100, 50, 1208, 760);
+                var strip = (ClassicTabs) owner.tabBar();
+                Rectangle entry = TabDragTestSupport.onScreen(strip, strip.entries().getLast().getBounds());
+                Rectangle whole = TabDragTestSupport.onScreen(strip, new Rectangle(strip.getSize()));
+                Point below = new Point(entry.x + entry.width / 2, whole.y + whole.height - 1);
+                assertThat(entry.contains(below)).as("below the tab itself").isFalse();
+                Component source = TabDragTestSupport.startPane(owner, notes, below);
+                try {
+                    assertThat(owner.tabDrag().active()).isTrue();
+                    assertThat(owner.activeParentTab()).as("its tab shows").isEqualTo(other);
+                } finally {
+                    TabDragTestSupport.mouse(source, MouseEvent.MOUSE_RELEASED, below, TabDragTestSupport.PANE);
+                }
+                assertThat(owner.activeParentTab()).as("and gives way when the drag ends there").isEqualTo(shown);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
     @Test void theDefaultLookKeepsTheEqualTabs() throws Exception {
         edt(() -> {
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), dev.jasper.app.appearance.ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             assertThat(owner.tabBar()).isInstanceOf(WindowTabs.class).isSameAs(owner.windowTabs());
             owner.setSize(800, 600);
             LayoutTestSupport.layoutTree(owner);
-            assertThat(owner.tabBar().component().getHeight()).as("unlike the classic tabs, the equal tabs hide at one tab").isZero();
+            assertThat(owner.tabBar().component().isVisible()).as("unlike the classic tabs, the equal tabs hide at one tab").isFalse();
+            assertThat(owner.tabBar().component().getHeight()).isZero();
         });
     }
 

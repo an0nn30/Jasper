@@ -2,7 +2,6 @@ package dev.jasper.ui.swing;
 
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.model.Nodes;
-import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.util.List;
@@ -27,19 +26,19 @@ final class Separators {
         }
     }
 
-    /** One hairline in {@code border.subtle}, as tall as a control glyph; the stack's row centres it. */
+    /** One hairline as the kit's separator face sizes and colours it; the stack's row centres it. */
     static final class Rule extends JSeparator {
         final KitContext context;
         Rule(KitContext context) { super(SwingConstants.VERTICAL); this.context = context; setOpaque(false); }
         @Override public Dimension getPreferredSize() {
             if (context == null) return super.getPreferredSize(); // the look and feel may measure during construction
-            return new Dimension(ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE), ThemePainting.metric(context, DesignMetrics.Role.ICON_CONTROL));
+            return context.faces().separators.size(context);
         }
         @Override public Dimension getMinimumSize() { return getPreferredSize(); }
         @Override public Dimension getMaximumSize() { return getPreferredSize(); }
         @Override protected void paintComponent(Graphics graphics) {
             int stroke = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
-            graphics.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
+            graphics.setColor(context.faces().separators.rule(context));
             graphics.fillRect((getWidth() - stroke) / 2, 0, stroke, getHeight());
         }
     }

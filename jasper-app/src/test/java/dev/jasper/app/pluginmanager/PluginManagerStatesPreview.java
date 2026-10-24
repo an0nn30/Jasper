@@ -30,7 +30,7 @@ public final class PluginManagerStatesPreview {
     public static void capture(Path output) throws Exception {
         Path home=Files.createTempDirectory("jasper-plugin-states-");
         var runtime=new PluginRuntime[1];var controller=new ThemeController[1];var windows=new AuxiliaryWindows[1];
-        var manager=new PluginManager[1];var page=new SettingsPage[1];var flow=new RestartFlow[1];var workers=new ArrayDeque<Runnable>();
+        var manager=new PluginManager[1];var page=new SettingsPage[1];var flow=new RestartFlow[1];
         String id="dev.example.review";
         try {
             PluginJars.build(home.resolve("plugins").resolve(id).resolve("jars"),"main.jar",PluginJars.descriptor(id,"1.0.0","fix.Main")+"capabilities = [\"terminal.observe\"]\n",Map.of(),List.of());
@@ -40,9 +40,8 @@ public final class PluginManagerStatesPreview {
                 controller[0]=ThemeTestSupport.controller(true);
                 windows[0]=new AuxiliaryWindows(UiState.inMemory(),surface->new AuxiliarySurface.Shell(()->{},()->{},()->{},title->{},()->new Rectangle(0,0,744,600),(title,initial)->Optional.empty()));
                 runtime[0]=new PluginRuntime(new PluginRuntime.Options(null,home.resolve("plugins"),null,true,home.resolve("plugins.toml"),home.resolve("plugins.lock")),new ActivityNotifier(new BuddyTestSupport().companion(),()->{}),PluginRuntime.SettingsReports.IGNORED,new Contributions(),windows[0],new TerminalRegistry());runtime[0].start(Map.of(),true);
-                var resident=new ResidentControl(()->true,()->false);
-                flow[0]=new RestartFlow(resident,mode->false,workers::add,Runnable::run,Duration.ofMillis(20),Duration.ofMillis(1));
-                manager[0]=new PluginManager(runtime[0],windows[0],new PluginManager.Hooks(surface->Optional.empty(),flow[0],()->{},resident,true,Runnable::run,path->{},path->{},uri->{}));
+                flow[0]=new RestartFlow(mode->false);
+                manager[0]=new PluginManager(runtime[0],windows[0],new PluginManager.Hooks(surface->Optional.empty(),flow[0],()->{},Runnable::run,path->{},path->{},uri->{}));
                 var host=windows[0].window("app.settings","Settings",new Dimension(744,600),true);
                 page[0]=manager[0].page(new PageContext(null,value->{},Runnable::run,(title,initial)->Optional.empty(),()->{},()->host,()->controller[0].appearance().context(ThemeRoute.CHROME)));
                 host.setContent(page[0].component());page[0].selected();
@@ -63,15 +62,11 @@ public final class PluginManagerStatesPreview {
                     save(windows[0].open().getLast().holder(),dir.resolve("remove.png"),540,420);
                     save(windows[0].open().getLast().holder(),dir.resolve("remove-short.png"),540,240);
                     PluginKit.press(m.confirm().view(),ConfirmView.CANCEL);
-                    flow[0].restartNormally();save(panel,dir.resolve("restart-probing.png"),744,600);
-                    workers.remove().run();save(panel,dir.resolve("restart-resident-found.png"),744,600);
-                    flow[0].askResidentToQuit();save(panel,dir.resolve("restart-waiting.png"),744,600);
-                    workers.remove().run();save(panel,dir.resolve("restart-stuck.png"),744,600);save(panel,dir.resolve("restart-stuck-narrow.png"),440,400);
-                    flow[0].launchAnyway();save(panel,dir.resolve("restart-unavailable.png"),744,600);flow[0].cancel();
+                    flow[0].restartNormally();save(panel,dir.resolve("restart-unavailable.png"),744,600);flow[0].cancel();
                 });
             }
         } finally {
-            if(runtime[0]!=null){var done=new CompletableFuture<List<CompletableFuture<?>>>();SwingUtilities.invokeAndWait(()->done.complete(runtime[0].stop()));CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10,TimeUnit.SECONDS);}
+            if(runtime[0]!=null){var pluginWorkers=dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime[0]);var done=new CompletableFuture<List<CompletableFuture<?>>>();SwingUtilities.invokeAndWait(()->done.complete(runtime[0].stop()));CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10,TimeUnit.SECONDS);pluginWorkers.await();}
             SwingUtilities.invokeAndWait(()->{if(page[0]!=null)page[0].dispose();if(windows[0]!=null)windows[0].close();if(controller[0]!=null)controller[0].close();});
             try(var paths=Files.walk(home)){for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}
         }

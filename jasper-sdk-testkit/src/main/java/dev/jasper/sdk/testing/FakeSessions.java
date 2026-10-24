@@ -30,6 +30,8 @@ final class FakeSessions {
         final FakePluginContext owner; final SessionSpec spec;
         dev.jasper.sdk.terminal.RemoteDirectory directory;
         Attempt attempt; TerminalConnection connection; boolean everAttached; String state = "CONNECTING"; String status = "";
+        /** Restored with its tab (workspace tabs spec 13); kept once its pane starts, unlike the pane's {@code held}. */
+        boolean restored;
         Session(FakePluginContext owner, SessionSpec spec) { this.owner = owner; this.spec = spec; }
     }
 
@@ -128,6 +130,15 @@ final class FakeSessions {
         }
     }
 
+    /** A restored session waits, not started, until its tab is shown, when the workspace connects it. */
+    void hold(FakePluginContext owner, FakeWorkspace.Pane pane, SessionSpec spec) {
+        pane.session = new Session(owner, spec);
+        pane.session.restored = true;
+        pane.session.state = "NOT_STARTED";
+        pane.held = pane.info;
+        pane.info = FakeTerminals.notStarted(pane.info);
+    }
+
     String state(FakeWorkspace.Pane paneOrNull) {
         if (paneOrNull == null || !paneOrNull.open) return "CLOSED|";
         return paneOrNull.session == null ? "LOCAL|" : paneOrNull.session.state + "|" + paneOrNull.session.status;
@@ -136,8 +147,9 @@ final class FakeSessions {
     void cancel(FakeWorkspace.Pane pane) {
         if (pane.session == null || pane.session.attempt == null) return;
         pane.session.attempt.cancel();
-        // As in a real pane: with nothing ever shown there is nothing to return to.
-        if (!pane.session.everAttached) workspace.close(pane);
+        // As in a real pane: with nothing ever shown there is nothing to return to, unless the pane came back with its tab to
+        // be reconnected (workspace plan 6b Rulings 44).
+        if (!pane.session.everAttached && !pane.session.restored) workspace.close(pane);
         else ended(pane, "Connection cancelled", OptionalInt.empty());
     }
 
@@ -183,7 +195,7 @@ final class FakeSessions {
             String message = status != null ? "exit " + status
                 : String.valueOf(connection.exited().handle((value, error) -> error == null ? "unknown" : String.valueOf(error.getMessage())).join());
             ended(pane, message, status == null ? OptionalInt.empty() : OptionalInt.of(status));
-            if (pane.session.spec.onExit() == ExitPolicy.CLOSE_PANE) workspace.close(pane);
+            if (pane.session.spec.onExit() == ExitPolicy.CLOSE) workspace.close(pane);
         }
     }
 }

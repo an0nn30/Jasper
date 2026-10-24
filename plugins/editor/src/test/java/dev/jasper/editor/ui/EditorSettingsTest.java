@@ -25,14 +25,55 @@ class EditorSettingsTest {
     @Test void defaultsPickTheFirstInstalledPreferredFont() {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             assertThat(start(host, Set.of("Menlo", "JetBrains Mono")).current())
-                .isEqualTo(new EditorSettings("JetBrains Mono", 13, 4, false, 10, false));
-            assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "tab_size", "soft_wrap", "vim", "max_file_mib", "recent_files_days",
+                .isEqualTo(new EditorSettings("JetBrains Mono", 13, java.util.List.of(), false, 1.0, false, 4, false, 10, false, "workspace"));
+            assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "font_fallback", "font_ligatures", "font_line_height", "follow_terminal_font", "color_scheme", "markdown_view_mode", "tab_size", "soft_wrap", "vim", "max_file_mib", "recent_files_days",
                 "default_editor", "custom_command", "custom_in_terminal", "keep_environment_editor");
             assertThat(host.settingsReports(ID)).isEmpty();
         }
         try (var host = new FakePluginHost(home.resolve("other"))) {
             assertThat(start(host, Set.of()).current().fontFamily()).isEqualTo("Monospaced");
         }
+    }
+
+    /** Plan 15a: a look's font family (Enterprise's IBM Plex Mono) is the default only when it is installed. */
+    @Test void aLooksFontFamilyIsTheDefaultOnlyWhenItIsInstalled() {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.setKitDefault(ID, "font_family", "IBM Plex Mono");
+            assertThat(start(host, Set.of("IBM Plex Mono", "Menlo")).current().fontFamily()).isEqualTo("IBM Plex Mono");
+            assertThat(host.lookDefaultProblems(ID)).isEmpty();
+        }
+        try (var host = new FakePluginHost(home.resolve("other"))) {
+            host.setKitDefault(ID, "font_family", "IBM Plex Mono");
+            assertThat(start(host, Set.of("Menlo")).current().fontFamily()).isEqualTo("Menlo");
+            assertThat(host.lookDefaultProblems(ID)).singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
+                .startsWith("dev.jasper.editor: the look's default for font_family is not used: ");
+        }
+    }
+
+    @Test void colorSchemeRejectsMalformedValues() {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.setSetting(ID, "color_scheme", "catppuccin-mocha/dark");
+            assertThat(start(host, Set.of()).current().colorScheme()).isEqualTo("catppuccin-mocha/dark");
+            assertThat(host.settingsReports(ID)).isEmpty();
+        }
+        for (String bad : List.of("mocha", "x/dim", "X/dark", "")) {
+            try (var host = new FakePluginHost(home.resolve(bad.isEmpty() ? "empty" : bad.replace('/', '-')))) {
+                host.setSetting(ID, "color_scheme", bad);
+                assertThat(start(host, Set.of()).current().colorScheme()).as(bad).isEqualTo("workspace");
+                assertThat(host.settingsReports(ID)).as(bad).isNotEmpty();
+            }
+        }
+    }
+
+    @Test void theChosenSchemeIsFoundAmongTheInstalledOnes() {
+        var color = java.awt.Color.GRAY;
+        var styles = new java.util.EnumMap<dev.jasper.sdk.ui.SyntaxRole, dev.jasper.sdk.ui.SyntaxStyle>(dev.jasper.sdk.ui.SyntaxRole.class);
+        for (var role : dev.jasper.sdk.ui.SyntaxRole.values()) styles.put(role, new dev.jasper.sdk.ui.SyntaxStyle(color, false, false));
+        var ash = new dev.jasper.sdk.ui.EditorScheme("ash/dark", "Ash", dev.jasper.sdk.Variant.DARK,
+            new dev.jasper.sdk.ui.EditorPalette(color, color, color, color, color, color, color), new dev.jasper.sdk.ui.SyntaxPalette(styles));
+        assertThat(EditorSettings.scheme(List.of(ash), "ash/dark")).contains(ash);
+        assertThat(EditorSettings.scheme(List.of(ash), "ash/light")).isEmpty();
+        assertThat(EditorSettings.scheme(List.of(ash), "workspace")).isEmpty();
     }
 
     @Test void badValuesAreReportedAndTheirDefaultsUsed() {
@@ -44,7 +85,7 @@ class EditorSettingsTest {
             host.setSetting(ID, "max_file_mib", 20L);
             host.setSetting(ID, "vim", "yes");
             var settings = start(host, Set.of("Menlo", "Consolas")).current();
-            assertThat(settings).isEqualTo(new EditorSettings("Menlo", 13, 4, true, 20, false));
+            assertThat(settings).isEqualTo(new EditorSettings("Menlo", 13, java.util.List.of(), false, 1.0, false, 4, true, 20, false));
             assertThat(settings.maxFileBytes()).isEqualTo(20L * 1024 * 1024);
             assertThat(settings.font()).isEqualTo(new Font("Menlo", Font.PLAIN, 13));
             assertThat(host.settingsReports(ID)).extracting(line -> line.substring(0, line.indexOf(':')))
@@ -75,16 +116,87 @@ class EditorSettingsTest {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             host.start(INFO, Set.of(), Set.of(), context -> new EditorSettings.Declared(recording(context.settings(), specs), Set.of()));
             assertThat(specs).extracting(spec -> spec.section() + "/" + spec.key()).containsExactly(
-                "Font/font_family", "Font/font_size", "Editing/tab_size", "Editing/soft_wrap", "Editing/vim", "Files/max_file_mib", "Files/recent_files_days",
+                "Font/font_family", "Font/font_size", "Font/font_fallback", "Font/font_ligatures", "Font/font_line_height", "Font/follow_terminal_font", "Colors/color_scheme", "Markdown/markdown_view_mode", "Editing/tab_size", "Editing/soft_wrap", "Editing/vim", "Files/max_file_mib", "Files/recent_files_days",
                 "Default editor/default_editor", "Default editor/custom_command", "Default editor/custom_in_terminal",
                 "Default editor/keep_environment_editor");
             assertThat(specs).filteredOn(spec -> spec.kind() instanceof dev.jasper.sdk.settings.SettingKind.Bool)
-                .extracting(dev.jasper.sdk.settings.SettingSpec::key).containsExactly("soft_wrap", "vim", "custom_in_terminal", "keep_environment_editor");
+                .extracting(dev.jasper.sdk.settings.SettingSpec::key).containsExactly("font_ligatures", "follow_terminal_font", "soft_wrap", "vim", "custom_in_terminal", "keep_environment_editor");
             assertThat(specs).allSatisfy(spec -> {
                 assertThat(spec.label()).as("sentence-case labels without a colon").doesNotEndWith(":").isNotBlank();
                 assertThat(spec.description()).isNotBlank();
             });
             assertThat(specs.getFirst().editor()).as("the font family is the settings font picker").isPresent();
+        }
+    }
+
+    @Test void fractionalTypographyAndOldIntegerSizesAreReadWithoutRounding() {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.setSetting(ID, "font_size", 13L);
+            var declared = start(host, Set.of());
+            assertThat(declared.current().fontSize()).isEqualTo(13.0);
+            host.setSetting(ID, "font_size", 13.5);
+            host.setSetting(ID, "font_fallback", List.of("Dialog", "DialogInput"));
+            host.setSetting(ID, "font_ligatures", true);
+            host.setSetting(ID, "font_line_height", 1.25);
+            host.setSetting(ID, "follow_terminal_font", true);
+            var settings = declared.current();
+            assertThat(settings.font().getSize2D()).isEqualTo(13.5f);
+            assertThat(settings.fontFallback()).containsExactly("Dialog", "DialogInput");
+            assertThat(settings.fontLigatures()).isTrue();
+            assertThat(settings.fontLineHeight()).isEqualTo(1.25);
+            assertThat(settings.followTerminalFont()).isTrue();
+            assertThat(host.settingsReports(ID)).isEmpty();
+        }
+    }
+
+    @Test void typographyBoundariesAndInvalidValuesUseTheDeclaredDefaults() {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            var declared = start(host, Set.of());
+            assertThat(declared.current().fontFallback()).isEmpty();
+            assertThat(declared.current().fontLigatures()).isFalse();
+            assertThat(declared.current().fontLineHeight()).isEqualTo(1.0);
+            assertThat(declared.current().followTerminalFont()).isFalse();
+            for (double size : List.of(6.0, 72.0, 13.5)) {
+                host.setSetting(ID, "font_size", size);
+                assertThat(declared.current().fontSize()).isEqualTo(size);
+            }
+            for (double size : List.of(5.99, 72.01, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+                host.setSetting(ID, "font_size", size);
+                assertThat(declared.current().fontSize()).isEqualTo(13.0);
+            }
+            for (double height : List.of(.5, 3.0, 1.25)) {
+                host.setSetting(ID, "font_line_height", height);
+                assertThat(declared.current().fontLineHeight()).isEqualTo(height);
+            }
+            for (double height : List.of(.49, 3.01, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+                host.setSetting(ID, "font_line_height", height);
+                assertThat(declared.current().fontLineHeight()).isEqualTo(1.0);
+            }
+            for (List<String> fallback : List.of(List.of(""), List.of(" "), List.of("bad\0family"))) {
+                host.setSetting(ID, "font_fallback", fallback);
+                assertThat(declared.current().fontFallback()).isEmpty();
+            }
+            for (String key : List.of("font_ligatures", "follow_terminal_font")) host.setSetting(ID, key, "yes");
+            assertThat(declared.current().fontLigatures()).isFalse();
+            assertThat(declared.current().followTerminalFont()).isFalse();
+            assertThat(host.settingsReports(ID)).isNotEmpty();
+        }
+    }
+
+    @Test void kitTypographyDefaultsRemainIndependentWhenFollowing() {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.setKitDefault(ID, "font_family", "IBM Plex Mono");
+            host.setKitDefault(ID, "font_size", 14.5);
+            host.setKitDefault(ID, "font_fallback", List.of("Dialog"));
+            host.setKitDefault(ID, "font_line_height", 1.2);
+            host.setKitDefault(ID, "font_ligatures", true);
+            host.setSetting(ID, "follow_terminal_font", true);
+            var own = start(host, Set.of("IBM Plex Mono")).current();
+            assertThat(own.fontFamily()).isEqualTo("IBM Plex Mono");
+            assertThat(own.fontSize()).isEqualTo(14.5);
+            assertThat(own.fontFallback()).containsExactly("Dialog");
+            assertThat(own.fontLineHeight()).isEqualTo(1.2);
+            assertThat(own.fontLigatures()).isTrue();
         }
     }
 

@@ -6,11 +6,11 @@ unverified.
 
 ## Plan A: local files
 
-- [ ] 1. File → Open in Editor… (Cmd/Ctrl+O) in a terminal window opens the chosen files in tabs in one Editor window.
-- [ ] 2. Dropping a file from Finder onto the Editor window opens it; dropping a folder does nothing.
+- [ ] 1. File → Open in Editor… (Cmd/Ctrl+O) in a Jasper window opens the chosen files in tabs in that window.
+- [ ] 2. Dropping a file from Finder onto an editor tab opens it; dropping a folder does nothing.
 - [ ] 3. TOML, JSON, Python, Bash and YAML samples are highlighted; `Cargo.lock` and a `#!/usr/bin/env python3` script without an extension are detected.
 - [ ] 4. Editing shows ●; Cmd/Ctrl+S saves and clears it; `ls -l` shows the same permissions, and a symbolic link to the file is still a link.
-- [ ] 5. Cmd/Ctrl+W closes the current tab, asking about unsaved changes; with no tabs it closes the window.
+- [ ] 5. Cmd/Ctrl+W closes the current tab, asking about unsaved changes; a child window closes with its last tab, and the main window stays open.
 - [ ] 6. Cmd+Q with an unsaved tab asks Save All / Discard / Cancel; Cancel keeps Jasper running, Save All saves then quits.
 - [ ] 7. Changing an open file from the terminal (`echo x >> file`) reloads a clean tab within a few seconds and shows the banner on an edited one.
 - [ ] 8. Switching the theme between light and dark recolours the editor; the tab row, status line and find bar follow the theme.
@@ -26,7 +26,7 @@ unverified.
 - [ ] 15. Double-clicking a link to a file opens the file, and saving keeps the link (`ls -l` still shows `->`); double-clicking a link to a folder navigates into it.
 - [ ] 16. Selecting several files and choosing Open in Editor opens each in a tab; with more than 20 selected, 20 open and the browser says "Opened 20 of N files."
 - [ ] 17. Saving a read-only remote file (`chmod 444`) fails with "permission denied" and leaves it unchanged.
-- [ ] 18. After the SSH connection ends (close its tabs and wait for it to drop), saving an edited remote tab reconnects, asking for sign-in in a terminal window if needed; with every terminal window closed, the save fails with "Reconnecting to <host> needs an open terminal window for the sign-in prompt."
+- [ ] 18. After the SSH connection ends (close its tabs and wait for it to drop), saving an edited remote tab reconnects, asking for sign-in in a Jasper window if needed.
 - [ ] 19. With the Editor disabled in the Plugins manager (after the restart), double-clicking a file in the SFTP browser does nothing and Open in Editor is not in the menu.
 - [ ] 20. On a host at least 50 ms away (ping), saving an edited remote file and Save All with about five remote tabs complete in reasonable time; note the times (each save currently costs several dozen sequential SFTP round trips).
 
@@ -156,3 +156,53 @@ unverified.
 - [ ] 112. `dzab` deletes up to `ab`; `.` repeats it at the next `ab`.
 - [ ] 113. `v` then `sab` extends the Visual area to `ab`.
 - [ ] 114. `3sab` only stops at an `ab` within about three columns of the cursor.
+
+
+## Fonts and Markdown preview
+
+Editor 0.11.0 requires SDK 0.18.3. Remote 0.15.1 supplies provider-relative resources while retaining its older-Editor
+optional dependency range. CommonMark core, GFM tables, strikethrough and task-list extensions are pinned to 0.30.0
+and bundled only with Editor; the BSD-2-Clause notice is included in the generated dependency inventory.
+
+Automated acceptance uses the shipped Editor plugin in `FakePluginHost`, two host windows, real temporary local files
+and an opaque fake SFTP provider. It covers unsaved preview, independent modes, followed fractional typography,
+theme changes, preview search, undo/redo, dirty-target navigation, relative image resolution, save/reload/Save As,
+window moves and shutdown during queued work. Actual staged-host tests render classic/modern document controls at
+260 and 760 pixels. Headless source/preview renders cover 6, 13.5 and 72 points with line heights 0.5, 1 and 3,
+light/dark glass and selection, alongside the existing tables/code/images fixtures.
+
+The opt-in `JASPER_MARKDOWN_PERFORMANCE=true` `MarkdownPerformanceTest` measures real scroll containers, source and
+preview cold layout, complete-map rebuilding, and three simultaneously retained previews. It reports timing and
+heap observations rather than imposing machine-dependent test thresholds. Source attribution and legal breaks are
+indexed; ASCII preview leaves share paragraph breaks and bound flow candidates; scroll geometry yields between
+batches. On the development Mac, the final headless sample measured warmed complete-map rebuilds of 0.98 ms for
+one 2 MiB line, 0.58 ms for 140,000 units of dense inline markup, 135 ms across yielded batches for 50,000 anchors,
+and 6–11 ms for each of three retained 165,000-unit previews. Exact cold source layout took 1.28 s for the giant line
+and 2.12 s for dense markup; preview cold layout took 0.36 s and 1.11 s respectively. These costs can recur when an
+edit, resize or font change invalidates the affected layout. The three-preview fixture's largest EDT dispatch was
+420 ms. These measurements do not establish responsive maximum-size editing. A 10 ms sampler observed up to
+510 MiB used heap across the sequential fixtures; this includes retained heap from prior cases and is neither
+per-document retained memory nor a process RSS limit.
+
+The vendor's single bulk Java-tokenizer call remains noninterruptible: the 2 MiB `int ` fixture measured
+about 27 seconds from interruption to return. It runs on the render worker with one replaceable pending snapshot.
+
+Before the review fixes, headless `check` passed on October 20 with the installed Python 3.13 override:
+11,843 tests, zero failures/errors, 29 skips (25 existing platform skips and four opt-in performance cases,
+which passed separately); `sdkRelease` also passed. After the review fixes, the full Editor check passed:
+5,115 tests, zero failures/errors, four opt-in performance skips, plus plugin, SDK and application architecture gates.
+Headless `packageApp` and `verifyPackage` rebuilt and verified the macOS arm64 image without a trained AOT cache.
+The whole-repository check has not been repeated after the review fixes.
+
+After local main integration at `048b58680`, full headless `check` passed with the Python 3.13 override: **11,866 tests, zero failures/errors, 29 skips**, all 150 tasks executed. The merge preserves newer platform Find Again shortcuts and host-owned Close Tab; independent conflict-resolution review passed.
+
+User-run desktop acceptance remains pending:
+
+- [ ] Follow saved terminal fonts in two windows, keep an unapplied independent draft, then turn following off.
+- [ ] Check fractional sizes, installed fallback glyphs, ligatures, IME, wrapped combining marks/emoji, selection and pointer/caret alignment.
+- [ ] Check classic/modern toolbar tooltips, physical keyboard focus, Source/Split/Preview, divider dragging and restart persistence.
+- [ ] Scroll both panes with a trackpad, disable synchronization, edit/delete the visible heading, resize and change fonts while preserving passages.
+- [ ] Find and copy preview text, activate links by keyboard, Tab/Shift+Tab out of Preview, and verify Replace/Go to Line reveal the source without changing the default mode.
+- [ ] Check light/dark/glass, large fonts, dense markup and long-document typing on the target desktop.
+- [ ] Move hidden and active tabs between real windows while rendering, then reactivate and verify focus.
+- [ ] Load relative images through SFTP sign-in and distinct routes, grant web-image consent, Save As and close during late image completion.

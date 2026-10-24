@@ -21,6 +21,7 @@ final class ViewportSync {
     private final VimTextArea area;
     private JViewport viewport;
     private boolean moving;
+    private final java.beans.PropertyChangeListener typographyChanged = event -> resize(true);
     private final ChangeListener scrolled = event -> userScrolled();
     private final ComponentListener resized = new ComponentAdapter() {
         @Override public void componentResized(ComponentEvent event) { resize(); }
@@ -32,6 +33,7 @@ final class ViewportSync {
         this.editor = editor;
         this.area = area;
         area.addHierarchyListener(moved);
+        area.addPropertyChangeListener("editorTypography", typographyChanged);
         viewport();
     }
 
@@ -41,6 +43,7 @@ final class ViewportSync {
         if (found != viewport) {
             detach();
             viewport = found;
+            editor.view().physical(viewport != null);
             if (viewport != null) {
                 viewport.addChangeListener(scrolled);
                 viewport.addComponentListener(resized);
@@ -53,6 +56,8 @@ final class ViewportSync {
     /** Vim turned off: nothing is listened to any more. */
     void close() {
         area.removeHierarchyListener(moved);
+        area.removePropertyChangeListener("editorTypography", typographyChanged);
+        editor.view().physical(false);
         detach();
     }
 
@@ -66,9 +71,12 @@ final class ViewportSync {
     /**
      * The view's size from the viewport: whole lines and whole characters of the Editor's font (the text area's own
      * left and right insets hold no text). When the size changes, the view scrolls to keep the cursor shown, and the
-     * text area's room below the last line follows the new height.
+     * text area's room below the last line follows the new height. Once the viewport has a size, a split view's start
+     * goes in ({@link VimEditor#startAt}).
      */
-    void resize() {
+    void resize() { resize(false); }
+
+    private void resize(boolean force) {
         JViewport port = viewport;
         if (port == null) return;
         Rectangle visible = port.getViewRect();
@@ -80,9 +88,11 @@ final class ViewportSync {
         View view = editor.view();
         int rows = Math.max(1, visible.height / lineHeight), columns = Math.max(1, textWidth / charWidth);
         area.revalidate();
-        if (rows == view.height() && columns == view.width()) return;
-        view.resize(rows, columns);
-        editor.viewResized();
+        if (force || rows != view.height() || columns != view.width()) {
+            view.resize(rows, columns);
+            editor.viewResized();
+        }
+        editor.sized();
     }
 
     /** After a command: the viewport shows the view's first line and column. */
@@ -108,21 +118,62 @@ final class ViewportSync {
         } catch (BadLocationException ignored) { }
     }
 
-    /** The user scrolled: the view's first line follows, and the cursor moves inside the window. */
+    /**
+     * The user scrolled: the view's first line follows, and the cursor moves inside the window. While another view's
+     * edit waits to put this view back on its text, or a split view waits to start where its source is, only a scroll
+     * the user makes with the wheel or on a scroll bar counts ({@link #scrollingByHand}): the viewport's own moves
+     * meanwhile, its layout and the caret's scrolling, would pull the cursor onto other text, and the place that waits
+     * decides where the view goes.
+     */
     private void userScrolled() {
         if (moving || viewport == null) return;
-        Point at = viewport.getViewPosition();
-        int offset = area.viewToModel2D(new Point(0, at.y));
+        if (editor.placePending() && !scrollingByHand()) return;
+        int top = topline(viewport.getViewPosition().y);
+        if (top < 0 || top == editor.view().topline) return;
+        editor.viewScrolled(top);
+    }
+
+    /**
+     * @return whether the event being dispatched is the user's scroll: the wheel, or the mouse on a scroll bar or one of
+     *     its parts. A window's own mouse event, before Swing hands it to the component under the mouse, counts by that
+     *     component; a click anywhere else (a tab's header) does not
+     */
+    static boolean scrollingByHand() {
+        java.awt.AWTEvent event = java.awt.EventQueue.getCurrentEvent();
+        if (event instanceof java.awt.event.MouseWheelEvent) return true;
+        if (!(event instanceof java.awt.event.MouseEvent mouse) || mouse.getComponent() == null) return false;
+        java.awt.Component target = mouse.getComponent();
+        if (!(target instanceof javax.swing.JComponent) && target instanceof java.awt.Container window)
+            target = SwingUtilities.getDeepestComponentAt(window, mouse.getX(), mouse.getY());
+        return target instanceof javax.swing.JScrollBar || SwingUtilities.getAncestorOfClass(javax.swing.JScrollBar.class, target) != null;
+    }
+
+    /**
+     * Another view's edit puts the viewport back on the line it showed first (pane flexibility spec 6): it shows
+     * {@code position}, and the cursor does not follow, as it follows a user's scroll; the editor places it after.
+     *
+     * @param position the viewport position to show
+     * @return the window's first line there, as Vim numbers lines; -1 when the text area is in no viewport
+     */
+    int keep(Point position) {
+        JViewport port = viewport();
+        if (port == null) return -1;
+        moving = true;
+        try { port.setViewPosition(position); } finally { moving = false; }
+        return topline(position.y);
+    }
+
+    /** @return the first line shown whole from {@code y} down, as Vim numbers lines; -1 when there is none */
+    private int topline(int y) {
+        int offset = area.viewToModel2D(new Point(0, y));
         int line;
         try { line = area.getLineOfOffset(Math.max(0, offset)); }
-        catch (BadLocationException bad) { return; }
-        View view = editor.view();
+        catch (BadLocationException bad) { return -1; }
         int top = line + 1;
         // The first line only partly shown does not count, as Vim shows whole lines.
         try {
-            if (area.yForLine(line) < at.y && top < editor.buffer().count()) top++;
+            if (area.yForLine(line) < y && top < editor.buffer().count()) top++;
         } catch (BadLocationException ignored) { }
-        if (top == view.topline) return;
-        editor.viewScrolled(top);
+        return top;
     }
 }

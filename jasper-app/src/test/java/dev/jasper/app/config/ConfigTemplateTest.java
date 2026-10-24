@@ -32,7 +32,7 @@ class ConfigTemplateTest {
             "# close_pane = \"cmd+w\"", "# reload_config = \"none\"");
         assertThat(ConfigTemplate.text(true)).doesNotContain("history_palette", "snippets_palette");
         assertThat(ConfigTemplate.text(false)).contains("# command_palette = \"ctrl+shift+p\"", "# clear_scrollback = \"ctrl+shift+k\"",
-            "# next_tab = \"ctrl+tab\"", "cmd means Ctrl+Shift outside macOS");
+            "# next_tab = \"ctrl+pagedown\"", "cmd means Ctrl+Shift outside macOS");
         assertThat(ConfigTemplate.text(false)).doesNotContain("Ctrl+K");
     }
 

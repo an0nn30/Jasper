@@ -122,10 +122,10 @@ public final class PluginSelection {
             themes(candidates, resolution));
     }
 
-    /** macOS, and whether its unified title bar is available, read without AWT. */
+    /** The platform, and whether the unified macOS title bar is available, read without AWT. */
     static Projections.Host host() {
-        boolean mac = System.getProperty("os.name", "").startsWith("Mac");
-        return new Projections.Host(mac, mac && com.formdev.flatlaf.util.SystemInfo.isMacFullWindowContentSupported);
+        var platform = Projections.Platform.of(System.getProperty("os.name", ""));
+        return new Projections.Host(platform, platform == Projections.Platform.MAC && com.formdev.flatlaf.util.SystemInfo.isMacFullWindowContentSupported);
     }
 
     /** The presentation this launch runs. */

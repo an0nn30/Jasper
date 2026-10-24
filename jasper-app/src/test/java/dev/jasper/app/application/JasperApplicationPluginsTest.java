@@ -56,21 +56,29 @@ class JasperApplicationPluginsTest {
         PluginJars.build(dev, "life.jar", PluginJars.descriptor("dev.example.life", "1.0.0", "fix.life.Main"),
             Map.of("fix.life.Main", FIXTURE), List.of());
         var stoppedBeforeExit = new boolean[1];
+        var savedBeforeExit = new boolean[1];
         var terminated = new CountDownLatch(1);
         Path data = dirs.plugins().resolve("dev.example.life/data");
         JasperApplication[] application = new JasperApplication[1];
         edt(() -> {
             application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> {
                 stoppedBeforeExit[0] = java.nio.file.Files.exists(data.resolve("stopped"));
+                savedBeforeExit[0] = java.nio.file.Files.exists(dirs.workspaceState());
                 terminated.countDown();
             });
             application[0].startPlugins(null, dev, false, dirs);
             application[0].startPlugins(null, dev, false, dirs);
+            // A stand-in frame opens the main window headless, so Quit has a window to save (workspace plan 6a Task 9).
+            application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
+                () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            application[0].openFirstWindow(List.of()).orElseThrow();
         });
         assertThat(data.resolve("started")).exists();
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
         assertThat(stoppedBeforeExit[0]).isTrue();
+        assertThat(savedBeforeExit[0]).as("the windows saved in the home's workspace.toml").isTrue();
     }
 
     private static final String BINDING_FIXTURE = """
@@ -113,6 +121,7 @@ class JasperApplicationPluginsTest {
             edt(application[0]::quit);
             // Shutdown writes the layout state into the temporary home; let it finish before JUnit deletes that.
             assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+            ApplicationPluginCleanup.await(application[0]);
             worker.shutdownNow();
         }
     }
@@ -129,6 +138,7 @@ class JasperApplicationPluginsTest {
         java.nio.file.Files.delete(dirs.uiState());
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
         assertThat(dirs.uiState()).as("saved again at shutdown, keeping what was loaded").exists()
             .content().contains("rail_visible = false");
     }
@@ -171,6 +181,7 @@ class JasperApplicationPluginsTest {
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     @Test void anOutOfMemoryErrorWarnsThatJasperIsLowOnMemory() throws Exception {
@@ -186,6 +197,7 @@ class JasperApplicationPluginsTest {
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     @Test void quitReleasesTheHeapWatchAndTheMemoryIndicatorsAction() throws Exception {
@@ -208,6 +220,7 @@ class JasperApplicationPluginsTest {
         assertThat(oldGeneration.getCollectionUsageThreshold()).as("the low-memory watch, installed when start-up settled").isPositive();
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
         assertThat(application[0].contributions().action(MemoryIndicator.COLLECT)).as("closed with the application").isEmpty();
         assertThat(oldGeneration.getCollectionUsageThreshold()).as("the threshold is released").isZero();
     }
@@ -226,10 +239,11 @@ class JasperApplicationPluginsTest {
             assertThat(application.restart(RestartMode.NORMAL)).as("already on its way out").isTrue();
         });
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
-        assertThat(order).containsExactly("endpoint released", "spawn [jasper, SAME]", "terminate");
+        assertThat(order).containsExactly("endpoint released", "spawn [jasper, SAME, --replacing, " + ProcessHandle.current().pid() + "]",
+            "terminate");
     }
 
-    @Test void aReplacementForAnEndpointOwnerWhoseCleanupHangsCanNeverHandOff() throws Exception {
+    @Test void aReplacementStartsEvenWhenCleanupHangsAndWaitsForTheLock() throws Exception {
         List<String> spawned = new CopyOnWriteArrayList<>();
         var terminated = new CountDownLatch(1);
         var release = new CountDownLatch(1);
@@ -243,53 +257,8 @@ class JasperApplicationPluginsTest {
                 application.restart(RestartMode.SAME);
             });
             assertThat(terminated.await(10, TimeUnit.SECONDS)).as("the shutdown grace bounds the wait").isTrue();
-            assertThat(spawned).containsExactly("jasper --standalone");
+            assertThat(spawned).containsExactly("jasper --replacing " + ProcessHandle.current().pid());
         } finally { release.countDown(); }
-    }
-
-    private static final String GUARD_FIXTURE = """
-        package fix.guard;
-        import dev.jasper.sdk.plugin.Plugin;
-        import dev.jasper.sdk.plugin.PluginContext;
-        import dev.jasper.sdk.ui.WindowSpec;
-        import java.awt.Dimension;
-        import java.nio.file.Files;
-        public final class Main implements Plugin {
-            @Override public void start(PluginContext context) {
-                var window = context.windows().create(new WindowSpec("dev.example.guard.window", "Guarded", new Dimension(100, 100), false));
-                window.onClosing(() -> {
-                    try { Files.writeString(context.dataDirectory().resolve("asked"), "yes"); }
-                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
-                    return Files.exists(context.dataDirectory().resolve("allow"));
-                });
-            }
-        }
-        """;
-
-    @Test void quitAndRestartAskPluginWindowsFirstAndARefusalKeepsJasperRunning() throws Exception {
-        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
-        Path dev = home.resolve("dev-plugin");
-        PluginJars.build(dev, "guard.jar", PluginJars.descriptor("dev.example.guard", "1.0.0", "fix.guard.Main"),
-            Map.of("fix.guard.Main", GUARD_FIXTURE), List.of());
-        Path data = dirs.plugins().resolve("dev.example.guard/data");
-        List<String> spawned = new CopyOnWriteArrayList<>();
-        var terminated = new CountDownLatch(1);
-        JasperApplication[] application = new JasperApplication[1];
-        edt(() -> {
-            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
-            application[0].restartPlanner = mode -> Optional.of(List.of("jasper"));
-            application[0].spawner = command -> spawned.add(String.join(" ", command));
-            application[0].startPlugins(null, dev, false, dirs);
-        });
-        edt(application[0]::quit);
-        edt(() -> assertThat(application[0].restart(RestartMode.SAME)).as("handled: the window said no").isTrue());
-        edt(() -> { });
-        assertThat(data.resolve("asked")).exists();
-        assertThat(terminated.getCount()).as("still running").isEqualTo(1);
-        java.nio.file.Files.writeString(data.resolve("allow"), "yes");
-        edt(application[0]::quit);
-        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
-        assertThat(spawned).as("the refused restart left no relaunch behind").isEmpty();
     }
 
     private static final String QUIT_FIXTURE = """
@@ -332,15 +301,16 @@ class JasperApplicationPluginsTest {
         java.nio.file.Files.writeString(data.resolve("allow"), "yes");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
         assertThat(spawned).as("the refused restart left no relaunch behind").isEmpty();
     }
 
-    @Test void quitNowDoesNotAskPluginWindows() throws Exception {
+    @Test void quitNowDoesNotAskTheQuitGuards() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
         Path dev = home.resolve("dev-plugin");
-        PluginJars.build(dev, "guard.jar", PluginJars.descriptor("dev.example.guard", "1.0.0", "fix.guard.Main"),
-            Map.of("fix.guard.Main", GUARD_FIXTURE), List.of());
-        Path data = dirs.plugins().resolve("dev.example.guard/data");
+        PluginJars.build(dev, "quit.jar", PluginJars.descriptor("dev.example.quit", "1.0.0", "fix.quit.Main"),
+            Map.of("fix.quit.Main", QUIT_FIXTURE), List.of());
+        Path data = dirs.plugins().resolve("dev.example.quit/data");
         var terminated = new CountDownLatch(1);
         JasperApplication[] application = new JasperApplication[1];
         edt(() -> {
@@ -349,6 +319,7 @@ class JasperApplicationPluginsTest {
         });
         edt(application[0]::quitNow);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
         assertThat(data.resolve("asked")).as("the guard was never consulted").doesNotExist();
     }
 
@@ -397,13 +368,14 @@ class JasperApplicationPluginsTest {
         assertThat(dirs.plugins().resolve("dev.example.terms/data").resolve("windows")).hasContent("0 false");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     /** The installed LAF is FlatLaf's IntelliJ theme LAF carrying the saved theme's module snapshot; its identity. */
     private static String installedLightLaf() {
         var laf = javax.swing.UIManager.getLookAndFeel();
         assertThat(laf).isInstanceOf(com.formdev.flatlaf.IntelliJTheme.ThemeLaf.class);
-        var light = dev.jasper.ui.theme.JasperTheme.bundled().generated(false);
+        var light = dev.jasper.ui.theme.JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false);
         assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(light);
         assertThat(laf.getDefaults().get("Jasper.installedTheme")).as("the snapshot travels with the LAF itself").isSameAs(light);
         assertThat(laf.getName()).isEqualTo(light.name());
@@ -451,7 +423,7 @@ class JasperApplicationPluginsTest {
             assertThat(dirs.plugins().resolve("dev.example.look/data/appearance")).as("the plugin started under that same LAF")
                 .hasContent("LIGHT\n" + installed[0] + "\ncom.formdev.flatlaf.ui.FlatButtonUI");
         } finally {
-            if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
+            if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); ApplicationPluginCleanup.await(application[0]); }
             service.close();
             edt(() -> ThemeTestSupport.controller(true));
         }
@@ -472,6 +444,7 @@ class JasperApplicationPluginsTest {
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     private static final String LINE_EDITOR = """
@@ -520,6 +493,7 @@ class JasperApplicationPluginsTest {
             .containsExactlyInAnyOrder("Foo.java|42", "Foo.java|-");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
     }
 
     /**
@@ -553,6 +527,38 @@ class JasperApplicationPluginsTest {
         });
         awaitCalls(calls, 2);
         assertThat(calls).as("plugins running, none provides an editor").containsExactly("edit:run.command", "reveal:run.command");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
+    @Test void aRequestedFilesDesktopFallbackOnlyReveals() throws Exception {
+        Path notes = java.nio.file.Files.writeString(home.resolve("notes.txt"), "notes\n");
+        var calls = new CopyOnWriteArrayList<String>();
+        var desktop = new dev.jasper.app.platform.ConfigEditor(path -> calls.add("edit:" + path.getFileName()),
+            path -> calls.add("open:" + path.getFileName()), path -> calls.add("reveal:" + path.getFileName()));
+        java.util.UUID window = java.util.UUID.randomUUID();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].openRequestedFile(notes, window, desktop);
+        });
+        awaitCalls(calls, 1);
+        assertThat(calls).as("plugins not started: the desktop's edit action could hand the file back to Jasper")
+            .containsExactly("reveal:notes.txt");
+
+        calls.clear();
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("life-plugin");
+        PluginJars.build(dev, "life.jar", PluginJars.descriptor("dev.example.life", "1.0.0", "fix.life.Main"),
+            Map.of("fix.life.Main", FIXTURE), List.of());
+        edt(() -> {
+            application[0].startPlugins(null, dev, false, dirs);
+            application[0].openRequestedFile(notes, window, desktop);
+        });
+        awaitCalls(calls, 1);
+        assertThat(calls).as("plugins running, none provides an editor").containsExactly("reveal:notes.txt");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }

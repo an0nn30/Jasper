@@ -60,7 +60,7 @@ class SessionPaneTest {
             registry.onEvent(events::add);
             owner.connectTerminals(registry, () -> { });
             var request = new SessionRequest("dev.example.ssh", "build-host", closeOnExit, attempts::add, Runnable::run);
-            pane = owner.openTab(HOME, request).focusedPane();
+            pane = owner.openTab(HOME, request).pane();
         });
     }
 
@@ -87,22 +87,22 @@ class SessionPaneTest {
             connection.remote.write(("\033]2;old prompt\007\033]1341;jasper;cmd;" + command + "\007\033]133;C\007").getBytes(StandardCharsets.UTF_8));
             connection.remote.flush();
             until(() -> field[0].contextText().equals("build-host:/srv/app : sleep 12"));
-            edt(() -> assertThat(owner.currentTab().title()).isEqualTo("sleep 12"));
+            edt(() -> assertThat(owner.currentTerminal().title()).isEqualTo("sleep 12"));
             connection.remote.write("\033]2;Claude Code — Reviewing files\007".getBytes(StandardCharsets.UTF_8)); connection.remote.flush();
             until(() -> field[0].contextText().equals("Claude Code — Reviewing files"));
             edt(() -> {
-                assertThat(owner.currentTab().title()).isEqualTo("Claude Code — Reviewing files");
-                var tab = owner.currentTab();
-                tab.split(SplitTree.Axis.RIGHT);
+                assertThat(owner.currentTerminal().title()).isEqualTo("Claude Code — Reviewing files");
+                var tab = owner.currentTerminal();
+                owner.split(dev.jasper.app.layout.Side.RIGHT);
                 assertThat(field[0].contextText()).isNotEqualTo("Claude Code — Reviewing files");
-                tab.focus(pane);
+                owner.selectTab(tab);
                 assertThat(field[0].contextText()).isEqualTo("Claude Code — Reviewing files");
                 owner.newTab(HOME); owner.selectTab(tab);
                 assertThat(field[0].contextText()).isEqualTo("Claude Code — Reviewing files");
             });
             connection.remote.write("\033]133;D;0\007".getBytes(StandardCharsets.UTF_8)); connection.remote.flush();
             until(() -> field[0].contextText().equals("build-host:/srv/app : Shell"));
-            edt(() -> assertThat(owner.currentTab().title()).isEqualTo("build-host"));
+            edt(() -> assertThat(owner.currentTerminal().title()).isEqualTo("build-host"));
         } finally { edt(() -> bar[0].close()); }
     }
 
@@ -172,7 +172,7 @@ class SessionPaneTest {
             pane.write("uptime\r".getBytes(StandardCharsets.UTF_8));
         });
         until(() -> loopback.typed().equals("uptime\r"));
-        edt(() -> owner.closeTab(owner.currentTab()));
+        edt(() -> owner.closeTab(owner.currentTerminal()));
         until(() -> loopback.closes.get() == 1);
     }
 
@@ -242,6 +242,43 @@ class SessionPaneTest {
         });
     }
 
+    /** Workspace tabs plan 6b: a restored session its plugin leaves not connected offers Reconnect, not Retry. */
+    @Test void aRestoredSessionLeftNotConnectedOffersReconnect() throws Exception {
+        edt(() -> {
+            var request = new SessionRequest("dev.example.ssh", "build-host", false, attempts::add, Runnable::run);
+            pane = new TerminalPane(HOME, launcher(new ArrayDeque<>()), request);
+            pane.restored();
+            pane.start();
+        });
+        attempts.get(0).fail("Not connected: Reconnect to sign in");
+        until(() -> pane.noticeText().equals("Not connected: Reconnect to sign in"));
+        edt(() -> {
+            assertThat(pane.noticePrimary().getText()).isEqualTo("Reconnect");
+            pane.close();
+        });
+    }
+
+    /** Workspace plan 6b's review: cancelling a restored session's first connect keeps its pane, which offers Reconnect. */
+    @Test void cancellingARestoredSessionsFirstConnectKeepsItsPaneWithReconnect() throws Exception {
+        int[] closes = new int[1];
+        edt(() -> {
+            var request = new SessionRequest("dev.example.ssh", "build-host", false, attempts::add, Runnable::run);
+            pane = new TerminalPane(HOME, launcher(new ArrayDeque<>()), request);
+            pane.onClose = () -> closes[0]++;
+            pane.restored();
+            pane.start();
+        });
+        edt(() -> {
+            assertThat(pane.noticeSecondary().getText()).isEqualTo("Cancel");
+            pane.noticeSecondary().doClick();
+            assertThat(attempts.get(0).isCancelled()).isTrue();
+            assertThat(closes[0]).as("its pane stays").isZero();
+            assertThat(pane.noticeText()).isEqualTo("Connection cancelled");
+            assertThat(pane.noticePrimary().getText()).isEqualTo("Reconnect");
+            pane.close();
+        });
+    }
+
     @Test void aFailedTransportSaysWhyAndClosePaneOnExitClosesIt() throws Exception {
         open(false);
         var broken = new Loopback();
@@ -265,7 +302,7 @@ class SessionPaneTest {
         edt(() -> {
             owner = content(launcher(new ArrayDeque<>()));
             var request = new SessionRequest("dev.example.ssh", "build-host", false, attempt -> { throw new IllegalStateException("no such host"); }, Runnable::run);
-            pane = owner.openTab(HOME, request).focusedPane();
+            pane = owner.openTab(HOME, request).pane();
         });
         until(() -> pane.noticeText().equals("no such host"));
         assertThat(onEdt(() -> pane.noticePrimary().getText())).isEqualTo("Retry");

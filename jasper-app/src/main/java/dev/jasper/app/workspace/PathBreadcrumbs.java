@@ -129,10 +129,11 @@ final class PathBreadcrumbs extends JPanel {
         }
     }
     private static JLabel label(String text) {
-        var label = new JLabel(text) {
+        var label = new JLabel() {
             @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         };
-        label.putClientProperty("html.disable", true); return label;
+        // html.disable before the text: the UI reads it only when the text changes.
+        label.putClientProperty("html.disable", true); label.setText(text); return label;
     }
     @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
     private static String clean(String value) {

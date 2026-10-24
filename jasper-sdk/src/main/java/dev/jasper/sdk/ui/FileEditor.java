@@ -17,7 +17,7 @@ public interface FileEditor {
      *
      * @param file the file
      * @param line the line to show, from 1; empty for the file's start
-     * @param window the terminal window the open came from, as this plugin's handle; empty when it came from elsewhere
+     * @param window the Jasper window the open came from, as this plugin's handle; empty when it came from elsewhere
      * @return true when it opened the file; false hands the file to the desktop
      */
     boolean edit(Path file, OptionalInt line, Optional<WindowOwner> window);

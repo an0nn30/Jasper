@@ -14,6 +14,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ApplicationIconTest {
     private static final Path ICONS = Path.of(System.getProperty("jasper.projectDir"), "packaging", "icons");
 
+    @Test void enterpriseKeepsTheSameShellPromptIconAsNormalMode() {
+        ApplicationIcon.useLook(java.util.List.of());
+        var normal = ApplicationIcon.images();
+        try {
+            var branding = dev.jasper.app.testsupport.EnterpriseResources.facts().parsed().orElseThrow().branding();
+            assertThat(branding).isSameAs(dev.jasper.app.presentation.Branding.NONE);
+            assertThat(branding.iconFiles()).isEmpty();
+            ApplicationIcon.useLook(branding.iconFiles());
+            assertThat(ApplicationIcon.images()).isSameAs(normal);
+            assertThat(ApplicationIcon.branded()).isFalse();
+            assertThat(ApplicationIcon.setsTaskbarIcon(true, "/Applications/Jasper.app", ApplicationIcon.branded())).isFalse();
+        } finally {
+            ApplicationIcon.useLook(java.util.List.of());
+        }
+    }
+
     @Test void packagedMacKeepsItsNativeIconWhileDevelopmentCanSetOne() {
         assertThat(ApplicationIcon.usesBundleIcon(true, "/Applications/Jasper.app/Contents/MacOS/Jasper")).isTrue();
         assertThat(ApplicationIcon.usesBundleIcon(true, null)).isFalse();
@@ -86,14 +102,16 @@ class ApplicationIconTest {
         assertThat(windows.getRGB(0, 0) >>> 24).isZero();
     }
 
-    @Test void macFaceFillsTheNativeShapeWithoutTransparentOrSilverMargins() throws Exception {
+    @Test void macShellFillsTheNativeShapeWithForestSurround() throws Exception {
         BufferedImage mac = read("macos", 256);
-        // The terminal face reaches the native edge; no transparent inset or silver tile.
+        // Shell Prompt reaches the native edge with its dark forest surround.
         int surround = mac.getRGB(35, 128);
         assertThat(surround >>> 24).isEqualTo(255);
         assertThat((surround >>> 16) & 255).isLessThan(64);
         assertThat((surround >>> 8) & 255).isLessThan(64);
         assertThat(surround & 255).isLessThan(64);
+        assertThat((surround >>> 8) & 255).isGreaterThan((surround >>> 16) & 255);
+        assertThat((surround >>> 16) & 255).isGreaterThan(surround & 255);
     }
 
     @Test void loadsAllPlatformImageSetsWithoutInitializingTheDesktop() {
@@ -140,6 +158,12 @@ class ApplicationIconTest {
         assertThat(linux.getColorModel().hasAlpha()).isTrue();
         assertThat(linux.getRGB(0, 0) >>> 24).isZero();
         assertThat(firstOpaquePixel(linux, 128)).isBetween(12, 15);
+    }
+
+    @Test void websiteIconMatchesTheShippedShellPrompt() throws Exception {
+        Path website = ICONS.getParent().getParent().resolve("website/assets/jasper.png");
+        assertThat(Files.readAllBytes(website))
+            .isEqualTo(Files.readAllBytes(ICONS.resolve("linux/hicolor/256x256/apps/jasper.png")));
     }
 
     private static BufferedImage read(String platform, int size) throws Exception {

@@ -57,7 +57,7 @@ class EditorTabTest {
     @Test void translucentWorkspaceLetsTheGlassSurfaceFillTextAndGutterOnceAtTheWorkspaceOpacity() throws Exception {
         dev.jasper.editor.testsupport.Kits.edt(() -> {
             var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
-            var settings = new EditorSettings("Monospaced", 17, 2, false, 10, false);
+            var settings = new EditorSettings("Monospaced", 17, java.util.List.of(), false, 1.0, false, 2, false, 10, false);
             var syntax = EditorThemeTest.syntax(0x223300);
             tab.apply(settings, new EditorTheme(), EditorThemeTest.EDITOR, syntax, 0.5);
             tab.surface().setSize(600, 400);
@@ -98,7 +98,7 @@ class EditorTabTest {
     @Test void theDocumentsMinimumHeightDoesNotGrowWithItsText() throws Exception {
         dev.jasper.editor.testsupport.Kits.edt(() -> {
             var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
-            tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(), EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300), 1.0);
+            tab.apply(new EditorSettings("Monospaced", 17, java.util.List.of(), false, 1.0, false, 2, false, 10, false), new EditorTheme(), EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300), 1.0);
             measure(tab);
             int empty = tab.surface().getMinimumSize().height;
             tab.area().setText(String.join("\n", java.util.Collections.nCopies(400, "a long document line")));
@@ -234,6 +234,54 @@ class EditorTabTest {
         assertThat(button(binary, EditorTab.RETRY).state().visible()).isFalse();
     }
 
+    /** Workspace tabs spec 13: a restored remote document waits with Load, reads first asking nothing, then as usual on Retry. */
+    @Test void aDeferredDocumentOffersLoadReadsQuietlyFirstAndAsUsualOnRetry() {
+        var quiet = new java.util.concurrent.atomic.AtomicInteger();
+        var loud = new java.util.concurrent.atomic.AtomicInteger();
+        dev.jasper.editor.api.EditorDocument remote = new dev.jasper.editor.api.EditorDocument() {
+            @Override public String key() { return "test:/srv/notes.md"; }
+            @Override public String name() { return "notes.md"; }
+            @Override public String location() { return "box:/srv/notes.md"; }
+            @Override public Optional<String> host() { return Optional.of("box"); }
+            @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> read(long limitBytes) {
+                loud.incrementAndGet();
+                return java.util.concurrent.CompletableFuture.completedFuture(new dev.jasper.editor.api.Content("hi\n".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                    new dev.jasper.editor.api.Revision(1, 3)));
+            }
+            @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Content> readQuietly(long limitBytes) {
+                quiet.incrementAndGet();
+                return java.util.concurrent.CompletableFuture.failedFuture(new java.io.IOException("Not signed in to box; Retry signs in"));
+            }
+            @Override public java.util.concurrent.CompletableFuture<Optional<dev.jasper.editor.api.Revision>> revision() {
+                return java.util.concurrent.CompletableFuture.completedFuture(Optional.empty());
+            }
+            @Override public java.util.concurrent.CompletableFuture<dev.jasper.editor.api.Revision> write(byte[] content) {
+                return java.util.concurrent.CompletableFuture.failedFuture(new java.io.IOException("read only"));
+            }
+        };
+        var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), new DocumentSession(remote, environment), closed::add, false);
+        tab.session().defer();
+        assertThat(stateText(tab)).isEqualTo("notes.md on box loads when you select it");
+        assertThat(button(tab, EditorTab.RETRY).label()).isEqualTo("Load");
+        assertThat(button(tab, EditorTab.RETRY).state().visible()).isTrue();
+        assertThat(button(tab, EditorTab.DISMISS).label()).as("nothing is loading to cancel").isEqualTo("Close");
+        assertThat(quiet.get() + loud.get()).isZero();
+        click(tab, EditorTab.RETRY);
+        drain();
+        assertThat(quiet).hasValue(1);
+        assertThat(tab.session().state()).isEqualTo(DocumentSession.State.FAILED);
+        assertThat(stateText(tab)).isEqualTo(EditorTab.FAILED_TITLE);
+        assertThat(dev.jasper.editor.testsupport.Kits.node(tab.view(), EditorTab.STATE, dev.jasper.sdk.ui.Nodes.Empty.class).description())
+            .as("the quiet read's reason").contains("Not signed in to box; Retry signs in");
+        assertThat(button(tab, EditorTab.RETRY).label()).isEqualTo("Retry");
+        assertThat(button(tab, EditorTab.RETRY).state().visible()).isTrue();
+        click(tab, EditorTab.RETRY);
+        drain();
+        assertThat(loud).as("Retry reads as usual, which may sign in").hasValue(1);
+        assertThat(tab.session().state()).isEqualTo(DocumentSession.State.READY);
+        tab.dispose();
+    }
+
     @Test void theBannerOffersReloadOrKeepMineAndCloseOrKeep() throws Exception {
         Path file = Files.writeString(folder.resolve("b.yaml"), "a: 1\n");
         var tab = open(file);
@@ -264,12 +312,12 @@ class EditorTabTest {
         int[] ran = {0};
         var saveAs = KeyNames.stroke(KeyEvent.VK_S, InputEvent.SHIFT_DOWN_MASK);
         tab.bind(List.of(new Command("save-as", "Save As…", Optional.of(saveAs), true, () -> ran[0]++),
-            new Command("close-tab", "Close Tab", Optional.of(KeyNames.stroke(KeyEvent.VK_W, 0)), false, () -> ran[0] += 10)));
+            new Command("close-pane", "Close Pane", Optional.of(KeyNames.stroke(KeyEvent.VK_W, 0)), false, () -> ran[0] += 10)));
         Object key = tab.area().getInputMap(JComponent.WHEN_FOCUSED).get(saveAs);
         assertThat(key).as("RSyntaxTextArea's own binding for this stroke is overridden").isEqualTo("save-as");
         tab.area().getActionMap().get(key).actionPerformed(new ActionEvent(tab.area(), ActionEvent.ACTION_PERFORMED, "save-as"));
         assertThat(ran[0]).isEqualTo(1);
-        assertThat(tab.area().getInputMap(JComponent.WHEN_FOCUSED).get(KeyNames.stroke(KeyEvent.VK_W, 0))).as("unbound commands stay out").isNotEqualTo("close-tab");
+        assertThat(tab.area().getInputMap(JComponent.WHEN_FOCUSED).get(KeyNames.stroke(KeyEvent.VK_W, 0))).as("unbound commands stay out").isNotEqualTo("close-pane");
         tab.addToPopup(List.of(new Command("save", "Save", Optional.empty(), true, () -> ran[0]++)));
         assertThat(Arrays.stream(tab.area().getPopupMenu().getComponents()).filter(JMenuItem.class::isInstance)
             .map(item -> ((JMenuItem) item).getText())).contains("Save");
@@ -277,7 +325,7 @@ class EditorTabTest {
 
     @Test void settingsApplyTheFontAndTabSize() {
         var tab = new EditorTab(new dev.jasper.sdk.testing.FakeKit("dev.jasper.editor"), DocumentSession.untitled("Untitled", environment), closed::add, false);
-        tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(),
+        tab.apply(new EditorSettings("Monospaced", 17, java.util.List.of(), false, 1.0, false, 2, false, 10, false), new EditorTheme(),
             EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300));
         assertThat(tab.area().getFont().getSize()).isEqualTo(17);
         assertThat(tab.area().getTabSize()).isEqualTo(2);
@@ -286,13 +334,13 @@ class EditorTabTest {
     @Test void workspaceAndFontChangesKeepDirtyDocumentAndUpdateStyledTokenFonts() throws Exception {
         var tab = open(Files.writeString(folder.resolve("colors.txt"), "original\n"));
         drain();
-        var first = new EditorSettings("Monospaced", 17, 2, false, 10, false);
+        var first = new EditorSettings("Monospaced", 17, java.util.List.of(), false, 1.0, false, 2, false, 10, false);
         var syntax = EditorThemeTest.syntax(0x223300);
         tab.apply(first, new EditorTheme(), EditorThemeTest.EDITOR, syntax);
         tab.area().append("changed");
         tab.area().select(2, 5);
         var document = tab.area().getDocument();
-        var second = new EditorSettings("Monospaced", 22, 4, false, 10, false);
+        var second = new EditorSettings("Monospaced", 22, java.util.List.of(), false, 1.0, false, 4, false, 10, false);
         var next = EditorThemeTest.syntax(0x334400);
         tab.apply(second, new EditorTheme(), EditorThemeTest.EDITOR, next);
         assertThat(tab.area().getDocument()).isSameAs(document);

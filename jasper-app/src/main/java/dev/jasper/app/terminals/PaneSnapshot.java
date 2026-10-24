@@ -9,8 +9,8 @@ import java.util.OptionalInt;
 public record PaneSnapshot(String title, Optional<Path> workingDirectory, int columns, int rows, boolean shellIntegration,
                            State state, OptionalInt exitStatus, Optional<String> providerId,
                            Optional<RemoteLocation> remoteDirectory, String shell) {
-    /** A session's life. */
-    public enum State { STARTING, RUNNING, EXITED }
+    /** A session's life; {@code NOT_STARTED} is a restored terminal tab's pane until its tab is first shown. */
+    public enum State { NOT_STARTED, STARTING, RUNNING, EXITED }
 
     public PaneSnapshot {
         Objects.requireNonNull(title); Objects.requireNonNull(workingDirectory); Objects.requireNonNull(state); Objects.requireNonNull(exitStatus);

@@ -100,7 +100,7 @@ class FileLinkClickTest {
         List<SessionAttempt> attempts = Collections.synchronizedList(new ArrayList<>());
         TerminalPane[] pane = new TerminalPane[1];
         edt(() -> pane[0] = window(launcher(new ArrayDeque<>()))
-            .openTab(directory, new SessionRequest("dev.example.ssh", "build-host", false, attempts::add, Runnable::run)).focusedPane());
+            .openTab(directory, new SessionRequest("dev.example.ssh", "build-host", false, attempts::add, Runnable::run)).pane());
         until(() -> !attempts.isEmpty());
         attempts.getFirst().attach(connection());
         until(() -> pane[0].view() != null);

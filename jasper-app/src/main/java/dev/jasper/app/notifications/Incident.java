@@ -10,7 +10,7 @@ import java.util.UUID;
  */
 public record Incident(UUID id, String source, String operation, String thread, String exceptionClass, String message,
                        String trace, int count, Instant firstSeen, Instant lastSeen) {
-    /** The room a summary gets: the Errors window's list rows and the notification's content. */
+    /** The room a summary gets: the Errors tab's list rows and the notification's content. */
     static final int SUMMARY_LIMIT = 200;
 
     public Incident {

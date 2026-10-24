@@ -1,21 +1,18 @@
 package dev.jasper.app.application;
 
 import dev.jasper.app.commands.CommandHistory;
-import dev.jasper.app.contributions.ContentHost;
+import dev.jasper.app.contributions.WorkspaceHost;
 import dev.jasper.app.notifications.Delivery;
 import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.restart.RestartMode;
 import dev.jasper.app.startup.StartupTrace;
-import dev.jasper.app.testsupport.PluginJars;
 import java.awt.HeadlessException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -135,8 +132,35 @@ class JasperApplicationBackgroundTest {
             // Headless, composing the window fails at its JFrame. By then Jasper must already be back in the Dock (macOS
             // gives a window of a hidden application neither the menu bar nor focus), and it hides again because
             // nothing opened.
-            assertThatThrownBy(() -> edt(() -> application.openOrRaise("reopen"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.open(List.of(), "reopen"))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).containsExactly(true, false);
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    /**
+     * A {@code --background} launch whose setting is off but which holds a request (plan Ruling 20) began as an accessory
+     * application: its window needs the Dock presence a resident's gets, and it keeps it, since it quits with its last window.
+     */
+    @Test void aHiddenLaunchThatIsNotResidentShowsItselfInTheDockBeforeItsFirstWindow() throws Exception {
+        JasperApplication application = application(() -> { }, false);
+        try {
+            edt(() -> application.residency(false));
+            assertThat(dock).as("nothing opened yet").isEmpty();
+            assertThatThrownBy(() -> edt(() -> application.open(List.of(), "handoff"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(dock).as("in the Dock before the window is composed, and not hidden again").containsExactly(true);
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void aLaunchThatIsNotResidentAndWasNeverHiddenLeavesTheDockAlone() throws Exception {
+        JasperApplication application = application(() -> { }, true);
+        try {
+            edt(() -> application.residency(false));
+            assertThatThrownBy(() -> edt(() -> application.open(List.of(), "handoff"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(dock).as("it was in the Dock from the start").isEmpty();
         } finally {
             edt(application::quitNow);
         }
@@ -154,11 +178,11 @@ class JasperApplicationBackgroundTest {
             assertThat(presence(application)).as("resident, nothing open, nothing opening: it may stay so for hours")
                 .isEqualTo(Delivery.Presence.IDLE);
             // Headless, composing fails at the JFrame; the Dock switch inside the opening sees the open in progress.
-            assertThatThrownBy(() -> edt(() -> application.openOrRaise("reopen"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.open(List.of(), "reopen"))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(presenceAtSwitch).as("a failure raised while the window opens still waits for it")
                 .startsWith(Delivery.Presence.NO_WINDOW);
             assertThat(presence(application)).as("the failed open is over: idle again").isEqualTo(Delivery.Presence.IDLE);
-            assertThatThrownBy(() -> edt(application::newWindow)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(presence(application)).as("every open, failed or not, ends its opening").isEqualTo(Delivery.Presence.IDLE);
         } finally {
             edt(application::quitNow);
@@ -171,7 +195,7 @@ class JasperApplicationBackgroundTest {
             assertThat(presence(application)).as("before residency is decided (start-up)").isEqualTo(Delivery.Presence.NO_WINDOW);
             edt(() -> application.residency(false));
             assertThat(presence(application)).as("a plain start before its first window").isEqualTo(Delivery.Presence.NO_WINDOW);
-            assertThatThrownBy(() -> edt(() -> application.newWindow())).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(presence(application)).isEqualTo(Delivery.Presence.NO_WINDOW);
         } finally {
             edt(application::quitNow);
@@ -220,9 +244,9 @@ class JasperApplicationBackgroundTest {
         // A plain launch is in the Dock already: the failed window must not leave it there with nothing open.
         JasperApplication application = settled(() -> { }, true);
         try {
-            assertThatThrownBy(() -> edt(() -> application.openOrRaise("menu"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.open(List.of(), "menu"))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).containsExactly(false);
-            assertThatThrownBy(() -> edt(() -> application.newWindow())).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).as("the second attempt shows Jasper, then hides it again").containsExactly(false, true, false);
         } finally {
             edt(application::quitNow);
@@ -234,7 +258,7 @@ class JasperApplicationBackgroundTest {
         StartupTrace cold = StartupTrace.detached();
         JasperApplication coldApplication = application(cold, () -> { }, true);
         try {
-            assertThatThrownBy(() -> edt(coldApplication::newWindow)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> coldApplication.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(cold.windows()).extracting(window -> window.trigger()).containsExactly("cold");
         } finally {
             edt(coldApplication::quitNow);
@@ -243,7 +267,7 @@ class JasperApplicationBackgroundTest {
         warmed.mark(StartupTrace.Milestone.WARMED_UP);
         JasperApplication warmedApplication = application(warmed, () -> { }, true);
         try {
-            assertThatThrownBy(() -> edt(warmedApplication::newWindow)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> warmedApplication.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(warmed.windows()).extracting(window -> window.trigger()).containsExactly("menu");
         } finally {
             edt(warmedApplication::quitNow);
@@ -254,7 +278,7 @@ class JasperApplicationBackgroundTest {
         JasperApplication application = application(() -> { }, true);
         try {
             edt(() -> application.residency(false));
-            assertThatThrownBy(() -> edt(() -> application.newWindow())).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).isEmpty();
         } finally {
             edt(application::quitNow);
@@ -292,22 +316,30 @@ class JasperApplicationBackgroundTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
 
-    @Test void aContentTabThatRefusesToCloseKeepsEverythingOpen() throws Exception {
+    @Test void aContentTabThatRefusesToCloseKeepsEverythingOpenUntilItAgrees() throws Exception {
+        var terminations = new AtomicInteger();
         var asked = new AtomicInteger();
-        JasperApplication application = settled(() -> { }, true);
+        var allow = new AtomicBoolean();
+        JasperApplication application = settled(terminations::incrementAndGet, true);
         try {
             edt(() -> {
-                var content = application.contributions().content();
-                content.addHost(new ContentHost(UUID.randomUUID(), false, entry -> { }, entry -> { }, entry -> { }, () -> { }));
-                content.open("dev.example.editor", "notes.txt", "notes.txt", null, new JLabel("unsaved"));
+                var content = application.contributions().tabs();
+                UUID window = UUID.randomUUID();
+                content.addHost(new WorkspaceHost(window, entry -> { }, entry -> { }, entry -> { }, () -> { }));
+                content.open("dev.example.editor", "notes.txt", "notes.txt", window, new JLabel("unsaved"));
                 content.guard("dev.example.editor", (entries, batch) -> {
                     asked.incrementAndGet();
-                    return CompletableFuture.completedFuture(false);
+                    return CompletableFuture.completedFuture(allow.get());
                 });
             });
             edt(application::quitRequested);
             assertThat(asked).as("the editor was asked, as when its window closes").hasValue(1);
             assertThat(dock).as("nothing closed, so Jasper stays in the Dock").isEmpty();
+            allow.set(true);
+            edt(application::quitRequested);
+            assertThat(asked).hasValue(2);
+            assertThat(dock).as("it closes once the editor agrees").containsExactly(false);
+            assertThat(terminations).as("and the process stays").hasValue(0);
         } finally {
             edt(application::quitNow);
         }
@@ -468,7 +500,7 @@ class JasperApplicationBackgroundTest {
     }
 
     @Test void aProcessThatIsNotResidentKeepsTheOrdinaryHandlerEvenWithAPresence() throws Exception {
-        // --standalone, --safe-mode, run_in_background = false or a failed bind: a presence is installed, nothing prepares it.
+        // --safe-mode, --config, another home or run_in_background = false: a presence is installed, nothing prepares it.
         var terminated = new CountDownLatch(1);
         var recorded = new Answer();
         var answer = new Answer();
@@ -580,50 +612,6 @@ class JasperApplicationBackgroundTest {
         assertThat(answer.cancelled()).as("as before: cancelled, then quit").hasValue(1);
     }
 
-    private static final String GUARD_FIXTURE = """
-        package fix.guard;
-        import dev.jasper.sdk.plugin.Plugin;
-        import dev.jasper.sdk.plugin.PluginContext;
-        import dev.jasper.sdk.ui.WindowSpec;
-        import java.awt.Dimension;
-        import java.nio.file.Files;
-        public final class Main implements Plugin {
-            @Override public void start(PluginContext context) {
-                var window = context.windows().create(new WindowSpec("dev.example.guard.window", "Guarded", new Dimension(100, 100), false));
-                window.onClosing(() -> {
-                    try { Files.writeString(context.dataDirectory().resolve("asked"), "yes"); }
-                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
-                    return Files.exists(context.dataDirectory().resolve("allow"));
-                });
-            }
-        }
-        """;
-
-    @Test @DisabledOnOs(OS.WINDOWS) void aPluginWindowThatRefusesToCloseKeepsEverythingOpenAndTheDockAsItWas() throws Exception {
-        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
-        Path dev = home.resolve("dev-plugin");
-        PluginJars.build(dev, "guard.jar", PluginJars.descriptor("dev.example.guard", "1.0.0", "fix.guard.Main"),
-            Map.of("fix.guard.Main", GUARD_FIXTURE), List.of());
-        Path data = dirs.plugins().resolve("dev.example.guard/data");
-        var terminated = new CountDownLatch(1);
-        JasperApplication application = settled(terminated::countDown, true);
-        try {
-            edt(() -> application.startPlugins(null, dev, false, dirs));
-            edt(application::quitRequested);
-            assertThat(data.resolve("asked")).as("the plugin window was asked, as when it is closed").exists();
-            assertThat(dock).as("nothing closed, so Jasper stays in the Dock").isEmpty();
-            assertThat(terminated.getCount()).isEqualTo(1);
-            Files.writeString(data.resolve("allow"), "yes");
-            edt(application::quitRequested);
-            assertThat(dock).as("it was still open, and closes once the plugin agrees").containsExactly(false);
-            assertThat(terminated.getCount()).as("and the process stays").isEqualTo(1);
-        } finally {
-            edt(application::quitNow);
-            // The shutdown writes the plugin's and the window state under the temporary directory.
-            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
-        }
-    }
-
     @Test void aReopenAfterAnUpdateRelaunchesTheNewBuildFromTheBackground() throws Exception {
         var terminated = new CountDownLatch(1);
         var spawned = new CopyOnWriteArrayList<List<String>>();
@@ -641,7 +629,8 @@ class JasperApplicationBackgroundTest {
         edt(application::reopened);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).as("the old build exits").isTrue();
         assertThat(modes).containsExactly(RestartMode.SAME);
-        assertThat(spawned).as("and starts the new one").containsExactly(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper"));
+        assertThat(spawned).as("and starts the new one, waiting for this process's lock")
+            .containsExactly(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper", "--replacing", Long.toString(ProcessHandle.current().pid())));
         assertThat(dock).as("no window of the old build was shown").isEmpty();
     }
 
@@ -704,7 +693,7 @@ class JasperApplicationBackgroundTest {
                 application.staleBuild(() -> true);
             });
             // Composing the window is where a headless JVM fails. Reaching it proves the process was neither quitting nor
-            // stopped, because openOrRaise returns first thing in either state.
+            // stopped, because open returns first thing in either state.
             assertThatThrownBy(() -> edt(application::reopened)).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(planned).as("a relaunch was planned").hasValue(1);
             assertThat(asked).as("and the plugin refused it").hasValue(1);
@@ -719,19 +708,17 @@ class JasperApplicationBackgroundTest {
     }
 
     @Test @DisabledOnOs(OS.WINDOWS) void aReopenWithAWindowOpenNeverRelaunchesTheBuild() throws Exception {
-        // "An upgrade must never take a running terminal down": any open window, a plugin's included, keeps the running
-        // build, and the reopen goes on as an ordinary one.
+        // "An upgrade must never take a running terminal down": any open window, an auxiliary one included, keeps the
+        // running build, and the reopen goes on as an ordinary one.
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
-        Path dev = home.resolve("dev-plugin");
-        PluginJars.build(dev, "guard.jar", PluginJars.descriptor("dev.example.guard", "1.0.0", "fix.guard.Main"),
-            Map.of("fix.guard.Main", GUARD_FIXTURE), List.of());
         var spawned = new CopyOnWriteArrayList<List<String>>();
         var planned = new AtomicInteger();
         var terminated = new CountDownLatch(1);
         JasperApplication application = settled(terminated::countDown, true);
         try {
             edt(() -> {
-                application.startPlugins(null, dev, false, dirs);
+                application.startPlugins(dirs);
+                application.auxiliary().window("test.window", "Window", new java.awt.Dimension(100, 100), false);
                 application.restartPlanner = mode -> {
                     planned.incrementAndGet();
                     return Optional.of(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper"));
@@ -739,7 +726,7 @@ class JasperApplicationBackgroundTest {
                 application.spawner = spawned::add;
                 application.staleBuild(() -> true);
             });
-            // The plugin's window is open; no terminal window can be composed headlessly, so the reopen ends there.
+            // An auxiliary window is open; no Jasper window can be composed headlessly, so the reopen ends there.
             assertThatThrownBy(() -> edt(application::reopened)).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(planned).as("the update was not acted on while a window is open").hasValue(0);
             assertThat(spawned).isEmpty();
@@ -747,6 +734,37 @@ class JasperApplicationBackgroundTest {
         } finally {
             edt(application::quitNow);
             // The shutdown writes the plugin's and the window state under the temporary directory.
+            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+            ApplicationPluginCleanup.await(application);
+        }
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS) void anUpdatedLaunchWithAWindowOpenSaysSoAndRelaunchesNothing() throws Exception {
+        // Spec 5.3: with windows open the owner carries the request out itself and says it was updated.
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var spawned = new CopyOnWriteArrayList<List<String>>();
+        var planned = new AtomicInteger();
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = settled(terminated::countDown, true);
+        try {
+            edt(() -> {
+                application.startPlugins(dirs);
+                application.auxiliary().window("test.window", "Window", new java.awt.Dimension(100, 100), false);
+                application.restartPlanner = mode -> {
+                    planned.incrementAndGet();
+                    return Optional.of(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper"));
+                };
+                application.spawner = spawned::add;
+                application.staleBuild(() -> true);
+            });
+            // An auxiliary window is open; the request then opens the main window, which cannot be composed headlessly.
+            assertThatThrownBy(() -> edt(() -> application.handedOff(List.of(), List.of(), true))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(planned).as("an update never takes an open window down").hasValue(0);
+            assertThat(spawned).isEmpty();
+            edt(() -> assertThat(application.notificationCenter().history()).extracting(entry -> entry.request().title())
+                .contains("Jasper was updated"));
+        } finally {
+            edt(application::quitNow);
             assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
         }
     }

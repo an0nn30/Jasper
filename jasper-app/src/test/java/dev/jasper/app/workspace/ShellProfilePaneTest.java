@@ -59,17 +59,20 @@ class ShellProfilePaneTest {
             TerminalPane first = owner[0].currentPane();
             assertThat(first.profile()).contains("login");
             assertThat(first.shellLabel()).isEqualTo("Profile login");
-            owner[0].currentTab().split(SplitTree.Axis.RIGHT);
+            owner[0].split(dev.jasper.app.layout.Side.RIGHT);
         });
         launchAll();
         edt(() -> {
-            TerminalTab tab = owner[0].currentTab();
-            wsl[0] = tab.split(tab.focusedPane(), SplitTree.Axis.DOWN, null, null, Optional.of("wsl:Ubuntu"));
+            TerminalContent tab = owner[0].currentTerminal();
+            wsl[0] = owner[0].openBeside(tab, dev.jasper.app.layout.Side.DOWN, null, null, Optional.of("wsl:Ubuntu"), Optional.empty()).pane();
             assertThat(wsl[0]).isNotNull();
             assertThat(wsl[0].shellLabel()).isEqualTo("Profile wsl:Ubuntu");
         });
         launchAll();
-        edt(() -> assertThat(owner[0].currentTab().split(wsl[0], SplitTree.Axis.RIGHT, null, null)).isNotNull());
+        edt(() -> {
+            TerminalContent target = owner[0].terminalOf(wsl[0]);
+            assertThat(owner[0].openBeside(target, dev.jasper.app.layout.Side.RIGHT, null, null, target.pane().profile(), Optional.empty())).isNotNull();
+        });
         launchAll();
         edt(() -> owner[0].newTab(HOME));
         launchAll();
@@ -97,16 +100,16 @@ class ShellProfilePaneTest {
         WindowContent[] owner = new WindowContent[1];
         edt(() -> owner[0] = content(launcher, windows::add));
         launchAll();
-        edt(() -> owner[0].currentTab().split(SplitTree.Axis.RIGHT));
+        edt(() -> owner[0].split(dev.jasper.app.layout.Side.RIGHT));
         launchAll();
         edt(() -> owner[0].newTab(owner[0].directory()));
         launchAll();
         edt(() -> {
-            owner[0].requestNewWindow();
+            owner[0].requestNewTerminalWindow();
             owner[0].openTab(HOME, null, Optional.empty());
         });
         launchAll();
-        edt(() -> owner[0].currentTab().split(SplitTree.Axis.DOWN));
+        edt(() -> owner[0].split(dev.jasper.app.layout.Side.DOWN));
         launchAll();
         assertThat(cds).containsExactly("~", "~", "~", HOME.toString(), HOME.toString());
         assertThat(windows).as("a new window from a pane without a directory of its own starts where a new shell starts")

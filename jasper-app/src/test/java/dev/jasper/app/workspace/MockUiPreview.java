@@ -69,9 +69,9 @@ public final class MockUiPreview {
                 themes[0] = ThemeTestSupport.controller(true);
                 owner[0] = content(launcher, themes[0]);
                 owner[0].newTab(HOME);
-                owner[0].currentTab().rename("jasper");
-                owner[0].tabStrip().setSelectedIndex(0);
-                owner[0].currentTab().rename("dustin");
+                owner[0].currentTerminal().rename("jasper");
+                owner[0].selectTab(owner[0].tabs().get(0));
+                owner[0].currentTerminal().rename("dustin");
                 root[0] = new JRootPane();
                 header[0] = WindowContent.installTitleBar(root[0], owner[0], true, title -> {});
                 owner[0].installRootBindings(root[0]);

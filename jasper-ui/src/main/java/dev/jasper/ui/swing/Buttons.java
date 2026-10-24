@@ -13,6 +13,16 @@ import javax.swing.border.EmptyBorder;
 /** Five button treatments sharing semantics, content fitting and owned action/focus listeners. */
 final class Buttons {
     private Buttons() {}
+    /**
+     * The classic chrome art for {@code name} at {@code extent}, when {@code view} draws the classic chrome icons and
+     * {@code chrome} says the control is in a toolbar strip or a panel header; null otherwise, and for every name outside
+     * the classic set. The flag is read first, so a view without it never asks.
+     */
+    static javax.swing.Icon classicChrome(KitView view, boolean chrome, String name, int extent) {
+        if (!view.classicChromeIcons() || !chrome || !dev.jasper.ui.icons.IconRegistry.classicChromeNames().contains(name)) return null;
+        var context = view.context();
+        return context.icons().classicChromeIcon(name, extent).map(icon -> icon.icon(context.theme(), SemanticColor.TEXT_PRIMARY)).orElse(null);
+    }
     /** One fully validated host-artwork snapshot; its registry is retired only after a successful header commit. */
     static final class HostArtwork implements AutoCloseable {
         final javax.swing.Icon raw;
@@ -59,6 +69,13 @@ final class Buttons {
             button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
             button.setRolloverEnabled(true); button.setHorizontalAlignment(SwingConstants.CENTER);
             button.focus = new ThemePainting.Focus(button, button, view); own(button.focus);
+            var revealAction = new java.awt.event.FocusAdapter() {
+                @Override public void focusGained(java.awt.event.FocusEvent event) {
+                    if (SwingUtilities.getAncestorOfClass(SplitViews.ActionBarScroll.class, button) != null)
+                        button.scrollRectToVisible(new Rectangle(0, 0, button.getWidth(), button.getHeight()));
+                }
+            };
+            button.addFocusListener(revealAction); own(() -> button.removeFocusListener(revealAction));
             ActionListener listener = event -> {
                 if (interactive()) try { events.accept(new UiEvent.Action(((Nodes.Button)this.node).action())); }
                 catch (Throwable failure) { view.report(failure); }
@@ -80,14 +97,24 @@ final class Buttons {
             button.circular=value.presentation()==Nodes.ButtonPresentation.HELP;
             button.contextual = value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.embedded = embedded;
-            if (hostArtwork != null) { button.setIcon(hostArtwork.icon(context(), button.iconRole(false), button.stripInk)); button.putClientProperty("Jasper.button.icon", null); }
+            button.toolbarStrip = view.toolbarStrip();
+            if (hostArtwork != null) {
+                // A host action with canonical artwork sits in the panel header; a plugin path keeps its art.
+                var classic = hostArtwork.semantic == null || hostArtwork.semantic.pathData() != null ? null
+                    : classicChrome(view, true, hostArtwork.semantic.name(), ThemePainting.metric(context(), DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH));
+                button.setIcon(classic != null ? classic : hostArtwork.icon(context(), button.iconRole(false), button.stripInk));
+                button.putClientProperty("Jasper.button.icon", null);
+            }
             else {
-                int extent=UIScale.scale(button.stripInk != null ? context().metrics().value(DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH) : button.orderedAction || button.orderedCommand ? context().metrics().value(DesignMetrics.Role.ORDERED_GLYPH) : button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size(context().metrics(), (embedded || button.panel) && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
-                button.setIcon(value.icon().isEmpty() ? null : button.stripInk != null ? context().icons().panel(value.icon(), context().theme().semantic(), button.stripInk, extent)
+                int extent=UIScale.scale(button.stripInk != null ? context().metrics().value(DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH) : button.orderedAction || button.orderedCommand ? context().metrics().value(DesignMetrics.Role.ORDERED_GLYPH) : button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size(context().metrics(), value.label().isEmpty() && (embedded || button.panel || button.toolbarStrip) ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
+                // A document bar in a panel's body also sets panel; only the header and toolbar strips take classic art.
+                var classic = value.icon().isEmpty() ? null : classicChrome(view, button.toolbarStrip || button.panel && !button.documentBar, value.icon(), extent);
+                button.setIcon(value.icon().isEmpty() ? null : classic != null ? classic : button.stripInk != null ? context().icons().panel(value.icon(), context().theme().semantic(), button.stripInk, extent)
                     : button.panel || button.panelDetail || button.panelRow
                     ? context().icons().panel(value.icon(),context().theme(),button.iconRole(false),extent)
                     : context().icons().icon(value.icon(), context().theme(), button.iconRole(false),extent));
-                button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() ? null : value.icon());
+                // Classic art is authored: it is not re-tinted on hover.
+                button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() || classic != null ? null : value.icon());
             }
             if(keycaps!=null){button.setText("");button.setIcon(new Keycaps(context(),keycaps));button.putClientProperty("Jasper.button.icon",null);}
             button.setHorizontalAlignment(button.recorder() ? SwingConstants.LEFT
@@ -97,7 +124,8 @@ final class Buttons {
             button.getAccessibleContext().setAccessibleName(keycaps!=null?keycaps.accessibleName():value.label().isEmpty() ? value.tooltip() : value.label());
             button.getAccessibleContext().setAccessibleDescription(value.state().error());
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
-            int horizontal = ThemePainting.metric(context(), button.armed() ? DesignMetrics.Role.KEYCAP_RECORDER_PADDING : button.orderedAction ? DesignMetrics.Role.ORDERED_ROW_SIDE : button.recorder() ? DesignMetrics.Role.FIELD_HORIZONTAL_PADDING : button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : view.runWindow() ? DesignMetrics.Role.RUN_WINDOW_BUTTON_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
+            int bar = button.documentBar && !value.label().isEmpty() ? context().faces().buttons.barPadding(context()) : -1;
+            int horizontal = bar >= 0 ? bar : button.gridAction ? ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_ACTION_PADDING) : ThemePainting.metric(context(), button.armed() ? DesignMetrics.Role.KEYCAP_RECORDER_PADDING : button.orderedAction ? DesignMetrics.Role.ORDERED_ROW_SIDE : button.recorder() ? DesignMetrics.Role.FIELD_HORIZONTAL_PADDING : button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : view.runWindow() ? DesignMetrics.Role.RUN_WINDOW_BUTTON_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
             button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0)
                 : new EmptyBorder(ring, value.label().isEmpty() ? ring : horizontal, ring, value.label().isEmpty() ? ring : horizontal));
             button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
@@ -142,7 +170,16 @@ final class Buttons {
         int disclosureWidth;
         /** A WINDOW form footer action keeps the window footer's measured minimum width. */
         boolean windowFooter;
-        /** Paints its kind's fill without the kind's outline (a title-strip menu surface). */
+        /**
+         * In a DOCUMENT split's bar row (set by the reconciler, cleared before each update): a text button takes the face's
+         * bar padding ({@link ButtonFace#barPadding}) and a menu part the face's bar arrow, where the face has them.
+         */
+        boolean documentBar;
+        /** A value's action in a manager detail's grid row (set by the reconciler, cleared before each update): {@code DETAIL_ACTION_PADDING} inside its face. */
+        boolean gridAction;
+        /** A text button in a row of a manager detail's actions (set by the reconciler, cleared before each update): at least {@code DETAIL_ACTION_MIN_WIDTH} wide. */
+        boolean detailAction;
+        /** Paints its kind's fill without the kind's outline (a toolbar strip's menu surface). */
         boolean borderless;
         /**
          * An inner part of a composite control (a secret's reveal and copy, a crumb), not an action standing in a layout:
@@ -153,6 +190,8 @@ final class Buttons {
         boolean panelEmpty;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
         boolean embedded, contextual, panelRow;
+        /** In a toolbar strip (set from {@link KitView#toolbarStrip()} on every refresh): an icon-only button there draws its glyph at the rail size. */
+        boolean toolbarStrip;
         float disabledOpacity=.42f;
         /** A severity tinting the glyph at rest and on hover (a favourite's warning star); null takes the kind's text colour. */
         Nodes.Severity iconSeverity;
@@ -161,6 +200,8 @@ final class Buttons {
         ThemePainting.Focus focus;
         KitButton(KitContext context) {
             this.context = context;
+            // Plain text: html.disable before any text, as the UI reads it only when the text changes.
+            putClientProperty("html.disable", true);
             // Leaving the view (this button or an ancestor removed) erases the drop the view painted for it.
             addHierarchyListener(event -> {
                 if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.PARENT_CHANGED) == 0) return;
@@ -268,6 +309,7 @@ final class Buttons {
             height += reservation;
             size.width += reservation;
             if (windowFooter) size.width = Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.WINDOW_ACTION_MIN_WIDTH));
+            if (detailAction) size.width = Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.DETAIL_ACTION_MIN_WIDTH));
             return new Dimension(getText() == null || getText().isEmpty() ? height : size.width, Math.max(height, size.height));
         }
         /** Shared painter permits a real specialized owner to select its semantic surface. */

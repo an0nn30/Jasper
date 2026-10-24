@@ -25,4 +25,12 @@ interface GroupFace extends Face {
     int cardGap(KitContext context, Nodes.CardKind kind, boolean page, int standard);
     /** Whether a Settings page row lays its list or table control across the row below its title and description, not beside them. */
     boolean listUnderTitle(KitContext context);
+    /**
+     * Whether a FORM card of form rows that is a Section's body inside a DETAIL stack (a manager detail's titled group,
+     * spec 14.8's Fields) is a grid ({@link Cards.GridRows}): its rows in a box, which {@link #paintCard} fills and
+     * divides; otherwise the card keeps its standard padding and layout.
+     */
+    boolean detailGrid();
+    /** The gap above {@code section} in a manager detail, {@code standard} being the default look's. */
+    int sectionGap(Cards.SectionSurface section, int standard);
 }

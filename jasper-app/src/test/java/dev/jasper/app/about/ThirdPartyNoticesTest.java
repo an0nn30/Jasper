@@ -19,6 +19,16 @@ class ThirdPartyNoticesTest {
         }
     }
 
+    @Test void commonMarkIncludesEveryPinnedModuleAndItsUpstreamBsdLicense() {
+        var component = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().equals("CommonMark Java")).findFirst().orElseThrow();
+        assertThat(component.modules()).containsExactlyInAnyOrder("org.commonmark:commonmark:0.30.0",
+            "org.commonmark:commonmark-ext-gfm-tables:0.30.0", "org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0",
+            "org.commonmark:commonmark-ext-task-list-items:0.30.0");
+        assertThat(component.licenseName()).isEqualTo("BSD 2-Clause License");
+        assertThat(ThirdPartyNotices.read(component.text())).contains("Copyright (c) 2015, Atlassian Pty Ltd",
+            "Redistribution and use in source and binary forms", "THIS SOFTWARE IS PROVIDED");
+    }
+
     @Test void jasperComesFirstThenTheRestByNameIgnoringCase() {
         var listed = ThirdPartyNotices.listed("1.2.0 + 14 commits");
         assertThat(listed.getFirst().title()).isEqualTo("Jasper 1.2.0 + 14 commits");
@@ -35,6 +45,33 @@ class ThirdPartyNoticesTest {
         assertThat(catppuccin.licenseName()).isEqualTo("MIT License");
         assertThat(catppuccin.homepage()).isEqualTo("https://github.com/catppuccin/jetbrains");
         assertThat(ThirdPartyNotices.read(catppuccin.text())).startsWith("MIT License\n\nCopyright (c) 2022 Catppuccin\n");
+    }
+
+    /** Plan 12 Rulings 5: one component names both IntelliJ icon sets, ships the Apache text and keeps upstream's NOTICE. */
+    @Test void theIntelliJIconsComponentNamesBothSetsAndKeepsTheUpstreamNotice() {
+        var icons = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().startsWith("IntelliJ Platform icons")).toList();
+        assertThat(icons).singleElement().satisfies(c -> {
+            assertThat(c.name()).isEqualTo("IntelliJ Platform icons (New UI and Classic)");
+            assertThat(c.license()).isEqualTo("Apache-2.0");
+            assertThat(ThirdPartyNotices.read(c.text())).contains("Apache License").contains("Version 2.0, January 2004")
+                .doesNotContain("OPEN-SOURCE BUILD TERMS");
+            assertThat(ThirdPartyNotices.read(c.notice().orElseThrow()))
+                .contains("8062c061ff33e22041d9f1844db5b8b8a6b5e4d7", "60b8fbadc2f08ef18a6ecab0c138a849e14f13fb")
+                .contains("This software includes code from IntelliJ IDEA\nCopyright (C) JetBrains s.r.o.\nhttps://www.jetbrains.com/idea/");
+        });
+    }
+
+    /** Plan 12: the Enterprise theme's port is listed with the Apache text, its pinned commits and upstream's NOTICE. */
+    @Test void theIntelliJThemesComponentNamesThePortAndKeepsTheUpstreamNotice() {
+        var themes = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().startsWith("IntelliJ Platform themes")).toList();
+        assertThat(themes).singleElement().satisfies(c -> {
+            assertThat(c.name()).isEqualTo("IntelliJ Platform themes (the Enterprise theme)");
+            assertThat(c.license()).isEqualTo("Apache-2.0");
+            assertThat(ThirdPartyNotices.read(c.text())).contains("Apache License").contains("Version 2.0, January 2004");
+            assertThat(ThirdPartyNotices.read(c.notice().orElseThrow()))
+                .contains("f7377708b654b73b206da40bb382ecb4d44e8f12", "8062c061ff33e22041d9f1844db5b8b8a6b5e4d7")
+                .contains("This software includes code from IntelliJ IDEA\nCopyright (C) JetBrains s.r.o.\nhttps://www.jetbrains.com/idea/");
+        });
     }
 
     @Test void jaspersTextIsTheRootLicense() throws Exception {

@@ -46,7 +46,9 @@ import javax.swing.UIManager;
  * framed by the window's kit. Each showing tool window sits in a rounded frame under its {@link ToolWindowHeader}; the
  * gaps between frames are this area's dividers. Under flush frames (spec 10.7) the frames are square and touch, each
  * divider is a painted 1 px rule with a wider drag area, and every header is a header strip that shows which frame holds
- * the focus. The terminal column has a rounded frame and exterior gutter while a stripe is visible, and is
+ * the focus. Under flush frames a frame is also activated by any press inside it or by its opening, which moves the
+ * keyboard into it; a press in the terminal column hands the tint back, and a divider drag keeps it. The terminal
+ * column has a rounded frame and exterior gutter while a stripe is visible, and is
  * borderless and square on the side of a hidden stripe; with neither stripe it fills its area edge to edge. The center frame is painted in the terminal palette's background, never
  * a theme's tool window colour. The area changes the state only when a divider drag ends; whoever changes the state
  * calls {@link #sync} afterwards. EDT only.
@@ -91,6 +93,14 @@ final class ToolWindowArea extends JPanel {
         Host(boolean toolWindow) {
             super(new BorderLayout());
             if (toolWindow) putClientProperty("Jasper.zone", "chrome");
+            // A frame with no keyed control takes the keyboard itself when activated (plan 12 Rulings 18). It is
+            // focusable only while it holds the keyboard, so it is never a Tab stop or an automatic focus target.
+            if (toolWindow && flush) {
+                setFocusable(false);
+                addFocusListener(new java.awt.event.FocusAdapter() {
+                    @Override public void focusLost(java.awt.event.FocusEvent event) { if (!event.isTemporary()) setFocusable(false); }
+                });
+            }
             int gutter = gutter();
             gutters(gutter, gutter, gutter, gutter);
         }
@@ -252,6 +262,8 @@ final class ToolWindowArea extends JPanel {
     private final dev.jasper.ui.kit.Kit kit;
     /** Whether frames are flush (the classic look's frame style). */
     private final boolean flush;
+    /** The window's chrome artwork, which the headers' classic names follow (plan 15b). */
+    private final dev.jasper.ui.icons.ChromeArtwork artwork;
     /** The window's kit's chrome painter: the rules under flush frames. */
     private final dev.jasper.ui.swing.ChromePainter painter;
     private final Host center;
@@ -295,7 +307,21 @@ final class ToolWindowArea extends JPanel {
      * @param flush whether frames are flush: divided by painted rules, with header strips (spec 10.7)
      */
     ToolWindowArea(JComponent terminalColumn, DockState state, dev.jasper.ui.kit.Kit kit, boolean flush) {
+        this(terminalColumn, state, kit, flush, dev.jasper.ui.icons.ChromeArtwork.NEW_UI);
+    }
+
+    /**
+     * @param terminalColumn the terminal column the frames dock around
+     * @param state the window's dock state
+     * @param kit the window's kit
+     * @param flush whether frames are flush: divided by painted rules, with header strips (spec 10.7)
+     * @param artwork the window's chrome artwork: under {@code CLASSIC} the headers' classic names draw IntelliJ's
+     *     classic art (plan 15b)
+     */
+    ToolWindowArea(JComponent terminalColumn, DockState state, dev.jasper.ui.kit.Kit kit, boolean flush,
+                   dev.jasper.ui.icons.ChromeArtwork artwork) {
         super(null);
+        this.artwork = Objects.requireNonNull(artwork, "artwork");
         this.state = Objects.requireNonNull(state, "state");
         this.kit = Objects.requireNonNull(kit, "kit");
         this.flush = flush;
@@ -427,14 +453,26 @@ final class ToolWindowArea extends JPanel {
     private Slot focused;
     /** Follows the permanent focus owner while the area is showing, under flush frames. */
     private final java.beans.PropertyChangeListener focusListener = event -> focusMoved(event.getNewValue() instanceof Component owner ? owner : null);
+    /** Hears every mouse press while the area is showing, under flush frames, and activates the frame it lands in. */
+    private final java.awt.event.AWTEventListener pressListener = event -> {
+        if (event.getID() == MouseEvent.MOUSE_PRESSED && event.getSource() instanceof Component source
+                && SwingUtilities.isDescendingFrom(source, this)) pressed(source);
+    };
+    /** Moves the keyboard into an activated frame; tests replace it. */
+    Consumer<Component> focuser = Component::requestFocusInWindow;
 
     @Override public void addNotify() {
         super.addNotify();
-        if (flush) java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("permanentFocusOwner", focusListener);
+        if (!flush) return;
+        java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("permanentFocusOwner", focusListener);
+        java.awt.Toolkit.getDefaultToolkit().addAWTEventListener(pressListener, java.awt.AWTEvent.MOUSE_EVENT_MASK);
     }
 
     @Override public void removeNotify() {
-        if (flush) java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().removePropertyChangeListener("permanentFocusOwner", focusListener);
+        if (flush) {
+            java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().removePropertyChangeListener("permanentFocusOwner", focusListener);
+            java.awt.Toolkit.getDefaultToolkit().removeAWTEventListener(pressListener);
+        }
         super.removeNotify();
     }
 
@@ -444,8 +482,73 @@ final class ToolWindowArea extends JPanel {
         Slot now = null;
         for (var entry : hosts.entrySet())
             if (owner != null && SwingUtilities.isDescendingFrom(owner, entry.getValue())) now = entry.getKey();
-        focused = now;
+        mark(now);
+    }
+
+    /** Shows {@code slot}'s frame, or none, as the focused one. */
+    private void mark(Slot slot) {
+        focused = slot;
         for (var entry : hosts.entrySet()) entry.getValue().focused(entry.getKey() == focused);
+    }
+
+    /**
+     * Plan 12 Rulings 18: a press inside a flush frame activates it, as IntelliJ activates a tool window, and once the
+     * press is dispatched moves the keyboard into it unless it is there already. A press in the terminal column hands
+     * the tint back; a press in no frame, such as on a divider's drag area, changes nothing. Standard frames ignore it.
+     */
+    void pressed(Component target) {
+        if (!flush || target == null) return;
+        if (SwingUtilities.isDescendingFrom(target, center)) { mark(null); return; }
+        for (var entry : hosts.entrySet())
+            if (SwingUtilities.isDescendingFrom(target, entry.getValue())) { activate(entry.getKey()); return; }
+    }
+
+    /** Activates the frame showing the tool window {@code id}, as a press inside it would; standard frames ignore it. */
+    void activate(String id) {
+        if (!flush) return;
+        for (var entry : hosts.entrySet())
+            if (entry.getValue().id != null && entry.getValue().id.equals(id)) { activate(entry.getKey()); return; }
+    }
+
+    private void activate(Slot slot) {
+        mark(slot);
+        Host host = hosts.get(slot);
+        SwingUtilities.invokeLater(() -> {
+            Component owner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner();
+            if (focused != slot || hosts.get(slot) != host || owner != null && SwingUtilities.isDescendingFrom(owner, host)) return;
+            Component target = focusTarget(slot);
+            if (target == host) host.setFocusable(true);
+            focuser.accept(target);
+        });
+    }
+
+    /**
+     * Where an activated frame's keyboard goes: the first component of its content, depth first, that is enabled,
+     * focusable, visible with every ancestor up to the frame and bound to keys while focused, a button only when no
+     * other component is, as IntelliJ focuses a tool window's list or tree before its toolbar; else the frame itself.
+     * Visibility is read through {@code isVisible()}, never {@code isShowing()}, so it holds before the window shows.
+     */
+    Component focusTarget(Slot slot) {
+        Host host = hosts.get(slot);
+        if (host == null) return null;
+        Component found = host.content == null ? null : keyed(host.content, false);
+        if (found == null && host.content != null) found = keyed(host.content, true);
+        return found != null ? found : host;
+    }
+
+    private static Component keyed(Component component, boolean buttons) {
+        if (!component.isVisible()) return null;
+        if (component instanceof JComponent candidate && candidate.isEnabled() && candidate.isFocusable()
+                && (buttons || !(candidate instanceof javax.swing.AbstractButton))) {
+            var keys = candidate.getInputMap(JComponent.WHEN_FOCUSED).allKeys();
+            if (keys != null && keys.length > 0) return candidate;
+        }
+        if (component instanceof Container container)
+            for (Component child : container.getComponents()) {
+                Component found = keyed(child, buttons);
+                if (found != null) return found;
+            }
+        return null;
     }
 
     /** The frame showing its header strip as focused, if any. */
@@ -496,6 +599,8 @@ final class ToolWindowArea extends JPanel {
         sources.forEach(component -> dragSource.accept(component, id));
         var ready = dev.jasper.ui.model.ControlState.READY;
         var ghost = dev.jasper.ui.model.Nodes.ButtonKind.GHOST;
+        // The view lives only in this window's area, so the flag is never cleared on release.
+        if (artwork == dev.jasper.ui.icons.ChromeArtwork.CLASSIC) view.classicChromeIcons(true);
         view.setPanelHostActions(panel, List.of(
             new dev.jasper.ui.model.Nodes.Button("host.options", ready, "", "more", ghost, "host.options", "Options"),
             new dev.jasper.ui.model.Nodes.Button("host.hide", ready, "", flush ? "remove" : "collapse", ghost, "host.hide", "Hide")), event -> {
@@ -536,12 +641,17 @@ final class ToolWindowArea extends JPanel {
     /**
      * The module's description of the same metadata in its frame; callbacks stay the plugin boundary's guarded, contained
      * ones. On a header strip a host module glyph is described too, so the strip draws it as its other actions (spec 10.7).
+     * In a standard frame under classic artwork a host module glyph of the classic set is given as its classic art, which
+     * the view draws as given (plan 15b).
      */
-    private static dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state,
-                                                                  dev.jasper.ui.swing.PanelHostHeader.Frame frame) {
+    private dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state,
+                                                           dev.jasper.ui.swing.PanelHostHeader.Frame frame) {
         boolean strip = frame != dev.jasper.ui.swing.PanelHostHeader.Frame.STANDARD;
+        boolean classic = artwork == dev.jasper.ui.icons.ChromeArtwork.CLASSIC;
         return new dev.jasper.ui.swing.PanelHostHeader(state.detail(), state.active(), state.actions().stream()
-            .map(action -> new dev.jasper.ui.swing.PanelHostHeader.Action(action.label(), action.icon(), action.invoke(), action.icon() instanceof dev.jasper.app.platform.PresentationIcon named
+            .map(action -> new dev.jasper.ui.swing.PanelHostHeader.Action(action.label(),
+                classic && !strip ? dev.jasper.app.platform.AppIcons.classicChromeIcon(action.icon()).orElse(action.icon()) : action.icon(),
+                action.invoke(), action.icon() instanceof dev.jasper.app.platform.PresentationIcon named
                 ? new dev.jasper.ui.swing.PanelHostHeader.Artwork(named.name(), named.pathData())
                 : strip ? dev.jasper.app.platform.AppIcons.kitName(action.icon()).map(name -> new dev.jasper.ui.swing.PanelHostHeader.Artwork(name, null)).orElse(null) : null)).toList(), frame);
     }
@@ -579,7 +689,7 @@ final class ToolWindowArea extends JPanel {
         var header = new ToolWindowHeader(title,
             () -> ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
                 slot -> onMove.accept(id, slot), () -> onHide.accept(id)),
-            () -> onHide.accept(id), kit, flush);
+            () -> onHide.accept(id), kit, flush, artwork);
         header.presentation(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
         return header;
     }

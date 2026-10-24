@@ -19,6 +19,7 @@ import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.MacTitleBar;
+import dev.jasper.app.platform.PlainTitlePane;
 import java.awt.Dialog;
 import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
@@ -26,7 +27,6 @@ import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
-import java.awt.event.ComponentListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -40,7 +40,6 @@ import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import javax.swing.JPanel;
 import javax.swing.JRootPane;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
@@ -59,8 +58,7 @@ public final class NativeShells {
     private static final String CHOOSER_BOUNDS = "file-chooser";
     private final ThemeController themes;
     private final UiState state;
-    private final Function<UUID, Window> terminalWindows;
-    private final Runnable newWindow;
+    private final Function<UUID, Window> jasperWindows;
     private final Runnable quit;
     private final Map<AuxiliarySurface, Window> natives = new HashMap<>();
     /** Classic dialogs drawn inside their owner's window (spec 10.8): they have no native window of their own. */
@@ -72,13 +70,11 @@ public final class NativeShells {
      *
      * @param themes the application's look
      * @param state remembered window bounds
-     * @param terminalWindows finds a terminal window's native window by id, or returns null
-     * @param newWindow opens a terminal window
+     * @param jasperWindows finds a Jasper window's native window by id, or returns null
      * @param quit quits the application
      */
-    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows,
-                        Runnable newWindow, Runnable quit) {
-        this(themes, state, terminalWindows, newWindow, quit, ShellChrome.standard());
+    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> jasperWindows, Runnable quit) {
+        this(themes, state, jasperWindows, quit, ShellChrome.standard());
     }
 
     /**
@@ -86,17 +82,16 @@ public final class NativeShells {
      *
      * @param themes the application's look
      * @param state remembered window bounds
-     * @param terminalWindows finds a terminal window's native window by id, or returns null
-     * @param newWindow opens a terminal window
+     * @param jasperWindows finds a Jasper window's native window by id, or returns null
      * @param quit quits the application
      * @param shell the look's title bar, menu row and appearance
      */
-    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows,
-                        Runnable newWindow, Runnable quit, ShellChrome shell) {
+    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> jasperWindows, Runnable quit,
+                        ShellChrome shell) {
         this.shell = Objects.requireNonNull(shell);
         this.themes = Objects.requireNonNull(themes); this.state = Objects.requireNonNull(state);
-        this.terminalWindows = Objects.requireNonNull(terminalWindows);
-        this.newWindow = Objects.requireNonNull(newWindow); this.quit = Objects.requireNonNull(quit);
+        this.jasperWindows = Objects.requireNonNull(jasperWindows);
+        this.quit = Objects.requireNonNull(quit);
     }
 
     /**
@@ -149,7 +144,7 @@ public final class NativeShells {
     }
 
     /**
-     * The host flags of a native dialog's kit content (spec 10.8): under the classic mapping its form footer is the band,
+     * The host flags of a native dialog's or a window's kit content (spec 10.8): under the classic mapping its form footer is the band,
      * and when a title bar the system draws ({@code systemTitle}) already shows the dialog's title, a FULL form does not
      * repeat it.
      */
@@ -213,10 +208,12 @@ public final class NativeShells {
         classicContent(surface);
         var dialog = new dev.jasper.ui.swing.ClassicDialog(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), surface.holder(),
             surface.title(), surface.swatch(), placement);
-        dialog.windowTitleHeight(owner.getInsets().top);
-        var titleBar = followTitleBar(owner, dialog);
+        var root = container.getRootPane();
+        dialog.windowTitleHeight(owner.getInsets().top + dev.jasper.app.platform.TitleInset.of(root));
+        var titleBar = followTitleBar(owner, root, dialog);
         owner.addComponentListener(titleBar);
-        var overlay = WindowOverlay.classic(container.getRootPane(), dialog);
+        root.addPropertyChangeListener(dev.jasper.app.platform.TitleInset.CHANGED, titleBar);
+        var overlay = WindowOverlay.classic(root, dialog);
         surface.holder().getAccessibleContext().setAccessibleName(surface.title());
         var close = new WindowAdapter() {
             @Override public void windowClosed(WindowEvent event) { surface.close(); }
@@ -232,7 +229,8 @@ public final class NativeShells {
             try { if (!surface.closed()) loop.enter(); } finally { closed.close(); }
         };
         return new AuxiliarySurface.Shell(show, overlay::focus, () -> {
-                drawnInWindow.remove(surface); owner.removeWindowListener(close); owner.removeComponentListener(titleBar); overlay.close();
+                drawnInWindow.remove(surface); owner.removeWindowListener(close); owner.removeComponentListener(titleBar);
+                root.removePropertyChangeListener(dev.jasper.app.platform.TitleInset.CHANGED, titleBar); overlay.close();
             },
             title -> { dialog.setTitle(title); surface.holder().getAccessibleContext().setAccessibleName(title); }, overlay::cardBounds,
             (title, initial) -> chooseFile(TopModal.over(owner), title, initial, Optional.empty()));
@@ -240,16 +238,33 @@ public final class NativeShells {
 
     /**
      * Keeps a centred classic dialog centred on its whole window as the window's title bar (its top inset) changes under
-     * it, as macOS full screen hides it: added to the owner window, it re-reads the inset on every resize.
+     * it, as macOS full screen hides it, and the classic title chrome inside the root (macOS's band, Windows' classic
+     * title bar), which can change without a resize: added to the owner window and as the root's
+     * {@link dev.jasper.app.platform.TitleInset#CHANGED} listener, it re-reads both on every resize and inset change.
      */
-    static ComponentListener followTitleBar(java.awt.Container window, dev.jasper.ui.swing.ClassicDialog dialog) {
-        return new ComponentAdapter() {
-            @Override public void componentResized(ComponentEvent event) { dialog.windowTitleHeight(window.getInsets().top); }
-        };
+    static TitleFollower followTitleBar(java.awt.Container window, javax.swing.JRootPane root, dev.jasper.ui.swing.ClassicDialog dialog) {
+        return new TitleFollower(window, root, dialog);
+    }
+
+    /** {@link NativeShells#followTitleBar}'s listener: the window's top inset plus the root's title inset is the dialog's title height. */
+    static final class TitleFollower extends ComponentAdapter implements java.beans.PropertyChangeListener {
+        private final java.awt.Container window;
+        private final javax.swing.JRootPane root;
+        private final dev.jasper.ui.swing.ClassicDialog dialog;
+
+        private TitleFollower(java.awt.Container window, javax.swing.JRootPane root, dev.jasper.ui.swing.ClassicDialog dialog) {
+            this.window = window; this.root = root; this.dialog = dialog;
+        }
+
+        private void follow() { dialog.windowTitleHeight(window.getInsets().top + dev.jasper.app.platform.TitleInset.of(root)); }
+
+        @Override public void componentResized(ComponentEvent event) { follow(); }
+
+        @Override public void propertyChange(java.beans.PropertyChangeEvent event) { follow(); }
     }
 
     /**
-     * The kit's modal overlay inside the owner's window: a terminal window, an auxiliary window or a dialog. A modal
+     * The kit's modal overlay inside the owner's window: a Jasper window, an auxiliary window or a dialog. A modal
      * one (a dialog presented as an overlay) blocks {@code show} until it closes, as a modal dialog does, and lets
      * Escape reach its content; a progress overlay returns at once and keeps Escape from the window.
      */
@@ -300,13 +315,21 @@ public final class NativeShells {
         var resources = new ShellResources(surface, frame);
         try {
             frame.setIconImages(ApplicationIcon.images());
-            resources.layout = installChrome(frame.getRootPane(), surface, shell.unifiedTitle());
+            PlainTitlePane.install(frame.getRootPane());
+            resources.layout = installChrome(frame.getRootPane(), surface, shell);
             MacTitleBar bar = resources.layout.bar();
-            // Under in-window menus (spec 10.1) the minimal File menu is a row of this frame, so Close Window keeps its key;
-            // a classic look gives it its terminal windows' row.
-            JMenuBar menus = menuBar(surface);
-            if (bar != null) bar.setMenuBar(menus); else { frame.setJMenuBar(menus); shell.styleMenus(menus); }
+            // The minimal File menu is a row of this frame (spec 10.1); a classic look's frames show no menu row, as the 07
+            // Credential Vault mocks draw them, and bind Close Window's key themselves (plan 10b Rulings 14).
+            JMenuBar menus = bar != null || shell.frameMenuRow() ? menuBar(surface) : null;
+            if (bar != null) bar.setMenuBar(menus);
+            else if (menus != null) frame.setJMenuBar(menus);
+            else bindCloseWindow(frame.getRootPane(), surface);
             shell.followTheme(frame.getRootPane(), bar, themes.current().chrome().dark());
+            // Spec 10.8: under the classic mapping a window form's footer is the band too; content set later takes it.
+            var marks = nativeMarks(surface, false);
+            for (var child : surface.holder().getComponents())
+                if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) marks.accept(view);
+            surface.laterContent(marks);
             frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
             frame.addWindowListener(new WindowAdapter() {
                 @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
@@ -317,10 +340,10 @@ public final class NativeShells {
             frame.pack();
             var saved = state.window(surface.id()).map(value -> new Rectangle(value.x(), value.y(), value.width(), value.height())).filter(NativeShells::onSomeScreen);
             if (saved.isPresent()) frame.setBounds(saved.get());
-            else { frame.setSize(initialSize(surface, frame.getSize(), surface.holder().getSize(), usableBounds(frame))); frame.setLocationByPlatform(true); }
+            else { frame.setSize(initialSize(surface, usableBounds(frame))); frame.setLocationByPlatform(true); }
             resources.theme = themes.subscribe((resolved, chromeChanged) -> {
                 if (chromeChanged) SwingUtilities.updateComponentTreeUI(frame);
-                if (bar != null) bar.setLight(!resolved.chrome().dark()); else shell.styleMenus(menus);
+                if (bar != null) bar.setLight(!resolved.chrome().dark());
                 shell.followTheme(frame.getRootPane(), bar, resolved.chrome().dark());
                 resources.layout.body().changed();
             });
@@ -332,20 +355,16 @@ public final class NativeShells {
         } catch (RuntimeException | Error failure) { resources.close(); throw failure; }
     }
 
-    /** Content default adds the measured actual chrome delta once; remembered bounds bypass this path. */
-    static java.awt.Dimension initialSize(AuxiliarySurface surface, java.awt.Dimension packed, java.awt.Dimension body, Rectangle usable) {
+    /** The window's preferred size within the usable screen; remembered bounds bypass this path. */
+    static java.awt.Dimension initialSize(AuxiliarySurface surface, Rectangle usable) {
         var requested = surface.preferredSize();
-        if (surface.contentSize()) {
-            requested.width += Math.max(0, packed.width - body.width);
-            requested.height += Math.max(0, packed.height - body.height);
-        }
         return new java.awt.Dimension(Math.min(requested.width, usable.width), Math.min(requested.height, usable.height));
     }
 
     private Window owner(AuxiliarySurface surface) {
         var placed = windowed(surface, drawnInWindow::contains);
         if (placed.ownerSurface().isPresent()) return natives.get(placed.ownerSurface().orElseThrow());
-        return placed.anchorOwner().map(SwingUtilities::getWindowAncestor).orElseGet(() -> placed.ownerWindow().map(terminalWindows).orElse(null));
+        return placed.anchorOwner().map(SwingUtilities::getWindowAncestor).orElseGet(() -> placed.ownerWindow().map(jasperWindows).orElse(null));
     }
 
     /**
@@ -385,10 +404,31 @@ public final class NativeShells {
             .orElseThrow(() -> new IllegalArgumentException("Attached sheet needs a registered measured owner body"));
     }
     /**
-     * Whether the user may resize this dialog's native window: only one that remembers its bounds. A dialog sized to its
-     * content (every plugin dialog, a confirmation) and an attached sheet are fixed-size; their content still re-packs them.
+     * Whether the user may resize this dialog's native window: only one that remembers its bounds, a window-sized plugin
+     * dialog among them. A dialog sized to its content (a plugin's dialog, a confirmation) and an attached sheet are
+     * fixed-size; their content still re-packs them.
      */
     static boolean resizable(AuxiliarySurface surface) { return !surface.attachedSheet() && !surface.id().isEmpty(); }
+
+    /**
+     * Whether the shell packs this dialog to its content at each show and re-packs it as the content changes ({@link
+     * DialogFit}): not a dialog that remembers its bounds, whose size is the user's, nor an attached sheet.
+     */
+    static boolean fitted(AuxiliarySurface surface) { return surface.id().isEmpty() && !surface.attachedSheet(); }
+
+    /** A window-sized dialog's least content size: the Credential Vault manager window's before workspace tabs plan 4b. */
+    static java.awt.Dimension windowContent(boolean classic) { return classic ? new java.awt.Dimension(820, 571) : new java.awt.Dimension(900, 555); }
+
+    /**
+     * A window-sized dialog's first size when it remembers none: its content's preferred size, at least {@link
+     * #windowContent} in each dimension, plus {@code chrome}, within the usable screen.
+     */
+    static java.awt.Dimension windowSize(AuxiliarySurface surface, java.awt.Dimension chrome, Rectangle usable) {
+        var content = surface.holder().getPreferredSize();
+        var least = windowContent(surface.classic());
+        return new java.awt.Dimension(Math.min(Math.max(content.width, least.width) + chrome.width, usable.width),
+            Math.min(Math.max(content.height, least.height) + chrome.height, usable.height));
+    }
 
     private AuxiliarySurface.Shell dialog(AuxiliarySurface surface) {
         Window owner = owner(surface);
@@ -410,7 +450,8 @@ public final class NativeShells {
             dialog.setResizable(resizable(surface));
             dialog.getAccessibleContext().setAccessibleName(surface.title());
             dialog.setIconImages(ApplicationIcon.images());
-            resources.layout = installChrome(dialog.getRootPane(), surface, shell.unifiedTitle());
+            PlainTitlePane.install(dialog.getRootPane());
+            resources.layout = installChrome(dialog.getRootPane(), surface, shell);
             MacTitleBar bar = resources.layout.bar();
             shell.followTheme(dialog.getRootPane(), bar, themes.current().chrome().dark());
             // Spec 10.8: under the classic mapping the footer is the band, and the title bar the system draws titles the
@@ -428,7 +469,11 @@ public final class NativeShells {
             if (bar != null) bar.attach(dialog);
             dialog.pack();
             if (remembered) {
-                dialog.setSize(surface.preferredSize()); dialog.setLocationRelativeTo(owner);
+                // A window-sized dialog starts as a window: its content at least a window's, plus the chrome the pack measured.
+                var packed = dialog.getSize(); var body = surface.holder().getSize();
+                dialog.setSize(surface.windowSized() ? windowSize(surface, new java.awt.Dimension(Math.max(0, packed.width - body.width),
+                    Math.max(0, packed.height - body.height)), usableBounds(dialog)) : surface.preferredSize());
+                dialog.setLocationRelativeTo(owner);
                 state.window(surface.id()).map(saved -> new Rectangle(saved.x(), saved.y(), saved.width(), saved.height())).filter(NativeShells::onSomeScreen).ifPresent(dialog::setBounds);
             } else if (!attached) dialog.setLocationRelativeTo(owner);
             resources.theme = themes.subscribe((resolved, chromeChanged) -> {
@@ -438,7 +483,7 @@ public final class NativeShells {
                 if (resources.attachment != null) resources.attachment.changed();
             });
             resources.floating = surface.modal() ? FloatWhileActive.attach(dialog) : null;
-            DialogFit fit = remembered || attached ? null : new DialogFit(surface.holder(), fitTarget(dialog));
+            DialogFit fit = fitted(surface) ? new DialogFit(surface.holder(), fitTarget(dialog)) : null;
             if (fit != null) surface.fitWith(fit);
             boolean[] watching = {false};
             if (attached && (!liveOwner(surface, owner) || body(owner) != ownerBody)) throw new IllegalArgumentException("Sheet owner changed during construction");
@@ -452,7 +497,7 @@ public final class NativeShells {
                         resources.unwatch = watchOwner(owner, resources.attachment);
                     }
                     resources.attachment.fitNow();
-                } else if (!remembered) {
+                } else if (fit != null) {
                     dialog.pack(); dialog.setLocationRelativeTo(owner); fit.packed();
                     if (!watching[0]) {
                         watching[0] = true;
@@ -493,8 +538,37 @@ public final class NativeShells {
     }
 
     record ShellLayout(MacTitleBar bar, dev.jasper.app.platform.WindowBody body, AuxiliarySurface surface) implements AutoCloseable {
-        @Override public void close() { surface.onTitleActionsChanged(() -> {}); body.close(); if (bar != null) bar.close(); }
+        @Override public void close() { body.close(); if (bar != null) bar.close(); }
     }
+    /**
+     * {@link #installChrome(JRootPane, AuxiliarySurface, boolean)} under the look's shells. Under a classic title on Windows
+     * the root also publishes its {@link dev.jasper.app.platform.TitleInset}: FlatLaf gives it a title pane (plan 14
+     * Rulings 16), and classic dialogs drawn in this window start below it (spec 10.8).
+     */
+    static ShellLayout installChrome(JRootPane root, AuxiliarySurface surface, ShellChrome shell) {
+        var layout = installChrome(root, surface, shell.unifiedTitle());
+        if (shell.classicTitle() && !shell.macOs()) publishTitlePaneInset(root);
+        return layout;
+    }
+
+    /**
+     * Publishes the content pane's top as {@code root}'s title inset while FlatLaf decorates it, and announces the inset
+     * once decorations arrive and the root is laid out: FlatLaf decorates a Windows 10 or 11 frame only when its native
+     * peer is created.
+     */
+    private static void publishTitlePaneInset(JRootPane root) {
+        dev.jasper.app.platform.TitleInset.publish(root, () -> root.getWindowDecorationStyle() == JRootPane.NONE || root.getContentPane() == null
+            ? 0 : root.getContentPane().getY());
+        if (root.getWindowDecorationStyle() != JRootPane.NONE) return;
+        root.addPropertyChangeListener("windowDecorationStyle", new java.beans.PropertyChangeListener() {
+            @Override public void propertyChange(java.beans.PropertyChangeEvent event) {
+                if (root.getWindowDecorationStyle() == JRootPane.NONE) return;
+                root.removePropertyChangeListener("windowDecorationStyle", this);
+                SwingUtilities.invokeLater(() -> dev.jasper.app.platform.TitleInset.changed(root, 0));
+            }
+        });
+    }
+
     /** The one production chrome/body registration path for auxiliary windows and immediate dialog owners. */
     static ShellLayout installChrome(JRootPane root, AuxiliarySurface surface, boolean supported) {
         MacTitleBar bar;
@@ -525,22 +599,8 @@ public final class NativeShells {
     /** Shared, headless-testable title setup for both kinds of SDK/application auxiliary surface. */
     static MacTitleBar installTitleBar(JRootPane root, AuxiliarySurface surface, boolean supported) {
         MacTitleBar bar = MacTitleBar.install(root, surface.holder(), () -> { }, supported);
-        surface.titleActions().setOpaque(false);
-        surface.titleActions().setVisible(surface.titleActions().getComponentCount() > 0);
-        if (bar == null && surface.kind() == AuxiliarySurface.Kind.WINDOW) {
-            var content = new JPanel(new java.awt.BorderLayout());
-            var toolbar = new JPanel(new java.awt.BorderLayout());
-            toolbar.add(surface.titleActions(), java.awt.BorderLayout.EAST);
-            toolbar.setVisible(surface.titleActions().isVisible());
-            content.add(toolbar, java.awt.BorderLayout.NORTH); content.add(surface.holder(), java.awt.BorderLayout.CENTER);
-            root.setContentPane(content);
-            surface.onTitleActionsChanged(() -> { toolbar.setVisible(surface.titleActions().isVisible()); content.revalidate(); content.repaint(); });
-        }
         if (bar != null) {
             bar.setStyle(surface.kind() == AuxiliarySurface.Kind.WINDOW ? MacTitleBar.Style.WINDOW : MacTitleBar.Style.DIALOG);
-            if (surface.kind() == AuxiliarySurface.Kind.WINDOW) {
-                bar.setAccessory(surface.titleActions()); surface.onTitleActionsChanged(bar::accessoryChanged);
-            }
             bar.setTitle(surface.title());
             bar.setTitleSwatch(surface.swatch());
             for (var child : surface.holder().getComponents()) {
@@ -571,7 +631,7 @@ public final class NativeShells {
 
     /** Owner-based file, folder or save-target selection in Jasper's own chooser, over any modal dialog the owner shows. */
     public List<Location> choosePaths(PathChoice choice, Consumer<Runnable> cancellation) {
-        Window owner = choice.terminalOwner() != null ? terminalWindows.apply(choice.terminalOwner()) : natives.get(choice.auxiliaryOwner());
+        Window owner = choice.jasperOwner() != null ? jasperWindows.apply(choice.jasperOwner()) : natives.get(choice.auxiliaryOwner());
         if (owner == null || !owner.isShowing()) throw new IllegalArgumentException("Picker requires a shown owner");
         owner = TopModal.over(owner); // over a modal dialog showing on the owner, not blocked and covered by it
         ChooserRequest.Mode mode = switch (choice.mode()) {
@@ -581,7 +641,7 @@ public final class NativeShells {
         };
         var local = new LocalBrowser();
         return showChooser(owner, ChooserRequest.of(choice.title(), mode, choice.multiple(), choice.initial(), choice.terminalFolder(),
-            choice.suggestedName(), Optional.empty(), Optional.ofNullable(choice.terminalOwner()), local.homePath()), local, choice.sources(), cancellation);
+            choice.suggestedName(), Optional.empty(), Optional.ofNullable(choice.jasperOwner()), local.homePath()), local, choice.sources(), cancellation);
     }
 
     private Optional<Path> chooseFile(Window owner, String title, Optional<Path> initialPath, Optional<String> suffix) {
@@ -595,6 +655,7 @@ public final class NativeShells {
     private List<Location> showChooser(Window owner, ChooserRequest request, LocalBrowser local, List<ChooserSource> extra,
                                        Consumer<Runnable> cancellation) {
         var dialog = new JDialog(owner, request.title(), Dialog.ModalityType.DOCUMENT_MODAL);
+        PlainTitlePane.install(dialog.getRootPane());
         ExecutorService worker = Executors.newSingleThreadExecutor(task -> {
             var thread = new Thread(task, "jasper-file-chooser");
             thread.setDaemon(true);
@@ -689,18 +750,19 @@ public final class NativeShells {
         };
     }
 
-    /** A minimal menu bar: macOS otherwise shows only the application menu while this window has focus. */
+    /**
+     * A minimal menu bar, Close Window and, off macOS, Quit (workspace tabs spec 6.6): macOS otherwise shows only the
+     * application menu while this window has focus.
+     */
     private JMenuBar menuBar(AuxiliarySurface surface) {
         int shortcut = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
         var file = new JMenu("File");
-        var open = new JMenuItem("New Window");
-        open.addActionListener(event -> newWindow.run());
         var close = new JMenuItem("Close Window");
         close.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, shortcut));
         close.addActionListener(event -> {
-            if (!dev.jasper.app.platform.WindowInput.captureShortcut(surface.holder(), close.getAccelerator())) surface.closeCommand();
+            if (!dev.jasper.app.platform.WindowInput.captureShortcut(surface.holder(), close.getAccelerator())) surface.requestClose();
         });
-        file.add(open); file.add(close);
+        file.add(close);
         if (!SystemInfo.isMacOS) {
             var exit = new JMenuItem("Quit");
             exit.addActionListener(event -> quit.run());
@@ -709,6 +771,20 @@ public final class NativeShells {
         var bar = new JMenuBar();
         bar.add(file);
         return bar;
+    }
+
+    /**
+     * Close Window's shortcut on {@code root}, for a frame without a menu row (a classic look's auxiliary frames, plan 10b
+     * Rulings 14): it runs the window's Close Window command unless the window is recording shortcuts, as the item does.
+     */
+    static void bindCloseWindow(JRootPane root, AuxiliarySurface surface) {
+        var key = KeyStroke.getKeyStroke(KeyEvent.VK_W, SystemInfo.isMacOS ? java.awt.event.InputEvent.META_DOWN_MASK : java.awt.event.InputEvent.CTRL_DOWN_MASK);
+        root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).put(key, "jasper.closeWindow");
+        root.getActionMap().put("jasper.closeWindow", new javax.swing.AbstractAction("Close Window") {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                if (!dev.jasper.app.platform.WindowInput.captureShortcut(root, key)) surface.requestClose();
+            }
+        });
     }
 
     /** Remembered bounds are ignored when no current display shows them, for example after unplugging a monitor. */

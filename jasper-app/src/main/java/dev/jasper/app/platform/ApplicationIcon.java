@@ -36,6 +36,22 @@ public final class ApplicationIcon {
         return images(SystemInfo.isMacOS ? "macos" : SystemInfo.isWindows ? "windows" : "linux");
     }
 
+    /**
+     * Jasper's packaged PNG for the current desktop, independent of a look override.
+     * @param size a shipped icon size (64 and 128 are available on every platform)
+     * @return the PNG bytes
+     */
+    public static byte[] defaultPng(int size) {
+        String platform = SystemInfo.isMacOS ? "macos" : SystemInfo.isWindows ? "windows" : "linux";
+        String name = "/dev/jasper/app/icons/app/" + platform + "/icon-" + size + ".png";
+        try (var input = ApplicationIcon.class.getResourceAsStream(name)) {
+            if (input == null) throw new IllegalArgumentException("Missing application icon: " + name);
+            return input.readAllBytes();
+        } catch (IOException failure) {
+            throw new UncheckedIOException("Cannot read application icon: " + name, failure);
+        }
+    }
+
     static List<Image> images(String platform) {
         return switch (platform) {
             case "macos" -> Mac.IMAGES;

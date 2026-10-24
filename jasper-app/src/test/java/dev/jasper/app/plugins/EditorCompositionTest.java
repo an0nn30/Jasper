@@ -65,7 +65,7 @@ class EditorCompositionTest {
                 call(call(editor.selectedTab(), "session"), "setStyle", new Class<?>[]{String.class}, "text/java");
                 area.select(4, 7);
                 EditorEvidence.measure(area);
-                var entry = editor.contributions.content().entries().getFirst();
+                var entry = editor.contributions.tabs().hosted().getFirst();
                 var view = (KitView) entry.component();
                 EditorEvidence.capture(theme, "document", view, WIDTH, HEIGHT, FIND_ANCHORS);
                 entry.commands().stream().filter(c -> c.id().equals("replace")).findFirst().orElseThrow().run().run();
@@ -166,7 +166,7 @@ class EditorCompositionTest {
             StagedVaultHost.await(() -> (boolean) call(editor.selectedTab(), "showingText"), "the document");
             onEdt(() -> {
                 var area = editor.documentText(); area.setText("a: mine\nb: 2\n");
-                var view = (KitView) editor.contributions.content().entries().getFirst().component();
+                var view = (KitView) editor.contributions.tabs().hosted().getFirst().component();
                 Object session = call(editor.selectedTab(), "session");
                 try {
                     java.nio.file.Files.writeString(file, "a: 22\nb: 2\nc: 3\n");
@@ -209,9 +209,9 @@ class EditorCompositionTest {
             });
             // A failed read and a read still under way are the canonical empty state.
             onEdt(() -> call(editor.editorWindow(), "openLocal", new Class<?>[]{Path.class}, data.resolve("gone.txt")));
-            StagedVaultHost.await(() -> named((KitView) editor.contributions.content().entries().getFirst().component(), "document.retry", AbstractButton.class).isVisible(), "the failed state");
+            StagedVaultHost.await(() -> named((KitView) editor.contributions.tabs().hosted().getFirst().component(), "document.retry", AbstractButton.class).isVisible(), "the failed state");
             onEdt(() -> {
-                var view = (KitView) editor.contributions.content().entries().getFirst().component();
+                var view = (KitView) editor.contributions.tabs().hosted().getFirst().component();
                 EditorEvidence.capture(theme, "load-failed", view, WIDTH, HEIGHT, "document.state", "document.dismiss", "document.retry");
                 var dismiss = bounds(view, named(view, "document.dismiss", JComponent.class)); var retry = bounds(view, named(view, "document.retry", JComponent.class));
                 assertThat(dismiss.x).as("the secondary, then the primary").isLessThan(retry.x);
@@ -221,7 +221,7 @@ class EditorCompositionTest {
             });
             onEdt(() -> call(editor.editorWindow(), "open", new Class<?>[]{loaderClass(editor, "dev.jasper.editor.api.EditorDocument")}, pendingDocument(editor)));
             onEdt(() -> {
-                var view = (KitView) editor.contributions.content().entries().getFirst().component();
+                var view = (KitView) editor.contributions.tabs().hosted().getFirst().component();
                 EditorEvidence.capture(theme, "loading", view, WIDTH, HEIGHT, "document.state", "document.dismiss");
                 assertThat(named(view, "document.retry", AbstractButton.class).isVisible()).isFalse();
                 assertThat(((dev.jasper.sdk.ui.Nodes.Empty) node(editor.documentView().spec().root(), "document.state")).title()).isEqualTo("Loading report.log from build-01…");

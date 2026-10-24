@@ -116,7 +116,7 @@ public record TerminalOptions(String fontFamily, float fontSize, List<String> fa
         public Builder scrollback(int value) { scrollback = value; return this; }
         /** Enables copying a completed selection to the clipboard. */
         public Builder copyOnSelect(boolean value) { copyOnSelect = value; return this; }
-        /** Sets the line-height multiplier, from 1 through 3, for the view. */
+        /** Sets the line-height multiplier, from 0.5 through 3, for the view. */
         public Builder lineHeight(float value) { lineHeight = value; return this; }
         /** Selects how the view signals a terminal bell. */
         public Builder bell(BellMode value) { bell = value; return this; }

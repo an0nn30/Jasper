@@ -102,19 +102,159 @@ class PluginRuntimeTest {
 
     private static void settle() { for (int i = 0; i < 3; i++) onEdt(() -> { }); }
 
-    /** Waits for what {@link PluginRuntime#stop} left running, which ends with closing the plugins' classloaders. */
+    /** Waits for the bounded shutdown grace returned by {@link PluginRuntime#stop}. */
     private static void await(List<CompletableFuture<?>> pending) throws Exception {
         CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
     }
 
     /** Stops the plugins and waits until their jars are closed: Windows cannot delete a jar a classloader holds open. */
-    private static void stopAndWait(PluginRuntime runtime) throws Exception { await(AppContractTest.onEdtValue(runtime::stop)); }
+    private static void stopAndWait(PluginRuntime runtime) throws Exception {
+        var workers = PluginShutdownTestSupport.capture(runtime);
+        await(AppContractTest.onEdtValue(runtime::stop));
+        workers.await();
+    }
 
     private Path probe(Path parent, String id) throws Exception {
         Path directory = parent.resolve(id);
         PluginJars.build(directory, "probe.jar", PluginJars.descriptor(id, "1.0.0", "fix.probe.Main"),
             Map.of("fix.probe.Main", FIXTURE), List.of());
         return directory;
+    }
+
+    @Test void savedTerminalTypographySeedsPluginsAndUpdatesBeforeConfigurationNotifications() throws Exception {
+        Path dev = root.resolve("dev/dev.example.font");
+        String source = """
+            package fix.font;
+            import dev.jasper.sdk.plugin.Plugin;
+            import dev.jasper.sdk.plugin.PluginContext;
+            import dev.jasper.sdk.events.AppEvents;
+            import java.nio.file.Files;
+            public final class Main implements Plugin {
+                private void note(PluginContext context, String file) {
+                    var font = context.appearance().terminalTypography();
+                    try { Files.writeString(context.dataDirectory().resolve(file),
+                        font.family() + "|" + font.size() + "|" + font.fallback() + "|" + font.ligatures() + "|" + font.lineHeight()); }
+                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                }
+                public void start(PluginContext context) {
+                    note(context, "initial");
+                    context.appearance().onTerminalTypographyChanged(value -> note(context, "changed"));
+                    context.events().subscribe(AppEvents.CONFIG_RELOADED, event -> note(context, "reloaded"));
+                }
+            }
+            """;
+        PluginJars.build(dev, "font.jar", PluginJars.descriptor("dev.example.font", "1.0.0", "fix.font.Main"),
+            Map.of("fix.font.Main", source), List.of());
+        var runtime = runtime(null, root.resolve("user"), dev, false, new ArrayList<>());
+        var data = root.resolve("user/dev.example.font/data");
+        try {
+            onEdt(() -> {
+                runtime.terminalTypography(new dev.jasper.app.config.FontConfig("DialogInput", 13.5f,
+                    List.of("Monospaced"), true, 1.25f));
+                runtime.start(Map.of(), true);
+            });
+            assertThat(Files.readString(data.resolve("initial"))).isEqualTo("DialogInput|13.5|[Monospaced]|true|1.25");
+            onEdt(() -> {
+                runtime.terminalTypography(new dev.jasper.sdk.ui.TerminalTypography("Monospaced", 15.25, List.of(), false, 1.5));
+                runtime.configurationChanged(Map.of());
+            });
+            settle();
+            assertThat(Files.readString(data.resolve("changed"))).isEqualTo("Monospaced|15.25|[]|false|1.5");
+            assertThat(Files.readString(data.resolve("reloaded"))).isEqualTo("Monospaced|15.25|[]|false|1.5");
+        } finally { stopAndWait(runtime); }
+    }
+
+    @Test void shutdownKeepsPluginClassesAvailableUntilWorkerCleanupFinishes() throws Exception {
+        assertShutdownKeepsCleanupClasses(false);
+    }
+
+    @Test void shutdownKeepsPluginClassesAvailableForConnectionsAttachedAfterCancellation() throws Exception {
+        assertShutdownKeepsCleanupClasses(true);
+    }
+
+    private void assertShutdownKeepsCleanupClasses(boolean lateConnection) throws Exception {
+        Path bundled = root.resolve("bundled");
+        PluginJars.build(bundled.resolve("dev.example.cleanup"), "cleanup.jar",
+            PluginJars.descriptor("dev.example.cleanup", "1.0.0", "fix.cleanup.Main"), Map.of(
+                "fix.cleanup.Main", """
+                    package fix.cleanup;
+                    import java.util.concurrent.*;
+                    public final class Main implements dev.jasper.sdk.plugin.Plugin {
+                        public static final CountDownLatch RUNNING = new CountDownLatch(1);
+                        public static final CountDownLatch RELEASE = new CountDownLatch(1);
+                        public static final CompletableFuture<String> CLOSED = new CompletableFuture<>();
+                        public static final CountDownLatch CLEANING = new CountDownLatch(1);
+                        public static final CountDownLatch CLOSE_RELEASE = new CountDownLatch(1);
+                        public static Runnable FINISH;
+                        public static final Runnable CLOSE = () -> {
+                            CLEANING.countDown();
+                            try { CLOSE_RELEASE.await(); CLOSED.complete(Late.close()); }
+                            catch (Throwable failure) { CLOSED.completeExceptionally(failure); }
+                        };
+                        public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                            context.background().execute(() -> {
+                                RUNNING.countDown();
+                                try { new CountDownLatch(1).await(); }
+                                catch (InterruptedException stopping) {
+                                    try { RELEASE.await(); if (FINISH != null) FINISH.run(); else CLOSED.complete(Late.close()); }
+                                    catch (Throwable failure) { CLOSED.completeExceptionally(failure); }
+                                }
+                            });
+                        }
+                    }
+                    """,
+                "fix.cleanup.Late", """
+                    package fix.cleanup;
+                    public final class Late { public static String close() { return "closed"; } }
+                    """), List.of());
+        PluginRuntime runtime = runtime(bundled, root.resolve("user"), null, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        var field = PluginRuntime.class.getDeclaredField("loaders");
+        field.setAccessible(true);
+        var loader = (ClassLoader) ((List<?>) field.get(runtime)).getFirst();
+        Class<?> main = loader.loadClass("fix.cleanup.Main");
+        var running = (java.util.concurrent.CountDownLatch) main.getField("RUNNING").get(null);
+        var release = (java.util.concurrent.CountDownLatch) main.getField("RELEASE").get(null);
+        var closed = (CompletableFuture<?>) main.getField("CLOSED").get(null);
+        var cleaning = (java.util.concurrent.CountDownLatch) main.getField("CLEANING").get(null);
+        var closeRelease = (java.util.concurrent.CountDownLatch) main.getField("CLOSE_RELEASE").get(null);
+        if (lateConnection) {
+            var hostField = PluginRuntime.class.getDeclaredField("host");
+            hostField.setAccessible(true);
+            var host = (PluginHost) hostField.get(runtime);
+            var sessions = new HostedSessions("dev.example.cleanup", host.containment, host.cleanup,
+                id -> null, name -> null);
+            var pending = new AtomicReference<dev.jasper.sdk.terminal.PendingSession>();
+            var request = sessions.request(dev.jasper.sdk.terminal.SessionSpec.of("late", pending::set));
+            var attempt = new dev.jasper.app.terminals.SessionAttempt(UUID.randomUUID(), 80, 24,
+                request.cleanup(), Runnable::run);
+            onEdt(() -> request.connector().accept(attempt));
+            attempt.cancel();
+            var close = (Runnable) main.getField("CLOSE").get(null);
+            main.getField("FINISH").set(null, (Runnable) () -> pending.get().attach(
+                new dev.jasper.sdk.terminal.TerminalConnection(new java.io.ByteArrayInputStream(new byte[0]),
+                    new java.io.ByteArrayOutputStream(), (columns, rows) -> { }, new CompletableFuture<>(), close)));
+        }
+        var workers = PluginShutdownTestSupport.capture(runtime);
+        try {
+            assertThat(running.await(5, TimeUnit.SECONDS)).isTrue();
+            await(AppContractTest.onEdtValue(runtime::stop));
+            assertThat(closed).isNotDone();
+            release.countDown();
+            if (lateConnection) {
+                assertThat(cleaning.await(5, TimeUnit.SECONDS)).isTrue();
+                for (var executor : workers.executors()) assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> workers.resourcesClosed().get(100, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(java.util.concurrent.TimeoutException.class);
+                closeRelease.countDown();
+            }
+            assertThat(closed.get(5, TimeUnit.SECONDS)).isEqualTo("closed");
+        } finally {
+            release.countDown();
+            closeRelease.countDown();
+            workers.await();
+        }
+        assertThat(loader.getResource("fix/cleanup/Late.class")).isNull();
     }
 
     @Test void manifestArtworkIsCachedBeforeSettingsAndClearedAtStop() throws Exception {
@@ -208,9 +348,7 @@ class PluginRuntimeTest {
         assertThat(data.resolve("reloaded")).hasContent("yes");
         assertThat(data.resolve("theme")).hasContent("LIGHT");
 
-        var pending = new AtomicReference<List<CompletableFuture<?>>>();
-        onEdt(() -> pending.set(runtime.stop()));
-        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        stopAndWait(runtime);
         settle();
         assertThat(data.resolve("stopped")).hasContent("yes");
         onEdt(() -> assertThat(deck.notices()).as("the activity it left open ends with it, and so does its card").isEmpty());
@@ -246,9 +384,7 @@ class PluginRuntimeTest {
         });
         assertThat(root.resolve("absent/dev.example.link/data/shown")).hasContent(window.toString());
 
-        var pending = new AtomicReference<List<CompletableFuture<?>>>();
-        onEdt(() -> pending.set(runtime.stop()));
-        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        stopAndWait(runtime);
         settle();
         onEdt(() -> assertThat(deck.notices()).as("stopping closes the plugin's connections").isEmpty());
     }
@@ -274,6 +410,33 @@ class PluginRuntimeTest {
         PluginRuntime safe = runtime(null, user, null, true, new ArrayList<>());
         onEdt(() -> safe.start(Map.of(), true));
         assertThat(safe.statusLines()).singleElement().asString().contains("DISABLED", "safe mode");
+        // Workspace plan 6b's final review M3: a saved tab's placeholder says safe mode keeps it off, not the user.
+        assertThat(safe.standing("dev.example.probe")).hasValueSatisfying(standing ->
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.SAFE_MODE));
+    }
+
+    /**
+     * Workspace plan 6b's residual round, items 3 and 4: outside safe mode, a plugin the user turned off stands as turned off,
+     * never as held back by safe mode, and one marked for removal as that, which a placeholder says without advising to turn
+     * it on. In safe mode the plugin the user turned off is still held back by safe mode.
+     */
+    @Test void aPluginTheUserTurnedOffOrMarkedForRemovalStandsAsThatAndNotAsSafeMode() throws Exception {
+        Path user = root.resolve("user");
+        probe(user, "dev.example.off");
+        probe(user, "dev.example.gone");
+        Files.writeString(root.resolve("plugins.toml"), "version = 1\n"
+            + "[plugins.\"dev.example.off\"]\nenabled = false\nconsented = []\n"
+            + "[plugins.\"dev.example.gone\"]\nenabled = true\nconsented = []\nremove = true\n");
+        PluginRuntime normal = runtime(null, user, null, false, new ArrayList<>());
+        onEdt(() -> normal.start(Map.of(), true));
+        assertThat(normal.standing("dev.example.off")).as("turned off by the user").hasValueSatisfying(standing ->
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.TURNED_OFF));
+        assertThat(normal.standing("dev.example.gone")).as("marked for removal").hasValueSatisfying(standing ->
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.MARKED_FOR_REMOVAL));
+        PluginRuntime safe = runtime(null, user, null, true, new ArrayList<>());
+        onEdt(() -> safe.start(Map.of(), true));
+        assertThat(safe.standing("dev.example.off")).as("safe mode holds back every user plugin").hasValueSatisfying(standing ->
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.SAFE_MODE));
     }
 
     private static String declaring(String id, String command, String summary) {
@@ -298,6 +461,8 @@ class PluginRuntimeTest {
         Path list = root.resolve("subcommands.tsv");
         PluginRuntime runtime = runtime(bundled, user, null, false, new ArrayList<>());
         onEdt(() -> runtime.subcommandList(list));
+        assertThat(runtime.declaresSubcommand("alpha")).as("before the plugins start").isFalse();
+        assertThat(runtime.runsSubcommand("alpha")).as("before the plugins start").isFalse();
         onEdt(() -> runtime.start(Map.of(), true));
         assertThat(runtime.statusLines())
             .anySatisfy(line -> assertThat(line).contains("dev.example.alpha", "ACTIVE"))
@@ -305,6 +470,13 @@ class PluginRuntimeTest {
         assertThat(run(runtime, "beta", 1)).isEqualTo("jasper: beta is unavailable (the dev.example.beta plugin is off)\n");
         assertThat(run(runtime, "alpha", 1)).as("running, but it never called handle").isEqualTo("jasper: alpha is unavailable (the dev.example.alpha plugin is off)\n");
         assertThat(run(runtime, "gamma", 2)).isEqualTo("jasper: unknown command gamma; run jasper --help for the list\n");
+        assertThat(runtime.declaresSubcommand("alpha")).isTrue();
+        assertThat(runtime.declaresSubcommand("beta")).as("declared, though its plugin waits for consent").isTrue();
+        assertThat(runtime.declaresSubcommand("gamma")).isFalse();
+        // Workspace plan 6b's residual round: only a call whose plugin registered its handler runs, and restores windows first.
+        assertThat(runtime.runsSubcommand("alpha")).as("running, but it never called handle").isFalse();
+        assertThat(runtime.runsSubcommand("beta")).as("its plugin waits for consent").isFalse();
+        assertThat(runtime.runsSubcommand("gamma")).as("declared by none").isFalse();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (!Files.exists(list) && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(dev.jasper.app.commandline.SubcommandList.read(list)).as("--help lists only what runs").containsExactly(
@@ -381,9 +553,7 @@ class PluginRuntimeTest {
         assertThat(failed.message()).contains("dev.example.absent");
         assertThat(failed.snapshot()).isNull();
 
-        var pending = new AtomicReference<List<CompletableFuture<?>>>();
-        onEdt(() -> pending.set(runtime.stop()));
-        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        stopAndWait(runtime);
     }
 
         @Test void aChangedSettingsFileReachesThePluginWithoutAConfigReload() throws Exception {
@@ -405,9 +575,7 @@ class PluginRuntimeTest {
             onEdt(runtime::pollSettingsNow);
             settle();
             assertThat(reports).filteredOn(r -> !r.startsWith("clear ")).singleElement().asString().startsWith("dev.example.probe.toml: ");
-            var pending = new AtomicReference<List<CompletableFuture<?>>>();
-            onEdt(() -> pending.set(runtime.stop()));
-            CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            stopAndWait(runtime);
         }
 
     @Test void whatKeptPluginsFromRunningIsListedAsProblems() throws Exception {
@@ -437,6 +605,14 @@ class PluginRuntimeTest {
                 assertThat(problem.cause()).as("no exception lies behind it").isEmpty();
             });
         assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
+        // Workspace tabs spec 13: only a plugin that runs rebuilds its saved tabs; the others' placeholders say why.
+        assertThat(runtime.standing("dev.example.probe")).hasValueSatisfying(standing ->
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.RUNNING));
+        assertThat(runtime.standing("dev.example.future")).as("it needs another SDK").hasValueSatisfying(standing -> {
+            assertThat(standing.name()).isEqualTo("Future");
+            assertThat(standing.kind()).isEqualTo(PluginRuntime.Standing.Kind.FAILED);
+        });
+        assertThat(runtime.standing("dev.example.absent")).as("not installed").isEmpty();
         stopAndWait(runtime);
     }
 
@@ -493,9 +669,7 @@ class PluginRuntimeTest {
         assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of("EDITOR", "vim"))))
             .as("the failed plugin's contributor went with it").isEqualTo(Map.of("EDITOR", "probe --wait", "VISUAL", "probe --wait"));
         assertThatIllegalStateException().as("off the UI thread").isThrownBy(() -> runtime.shellVariables(Map.of()));
-        var pending = new AtomicReference<List<CompletableFuture<?>>>();
-        onEdt(() -> pending.set(runtime.stop()));
-        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        stopAndWait(runtime);
         assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of()))).as("after the plugin stopped").isEmpty();
     }
 
@@ -535,9 +709,7 @@ class PluginRuntimeTest {
         Path edited = root.resolve("absent/dev.example.editor/data/edited");
         assertThat(Files.readAllLines(edited)).containsExactly("during.txt");
         onEdt(() -> assertThatIllegalStateException().as("never on the UI thread").isThrownBy(() -> runtime.open(during, desktop::add)));
-        var pending = new AtomicReference<List<CompletableFuture<?>>>();
-        onEdt(() -> pending.set(runtime.stop()));
-        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        stopAndWait(runtime);
         runtime.open(after, desktop::add);
         assertThat(desktop).containsExactly(before, after);
         assertThat(Files.readAllLines(edited)).as("a stopped plugin's editor is not asked").containsExactly("during.txt");
@@ -647,7 +819,8 @@ class PluginRuntimeTest {
         var tall = new dev.jasper.ui.kit.Kit("tall-buttons", base.metrics().with(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT, 40),
             base.type(), base.faces(), base.controls(), base.colors(), base.uiKeys());
         PluginRuntime runtime = runtime(null, root.resolve("absent"), devPlugins, false, new ArrayList<>());
-        onEdt(() -> runtime.presentation(tall));
+        var look = dev.jasper.app.presentation.Projections.standard(new dev.jasper.app.presentation.Projections.Host(dev.jasper.app.presentation.Projections.Platform.LINUX, false)).plugins();
+        onEdt(() -> runtime.presentation(tall, look, dev.jasper.app.config.DefaultSource.CORE));
         onEdt(() -> runtime.start(Map.of(), true));
         settle();
         var context = new dev.jasper.app.settingsui.PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(),
@@ -667,9 +840,48 @@ class PluginRuntimeTest {
                     assertThat(made.getPreferredSize().height).as("the plugin's button measures with the presentation's kit")
                         .isGreaterThan(standard.getPreferredSize().height);
                 } finally { view.close(); reference.close(); page.dispose(); }
-                assertThatIllegalStateException().isThrownBy(() -> runtime.presentation(base)).withMessage("Plugins have already started");
+                assertThatIllegalStateException().isThrownBy(() -> runtime.presentation(base, look, dev.jasper.app.config.DefaultSource.CORE)).withMessage("Plugins have already started");
             });
         } finally { stopAndWait(runtime); }
+    }
+
+    static final String LOOK_READER = """
+        package fix.look;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                var size = context.settings().declare(dev.jasper.sdk.settings.SettingSpec.of("size",
+                    dev.jasper.sdk.settings.SettingKind.integer(8, 48), 13).label("Size"));
+                System.setProperty("jasper.test.look", context.appearance().presentation().classic() + " "
+                    + context.appearance().presentation().toolWindows() + " " + size.get());
+            }
+        }
+        """;
+
+    /**
+     * Plan 15a Task 2: a started plugin reads the presentation the runtime was given, and the look's defaults for its
+     * settings; the setter refuses after start.
+     */
+    @Test void aStartedPluginReadsThePresentationTheRuntimeWasGiven() throws Exception {
+        Path devPlugins = root.resolve("dev").resolve("dev.example.look");
+        PluginJars.build(devPlugins, "look.jar", PluginJars.descriptor("dev.example.look", "1.0.0", "fix.look.Main"),
+            Map.of("fix.look.Main", LOOK_READER), List.of());
+        var enterprise = dev.jasper.app.presentation.Projections.of(dev.jasper.app.testsupport.EnterpriseLook.CHROME, true, true,
+            "dev.jasper.enterprise", new dev.jasper.app.presentation.Projections.Host(dev.jasper.app.presentation.Projections.Platform.LINUX, false)).plugins();
+        var defaults = new dev.jasper.app.config.DefaultSource(Map.of(), Map.of("dev.example.look", Map.of("size", 15L)));
+        PluginRuntime runtime = runtime(null, root.resolve("absent"), devPlugins, false, new ArrayList<>());
+        try {
+            onEdt(() -> runtime.presentation(dev.jasper.ui.kit.Kit.DEFAULT, enterprise, defaults));
+            onEdt(() -> runtime.start(Map.of(), true));
+            settle();
+            assertThat(System.getProperty("jasper.test.look")).as("the presentation and the look's default for the plugin's setting")
+                .isEqualTo("true STRIPES 15");
+            onEdt(() -> assertThatIllegalStateException()
+                .isThrownBy(() -> runtime.presentation(dev.jasper.ui.kit.Kit.DEFAULT, enterprise, dev.jasper.app.config.DefaultSource.CORE))
+                .withMessage("Plugins have already started"));
+        } finally {
+            System.clearProperty("jasper.test.look");
+            stopAndWait(runtime);
+        }
     }
 
     static final String LINE_EDITOR = """

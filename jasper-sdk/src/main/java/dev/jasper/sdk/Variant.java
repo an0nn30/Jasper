@@ -1,9 +1,12 @@
 package dev.jasper.sdk;
 
-/** The application's current look: plugins pick colors and icons that suit it. */
+/**
+ * Whether a theme is dark or light, so a plugin can pick colours and icons that suit it. The UI package reports one
+ * variant for the chrome theme and one for the workspace theme.
+ */
 public enum Variant {
-    /** Dark application chrome; terminal colors may be configured independently. */
+    /** A dark theme. The terminal's colour scheme is configured separately and may differ. */
     DARK,
-    /** Light application chrome; terminal colors may be configured independently. */
+    /** A light theme. The terminal's colour scheme is configured separately and may differ. */
     LIGHT
 }

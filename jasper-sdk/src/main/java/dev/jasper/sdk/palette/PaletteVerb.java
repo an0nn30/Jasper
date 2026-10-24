@@ -3,8 +3,8 @@ package dev.jasper.sdk.palette;
 import java.util.Objects;
 
 /**
- * One thing a scope can do with a row. A scope's verbs are bound in order to Enter, Cmd/Ctrl+Enter
- * and Shift+Enter.
+ * One thing a scope can do with a row. A scope's verbs are bound in order to Enter, Cmd+Enter (Ctrl+Enter on Linux
+ * and Windows) and Shift+Enter.
  *
  * @param id    lower-case identifier, unique within the scope: {@code [a-z][a-z0-9_.-]{0,127}}
  * @param label what the hint bar shows next to this verb's key, such as "Paste and run"

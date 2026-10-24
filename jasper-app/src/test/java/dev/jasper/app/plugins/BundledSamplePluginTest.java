@@ -42,8 +42,9 @@ class BundledSamplePluginTest {
         onEdt(() -> {
             assertThat(contributions.action("dev.jasper.sample.demo")).get()
                 .satisfies(action -> assertThat(action.icon()).as("an SVG from the plugin's own jar").isNotNull());
-            assertThat(contributions.toolbar()).hasSize(2)
-                .contains(new dev.jasper.app.contributions.ToolbarEntry.Button("dev.jasper.sample.demo"))
+            assertThat(contributions.toolbar()).hasSize(3)
+                .contains(new dev.jasper.app.contributions.ToolbarEntry.Button("dev.jasper.sample.demo"),
+                    new dev.jasper.app.contributions.ToolbarEntry.Button("dev.jasper.editor.new_window"))
                 .anySatisfy(entry -> assertThat(entry).isInstanceOfSatisfying(
                     dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, dropdown -> {
                         assertThat(dropdown.title()).isEqualTo("Sessions");
@@ -77,7 +78,7 @@ class BundledSamplePluginTest {
         });
         assertThat(runtime.get().statusLines()).as("the sample, the seven bundled feature plugins and Enterprise, off by default").hasSize(9)
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.enterprise", "BUNDLED", "DISABLED", "off by default"))
-            .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.2.1", "BUNDLED", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.5.0", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.history", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.snippets", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.vault", "BUNDLED", "ACTIVE"))
@@ -95,10 +96,43 @@ class BundledSamplePluginTest {
         }
         assertThat(lines.get()).contains(outcome);
         onEdt(() -> assertThat(deck.notices()).as("Buddy keeps live work only").isEmpty());
+        var workers = PluginShutdownTestSupport.capture(runtime.get());
         var pending = new AtomicReference<List<CompletableFuture<?>>>();
         onEdt(() -> pending.set(runtime.get().stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        workers.await();
     }
+    @Test void everyBundledPluginsDefaultShortcutSurvivesOnBothKeymaps() throws Exception {
+        Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
+        var runtime = new AtomicReference<PluginRuntime>();
+        var contributions = AppContractTest.onEdtValue(dev.jasper.app.contributions.Contributions::new);
+        onEdt(() -> {
+            runtime.set(new PluginRuntime(new PluginRuntime.Options(staged, root.resolve("user"), null, false,
+                root.resolve("plugins.toml"), root.resolve("plugins.lock")),
+                new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }), PluginRuntime.SettingsReports.IGNORED,
+                contributions, AppContractTest.headlessWindows(), new dev.jasper.app.terminals.TerminalRegistry()));
+            // Every sample demo that registers an action, so its defaults are checked too.
+            runtime.get().start(Map.of("dev.jasper.sample", Map.<String, Object>of("demo_ui", true, "demo_terminal", true,
+                "demo_session", true, "demo_scope", true, "demo_step_millis", 0L)), true);
+        });
+        try {
+            onEdt(() -> {
+                var extensions = contributions.actions().stream().filter(action -> dev.jasper.app.config.KeyBindings.extensionId(action.id()))
+                    .map(dev.jasper.app.contributions.ActionEntry::extension).toList();
+                assertThat(extensions).extracting(dev.jasper.app.config.KeyBindings.Extension::id)
+                    .contains("dev.jasper.sample.demo", "dev.jasper.sample.greetings.open", "dev.jasper.vault.lock");
+                for (boolean macOs : new boolean[]{true, false}) {
+                    assertThat(dev.jasper.app.config.KeyBindings.defaults(macOs).withExtensions(extensions).problems())
+                        .as("dropped defaults with macOS=" + macOs).isEmpty();
+                }
+            });
+        } finally {
+            var pending = new AtomicReference<List<CompletableFuture<?>>>();
+            onEdt(() -> pending.set(runtime.get().stop()));
+            CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        }
+    }
+
     @Test void everyBundledPluginShipsAnIconAndRemoteNamesItsHomepage() throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
         var runtime = new AtomicReference<PluginRuntime>();
@@ -118,9 +152,11 @@ class BundledSamplePluginTest {
             assertThat(rows).filteredOn(row -> row.id().equals("dev.jasper.remote")).singleElement()
                 .satisfies(row -> assertThat(row.homepage()).isEqualTo("https://github.com/an0nn30/Jasper"));
         } finally {
+            var workers = PluginShutdownTestSupport.capture(runtime.get());
             var pending = new AtomicReference<List<CompletableFuture<?>>>();
             onEdt(() -> pending.set(runtime.get().stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            workers.await();
         }
     }
 
@@ -172,9 +208,11 @@ class BundledSamplePluginTest {
                     dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, menu -> assertThat(dev.jasper.app.testsupport.IconPixels.of(menu.icon())).isEqualTo(dev.jasper.app.testsupport.IconPixels.of(icon)));
             });
         } finally {
+            var workers = PluginShutdownTestSupport.capture(runtime.get());
             var pending = new AtomicReference<List<CompletableFuture<?>>>();
             onEdt(() -> pending.set(runtime.get().stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            workers.await();
             onEdt(() -> ThemeTestSupport.controller(true));
         }
     }

@@ -76,7 +76,29 @@ class FakeUiTest {
             });
             assertThat(host.actionSpec("dev.x.tool.absent")).isEmpty();
             assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("dev.x.tool.other", "Other")
-                .withContext(ShortcutContext.window("dev.y.manager")), invoked -> { }));
+                .withContext(ShortcutContext.panel("dev.y.hosts")), invoked -> { }));
+        }
+    }
+
+    @Test void editorSchemesArePublishedOnFlushAsAWorkspaceChange() {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            var appearance = context.appearance();
+            var seen = new java.util.concurrent.atomic.AtomicInteger();
+            appearance.onWorkspaceChanged(event -> seen.incrementAndGet());
+            assertThat(appearance.editorSchemes()).isEmpty();
+            var colors = workspaceColors(java.awt.Color.RED);
+            var dark = new dev.jasper.sdk.ui.EditorScheme("red/dark", "Red", Variant.DARK, colors.editor(), colors.syntax());
+            host.setEditorSchemes(List.of(dark));
+            assertThat(appearance.editorSchemes()).as("until the flush").isEmpty();
+            host.flush();
+            assertThat(appearance.editorSchemes()).containsExactly(dark);
+            assertThat(seen).hasValue(1);
+            host.setEditorSchemes(List.of(dark));
+            host.flush();
+            assertThat(seen).as("an equal list announces nothing").hasValue(1);
+            assertThatThrownBy(() -> java.util.concurrent.CompletableFuture.runAsync(appearance::editorSchemes).join())
+                .hasCauseInstanceOf(IllegalStateException.class);
         }
     }
 

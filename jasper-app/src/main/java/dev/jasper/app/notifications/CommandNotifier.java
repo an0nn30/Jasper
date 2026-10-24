@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
@@ -161,6 +162,18 @@ public final class CommandNotifier implements AutoCloseable {
             outcomes.values().forEach(ids -> ids.remove(id));
             outcomes.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(id);
         });
+    }
+
+    /**
+     * Who posted a notification this notifier still answers for: the key of the pane whose command it reports, until that
+     * pane closes. A click resolves the pane's window from it then, since its tab may have moved (workspace tabs spec 9.3).
+     *
+     * @param notification a notification's id
+     * @return the pane's key; empty for any other notification
+     */
+    public Optional<Object> producer(UUID notification) {
+        for (var entry : outcomes.entrySet()) if (entry.getValue().contains(notification)) return Optional.of(entry.getKey());
+        return Optional.empty();
     }
 
     /** The pane is gone: its running card goes, and its notifications expire, since there is no pane to focus. */

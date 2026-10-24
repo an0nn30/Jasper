@@ -25,8 +25,9 @@ import dev.jasper.app.files.ChooserSource;
  * EDT-only; callbacks into contributors are their concern to contain.
  */
 public final class Contributions {
-    private final ContentRegistry content = new ContentRegistry();
-    public ContentRegistry content() { return content; }
+    private final TabRegistry tabs = new TabRegistry();
+    /** Every window's tabs (workspace tabs spec 9.1): the application's one registry. */
+    public TabRegistry tabs() { return tabs; }
     private final QuitGuards quitGuards = new QuitGuards();
     public QuitGuards quitGuards() { return quitGuards; }
 
@@ -53,7 +54,13 @@ public final class Contributions {
 
     /** A request to show, hide or toggle a panel in one window; each window answers only its own. */
     public record PanelRequest(UUID windowId, String panelId, Op op) {
-        public enum Op { SHOW, HIDE, TOGGLE }
+        public enum Op {
+            SHOW, HIDE, TOGGLE,
+            /** A toggle by the user's View action, or by the panel's own toggle action as it runs: a panel it shows, or a visible one that is not the active tool window, becomes the active tool window under flush frames (Enterprise plan 12 Rulings 18). */
+            ACTIVATING_TOGGLE,
+            /** A show by the panel's own toggle action (plan 15b Rulings 1), or a user's View toggle from a child window as the main window receives it: shows the panel and makes it the active tool window under flush frames. */
+            ACTIVATING_SHOW
+        }
     }
 
     private final Map<String, PanelEntry> panels = new LinkedHashMap<>();
@@ -61,6 +68,7 @@ public final class Contributions {
     /** Single-element holders: the same action may be placed twice, and removal is by identity. */
     private final List<String[]> railActions = new ArrayList<>();
     private final List<Consumer<PanelRequest>> panelListeners = new ArrayList<>();
+    private java.util.function.UnaryOperator<PanelRequest> panelRoute = java.util.function.UnaryOperator.identity();
     private MenuSection panelsMenu;
 
 
@@ -130,6 +138,36 @@ public final class Contributions {
         return status.stream().sorted(Comparator.comparingInt(StatusEntry::priority)).toList();
     }
 
+    private final List<SplitItem> splitItems = new ArrayList<>();
+
+    /**
+     * Lists a split item in every window's Split lists (tabs and panes spec 8; workspace plan 8b Rulings 17); its
+     * contributor registers its two actions with {@link #addAction}. Ids are unique.
+     *
+     * @param item the item
+     * @return removes it from the lists
+     * @throws IllegalArgumentException when an item with its id is listed
+     */
+    public Subscription addSplitItem(SplitItem item) {
+        requireEdt();
+        Objects.requireNonNull(item, "item");
+        for (SplitItem existing : splitItems)
+            if (existing.id().equals(item.id())) throw new IllegalArgumentException("Split item already registered: " + item.id());
+        splitItems.add(item);
+        changed(Kind.MENUS);
+        return new Subscription(() -> { if (splitItems.remove(item)) changed(Kind.MENUS); });
+    }
+
+    /**
+     * The split items in the Split lists' order (workspace plan 8b Rulings 5): the bundled plugins' first, each in the
+     * order it was listed.
+     *
+     * @return the items
+     */
+    public List<SplitItem> splitItems() {
+        return splitItems.stream().sorted(Comparator.comparing((SplitItem item) -> !item.bundled())).toList();
+    }
+
     public Subscription onChanged(Consumer<Kind> listener) {
         requireEdt();
         listeners.add(Objects.requireNonNull(listener, "listener"));
@@ -153,7 +191,7 @@ public final class Contributions {
         panels.put(id, entry);
         if (toggleActionId.isEmpty())
             panelToggles.put(id, addAction(toggle, "Toggle " + title, icon, List.of("panel", "show", "hide"), Optional.empty(),
-                invocation -> requestPanel(new PanelRequest(invocation.windowId(), id, PanelRequest.Op.TOGGLE))));
+                invocation -> requestPanel(new PanelRequest(invocation.windowId(), id, PanelRequest.Op.ACTIVATING_TOGGLE))));
         rebuildPanelsMenu();
         changed(Kind.PANELS);
         return entry;
@@ -243,10 +281,22 @@ public final class Contributions {
         return new Subscription(() -> panelListeners.remove(listener));
     }
 
+    /**
+     * Where a panel request goes before any window hears it: the window manager sends a child window's to the main
+     * window, which has the dock (workspace tabs spec 6.3). By default a request goes where it names.
+     *
+     * @param route maps a request to the one the windows hear
+     */
+    public void panelRoute(java.util.function.UnaryOperator<PanelRequest> route) {
+        requireEdt();
+        panelRoute = Objects.requireNonNull(route, "route");
+    }
+
     public void requestPanel(PanelRequest request) {
         requireEdt();
+        PanelRequest routed = Objects.requireNonNull(panelRoute.apply(Objects.requireNonNull(request, "request")), "routed");
         for (Consumer<PanelRequest> listener : List.copyOf(panelListeners)) {
-            try { listener.accept(request); }
+            try { listener.accept(routed); }
             catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A panel request listener failed", failure); }
         }
     }

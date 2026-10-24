@@ -36,11 +36,12 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
 /**
- * The Errors window's content (spec section 5): this session's incidents, most recently seen first, beside the
- * selected one's detail. One chrome kit view composes it as a manager window (the Vault manager's arrangement without
- * its rail): a list column of incidents; a detail column with the incident's heading (its summary, source and
- * operation, then Disable Plugin for a plugin's incident and Copy), its message and stack trace each in a detail card
- * and when it was seen; and the window footer band with the count, Open Log Folder, Clear and Done. The message and
+ * The Errors tab's content (spec section 5; workspace tabs spec 6.6): this session's incidents, most recently seen
+ * first, beside the selected one's detail. One kit view on the workspace route composes it as a manager (the Vault
+ * manager's arrangement without its rail) and paints its surface, as a plugin's content tab does: a list column of
+ * incidents; a detail column with the incident's heading (its summary, source and operation, then Disable Plugin for a
+ * plugin's incident and Copy), its message and stack trace each in a detail card and when it was seen; and the footer
+ * band with the count, Open Log Folder and Clear. The tab strip carries its title and closes it. The message and
  * trace are read-only specialized text (Custom EDITOR) so they stay selectable and scrollable; the trace card shows at
  * most {@code ERRORS_TRACE_ROWS} lines before it scrolls. With no incidents the detail column is the standard empty
  * state. Every text is literal. EDT only; {@link #close} stops it listening.
@@ -70,13 +71,12 @@ public final class ErrorsView extends JPanel {
     }
 
     static final String LIST = "errors", TITLE = "detail.title", HEADER = "detail.source", SIGHTINGS = "detail.sightings";
-    static final String COPY = "copy", DISABLE = "disable", LOG_FOLDER = "log-folder", CLEAR = "clear", DONE = "done";
+    static final String COPY = "copy", DISABLE = "disable", LOG_FOLDER = "log-folder", CLEAR = "clear";
     static final String EMPTY = "no-errors", STATUS = "status.count";
     private static final String ROOT = "errors.window", MESSAGE = "errors.message", TRACE = "errors.trace";
     private final KitContext kit;
     private final Incidents incidents;
     private final Hooks hooks;
-    private final Runnable done;
     private final DateTimeFormatter time;
     private final KitView view;
     private final JTextArea message = new JTextArea(), trace = new JTextArea();
@@ -91,18 +91,19 @@ public final class ErrorsView extends JPanel {
     private boolean closed;
 
     /**
-     * @param kit the chrome kit context
+     * @param kit the workspace route's kit context: the view is a content tab's
      * @param incidents the store it lists and clears
      * @param hooks what it asks of the application
      * @param zone the zone sightings are shown in
-     * @param done closes the window (Done and Escape)
+     * @throws IllegalArgumentException when {@code kit} is not on the workspace route
      */
-    public ErrorsView(KitContext kit, Incidents incidents, Hooks hooks, ZoneId zone, Runnable done) {
+    public ErrorsView(KitContext kit, Incidents incidents, Hooks hooks, ZoneId zone) {
         super(new BorderLayout());
         this.kit = Objects.requireNonNull(kit, "kit");
+        if (kit.route() != dev.jasper.ui.theme.ThemeRoute.WORKSPACE)
+            throw new IllegalArgumentException("The Errors tab paints from the workspace route, not " + kit.route());
         this.incidents = Objects.requireNonNull(incidents, "incidents");
         this.hooks = Objects.requireNonNull(hooks, "hooks");
-        this.done = Objects.requireNonNull(done, "done");
         time = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(zone);
         setOpaque(false);
         message.setLineWrap(true);
@@ -120,6 +121,8 @@ public final class ErrorsView extends JPanel {
         listed = List.copyOf(incidents.list());
         if (!listed.isEmpty()) selectedId = listed.getFirst().id();
         view = new KitView(kit, spec(), this::event);
+        // A content tab paints its route's surface, as a plugin's content tab does.
+        view.paintsSurface(true);
         view.getAccessibleContext().setAccessibleName("Errors");
         add(view, BorderLayout.CENTER);
         theme = kit.binding().subscribe(pair -> restyle());
@@ -155,7 +158,6 @@ public final class ErrorsView extends JPanel {
                     case DISABLE -> selected().filter(Incident::fromPlugin).ifPresent(incident -> hooks.disablePlugin().accept(incident.source()));
                     case LOG_FOLDER -> hooks.openLogFolder().run();
                     case CLEAR -> incidents.clear();
-                    case DONE -> done.run();
                     default -> { }
                 }
             }
@@ -174,13 +176,13 @@ public final class ErrorsView extends JPanel {
         render();
     }
 
-    /** Scrolls the selected row into view again; the window calls this once it has been laid out. */
+    /** Scrolls the selected row into view again; the tab calls this once it has been laid out. */
     public void revealSelection() {
         if (closed || selectedId == null || indexOf(selectedId) < 0) return;
         view.reveal(summaryId(selectedId));
     }
 
-    /** Stops listening and closes the kit view; the window calls this when it closes. Idempotent. */
+    /** Stops listening and closes the kit view; the tab calls this when it closes. Idempotent. */
     public void close() {
         if (closed) return;
         closed = true;
@@ -240,10 +242,11 @@ public final class ErrorsView extends JPanel {
         var columns = new Nodes.Split("errors.columns", ControlState.READY, Nodes.SplitKind.SIDEBAR_DETAIL, List.of(listPanel, detailPanel));
         var actions = List.of(
             button(LOG_FOLDER, "Open Log Folder", ControlState.READY, Nodes.ButtonKind.SECONDARY),
-            button(CLEAR, "Clear", new ControlState(true, any, false, ""), Nodes.ButtonKind.SECONDARY),
-            button(DONE, "Done", ControlState.READY, Nodes.ButtonKind.PRIMARY));
+            button(CLEAR, "Clear", new ControlState(true, any, false, ""), Nodes.ButtonKind.SECONDARY));
+        // The WINDOW form's full-bleed body and pinned footer band; the kit draws no title in it ("Errors" names it for
+        // assistive technology) and nothing cancels it: Escape leaves the tab open.
         return new ViewSpec(new Nodes.Form(ROOT, ControlState.READY, Nodes.FormKind.WINDOW, "Errors", Optional.empty(), List.of(columns),
-            Optional.of(status()), actions, DONE, Nodes.FormSubmission.NONE));
+            Optional.of(status()), actions, "", Nodes.FormSubmission.NONE));
     }
 
     private static Nodes.Header hiddenHeader(String id, String title) {
@@ -347,7 +350,6 @@ public final class ErrorsView extends JPanel {
     AbstractButton disableButton() { return (AbstractButton) NotificationCard.find(view, DISABLE); }
     AbstractButton logFolderButton() { return (AbstractButton) NotificationCard.find(view, LOG_FOLDER); }
     AbstractButton clearButton() { return (AbstractButton) NotificationCard.find(view, CLEAR); }
-    AbstractButton doneButton() { return (AbstractButton) NotificationCard.find(view, DONE); }
     KitView kitView() { return view; }
     JTextArea messageArea() { return message; }
     JTextArea traceArea() { return trace; }

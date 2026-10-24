@@ -29,14 +29,14 @@ public final class TitleBarPreview {
                 try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                     for (boolean themeDark : new boolean[]{true, false}) {
                         owner.selectVariant(themeDark);
-                        while (owner.tabStrip().getTabCount() > 1) owner.closeTab(owner.currentTab());
-                        owner.currentTab().rename("zsh");
+                        while (owner.tabCount() > 1) owner.closeTab(owner.currentTerminal());
+                        owner.currentTerminal().rename("zsh");
                         render(root, owner, bar, output, themeDark, "single", 830);
-                        owner.newTab(HOME); owner.currentTab().rename("zsh");
+                        owner.newTab(HOME); owner.currentTerminal().rename("zsh");
                         render(root, owner, bar, output, themeDark, "shell-tabs", 830);
-                        owner.currentTab().rename("Reviewing the notification implementation");
-                        owner.selectTab((TerminalTab) owner.tabStrip().getComponentAt(0));
-                        owner.currentTab().rename("tmux");
+                        owner.currentTerminal().rename("Reviewing the notification implementation");
+                        owner.selectTab(owner.tabs().get(0));
+                        owner.currentTerminal().rename("tmux");
                         owner.chrome().search().setContext("Claude Code — Reviewing the notification implementation", "Claude Code — Reviewing the notification implementation", dev.jasper.app.platform.AppIcons.named("TERMINAL"));
                         render(root, owner, bar, output, themeDark, "tmux-tabs", 830);
                         render(root, owner, bar, output, themeDark, "narrow", 450);
@@ -57,8 +57,8 @@ public final class TitleBarPreview {
         int height = bar.getPreferredSize().height;
         WindowTabsTest.layout(root, width, com.formdev.flatlaf.util.UIScale.scale(620));
         assertThat(bar.getWidth()).isEqualTo(width);
-        assertThat(owner.tabStrip().getTabCount()).as("actual tab owner for %s", name).isEqualTo(name.equals("single") ? 1 : 2);
-        assertThat(owner.windowTabs().isVisible()).isEqualTo(!name.equals("single"));
+        assertThat(owner.tabCount()).as("actual tab owner for %s", name).isEqualTo(name.equals("single") ? 1 : 2);
+        assertThat(owner.windowTabs().isVisible()).as("every group shows its strip").isTrue();
         if (owner.windowTabs().isVisible()) {
             assertThat(owner.windowTabs().getWidth()).isEqualTo(width);
             assertThat(owner.windowTabs().getHeight()).isPositive();
@@ -81,7 +81,6 @@ public final class TitleBarPreview {
         catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
         // Tabs are owned below the titlebar. Preserve their actual region separately from the strip.
         var tabs = owner.windowTabs();
-        if (!tabs.isVisible()) return; // One tab intentionally has no strip in the current workspace.
         var tabImage = new BufferedImage(width * 2, tabs.getHeight() * 2, BufferedImage.TYPE_INT_RGB);
         var tabGraphics = tabImage.createGraphics();
         try { tabGraphics.scale(2, 2); tabs.printAll(tabGraphics); }

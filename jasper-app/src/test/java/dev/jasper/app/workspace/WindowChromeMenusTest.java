@@ -36,7 +36,8 @@ class WindowChromeMenusTest {
 
     static WorkspaceChrome classic() {
         return WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.UNIFIED, WorkspaceLook.Stripes.RAILS,
-            WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD), new TitleFormat("{context}"));
+            WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD,
+            WorkspaceLook.Icons.NEW_UI), new TitleFormat("{context}"));
     }
 
     static List<String> titles(WindowContent owner) {
@@ -72,10 +73,10 @@ class WindowChromeMenusTest {
         edt(() -> {
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             owner.connectContributions(model(false));
-            assertThat(titles(owner)).containsExactly("File", "Edit", "View", "Pane", "Tab", "Session", "Transfer", "Tools", "Own", "Help");
+            assertThat(titles(owner)).containsExactly("File", "Edit", "View", "Tab", "Session", "Transfer", "Tools", "Own", "Help");
             var first = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             first.connectContributions(model(true));
-            assertThat(titles(first)).as("registration order, as today").containsExactly("File", "Edit", "View", "Pane", "Tab", "Session", "Transfer", "Tools", "Help", "Own");
+            assertThat(titles(first)).as("registration order, as today").containsExactly("File", "Edit", "View", "Tab", "Session", "Transfer", "Tools", "Help", "Own");
             assertThat(owner.chrome().menuBar().getClientProperty("FlatLaf.style")).as("the standard bar is not restyled").isNull();
         });
     }
@@ -91,22 +92,58 @@ class WindowChromeMenusTest {
         });
     }
 
-    @Test void theClassicWindowMenuHoldsPaneThenTabThenTheToolWindows() throws Exception {
+    @Test void theClassicWindowMenuHoldsTheTabMenuThenTheToolWindows() throws Exception {
         edt(() -> {
             var model = model(false);
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel());
-            model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.PANE)).set(List.of(new MenuEntry.Item("dev.x.split")));
+            model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TAB)).set(List.of(new MenuEntry.Item("dev.x.split")));
+            // A split item whose actions carry an icon (workspace plan 8b Rulings 22).
+            for (String side : List.of("Right", "Down"))
+                model.addAction("dev.x.split_" + side.toLowerCase(java.util.Locale.ROOT) + "_sketch", "Split " + side + " with Sketch",
+                    new ImageIcon(), List.of(), Optional.empty(), invocation -> { });
+            model.addSplitItem(new dev.jasper.app.contributions.SplitItem("dev.x.sketch", "Sketch", new ImageIcon(),
+                "dev.x.split_right_sketch", "dev.x.split_down_sketch", false, false));
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), classic());
             owner.connectContributions(model);
             var window = items(menu(owner, "Window"));
-            assertThat(window.getFirst()).isEqualTo("Split Right");
-            assertThat(window).as("Pane's items and the plugin's Pane section, Tab's items, then the toggles")
-                .containsSubsequence("Split Right", "Next Prompt", "---", "split", "---", "Next Tab", "Previous Tab", "---", "Toggle Hosts");
+            assertThat(window.getFirst()).isEqualTo("submenu:Split");
+            assertThat(window).as("the Tab menu's Split list, pane, prompt and tab items with the plugin's Tab section, then the toggles")
+                .containsSubsequence("submenu:Split", "Move Pane to New Tab", "submenu:Move Pane to Tab", "Next Prompt", "---", "Next Tab",
+                    "Previous Tab", "---",
+                    "split", "---", "Toggle Hosts");
+            assertThat(window).as("Move Pane to Tab and Move Tab Into right after Move Pane to New Tab")
+                .containsSequence("Move Pane to New Tab", "submenu:Move Pane to Tab", "submenu:Move Tab Into");
             assertThat(window.getLast()).as("the tool-window toggles close the menu").isEqualTo("Toggle Hosts");
+            var split = (JMenu) menu(owner, "Window").getMenuComponent(0);
+            assertThat(items(split)).containsExactly("Terminal Right", "Terminal Down", "Sketch Right", "Sketch Down");
+            for (Component child : split.getMenuComponents())
+                assertThat(((JMenuItem) child).getIcon()).as("%s: the Split submenu shows no icons", ((JMenuItem) child).getText()).isNull();
             assertThat(items(menu(owner, "View"))).as("the toggles moved to Window").doesNotContain("submenu:Tool Windows");
             var standard = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             standard.connectContributions(model);
             assertThat(items(menu(standard, "View"))).as("the default look keeps them in View").contains("submenu:Tool Windows");
+        });
+    }
+
+    /**
+     * Pane flexibility spec 4 and 5 (workspace plan 9a Rulings 22): the classic Window menu, which holds the Tab menu's
+     * items, fills its Move Pane to Tab and Move Tab Into submenus as it opens, each with the window's other tab.
+     */
+    @Test void theClassicWindowMenuFillsItsMoveSubmenusAsItOpens() throws Exception {
+        edt(() -> {
+            var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), classic());
+            owner.connectContributions(model(false));
+            owner.newTab(DesktopTestSupport.HOME);
+            JMenu window = menu(owner, "Window");
+            for (var listener : window.getMenuListeners()) listener.menuSelected(new javax.swing.event.MenuEvent(window));
+            for (String title : List.of("Move Pane to Tab", "Move Tab Into")) {
+                JMenu moves = null;
+                for (Component child : window.getMenuComponents())
+                    if (child instanceof JMenu sub && title.equals(sub.getText())) moves = sub;
+                assertThat(moves).as(title).isNotNull();
+                assertThat(moves.isEnabled()).as("%s offers the other tab", title).isTrue();
+                assertThat(items(moves)).as(title).singleElement().satisfies(text -> assertThat(text).startsWith("1 "));
+            }
         });
     }
 

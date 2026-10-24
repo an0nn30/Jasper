@@ -14,31 +14,89 @@ class HostedContentTest {
     @AfterEach void cleanup() throws Exception {closeOwners();}
     @Test void fileSelectionHasNoTerminalAndUsesTheSharedTabStrip() throws Exception {
         edt(()->{
-            var owner=content(launcher(new ArrayDeque<>())); var terminal=owner.currentTab();
+            var owner=content(launcher(new ArrayDeque<>())); var terminal=owner.currentTerminal();
             var model=new Contributions();owner.connectContributions(model);
             var panel=new JTextArea("text");
-            var entry=model.content().open("dev.editor","file","File",owner.id(),panel);
+            var entry=model.tabs().open("dev.editor","file","File",owner.id(),panel);
             entry.presentation("File","host",new ImageIcon(),true,"/etc/file","host");
-            assertThat(owner.currentTab()).isNull(); assertThat(owner.currentPane()).isNull();
+            assertThat(owner.currentTerminal()).isNull(); assertThat(owner.currentPane()).isNull();
             assertThat(owner.terminalTabs()).containsExactly(terminal);
             assertThat(owner.selectedContent()).isSameAs(entry);
             assertThat(owner.windowTabs().tabList().getComponentCount()).isEqualTo(2);
-            assertThat(owner.action(ActionId.SPLIT_RIGHT).isEnabled()).isFalse();
+            assertThat(owner.action(ActionId.SPLIT_RIGHT).isEnabled()).as("a split beside a plugin view (Rulings 11)").isTrue();
             int[] find={0};entry.commands(List.of(new ContentCommand("find","Find",KeyStroke.getKeyStroke("meta F"),true,()->find[0]++)));
             owner.invoke(ActionId.FIND);assertThat(find[0]).isEqualTo(1);
-            owner.reorderTab(1,0);assertThat(owner.selectedContent()).isSameAs(entry);
+            owner.reorderParentTab(owner.parentTabOf(owner.tabs().get(1)).orElseThrow(), 0);assertThat(owner.selectedContent()).isSameAs(entry);
             owner.selectTab(terminal);assertThat(owner.currentPane()).isNotNull();
             entry.select();assertThat(owner.selectedContent()).isSameAs(entry);
-            entry.requestClose();assertThat(owner.currentTab()).isSameAs(terminal);
+            entry.requestClose();assertThat(owner.currentTerminal()).isSameAs(terminal);
+        });
+    }
+    /**
+     * What a plugin item's view hears (the merge fix wave's L1): a pane beside the focused one shows, though its item is
+     * not the window's active one; hiding its tab, another tab of the window shown, tells the view it no longer shows
+     * ({@code SHOWING_CHANGED}), and showing the tab again tells it it shows. The Editor's Markdown preview suspends,
+     * releasing its pixels, and renders again on exactly that.
+     */
+    @Test void anItemBesideTheFocusedPaneShowsAndHidingItsTabTellsItsViewItNoLongerShows() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var model = new Contributions(); owner.connectContributions(model);
+            var view = new JPanel();
+            var heard = new ArrayList<Boolean>();
+            view.addHierarchyListener(event -> {
+                if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0) heard.add(view.isShowing());
+            });
+            var entry = model.tabs().open("dev.editor", "notes", "notes.md", owner.id(), view);
+            owner.addNotify();
+            try {
+                assertThat(view.isShowing()).isTrue();
+                owner.split(dev.jasper.app.layout.Side.RIGHT);
+                assertThat(owner.workspace().model().groups()).as("[item | terminal] in one tab").hasSize(2);
+                assertThat(entry.active()).as("the terminal's pane has the focus").isFalse();
+                assertThat(view.isShowing()).as("a pane beside the focused one shows").isTrue();
+                heard.clear();
+                owner.newTab(HOME);
+                assertThat(view.isShowing()).isFalse();
+                assertThat(heard).as("its view hears its tab hide").containsExactly(false);
+                entry.select();
+                assertThat(view.isShowing()).isTrue();
+                assertThat(heard).as("and show again").containsExactly(false, true);
+            } finally {
+                owner.removeNotify();
+            }
+        });
+    }
+
+    @Test void fontSizeActionsRunTheSelectedContentsFontCommands() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>())); var terminal = owner.currentTerminal();
+            var model = new Contributions(); owner.connectContributions(model);
+            var plain = model.tabs().open("dev.editor", "plain", "Plain", owner.id(), new JPanel());
+            owner.invoke(ActionId.FONT_BIGGER);
+            assertThat(owner.action(ActionId.FONT_BIGGER).isEnabled()).as("content without the command").isFalse();
+            var entry = model.tabs().open("dev.editor", "file", "File", owner.id(), new JPanel());
+            var ran = new ArrayList<String>();
+            entry.commands(List.of(
+                new ContentCommand("font-bigger", "Increase Font Size", null, true, () -> ran.add("bigger")),
+                new ContentCommand("font-smaller", "Decrease Font Size", null, true, () -> ran.add("smaller")),
+                new ContentCommand("font-reset", "Reset Font Size", null, true, () -> ran.add("reset"))));
+            owner.invoke(ActionId.FONT_BIGGER); owner.invoke(ActionId.FONT_SMALLER); owner.invoke(ActionId.FONT_RESET);
+            assertThat(ran).containsExactly("bigger", "smaller", "reset");
+            assertThat(owner.action(ActionId.FONT_RESET).isEnabled()).isTrue();
+            owner.selectTab(terminal);
+            owner.invoke(ActionId.FONT_BIGGER);
+            assertThat(ran).as("a terminal tab keeps the terminal's own font actions").hasSize(3);
+            plain.requestClose();
         });
     }
     @Test void documentOnlyShortcutIsInstalledAndRemovedOnSelectionChange() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
-            var terminal = owner.currentTab();
+            var terminal = owner.currentTerminal();
             var root = new JRootPane(); root.setContentPane(owner); owner.installRootBindings(root);
             var model = new Contributions(); owner.connectContributions(model);
-            var entry = model.content().open("dev.editor", "a", "A", owner.id(), new JPanel());
+            var entry = model.tabs().open("dev.editor", "a", "A", owner.id(), new JPanel());
             int[] saves = {0};
             var stroke = KeyStroke.getKeyStroke("meta S");
             entry.commands(List.of(new ContentCommand("save", "Save", stroke, true, () -> saves[0]++)));
@@ -50,6 +108,46 @@ class HostedContentTest {
             assertThat(root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(stroke)).isNull();
         });
     }
+    @Test void staleContentMenuResolvesCurrentHostSelectionAfterSwitchMoveAndClose() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = content(launcher(new ArrayDeque<>())); owner.connectContributions(model);
+            var other = content(launcher(new ArrayDeque<>())); other.connectContributions(model);
+            int[] calls = {0, 0};
+            var a = model.tabs().open("dev.editor", "a", "A", owner.id(), new JPanel());
+            a.commands(List.of(new ContentCommand("preview", "Preview", null, true, () -> calls[0]++)));
+            var menu = owner.tabMenu(a);
+            var item = java.util.Arrays.stream(menu.getComponents()).filter(JMenuItem.class::isInstance).map(JMenuItem.class::cast)
+                .filter(entry -> entry.getText().equals("Preview")).findFirst().orElseThrow();
+            var b = model.tabs().open("dev.editor", "b", "B", owner.id(), new JPanel());
+            b.commands(List.of(new ContentCommand("preview", "Preview", null, true, () -> calls[1]++)));
+            item.doClick(); assertThat(calls).containsExactly(0, 1);
+            model.tabs().move(a, other.id());
+            item.doClick(); assertThat(calls).containsExactly(0, 2);
+            b.commands(List.of(new ContentCommand("preview", "Preview", null, false, () -> calls[1]++)));
+            item.doClick(); assertThat(calls).containsExactly(0, 2);
+            b.requestClose(); item.doClick(); assertThat(calls).containsExactly(0, 2);
+            assertThat(other.selectedContent()).isSameAs(a);
+        });
+    }
+
+    @Test void previewClipboardKeysStayWithNativeReadOnlyTextComponent() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var model = new Contributions(); owner.connectContributions(model);
+            var preview = new JEditorPane(); preview.setEditable(false);
+            var entry = model.tabs().open("dev.editor", "preview", "Preview", owner.id(), preview);
+            int[] mutations = {0};
+            var paste = KeyStroke.getKeyStroke("meta V");
+            var copy = KeyStroke.getKeyStroke("meta C");
+            entry.commands(List.of(new ContentCommand("paste", "Paste", paste, true, () -> mutations[0]++),
+                new ContentCommand("copy", "Copy", copy, true, () -> mutations[0]++)));
+            assertThat(owner.dispatchShortcut(paste, preview)).isFalse();
+            assertThat(owner.dispatchShortcut(copy, preview)).isFalse();
+            assertThat(mutations).containsExactly(0);
+        });
+    }
+
     @Test void aWindowConnectedWithoutHostingContentNeverReceivesPluginContent() throws Exception {
         edt(() -> {
             var model = new Contributions();
@@ -59,13 +157,13 @@ class HostedContentTest {
             var rehearsal = content(launcher(new ArrayDeque<>()));
             rehearsal.connectContributions(model, UiState.inMemory(), false);
             rehearsal.setActive(true);
-            var entry = model.content().open("dev.editor", "a", "A", null, new JPanel());
+            var entry = model.tabs().open("dev.editor", "a", "A", null, new JPanel());
             assertThat(entry.window()).as("the main host stays the real window").isEqualTo(real.id());
             assertThat(real.selectedContent()).isSameAs(entry);
             assertThat(rehearsal.selectedContent()).isNull();
             assertThat(rehearsal.mayClose()).isTrue();
             rehearsal.close();
-            assertThat(model.content().entries()).as("closing the rehearsal takes nothing with it").containsExactly(entry);
+            assertThat(model.tabs().hosted()).as("closing the rehearsal takes nothing with it").containsExactly(entry);
             assertThat(real.selectedContent()).isSameAs(entry);
         });
     }
@@ -75,18 +173,18 @@ class HostedContentTest {
             var rehearsal = content(launcher(new ArrayDeque<>()));
             rehearsal.connectContributions(model, UiState.inMemory(), false);
             var created = new WindowContent[1];
-            model.content().setFactory(separate -> {
+            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> {
                 created[0] = content(launcher(new ArrayDeque<>()));
                 created[0].connectContributions(model, UiState.inMemory());
                 return created[0].id();
-            });
-            var entry = model.content().open("dev.editor", "a", "A", null, new JPanel());
+            }, id -> created[0] != null && created[0].id().equals(id), tab -> { }));
+            var entry = model.tabs().open("dev.editor", "a", "A", null, new JPanel());
             assertThat(created[0]).as("a real window was asked for").isNotNull();
             assertThat(entry.window()).isEqualTo(created[0].id());
             assertThat(rehearsal.selectedContent()).isNull();
         });
     }
-    @Test void detachedWorkspaceDoesNotScheduleATerminalLaunch() throws Exception {
+    @Test void anEmptyWorkspaceDoesNotScheduleATerminalLaunch() throws Exception {
         edt(() -> {
             var pending = new ArrayDeque<Runnable>();
             try (var owner = new WindowContent(launcher(pending), null, path -> {}, () -> {}, () -> {})) {
@@ -94,8 +192,8 @@ class HostedContentTest {
                 assertThat(owner.terminalTabs()).isEmpty();
                 assertThat(owner.currentPane()).isNull();
                 var model = new Contributions(); owner.connectContributions(model);
-                var entry = model.content().open("dev.editor", "a", "A", owner.id(), new JPanel());
-                assertThat(entry.detached()).isTrue();
+                var entry = model.tabs().open("dev.editor", "a", "A", owner.id(), new JPanel());
+                assertThat(entry.window()).isEqualTo(owner.id());
                 assertThat(owner.selectedContent()).isSameAs(entry);
             }
         });

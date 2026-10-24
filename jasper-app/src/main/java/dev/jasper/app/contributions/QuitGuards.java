@@ -10,7 +10,7 @@ import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /**
- * Plugins' quit and restart guards, asked in registration order after plugin windows and content tabs, before
+ * Plugins' quit and restart guards, asked in registration order after content tabs, before
  * anything closes. EDT-only. Callers contain their guards: a supplier here never throws and its future never fails.
  */
 public final class QuitGuards {

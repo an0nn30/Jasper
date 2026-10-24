@@ -7,6 +7,73 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class UiValuesTest {
+    /** The Editor's Color scheme setting: an editor scheme's id is its theme's id and its variant. */
+    @Test void editorSchemeChecksItsId() {
+        var c = java.awt.Color.GRAY;
+        var editor = new EditorPalette(c, c, c, c, c, c, c);
+        var styles = new java.util.EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
+        for (var role : SyntaxRole.values()) styles.put(role, new SyntaxStyle(c, false, false));
+        var syntax = new SyntaxPalette(styles);
+        var scheme = new EditorScheme("jasper-meadow/dark", "Jasper Meadow", dev.jasper.sdk.Variant.DARK, editor, syntax);
+        assertThat(scheme.id()).isEqualTo("jasper-meadow/dark");
+        assertThat(new EditorScheme("catppuccin-latte/light", "Latte", dev.jasper.sdk.Variant.LIGHT, editor, syntax).variant())
+            .isEqualTo(dev.jasper.sdk.Variant.LIGHT);
+        for (String id : new String[]{"jasper-meadow/light", "Meadow/dark", "jasper-meadow", "/dark", "a/dark/x"})
+            assertThatIllegalArgumentException().as(id).isThrownBy(() -> new EditorScheme(id, "Meadow", dev.jasper.sdk.Variant.DARK, editor, syntax));
+        assertThatIllegalArgumentException().isThrownBy(() -> new EditorScheme("a/dark", " ", dev.jasper.sdk.Variant.DARK, editor, syntax));
+        assertThatNullPointerException().isThrownBy(() -> new EditorScheme("a/dark", "A", dev.jasper.sdk.Variant.DARK, null, syntax));
+    }
+
+    /** Workspace tabs spec 14: the Tab menu holds what the Pane menu held. */
+    @Test void theStandardMenusAreFileEditViewTabAndThePluginOnes() {
+        assertThat(StandardMenu.values()).containsExactly(StandardMenu.FILE, StandardMenu.EDIT, StandardMenu.VIEW, StandardMenu.TAB,
+            StandardMenu.TOOLS, StandardMenu.SESSION, StandardMenu.TRANSFER);
+    }
+
+    /** Tabs and panes spec 10 and 11 (workspace plan 8b Rulings 3): a split item's id names its two actions. */
+    @Test void aSplitItemsIdNamesItsRightAndDownActions() {
+        var editor = SplitItemSpec.of("dev.jasper.editor.editor", "Editor").withIcon("file");
+        assertThat(editor.rightAction()).isEqualTo("dev.jasper.editor.split_right_editor");
+        assertThat(editor.downAction()).isEqualTo("dev.jasper.editor.split_down_editor");
+        assertThat(editor.icon()).contains("file");
+        var longest = SplitItemSpec.of("dev.x." + "a".repeat(110), "Long");
+        assertThat(ActionSpec.of(longest.rightAction(), "Split Right with Long").id()).as("still an action id").hasSize(128);
+        for (String id : new String[]{"", "nodot", "Upper.case", "dev.x." + "a".repeat(111)})
+            assertThatIllegalArgumentException().as(id).isThrownBy(() -> SplitItemSpec.of(id, "Label"));
+        assertThatIllegalArgumentException().isThrownBy(() -> SplitItemSpec.of("dev.x.notes", " "));
+        assertThatNullPointerException().isThrownBy(() -> new SplitItemSpec("dev.x.notes", "Notes", null, false));
+        assertThat(SplitChoice.TERMINAL).isEqualTo(new SplitChoice("Terminal", "split_right", "split_down", false));
+    }
+
+    /**
+     * Pane flexibility spec 3 and workspace plan 9a Rulings 1: an item whose actions ask something first says so, its
+     * copies keep it, and its entries end with an ellipsis; one that opens at once, the terminal's included, has none.
+     */
+    @Test void anAskingSplitItemsEntriesEndWithAnEllipsis() {
+        var openFile = SplitItemSpec.of("dev.jasper.editor.open-file", "Open File").asking();
+        assertThat(openFile.asks()).isTrue();
+        assertThat(openFile.withIcon("file").asks()).as("a copy with an icon keeps it").isTrue();
+        assertThat(openFile.withIcon("file").icon()).contains("file");
+        assertThat(SplitItemSpec.of("dev.jasper.editor.editor", "Editor").withIcon("file").asks()).as("an item that opens at once")
+            .isFalse();
+        assertThat(openFile.rightAction()).isEqualTo("dev.jasper.editor.split_right_open-file");
+        assertThat(ActionSpec.of(openFile.downAction(), "Split Down with Open File…").id()).as("an action id")
+            .isEqualTo("dev.jasper.editor.split_down_open-file");
+        var choice = new SplitChoice("Open File", openFile.rightAction(), openFile.downAction(), true);
+        assertThat(choice.rightLabel()).isEqualTo("Open File Right…");
+        assertThat(choice.downLabel()).isEqualTo("Open File Down…");
+        assertThat(SplitChoice.TERMINAL.rightLabel()).isEqualTo("Terminal Right");
+        assertThat(SplitChoice.TERMINAL.downLabel()).isEqualTo("Terminal Down");
+    }
+
+    /** Pane flexibility spec 4: a tab choice is numbered from 1 and worded "N title", or "Tab N" without a title. */
+    @Test void aTabChoiceIsNumberedFromOneAndWordedNumberThenTitle() {
+        assertThat(new TabChoice(3, "notes.txt").label()).isEqualTo("3 notes.txt");
+        assertThat(new TabChoice(2, "").label()).as("a title the plugin may not read").isEqualTo("Tab 2");
+        assertThatIllegalArgumentException().isThrownBy(() -> new TabChoice(0, "zsh"));
+        assertThatNullPointerException().isThrownBy(() -> new TabChoice(1, null));
+    }
+
     @Test void actionSpecValidatesAndCopies() {
         var keywords = new ArrayList<>(List.of("connect"));
         ActionSpec spec = ActionSpec.of("dev.x.tool.run", "Run Tool").withKeywords(keywords).withDefaultBinding("cmd+alt+j");

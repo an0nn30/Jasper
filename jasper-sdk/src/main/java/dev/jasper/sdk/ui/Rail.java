@@ -2,7 +2,7 @@ package dev.jasper.sdk.ui;
 
 import dev.jasper.sdk.Subscription;
 
-/** Plain action buttons on the left stripe, after the panel icons: for example a button that opens a plugin window. */
+/** Plain action buttons on the left stripe, after the panels' buttons: for example a button that opens a plugin's tab. */
 public interface Rail {
     /**
      * Adds a button for an action on the UI thread. The action should have an icon.

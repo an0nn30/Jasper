@@ -26,11 +26,12 @@ import dev.jasper.vault.store.KeychainStore;
 import dev.jasper.vault.store.VaultFile;
 import dev.jasper.vault.ui.CopyCards;
 import dev.jasper.vault.ui.GrantPanel;
+import dev.jasper.vault.ui.LockShortcut;
 import dev.jasper.vault.ui.PasswordPanel;
 import dev.jasper.vault.ui.PickerPanel;
 import dev.jasper.vault.ui.VaultScope;
 import dev.jasper.vault.ui.VaultManager;
-import dev.jasper.vault.ui.VaultManagerWindow;
+import dev.jasper.vault.ui.VaultManagerDialog;
 import dev.jasper.vault.ui.KeyGeneratorForm;
 import java.util.concurrent.CompletableFuture;
 import java.awt.AWTEvent;
@@ -48,7 +49,7 @@ import javax.swing.Timer;
 /**
  * Wires the vault to Jasper: the lock manager on the plugin's executors, the service published per
  * consumer, the Open and Lock actions, the lock-state topic, the settings file and the inactivity lock.
- * Owns the manager window, status item, rail action and palette scope.
+ * Owns the manager dialog, status item, rail action and palette scope.
  */
 public class VaultPlugin implements Plugin {
     public static final String OPEN = "dev.jasper.vault.open";
@@ -87,7 +88,7 @@ public class VaultPlugin implements Plugin {
     public static final String ADD_LOGIN = "dev.jasper.vault.add_login", ADD_KEY = "dev.jasper.vault.add_key",
         ADD_NOTE = "dev.jasper.vault.add_note";
     private VaultManager manager;
-    private VaultManagerWindow managerWindow;
+    private VaultManagerDialog managerDialog;
     private PluginDialog createDialog;
     private CompletableFuture<Boolean> creating;
     private final java.util.Set<CompletableFuture<Boolean>> createWaiters = new java.util.HashSet<>();
@@ -107,7 +108,7 @@ public class VaultPlugin implements Plugin {
 
     @Override public void start(PluginContext context) throws Exception {
         this.context = context;
-        layout = dev.jasper.vault.workstation.Layout.of(context.services());
+        layout = dev.jasper.vault.workstation.Layout.of(context.appearance().presentation());
         stopped = false;
         Files.createDirectories(context.dataDirectory());
         declared = new VaultSettings.Declared(context.settings());
@@ -132,31 +133,31 @@ public class VaultPlugin implements Plugin {
             .withDefaultBinding("cmd+\\"),
             invoked -> context.palette().open(invoked.window(), VaultScope.ID, Optional.empty(), Optional.empty()));
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock"))
-            .withDefaultBinding("cmd+shift+l"), invoked -> lock.lock());
+            .withDefaultBinding(LockShortcut.BINDING), invoked -> lock.lock());
         lockAction.setEnabled(false);
         scope = new VaultScope(lock, service, CopyCards.declare(context), this::open, this::unlockThenSearch);
         context.palette().register(scope);
         manager = new VaultManager(lock, context.background(), ui, this::vaultChanged);
-        managerWindow = new VaultManagerWindow(context, lock, manager, service, this::managerStatus, this::showGenerator);
+        managerDialog = new VaultManagerDialog(context, lock, manager, service, this::managerStatus, this::showGenerator, layout);
         context.actions().register(ActionSpec.of(GENERATE, "Generate SSH Key...")
             .withKeywords(List.of("vault", "ssh", "key", "generate")),
             invoked -> openThen(invoked.window(), Optional.empty(), this::showGenerator));
         // The manager's own surface stays as depicted (no extra rail menu); these reach its less frequent tasks.
         context.actions().register(ActionSpec.of(CHANGE_PASSWORD, "Change Vault Master Password...")
             .withKeywords(List.of("vault", "master", "password", "change")),
-            invoked -> openThen(invoked.window(), Optional.empty(), managerWindow::changePassword));
+            invoked -> openThen(invoked.window(), Optional.empty(), managerDialog::changePassword));
         context.actions().register(ActionSpec.of(GRANTS, "Vault Plugin Grants...")
             .withKeywords(List.of("vault", "grants", "plugins", "revoke", "permissions")),
-            invoked -> openThen(invoked.window(), Optional.empty(), managerWindow::showGrants));
+            invoked -> openThen(invoked.window(), Optional.empty(), managerDialog::showGrants));
         context.actions().register(ActionSpec.of(ADD_LOGIN, "Add Login...")
             .withKeywords(List.of("vault", "login", "password", "credential", "add", "new")),
-            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.LOGIN)));
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerDialog.add(VaultManager.Type.LOGIN)));
         context.actions().register(ActionSpec.of(ADD_KEY, "Add SSH Key...")
             .withKeywords(List.of("vault", "ssh", "key", "add", "new")),
-            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.SSH_KEY)));
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerDialog.add(VaultManager.Type.SSH_KEY)));
         context.actions().register(ActionSpec.of(ADD_NOTE, "Add Secure Note...")
             .withKeywords(List.of("vault", "secure", "note", "add", "new")),
-            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerWindow.add(VaultManager.Type.NOTE)));
+            invoked -> openThen(invoked.window(), Optional.empty(), () -> managerDialog.add(VaultManager.Type.NOTE)));
         var fileMenu = context.menus().standard(StandardMenu.FILE);
         fileMenu.add(OPEN);
         fileMenu.add(CHANGE_PASSWORD);
@@ -177,7 +178,7 @@ public class VaultPlugin implements Plugin {
         if (ticker != null) ticker.stop();
         if (activity != null) Toolkit.getDefaultToolkit().removeAWTEventListener(activity);
         try {
-            if (managerWindow != null) managerWindow.close();
+            if (managerDialog != null) managerDialog.close();
             if (createDialog != null) createDialog.close();
             if (currentUnlock != null) currentUnlock.cancel();
         } finally {
@@ -200,7 +201,7 @@ public class VaultPlugin implements Plugin {
         };
         ready.thenAccept(ok -> {
             if (!ok || stopped || lock.state() != LockState.UNLOCKED) return;
-            managerWindow.show(named, select);
+            managerDialog.show(named, select);
             after.run();
         }).exceptionally(failure -> {
             if (!stopped) context.notifications().group().error("Could not open Credential Vault", message(failure), failure);
@@ -287,11 +288,13 @@ public class VaultPlugin implements Plugin {
     private void showUnlock(UnlockPrompt prompt) {
         currentUnlock = prompt;
         prompt.onDismiss(() -> { if (currentUnlock == prompt) currentUnlock = null; });
-        if (!prompt.anchored() && managerWindow != null && managerWindow.showUnlock(prompt)) return;
+        if (!prompt.anchored() && managerDialog != null && managerDialog.showUnlock(prompt)) return;
         var presentation=prompt.presentationOwner();
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Unlock Vault", prompt.anchored()?presentation:owner(prompt.owner()), true,
             DialogSpec.Presentation.OVERLAY));
-        PasswordPanel panel = PasswordPanel.unlock(context.kit(), prompt);
+        // The footnote is the auto-lock (plan 10b Rulings 11); the rows layout ignores it.
+        PasswordPanel panel = PasswordPanel.unlock(context.kit(), prompt, layout,
+            settings.autoLock().isZero() ? "" : "Auto-locks after " + settings.autoLock().toMinutes() + " min idle");
         dialog.setContent(panel.view());
         boolean[] active={true};
         prompt.onPresentationRetired(()->{active[0]=false;panel.close();dialog.close();});
@@ -336,7 +339,7 @@ public class VaultPlugin implements Plugin {
         dialog.show();
     }
 
-    /** A dialog needs an owner; a prompt raised without one (a consumer with no window yet) uses any terminal window. */
+    /** A dialog needs an owner; a prompt raised without one (a consumer with no window yet) uses any Jasper window. */
     private WindowHandle owner(WindowHandle named) {
         if (named != null && named.isOpen()) return named;
         return context.terminals().activeWindow().or(() -> context.terminals().windows().stream().findFirst())
@@ -379,17 +382,17 @@ public class VaultPlugin implements Plugin {
 
     private void vaultChanged() {
         if (scope != null) scope.changed();
-        if (!stopped && managerWindow != null) managerWindow.changed();
+        if (!stopped && managerDialog != null) managerDialog.changed();
     }
 
-    private VaultManagerWindow.Status managerStatus() {
-        return new VaultManagerWindow.Status(lock.deviceSecretSource(),
+    private VaultManagerDialog.Status managerStatus() {
+        return new VaultManagerDialog.Status(lock.deviceSecretSource(),
             settings.autoLock().isZero() ? "off" : settings.autoLock().toMinutes() + " min",
             context.dataDirectory().resolve("vault.jv").toString());
     }
 
     private void showGenerator() {
-        managerWindow.dialog("Generate SSH Key", close -> new KeyGeneratorForm(context.kit(), request ->
+        managerDialog.dialog("Generate SSH Key", close -> new KeyGeneratorForm(context.kit(), request ->
             manager.generate(settings.keysDirectory(), request.algorithm(), request.name(), request.comment(), request.username(), request.passphrase()), close));
     }
 

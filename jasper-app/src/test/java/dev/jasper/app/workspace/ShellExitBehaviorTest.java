@@ -7,9 +7,8 @@ import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.application.ConfigurationTestSupport;
 import dev.jasper.app.launch.ShellLauncher;
-import dev.jasper.app.workspace.SplitTree;
 import dev.jasper.app.workspace.TerminalPane;
-import dev.jasper.app.workspace.TerminalTab;
+import dev.jasper.app.workspace.TerminalContent;
 import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.search.SearchQuery;
@@ -64,13 +63,13 @@ class ShellExitBehaviorTest {
         start(policy, false, false);
         deliver();
         TerminalPane pane = owner.currentPane();
-        TerminalTab tab = owner.currentTab();
+        TerminalContent tab = owner.currentTerminal();
         TerminalView view = pane.view();
         edt(() -> exit(pane, code));
         if (closes) until(() -> empty.get() == 1);
         edt(() -> {
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(closes ? 0 : 1);
-            assertThat(tab.panes()).hasSize(closes ? 0 : 1);
+            assertThat(owner.tabCount()).isEqualTo(closes ? 0 : 1);
+            assertThat(tab.closed()).isEqualTo(closes);
             assertThat(empty).hasValue(closes ? 1 : 0);
             if (!closes) {
                 assertThat(pane.running()).isFalse();
@@ -82,28 +81,27 @@ class ShellExitBehaviorTest {
         edt(() -> assertThat(empty).hasValue(1));
     }
 
-    @Test void hiddenZoomedAndInactiveExitsPreserveSiblingSessionsAndSelection() throws Exception {
+    @Test void hiddenMaximizedAndInactiveExitsPreserveOtherSessionsAndSelection() throws Exception {
         start("keep_open", false, false); deliver();
-        TerminalTab first = owner.currentTab(); TerminalPane hidden = owner.currentPane();
-        edt(() -> first.split(SplitTree.Axis.RIGHT)); deliver();
-        TerminalPane sibling = first.focusedPane();
-        edt(() -> { first.toggleZoom(); owner.newTab(directory); }); deliver();
-        TerminalTab selected = owner.currentTab(); TerminalPane selectedPane = owner.currentPane();
+        TerminalPane hidden = owner.currentPane();
+        edt(() -> owner.invoke(dev.jasper.app.commands.ActionId.SPLIT_RIGHT)); deliver();
+        TerminalPane sibling = owner.currentPane();
+        edt(() -> { owner.invoke(dev.jasper.app.commands.ActionId.MAXIMIZE_PANE); owner.newTab(directory); }); deliver();
+        TerminalContent selected = owner.currentTerminal(); TerminalPane selectedPane = owner.currentPane();
         reload("close");
         edt(() -> exit(hidden, 0));
-        until(() -> first.panes().size() == 1);
+        until(() -> owner.tabCount() == 2);
         edt(() -> {
-            assertThat(first.panes()).containsExactly(sibling);
+            assertThat(owner.terminalOf(hidden)).as("the hidden group's tab closed").isNull();
             assertThat(sibling.running()).isTrue();
             assertThat(selectedPane.running()).isTrue();
-            assertThat(owner.currentTab()).isSameAs(selected);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.currentTerminal()).isSameAs(selected);
             assertThat(empty).hasValue(0);
             exit(sibling, 7);
         });
-        until(() -> owner.tabStrip().getTabCount() == 1);
+        until(() -> owner.tabCount() == 1);
         edt(() -> {
-            assertThat(owner.currentTab()).isSameAs(selected);
+            assertThat(owner.currentTerminal()).isSameAs(selected);
             assertThat(selectedPane.running()).isTrue();
             assertThat(empty).hasValue(0);
             exit(selectedPane, 0);
@@ -120,7 +118,7 @@ class ShellExitBehaviorTest {
         var options = running.view().options(); var session = running.session();
         reload("close_on_success");
         edt(() -> {
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.tabCount()).isEqualTo(2);
             assertThat(retained.view()).isSameAs(retainedView);
             assertThat(running.view().options()).isSameAs(options);
             assertThat(running.session()).isSameAs(session);
@@ -128,7 +126,7 @@ class ShellExitBehaviorTest {
             assertThat(running.view().palette()).isEqualTo(ThemeTestSupport.terminal(false));
             exit(running, 0);
         });
-        until(() -> owner.tabStrip().getTabCount() == 1);
+        until(() -> owner.tabCount() == 1);
         edt(() -> {
             assertThat(owner.currentPane()).isSameAs(retained);
             assertThat(retainedView.find(new SearchQuery("[process exited with code 0]", false, true)).count()).isEqualTo(1);
@@ -146,7 +144,7 @@ class ShellExitBehaviorTest {
             TerminalPane pane = owner.currentPane();
             var configure = pane.onReady;
             pane.onReady = view -> {
-                assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+                assertThat(owner.tabCount()).isEqualTo(1);
                 assertThat(pane.view()).isSameAs(view);
                 assertThat(pane.findBar()).isNotNull();
                 configure.accept(view); ready.incrementAndGet();
@@ -156,7 +154,7 @@ class ShellExitBehaviorTest {
         edt(() -> {}); // The already-completed exit is queued after launch delivery.
         edt(() -> {
             assertThat(ready).hasValue(1);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(tabs);
+            assertThat(owner.tabCount()).isEqualTo(tabs);
             assertThat(empty).hasValue(tabs == 0 ? 1 : 0);
         });
     }
@@ -166,7 +164,7 @@ class ShellExitBehaviorTest {
         edt(() -> owner.newTab(directory));
         deliver(); deliver();
         until(() -> empty.get() == 1);
-        edt(() -> assertThat(owner.tabStrip().getTabCount()).isZero());
+        edt(() -> assertThat(owner.tabCount()).isZero());
     }
 
     @Test void exitDeliveryUsesPolicyReloadedWhileEdtWasHandlingExit() throws Exception {
@@ -216,8 +214,8 @@ class ShellExitBehaviorTest {
         edt(() -> {
             assertThat(failures).singleElement().asString().contains("controlled launch failure");
             assertThat(empty).hasValue(0);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
-            assertThat(owner.currentTab().panes()).hasSize(1);
+            assertThat(owner.tabCount()).isEqualTo(1);
+            assertThat(owner.currentTerminal().closed()).isFalse();
             var label = (JLabel) owner.currentPane().getComponent(0);
             assertThat(label.getText()).startsWith("Could not start terminal: ").contains("controlled launch failure");
         });
@@ -226,16 +224,16 @@ class ShellExitBehaviorTest {
     @Test void launchFailureInASecondTabReportsErrorAndClosesFailedPaneKeepingTheWindow() throws Exception {
         launchesBeforeFailure = 1;
         start("keep_open", false, true); deliver();
-        TerminalTab first = owner.currentTab();
+        TerminalContent first = owner.currentTerminal();
         edt(() -> owner.newTab(directory));
         deliver();
         edt(() -> {
             assertThat(failures).singleElement().asString().contains("controlled launch failure");
             assertThat(empty).hasValue(0);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
-            assertThat(owner.currentTab()).isSameAs(first);
-            assertThat(first.panes()).hasSize(1);
-            assertThat(first.focusedPane().running()).isTrue();
+            assertThat(owner.tabCount()).isEqualTo(1);
+            assertThat(owner.currentTerminal()).isSameAs(first);
+            assertThat(first.closed()).isFalse();
+            assertThat(first.pane().running()).isTrue();
         });
     }
 
@@ -320,14 +318,14 @@ class ShellExitBehaviorTest {
 
     @Test void aProgramTabClosesWhenItsProgramSucceedsWhateverOnExitSays() throws Exception {
         startWithSettings("keep_open"); deliver();
-        TerminalTab shellTab = owner.currentTab();
+        TerminalContent shellTab = owner.currentTerminal();
         edt(() -> owner.openTab(directory, null, Optional.empty(), Optional.of(PROGRAM))); deliver();
         TerminalPane program = owner.currentPane();
         assertThat(started.getLast().command()).isEqualTo(PROGRAM);
         edt(() -> exit(program, 0));
-        until(() -> owner.tabStrip().getTabCount() == 1);
+        until(() -> owner.tabCount() == 1);
         edt(() -> {
-            assertThat(owner.currentTab()).isSameAs(shellTab);
+            assertThat(owner.currentTerminal()).isSameAs(shellTab);
             assertThat(empty).hasValue(0);
         });
     }
@@ -341,12 +339,12 @@ class ShellExitBehaviorTest {
         edt(() -> exit(program, 1));
         edt(() -> { });
         edt(() -> {
-            assertThat(owner.tabStrip().getTabCount()).as("terminal.on_exit = close does not reach a program tab").isEqualTo(2);
+            assertThat(owner.tabCount()).as("terminal.on_exit = close does not reach a program tab").isEqualTo(2);
             assertThat(program.running()).isFalse();
             assertThat(program.view().find(new SearchQuery("[process exited with code 1]", false, true)).count()).isEqualTo(1);
         });
         edt(() -> exit(shell, 1));
-        until(() -> owner.tabStrip().getTabCount() == 1);
+        until(() -> owner.tabCount() == 1);
         edt(() -> assertThat(owner.currentPane()).as("the reload did reach the shell tab").isSameAs(program));
     }
 
@@ -360,8 +358,8 @@ class ShellExitBehaviorTest {
             .apply(new dev.jasper.app.terminals.OpenSpec.Local(Optional.of(directory), Optional.empty(), Optional.of(PROGRAM)))).isPresent());
         deliver();
         edt(() -> {
-            var pane = registry.get().window(owner.id()).orElseThrow().selectedTab().get().orElseThrow().focusedPane().get().orElseThrow();
-            assertThat(pane.split().apply(dev.jasper.app.terminals.SplitAxis.RIGHT,
+            var pane = registry.get().window(owner.id()).orElseThrow().selectedTab().get().orElseThrow().terminal().get().orElseThrow();
+            assertThat(pane.split().apply(dev.jasper.app.layout.Side.RIGHT,
                 new dev.jasper.app.terminals.OpenSpec.Local(Optional.empty(), Optional.empty(), Optional.of(split)))).isPresent();
         });
         deliver();

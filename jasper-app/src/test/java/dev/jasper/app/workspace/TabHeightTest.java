@@ -20,7 +20,7 @@ class TabHeightTest {
         edt(() -> owners[0] = content(launcher(pending)));
         pending.remove().run(); until(() -> owners[0].currentPane().view() != null);
         edt(() -> {
-            var owner = owners[0]; var pane = owner.currentPane(); var tab = owner.currentTab();
+            var owner = owners[0]; var pane = owner.currentPane(); var tab = owner.currentTerminal();
             var session = pane.session(); pane.view().setFontSize(19);
             owner.newTab(HOME); owner.selectTab(tab);
             var root = new JRootPane(); owner.installRootBindings(root);
@@ -39,7 +39,7 @@ class TabHeightTest {
                 owner.selectVariant(false); LayoutTestSupport.layoutTree(root);
                 assertThat(header.getHeight()).isEqualTo(30);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(44);
-                assertThat(owner.currentTab()).isSameAs(tab);
+                assertThat(owner.currentTerminal()).isSameAs(tab);
                 assertThat(owner.currentPane().session()).isSameAs(session);
                 assertThat(pane.view().fontSize()).isEqualTo(19);
                 assertThat(content(launcher(new ArrayDeque<>())).tabHeight()).isEqualTo(30);
@@ -51,7 +51,7 @@ class TabHeightTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>())); var root = new JRootPane();
             WindowContent.installTitleBar(root, owner, false, title -> {}); root.setSize(958, 958);
-            assertThat(owner.windowTabs().isVisible()).isFalse();
+            assertThat(owner.windowTabs().isVisible()).as("a window's only tab shows no strip").isFalse();
             owner.newTab(HOME);
             for (int height : new int[]{20, 72, 30}) {
                 owner.setTabHeight(height); LayoutTestSupport.layoutTree(root);

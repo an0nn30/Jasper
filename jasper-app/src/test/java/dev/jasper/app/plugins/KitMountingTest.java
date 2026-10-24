@@ -1,7 +1,6 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.sdk.ui.*;
-import java.awt.Dimension;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
 import org.junit.jupiter.api.Test;
@@ -16,22 +15,22 @@ class KitMountingTest {
             var containment=new Containment(() -> true);var model=new dev.jasper.app.contributions.Contributions();
             var fixture=new TerminalFixture();var main=fixture.addWindow();var separate=fixture.addWindow();
             var failMain=new java.util.concurrent.atomic.AtomicBoolean();var holder=new JPanel();
-            model.content().addHost(new dev.jasper.app.contributions.ContentHost(main,false,e -> {if(failMain.get())throw new IllegalStateException("recovery failed");holder.add(e.component());},e -> holder.remove(e.component()),e -> {},() -> {}));
-            model.content().addHost(new dev.jasper.app.contributions.ContentHost(separate,true,e -> {throw new IllegalStateException("destination failed");},e -> {},e -> {},() -> {}));
-            model.content().setFactory(detached -> detached?separate:main);
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, e -> {if(failMain.get())throw new IllegalStateException("recovery failed");holder.add(e.component());},e -> holder.remove(e.component()),e -> {},() -> {}));
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(separate, e -> {throw new IllegalStateException("destination failed");},e -> {},e -> {},() -> {}));
+            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> model.tabs().move(tab, separate)));
             var terminals=new HostedTerminals("test.kit",new CapabilityGate("test.kit",java.util.Set.of()),fixture.registry,Runnable::run,() -> true,() -> true,new HostedSessions("test.kit",containment,Runnable::run,id -> null, name -> new javax.swing.ImageIcon()));
             var ui=new HostedUi("test.kit",model,containment,Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},AppContractTest.headlessWindows(),terminals);
             var kit=new HostedKit("test.kit",() -> true,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
             var disposed=new AtomicInteger();var original=kit.create(HostedKitTest.custom(Nodes.CustomKind.EDITOR,"doc"),e -> {});
             var editor=new JTextArea("unsaved");var document=editor.getDocument();original.registerContent(new CustomContent("doc",Nodes.CustomKind.EDITOR,editor,disposed::incrementAndGet));
-            var spec=new ContentSpec("doc","Document");var tab=ui.windows().openTab(spec,null,original);var entry=model.content().entries().getFirst();
-            failMain.set(true);assertThatThrownBy(() -> tab.move(true)).isInstanceOf(IllegalStateException.class).hasMessage("destination failed");
+            var spec=new ContentSpec("doc","Document");var tab=ui.windows().openTab(spec,null,original);var entry=model.tabs().hosted().getFirst();
+            failMain.set(true);assertThatThrownBy(() -> tab.moveToNewWindow()).isInstanceOf(IllegalStateException.class).hasMessage("destination failed");
             assertThat(entry.window()).isNull();assertThat(entry.closed()).isFalse();failMain.set(false);
             var incoming=kit.create(new ViewSpec(new Nodes.Text("body",ControlState.READY,"Unused",Nodes.TextRole.BODY)),e -> {});
             assertThat(ui.windows().openTab(spec,null,incoming)).isSameAs(tab);
             assertThat(entry.window()).isEqualTo(main);assertThat(holder.getComponent(0)).isSameAs(original.component());
             assertThat(editor.getDocument()).isSameAs(document);assertThat(disposed.get()).isZero();
-            var window=ui.windows().create(new WindowSpec("test.kit.extra","Extra",new Dimension(400,300),false));window.setContent(incoming);
+            var window=ui.windows().dialog(new DialogSpec("Extra",tab,false));window.setContent(incoming);
             tab.close();assertThat(disposed.get()).isEqualTo(1);window.close();ui.closeAll();kit.close();
         });
     }
@@ -156,49 +155,20 @@ class KitMountingTest {
         });
     }
 
-    @Test void singletonReplacementRejectsForeignAndClosesOwnedContentExactlyOnce() throws Exception {
-        SwingUtilities.invokeAndWait(() -> {
-            var containment = new Containment(java.awt.EventQueue::isDispatchThread);
-            var windows = AppContractTest.headlessWindows();
-            var ui = new HostedUi("test.kit", new dev.jasper.app.contributions.Contributions(), containment,
-                Runnable::run, java.awt.EventQueue::isDispatchThread, () -> true, getClass().getClassLoader(),
-                () -> dev.jasper.sdk.Variant.DARK, h -> () -> {}, windows, null);
-            var kit = new HostedKit("test.kit", () -> true, ui::kitThemes, ui.appearance(), containment);
-            ui.kit(kit);
-            var foreign = new HostedKit("other.kit", () -> true, ui::kitThemes, null, containment);
-            var spec = new WindowSpec("test.kit.window", "Document", new Dimension(400, 300), true);
-            var window = ui.windows().create(spec);
-            var disposed = new AtomicInteger();
-            var first = kit.create(HostedKitTest.custom(Nodes.CustomKind.EDITOR, "document"), e -> {});
-            first.registerContent(new CustomContent("document", Nodes.CustomKind.EDITOR, new JTextArea("stable"), disposed::incrementAndGet));
-            window.setContent(first);
-            assertThat(ui.windows().create(spec)).isSameAs(window);
-            var alien = foreign.create(first.spec(), e -> {});
-            assertThatThrownBy(() -> window.setContent(alien)).isInstanceOf(IllegalArgumentException.class);
-            assertThat(disposed.get()).isZero();
-            window.setContent(first);
-            assertThat(disposed.get()).isZero();
-            var second = kit.create(new ViewSpec(new Nodes.Text("body", ControlState.READY, "Next", Nodes.TextRole.BODY)), e -> {});
-            window.setContent(second);
-            assertThat(disposed.get()).isEqualTo(1);
-            assertThatThrownBy(first::spec).isInstanceOf(IllegalStateException.class);
-            window.close(); window.close(); ui.closeAll(); kit.close(); foreign.close();
-            assertThat(disposed.get()).isEqualTo(1);
-            assertThat(kit.viewCount()).isZero();
-        });
-    }
     /** Plan 2 Task 7 host contract: closing a dialog that holds a Vault-style password prompt. */
     @Test void closingAVaultPromptDialogDisposesItsViewAndErasesTheTypedSecretBeforeOwnerCleanup() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var containment = new Containment(java.awt.EventQueue::isDispatchThread);
             var windows = AppContractTest.headlessWindows();
+            var fixture = new TerminalFixture();
+            var terminals = new HostedTerminals("test.kit", new CapabilityGate("test.kit", java.util.Set.of()), fixture.registry, Runnable::run, () -> true,
+                () -> true, new HostedSessions("test.kit", containment, Runnable::run, id -> null, name -> new javax.swing.ImageIcon()));
             var ui = new HostedUi("test.kit", new dev.jasper.app.contributions.Contributions(), containment,
                 Runnable::run, java.awt.EventQueue::isDispatchThread, () -> true, getClass().getClassLoader(),
-                () -> dev.jasper.sdk.Variant.DARK, h -> () -> {}, windows, null);
+                () -> dev.jasper.sdk.Variant.DARK, h -> () -> {}, windows, terminals);
             var kit = new HostedKit("test.kit", () -> true, ui::kitThemes, ui.appearance(), containment);
             ui.kit(kit);
-            var owner = ui.windows().create(new WindowSpec("test.kit.owner", "Owner", new Dimension(400, 300), true));
-            owner.show();
+            var owner = terminals.windowHandle(fixture.addWindow());
             var dialog = ui.windows().dialog(new DialogSpec("Unlock Vault", owner, true));
             var events = new java.util.ArrayList<UiEvent>();
             var prompt = new ViewSpec(new Nodes.Form("form", ControlState.READY, Nodes.FormKind.FULL, "Unlock", java.util.Optional.empty(),
@@ -230,7 +200,7 @@ class KitMountingTest {
             assertThat(field.getDocument().getLength()).isZero();
             assertThatThrownBy(() -> view.withSecret("password", chars -> {})).isInstanceOf(IllegalStateException.class);
             assertThat(kit.viewCount()).isZero();
-            owner.close(); ui.closeAll(); kit.close();
+            ui.closeAll(); kit.close();
         });
     }
     @Test void nativeAndHostedContextsUseLiveMotionPolicy() throws Exception {

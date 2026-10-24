@@ -31,22 +31,23 @@ final class WorkspaceConfiguration {
         boolean exitChanged = previous == null || previous.terminal().onExit() != next.terminal().onExit();
         configuredFontSize = next.fontSize();
         if (optionsChanged || dimChanged || exitChanged) {
-            for (TerminalTab tab : owner.terminalTabs()) {
-                for (TerminalPane pane : tab.panes()) {
-                    if (optionsChanged && pane.view() != null) {
-                        float size = sizeChanged ? next.fontSize() : pane.view().fontSize();
-                        pane.view().applyOptions(pane.view().options().toBuilder()
-                            .fontFamily(next.font().family()).fontSize(size).fallbackFonts(next.font().fallback())
-                            .ligatures(next.font().ligatures()).lineHeight(next.font().lineHeight())
-                            .cursorStyle(next.terminal().cursorShape()).cursorBlink(next.terminal().cursorBlink())
-                            .optionAsMeta(next.terminal().optionAsMeta()).scrollback(next.terminal().scrollback())
-                            .copyOnSelect(next.terminal().copyOnSelect()).bell(next.terminal().bell()).build());
-                    }
-                    if (dimChanged) pane.setConfiguredDim(next.terminal().dimInactivePanes());
-                    if (exitChanged) pane.setShellExitBehavior(next.terminal().onExit());
+            for (TerminalContent terminal : owner.terminalTabs()) {
+                TerminalPane pane = terminal.pane();
+                if (optionsChanged && pane.view() != null) {
+                    float size = sizeChanged ? next.fontSize() : pane.view().fontSize();
+                    pane.view().applyOptions(pane.view().options().toBuilder()
+                        .fontFamily(next.font().family()).fontSize(size).fallbackFonts(next.font().fallback())
+                        .ligatures(next.font().ligatures()).lineHeight(next.font().lineHeight())
+                        .cursorStyle(next.terminal().cursorShape()).cursorBlink(next.terminal().cursorBlink())
+                        .optionAsMeta(next.terminal().optionAsMeta()).scrollback(next.terminal().scrollback())
+                        .copyOnSelect(next.terminal().copyOnSelect()).bell(next.terminal().bell()).build());
                 }
+                if (dimChanged) pane.setConfiguredDim(next.terminal().dimInactivePanes());
+                if (exitChanged) pane.setShellExitBehavior(next.terminal().onExit());
             }
         }
+        // A plugin's view in a pane dims under an overlay of the configured amount too (workspace plan 8a Rulings 12).
+        if (dimChanged) owner.dimPanes();
         if (previous == null || !previous.keybindings().equals(next.keybindings())) owner.setBindings(next.bindings(macOs));
         if (previous == null || previous.visibleRows() != next.visibleRows()) owner.commandPalette().setVisibleRows(next.visibleRows());
         owner.requestGlass();

@@ -123,39 +123,29 @@ class WorkspaceGlassTest {
         });
     }
 
-    @Test void splitsKeepASolidDividerBetweenTranslucentPanes() throws Exception {
+    @Test void splitsKeepASolidDividerBetweenTranslucentTabs() throws Exception {
         var pending = new ArrayDeque<Runnable>();
-        TerminalTab[] created = new TerminalTab[1];
-        edt(() -> created[0] = new TerminalTab(DesktopTestSupport.HOME, DesktopTestSupport.idleLauncher(pending)));
-        TerminalTab tab = created[0];
-        edt(tab::start);
-        try {
-            pending.remove().run();
-            edt(() -> {
-                tab.setBackgroundOpacity(0.5f);
-                tab.split(SplitTree.Axis.RIGHT);
-            });
-            pending.remove().run();
-            edt(() -> {
-                assertThat(tab.isOpaque()).isFalse();
-                assertThat(tab.panes()).hasSize(2).allMatch(pane -> !pane.isOpaque());
-                var split = (TerminalTab.PaneSplit) tab.getComponent(0);
-                assertThat(split.isOpaque()).isFalse();
-                tab.setSize(600, 300);
-                LayoutTestSupport.layoutTree(tab);
-                LayoutTestSupport.layoutTree(tab);
-                var image = render(tab);
-                var divider = ((BasicSplitPaneUI) split.getUI()).getDivider();
-                assertThat(alpha(image, tab, divider, divider.getWidth() / 2, divider.getHeight() / 2)).as("divider").isEqualTo(255);
-                for (TerminalPane pane : tab.panes())
-                    assertThat(alpha(image, tab, pane, 2, 2)).as("pane padding").isEqualTo(128);
-
-                tab.setBackgroundOpacity(1f);
-                assertThat(tab.isOpaque()).isTrue();
-                assertThat(split.isOpaque()).isTrue();
-                assertThat(tab.panes()).allMatch(JComponent::isOpaque);
-            });
-        } finally { edt(tab::close); }
+        WindowContent[] owner = new WindowContent[1];
+        edt(() -> owner[0] = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(pending)));
+        pending.remove().run();
+        edt(() -> { owner[0].applyBackgroundOpacity(0.5); owner[0].invoke(dev.jasper.app.commands.ActionId.SPLIT_RIGHT); });
+        pending.remove().run();
+        edt(() -> {
+            var split = owner[0].workspace().split(java.util.List.of());
+            assertThat(split.isOpaque()).isFalse();
+            assertThat(owner[0].terminalTabs()).hasSize(2).allMatch(tab -> !tab.isOpaque() && !tab.pane().isOpaque());
+            owner[0].setSize(900, 500);
+            LayoutTestSupport.layoutTree(owner[0]);
+            LayoutTestSupport.layoutTree(owner[0]);
+            var image = render(owner[0]);
+            var divider = split.divider(0);
+            assertThat(alpha(image, owner[0], divider, divider.getWidth() / 2, divider.getHeight() / 2)).as("divider").isEqualTo(255);
+            for (TerminalContent tab : owner[0].terminalTabs())
+                assertThat(alpha(image, owner[0], tab.pane(), 2, 2)).as("pane padding").isEqualTo(128);
+            owner[0].applyBackgroundOpacity(1);
+            assertThat(split.isOpaque()).isTrue();
+            assertThat(owner[0].terminalTabs()).allMatch(tab -> tab.isOpaque() && tab.pane().isOpaque());
+        });
     }
 
     @Test void aTranslucentWindowLeavesItsChromeSolid() throws Exception {
@@ -196,7 +186,7 @@ class WorkspaceGlassTest {
             var strip = owner.windowTabs();
             assertThat(strip.getHeight()).as("the tab strip is laid out").isPositive();
 
-            var entry = WindowTabsTest.named(strip, "select:" + owner.currentTab().title()).getParent();
+            var entry = WindowTabsTest.named(strip, "select:" + owner.currentTerminal().title()).getParent();
             // Sample above text: the tab strip keeps the workspace glass alpha.
             int x = entry.getX() + entry.getWidth() / 2, y = 4;
             Point at = SwingUtilities.convertPoint(strip, x, y, owner);
@@ -219,7 +209,7 @@ class WorkspaceGlassTest {
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
             for (int i = 0; i < 8; i++) {
                 if (i > 0) owner.newTab(DesktopTestSupport.HOME);
-                owner.currentTab().rename("wide terminal tab " + i);
+                owner.currentTerminal().rename("wide terminal tab " + i);
             }
             owner.update(); owner.applyBackgroundOpacity(.5);
             var strip = owner.windowTabs(); WindowTabsTest.layout(strip, 400, 30);
@@ -247,9 +237,9 @@ class WorkspaceGlassTest {
         edt(() -> {
             WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
             owner.applyBackgroundOpacity(0.7);
-            TerminalTab tab = owner.openTab(DesktopTestSupport.HOME);
+            TerminalContent tab = owner.openTab(DesktopTestSupport.HOME);
             assertThat(tab.isOpaque()).isFalse();
-            assertThat(tab.panes()).allMatch(pane -> !pane.isOpaque());
+            assertThat(tab.pane().isOpaque()).isFalse();
         });
     }
 
@@ -273,11 +263,11 @@ class WorkspaceGlassTest {
             var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
             int[] runs = {0};
             owner.setGlassListener(() -> runs[0]++);
-            model.content().open("dev.editor", "opaque", "Opaque", owner.id(), new JPanel()).requestClose();
+            model.tabs().open("dev.editor", "opaque", "Opaque", owner.id(), new JPanel()).requestClose();
             assertThat(runs[0]).as("an opaque window has no glass to announce").isZero();
             owner.applyBackgroundOpacity(0.6);
             runs[0] = 0;
-            var entry = model.content().open("dev.editor", "glass", "Glass", owner.id(), new JPanel());
+            var entry = model.tabs().open("dev.editor", "glass", "Glass", owner.id(), new JPanel());
             assertThat(runs[0]).as("mounted").isEqualTo(1);
             entry.requestClose();
             assertThat(runs[0]).as("unmounted").isEqualTo(2);
@@ -291,13 +281,13 @@ class WorkspaceGlassTest {
             var hosted = new JPanel();
             var inside = new JPanel();
             hosted.add(inside);
-            model.content().open("dev.editor", "glass", "Glass", owner.id(), hosted);
+            model.tabs().open("dev.editor", "glass", "Glass", owner.id(), hosted);
             var side = new JPanel();
             var sideChild = new JPanel();
             side.add(sideChild);
             DockTestSupport.show(owner, Slot.LEFT_TOP, side, 200);
             assertThat(owner.workspaceOpacity(inside)).as("opaque window").isEqualTo(1.0);
-            var terminalTab = owner.tabStrip().getComponentAt(0);
+            var terminalTab = owner.tabs().get(0).component();
 
             owner.applyBackgroundOpacity(0.5);
             assertThat(owner.workspaceOpacity(hosted)).as("hosted centre content").isEqualTo(0.5);
@@ -317,7 +307,7 @@ class WorkspaceGlassTest {
             owner.applyBackgroundOpacity(0.8);
             assertThat(owner.backgroundOpacity()).isEqualTo(0.8);
             assertThat(owner.workspaceOpacity(owner.currentPane())).isEqualTo(0.8);
-            assertThat(owner.currentTab().isOpaque()).as("terminal tabs still follow").isFalse();
+            assertThat(owner.currentTerminal().isOpaque()).as("terminal tabs still follow").isFalse();
         });
     }
 
@@ -329,11 +319,11 @@ class WorkspaceGlassTest {
             owner.setGlassListener(() -> { throw new AssertionError("a plugin handler failed"); });
             var component = new JPanel();
             org.assertj.core.api.Assertions.assertThatThrownBy(
-                () -> model.content().open("dev.editor", "glass", "Glass", owner.id(), component))
+                () -> model.tabs().open("dev.editor", "glass", "Glass", owner.id(), component))
                 .as("errors other than contained ones propagate").isInstanceOf(AssertionError.class);
-            assertThat(owner.tabStrip().indexOfComponent(component)).as("the registry rolled the mount back").isEqualTo(-1);
+            assertThat(owner.tabs().stream().map(tab -> tab.component()).toList()).as("the registry rolled the mount back").doesNotContain(component);
             assertThat(owner.selectedContent()).isNull();
-            assertThat(model.content().entries()).isEmpty();
+            assertThat(model.tabs().hosted()).isEmpty();
         });
     }
 

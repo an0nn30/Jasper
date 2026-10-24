@@ -16,55 +16,39 @@ public final class KitFixtures {
 
     public static GeneratedTheme light() { return JasperTheme.bundled().generated(false); }
 
+    /** The shipped Enterprise theme's Light variant (the Enterprise plugin's {@code themes/enterprise.json}). */
+    public static GeneratedTheme enterpriseLight() { return enterpriseTheme().generated(false); }
+
+    /** The shipped Enterprise theme's Dark variant (the Enterprise plugin's {@code themes/enterprise.json}). */
+    public static GeneratedTheme enterpriseDark() { return enterpriseTheme().generated(true); }
+
     /**
-     * Spec 7.6's Enterprise Light as a fixture theme (plan 4c Rulings 20): Slate Cobalt Light with the table's named roles
-     * and its eight derived overrides; the ruled roles (focus, status, identity and the hue surfaces) follow the named
-     * roles as {@code JasperTheme} derives them, and any other role the table does not name keeps Slate Cobalt Light's
-     * value. The shipped theme, with its derived neutrals, is plan 5's.
+     * {@code key}'s colour on {@code theme}: a {@link SemanticColor} from its palette or a {@link DerivedColor} from its
+     * derived palette, each as the role holds it (an alpha-carrying role keeps its alpha).
+     *
+     * @throws IllegalArgumentException when {@code key} names no semantic or derived role
      */
-    public static GeneratedTheme enterpriseLight() {
-        var base = light();
-        var values = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
-        for (var role : SemanticColor.values()) values.put(role, base.semantic().color(role));
-        java.util.function.BiConsumer<Integer, SemanticColor[]> name = (rgb, roles) -> { for (var role : roles) values.put(role, new java.awt.Color(rgb)); };
-        name.accept(0xECEDEF, new SemanticColor[] {SemanticColor.SURFACE_APP, SemanticColor.SURFACE_DIALOG});
-        name.accept(0xE1E3E6, new SemanticColor[] {SemanticColor.SURFACE_TITLEBAR});
-        name.accept(0xF7F7F8, new SemanticColor[] {SemanticColor.SURFACE_PANEL, SemanticColor.SURFACE_SIDEBAR});
-        name.accept(0xFFFFFF, new SemanticColor[] {SemanticColor.SURFACE_CARD, SemanticColor.SURFACE_INPUT, SemanticColor.SURFACE_TERMINAL,
-            SemanticColor.TEXT_ONACCENT, SemanticColor.TEXT_ONSELECTION});
-        name.accept(0x2F65CA, new SemanticColor[] {SemanticColor.ACCENT, SemanticColor.SELECTION_BG, SemanticColor.HUE_BLUE});
-        name.accept(0xDCE5F7, new SemanticColor[] {SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.TEXT_ONSELECTION_SECONDARY});
-        name.accept(0x8A5A00, new SemanticColor[] {SemanticColor.STATUS_WARNING});
-        name.accept(0xB5651D, new SemanticColor[] {SemanticColor.HUE_AMBER});
-        name.accept(0xC4C7CC, new SemanticColor[] {SemanticColor.BORDER_WINDOW});
-        name.accept(0xB4B8BF, new SemanticColor[] {SemanticColor.BORDER_CONTROL, SemanticColor.BORDER_INPUT, SemanticColor.BUTTON_SECONDARY_BORDER});
-        name.accept(0x1E1F22, new SemanticColor[] {SemanticColor.TEXT_PRIMARY});
-        name.accept(0x3A3D42, new SemanticColor[] {SemanticColor.TEXT_STRONG_SECONDARY});
-        name.accept(0x5C6370, new SemanticColor[] {SemanticColor.TEXT_SECONDARY, SemanticColor.TEXT_TERTIARY});
-        name.accept(0x7A808A, new SemanticColor[] {SemanticColor.TEXT_PLACEHOLDER});
-        name.accept(0x2E9E4F, new SemanticColor[] {SemanticColor.STATUS_SUCCESS, SemanticColor.HUE_GREEN});
-        name.accept(0xD03A3A, new SemanticColor[] {SemanticColor.STATUS_DANGER});
-        name.accept(0x8A4FBF, new SemanticColor[] {SemanticColor.HUE_PURPLE});
-        // The roles a theme file never names follow their rules, as JasperTheme derives them when it loads the file.
-        values.put(SemanticColor.BORDER_FOCUS, values.get(SemanticColor.ACCENT));
-        values.put(SemanticColor.SURFACE_STATUS, values.get(SemanticColor.SURFACE_APP));
-        values.put(SemanticColor.BORDER_IDENTITY, values.get(SemanticColor.BORDER_CONTROL));
-        values.put(SemanticColor.HUE_BLUE_SURFACE, values.get(SemanticColor.HUE_BLUE));
-        values.put(SemanticColor.HUE_GREEN_SURFACE, values.get(SemanticColor.HUE_GREEN));
-        values.put(SemanticColor.HUE_AMBER_SURFACE, values.get(SemanticColor.HUE_AMBER));
-        values.put(SemanticColor.HUE_PURPLE_SURFACE, values.get(SemanticColor.HUE_PURPLE));
-        values.put(SemanticColor.HUE_NEUTRAL_SURFACE, values.get(SemanticColor.HUE_NEUTRAL));
-        var overrides = new java.util.EnumMap<DerivedColor, java.awt.Color>(DerivedColor.class);
-        overrides.put(DerivedColor.SURFACE_HEADER, new java.awt.Color(0xE1E3E6));
-        overrides.put(DerivedColor.SURFACE_HEADER_ACTIVE, new java.awt.Color(0xD9DFEA));
-        overrides.put(DerivedColor.SURFACE_STRIPE, new java.awt.Color(0xE4E6E9));
-        overrides.put(DerivedColor.SURFACE_TABLE_HEADER, new java.awt.Color(0xF0F1F3));
-        overrides.put(DerivedColor.SURFACE_ZEBRA, new java.awt.Color(0xF7F8FA));
-        overrides.put(DerivedColor.SURFACE_ROW_HOVER, new java.awt.Color(0xEEF2FA));
-        overrides.put(DerivedColor.WARNING_GROUND, new java.awt.Color(0xFBF1DA));
-        overrides.put(DerivedColor.WARNING_BORDER, new java.awt.Color(0xE6CF95));
-        return new GeneratedTheme("Enterprise", false, base.author(), new SemanticPalette(values), base.terminal(), base.editor(), base.syntax(),
-            base.glass(), overrides);
+    public static java.awt.Color colour(GeneratedTheme theme, String key) {
+        var semantic = SemanticColor.of(key);
+        if (semantic.isPresent()) return semantic.get().color(theme);
+        for (var role : DerivedColor.values()) if (role.key().equals(key)) return role.color(theme);
+        throw new IllegalArgumentException("No semantic or derived colour role " + key);
+    }
+
+    /** What a face paints for {@code pair} on {@code theme}: {@link SurfaceContrast#painted(GeneratedTheme, PaintPair)}. */
+    public static java.awt.Color painted(GeneratedTheme theme, PaintPair pair) { return SurfaceContrast.painted(theme, pair); }
+
+    /** The repository root, from {@code jasper.repoRoot}. */
+    private static java.nio.file.Path repoRoot() {
+        return java.nio.file.Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
+    }
+
+    /** The Enterprise plugin's theme file, parsed. */
+    private static JasperTheme enterpriseTheme() {
+        try {
+            return JasperTheme.parse(java.nio.file.Files.readString(repoRoot().resolve("plugins/enterprise/src/main/resources/themes/enterprise.json")),
+                "enterprise");
+        } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
     }
 
     /** The platform UI family the default kit draws in when the user names none (resolved once per process). */
@@ -136,19 +120,15 @@ public final class KitFixtures {
         var themes = new java.util.ArrayList<GeneratedTheme>();
         for (var theme : JasperTheme.builtIns())
             for (boolean dark : new boolean[] {true, false}) if (theme.has(dark)) themes.add(theme.generated(dark));
-        var expected = java.nio.file.Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize()
-            .resolve("tools/themes/testdata/expected");
+        var expected = repoRoot().resolve("tools/themes/testdata/expected");
         for (String id : java.util.List.of("ocean", "ocean-dawn", "stray")) {
             try {
                 var theme = JasperTheme.parse(java.nio.file.Files.readString(expected.resolve(id + ".json")), id);
                 for (boolean dark : new boolean[] {true, false}) if (theme.has(dark)) themes.add(theme.generated(dark));
             } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
         }
-        var enterprise = expected.getParent().getParent().getParent().getParent().resolve("plugins/enterprise/src/main/resources/themes/enterprise.json");
-        try {
-            var theme = JasperTheme.parse(java.nio.file.Files.readString(enterprise), "enterprise");
-            for (boolean dark : new boolean[] {true, false}) themes.add(theme.generated(dark));
-        } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        themes.add(enterpriseDark());
+        themes.add(enterpriseLight());
         return java.util.List.copyOf(themes);
     }
 

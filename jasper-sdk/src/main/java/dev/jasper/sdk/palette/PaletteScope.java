@@ -18,7 +18,9 @@ public interface PaletteScope {
     ScopeSpec spec();
 
     /**
-     * Answers a query. The empty query is the "recent" or "all" list and may carry a section label.
+     * Answers a query. An empty query asks for the rows to show before anything is typed: the scope's own list while it
+     * is chosen, which may carry a section label, and rows that top up the palette's suggestions when the scope is
+     * offered among recent items.
      *
      * @param query   the raw query text
      * @param context the window, origin pane and row budget
@@ -57,15 +59,17 @@ public interface PaletteScope {
     void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context);
 
     /**
-     * Called when the palette opens on this scope's own tab, and when it opens on All or switches to
-     * All while this scope takes part; a scope may ask its index for a background refresh.
+     * Called when the palette opens with this scope chosen or the user chooses it, and when the palette opens with no
+     * scope chosen or returns to that while this scope is in All; a scope may ask its index for a background refresh.
      *
      * @param context the query context
      */
     default void activated(PaletteQuery context) { }
 
     /**
-     * Tells the palette its results may have changed; an open query is re-run.
+     * Tells the palette its results may have changed; an open query is re-run. Each window's palette registers a
+     * listener when it starts showing this scope's rows and closes it when it stops, so several may be registered at
+     * once.
      *
      * @param listener called on the UI thread
      * @return the registration

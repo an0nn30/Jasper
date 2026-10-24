@@ -20,18 +20,42 @@ class VaultSheetRenderTest {
     static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
 
     @TempDir Path home;
-    @Test void mountedTitleMenuAndAttachedFormsRenderAcrossThemesFontsAndShortOwners() throws Exception {
+    @Test void mountedManagerMenuAndAttachedFormsRenderAcrossThemesFontsAndShortOwners() throws Exception {
         var controller = SurfaceFixtures.edt(() -> ThemeTestSupport.controller(true));
         try {
             for (String state : List.of("dark", "light", "enlarged", "short")) {
                 SurfaceFixtures.edt(() -> {controller.configure(!state.equals("light"), dev.jasper.app.config.TerminalSchemeChoice.MATCH, state.equals("enlarged") ? new UiFontConfig("system",20f) : UiFontConfig.defaults()); return null;});
                 for (String id : List.of("vault-manager", "vault-login", "vault-key")) {
                     try(var fixture = new KitViewTestAccess(home.resolve(state+"-"+id), id, SurfaceFixtures.edt(controller::current))) {
-                        SurfaceFixtures.edt(() -> {render(fixture.surface(),state,id);return null;});
+                        SurfaceFixtures.edt(() -> {if (id.equals("vault-manager")) manager(fixture.surface(),state,id); else sheet(fixture.surface(),state,id);return null;});
                     }
                 }
             }
         } finally { SurfaceFixtures.edt(() -> {controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());controller.close();return null;}); }
+    }
+    /**
+     * The staged Vault's manager is a window-sized dialog: resizable, remembered under the Vault's id and its title, never
+     * re-packed, and taller than its content asks: 555 under the default look, as wide as its content or 900.
+     */
+    @Test void theManagerOpensAsAResizableWindowSizedDialog() throws Exception {
+        var controller = SurfaceFixtures.edt(() -> ThemeTestSupport.controller(true));
+        try (var fixture = new KitViewTestAccess(home.resolve("window-sized"), "vault-manager", SurfaceFixtures.edt(controller::current))) {
+            SurfaceFixtures.edt(() -> {
+                var manager = fixture.surface();
+                assertThat(manager.kind()).isEqualTo(AuxiliarySurface.Kind.DIALOG);
+                assertThat(manager.modal()).isFalse();
+                assertThat(manager.windowSized()).isTrue();
+                assertThat(manager.id()).isEqualTo("dev.jasper.vault|Credential Vault");
+                assertThat(NativeShells.resizable(manager)).as("the user can resize it").isTrue();
+                assertThat(NativeShells.fitted(manager)).as("its content never re-packs it").isFalse();
+                var preferred = manager.holder().getPreferredSize();
+                assertThat(preferred.height).as("the manager's content asks for less than a window's height").isLessThan(555);
+                var chrome = new Dimension(0, 28);
+                assertThat(NativeShells.windowSize(manager, chrome, new Rectangle(0, 0, 4000, 3000)))
+                    .isEqualTo(new Dimension(Math.max(preferred.width, 900), 555 + 28));
+                return null;
+            });
+        } finally { SurfaceFixtures.edt(() -> { controller.close(); return null; }); }
     }
     /** Unlock and Create are modal overlays inside the asking window: centred over its dimmed content. */
     @Test void unlockAndCreateAreModalOverlaysCentredOverTheDimmedWindow() throws Exception {
@@ -47,7 +71,7 @@ class VaultSheetRenderTest {
                             var surface = fixture.surface();
                             assertThat(surface.kind()).as("%s is an overlay", id).isEqualTo(AuxiliarySurface.Kind.OVERLAY);
                             assertThat(surface.modal()).isTrue();
-                            // A stand-in terminal window: a title row and a body with some text.
+                            // A stand-in Jasper window: a title row and a body with some text.
                             var owner = new JRootPane(); var body = new JPanel(new BorderLayout());
                             var text = new JLabel("  dustin@mac ~ % ssh dustin@192.168.1.120"); text.setForeground(new Color(200, 200, 200));
                             text.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13)); text.setVerticalAlignment(SwingConstants.TOP);
@@ -134,55 +158,68 @@ class VaultSheetRenderTest {
             }
         }finally{SurfaceFixtures.edt(()->{controller.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());controller.close();return null;});}
     }
-    private static void render(AuxiliarySurface surface,String state,String id) {
-        boolean editor = surface.attachedSheet();var manager = editor ? surface.ownerSurface().orElseThrow() : surface;
-        var root = new JRootPane();var child = new JRootPane();
+    /** The manager's dialog under its chrome, its Add menu, and in the short state Done focused at the foot. */
+    private static void manager(AuxiliarySurface manager,String state,String id) {
+        var root = new JRootPane();
         try(var chrome=NativeShells.installChrome(root,manager,true)) {
             int width = state.equals("enlarged") ? 1350 : 900;
             int height = state.equals("short") ? 45 : state.equals("enlarged") ? 833 : 555;
             root.setSize(width,height+chrome.bar().getPreferredSize().height);layout(root);
             assertThat(chrome.body().boundsInRoot().orElseThrow().height).isEqualTo(height);
-            if (!editor) {
-                capture(state,id,root,null,null,"body="+chrome.body().boundsInRoot().orElseThrow());
-                var menu = find(manager.titleActions(),"add").getComponentPopupMenu();menu.setSize(menu.getPreferredSize());layout(menu);
-                capture(state,"vault-menu",menu,null,null,"actual title MenuButton descriptor; headless menu rendering");
-                if(state.equals("short")) {
-                    var done=(JButton)find(manager.holder(),"okay");
-                    for(var listener:done.getFocusListeners())listener.focusGained(new java.awt.event.FocusEvent(done,java.awt.event.FocusEvent.FOCUS_GAINED));
-                    layout(root);
-                    assertThat(done.getVisibleRect().height).isEqualTo(done.getHeight());
-                    capture(state,"vault-manager-footer-focused",root,null,null,"actual mounted WINDOW after footer focus listener; full action visible at45logical; below-action viewport remains explicitly constrained");
-                }
-                return;
+            capture(state,id,root,null,null,"body="+chrome.body().boundsInRoot().orElseThrow());
+            var menu = find(manager.holder(),"add").getComponentPopupMenu();menu.setSize(menu.getPreferredSize());layout(menu);
+            capture(state,"vault-menu",menu,null,null,"actual Add MenuButton descriptor; headless menu rendering");
+            if(state.equals("short")) {
+                var done=(JButton)find(manager.holder(),"okay");
+                for(var listener:done.getFocusListeners())listener.focusGained(new java.awt.event.FocusEvent(done,java.awt.event.FocusEvent.FOCUS_GAINED));
+                layout(root);
+                assertThat(done.getVisibleRect().height).isEqualTo(done.getHeight());
+                capture(state,"vault-manager-footer-focused",root,null,null,"actual mounted WINDOW after footer focus listener; full action visible at45logical; below-action viewport remains explicitly constrained");
             }
-            try(var sheetChrome=NativeShells.installChrome(child,surface,true)) {
-                var bounds = new java.util.concurrent.atomic.AtomicReference<Rectangle>();
-                try(var sheet=NativeShells.attachSheet(surface,chrome.body(),new AttachedSheet.Target(()->true,Point::new,
-                        ()->new Rectangle(0,0,width,Math.max(900,height+100)),value->{
-                            bounds.set(value);
-                            if (!child.getSize().equals(value.getSize())) { child.setSize(value.getSize()); layout(child); }
-                        }))) {
-                    sheet.fitNow(); sheet.fitNow();
-                    assertThat(surface.holder().getSize()).isEqualTo(child.getSize());
-                    for (String action : List.of("cancel", "save")) {
-                        var button = find(surface.holder(), action);
-                        assertThat(button).as("actual footer action %s", action).isNotNull();
-                        if (!state.equals("short"))
-                            assertThat(new Rectangle(child.getSize()).contains(SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), child)))
-                                .as("native final allocation contains %s", action).isTrue();
-                    }
-                    assertThat(sheet.fallback()).isEqualTo(state.equals("short"));
-                    if (id.equals("vault-login")) {
-                        // The form segment height inside the form track inset.
-                        int segmentHeight = com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_HEIGHT));
-                        assertThat(find(surface.holder(), "auth.option.password").getHeight())
-                            .as("actual Login segment preserves its nonheader height in %s", state).isEqualTo(segmentHeight);
-                        assertThat(find(surface.holder(), "auth.input").getHeight())
-                            .isEqualTo(segmentHeight + 2 * com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_PADDING)));
-                    }
-                    capture(state,id,root,child,bounds.get(),"body="+chrome.body().boundsInRoot().orElseThrow()+"\nsheet="+bounds.get()+"\nfallback="+sheet.fallback());
-                    capture(state,id+"-sheet",child,null,null,"same actual mounted attached sheet; no native shadow/peer");
+        }
+    }
+    /**
+     * The sheet over a stand-in for the manager's dialog: a 38-pixel title row over a body {@code width} by {@code height}
+     * logical pixels. The stand-in leaves the manager's own view where it is: moving it would retire the anchor on its Done
+     * button that owns the sheet, and with it the sheet.
+     */
+    private static void sheet(AuxiliarySurface surface,String state,String id) {
+        assertThat(surface.attachedSheet()).as("%s attaches as a sheet", id).isTrue();
+        int width = state.equals("enlarged") ? 1350 : 900;
+        int height = state.equals("short") ? 45 : state.equals("enlarged") ? 833 : 555;
+        var root = new JRootPane(); var content = new JPanel(new BorderLayout()); var title = new JPanel(); var window = new JPanel();
+        title.setPreferredSize(new Dimension(width, 38)); content.add(title, BorderLayout.NORTH); content.add(window, BorderLayout.CENTER);
+        root.setContentPane(content); root.setSize(width, height + 38); layout(root);
+        var child = new JRootPane();
+        try (var body = dev.jasper.app.platform.WindowBody.install(root, window, () -> new Rectangle(0, 0, window.getWidth(), window.getHeight()));
+             var sheetChrome = NativeShells.installChrome(child, surface, true)) {
+            assertThat(body.boundsInRoot().orElseThrow().height).isEqualTo(height);
+            var bounds = new java.util.concurrent.atomic.AtomicReference<Rectangle>();
+            try (var sheet = NativeShells.attachSheet(surface, body, new AttachedSheet.Target(() -> true, Point::new,
+                    () -> new Rectangle(0, 0, width, Math.max(900, height + 100)), value -> {
+                        bounds.set(value);
+                        if (!child.getSize().equals(value.getSize())) { child.setSize(value.getSize()); layout(child); }
+                    }))) {
+                sheet.fitNow(); sheet.fitNow();
+                assertThat(surface.holder().getSize()).isEqualTo(child.getSize());
+                for (String action : List.of("cancel", "save")) {
+                    var button = find(surface.holder(), action);
+                    assertThat(button).as("actual footer action %s", action).isNotNull();
+                    if (!state.equals("short"))
+                        assertThat(new Rectangle(child.getSize()).contains(SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), child)))
+                            .as("native final allocation contains %s", action).isTrue();
                 }
+                assertThat(sheet.fallback()).isEqualTo(state.equals("short"));
+                if (id.equals("vault-login")) {
+                    // The form segment height inside the form track inset.
+                    int segmentHeight = com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_HEIGHT));
+                    assertThat(find(surface.holder(), "auth.option.password").getHeight())
+                        .as("actual Login segment preserves its nonheader height in %s", state).isEqualTo(segmentHeight);
+                    assertThat(find(surface.holder(), "auth.input").getHeight())
+                        .isEqualTo(segmentHeight + 2 * com.formdev.flatlaf.util.UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SEGMENT_PADDING)));
+                }
+                capture(state,id,root,child,bounds.get(),"body="+body.boundsInRoot().orElseThrow()+"\nsheet="+bounds.get()+"\nfallback="+sheet.fallback());
+                capture(state,id+"-sheet",child,null,null,"same actual mounted attached sheet; no native shadow/peer");
             }
         }
     }

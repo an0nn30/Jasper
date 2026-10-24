@@ -1,7 +1,6 @@
 package dev.jasper.app.application;
 
 import dev.jasper.app.launch.ShellLauncher;
-import dev.jasper.app.workspace.WindowCallbacks;
 import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.session.AttachedConnection;
@@ -42,10 +41,6 @@ final class Rehearsal {
         + "\033[1;32mjasper\033[0m \033[34m~\033[0m % ";
     /** How long the rehearsal waits for the canned output to reach the screen before it paints anyway. */
     static final Duration FALLBACK = Duration.ofSeconds(2);
-    /** A rehearsal window asks nothing of the application. */
-    static final WindowCallbacks CALLBACKS = new WindowCallbacks(directory -> { }, () -> { }, window -> { }, window -> { },
-        state -> { });
-
     private Rehearsal() { }
 
     /** A canned session, and what lets its output play. */

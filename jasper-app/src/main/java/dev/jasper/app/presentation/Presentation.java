@@ -4,7 +4,6 @@ import dev.jasper.app.config.DefaultSource;
 import dev.jasper.ui.kit.Kit;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * The one presentation a process runs with (spec 3.2 and 4.9), chosen on the bootstrap thread and replaced at most once,
@@ -35,16 +34,6 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
         public Provider { Objects.requireNonNull(id); Objects.requireNonNull(name); Objects.requireNonNull(version); Objects.requireNonNull(digest); }
     }
 
-    /**
-     * The groups of projections whose plans consume them (spec 19.1 rows 6 to 9): the window shell (desktop flags,
-     * menus, shell, motion, title), the window content (header, tabs, status, run item, dialogs), the dock, the Run window
-     * and Settings.
-     */
-    public enum Landed { WINDOW_CHROME, WINDOW_CONTENT, DOCK_CHROME, RUN_WINDOW, SETTINGS }
-
-    /** The groups that have landed; every other group's values map to the default projection. */
-    public static final Set<Landed> LANDED = Set.of(Landed.WINDOW_CHROME, Landed.WINDOW_CONTENT, Landed.SETTINGS, Landed.DOCK_CHROME, Landed.RUN_WINDOW);
-
     /** Every part is required. */
     public Presentation {
         Objects.requireNonNull(branding, "branding");
@@ -61,7 +50,7 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
      */
     public static Presentation standard(Projections.Host host) {
         return new Presentation(Optional.empty(), Kit.DEFAULT, ChromeSpec.DEFAULT, false, KitParser.Faces.NONE, DefaultSource.CORE,
-            Projections.of(ChromeSpec.DEFAULT, false, false, "", host, LANDED), java.util.List.of(), Branding.NONE);
+            Projections.of(ChromeSpec.DEFAULT, false, false, "", host), java.util.List.of(), Branding.NONE);
     }
 
     /**
@@ -74,7 +63,7 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
      */
     public static Presentation of(Provider provider, KitParser.Parsed parsed, Projections.Host host) {
         return new Presentation(Optional.of(provider), parsed.kit(), parsed.chrome(), parsed.classicBase(), parsed.faces(), parsed.defaults(),
-            Projections.of(parsed.chrome(), parsed.classicBase(), parsed.faces().ui().isPresent(), provider.id(), host, LANDED), parsed.dropped(), parsed.branding());
+            Projections.of(parsed.chrome(), parsed.classicBase(), parsed.faces().ui().isPresent(), provider.id(), host), parsed.dropped(), parsed.branding());
     }
 
     /**
@@ -89,13 +78,11 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
     }
 
     /**
-     * The desktop flags the bootstrap applied: the look's once window chrome has landed, else the default look's.
+     * The desktop flags the bootstrap applied.
      *
      * @return the committed flags
      */
-    public DesktopFlags committedDesktop() {
-        return LANDED.contains(Landed.WINDOW_CHROME) ? projections.desktop() : DesktopFlags.STANDARD;
-    }
+    public DesktopFlags committedDesktop() { return projections.desktop(); }
 
     /**
      * The provider's id, or {@code default}: how the start-up trace names the look.

@@ -5,16 +5,28 @@ import dev.jasper.app.presentation.Projections;
 import java.util.Objects;
 
 /**
- * What a terminal window is made of under the look (Enterprise presentation spec 9.1): the workspace's chrome and the
+ * What a Jasper window is made of under the look (Enterprise presentation spec 9.1): the workspace's chrome and the
  * shell's title facts.
  *
  * @param chrome the workspace strategies
  * @param unifiedTitle whether the frame draws the unified macOS title bar
  * @param followThemeAppearance whether a frame with the system's title bar keeps its macOS appearance in step with the theme
+ * @param classicTitle whether the frame draws IntelliJ Classic's title: the band on macOS, the custom title bar on Windows
  */
-public record WindowLook(WorkspaceChrome chrome, boolean unifiedTitle, boolean followThemeAppearance) {
+public record WindowLook(WorkspaceChrome chrome, boolean unifiedTitle, boolean followThemeAppearance, boolean classicTitle) {
     /** The chrome is required. */
     public WindowLook { Objects.requireNonNull(chrome, "chrome"); }
+
+    /**
+     * A look without the classic title.
+     *
+     * @param chrome the workspace strategies
+     * @param unifiedTitle whether the frame draws the unified macOS title bar
+     * @param followThemeAppearance whether a frame with the system's title bar keeps its macOS appearance in step with the theme
+     */
+    public WindowLook(WorkspaceChrome chrome, boolean unifiedTitle, boolean followThemeAppearance) {
+        this(chrome, unifiedTitle, followThemeAppearance, false);
+    }
 
     /**
      * The look of {@code projections}.
@@ -24,7 +36,7 @@ public record WindowLook(WorkspaceChrome chrome, boolean unifiedTitle, boolean f
      */
     public static WindowLook of(Projections projections) {
         return new WindowLook(WorkspaceChrome.of(projections.workspace(), projections.title(), projections.palette()), projections.shell().unifiedTitle(),
-            projections.shell().followThemeAppearance());
+            projections.shell().followThemeAppearance(), projections.shell().classicTitle());
     }
 
     /**

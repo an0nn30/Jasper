@@ -54,6 +54,8 @@ public final class VimEditor {
     private final Highlights highlights;
     private final View view = new View(this);
     private final ViewportSync viewport;
+    /** A split view's start while its viewport has no size yet: the source's cursor offset and first line; or null. */
+    private int[] start;
     private final Folds folds;
     private final LineNumbers lineNumbers;
     /** The text area's word-wrapping, put back when Vim turns off (Vim wraps at any character). */
@@ -109,8 +111,11 @@ public final class VimEditor {
         this.vim = vim;
         this.area = area;
         this.buffer = new Buffer(area.getDocument());
-        this.marks = new Marks(area.getDocument());
-        this.options = vim.options().local();
+        this.marks = new Marks(this, area);
+        // Another view's editor of the document joins its Vim buffer (pane flexibility spec 6): its buffer-local options
+        // are the buffer's, and its window-local ones start as that editor's window's.
+        VimEditor sibling = marks.sibling();
+        this.options = sibling == null ? vim.options().local() : sibling.options.window();
         this.machine = new Machine(this);
         this.insert = new InsertMode(this);
         this.highlights = new Highlights(area);
@@ -124,8 +129,13 @@ public final class VimEditor {
         area.getDocument().addDocumentListener(highlightListener);
         area.addFocusListener(leaveListener);
         originalCaret = area.getCaret() instanceof ConfigurableCaret caret ? caret.getStyle() : CaretStyle.VERTICAL_LINE_STYLE;
+        if (sibling != null) {
+            // The buffer has its options already, which the Editor's defaults and the language set when it opened.
+            this.defaults = sibling.defaults;
+            languagePairs = sibling.languagePairs;
+        }
         editorDefaults(defaults);
-        languageChanged();
+        if (sibling == null) languageChanged();
         area.addPropertyChangeListener(org.fife.ui.rsyntaxtextarea.RSyntaxTextArea.SYNTAX_STYLE_PROPERTY, languageListener);
         options.onChanged(this::syncArea);
         syncArea();
@@ -161,8 +171,30 @@ public final class VimEditor {
         viewport.close();
         lineNumbers.close();
         highlights.clear();
+        options.close();
         vim.forget(this);
         buffer.close();
+    }
+
+    /**
+     * This editor's view closes while {@code heir}'s shows the same file: its uppercase marks become {@code heir}'s, as
+     * Vim's file marks are the file's (pane flexibility spec 6). Without it, {@link #close} gives them to another editor
+     * of the file.
+     *
+     * @param heir the editor of another view of the same file
+     */
+    public void leaveMarksTo(VimEditor heir) { vim.moveGlobalMarks(this, heir); }
+
+    /**
+     * This editor's view was split from {@code source}'s (Vim's win_init): it starts with its jumplist, its {@code ''}
+     * mark, its place in the change list and its window-local options.
+     *
+     * @param source the editor of the view of the same file this one was split from
+     */
+    public void splitFrom(VimEditor source) {
+        if (!marks.sameBuffer(source.marks)) return;
+        marks.splitFrom(source.marks);
+        options.windowFrom(source.options);
     }
 
     /**
@@ -300,6 +332,77 @@ public final class VimEditor {
             finally { busy = was; }
         }
         if (!was) fire();
+    }
+
+    /**
+     * Another view of the document edited it, and the viewport goes back to {@code position}, which shows the line this
+     * view showed first (pane flexibility spec 6). The cursor, which moved with its text as Vim's mark_adjust moves
+     * another window's w_cursor, stays on it: when that leaves it outside the window, the window scrolls as
+     * update_topline scrolls it into sight, with 'scrolloff'.
+     *
+     * @param position the viewport position that shows the view's first line where it was shown
+     */
+    void keepPlace(java.awt.Point position) {
+        int top = viewport.keep(position);
+        if (top < 0) return;
+        view.topline(top);
+        view.compBotline();
+        int lnum = cursor().line + 1;
+        boolean outside = lnum < view.topline || lnum >= view.botline && view.botline <= buffer.count();
+        if (outside && !commandLine.active()) {
+            view.updateTopline();
+            view.cursColumns();
+            viewport.show();
+        }
+        if (!busy) fire();
+    }
+
+    /**
+     * This editor's view opens beside another view of its file and starts where that view is (Rulings 19), as Vim's
+     * {@code :split} starts a window on its source window's cursor: once the viewport has its size, the cursor goes to
+     * {@code offset}, the window shows {@code line} first, and update_topline then brings the cursor into sight, with
+     * 'scrolloff'. Until then the viewport's own moves leave the cursor where it is.
+     *
+     * @param offset the source view's cursor
+     * @param line the first line the source view shows, 0-based
+     */
+    public void startAt(int offset, int line) {
+        start = new int[] { offset, line };
+        viewport.resize();
+    }
+
+    /** The viewport has its size: a split view's start ({@link #startAt}) goes in now. */
+    void sized() {
+        if (start == null) return;
+        int offset = start[0], line = start[1];
+        start = null;
+        boolean was = busy;
+        busy = true;
+        try {
+            setCursor(buffer.pos(Math.min(offset, buffer.length())));
+            view.topline(line + 1);
+            view.updateTopline();
+            view.cursColumns();
+            viewport.show();
+        } finally { busy = was; }
+        if (!was) fire();
+    }
+
+    /** @return whether a split view's start or another view's edit waits to place this view's window */
+    boolean placePending() { return start != null || area.placeHeld(); }
+
+    /**
+     * Another view replaced the whole text, and Swing's caret went past what it put in: the cursor goes back to the start
+     * of {@code line}, or of the last line when the text is shorter, as a reload puts it back on its line.
+     *
+     * @param line the cursor's line before the replace, 0-based
+     */
+    void cursorToLine(int line) {
+        boolean was = busy;
+        busy = true;
+        try { setCursor(new Pos(Math.min(line, buffer.count() - 1), 0)); }
+        finally { busy = was; }
+        curswant = -1;
     }
 
     /** The viewport's size changed the view's: outside a command, the view scrolls to keep the cursor shown. */

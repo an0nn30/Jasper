@@ -20,7 +20,8 @@ public final class MockComparison {
         return Math.sqrt(Math.pow(p[0] - q[0], 2) + Math.pow(p[1] - q[1], 2) + Math.pow(p[2] - q[2], 2));
     }
 
-    private static double[] lab(Color color) {
+    /** CIE L*a*b* of an sRGB colour under D65; alpha is ignored. */
+    public static double[] lab(Color color) {
         double r = linear(color.getRed()), g = linear(color.getGreen()), b = linear(color.getBlue());
         double x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047, y = 0.2126 * r + 0.7152 * g + 0.0722 * b, z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
         double fx = f(x), fy = f(y), fz = f(z);

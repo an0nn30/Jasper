@@ -39,7 +39,7 @@ class RemoteEditingTest {
     final ExecutorService background = Executors.newCachedThreadPool();
     final List<Optional<WindowHandle>> owners = new CopyOnWriteArrayList<>();
     volatile boolean connected = true;
-    final EditChannels channels = new EditChannels((identity, owner) -> {
+    final EditChannels channels = EditChannelsTest.channels((identity, owner) -> {
         owners.add(owner);
         return CompletableFuture.completedFuture(new LocalEndpoint());
     }, identity -> connected, background, ui);
@@ -59,8 +59,11 @@ class RemoteEditingTest {
         }
     };
     volatile Optional<WindowHandle> active = Optional.empty();
-    final RemoteEditing editing = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"));
-    final RemoteEditing reopening = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"), id -> Optional.ofNullable(saved.get(id)));
+    // As Remote makes it once its saved hosts have loaded, where signing in to a route may ask.
+    final RemoteEditing editing = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+        id -> Optional.empty(), () -> CompletableFuture.completedFuture(null), ui, route -> false);
+    final RemoteEditing reopening = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+        id -> Optional.ofNullable(saved.get(id)), () -> CompletableFuture.completedFuture(null), ui, route -> false);
     final ConnectionIdentity prod = EditChannelsTest.identity("prod");
     final TestWindow origin = new TestWindow(UUID.randomUUID(), new AtomicBoolean(true));
 
@@ -106,6 +109,74 @@ class RemoteEditingTest {
         assertThat(reopening.reopen(RemoteDocument.key(routed, "/etc/hosts"))).isPresent();
     }
 
+    /**
+     * Workspace tabs spec 13: Jasper restores its windows before Remote has read its saved hosts; a recorded key still
+     * reopens, and the document finds its hosts when it is first read. A host gone once they are read fails that read.
+     */
+    @Test void aKeyReopensBeforeTheSavedHostsHaveLoadedAndFindsThemWhenRead() throws Exception {
+        var loaded = new CompletableFuture<Void>();
+        var early = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+            id -> Optional.ofNullable(saved.get(id)), () -> loaded, ui, route -> true);
+        String key = RemoteDocument.key(prod, "/etc/hosts");
+        EditorDocument document = early.reopen(key).orElseThrow().apply(origin);
+        assertThat(document.key()).isEqualTo(key);
+        assertThat(document.name()).isEqualTo("hosts");
+        var read = onUi(() -> document.read(1 << 20));
+        assertThat(read).as("waits for the saved hosts").isNotDone();
+        var target = prod.hops().getFirst().host();
+        saved.put(target.id(), target);
+        loaded.complete(null);
+        assertThat(read.get(10, TimeUnit.SECONDS).bytes()).isEqualTo(Files.readAllBytes(Path.of("/etc/hosts")));
+        assertThat(onUi(document::host)).contains("prod");
+        var gone = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+            id -> Optional.empty(), () -> CompletableFuture.completedFuture(null), ui, route -> true);
+        assertThat(gone.reopen(key)).as("the saved hosts are read: a host that is gone cannot reopen").isEmpty();
+        var pending = new CompletableFuture<Void>();
+        var later = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+            id -> Optional.empty(), () -> pending, ui, route -> true);
+        EditorDocument orphan = later.reopen(key).orElseThrow().apply(origin);
+        var failed = onUi(() -> orphan.read(1 << 20));
+        pending.complete(null);
+        assertThatThrownBy(() -> failed.get(10, TimeUnit.SECONDS)).hasRootCauseMessage("Its host is no longer saved in Remote");
+    }
+
+    /**
+     * Workspace plan 6b's review: a recorded key whose saved hosts could not be read says so when it is read, before and
+     * after that read failed, rather than that its host is no longer saved.
+     */
+    @Test void aKeyWhoseSavedHostsCouldNotBeReadSaysSo() throws Exception {
+        String key = RemoteDocument.key(prod, "/etc/hosts");
+        var pending = new CompletableFuture<Void>();
+        var early = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+            id -> Optional.empty(), () -> pending, ui, route -> true);
+        EditorDocument document = early.reopen(key).orElseThrow().apply(origin);
+        var read = onUi(() -> document.read(1 << 20));
+        pending.completeExceptionally(new java.io.IOException("Invalid TOML at line 2\n  name =\n         ^"));
+        assertThatThrownBy(() -> read.get(10, TimeUnit.SECONDS)).hasRootCauseMessage("Remote's hosts.toml could not be read: Invalid TOML at line 2");
+        var later = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+            id -> Optional.empty(), () -> pending, ui, route -> true);
+        EditorDocument reopened = later.reopen(key).orElseThrow(() -> new AssertionError("a key reopens while its hosts cannot be read")).apply(origin);
+        var again = onUi(() -> reopened.read(1 << 20));
+        assertThatThrownBy(() -> again.get(10, TimeUnit.SECONDS)).hasRootCauseMessage("Remote's hosts.toml could not be read: Invalid TOML at line 2");
+    }
+
+    /** Workspace tabs spec 13: a quiet read asks nothing: it reads when signing in would not, and otherwise fails saying so. */
+    @Test void aQuietReadSignsInOnlyWhenNothingWouldBeAsked() throws Exception {
+        var target = prod.hops().getFirst().host();
+        saved.put(target.id(), target);
+        connected = false;
+        var asking = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+            id -> Optional.ofNullable(saved.get(id)), () -> CompletableFuture.completedFuture(null), ui, route -> false);
+        EditorDocument document = asking.reopen(RemoteDocument.key(prod, "/etc/hosts")).orElseThrow().apply(origin);
+        var quiet = onUi(() -> document.readQuietly(1 << 20));
+        assertThatThrownBy(() -> quiet.get(10, TimeUnit.SECONDS)).hasRootCauseMessage("Not signed in to prod; Retry signs in");
+        assertThat(owners).as("no channel opened, nothing asked").isEmpty();
+        var silent = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"),
+            id -> Optional.ofNullable(saved.get(id)), () -> CompletableFuture.completedFuture(null), ui, route -> true);
+        EditorDocument signsIn = silent.reopen(RemoteDocument.key(prod, "/etc/hosts")).orElseThrow().apply(origin);
+        assertThat(onUi(() -> signsIn.readQuietly(1 << 20)).get(10, TimeUnit.SECONDS).bytes()).isNotEmpty();
+    }
+
     @Test void registeringHandsTheEditorTheRemotePrefixUntilClosed() {
         var target = prod.hops().getFirst().host();
         saved.put(target.id(), target);
@@ -137,7 +208,7 @@ class RemoteEditingTest {
         assertThat(owners).containsExactly(Optional.of(origin), Optional.of(other));
         active = Optional.empty();
         assertThatThrownBy(() -> onUi(document::revision).get(10, TimeUnit.SECONDS))
-            .hasRootCauseMessage("Reconnecting to prod needs an open terminal window for the sign-in prompt.");
+            .hasRootCauseMessage("Reconnecting to prod needs an open Jasper window for the sign-in prompt.");
     }
 
     @Test void kindsFollowLinksInOrder() throws Exception {

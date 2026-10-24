@@ -55,7 +55,8 @@ class PanelContributionsTest {
         assertThat(toggle.title()).isEqualTo("Toggle Hosts");
         UUID window = UUID.randomUUID();
         toggle.invoke(new Contributions.Invocation(window, Optional.empty()));
-        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, "dev.x.hosts", Contributions.PanelRequest.Op.TOGGLE));
+        // Plan 12 Rulings 18: the View toggle action is a user gesture.
+        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
         assertThat(model.menus()).singleElement().satisfies(section -> {
             assertThat(section.target()).isEqualTo(MenuTarget.standard(MenuTarget.Slot.VIEW));
             assertThat(section.entries()).containsExactly(new MenuEntry.Submenu("Tool Windows", List.of(new MenuEntry.Item("dev.x.hosts.toggle"))));

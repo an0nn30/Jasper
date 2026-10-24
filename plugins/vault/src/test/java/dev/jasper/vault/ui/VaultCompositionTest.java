@@ -30,7 +30,7 @@ class VaultCompositionTest {
             var panel=new ManagerPanel(new FakeKit("dev.jasper.vault"),id->Optional.ofNullable(values.get(id)),t->{},id->{},id->{},id->{},g->{},()->{},()->{},()->{},()->{});
             panel.copies(CopyCards.declare(context));
             var rows=List.of(new VaultManager.Row(login.id(),login.name(),login.username(),VaultManager.Type.LOGIN),new VaultManager.Row(note.id(),note.name(),"",VaultManager.Type.NOTE));
-            var status=new VaultManagerWindow.Status("test","5 min","/synthetic/vault.jv");panel.refresh(rows,List.of(),status,true);panel.select(login.id());
+            var status=new VaultManagerDialog.Status("test","5 min","/synthetic/vault.jv");panel.refresh(rows,List.of(),status,true);panel.select(login.id());
             var view=panel.view();String password="detail.secret."+login.id(),text="detail.secret."+note.id();
             assertThat(secret(view,password)).isEqualTo("password-draft");press(view,"detail.username.copy");press(view,"detail.password.copy");
             panel.select(note.id());assertThatThrownBy(()->view.withSecret(password,c->{})).isInstanceOf(IllegalArgumentException.class);
@@ -56,7 +56,7 @@ class VaultCompositionTest {
             Map<UUID,Object> values = Map.of(login.id(), login, key.id(), key, note.id(), note);
             var panel = new ManagerPanel(new FakeKit("dev.jasper.vault"), id -> Optional.ofNullable(values.get(id)), t -> {}, id -> {}, id -> {}, id -> {}, grant -> {}, () -> {}, () -> {}, () -> {}, () -> {});
             var rows = List.of(new VaultManager.Row(login.id(),login.name(),login.username(),VaultManager.Type.LOGIN), new VaultManager.Row(key.id(),key.name(),key.fingerprint(),VaultManager.Type.SSH_KEY), new VaultManager.Row(note.id(),note.name(),"",VaultManager.Type.NOTE));
-            panel.refresh(rows,List.of(),new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"),true);
+            panel.refresh(rows,List.of(),new VaultManagerDialog.Status("test", "5 min", "/synthetic/vault.jv"),true);
             var view = panel.view();
             assertThat(node(view,ManagerPanel.ROOT,Nodes.Form.class).kind().name()).isEqualTo("WINDOW");
             assertThat(node(view,"columns",Nodes.Split.class).kind()).isEqualTo(Nodes.SplitKind.THREE_COLUMN);
@@ -76,7 +76,7 @@ class VaultCompositionTest {
             panel.select(key.id());
             assertThat(node(view,"detail.created",Nodes.Text.class).text()).contains(java.time.format.DateTimeFormatter.ofPattern("MMM d, uuuu",java.util.Locale.ENGLISH).withZone(java.time.ZoneId.systemDefault()).format(Instant.EPOCH));
             assertThat(all(view)).noneMatch(n -> n instanceof Nodes.Secret);
-            var menu = node(panel.titleActions(),ManagerPanel.ADD,Nodes.MenuButton.class);
+            var menu = node(panel.view(),ManagerPanel.ADD,Nodes.MenuButton.class);
             assertThat(menu.items().getFirst().icon()).isEqualTo("user");
             assertThat(menu.items().getLast().icon()).isEqualTo("sparkle");
             assertThat(menu.items()).filteredOn(i -> !i.separator()).allSatisfy(i -> assertThat(i.icon()).isNotBlank());

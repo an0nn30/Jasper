@@ -52,7 +52,8 @@ class NotificationsFeatureTest {
         contributions.onPanelRequest(requests::add);
         UUID window = UUID.randomUUID();
         contributions.action(NotificationsFeature.SHOW_HISTORY).orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
-        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, NotificationsFeature.PANEL_ID, Contributions.PanelRequest.Op.TOGGLE));
+        // Plan 12 Rulings 18: the View toggle action is a user gesture.
+        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, NotificationsFeature.PANEL_ID, Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
     }
 
     @Test void theBadgeCountsUnreadAndTurnsRedForErrors() {
@@ -180,6 +181,18 @@ class NotificationsFeatureTest {
         contributions.action(NotificationsFeature.DISMISS_CARDS).orElseThrow()
             .invoke(new Contributions.Invocation(window.id(), Optional.empty()));
         assertThat(feature.layer(window.id()).showing()).isEmpty();
+        assertThat(center.unread()).isZero();
+    }
+
+    @Test void dismissCardsFromAWindowWithoutCardsClosesTheMainWindowsCards() {
+        // Cards show in the main window only; Dismiss Cards run from a child window (whose palette lists it) closes them.
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
+        var main = window();
+        feature.attach(main);
+        feature.info("One", "");
+        contributions.action(NotificationsFeature.DISMISS_CARDS).orElseThrow()
+            .invoke(new Contributions.Invocation(UUID.randomUUID(), Optional.empty()));
+        assertThat(feature.layer(main.id()).showing()).isEmpty();
         assertThat(center.unread()).isZero();
     }
 

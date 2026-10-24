@@ -63,7 +63,8 @@ class ShortcutEditorIntegrationTest {
                     PaletteTestSupport.executeSelected(palette.component());
                     assertThat(palette.isOpen()).isFalse();
                     assertThat(opened[0]).isEqualTo(1);
-                    ShortcutTestSupport.set(page[0], "New tab", KeyStroke.getKeyStroke("ctrl alt N"));
+                    // The id and its group: a search for the title or the id alone also finds Move Pane to New Tab.
+                    ShortcutTestSupport.set(page[0], "new_tab tabs", KeyStroke.getKeyStroke("ctrl alt N"));
                 });
                 assertThat(Files.exists(file) ? Files.readString(file) : "").as("Set writes nothing").doesNotContain("ctrl+alt+n");
                 edt(() -> {

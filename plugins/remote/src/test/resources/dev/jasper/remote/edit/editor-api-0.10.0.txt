@@ -1,0 +1,19 @@
+Original Editor 0.10.0 exported API fixture
+
+Source: Jasper commit 0a7caf6e7d8966d7c1f1efb55637638a15491815, plugins/editor/src/main/java/dev/jasper/editor/api/ (all eight Java sources, unchanged).
+The source commit's plugin.toml declares Editor 0.10.0. This fixture contains
+only its exported API and manifest; no implementation or third-party classes.
+Compiled offline with JetBrains javac 25.0.4.1, -g:none, against jasper-sdk classes.
+ZIP entries sorted, DEFLATED, fixed 1980 timestamps. No new API is synthesized.
+
+JAR SHA-256: 0223cf33e2e1b1f0424281938bd87532472645285cbd62ec43c661585b1e83b5
+
+Original source SHA-256:
+b54b76ece2f70e99debd4abe53862d53aef44c4cd076b66f8d8bab8440dc046b  Content.java
+573a5a787273572f8ef3dd180e6b3c4e446bef1eca08754267e07f7bd82e3b39  Editor.java
+b0a4d60606df5248d1db6cd9cfdebcffa802a0c7715fdd15957f75689d93a50d  EditorDocument.java
+e52eef5891d2552c074fa2a81284cf5879ff9447abbe2d07b5a73f54518dc174  LocationResolver.java
+d6b30c221a2006286f59bb46eb3043e00e193c2e58d62bd68b8bdedcb5619b5a  OpenRequest.java
+e0e3018f87b19f8cf36bd9d90a00e84a151ff47bbcb87765b9e4767bc17fd735  Revision.java
+1ec33f7555293fefedb4cc1331c9f45322fc99f6786f5d8608a50d6a35b2a35b  TooLargeException.java
+bac0ea0483008c05a7cda12bc46cb3fee310e5d6dba517f2873f6a9bad6479a7  package-info.java

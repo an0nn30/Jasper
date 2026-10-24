@@ -7,14 +7,12 @@ import static org.assertj.core.api.Assertions.within;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuEntry;
 import dev.jasper.app.contributions.MenuTarget;
-import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.presentation.Projections;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockProfile;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import javax.swing.JRootPane;
@@ -58,9 +56,12 @@ class EnterpriseMenuRowMockTest {
      * @param owner the window's content, for the geometry of its parts
      * @param root the root pane it is mounted in
      * @param field the search field's bounds in the root, read before the window closed
+     * @param search the Search Everywhere button's bounds in the root (empty under the field), read before the window closed
+     * @param settings the "Settings…" button's bounds in the root, read before the window closed
      * @param firstTab the first classic tab's bounds in the root (empty under equal tabs), read before the window closed
      */
-    record Mounted(BufferedImage image, WindowContent owner, JRootPane root, Rectangle field, Rectangle firstTab) { }
+    record Mounted(BufferedImage image, WindowContent owner, JRootPane root, Rectangle field, Rectangle search, Rectangle settings,
+                   Rectangle firstTab) { }
 
     /** The Enterprise window as the mocks show its content, printed at 2× and written for inspection. EDT. */
     static BufferedImage render(boolean dark, java.util.function.Consumer<WindowContent> fixture) {
@@ -71,8 +72,8 @@ class EnterpriseMenuRowMockTest {
     static Mounted mounted(boolean dark, String name, java.util.function.Consumer<WindowContent> fixture) {
         var themes = EnterpriseLook.controller(dark);
         try {
-            var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, false),
-                EnumSet.allOf(Presentation.Landed.class));
+            // The mocks' host: the system title bar and the in-window menu row (plan 14).
+            var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", ChromeRenderTest.LINUX);
             var look = WindowLook.of(projections);
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look.chrome());
             owner.connectContributions(workstation());
@@ -84,9 +85,14 @@ class EnterpriseMenuRowMockTest {
             // Closing the window clears its tab strip: the parts' geometry is read now (Execution notes R35).
             var field = owner.chrome().header().field();
             var fieldAt = javax.swing.SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), root);
+            var classic = (ClassicHeader) owner.chrome().composition();
+            var search = classic.searchButton();
+            var searchAt = search == null ? new Rectangle() : javax.swing.SwingUtilities.convertRectangle(search.getParent(), search.getBounds(), root);
+            var settings = ClassicHeaderTest.labelled(classic.trailing(), "Settings…");
+            var settingsAt = javax.swing.SwingUtilities.convertRectangle(settings.getParent(), settings.getBounds(), root);
             var firstTab = owner.tabBar() instanceof ClassicTabs tabs && !tabs.entries().isEmpty()
                 ? javax.swing.SwingUtilities.convertRectangle(tabs, tabs.entries().getFirst().getBounds(), root) : new Rectangle();
-            return new Mounted(image, owner, root, fieldAt, firstTab);
+            return new Mounted(image, owner, root, fieldAt, searchAt, settingsAt, firstTab);
         } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
     }
 
@@ -103,10 +109,9 @@ class EnterpriseMenuRowMockTest {
         assertThat(renderRuns).as(what + " row and rule runs").hasSizeGreaterThanOrEqualTo(2);
         // The 24 px row (48 at 2x) on surface.app, then its 1 px rule.
         assertThat(renderRuns.get(0).length()).as(what + " row").isCloseTo(mockRuns.get(0).length(), within(2));
-        assertThat(MockProfile.deltaE(renderRuns.get(0).color(), mockRuns.get(0).color())).as(what + " row colour").isLessThanOrEqualTo(2.5);
+        assertThat(MockProfile.deltaE(renderRuns.get(0).color(), MockProfile.role(dark, "surface.app"))).as(what + " row colour").isLessThanOrEqualTo(2.5);
         assertThat(renderRuns.get(1).length()).as(what + " rule").isCloseTo(mockRuns.get(1).length(), within(1));
-        // Plan 6b Task 1 overrides Enterprise Dark's border.divider with the mock's rule (#4A4D53).
-        assertThat(MockProfile.deltaE(renderRuns.get(1).color(), mockRuns.get(1).color())).as(what + " rule colour").isLessThanOrEqualTo(2.5);
+        assertThat(MockProfile.deltaE(renderRuns.get(1).color(), MockProfile.role(dark, "border.divider"))).as(what + " rule colour").isLessThanOrEqualTo(2.5);
         var mockInks = MockProfile.inks(mock, new Rectangle(X + 2, Y + 2, 900, 44), 12, 25);
         var renderInks = MockProfile.inks(render[0], new Rectangle(2, 2, 900, 44), 12, 25);
         assertThat(mockInks).as("the mock's eight menu titles").hasSize(8);

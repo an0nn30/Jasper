@@ -13,6 +13,7 @@ import org.junit.jupiter.api.condition.OS;
 
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -152,52 +153,123 @@ class JasperApplicationResidencyTest {
         }
     }
 
-    @Test void openOrRaiseDoesNotThrowOnceTheApplicationHasQuit() throws Exception {
+    @Test void aQuittingApplicationTakesNoMoreRequests() throws Exception {
+        JasperApplication application = application(() -> { });
+        edt(() -> assertThat(application.acceptsRequests()).isTrue());
+        edt(application::quit);
+        edt(() -> assertThat(application.acceptsRequests()).as("plan Ruling 23").isFalse());
+    }
+
+    @Test void anOpenDoesNotThrowOnceTheApplicationHasQuit() throws Exception {
         JasperApplication application = application(() -> { });
         edt(() -> application.residency(true));
         edt(application::quit);
-        // Only that a late request is harmless: with no windows open this reaches openWindow, which
-        // has its own quitting guard. The branch that openOrRaise's own guard protects -- raising an
-        // existing window during shutdown -- needs a live window and cannot be covered headlessly.
-        // It is on the manual checklist instead.
-        edt(() -> application.openOrRaise(DesktopTestSupport.HOME, "handoff"));
+        // Only that a late request is harmless. The branch open's own guard protects -- raising an existing window
+        // during shutdown -- needs a live window and cannot be covered headlessly; it is on the manual checklist.
+        edt(() -> application.open(List.of(DesktopTestSupport.HOME), "handoff"));
         edt(() -> { });
     }
 
-    @Test void aStaleRequestEndsResidencyAndShutsDownWhenNoWindowsRemain() throws Exception {
-        java.util.concurrent.atomic.AtomicInteger terminations = new java.util.concurrent.atomic.AtomicInteger();
-        JasperApplication application = application(terminations::incrementAndGet);
-        edt(() -> application.residency(true));
+    @Test void theOpenFileEventOpensItsFilesAsAnyOpenDoes(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+        Path notes = java.nio.file.Files.writeString(dir.resolve("notes.txt"), "");
+        JasperApplication application = application(() -> { });
+        try {
+            // What the handler runs on the EDT (an OpenFilesEvent cannot be built headlessly).
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.filesOpened(List.of(notes.toFile()))))
+                .as("no window is open, so one opens first").hasRootCauseInstanceOf(java.awt.HeadlessException.class);
+        } finally {
+            edt(application::quitNow);
+        }
+        edt(() -> application.filesOpened(List.of(notes.toFile())));   // once quitting: nothing, and no failure
+    }
+
+    @Test void anOpenWithNoWindowGoesForOne() throws Exception {
+        JasperApplication application = application(() -> { });
+        try {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.open(List.of(DesktopTestSupport.HOME), "handoff")))
+                .as("composing the window is where a headless JVM fails").hasRootCauseInstanceOf(java.awt.HeadlessException.class);
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void aLaunchsFirstWindowWithPathsIsStillAColdStart() throws Exception {
+        var trace = StartupTrace.detached();
+        JasperApplication application = application(() -> { });
+        try {
+            edt(() -> application.trace(trace));
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of(DesktopTestSupport.HOME))))
+                .hasRootCauseInstanceOf(java.awt.HeadlessException.class);
+            assertThat(trace.windows()).as("timed as the cold start it is (plan Ruling 13)")
+                .extracting(dev.jasper.app.startup.WindowTrace::trigger).containsExactly("cold");
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void anUpdatedLaunchWithNoWindowRestartsIntoTheNewBuildWithItsPaths(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+        var terminated = new CountDownLatch(1);
+        var spawned = new java.util.concurrent.ConcurrentLinkedQueue<List<String>>();
+        JasperApplication application = application(terminated::countDown);
+        edt(() -> {
+            application.residency(true);
+            application.restartPlanner = mode -> java.util.Optional.of(List.of("/opt/jasper/bin/Jasper"));
+            application.spawner = spawned::add;
+            application.staleBuild(() -> true);
+        });
+        Path notes = dir.resolve("notes.txt");
         var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/old.jar"), 1L);
-        assertThat(handler.apply(new LaunchRequest("t", Path.of("/new.jar"), 2L)))
-            .isEqualTo(LaunchRequest.Response.STALE);
-        edt(() -> { });
-        assertThat(application.resident()).isFalse();
-        // With no windows left there is nothing to wait for. Previously this process exited only
-        // when the JVM starved after the accept thread ended, skipping every close.
-        DesktopTestSupport.until(() -> terminations.get() == 1);
+        assertThat(handler.apply(LaunchRequest.of(Path.of("/new.jar"), 2L, dir, List.of(notes), List.of())))
+            .isEqualTo(LaunchRequest.Response.UPDATED);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).as("the old build exits").isTrue();
+        assertThat(spawned).as("its replacement waits for it, then opens the launch's paths").containsExactly(
+            List.of("/opt/jasper/bin/Jasper", "--replacing", Long.toString(ProcessHandle.current().pid()), notes.toString()));
+    }
+
+    @Test void anUpdatedLaunchFromAnotherInstallOpensAsAnOrdinaryOne() throws Exception {
+        var spawned = new java.util.concurrent.ConcurrentLinkedQueue<List<String>>();
+        JasperApplication application = application(() -> { });
+        try {
+            edt(() -> {
+                application.residency(true);
+                application.restartPlanner = mode -> java.util.Optional.of(List.of("/opt/jasper/bin/Jasper"));
+                application.spawner = spawned::add;
+                application.staleBuild(() -> false);
+            });
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.handedOff(List.of(), List.of(), true)))
+                .as("this build's own jar is unchanged: the request opens a window here")
+                .hasRootCauseInstanceOf(java.awt.HeadlessException.class);
+            assertThat(spawned).isEmpty();
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void theStartUpFlagsALaunchCouldNotApplyAreNamed() throws Exception {
+        JasperApplication application = application(() -> { });
+        try {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() ->
+                    application.handedOff(List.of(), List.of("--safe-mode", "--config"), false)))
+                .hasRootCauseInstanceOf(java.awt.HeadlessException.class);
+            edt(() -> assertThat(application.notificationCenter().history()).extracting(entry -> entry.request().title())
+                .contains("Jasper is already running: quit it first to start with --safe-mode and --config"));
+        } finally {
+            edt(application::quitNow);
+        }
+        assertThat(JasperApplication.ignoredFlagsTitle(List.of("--plugin-dir")))
+            .isEqualTo("Jasper is already running: quit it first to start with --plugin-dir");
+        assertThat(JasperApplication.ignoredFlagsTitle(List.of("--safe-mode", "--config", "--plugin-dir")))
+            .isEqualTo("Jasper is already running: quit it first to start with --safe-mode, --config and --plugin-dir");
     }
 
     @Test void aMatchingRequestIsAcceptedAndLeavesResidencyAlone() throws Exception {
         JasperApplication application = application(() -> { });
         edt(() -> application.residency(true));
-        edt(application::quit);   // So the queued openOrRaise is inert and no window is created.
+        edt(application::quit);   // So the queued open is inert and no window is created.
         var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/same.jar"), 7L);
-        assertThat(handler.apply(new LaunchRequest("t", Path.of("/same.jar"), 7L)))
+        assertThat(handler.apply(LaunchRequest.of(Path.of("/same.jar"), 7L, DesktopTestSupport.HOME, List.of(), List.of())))
             .isEqualTo(LaunchRequest.Response.OK);
         edt(() -> { });
-        // Unlike a stale request, a matching one never touches residency -- this is the assertion
-        // the test's name actually promises.
         assertThat(application.resident()).as("a matching request does not touch residency").isTrue();
-    }
-
-    @Test void aRetireRequestRunsTheNormalQuitPathEvenFromAnotherBuild() throws Exception {
-        var terminated = new CountDownLatch(1);
-        JasperApplication application = application(terminated::countDown);
-        edt(() -> application.residency(true));
-        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/resident.jar"), 1L);
-        var retire = new LaunchRequest("token", Path.of("/another-build.jar"), 2L, LaunchRequest.Kind.RETIRE);
-        assertThat(handler.apply(retire)).isEqualTo(LaunchRequest.Response.OK);
-        assertThat(terminated.await(5, TimeUnit.SECONDS)).as("a resident process with no windows quits").isTrue();
     }
 }

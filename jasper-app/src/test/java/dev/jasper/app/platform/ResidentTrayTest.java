@@ -67,19 +67,19 @@ class ResidentTrayTest {
         assertThat(ResidentTray.applies(null, false)).isFalse();
     }
 
-    @Test void theMenuBarItemOffersANewWindowSettingsAndTheRealQuit() {
+    @Test void theMenuBarItemOffersANewTerminalWindowSettingsAndTheRealQuit() {
         assertThat(ResidentTray.entries(true)).extracting(entry -> entry.label)
-            .containsExactly("New Window", "Settings…", null, "Quit Jasper Completely");
+            .containsExactly("New Terminal Window", "Settings…", null, "Quit Jasper Completely");
         assertThat(ResidentTray.entries(false)).extracting(entry -> entry.label)
             .as("the Windows tray menu is unchanged").containsExactly("Open Jasper", null, "Quit Jasper");
     }
 
     @Test void eachEntryRunsItsAction() {
         List<String> ran = new ArrayList<>();
-        var actions = new ResidentTray.Actions(() -> ran.add("open"), () -> ran.add("new window"),
+        var actions = new ResidentTray.Actions(() -> ran.add("open"), () -> ran.add("new terminal window"),
             () -> ran.add("settings"), () -> ran.add("quit"));
         for (ResidentTray.Entry entry : ResidentTray.Entry.values()) entry.action(actions).run();
-        assertThat(ran).containsExactly("open", "new window", "settings", "quit", "quit");
+        assertThat(ran).containsExactly("open", "new terminal window", "settings", "quit", "quit");
     }
 
     @Test void theMenuBarGlyphIsAShapeAtOneAndTwoTimesScale() {

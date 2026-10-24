@@ -64,6 +64,8 @@ final class WindowContributions implements AutoCloseable {
     /** In Zen, the panels that showed before it, which show again when it ends and stay saved as showing; else null. */
     private Set<String> beforeZen;
     private Subscription panelRequests;
+    /** Whether this window docks panels and shows status entries: the main window does, a child window does not. */
+    private final boolean docks;
 
     WindowContributions(WindowContent owner, Contributions model, UiState state) {
         this.owner = owner;
@@ -72,26 +74,33 @@ final class WindowContributions implements AutoCloseable {
         this.dock = owner.dock();
         // A window restored in Zen remembers its saved panels for leaving it instead of showing them.
         if (owner.zenMode()) beforeZen = new LinkedHashSet<>();
+        // A child window takes the actions, the menus and the palette scopes; panels and status entries are the main
+        // window's (workspace tabs spec 6.3).
+        docks = owner.isMain();
         syncActions();
         owner.chrome().connect(this);
-        renderStatus();
-        restoreSizes();
-        for (DockStripe stripe : owner.stripes().all()) {
-            stripe.onToggle = this::togglePanel;
-            stripe.onMove = this::movePanel;
-            stripe.onHide = this::hidePanel;
+        if (docks) {
+            renderStatus();
+            restoreSizes();
+            for (DockStripe stripe : owner.stripes().all()) {
+                stripe.onToggle = this::toggleAndActivate;
+                stripe.onMove = this::movePanel;
+                stripe.onHide = this::hidePanel;
+            }
+            owner.area().onMove = this::movePanel;
+            owner.area().onHide = this::hidePanel;
+            owner.dockDrag().onDrop = this::dropped;
+            owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
+            owner.dockDrag().labels = this::stripeLabel;
+            dock.addListener(docked);
+            panelRequests = model.onPanelRequest(this::requested);
         }
-        owner.area().onMove = this::movePanel;
-        owner.area().onHide = this::hidePanel;
-        owner.dockDrag().onDrop = this::dropped;
-        owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
-        owner.dockDrag().labels = this::stripeLabel;
-        dock.addListener(docked);
-        panelRequests = model.onPanelRequest(this::requested);
         paletteRequests = model.onPaletteRequest(this::requestedPalette);
         syncScopes();
-        syncPanels();
-        renderStripes();
+        if (docks) {
+            syncPanels();
+            renderStripes();
+        }
         listening = model.onChanged(this::changed);
     }
 
@@ -186,10 +195,47 @@ final class WindowContributions implements AutoCloseable {
             case SHOW -> showPanel(request.panelId());
             case HIDE -> hidePanel(request.panelId());
             case TOGGLE -> togglePanel(request.panelId());
+            case ACTIVATING_TOGGLE -> activatingToggle(request.panelId());
+            case ACTIVATING_SHOW -> showAndActivate(request.panelId());
         }
     }
 
     private void togglePanel(String id) { if (panels.containsKey(id)) dock.toggle(id); }
+
+    /** A toggle by a user gesture: a panel it shows becomes the active tool window under flush frames (plan 12 Rulings 18). */
+    private void toggleAndActivate(String id) { changeAndActivate(id, () -> dock.toggle(id)); }
+
+    /**
+     * A show by the panel's own toggle action (plan 15b Rulings 1), or for a user gesture in another window, a child
+     * window's View toggle: the panel becomes the active tool window under flush frames.
+     */
+    private void showAndActivate(String id) { changeAndActivate(id, () -> dock.show(id)); }
+
+    private void changeAndActivate(String id, Runnable change) {
+        if (!panels.containsKey(id)) return;
+        // Standard frames activate nothing, so a window replaced there still hands focus back to the terminal.
+        activating = owner.area().flush() ? id : null;
+        try { change.run(); } finally { activating = null; }
+        if (dock.visible(id)) owner.area().activate(id);
+    }
+
+    /**
+     * A toggle by the user's View action or the panel's own toggle action, as IntelliJ's ActivateToolWindowAction: under
+     * flush frames a visible tool window that is not the active one is activated, and only the active one hides; else a
+     * toggle that activates what it shows. A stripe click stays {@link #toggleAndActivate}.
+     */
+    private void activatingToggle(String id) {
+        if (!panels.containsKey(id)) return;
+        var area = owner.area();
+        if (area.flush() && dock.visible(id) && !area.focusedSlot().equals(dock.slot(id))) { area.activate(id); return; }
+        toggleAndActivate(id);
+    }
+
+    /**
+     * The panel a user gesture is toggling or showing and activating, or null: when it shows in place of another window,
+     * focus is not handed back to the terminal, whose focus events would otherwise land after the activation and undo it.
+     */
+    private String activating;
 
     private void showPanel(String id) { if (panels.containsKey(id)) dock.show(id); }
 
@@ -277,8 +323,8 @@ final class WindowContributions implements AutoCloseable {
         if (change.layout()) owner.area().sync();
         if (change.stripes()) renderStripes();
         for (String id : change.hidden()) notifyVisibility(id, false);
-        // Hiding a window by any route returns focus to the terminal.
-        if (!change.hidden().isEmpty()) owner.focusSelected();
+        // Hiding a window by any route returns focus to the terminal, unless a window being activated replaces it.
+        if (!change.hidden().isEmpty() && (activating == null || !change.shown().contains(activating))) owner.focusSelected();
         for (String id : change.shown()) notifyVisibility(id, true);
         persist();
     }
@@ -395,6 +441,8 @@ final class WindowContributions implements AutoCloseable {
     }
 
     private void changed(Contributions.Kind kind) {
+        if (!docks && (kind == Contributions.Kind.PANELS || kind == Contributions.Kind.RAIL || kind == Contributions.Kind.BADGES
+            || kind == Contributions.Kind.STATUS)) return;
         switch (kind) {
             case ACTIONS -> {
                 boolean structural = syncActions();
@@ -402,6 +450,7 @@ final class WindowContributions implements AutoCloseable {
                 // Titles label toolbar buttons, and a vanished or disabled action changes every placement of it.
                 owner.chrome().renderContributedToolbar();
                 owner.chrome().renderContributedMenus();
+                if (!docks) return;
                 renderStatus();
                 // Which actions the stripe shows changes only when one is added or removed, which rebuilds it. A title or
                 // enabled change renames and repaints the buttons it has, so that it does not end a drag.
@@ -462,7 +511,7 @@ final class WindowContributions implements AutoCloseable {
      */
     void close(boolean remember) {
         if (listening == null) return;
-        if (remember) persist();
+        if (remember && docks) persist();
         listening.close();
         listening = null;
         // Snapshot before teardown: the last window closed wins; disposal must not save panels as hidden.

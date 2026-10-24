@@ -16,8 +16,19 @@ import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.GlassSettings;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.contributions.OtherTab;
+import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.contributions.TabRegistry;
+import dev.jasper.app.contributions.WorkspaceHost;
+import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.Layout;
+import dev.jasper.app.layout.ParentTabs;
+import dev.jasper.app.layout.Side;
+import dev.jasper.app.layout.TabId;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.palette.PaletteKeyRouter;
@@ -25,6 +36,7 @@ import dev.jasper.app.palette.PaletteScope;
 import dev.jasper.app.palette.ScopeRegistry;
 import dev.jasper.app.palette.CommandsScope;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.platform.MacTitleBand;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.config.ToolbarMode;
@@ -42,23 +54,73 @@ import javax.swing.text.JTextComponent;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.terminals.SessionRequest;
-import dev.jasper.terminal.view.FileLink;
 
 /** Real window contents, independent of native JFrame construction for headless testing. */
 public final class WindowContent extends JPanel implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(WindowContent.class.getName());
     private final ShellLauncher launcher;
-    private final Consumer<Path> newWindow;
+    private final Consumer<Path> newTerminalWindow;
     private final Runnable quit;
     private final Runnable onEmpty;
-    private final java.util.Map<Component, dev.jasper.app.contributions.ContentEntry> hosted = new IdentityHashMap<>();
-    private dev.jasper.app.contributions.ContentRegistry contentRegistry;
-    private Subscription contentHost;
+    /** Each tab this window shows, with its change listener. */
+    private final Map<Tab, Subscription> tabListeners = new IdentityHashMap<>();
+    /** This window's side of its terminal tabs (workspace tabs spec 9.3). */
+    private final TabHost tabHost = new TabHost(this);
+    /** Where focus goes: focus going into a plugin's view, or a pane, makes its tab the active tab (Rulings 26). */
+    private final KeyboardFocusManager focusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+    private final java.beans.PropertyChangeListener focusOwners = event -> {
+        if (event.getNewValue() instanceof Component focused) tabFocused(tabHolding(focused));
+    };
+    /**
+     * A left press on a pane's item makes its pane the active one, a view that takes no focus too (tabs and panes spec 5;
+     * workspace plan 8a Rulings 21). With the pane drag's modifier ({@link TabDrag#movesPane}) the press and its click are
+     * the pane drag's (spec 7; workspace plan 8c Rulings 2): consumed before the item hears them, the press handing the
+     * drag its gesture and focusing the item, as any press would, its pane already the active one or not (Rulings 14).
+     */
+    private final AWTEventListener paneClicks = event -> {
+        if (closed() || !(event instanceof MouseEvent press) || !SwingUtilities.isLeftMouseButton(press)
+            || !(press.getSource() instanceof Component source)) return;
+        int id = press.getID();
+        if (id != MouseEvent.MOUSE_PRESSED && id != MouseEvent.MOUSE_CLICKED) return;
+        Tab tab = tabHolding(under(source, press.getPoint()));
+        if (tab == null || parentTabs().holding(tab).filter(view -> view == parentTabs().active()).isEmpty()) return;
+        if (TabDrag.movesPane(press, macOs())) {
+            press.consume();
+            if (id == MouseEvent.MOUSE_PRESSED) {
+                // A dock drag still running lost its release: it ends first, as a press on a strip's entry ends it.
+                dockDrag().cancel();
+                tabDrag().pressedPane(this, tab, press);
+                // The item hears no press that would focus it: the window does.
+                if (tab != selectedTab()) selectTab(tab);
+                else focusSelected();
+            }
+            return;
+        }
+        if (id == MouseEvent.MOUSE_PRESSED && tab != selectedTab()) selectTab(tab);
+    };
+    /** Where this window's tabs live: a registry of its own until it joins the application's (connectContributions). */
+    private TabRegistry registry = new TabRegistry();
+    /** This window's workspace in {@link #registry}; closing it removes the tabs the window still holds. */
+    private Subscription host;
     private Runnable bringToFront = () -> {};
-    private final boolean detached;
-    private final JTabbedPane tabs = new TerminalDeck();
-    /** The look's editor tabs: the equal tabs, or the classic ones (spec 10.5). */
-    private final TabStrip windowTabs;
+    /** The window manager that opened this window, which moves its tabs to other windows (tabs and panes spec 6); else null. */
+    private WindowManager manager;
+    /** The main window, with Jasper's chrome, or a child window, a workspace alone (workspace tabs spec 6). */
+    private final WindowRole role;
+    /**
+     * The window's tabs, each holding panes in splits, under the window's one strip (workspace tabs spec 10; parent tabs
+     * spec 4), where the terminal column stood.
+     */
+    private final ParentTabsView parentTabs;
+    /** Where tabs moving in land while {@link #receive} runs: a parent tab, and its place in the bar when it is new. */
+    private record Landing(ParentTabId parentTab, int index) { }
+    private Landing landing;
+    /** Pane moves between this window's tabs under way ({@link #held}): only where the last one ends is announced. */
+    private int holding;
+    /** Whether a change during a held move asked for the focus. */
+    private boolean heldRefocus;
+    /** The configured tab motion, which the window's strip takes. */
+    private dev.jasper.app.config.AnimationSettings animations = dev.jasper.app.config.AnimationSettings.defaults();
     private final WorkspaceActions workspaceActions;
     private final CommandRegistry commands = new CommandRegistry();
     private final WindowCommands windowCommands;
@@ -94,6 +156,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final DockStripe leftStripe, rightStripe;
     /** Drags a tool window from its stripe button or its header to another slot. */
     private final DockDrag dockDrag;
+    /**
+     * Drags a tab from the strip, or a pane by its modifier (tabs and panes spec 6 and 7): the window manager's, which
+     * every window it opens shares; until it gives that, one of this window's own, which moves tabs and panes within this
+     * window and nothing out of it, as a move to another window needs a manager ({@link #mayMoveTabToNewWindow}).
+     */
+    private TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this));
     private UiState uiState = UiState.inMemory();
     private boolean railVisible = true;
     /** False once {@link #forgetLayout} ran: closing then saves nothing. */
@@ -113,8 +181,16 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     };
     private final java.beans.PropertyChangeListener cornerResized = event -> layoutCornerLayer();
     private final Map<KeyStroke, String> contentBindings = new HashMap<>();
-    private final Map<Component, dev.jasper.app.lifecycle.Subscription> contentListeners = new IdentityHashMap<>();
     Runnable onMinimumSizeChanged = () -> {};
+    /** What Close Window does: the window it belongs to sets it (workspace tabs spec 6.4). */
+    Runnable onCloseWindow = () -> {};
+    /** What {@code workspace.toml} saves of this window changed: its layout, or a terminal tab's name or directory (spec 13). */
+    Runnable onLayoutChanged = () -> {};
+    /**
+     * How a plugin's saved item comes back in this window (workspace tabs spec 13): its plugin's restorer rebuilds it with
+     * the saved id, else it is a placeholder; empty leaves it out, as closing it would. The window manager gives it.
+     */
+    java.util.function.BiFunction<TabId, WorkspaceFile.TabRecord.Content, Optional<Tab>> savedTabs = (tabId, saved) -> Optional.empty();
     static final int DEFAULT_TAB_HEIGHT = 30;
     static final int MIN_TAB_HEIGHT = 20;
     static final int MAX_TAB_HEIGHT = 72;
@@ -128,10 +204,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private double backgroundOpacity = 1;
     private Runnable glassListener = () -> {};
     private BiConsumer<GlassLevels, Boolean> glassRequests = (levels, dark) -> {};
-    private boolean rearranging;
     private WindowTerminals terminals;
+    /** The tab the palette last heard was active: a layout change that keeps it, such as a maximize, leaves the palette open. */
+    private Tab paletteTab;
     private boolean active = true;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
+    public Runnable onManageCygwinPackages;
     private Runnable openSettings, reloadConfiguration, migrateConfiguration;
     private java.util.function.Function<dev.jasper.app.config.SettingsEdit, java.util.concurrent.CompletableFuture<?>> saveSettings;
     private Consumer<String> openSettingsAt;
@@ -142,6 +220,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private boolean firstTerminalSeen;
     /** Whether this window's macOS appearance follows the theme (a native-titled look, spec 10.1); its dialogs follow too. */
     private boolean followsThemeAppearance;
+    /** IntelliJ Classic's macOS title band over the toolbar under a classic title (Enterprise plan 14), or null. */
+    private MacTitleBand titleBand;
+    /** The frame's formatted title, which the Windows classic title shows too. */
+    private String frameTitle = "Jasper";
+    /** The Windows classic title bar's title under a classic title (Enterprise plan 14), or null until decorated. */
+    private ClassicWindowTitle classicWindowTitle;
+    /** A Windows child window's title pane colours, which follow the theme and the window's activity; null elsewhere. */
+    private Runnable childTitleColors;
     Consumer<JComponent> showConfigDiagnostics = control -> {
         if (!followsThemeAppearance) JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
         else showOptionDialog(new JOptionPane(control, JOptionPane.PLAIN_MESSAGE), "Configuration");
@@ -181,9 +267,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return new Subscription(() -> {});
         activityListeners.add(listener);
         try {
-            for (TerminalTab tab : terminalTabs())
-                for (TerminalPane pane : tab.panes())
-                    listener.accept(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
+            for (TerminalContent terminal : terminalTabs())
+                listener.accept(new WorkspaceActivity.PaneState(terminal.pane().id(), WorkspaceActivity.State.OPENED));
         } catch (RuntimeException | Error failure) { activityListeners.remove(listener); throw failure; }
         return new Subscription(() -> activityListeners.remove(listener));
     }
@@ -196,47 +281,71 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         firstTerminal = java.util.Objects.requireNonNull(action, "action");
     }
 
-    private void emit(WorkspaceActivity.Event event) {
+    void emit(WorkspaceActivity.Event event) {
         for (var listener : java.util.List.copyOf(activityListeners)) listener.accept(event);
     }
 
 
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty) {
-        this(launcher, directory, newWindow, quit, onEmpty, new ThemeController(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty) {
+        this(launcher, directory, newTerminalWindow, quit, onEmpty, new ThemeController(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
     }
 
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes) {
-        this(launcher, directory, newWindow, quit, onEmpty, themes,
+        this(launcher, directory, newTerminalWindow, quit, onEmpty, themes,
             KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac")));
     }
 
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings) {
-        this(launcher, directory, newWindow, quit, onEmpty, themes, bindings,
+        this(launcher, directory, newTerminalWindow, quit, onEmpty, themes, bindings,
             new CommandHistory(), System.getProperty("os.name").startsWith("Mac"));
     }
 
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
-        this(launcher, directory, directory == null, newWindow, quit, onEmpty, themes, bindings, history, macOs);
+        this(launcher, directory, directory == null, newTerminalWindow, quit, onEmpty, themes, bindings, history, macOs);
     }
 
     /**
-     * A {@code detached} window starts with no tab and holds detached content; any other starts one tab in
-     * {@code directory}, where null means where a new shell starts. {@code newWindow} receives null the same way.
+     * An {@code empty} window starts with no tab; any other starts one tab in {@code directory}, where null means where a
+     * new shell starts. {@code newTerminalWindow} receives null the same way.
      */
-    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+    WindowContent(ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
-        this(launcher, directory, detached, newWindow, quit, onEmpty, themes, bindings, history, macOs, WorkspaceChrome.STANDARD);
+        this(launcher, directory, empty, newTerminalWindow, quit, onEmpty, themes, bindings, history, macOs, WorkspaceChrome.STANDARD);
     }
 
-    /** As above, under the look's workspace chrome (Enterprise presentation spec 9.1). */
-    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+    /** As above, as the main window, under the look's workspace chrome (Enterprise presentation spec 9.1). */
+    WindowContent(ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs, WorkspaceChrome look) {
+        this(WindowRole.MAIN, launcher, directory, empty, newTerminalWindow, quit, onEmpty, themes, bindings, history, macOs, look);
+    }
+
+    /**
+     * A window's content in {@code role} (workspace tabs spec 6): the main window's shows Jasper's chrome around its
+     * workspace; a child window's shows its workspace alone, with the same actions, menus, keymap and palette, and docks
+     * no tool window.
+     *
+     * @param role the main window or a child window
+     * @param launcher starts the window's shells
+     * @param directory where the first tab starts, or null for where a new shell starts
+     * @param empty whether the window starts without a tab
+     * @param newTerminalWindow opens a window with a terminal tab in a directory, or where a new shell starts when it is null
+     * @param quit quits Jasper
+     * @param onEmpty runs when the window's last tab has closed or moved out
+     * @param themes the application's look
+     * @param bindings the keymap until a configuration arrives
+     * @param history the shared command history
+     * @param macOs whether the keymap and shortcut text are macOS's
+     * @param look the workspace's chrome under the look
+     */
+    public WindowContent(WindowRole role, ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newTerminalWindow,
+                         Runnable quit, Runnable onEmpty, ThemeController themes, KeyBindings bindings, CommandHistory history,
+                         boolean macOs, WorkspaceChrome look) {
         super(new BorderLayout());
+        this.role = Objects.requireNonNull(role, "role");
         this.look = Objects.requireNonNull(look, "look");
-        this.detached = detached;
         setFocusTraversalPolicyProvider(true);
         setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
             @Override public Component getDefaultComponent(Container root) {
@@ -251,7 +360,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         this.bindings = bindings;
         this.macOs = macOs;
         this.themes = themes;
-        this.launcher = launcher; this.newWindow = newWindow; this.quit = quit; this.onEmpty = onEmpty;
+        this.launcher = launcher; this.newTerminalWindow = newTerminalWindow; this.quit = quit; this.onEmpty = onEmpty;
         workspaceActions = new WorkspaceActions(this);
         windowCommands = new WindowCommands(this, commands);
         chrome = new WindowChrome(this);
@@ -264,16 +373,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
-        windowTabs = look.tabs(this);
-        // The tabs belong to the terminal column, so the stripes and the side panels reach the toolbar.
-        var terminalColumn = new JPanel(new BorderLayout());
-        // The rounded host paints behind this layout-only container, including partial tab repaints.
-        terminalColumn.setOpaque(false);
-        terminalColumn.add(windowTabs.component(), BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
-        stripes = look().dock().stripes(themes.kit());
+        // The parent tabs are the terminal column, so the stripes and the side panels reach the toolbar; the rounded host
+        // paints behind this layout-only container, including partial tab repaints.
+        parentTabs = new ParentTabsView(this);
+        stripes = look().dock().stripes(themes.kit(), look().chromeArtwork());
         leftStripe = stripes.left();
         rightStripe = stripes.right();
-        area = new ToolWindowArea(terminalColumn, dock, themes.kit(), look().dock().flushFrames());
+        area = new ToolWindowArea(parentTabs, dock, themes.kit(), look().dock().flushFrames(), look().chromeArtwork());
         area.setStatusVisible(chrome.status().isVisible());
         area.setHeaderVisible(true);
         for (DockStripe stripe : stripes.all()) stripe.setVisible(false);
@@ -287,18 +393,25 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         area.releaseDragSource = dockDrag::uninstall;
         // A dock change moves the window's minimum size; read the hook when it fires, as the frame sets it later.
         area.onMinimumSizeChanged = () -> onMinimumSizeChanged.run();
-        add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
-        tabs.addChangeListener(event -> {
-            if (!rearranging) {
-                if (terminals != null) terminals.tabSelected();
-                if (commandPalette != null) commandPalette.tabChanged();
-                update();
-                focusSelected();
-            }
-        });
+        // A child window shows its workspace alone, in the centre surface that paints the main window's glass, with no dock,
+        // stripes or chrome around it; its chrome serves its menus and actions and is never shown (spec 6.3).
+        if (role == WindowRole.MAIN) { add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH); }
+        else add(area, BorderLayout.CENTER);
         themeRegistration = themes.subscribe(this::applyTheme);
-        if (!detached) newTab(directory);
-        else setPreferredSize(new Dimension(900, 650));
+        host = registry.addHost(workspaceHost());
+        focusManager.addPropertyChangeListener("permanentFocusOwner", focusOwners);
+        Toolkit.getDefaultToolkit().addAWTEventListener(paneClicks, AWTEvent.MOUSE_EVENT_MASK);
+        if (!empty) {
+            try { newTab(directory); }
+            catch (RuntimeException | Error failure) {
+                // The theme controller and the focus manager outlive a window that failed to build.
+                try { themeRegistration.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+                try { windowCommands.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+                focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
+                Toolkit.getDefaultToolkit().removeAWTEventListener(paneClicks);
+                throw failure;
+            }
+        } else setPreferredSize(new Dimension(900, 650));
     }
 
     private final JPanel body = new JPanel(new BorderLayout());
@@ -317,21 +430,153 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * Mounts {@code content} in a terminal frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
-     * unified macOS bar hosting the header, or the system's title bar with the header as a row in the window. Either way
-     * the menu bar is the root's (the unified bar's {@code setMenuBar} puts it there too); on macOS the screen menu bar
-     * shows it while the look keeps that on, and otherwise it is a row in the window. TerminalWindow and the chrome
-     * renders share this path. Returns the unified bar, or null.
+     * Mounts {@code content} in a window frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
+     * unified macOS bar hosting the header, the system's title bar with the header as a row in the window, or, under a
+     * classic title, IntelliJ Classic's band in the toolbar's colour above that row on macOS and FlatLaf's title pane with
+     * the menus and the title on Windows. Either way the menu bar is the root's (the unified bar's {@code setMenuBar} puts
+     * it there too); on macOS the screen menu bar shows it while the look keeps that on, and otherwise it is a row in the
+     * window or of the Windows title bar. The main window's frame and the chrome renders share this path. Returns the
+     * unified bar, or null.
      */
     static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
         MacTitleBar bar = installTitleBar(root, content, look.unifiedTitle(), look.followThemeAppearance(), nativeTitle);
-        if (bar == null) installCustomTitleBar(root, content);
+        // IntelliJ Classic's frame (plan 14): the band on macOS, FlatLaf's title pane with the menus and the title on Windows.
+        if (bar == null && look.classicTitle() && content.macOs) installMacTitleBand(root, content);
+        else if (bar == null && look.classicTitle()) installClassicTitleBar(root, content);
+        else if (bar == null) installCustomTitleBar(root, content);
         // Under a native-titled look the header is a row of window chrome, whichever composition draws it (spec 10.1,
         // and spec 9.1's fallback row); the default look keeps today's title-bar zone.
         if (bar == null && look.followThemeAppearance()) content.chrome().chromeRow();
         if (bar != null) bar.setMenuBar(content.menuBar()); else root.setJMenuBar(content.menuBar());
         return bar;
     }
+
+    /**
+     * Mounts a child window's {@code content} in its frame's {@code root} (workspace tabs spec 6.3): the look's title bar
+     * (the unified macOS bar with a centred title, the system's, or, under a classic title, IntelliJ Classic's band on
+     * macOS and a 28 px FlatLaf title pane in the toolbar's colour on Windows) showing the active tab's title, and no
+     * header, toolbar or status bar. On macOS the screen menu bar shows the same menus as the main window's, built from
+     * the same menu model, while the look keeps menus there ({@code screenMenuBar}); a child window never shows a menu
+     * row, and its title row ends with its ⋮ ({@code mountWindowMenu}): on Windows and Linux the title pane holds the
+     * title and the ⋮. Returns the unified bar, or null.
+     */
+    static MacTitleBar mountChild(JRootPane root, WindowContent content, WindowLook look, boolean screenMenuBar,
+                                  Consumer<String> nativeTitle) {
+        // Compact keeps the system's title bar, as the main window's does (spec 10.1).
+        boolean compact = content.viewMode == ViewMode.COMPACT;
+        MacTitleBar bar = null;
+        if (compact) root.setContentPane(content);
+        else bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), look.unifiedTitle());
+        // Under a classic title macOS always shows the menus in the screen menu bar, Compact included (Enterprise plan 14).
+        if (look.classicTitle() && content.macOs) content.chrome.menuBar().screenMenuBar(true);
+        boolean classic = look.classicTitle() && !compact;
+        if (bar != null) {
+            MacTitleBar unified = bar;
+            unified.setStyle(MacTitleBar.Style.WINDOW);
+            // The native controls sit on the title bar, which a theme may make dark on a light theme or light on a dark one.
+            content.onThemeChanged = theme -> unified.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(theme.chrome()).dark());
+        } else if (classic && content.macOs) {
+            // IntelliJ Classic's band, as the main window's (plan 14 Rulings 7 and 8); a child window has no toolbar, so
+            // the band takes the colour the main window's toolbar row has under a classic title.
+            content.titleBand = MacTitleBand.install(root, () -> ThemeZone.color(null, SemanticColor.SURFACE_APP));
+            content.onThemeChanged = theme -> content.titleBand.setDark(theme.chrome().dark());
+        } else if (content.macOs && (compact || look.followThemeAppearance())) {
+            content.onThemeChanged = theme -> dev.jasper.app.platform.MacAppearance.follow(root, theme.chrome().dark());
+        } else if (!content.macOs) {
+            // FlatLaf's title pane holds the title and the window's ⋮ (mountWindowMenu), in the chrome's colours, as
+            // the main window's holds its title; under a classic title it is 28 px, as the main window's (plan 14
+            // Rulings 13), and in-window dialogs and overlays start below it (Rulings 19).
+            if (classic) {
+                root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, ClassicWindowTitle.BAR_HEIGHT);
+                dev.jasper.app.platform.TitleInset.publish(root, () -> root.getContentPane() == null ? 0 : root.getContentPane().getY());
+            }
+            // FlatLaf paints the title in this one colour, active or not, so a classic title dims it here while the window is
+            // inactive, as the main window's does (Rulings 14).
+            Runnable colors = () -> {
+                root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, ThemeZone.color(null, SemanticColor.SURFACE_APP));
+                root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, classic
+                    ? dev.jasper.ui.theme.SurfaceContrast.painted(dev.jasper.ui.swing.FlatLafInstaller.installedTheme(),
+                        content.active ? WindowPairs.TITLE : WindowPairs.INACTIVE_TITLE)
+                    : ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
+            };
+            content.childTitleColors = colors;
+            content.onThemeChanged = theme -> colors.run();
+        }
+        content.onThemeChanged.accept(content.theme());
+        content.followsThemeAppearance = bar == null && look.followThemeAppearance() && content.macOs;
+        if (screenMenuBar) root.setJMenuBar(content.menuBar());
+        content.mountWindowMenu(root, bar, look.classicTitle());
+        MacTitleBar titled = bar;
+        content.onTitle = title -> {
+            nativeTitle.accept(title);
+            if (titled != null) titled.setTitle(title);
+        };
+        if (content.bodyLease != null) content.bodyLease.close();
+        content.bodyLease = dev.jasper.app.platform.WindowBody.install(root, content,
+            () -> new java.awt.Rectangle(0, 0, content.getWidth(), content.getHeight()));
+        content.update();
+        return bar;
+    }
+
+    /**
+     * Puts a child window's ⋮, its compact toolbar (parent tabs spec 6; workspace plan 7b Rulings 17), at the trailing end
+     * of its title row: the unified macOS bar's, or IntelliJ Classic's band on macOS. On Windows and Linux it ends a menu
+     * bar of its own after a glue, which FlatLaf's title pane embeds with the title in the glue, and which is a row under
+     * the system's title bar otherwise. On macOS under the system's title bar it ends a row at the top of the window, 8 px
+     * from its edge as in the other title rows. Under a {@code classic} title it is the classic ⋮ the main window's classic
+     * row ends with ({@link WindowChrome#classicWindowMenu(WindowContent)}).
+     */
+    private void mountWindowMenu(JRootPane root, MacTitleBar bar, boolean classic) {
+        JComponent button = classic ? WindowChrome.classicWindowMenu(this) : new WindowMenuButton(this);
+        if (bar != null) bar.setTrailing(button);
+        else if (titleBand != null) titleBand.setTrailing(button);
+        else if (!macOs) {
+            var row = new JMenuBar();
+            row.setName("windowBar");
+            row.add(Box.createHorizontalGlue());
+            row.add(button);
+            root.setJMenuBar(row);
+        } else {
+            var row = new JPanel(new BorderLayout());
+            row.setName("windowBar");
+            row.setOpaque(false);
+            row.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, com.formdev.flatlaf.util.UIScale.scale(8)));
+            row.add(button, BorderLayout.EAST);
+            add(row, BorderLayout.NORTH);
+        }
+    }
+
+    /**
+     * How {@link #showWindowMenu} shows the menu it is given: under the ⋮, while the ⋮ shows. A headless test, where
+     * nothing shows, records what a click would show instead.
+     */
+    BiConsumer<JComponent, java.util.function.Supplier<JPopupMenu>> windowMenuPopup = (invoker, menu) -> {
+        if (invoker.isShowing()) menu.get().show(invoker, 0, invoker.getHeight());
+    };
+
+    /** Opens {@link #windowMenu()} under {@code invoker}, a ⋮, while it shows (parent tabs spec 6). */
+    void showWindowMenu(JComponent invoker) {
+        if (!closed) windowMenuPopup.accept(invoker, this::windowMenu);
+    }
+
+    /**
+     * The macOS classic title (plan 14 Rulings 7 and 8): IntelliJ Classic's band above the toolbar row, filled with the
+     * header's {@code surface.app} so the band and the toolbar read as one, never the title-bar zone's colour. The window
+     * takes the vibrant appearance of the theme's darkness in place of {@link #installTitleBar}'s Aqua follower; the
+     * window's dialogs still follow through {@code followsThemeAppearance}. Compact keeps the system title bar without
+     * the band.
+     */
+    static void installMacTitleBand(JRootPane root, WindowContent content) {
+        // Under a classic title macOS always shows the menus in the screen menu bar (Rulings 5 and 18), Compact included.
+        content.chrome.menuBar().screenMenuBar(true);
+        if (content.viewMode == ViewMode.COMPACT) return;
+        content.titleBand = MacTitleBand.install(root, () -> ThemeZone.color(content.chrome().header(), SemanticColor.SURFACE_APP));
+        content.onThemeChanged = theme -> content.titleBand.setDark(theme.chrome().dark());
+        content.onThemeChanged.accept(content.theme());
+    }
+
+    /** The macOS classic title band, or null without it. */
+    MacTitleBand titleBand() { return titleBand; }
 
     /** Workspace adapter: wires title/theme values to the platform-only title bar. */
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
@@ -365,9 +610,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 pane == null ? "" : pane.commandLabel());
             if (document != null) context = new WindowHeaderContext(document.title() + (document.host().isEmpty() ? "" : " — " + document.host()), document.location(), document.host().isEmpty() ? "FILE" : "SERVER");
             // The frame title follows the look's template (spec 10.4); the title field keeps the context.
-            nativeTitle.accept(WindowTitle.format(content.look().title(), context.label(),
+            String formatted = WindowTitle.format(content.look().title(), context.label(),
                 document != null ? document.title() : WindowTitle.session(snapshot),
-                document != null ? document.location() : WindowTitle.directory(snapshot, home)));
+                document != null ? document.location() : WindowTitle.directory(snapshot, home));
+            nativeTitle.accept(formatted);
+            content.frameTitle = formatted;
+            if (content.classicWindowTitle != null) content.classicWindowTitle.setText(formatted);
             content.chrome.search().setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
         };
         if (bar != null) {
@@ -395,16 +643,31 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * is created (on {@code pack} or first show), so a new frame's root pane still reads {@code NONE} here.
      */
     static boolean installCustomTitleBar(JRootPane root, WindowContent content) {
+        return whenDecorated(root, content, WindowContent::decorateTitleBar);
+    }
+
+    /**
+     * The Windows classic title (plan 14 Rulings 13 to 15): FlatLaf's title pane, 28 px in the toolbar's colour, embeds the
+     * menus and then the frame's title, left-aligned after them; the header stays a row of the window under it. Returns
+     * as {@link #installCustomTitleBar} does, and with native decorations FlatLaf never decorates, so the menus stay a
+     * row of the window.
+     */
+    static boolean installClassicTitleBar(JRootPane root, WindowContent content) {
+        return whenDecorated(root, content, WindowContent::decorateClassicTitleBar);
+    }
+
+    /** Runs {@code decorate} now if {@code root} has look-and-feel decorations, else once when they arrive; never in Compact. */
+    private static boolean whenDecorated(JRootPane root, WindowContent content, BiConsumer<JRootPane, WindowContent> decorate) {
         if (content.viewMode == ViewMode.COMPACT) return false;
         if (root.getWindowDecorationStyle() != JRootPane.NONE) {
-            decorateTitleBar(root, content);
+            decorate.accept(root, content);
             return true;
         }
         root.addPropertyChangeListener("windowDecorationStyle", new java.beans.PropertyChangeListener() {
             @Override public void propertyChange(java.beans.PropertyChangeEvent event) {
                 if (root.getWindowDecorationStyle() == JRootPane.NONE) return;
                 root.removePropertyChangeListener("windowDecorationStyle", this);
-                decorateTitleBar(root, content);
+                decorate.accept(root, content);
             }
         });
         return false;
@@ -426,6 +689,29 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         content.onThemeChanged = theme -> colors.run();
         content.revalidate();
     }
+
+    private static void decorateClassicTitleBar(JRootPane root, WindowContent content) {
+        var title = new ClassicWindowTitle();
+        title.setText(content.frameTitle);
+        title.setActive(content.active);
+        content.classicWindowTitle = title;
+        content.chrome.menuBar().setTitle(title);
+        root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_SHOW_TITLE, false);
+        root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, ClassicWindowTitle.BAR_HEIGHT);
+        Runnable colors = () -> {
+            // The toolbar's colour, not a title-bar zone, so any theme's bar matches its toolbar (Rulings 13).
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, ThemeZone.color(content.chrome().header(), SemanticColor.SURFACE_APP));
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
+            title.refresh();
+        };
+        colors.run();
+        content.onThemeChanged = theme -> colors.run();
+        dev.jasper.app.platform.TitleInset.publish(root, () -> root.getContentPane() == null ? 0 : root.getContentPane().getY());
+        content.revalidate();
+    }
+
+    /** The Windows classic title bar's title, or null until FlatLaf decorates the window under a classic title. */
+    ClassicWindowTitle classicWindowTitle() { return classicWindowTitle; }
 
     void installRootBindings(JRootPane root) {
         removeRootBindings();
@@ -471,8 +757,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Runs a root-bound shortcut whose key is also one of the focus owner's focus-traversal keys before focus traversal
-     * takes it, such as Linux Ctrl+Tab and Ctrl+Shift+Tab in a text area, a table or a field, and swallows that key's
-     * typed and released tail wherever focus went. Plain Tab is no Keymap binding, so it still traverses.
+     * takes it, such as a Ctrl+Tab binding in a text area, a table or a field, and Next and Previous Tab before the focus
+     * owner's own bindings, such as a scroll pane's Ctrl+PageUp and Ctrl+PageDown (workspace plan 8a Rulings 16); it
+     * swallows that key's typed and released tail wherever focus went. Plain Tab is no Keymap binding, so it still
+     * traverses.
      */
     private boolean traversalShortcut(KeyEvent event) {
         switch (event.getID()) {
@@ -482,7 +770,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 traversalTyped = false;
                 Component focus = event.getComponent();
                 KeyStroke stroke = KeyStroke.getKeyStrokeForEvent(event);
-                if (!ownsKeySource(focus) || !traversalKey(focus, event)
+                if (!ownsKeySource(focus) || !(traversalKey(focus, event) || tabKey(stroke))
                     || !(rootKeys.containsKey(stroke) || contentBindings.containsKey(stroke))
                     || !claimsShortcut(stroke, focus)) return false;
                 traversalHeld.add(event.getKeyCode()); traversalTyped = true;
@@ -494,6 +782,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         }
         event.consume();
         return true;
+    }
+
+    /** Whether {@code stroke} is Next or Previous Tab's, which run before the focus owner's own bindings. */
+    private boolean tabKey(KeyStroke stroke) {
+        String bound = rootKeys.get(stroke);
+        return ActionId.NEXT_TAB.id().equals(bound) || ActionId.PREVIOUS_TAB.id().equals(bound);
     }
 
     private static boolean traversalKey(Component focus, KeyEvent event) {
@@ -719,7 +1013,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean settingsConnected() { return openSettingsAt != null; }
     void openWindowSettings() { if (openSettingsAt != null) openSettingsAt.accept("window"); }
     void reloadConfiguration() { reloadConfiguration.run(); }
-    void requestNewWindow() { newWindow.accept(directory()); }
+    /** New Terminal Window (workspace tabs spec 6.5): a child window with a terminal tab where a tab from here starts. */
+    void requestNewTerminalWindow() { newTerminalWindow.accept(directory()); }
+    /** Close Window (workspace tabs spec 6.4 and 11): this window, as its title bar's close button closes it. */
+    void requestCloseWindow() { onCloseWindow.run(); }
+    /**
+     * Move Tab to New Window (tabs and panes spec 6): the parent tab holding {@code tab}, through the window manager;
+     * nothing in a window outside one.
+     */
+    void moveTabToNewWindow(Tab tab) {
+        if (manager != null && tab != null) parentTabOf(tab).ifPresent(parentTab -> manager.moveTabToNewWindow(this, parentTab));
+    }
+    /** Move to Main Window: this full window's parent tabs join the main window's bar. */
+    void moveToMainWindow() { if (manager != null) manager.moveToMainWindow(this); }
     /** File › Open File…: {@link #fileChooser} from the active pane's folder, then the route a Cmd-click takes, at no line. */
     void openFile() { fileChooser.apply(java.util.Optional.ofNullable(directory())).ifPresent(file -> onOpenFile.accept(file, 0)); }
     void requestQuit() { quit.run(); }
@@ -736,10 +1042,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     String paletteShortcut() {
         return CommandsScope.shortcutText(action(ActionId.COMMAND_PALETTE).getValue(Action.ACCELERATOR_KEY), macOs);
     }
+    /** {@code id}'s shortcut as this platform writes it, from the live keymap; "" while it has none. */
+    String shortcutText(ActionId id) {
+        return CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
+    }
+    /** Select Tab {@code index + 1}'s shortcut as this platform writes it; "" past 9 or while it has none. */
     String tabShortcut(int index) {
         if (index < 0 || index >= 9) return "";
-        ActionId id = ActionId.valueOf("SELECT_TAB_" + (index + 1));
-        return CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
+        return shortcutText(ActionId.valueOf("SELECT_TAB_" + (index + 1)));
     }
     WindowCommandPalette commandPalette() { return commandPalette; }
     /** The title field's bounds in {@code target}'s coordinates while the palette can drop from it; null otherwise. */
@@ -770,6 +1080,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WorkspaceChrome look() { return look; }
     /** The application's one animations flag: the look's motion folded into the setting (spec 10.9). EDT. */
     boolean lookAnimates() { return themes.animationsEnabled(); }
+    /** Whether the keymap and shortcut text are macOS's: the pane drag's modifier follows it (workspace plan 8c Rulings 1). */
+    boolean macOs() { return macOs; }
     /** Whether the palette is open; the run item shows it (spec 10.6). Null-safe while the window is being built. */
     boolean paletteOpen() { return commandPalette != null && commandPalette.isOpen(); }
     /** The palette opened or closed: the run item repaints. */
@@ -813,21 +1125,65 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
     public boolean isActiveAndOpen() { return active && !closed; }
 
+    private final java.util.List<Runnable> afterPaint = new ArrayList<>();
+
+    /**
+     * Whether no terminal shows in this window now, so none paints the window's first output (workspace tabs spec 13):
+     * no pane of the tab it shows that shows (the maximized one alone while one is maximized) holds a terminal, or the
+     * workspace is empty. A hidden tab's terminal shows nothing.
+     *
+     * @return true when no shown pane holds a terminal
+     */
+    public boolean showsNoTerminal() {
+        WorkspaceView workspace = workspace();
+        Layout layout = workspace.model();
+        java.util.List<dev.jasper.app.layout.Group> shown = layout.maximized().flatMap(layout::group).map(java.util.List::of)
+            .orElseGet(layout::groups);
+        for (dev.jasper.app.layout.Group group : shown)
+            if (group.selected().flatMap(workspace::tab).filter(tab -> tab.content() instanceof TerminalContent).isPresent()) return false;
+        return true;
+    }
+
+    /**
+     * Runs {@code task} once, after this window's content next paints. EDT.
+     *
+     * @param task what runs after the paint
+     */
+    public void afterNextPaint(Runnable task) {
+        afterPaint.add(Objects.requireNonNull(task, "task"));
+        repaint();
+    }
+
+    @Override public void paint(Graphics graphics) {
+        super.paint(graphics);
+        if (afterPaint.isEmpty()) return;
+        var tasks = java.util.List.copyOf(afterPaint);
+        afterPaint.clear();
+        for (Runnable task : tasks) task.run();
+    }
+
     /** Stable identity of this window for extensions; never a Swing object. */
     public UUID id() { return id; }
 
-    /** Connects with layout state that lives only as long as this window. */
+    /** @return this window's role: the main window or a child window (workspace tabs spec 6) */
+    public WindowRole role() { return role; }
+
+    /** @return whether this is the main window, which has Jasper's chrome and dock and whose workspace may be empty */
+    public boolean isMain() { return role == WindowRole.MAIN; }
+
     /** Connects this window to the application-wide terminal registry, once. {@code toFront} raises the native window. */
     public void connectTerminals(TerminalRegistry registry, Runnable toFront) {
         if (closed || terminals != null) return;
         bringToFront = toFront;
         terminals = new WindowTerminals(this, Objects.requireNonNull(registry), Objects.requireNonNull(toFront));
-        chrome.windowOpened();
+        // A child window has no toolbar, so it builds no toolbar views (workspace tabs spec 6.3).
+        if (role == WindowRole.MAIN) chrome.windowOpened();
     }
 
-    java.util.List<TerminalTab> terminalTabs() {
-        var result = new ArrayList<TerminalTab>();
-        for (int i = 0; i < tabs.getTabCount(); i++) if (tabs.getComponentAt(i) instanceof TerminalTab tab) result.add(tab);
+    /** This window's terminal tabs: every parent tab's, in bar order. */
+    public java.util.List<TerminalContent> terminalTabs() {
+        var result = new ArrayList<TerminalContent>();
+        for (Tab tab : tabs()) if (tab.content() instanceof TerminalContent terminal) result.add(terminal);
         return result;
     }
 
@@ -848,7 +1204,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * As {@link #connectContributions(Contributions, UiState)}. A window that does not {@code hostsContent} is wired to
-     * the model but never registered as a place where plugin content opens, so the content registry cannot choose it as
+     * the model but never registered as a place where plugin content opens, so the tab registry cannot choose it as
      * the main window: the warm-up rehearsal is such a window, and content opened in it would vanish when it closes.
      */
     public void connectContributions(Contributions model, UiState state, boolean hostsContent) {
@@ -856,64 +1212,705 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         uiState = Objects.requireNonNull(state);
         railVisible = state.railVisible();
         // Restore before contributions can build or show saved panels.
-        setZenMode(state.zenMode());
+        if (role == WindowRole.MAIN) setZenMode(state.zenMode());
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         if (hostsContent) {
-            contentRegistry = model.content();
-            contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,
-                this::mountContent, this::unmountContent, entry -> selectTab(entry.component()), () -> bringToFront.run()));
+            // The window joins the application's registry, taking the tabs it already holds along (workspace plan 3a Rulings 3).
+            TabRegistry shared = model.tabs();
+            shared.adopt(registry, id);
+            host.close();
+            registry = shared;
+            host = registry.addHost(workspaceHost());
         }
         rebind();
     }
 
-    private void mountContent(dev.jasper.app.contributions.ContentEntry entry) {
-        JComponent component = entry.component();
+    /**
+     * The registry-facing side of this window's workspace (workspace tabs spec 9.1): its panes are every tab's, so an item
+     * placed beside a pane lands in that pane's tab (workspace plan 7a Rulings 8), and one placed without a pane opens as
+     * a new tab (plan 8a Rulings 3).
+     */
+    private WorkspaceHost workspaceHost() {
+        return new WorkspaceHost(id, this::attach, this::detach, this::selectTab, () -> bringToFront.run(),
+            parentTabs::groupOf,
+            (tab, group, side) -> attach(tab, false, group != null ? group : workspace().model().activeGroup(), side),
+            // A plugin's item: Terminal Right and Down beside it, which answer whether a terminal opened, and Move Pane to
+            // New Tab (workspace plan 8b Rulings 18).
+            (tab, side) -> {
+                if (!parentTabs.contains(tab)) return false;
+                selectTab(tab);
+                return split(side) != null;
+            },
+            this::mayMoveToNewTab, this::moveToNewTab,
+            // Move Pane to Tab, as ContentTab.moveToTab asks, numbered from 1 (pane flexibility spec 4).
+            this::paneTargets, (tab, number) -> moveToTab(tab, number - 1));
+    }
+
+    /**
+     * Shows an item in this window, in a new tab at the end of the strip and shown, which the main window's empty
+     * workspace takes in its place (tabs and panes spec 13; workspace plan 8a Rulings 3): one the registry placed here, or
+     * one this window opened. A failure leaves nothing mounted, takes back what the terminal registry heard, and
+     * propagates.
+     */
+    private void attach(Tab tab) { attach(tab, false, null, null); }
+
+    /**
+     * As {@link #attach(Tab)}; with {@code opened} a new terminal's pane is announced as opened, and with {@code beside}
+     * the item opens in a new pane on {@code side} of that pane, in the tab holding it.
+     */
+    private void attach(Tab tab, boolean opened, GroupId beside, Side side) {
+        JComponent component = tab.component();
+        boolean announced = false;
         try {
             WorkspaceTheme.apply(component, themes.current());
-            hosted.put(component, entry);
-            contentListeners.put(component, entry.onChanged(this::update));
-            tabs.addTab(entry.title(), component);
-            selectTab(component); update();
+            tabListeners.put(tab, tab.onChanged(this::update));
+            if (terminals != null) { terminals.tabArrived(tab, tab.movingFrom()); announced = true; }
+            tabHost.attach(tab, opened);
+            // An item a move between windows brings in lands in the tab chosen for it (workspace plan 7b Rulings 6).
+            if (beside == null && landing != null && tab.moving()) parentTabs.land(tab, landing.parentTab(), landing.index());
+            // Whatever opens without a pane opens as a new tab; the main window's empty workspace takes it in its place.
+            else if (beside == null && parentTabs.isEmpty()) workspace().open(tab);
+            else if (beside == null) parentTabs.openParentTab(tab);
+            else parentTabs.holding(beside).orElseThrow(() -> new IllegalArgumentException("Group " + beside + " is not in this window"))
+                .openBeside(tab, beside, side);
+            // A tab that moves in ends its parent tab's maximize; one that opens here does not (spec 15).
+            if (tab.moving()) parentTabs.holding(tab).ifPresent(WorkspaceView::unmaximize);
         } catch (RuntimeException | Error failure) {
-            var listener = contentListeners.remove(component);
+            var listener = tabListeners.remove(tab);
             if (listener != null) listener.close();
-            hosted.remove(component);
-            tabs.remove(component);
+            // A new tab's pane closes while it still reports here, so its announcement is closed again (Rulings 28).
+            if (opened && tab.content() instanceof TerminalContent terminal) {
+                try { terminal.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            }
+            tabHost.detach(tab);
+            // Plugins must not believe the tab is here (workspace plan 3b Rulings 5).
+            if (announced && terminals != null) terminals.tabWithdrawn(tab, tab.movingFrom());
+            parentTabs.remove(tab);
             WorkspaceTheme.clear(component);
             throw failure;
         }
         // After the mount stands: a failing glass handler must not roll it back.
         if (backgroundOpacity < 1) glassListener.run();
     }
-    private void unmountContent(dev.jasper.app.contributions.ContentEntry entry) {
-        if (!hosted.containsKey(entry.component())) return;
-        var listener = contentListeners.remove(entry.component());
-        if (listener != null) listener.close();
-        hosted.remove(entry.component()); tabs.remove(entry.component());
-        WorkspaceTheme.clear(entry.component()); update();
+
+    /**
+     * Takes a tab out of this window once it has closed (the registry disposes it first) or as it moves to another window:
+     * a closing tab is announced closed here, and the window closes when its last tab has left. A tab whose attach failed
+     * has nothing to take out.
+     */
+    private void detach(Tab tab) {
+        var listener = tabListeners.remove(tab);
+        if (listener == null) return;
+        listener.close();
+        tabHost.detach(tab);
+        if (terminals != null && !tab.moving()) terminals.tabClosed(tab);
+        if (closed) return;
+        // A tab that moves out ends its parent tab's maximize; closing a tab keeps it while its group stands (spec 15).
+        if (tab.moving()) parentTabs.holding(tab).ifPresent(WorkspaceView::unmaximize);
+        // A parent tab goes with its last tab, except the window's only one (parent tabs spec 4).
+        parentTabs.remove(tab);
+        WorkspaceTheme.clear(tab.component());
+        update();
         if (backgroundOpacity < 1) glassListener.run();
-        if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
+        // A move empties a window only once it has reported itself: the window manager closes it then (TabRegistry.Windows).
+        if (parentTabs.isEmpty() && !tab.moving()) onEmpty.run();
     }
-    public dev.jasper.app.contributions.ContentEntry selectedContent() { return hosted.get(tabs.getSelectedComponent()); }
-    Component selectedComponent() { return tabs.getSelectedComponent(); }
-    String tabTitle(Component component) {
-        var entry = hosted.get(component);
-        return entry == null ? ((TerminalTab) component).title() : (entry.dirty() ? "\u25cf " : "") + entry.title() + (entry.detail().isEmpty() ? "" : "  " + entry.detail());
-    }
-    Icon tabIcon(Component component) { var entry = hosted.get(component); return entry == null ? ((TerminalTab)component).icon() : entry.icon(); }
-    String tabTooltip(Component component) { var entry = hosted.get(component); return entry == null ? tabTitle(component) : entry.location(); }
-    JPopupMenu tabMenu(Component component) {
-        var menu = new JPopupMenu(); var entry = hosted.get(component);
-        if (entry != null) {
-            var move = new JMenuItem(entry.detached() ? "Move to Main Window" : "Open in Separate Window");
-            move.addActionListener(event -> entry.move(!entry.detached())); menu.add(move);
-            for (var command : entry.commands()) { var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
-                item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut()); item.addActionListener(event -> command.run().run()); menu.add(item); }
+
+    /**
+     * A parent tab's layout changed, or the window's parent tabs did (one opened, closed or shows now): the model takes
+     * {@code view}'s layout, which is saved, the registry hears the selection, the palette a new active tab; the active
+     * tab takes focus when {@code refocus} and {@code view} is the shown parent tab's. While a pane moves between tabs
+     * ({@link #held}) only the model takes it, and the rest follows once, where the pane lands.
+     */
+    void workspaceChanged(WorkspaceView view, boolean refocus) {
+        if (closed) return;
+        parentTabs.changed(view);
+        // A pane moving between tabs is announced once, where it lands (workspace plan 8c Rulings 17).
+        if (holding > 0) {
+            heldRefocus |= refocus;
+            return;
         }
-        var close = new JMenuItem("Close Tab"); close.setAccelerator(bindings().strokeFor(ActionId.CLOSE_TAB).orElse(null)); close.addActionListener(event -> closeTab(component)); menu.add(close); dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
+        // Every parent tab's layout change and every parent-tab change ends here (workspace plan 6a Rulings 8 and 28): the
+        // save is asked for once the model has it, so a listener below that throws costs no save.
+        layoutChanged();
+        startShown();
+        if (terminals != null) terminals.tabSelected();
+        Tab now = selectedTab();
+        if (commandPalette != null && now != paletteTab) { paletteTab = now; commandPalette.tabChanged(); }
+        update();
+        if (refocus && view == parentTabs.active()) focusSelected();
     }
-    public void focusSelected() { var entry = selectedContent(); if (entry != null) entry.focus(); else if (currentTab() != null) currentTab().focusTerminal(); }
-    public boolean mayClose() { return contentRegistry == null || contentRegistry.mayClose(() -> contentRegistry.inWindow(id)); }
+
+    /** Something {@code workspace.toml} saves of this window changed (workspace tabs spec 13). */
+    void layoutChanged() { if (!closed) onLayoutChanged.run(); }
+
+    /** Whether the start of the shown restored terminals waits for the end of this EDT turn (workspace plan 6a Rulings 31). */
+    private boolean startPending;
+
+    /**
+     * Starts, once this EDT turn ends, each restored terminal of the tab this window shows then, every pane of it, a
+     * maximize's hidden ones too; the others wait until their tab first shows (workspace tabs spec 13; tabs and panes
+     * spec 12; workspace plan 6a Rulings 4 and 31). A gesture that moves several tabs one at a time shows each for an
+     * instant: the start, asked for once per turn, reads what shows when the gesture has ended, so those stay unstarted.
+     */
+    private void startShown() {
+        if (startPending) return;
+        startPending = true;
+        SwingUtilities.invokeLater(() -> {
+            startPending = false;
+            if (closed) return;
+            for (Tab tab : workspace().tabs()) {
+                if (!(tab.content() instanceof TerminalContent terminal)) continue;
+                // A pane whose start throws costs only itself: the tab's other panes still start.
+                try { terminal.startIfWaiting(); }
+                catch (RuntimeException | Error failure) { LOG.log(System.Logger.Level.WARNING, "Could not start a restored terminal", failure); }
+            }
+        });
+    }
+
+    /**
+     * Shows a saved window in this window, which holds no item yet (workspace tabs spec 13; tabs and panes spec 12): its
+     * tabs under their saved ids, in strip order, with the saved one shown, each with its split layout and active pane;
+     * each terminal with its saved id, renamed title, profile and last local directory, its shell not started until its
+     * tab first shows. An item this window cannot rebuild is left out as closing it would leave it out
+     * ({@code WorkspaceFile.keeping}).
+     *
+     * @param record the window as saved
+     * @return how many items came back
+     */
+    int restore(WorkspaceFile.WindowRecord record) {
+        if (closed || !parentTabs.isEmpty()) throw new IllegalStateException("Only an empty open window restores");
+        // A window opened empty keeps a stand-in size for the item that moves in; a restored one gives it up, so its frame
+        // sizes it as a new window's, whether its items come back or it opens fresh.
+        setPreferredSize(null);
+        var restored = new LinkedHashMap<TabId, Tab>();
+        try {
+            // A plugin's item comes back through its plugin, or as a placeholder (workspace tabs spec 13; workspace plan 6b
+            // Rulings 19): every item takes its saved tab and pane below, terminals and plugins' items alike.
+            for (TabId saved : record.layout().tabs()) {
+                Optional<Tab> tab = switch (record.tabs().get(saved)) {
+                    case WorkspaceFile.TabRecord.Terminal terminal -> Optional.of(restoredTerminal(saved, terminal));
+                    case WorkspaceFile.TabRecord.Content content -> savedTabs.apply(saved, content);
+                };
+                tab.ifPresent(found -> restored.put(saved, found));
+            }
+            Optional<ParentTabs> shown = WorkspaceFile.keeping(record.layout(), restored::containsKey, isMain());
+            if (shown.isEmpty()) return 0;
+            Runnable show = () -> {
+                for (Tab tab : restored.values()) mount(tab);
+                parentTabs.restore(shown.get(), restored);
+            };
+            if (terminals != null) terminals.atomically(show); else show.run();
+        } catch (RuntimeException | Error failure) {
+            // Nothing half-restored stays: each item closes, and is announced closed where it was announced.
+            for (Tab tab : restored.values()) {
+                try { tab.close(); } catch (RuntimeException | Error closing) { failure.addSuppressed(closing); }
+            }
+            throw failure;
+        }
+        return restored.size();
+    }
+
+    /**
+     * Retry on a placeholder (workspace tabs spec 9.2): {@code rebuild} runs its plugin's restorer again, and the item it
+     * opens takes the placeholder's pane, in whichever tab holds it, selected; a placeholder whose restorer fails again
+     * says the new reason (workspace plan 6b Rulings 6 and 19).
+     *
+     * @param placeholder a placeholder this window holds
+     * @param rebuild runs the restorer for what was saved: the item it opened, else the sentence the placeholder says
+     */
+    void retry(Tab placeholder, java.util.function.Function<WorkspaceFile.TabRecord.Content, TabRegistry.Restored> rebuild) {
+        if (closed || !(placeholder.content() instanceof PlaceholderContent saved)) return;
+        Optional<WorkspaceView> view = parentTabs.holding(placeholder);
+        if (view.isEmpty()) return;
+        TabRegistry.Restored rebuilt = rebuild.apply(saved.saved());
+        if (rebuilt.tab().isEmpty()) {
+            saved.failed(rebuilt.problem(), true);
+            return;
+        }
+        Tab item = rebuilt.tab().get();
+        Runnable replace = () -> {
+            mount(item);
+            view.get().replace(placeholder, item);
+            placeholder.close();
+        };
+        if (terminals != null) terminals.atomically(replace); else replace.run();
+    }
+
+    /** A saved terminal whose shell waits until its tab first shows (workspace tabs spec 13). */
+    private Tab restoredTerminal(TabId tabId, WorkspaceFile.TabRecord.Terminal saved) {
+        Path directory = null;
+        try { if (!saved.directory().isEmpty()) directory = Path.of(saved.directory()); }
+        catch (java.nio.file.InvalidPathException unusable) { /* where a new shell starts */ }
+        Optional<String> profile = saved.profile().isEmpty() ? Optional.empty() : Optional.of(saved.profile());
+        TerminalContent terminal = new TerminalContent(tabId, directory, launcher, null, profile, Optional.empty());
+        terminal.pane().restored();
+        if (!saved.title().isEmpty()) terminal.rename(saved.title());
+        Tab tab;
+        try {
+            // Under its saved id, straight into this window: never through TabRegistry.open (workspace plan 4b's hand-off).
+            tab = registry.add(tabId, Tab.Kind.TERMINAL, terminal, id);
+        } catch (RuntimeException | Error failure) {
+            // Not registered, so no item closes it: its pane is closed here.
+            try { terminal.close(); } catch (RuntimeException | Error closing) { failure.addSuppressed(closing); }
+            throw failure;
+        }
+        tab.focusTarget(terminal::focusTerminal);
+        return tab;
+    }
+
+    /** Wires a restored item to this window as {@link #attach(Tab)} does, without placing it: the restore places every one at once. */
+    private void mount(Tab tab) {
+        WorkspaceTheme.apply(tab.component(), themes.current());
+        tabListeners.put(tab, tab.onChanged(this::update));
+        if (terminals != null) terminals.tabArrived(tab, Optional.empty());
+        tabHost.attach(tab, true);
+    }
+
+    /**
+     * Runs {@code move}, a pane moving between tabs of this window, as one change (workspace plan 8c Rulings 17): while it
+     * runs the parent tabs' model takes each layout as it changes, and the save, the terminal registry, the palette, the
+     * items' activation and the focus hear only where it ends, once, in one registry change. No item is announced
+     * selected or turns active on the way. The move's failure propagates after that, a failure of the announcement
+     * suppressed under it.
+     *
+     * @param move the move
+     */
+    void held(Runnable move) {
+        holding++;
+        Throwable failure = null;
+        try {
+            move.run();
+        } catch (RuntimeException | Error thrown) {
+            failure = thrown;
+            throw thrown;
+        } finally {
+            if (--holding == 0) {
+                boolean refocus = heldRefocus;
+                heldRefocus = false;
+                Runnable landed = () -> workspaceChanged(parentTabs.active(), refocus);
+                try {
+                    if (terminals != null) terminals.atomically(landed); else landed.run();
+                } catch (RuntimeException | Error late) {
+                    // The move's own failure stays the one that propagates.
+                    if (failure == null) throw late;
+                    failure.addSuppressed(late);
+                }
+            }
+        }
+    }
+
+    /** The selected plugin tab; null while a terminal tab is selected or the window is empty. */
+    public Tab selectedContent() { Tab tab = selectedTab(); return tab != null && tab.kind() == Tab.Kind.HOSTED ? tab : null; }
+    /** The shown tab's active pane's item; null in an empty workspace. */
+    Tab selectedTab() { return parentTabs.active().selected(); }
+    /** This window's items: its tabs in strip order, each one's items pane by pane. */
+    java.util.List<Tab> tabs() { return parentTabs.tabs(); }
+    int tabCount() { return parentTabs.tabCount(); }
+    /** The tab showing {@code component}; null when none of this window's does. */
+    Tab tab(Component component) {
+        for (Tab tab : tabs()) if (tab.component() == component) return tab;
+        return null;
+    }
+    /** The shown parent tab's workspace. */
+    WorkspaceView workspace() { return parentTabs.active(); }
+    /** The window's parent tabs. */
+    ParentTabsView parentTabs() { return parentTabs; }
+
+    /**
+     * What this window holds (tabs and panes spec 4): its parent tabs with their layouts, and the one that shows.
+     *
+     * @return the parent tabs
+     */
+    public ParentTabs windowLayout() { return parentTabs.model(); }
+
+    /** Whether {@code moving} holds tabs and the registry would move every one ({@code TabRegistry.movable}, Rulings 7). */
+    private boolean movable(java.util.List<Tab> moving) {
+        return !moving.isEmpty() && moving.stream().allMatch(tab -> registry.movable(tab));
+    }
+
+    /**
+     * Whether Move Tab to New Window may take {@code parentTab}: one of this window's, beside another parent tab, holding
+     * tabs that may all move; never without a window manager (tabs and panes spec 6; workspace plan 7b Rulings 7, plan 8a
+     * Rulings 6).
+     */
+    boolean mayMoveTabToNewWindow(ParentTabId parentTab) {
+        if (closed || manager == null || parentTab == null) return false;
+        Optional<WorkspaceView> view = parentTabs.view(parentTab);
+        return view.isPresent() && parentTabs.count() > 1 && movable(view.get().tabs());
+    }
+
+    /**
+     * Whether Move to Main Window may take this window's tabs: a full window's that the window manager opened, every one
+     * of which may move (Rulings 7).
+     */
+    boolean mayMoveToMainWindow() { return !closed && manager != null && !isMain() && movable(tabs()); }
+
+    /**
+     * Whether Move Pane to New Tab may take {@code tab} (tabs and panes spec 9; workspace plan 8b Rulings 9): an item of
+     * this window whose tab holds another pane, neither pinned nor being closed.
+     *
+     * @param tab an item, or null
+     * @return whether it would move
+     */
+    boolean mayMoveToNewTab(Tab tab) {
+        if (closed || tab == null || !registry.movable(tab)) return false;
+        return parentTabs.holding(tab).map(view -> view.tabCount() > 1).orElse(false);
+    }
+
+    /**
+     * Move Pane to New Tab (tabs and panes spec 9): {@code tab}'s pane leaves its tab for a new tab right after it, which
+     * shows; its other panes stay, nothing closes and nothing leaves the window. Nothing when {@link #mayMoveToNewTab}
+     * says no.
+     *
+     * @param tab an item of this window
+     */
+    void moveToNewTab(Tab tab) { if (mayMoveToNewTab(tab)) parentTabs.moveToNewTab(tab); }
+
+    /**
+     * A pane drag's drop beside {@code group}, a pane of this window (tabs and panes spec 7; workspace plan 8c Rulings
+     * 12): {@code tab}'s pane moves there on {@code side}, within its tab a layout change, into another tab leaving its
+     * tab, which goes with its last pane; the item then takes the focus. Nothing closes, nothing leaves the window and the
+     * registry hears no move. Nothing for an item that is pinned or being closed, or one this window does not hold.
+     *
+     * @param tab an item of this window
+     * @param group another pane of this window
+     * @param side where the item's pane goes
+     */
+    void movePane(Tab tab, GroupId group, Side side) {
+        if (closed || tab == null || !registry.movable(tab) || !parentTabs.contains(tab)) return;
+        parentTabs.moveBeside(tab, group, side);
+        selectTab(tab);
+    }
+
+    /**
+     * A pane drag's drop on a new-tab place of this window's strip (tabs and panes spec 7): Move Pane to New Tab's move,
+     * the new tab at {@code index} of the strip, which takes it at once (workspace plan 8c Rulings 9); the item then takes
+     * the focus. Nothing when {@link #mayMoveToNewTab} says no, as for its tab's only pane (Rulings 8).
+     *
+     * @param tab an item of this window
+     * @param index where the new tab goes among the strip's entries
+     */
+    void movePaneToNewTab(Tab tab, int index) {
+        if (!mayMoveToNewTab(tab)) return;
+        parentTabs.bar().atOnce(() -> parentTabs.moveToNewTab(tab, index));
+        selectTab(tab);
+    }
+
+    /**
+     * The tabs Move Pane to Tab offers {@code item} (pane flexibility spec 4): this window's other tabs, in strip order;
+     * none for an item a pane drag may not move (pinned, being closed, a restorer's; workspace plan 9a Rulings 7), and
+     * none in a window of one tab.
+     *
+     * @param item an item, or null
+     * @return the tabs, each numbered as Select Tab numbers it
+     */
+    java.util.List<OtherTab> paneTargets(Tab item) {
+        if (closed || item == null || !registry.movable(item)) return java.util.List.of();
+        return parentTabOf(item).map(this::otherTabs).orElse(java.util.List.of());
+    }
+
+    /** This window's tabs but {@code own}, numbered from 1 in strip order, each titled as the strip's tab list titles it. */
+    private java.util.List<OtherTab> otherTabs(ParentTabId own) {
+        var others = new ArrayList<OtherTab>();
+        java.util.List<WorkspaceView> views = parentTabs.views();
+        for (int i = 0; i < views.size(); i++) {
+            WorkspaceView view = views.get(i);
+            if (!view.id().equals(own) && view.selected() != null)
+                others.add(new OtherTab(view.id(), i + 1, WindowTabs.capped(tabTitle(view.selected())), view.selected().id()));
+        }
+        return others;
+    }
+
+    /**
+     * Whether Move Pane to Tab would move {@code item} into the tab at {@code index} of this window's strip: one of
+     * {@link #paneTargets}, so another tab than its own.
+     *
+     * @param item an item, or null
+     * @param index a place in the strip, 0 for the first
+     * @return whether it would move
+     */
+    boolean mayMoveToTab(Tab item, int index) {
+        return paneTargets(item).stream().anyMatch(other -> other.number() == index + 1);
+    }
+
+    /**
+     * Move Pane to Tab (pane flexibility spec 4): {@code item}'s pane moves to the right of the active pane of the tab at
+     * {@code index} of the strip, as a pane drag drops it there ({@link #movePane}; workspace plan 9a Rulings 6): that tab
+     * shows, the item takes the focus, a maximized pane there stops being maximized and the item's old tab goes with its
+     * last pane. Nothing when {@link #mayMoveToTab} says no.
+     *
+     * @param item an item of this window
+     * @param index a place in the strip, 0 for the first
+     */
+    void moveToTab(Tab item, int index) {
+        if (!mayMoveToTab(item, index)) return;
+        movePane(item, parentTabs.views().get(index).model().activeGroup(), Side.RIGHT);
+    }
+
+    /**
+     * The tabs Move Tab Into offers the tab {@code id} (pane flexibility spec 5): this window's other tabs, in strip order;
+     * none while it holds an item that may not move (a dialog open in a pane, one being closed; workspace plan 9a Rulings
+     * 7), and none in a window of one tab.
+     *
+     * @param id a tab of this window
+     * @return the tabs, each numbered as Select Tab numbers it
+     */
+    java.util.List<OtherTab> tabTargets(ParentTabId id) {
+        if (closed || id == null) return java.util.List.of();
+        Optional<WorkspaceView> view = parentTabs.view(id);
+        return view.isPresent() && movable(view.get().tabs()) ? otherTabs(id) : java.util.List.of();
+    }
+
+    /**
+     * Move Tab Into (pane flexibility spec 5): every pane of the tab {@code id} goes to the right of the active pane of the
+     * tab {@code into}, as {@link #mergeTab} moves them. Nothing unless {@link #tabTargets} offers {@code into}.
+     *
+     * @param id a tab of this window
+     * @param into another tab of this window
+     */
+    void moveTabInto(ParentTabId id, ParentTabId into) {
+        if (tabTargets(id).stream().noneMatch(other -> other.id().equals(into))) return;
+        parentTabs.view(into).ifPresent(target -> mergeTab(id, target.model().activeGroup(), Side.RIGHT));
+    }
+
+    /**
+     * Move Tab Into, and a tab's entry dropped beside a pane (pane flexibility spec 5): every pane of the tab {@code id}
+     * goes on {@code side} of {@code group}, a pane of another tab of this window, as one nested split that keeps their
+     * arrangement and sizes; that tab shows, its maximize ended, and the moved tab's active item takes the focus, so the
+     * tab is named after it (workspace plan 9a Rulings 10 to 12 and 16). Nothing closes, nothing leaves the window and
+     * the registry hears no move. Nothing for a tab holding an item that may not move, a pane of the tab itself or one
+     * the window does not hold.
+     *
+     * @param id a tab of this window
+     * @param group a pane of another tab of this window
+     * @param side where the tab's panes go
+     */
+    void mergeTab(ParentTabId id, GroupId group, Side side) {
+        WorkspaceView view = closed ? null : parentTabs.view(id).orElse(null);
+        if (view == null || !movable(view.tabs())) return;
+        Tab shown = view.selected();
+        parentTabs.moveInto(id, group, side);
+        if (parentTabs.view(id).isEmpty()) selectTab(shown);
+    }
+
+    /**
+     * Whether Move Tab Into would move the tab {@code id} into the tab at {@code index} of this window's strip: one of
+     * {@link #tabTargets}, so another tab than {@code id}.
+     *
+     * @param id a tab of this window, or null
+     * @param index a place in the strip, 0 for the first
+     * @return whether it would move
+     */
+    boolean mayMoveTabIntoTab(ParentTabId id, int index) {
+        return tabTargets(id).stream().anyMatch(other -> other.number() == index + 1);
+    }
+
+    /**
+     * Move Tab Into Tab 1 to 9, and the Tab menu's Move Tab Into (pane flexibility spec 5; workspace plan 9a Rulings
+     * 22): every pane of the tab {@code id} goes to the right of the active pane of the tab at {@code index} of the
+     * strip, as {@link #moveTabInto(ParentTabId, ParentTabId)} moves them. Nothing when {@link #mayMoveTabIntoTab} says
+     * no.
+     *
+     * @param id a tab of this window, or null
+     * @param index a place in the strip, 0 for the first
+     */
+    void moveTabIntoTab(ParentTabId id, int index) {
+        if (mayMoveTabIntoTab(id, index)) moveTabInto(id, parentTabs.views().get(index).id());
+    }
+
+    /**
+     * Move Tab Into's submenu for the tab {@code parent} (pane flexibility spec 5; workspace plan 9a Rulings 9): an entry
+     * for each other tab of the window, its number and title as plain text, that moves every pane of {@code parent} into
+     * that tab; disabled while there is none.
+     */
+    private JMenu tabMoves(ParentTabId parent) {
+        var moves = new JMenu("Move Tab Into");
+        var targets = tabTargets(parent);
+        for (OtherTab target : targets) {
+            var entry = PlainText.item(target.label());
+            entry.addActionListener(event -> moveTabInto(parent, target.id()));
+            moves.add(entry);
+        }
+        moves.setEnabled(!targets.isEmpty());
+        return moves;
+    }
+
+    /**
+     * Takes {@code moving}, other windows' tabs, into this window's parent tab {@code parentTab} through the tab registry,
+     * one move each, so each keeps its content and session and reports {@code TAB_MOVED} once (parent tabs spec 5;
+     * workspace plan 7b Rulings 6). A parent tab this window lacks opens under that id at {@code index} of the bar, in
+     * place of the window's empty workspace (the main window's, or a new full window's). That parent tab then takes
+     * {@code arranged} ({@link WorkspaceView#rearrange}) and shows, and {@code arranged}'s active tab is selected, focused
+     * and raised. A tab the registry does not move stays where it was; the first failure propagates once the others have
+     * moved. While such a tab stays in its window (a listener pinned it mid-move, or its move failed), the tabs that
+     * arrived keep the places they landed in, in that parent tab's own panes, and {@code arranged}, whose ids that window
+     * still holds, is not applied: no pane is in two windows (parent tabs spec 4). A receive that runs within another
+     * one, from a listener say, leaves the outer one's landing as it was.
+     *
+     * @param moving the tabs, in the order they move
+     * @param parentTab the parent tab they land in
+     * @param index where a new parent tab goes in the bar
+     * @param arranged the parent tab's layout once they are all in
+     * @return whether a tab moved in
+     */
+    boolean receive(java.util.List<Tab> moving, ParentTabId parentTab, int index, Layout arranged) {
+        if (closed) return false;
+        Throwable failure = null;
+        Landing outer = landing;
+        landing = new Landing(parentTab, index);
+        try {
+            for (Tab tab : moving) {
+                try {
+                    registry.move(tab, id);
+                } catch (RuntimeException | Error thrown) {
+                    failure = WindowManager.keep(failure, thrown);
+                }
+            }
+        } finally {
+            landing = outer;
+        }
+        WorkspaceView view = closed ? null : parentTabs.view(parentTab).orElse(null);
+        boolean arrived = view != null && moving.stream().anyMatch(view::contains);
+        boolean leftBehind = moving.stream().anyMatch(tab -> !tab.closed() && (view == null || !view.contains(tab)));
+        if (arrived) {
+            if (!leftBehind) view.rearrange(arranged);
+            Tab shown = view.selected();
+            if (shown != null) {
+                try {
+                    registry.select(shown);
+                } catch (RuntimeException | Error thrown) {
+                    failure = WindowManager.keep(failure, thrown);
+                }
+            }
+        }
+        WindowManager.rethrow(failure);
+        return arrived;
+    }
+    /**
+     * Takes {@code tab}, another window's item, into a new tab at {@code index} of this window's strip (its end past it),
+     * through the tab registry, one move, its content and session untouched (tabs and panes spec 7; workspace plan 8c
+     * Rulings 12): a pane dropped on a new-tab place of this window's strip. A tab moving in takes its place at once.
+     * Nothing once the window has closed; a receive that runs within another leaves the outer one's landing as it was.
+     *
+     * @param tab another window's item
+     * @param index where the new tab goes among the strip's entries
+     */
+    void receiveAsTab(Tab tab, int index) {
+        if (closed) return;
+        Landing outer = landing;
+        landing = new Landing(ParentTabId.random(), index);
+        try {
+            registry.move(tab, id);
+        } finally {
+            landing = outer;
+        }
+    }
+    TabRegistry tabRegistry() { return registry; }
+    boolean windowActive() { return active; }
+    dev.jasper.app.config.AnimationSettings animations() { return animations; }
+    String tabTitle(Tab tab) {
+        return tab.kind() == Tab.Kind.TERMINAL ? tab.title()
+            : (tab.dirty() ? "\u25cf " : "") + tab.title() + (tab.detail().isEmpty() ? "" : "  " + tab.detail());
+    }
+    Icon tabIcon(Tab tab) { return tab.icon(); }
+    String tabTooltip(Tab tab) { return tab.kind() == Tab.Kind.TERMINAL ? tabTitle(tab) : tab.location(); }
+    /** Whether a terminal tab's shell runs, which its strip entry tells assistive technology. */
+    boolean running(Tab tab) {
+        return tab.content() instanceof TerminalContent terminal && terminal.pane().running();
+    }
+    /**
+     * A tab's menu, from its strip entry (tabs and panes spec 6 and 10; workspace plan 8a Rulings 8), for the tab holding
+     * {@code item}: Rename Tab while {@code item} is a terminal, Move Tab to New Window, Move Tab Into (pane flexibility
+     * spec 5), a rule, Close Tab, then
+     * {@code item}'s own commands. Move to Main Window moves the whole window, so the window menu and the context menu
+     * offer it alone. Empty for an item this window does not hold.
+     *
+     * @param item the item the entry shows, its tab's active pane's
+     * @return the menu
+     */
+    JPopupMenu tabMenu(Tab item) {
+        var menu = new JPopupMenu();
+        parentTabOf(item).ifPresent(parent -> {
+            if (item.kind() == Tab.Kind.TERMINAL)
+                menu.add(tabMenuItem("Rename Tab", ActionId.RENAME_TAB, () -> { selectTab(item); invoke(ActionId.RENAME_TAB); }));
+            menu.add(windowItem(ActionId.MOVE_TAB_TO_NEW_WINDOW, item));
+            menu.add(tabMoves(parent));
+            menu.addSeparator();
+            menu.add(tabMenuItem(ActionId.CLOSE_TAB.label(), ActionId.CLOSE_TAB, () -> closeParentTab(parent)));
+            if (!item.commands().isEmpty()) menu.addSeparator();
+            for (var command : item.commands()) {
+                var entry = PlainText.item(command.title());
+                entry.setEnabled(command.enabled()); entry.setAccelerator(command.shortcut());
+                // A menu kept open across a selection change runs the command of the content selected now, if enabled.
+                entry.addActionListener(event -> {
+                    Tab current = selectedContent();
+                    if (current == null) return;
+                    current.commands().stream().filter(value -> value.id().equals(command.id()) && value.enabled())
+                        .findFirst().ifPresent(value -> value.run().run());
+                });
+                menu.add(entry);
+            }
+        });
+        dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        return menu;
+    }
+
+    /**
+     * The window menu's entries (tabs and panes spec 6; workspace plan 8a Rulings 7): Move Tab to New Window in every
+     * window, then Move to Main Window in a full window.
+     *
+     * @return the entries in menu order
+     */
+    java.util.List<ActionId> windowMenuItems() {
+        return isMain() ? java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW)
+            : java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TO_MAIN_WINDOW);
+    }
+
+    /**
+     * The ⋮'s menu (tabs and panes spec 6): {@link #windowMenuItems()}, each enabled as its action is, for the shown
+     * parent tab.
+     *
+     * @return the menu
+     */
+    JPopupMenu windowMenu() {
+        updateActions();
+        var menu = new JPopupMenu();
+        for (ActionId id : windowMenuItems()) {
+            var item = new JMenuItem(action(id));
+            item.putClientProperty("html.disable", true);
+            menu.add(item);
+        }
+        dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        return menu;
+    }
+
+    /** A menu entry for {@code id}, one of {@link #windowMenuItems()}, acting on {@code tab}'s parent tab or this window. */
+    private JMenuItem windowItem(ActionId id, Tab tab) {
+        Runnable run = switch (id) {
+            case MOVE_TAB_TO_NEW_WINDOW -> () -> moveTabToNewWindow(tab);
+            case MOVE_TO_MAIN_WINDOW -> this::moveToMainWindow;
+            default -> throw new IllegalArgumentException("Not a window menu entry: " + id);
+        };
+        var item = tabMenuItem(id.label(), id, run);
+        // Enabled only while every tab the entry would move may move (workspace plan 7b Rulings 7).
+        item.setEnabled(switch (id) {
+            case MOVE_TAB_TO_NEW_WINDOW -> parentTabOf(tab).map(this::mayMoveTabToNewWindow).orElse(false);
+            case MOVE_TO_MAIN_WINDOW -> mayMoveToMainWindow();
+            default -> false;
+        });
+        return item;
+    }
+
+    /** A tab menu item showing {@code shortcut}'s binding, if any, that runs {@code run}. */
+    private JMenuItem tabMenuItem(String title, ActionId shortcut, Runnable run) {
+        var item = new JMenuItem(title);
+        if (shortcut != null) item.setAccelerator(bindings().strokeFor(shortcut).orElse(null));
+        item.addActionListener(event -> run.run());
+        return item;
+    }
+    public void focusSelected() { Tab tab = selectedTab(); if (tab != null) tab.focus(); }
+    public boolean mayClose() { return registry.mayClose(() -> registry.inWindow(id)); }
 
     ToolWindowArea area() { return area; }
     DockState dock() { return dock; }
@@ -924,6 +1921,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** The window's stripes. */
     StripeSet stripes() { return stripes; }
     DockDrag dockDrag() { return dockDrag; }
+    /** The drag this window's strip starts with a tab and its panes with a modifier press. */
+    TabDrag tabDrag() { return tabDrag; }
+    /** The window manager that opened this window: its moves to other windows go through it. */
+    void manager(WindowManager value) { manager = Objects.requireNonNull(value, "value"); }
+
+    /** The window manager that opened this window, which carries a drag out of it; empty for any other window. */
+    Optional<WindowManager> manager() { return Optional.ofNullable(manager); }
+
+    /** Shares the window manager's tab drag; a drag of this window's own ends first. */
+    void tabDrag(TabDrag shared) {
+        tabDrag.cancel();
+        tabDrag = Objects.requireNonNull(shared, "shared");
+    }
     boolean railVisible() { return railVisible; }
 
     void setRailVisible(boolean value) {
@@ -942,8 +1952,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * predict this rule for the layout after the drop.
      */
     void syncRailVisibility() {
-        boolean left = railsEnabled() && !leftStripe.empty(), right = railsEnabled() && !rightStripe.empty();
-        boolean bottom = stripes.bottom().map(strip -> railsEnabled() && !strip.empty()).orElse(false);
+        // A child window has no stripes: its workspace fills the centre surface edge to edge (workspace tabs spec 6.3).
+        boolean rails = isMain() && railsEnabled();
+        boolean left = rails && !leftStripe.empty(), right = rails && !rightStripe.empty();
+        boolean bottom = stripes.bottom().map(strip -> rails && !strip.empty()).orElse(false);
         area.setStripesVisible(left, right);
         boolean bottomChanged = stripes.bottom().map(strip -> strip.isVisible() != bottom).orElse(false);
         if (leftStripe.isVisible() != left || rightStripe.isVisible() != right || bottomChanged) {
@@ -963,167 +1975,260 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     JToolBar toolbar() { return chrome.toolbar(); }
     WindowStatusBar status() { return chrome.status(); }
     JMenuBar menuBar() { return chrome.menuBar(); }
-    JTabbedPane tabStrip() { return tabs; }
-    /** The equal tabs; the default look's tests read them. */
-    WindowTabs windowTabs() { return (WindowTabs) windowTabs; }
-    TabStrip tabBar() { return windowTabs; }
-    private void refreshTabs() { windowTabs.refresh(); }
+    /** The window's equal tabs; the default look's tests read them. */
+    WindowTabs windowTabs() { return (WindowTabs) tabBar(); }
+    /** The window's one tab strip (tabs and panes spec 5). */
+    TabStrip tabBar() { return parentTabs.bar().strip(); }
+    private void refreshTabs() { parentTabs.refresh(); }
 
-    public TerminalTab currentTab() { return tabs.getSelectedComponent() instanceof TerminalTab tab ? tab : null; }
-    public TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
+    /** The active tab's terminal; null while a plugin's tab is active or the workspace is empty. */
+    public TerminalContent currentTerminal() {
+        Tab tab = selectedTab();
+        return tab != null && tab.content() instanceof TerminalContent terminal ? terminal : null;
+    }
+    public TerminalPane currentPane() { return currentTerminal() == null ? null : currentTerminal().pane(); }
     /**
      * Where a tab or window opened from here starts: the current pane's {@link TerminalPane#inheritableDirectory};
      * null, meaning where a new shell starts, when there is no pane or it has no directory of its own.
      */
     Path directory() { return currentPane() == null ? null : currentPane().inheritableDirectory(); }
 
-    /** A tab whose shell starts in {@code directory}; null means where a new shell starts (the user's home). */
-    public void newTab(Path directory) { openTab(directory); }
+    /**
+     * New Tab (tabs and panes spec 10): a terminal in a new tab at the end of the strip, shown, starting in
+     * {@code directory}. The main window's empty workspace takes it in its only tab, the one tab that may be empty
+     * (workspace plan 7a Rulings 7).
+     *
+     * @param directory where its shell starts; null means where a new shell starts
+     * @return the terminal; null once the window has closed
+     */
+    public TerminalContent newTab(Path directory) { return openTab(directory); }
 
-    TerminalTab openTab(Path directory) { return openTab(directory, null); }
+    /** Shows the parent tab {@code id} and focuses its active tab (workspace plan 7a Rulings 10); nothing for another window's. */
+    void selectParentTab(ParentTabId id) {
+        if (closed || parentTabs.view(id).isEmpty()) return;
+        parentTabs.select(id);
+        focusSelected();
+    }
+
+    /** Select Tab 1 to 9: the tab at {@code index} of the strip; nothing past the last. */
+    void selectParentTabAt(int index) {
+        var all = parentTabs.model().parentTabs();
+        if (index >= 0 && index < all.size()) selectParentTab(all.get(index).id());
+    }
+
+    /** Next and Previous Tab: the tab {@code delta} places along the strip, wrapping around. */
+    void selectParentTabRelative(int delta) { if (parentTabs.count() > 1) selectParentTab(parentTabs.model().step(delta)); }
+
+    /**
+     * Close Tab (tabs and panes spec 10): the items of every pane of the tab {@code id} as one gesture, after their
+     * guards; the tab goes with its last pane (spec 4).
+     */
+    void closeParentTab(ParentTabId id) { parentTabs.view(id).ifPresent(view -> closeTabs(view.tabs())); }
+
+    /** The parent tab holding {@code tab}; empty for a tab this window does not hold. */
+    Optional<ParentTabId> parentTabOf(Tab tab) { return parentTabs.holding(tab).map(WorkspaceView::id); }
+
+    /** The shown parent tab. */
+    ParentTabId activeParentTab() { return parentTabs.model().active(); }
+
+    /** How many parent tabs this window has. */
+    int parentTabCount() { return parentTabs.count(); }
+
+    /**
+     * A parent tab dragged along this window's bar (parent tabs spec 5): it takes {@code index} among the others, and
+     * the one that shows stays.
+     */
+    void reorderParentTab(ParentTabId id, int index) { if (!closed) parentTabs.reorder(id, index); }
+
+    TerminalContent openTab(Path directory) { return openTab(directory, null); }
 
     /** {@code requestOrNull} makes the tab's first pane a provided session instead of a local shell. */
-    TerminalTab openTab(Path directory, SessionRequest requestOrNull) { return openTab(directory, requestOrNull, Optional.empty()); }
+    TerminalContent openTab(Path directory, SessionRequest requestOrNull) { return openTab(directory, requestOrNull, Optional.empty()); }
 
     /** As above; {@code profile} names a local first pane's shell profile, empty for the user's default. */
-    TerminalTab openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile) {
+    TerminalContent openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile) {
         return openTab(directory, requestOrNull, profile, Optional.empty());
     }
 
     /** As above; {@code program} runs in the local first pane instead of its shell. */
-    TerminalTab openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile, Optional<java.util.List<String>> program) {
-        if (closed) return null;
-        TerminalTab tab = new TerminalTab(directory, launcher, requestOrNull, profile, program);
-        if (terminals != null) terminals.tabOpened(tab);
-        tab.onChanged = () -> {
-            for (TerminalPane pane : tab.panes()) if (pane.view() == null) pane.applyTheme(themes.current());
-            update();
-        };
-        tab.onEmpty = () -> closeTab(tab);
-        tab.onError = (message, cause) -> onLaunchFailure.accept(message, cause);
-        tab.lastInWindow = () -> tabs.getTabCount() == 1;
-        tab.configure = pane -> configurePane(tab, pane);
-        tab.onPaneCreated = pane -> connectActivity(tab, pane);
-        for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
-        WorkspaceTheme.apply(tab, themes.current());
-        tab.setBackground(themes.current().surface());
-        tab.setBackgroundOpacity((float) backgroundOpacity);
-        for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current());
-        tabs.addTab(tab.title(), tab);
-        tabs.setSelectedComponent(tab); update(); tab.start();
-        return tab;
-    }
-
-    private void connectActivity(TerminalTab tab, TerminalPane pane) {
-        emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
-        report(new TerminalEvent.PaneOpened(tab.id(), pane.id()));
-        pane.onCommandStarted = command -> {
-            long startedAt = System.nanoTime();
-            emit(new WorkspaceActivity.Started(pane.id(), command, () -> System.nanoTime() - startedAt,
-                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); },
-                pane.watched() && isActiveAndOpen() && tab == currentTab()));
-            report(new TerminalEvent.CommandStarted(pane.id(), command));
-        };
-        pane.onTitleChanged = title -> {
-            emit(new WorkspaceActivity.TitleChanged(pane.id(), title));
-            report(new TerminalEvent.TitleChanged(pane.id(), title));
-        };
-        pane.onClosed = () -> {
-            emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.CLOSED));
-            report(new TerminalEvent.PaneClosed(tab.id(), pane.id()));
-        };
-        pane.onPaneFocused = () -> {
-            emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.FOCUSED));
-            report(new TerminalEvent.PaneFocused(tab.id(), pane.id()));
-        };
-        pane.onPaneBlurred = () -> emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.BLURRED));
-        pane.onCommandFinished = (command, exitStatus, duration, workingDirectory, remote) -> {
-            emit(new WorkspaceActivity.Finished(pane.id(), command, exitStatus, duration,
-                new WorkspaceActivity.Origin(anyWindowActive.getAsBoolean(), isActiveAndOpen(),
-                    tab == currentTab(), pane.view() != null && pane.view().isFocusOwner()),
-                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); }));
-            report(new TerminalEvent.CommandFinished(pane.id(), command, exitStatus, duration, workingDirectory, remote));
-        };
-        pane.onDirectoryChanged = (directory, remote) -> report(new TerminalEvent.DirectoryChanged(pane.id(), directory, remote));
-        pane.onBell = () -> report(new TerminalEvent.Bell(tab.id(), pane.id()));
-        pane.onStarted = () -> report(new TerminalEvent.SessionStarted(pane.id()));
-        pane.onExited = status -> report(new TerminalEvent.SessionExited(pane.id(), status));
-        pane.onConnecting = () -> report(new TerminalEvent.SessionConnecting(pane.id()));
-    }
-
-    private void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }
-
-    private void configurePane(TerminalTab tab, TerminalPane pane) {
-        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.blocksActions();
-        pane.applyTheme(themes.current());
-        ConfigSnapshot configured = workspaceConfiguration.snapshot();
-        float configuredFontSize = workspaceConfiguration.configuredFontSize();
-        if (configured == null) {
-            pane.view().setFontSize(configuredFontSize);
-        } else {
-            pane.view().applyOptions(configured.viewOptions(configuredFontSize, themes.current().palette()));
-            pane.setConfiguredDim(configured.terminal().dimInactivePanes());
-            pane.setShellExitBehavior(configured.terminal().onExit());
-        }
-        pane.view().setShortcutHandler(event -> dispatchShortcut(KeyStroke.getKeyStrokeForEvent(event), pane.view()));
-        pane.view().setContextMenuHandler(event -> {
-            selectTab(tab); tab.focus(pane); pane.focusTerminal(); update();
-            JPopupMenu popup = chrome.contextMenu();
-            popup.show(pane.view(), event.getX(), event.getY());
-        });
-        pane.view().setFileLinkHandler(link -> openFileLink(pane, link));
-        if (!firstTerminalSeen) {
-            firstTerminalSeen = true;
-            try {
-                firstTerminal.accept(pane);
-            } catch (RuntimeException failure) {
-                LOG.log(System.Logger.Level.WARNING, "The first-terminal observer failed", failure);
-            }
-        }
+    TerminalContent openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile, Optional<java.util.List<String>> program) {
+        return openTerminal(directory, requestOrNull, profile, program, null, null);
     }
 
     /**
-     * A Cmd-click on a file in {@code pane}: resolved against the pane's local directory and given to {@link #onOpenFile}.
-     * A provided session, or a shell that reports a directory on another host, opens nothing.
+     * A terminal starting in {@code directory} (null: where a new shell starts), in a new tab of its own, or in a new
+     * pane on {@code side} of {@code beside} when that is given. Null once the window has closed.
      */
-    private void openFileLink(TerminalPane pane, FileLink link) {
-        Optional<Path> local = pane.localDirectory();
-        if (local.isEmpty()) return;
-        FileLinks.resolve(link.path(), local, Path.of(System.getProperty("user.home")),
-                System.getProperty("os.name", "").startsWith("Windows"), pane.wsl())
-            .ifPresent(file -> onOpenFile.accept(file, link.line()));
-    }
-
-    void selectTab(Component tab) {
-        if (tabs.indexOfComponent(tab) >= 0) { tabs.setSelectedComponent(tab); focusSelected(); }
-    }
-
-    void reorderTab(int from, int to) {
-        if (from == to || from < 0 || to < 0 || from >= tabs.getTabCount() || to >= tabs.getTabCount()) return;
-        Component selected = tabs.getSelectedComponent();
-        Component tab = tabs.getComponentAt(from);
-        String title = tabTitle(tab);
-        rearranging = true;
+    private TerminalContent openTerminal(Path directory, SessionRequest requestOrNull, Optional<String> profile,
+                                         Optional<java.util.List<String>> program, GroupId beside, Side side) {
+        if (closed) return null;
+        // A plugin's session opened while its saved tab is rebuilt here takes that tab's place (workspace tabs spec 13); any
+        // other terminal tab is refused until the restorer is done (workspace plan 6b Rulings 24).
+        Optional<TabId> saved = requestOrNull == null ? Optional.empty() : registry.slot(requestOrNull.providerId(), id);
+        if (saved.isEmpty() && registry.restoring(id)) return null;
+        TabId tabId = saved.orElseGet(TabId::random);
+        TerminalContent terminal = new TerminalContent(tabId, directory, launcher, requestOrNull, profile, program);
+        Tab tab = registry.add(tabId, Tab.Kind.TERMINAL, terminal, id);
+        tab.focusTarget(terminal::focusTerminal);
+        if (requestOrNull != null) tab.restore(requestOrNull.restore());
+        if (saved.isPresent()) {
+            // The restore places it with the window's other tabs; its session connects when it is first shown.
+            terminal.pane().restored();
+            registry.restored(tab);
+            return terminal;
+        }
         try {
-            tabs.removeTabAt(from); tabs.insertTab(title, null, tab, null, to);
-            tabs.setSelectedComponent(selected);
-        } finally { rearranging = false; }
-        update();
+            attach(tab, true, beside, side);
+        } catch (RuntimeException | Error failure) {
+            // attach mounted nothing; the registered tab and its pane go with the failure (workspace plan 3a Rulings 28).
+            try { tab.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            throw failure;
+        }
+        terminal.start();
+        return terminal;
     }
 
-    public void closeTab(Component tab) {
-        var entry = hosted.get(tab);
-        if (entry != null) { entry.requestClose(); return; }
-        if (!(tab instanceof TerminalTab terminal)) return;
-        int index = tabs.indexOfComponent(tab);
-        if (index < 0) return;
-        Runnable change = () -> {
-            terminal.close();
-            if (terminals != null) terminals.tabClosed(terminal);
-            tabs.removeTabAt(index); update();
-        };
-        if (terminals != null) terminals.atomically(change); else change.run();
-        if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
+    /**
+     * Split Right or Split Down (workspace tabs spec 11, workspace plan 3a Rulings 11): a terminal tab in a new group on
+     * {@code side} of the active group; beside a running terminal in its directory with its profile, otherwise (beside a
+     * plugin's view or a terminal whose shell ended) where a new tab from here starts, with the default profile. On an
+     * empty workspace it opens in the empty group. Null once the window has closed.
+     */
+    public TerminalContent split(Side side) {
+        TerminalContent target = currentTerminal();
+        if (target != null && target.pane().running())
+            return openBeside(target, side, null, null, target.pane().profile(), Optional.empty());
+        return openTerminal(directory(), null, Optional.empty(), Optional.empty(), workspace().model().activeGroup(), side);
+    }
+
+    /**
+     * A terminal tab in a new group on {@code side} of {@code target}'s group (spec 9.4), starting in
+     * {@code directoryOrNull}, else where {@code target} is; a request makes it a provided session. Null when the target
+     * is not this window's or its shell is not running.
+     */
+    TerminalContent openBeside(TerminalContent target, Side side, Path directoryOrNull, SessionRequest requestOrNull,
+                               Optional<String> profile, Optional<java.util.List<String>> program) {
+        Tab beside = target == null ? null : tab(target);
+        if (closed || beside == null || !target.pane().running()) return null;
+        GroupId group = parentTabs.groupOf(beside.id()).orElseThrow();
+        Path directory = directoryOrNull == null ? target.pane().inheritableDirectory() : directoryOrNull;
+        return openTerminal(directory, requestOrNull, profile, program, group, side);
+    }
+
+    /** Maximize Pane: the active pane fills the workspace, or the splits come back. */
+    void toggleMaximize() { workspace().toggleMaximize(); }
+
+    /** Focus Pane: the neighbouring pane that way takes focus with its selected tab; nothing past the edge. */
+    void focusGroup(Side side) {
+        WorkspaceView workspace = workspace();
+        workspace.neighbour(side).ifPresent(group -> {
+            workspace.activate(group);
+            focusSelected();
+        });
+    }
+
+    /** The terminal tab holding {@code pane}; null when none of this window's does. */
+    TerminalContent terminalOf(TerminalPane pane) {
+        for (TerminalContent terminal : terminalTabs()) if (terminal.pane() == pane) return terminal;
+        return null;
+    }
+
+    /**
+     * Focus went into {@code tab} (a click, a traversal, a focus request): it becomes the window's active tab and its
+     * group the active group, while focus stays where it went (workspace plan 3a Rulings 26). Null, or a tab that is
+     * already active, changes nothing.
+     */
+    void tabFocused(Tab tab) {
+        // Only the shown parent tab can hold the focus.
+        if (!closed && tab != null) parentTabs.holding(tab).filter(view -> view == parentTabs.active()).ifPresent(view -> view.focused(tab));
+    }
+
+    /** The tab whose component holds {@code component}; null when none of this window's does. */
+    Tab tabHolding(Component component) {
+        for (Tab tab : tabs()) if (SwingUtilities.isDescendingFrom(component, tab.component())) return tab;
+        return null;
+    }
+
+    /**
+     * The component a press at {@code point} on {@code source} lands on: the deepest at that place under its native window,
+     * or for content in no native window (a headless test's) under its outermost component; {@code source} when none is
+     * there. In a window AWT hands a press to the deepest component with mouse listeners, or else to the frame, so a press
+     * on a view's bare area comes from an ancestor of the view. A popup or the drag overlay over the place is what it
+     * lands on.
+     */
+    private static Component under(Component source, Point point) {
+        Component root = SwingUtilities.getRoot(source);
+        if (root == null) { root = source; while (root.getParent() != null) root = root.getParent(); }
+        Point at = SwingUtilities.convertPoint(source, point, root);
+        Component deepest = SwingUtilities.getDeepestComponentAt(root, at.x, at.y);
+        return deepest == null ? source : deepest;
+    }
+
+    void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }
+
+    /** This window's configuration, or null before the first one arrives. */
+    ConfigSnapshot configured() { return workspaceConfiguration.snapshot(); }
+
+    /** How much an inactive pane dims: the configured {@code terminal.dim_inactive_panes} (workspace plan 8a Rulings 12). */
+    float paneDim() {
+        ConfigSnapshot configured = configured();
+        return (configured == null ? ConfigSnapshot.defaults() : configured).terminal().dimInactivePanes();
+    }
+
+    /** Every tab's panes take their dim again, after the configured amount changed. */
+    void dimPanes() { if (!closed) for (WorkspaceView view : parentTabs.views()) view.dimPanes(); }
+
+    /** A pane's view is ready: the first in this window runs the start-up timing, once. */
+    void terminalConfigured(TerminalPane pane) {
+        if (firstTerminalSeen) return;
+        firstTerminalSeen = true;
+        try {
+            firstTerminal.accept(pane);
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "The first-terminal observer failed", failure);
+        }
+    }
+
+    /** Shows the tab holding {@code component}, as a click on its strip entry does. */
+    void selectTab(Component component) { selectTab(tab(component)); }
+
+    /**
+     * Selects {@code tab} in its parent tab and activates its group, before that parent tab shows, then shows it and
+     * focuses the tab: no other tab of a hidden parent tab turns active on the way.
+     */
+    void selectTab(Tab tab) {
+        WorkspaceView view = closed ? null : parentTabs.holding(tab).orElse(null);
+        if (view == null) return;
+        // The item first, while its tab may still hide, so no other item of that tab turns active on the way.
+        view.select(tab);
+        parentTabs.select(view.id());
+        focusSelected();
+    }
+
+    /** Closes the tab holding {@code component}. */
+    public void closeTab(Component component) { closeTab(tab(component)); }
+
+    /**
+     * Closes {@code tab}: a plugin's tab once its guard allows it; a terminal tab at once, its registry facts published as
+     * one change (workspace plan 3a Rulings 4).
+     */
+    public void closeTab(Tab tab) {
+        if (!parentTabs.contains(tab)) return;
+        if (tab.kind() == Tab.Kind.HOSTED) { tab.requestClose(); return; }
+        if (terminals != null) terminals.atomically(tab::close); else tab.close();
+    }
+
+    /**
+     * Closes {@code batch} on one decision: the plugin tabs' guards answer once and a refusal closes nothing; then every
+     * tab of the batch closes, terminal tabs included, their registry facts published as one change when the guards
+     * answered at once. A batch of terminal tabs alone needs no approval and closes at once, as one change.
+     */
+    void closeTabs(java.util.List<Tab> batch) {
+        var live = batch.stream().filter(parentTabs::contains).toList();
+        if (live.isEmpty()) return;
+        boolean terminalsOnly = live.stream().allMatch(tab -> tab.kind() == Tab.Kind.TERMINAL);
+        Runnable close = terminalsOnly ? () -> registry.removeAll(live) : () -> registry.requestClose(live);
+        if (terminals != null) terminals.atomically(close); else close.run();
     }
 
     boolean dispatchShortcut(KeyStroke stroke, Component source) {
@@ -1157,7 +2262,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return shortcutTarget(stroke, source).isPresent();
     }
 
-    private static boolean nativeContentClipboard(dev.jasper.app.contributions.ContentEntry document, KeyStroke stroke) {
+    private static boolean nativeContentClipboard(dev.jasper.app.contributions.Tab document, KeyStroke stroke) {
         return document.commands().stream().anyMatch(command ->
             stroke.equals(command.shortcut()) && (command.id().equals("copy") || command.id().equals("paste")));
     }
@@ -1195,8 +2300,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                     && SwingUtilities.isDescendingFrom(focus, entry.component());
             }
             case PANEL -> contributed != null && contributed.panelContains(context.owner(), focus);
-            // Plugin windows get the Keymap in plan K4; nothing in a terminal window is inside one.
-            case WINDOW -> false;
         };
     }
 
@@ -1210,19 +2313,20 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void updateActions() { workspaceActions.update(); }
 
     void update() {
-        if (closed) return;
-        for (int i = 0; i < tabs.getTabCount(); i++) {
-            Component tab = tabs.getComponentAt(i);
-            tabs.setTitleAt(i, tabTitle(tab));
-            if (tab instanceof TerminalTab terminal) terminal.setActive(active && tab == currentTab());
-            else { var entry = hosted.get(tab); if (entry != null) entry.active(tab == selectedComponent()); }
+        // A held move's items hear where it ends, once (workspace plan 8c Rulings 17).
+        if (closed || holding > 0) return;
+        Tab selected = selectedTab();
+        for (Tab tab : tabs()) {
+            // Every tab is active while it is the window's active tab; a terminal's dimming also follows the window.
+            if (tab.content() instanceof TerminalContent terminal) terminal.setActive(active && tab == selected);
+            tab.active(tab == selected);
         }
         TerminalPane pane = currentPane();
         String size = pane == null || pane.session() == null ? "Starting terminal" :
             pane.session().columns() + " \u00d7 " + pane.session().rows();
         chrome.status().setMetadata(pane == null ? null : pane.snapshot(), pane == null ? "" : size, pane != null && pane.running());
         chrome.status().setContent(selectedContent());
-        onTitle.accept(selectedComponent() == null ? "Jasper" : tabTitle(selectedComponent()));
+        onTitle.accept(selected == null ? "Jasper" : tabTitle(selected));
         syncContentBindings();
         updateActions(); refreshTabs(); onMinimumSizeChanged.run();
         if (terminals != null) terminals.refresh();
@@ -1326,40 +2430,27 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Updates all retained panes without reparenting them; the native boundary hooks in last. */
     void applyTheme(ResolvedTheme theme, boolean updateDelegates) {
         if (closed) return;
-        var retained = terminalTabs();
-        retained.forEach(TerminalTab::beginThemeUpdate);
-        try {
-            if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
-            if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
-            for (DockStripe stripe : stripes.all()) stripe.refreshTheme();
-            area.refreshTheme();
-            area.setTerminalBackground(theme.surface());
-            WorkspaceTheme.apply(windowTabs.component(), theme);
-            windowTabs.refresh();
-            for (var component : new ArrayList<>(hosted.keySet())) {
-                var entry = hosted.get(component);
-                if (entry != null) WorkspaceTheme.apply(entry.component(), theme, () -> hosted.get(component) == entry);
-            }
-            if (updateDelegates && contributed != null) contributed.refreshTheme();
-            for (TerminalTab tab : retained) {
-                WorkspaceTheme.apply(tab, theme);
-                tab.setBackground(theme.surface());
-                for (TerminalPane pane : tab.panes()) {
-                    // Zoom detaches sibling panes from the visible component hierarchy.
-                    if (updateDelegates && !SwingUtilities.isDescendingFrom(pane, this)) SwingUtilities.updateComponentTreeUI(pane);
-                    pane.applyTheme(theme);
-                }
-            }
-            setBackground(theme.surface());
-            tabs.setBackground(theme.surface());
-            chrome.refreshTheme();
-            if (commandPalette != null) commandPalette.refreshTheme();
-            onThemeChanged.accept(theme); update();
-            requestGlass();
-            revalidate(); repaint();
-        } finally {
-            retained.forEach(TerminalTab::endThemeUpdate);
+        if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
+        if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
+        for (DockStripe stripe : stripes.all()) stripe.refreshTheme();
+        area.refreshTheme();
+        area.setTerminalBackground(theme.surface());
+        // A group the maximize keeps out of the tree updates its delegates there; split positions follow the weights.
+        parentTabs.applyTheme(theme, updateDelegates);
+        for (Tab tab : new ArrayList<>(tabListeners.keySet()))
+            if (tab.kind() != Tab.Kind.TERMINAL) WorkspaceTheme.apply(tab.component(), theme, () -> tabListeners.containsKey(tab));
+        if (updateDelegates && contributed != null) contributed.refreshTheme();
+        for (TerminalContent terminal : terminalTabs()) {
+            WorkspaceTheme.apply(terminal, theme);
+            terminal.setBackground(theme.surface());
+            terminal.pane().applyTheme(theme);
         }
+        setBackground(theme.surface());
+        chrome.refreshTheme();
+        if (commandPalette != null) commandPalette.refreshTheme();
+        onThemeChanged.accept(theme); update();
+        requestGlass();
+        revalidate(); repaint();
     }
 
     /**
@@ -1391,9 +2482,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         float value = (float) opacity;
         boolean glass = value < 1f;
         area.setGlass(value);
-        tabs.setOpaque(!glass);
-        for (TerminalTab tab : terminalTabs()) tab.setBackgroundOpacity(value);
-        windowTabs.refresh();
+        parentTabs.setGlass(glass);
+        for (TerminalContent terminal : terminalTabs()) terminal.setBackgroundOpacity(value);
+        parentTabs.refresh();
         repaint();
         glassListener.run();
     }
@@ -1420,7 +2511,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * @return from 0.1 to 1
      */
     public double workspaceOpacity(Component component) {
-        return component != null && SwingUtilities.isDescendingFrom(component, tabs) ? backgroundOpacity : 1;
+        return component != null && SwingUtilities.isDescendingFrom(component, parentTabs) ? backgroundOpacity : 1;
     }
 
     /** Runs when this window's background opacity changes, or hosted content enters or leaves it while translucent.
@@ -1472,7 +2563,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     void setAnimations(dev.jasper.app.config.AnimationSettings settings) {
         if (closed) return;
-        if (windowTabs != null) windowTabs.setAnimations(settings);
+        animations = settings;
+        parentTabs.setAnimations(settings);
         commandPalette.setAnimations(settings);
     }
 
@@ -1480,7 +2572,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         requireSize("Tab height", height, MIN_TAB_HEIGHT, MAX_TAB_HEIGHT);
         if (closed || tabHeight == height) return;
         tabHeight = height;
-        if (windowTabs != null) { windowTabs.component().revalidate(); windowTabs.component().repaint(); }
+        parentTabs.revalidateStrips();
         onTabHeightChanged.run();
         revalidate(); repaint();
         JRootPane root = SwingUtilities.getRootPane(this);
@@ -1491,8 +2583,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void setActive(boolean value) {
         if (!value && commandPalette != null) commandPalette.windowDeactivated();
         // A modal dialog opening takes the drag's release, and so does another application taking focus.
-        if (!value) dockDrag.cancel();
-        active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();
+        if (!value) { dockDrag.cancel(); tabDrag.cancelFrom(this); }
+        if (classicWindowTitle != null) classicWindowTitle.setActive(value);
+        active = value;
+        if (childTitleColors != null) childTitleColors.run();
+        update();
     }
     void setToolbarMode(ToolbarMode mode) {
         toolbarMode = Objects.requireNonNull(mode); refreshChromeVisibility(); updateActions();
@@ -1511,38 +2606,44 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
+        focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
+        Toolkit.getDefaultToolkit().removeAWTEventListener(paneClicks);
         if (bodyLease != null) { bodyLease.close(); bodyLease = null; }
         dockDrag.cancel();
+        tabDrag.cancelFrom(this);
         paletteKeys.close();
         if (contributed != null) { contributed.close(rememberLayout); contributed = null; }
         area.close();
         commandPalette.close(); windowCommands.close(); commands.close();
         scopes.close();
         closed = true;
-        if (contentHost != null) { contentHost.close(); contentHost = null; }
-        for (var component : new ArrayList<>(hosted.keySet())) {
-            WorkspaceTheme.clear(hosted.get(component).component());
-        }
         syncPaletteDispatcher();
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};
-        if (windowTabs != null) windowTabs.close();
         uninstallCornerLayer();
         if (cornerLayer != null) { cornerLayer.removePropertyChangeListener("preferredSize", cornerResized); cornerLayer = null; }
         themeRegistration.close();
-        Runnable closeTabs = () -> {
-            for (TerminalTab tab : terminalTabs()) { tab.close(); if (terminals != null) terminals.tabClosed(tab); }
-        };
-        if (terminals != null) terminals.atomically(closeTabs); else closeTabs.run();
-        tabs.removeAll(); removeRootBindings();
+        // Leaving the registry removes the tabs this window still holds: each closes and is announced closed.
+        java.util.List<Tab> held = registry.inWindow(id);
+        Throwable leaving = null;
+        try { if (terminals != null) terminals.atomically(host::close); else host.close(); }
+        catch (RuntimeException | Error failure) { leaving = failure; }
+        for (Tab tab : held) WorkspaceTheme.clear(tab.component());
+        parentTabs.close(); removeRootBindings();
         if (terminals != null) { terminals.close(); terminals = null; }
         workspaceActions.disable();
         refreshTabs();
+        if (titleBand != null) { titleBand.close(); titleBand = null; }
         onThemeChanged = theme -> {};
+        childTitleColors = null;
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; fileChooser = folder -> java.util.Optional.empty();
+        onLayoutChanged = () -> {};
         activityListeners.clear();
         anyWindowActive = () -> false;
+        // A tab that failed to close does not leave the window half closed; its failure still reaches the caller.
+        if (leaving instanceof Error error) throw error;
+        if (leaving != null) throw (RuntimeException) leaving;
     }
 }

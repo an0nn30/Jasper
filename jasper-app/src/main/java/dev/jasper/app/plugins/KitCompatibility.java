@@ -20,7 +20,12 @@ final class KitCompatibility {
         "dev/jasper/sdk/settings/SettingsPanel$View",
         "dev/jasper/sdk/ui/BundledIcon",
         "dev/jasper/sdk/ui/IconName",
-        "dev/jasper/sdk/ui/PanelFactory$View")));
+        "dev/jasper/sdk/ui/PanelFactory$View"),
+        // The plugin windows SDK 0.20 removed with workspace tabs.
+        "0.20", List.of(
+        "dev/jasper/sdk/ui/PluginWindow",
+        "dev/jasper/sdk/ui/WindowSpec",
+        "dev/jasper/sdk/ui/WindowSpec$SizeBasis")));
     private static final Map<String, String> MEMBERS = removed(Map.of("0.15", List.of(
         "dev/jasper/sdk/notifications/NotificationSpec#withIcon(Ljavax/swing/Icon;)Ldev/jasper/sdk/notifications/NotificationSpec;",
         "dev/jasper/sdk/palette/PaletteRow#withIcon(Ljavax/swing/Icon;)Ldev/jasper/sdk/palette/PaletteRow;",
@@ -46,7 +51,6 @@ final class KitCompatibility {
         "dev/jasper/sdk/ui/PanelSpec#iconName()Ljava/lang/String;",
         "dev/jasper/sdk/ui/Panels#registerView(Ldev/jasper/sdk/ui/PanelSpec;Ldev/jasper/sdk/ui/PanelFactory$View;)Ldev/jasper/sdk/Subscription;",
         "dev/jasper/sdk/ui/PluginDialog#setContent(Ljavax/swing/JComponent;)V",
-        "dev/jasper/sdk/ui/PluginWindow#setContent(Ljavax/swing/JComponent;)V",
         "dev/jasper/sdk/ui/StatusItem#setIcon(Ljavax/swing/Icon;)V",
         "dev/jasper/sdk/ui/SyntaxPalette#current()Ldev/jasper/sdk/ui/SyntaxPalette;",
         "dev/jasper/sdk/ui/ToolbarItem#menu(Ljavax/swing/Icon;Ljava/lang/String;Ljava/util/List;)Ldev/jasper/sdk/ui/ToolbarItem;",
@@ -64,7 +68,20 @@ final class KitCompatibility {
         "dev/jasper/sdk/ui/Nodes$FormKind#HERO_COMPACTLdev/jasper/sdk/ui/Nodes$FormKind;",
         "dev/jasper/sdk/ui/Nodes$LayoutRole#HEROLdev/jasper/sdk/ui/Nodes$LayoutRole;",
         "dev/jasper/sdk/ui/Nodes$TextRole#HERO_TITLELdev/jasper/sdk/ui/Nodes$TextRole;",
-        "dev/jasper/sdk/ui/Nodes$IconSize#HEROLdev/jasper/sdk/ui/Nodes$IconSize;")));
+        "dev/jasper/sdk/ui/Nodes$IconSize#HEROLdev/jasper/sdk/ui/Nodes$IconSize;"),
+        // The members SDK 0.19 removed with workspace tabs.
+        "0.19", List.of(
+        "dev/jasper/sdk/terminal/TabHandle#activePane()Ljava/util/Optional;",
+        "dev/jasper/sdk/terminal/TabHandle#panes()Ljava/util/List;",
+        "dev/jasper/sdk/terminal/ExitPolicy#CLOSE_PANELdev/jasper/sdk/terminal/ExitPolicy;",
+        "dev/jasper/sdk/ui/StandardMenu#PANELdev/jasper/sdk/ui/StandardMenu;"),
+        // The members SDK 0.20 removed with plugin windows and the separate workspace; Windows.create and every PluginWindow
+        // member name a removed type, which the type check finds first.
+        "0.20", List.of(
+        "dev/jasper/sdk/ui/ContentTab#move(Z)V",
+        "dev/jasper/sdk/ui/ContentTab#isSeparate()Z",
+        "dev/jasper/sdk/ui/ShortcutContext#window(Ljava/lang/String;)Ldev/jasper/sdk/ui/ShortcutContext;",
+        "dev/jasper/sdk/ui/ShortcutContext$Kind#WINDOWLdev/jasper/sdk/ui/ShortcutContext$Kind;")));
 
     private static Map<String, String> removed(Map<String, List<String>> byVersion) {
         var removed = new HashMap<String, String>();

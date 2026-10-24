@@ -1,6 +1,7 @@
 package dev.jasper.ui.testsupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.ui.theme.JasperTheme;
@@ -10,6 +11,13 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class KitFixturesTest {
+    @Test void colourResolvesSemanticAndDerivedKeysOnTheTheme() {
+        var light = KitFixtures.enterpriseLight();
+        assertThat(KitFixtures.colour(light, "surface.app")).isEqualTo(light.semantic().color(SemanticColor.SURFACE_APP));
+        assertThat(KitFixtures.colour(light, "surface.header.active")).isEqualTo(dev.jasper.ui.theme.DerivedColor.SURFACE_HEADER_ACTIVE.color(light));
+        assertThatIllegalArgumentException().isThrownBy(() -> KitFixtures.colour(light, "surface.nowhere")).withMessageContaining("surface.nowhere");
+    }
+
     @Test void theFixturesAreSlateCobaltAndCustomDiffersInEveryOpaqueRole() {
         assertThat(KitFixtures.dark()).isSameAs(JasperTheme.bundled().generated(true));
         assertThat(KitFixtures.light()).isSameAs(JasperTheme.bundled().generated(false));
@@ -26,7 +34,7 @@ class KitFixturesTest {
     @Test void theThemeSetIsTheShippedVariantsThenTheConvertedOnes() {
         assertThat(KitFixtures.themes()).extracting(theme -> theme.name() + (theme.dark() ? " Dark" : " Light")).containsExactly(
             "Slate Cobalt Dark", "Slate Cobalt Light", "Catppuccin Latte Light", "Catppuccin Frappé Dark",
-            "Catppuccin Macchiato Dark", "Catppuccin Mocha Dark", "Ubuntu Yaru Dark", "Ubuntu Yaru Light", "Ocean Dark", "Ocean Dawn Light", "Stray Dark",
+            "Catppuccin Macchiato Dark", "Catppuccin Mocha Dark", "Ubuntu Yaru Dark", "Ubuntu Yaru Light", "Jasper Meadow Dark", "Jasper Meadow Light", "Ocean Dark", "Ocean Dawn Light", "Stray Dark",
             "Enterprise Dark", "Enterprise Light");
         assertThat(KitFixtures.themes().getFirst()).isSameAs(KitFixtures.dark());
     }
@@ -84,29 +92,20 @@ class KitFixturesTest {
         assertThat(KitFixtures.marked().semantic()).isEqualTo(KitFixtures.marked(KitFixtures.dark()).semantic());
     }
 
-    /** Plan 4c Rulings 20: Enterprise Light names spec 7.6's Light roles and overrides; the rest is Slate Cobalt Light's. */
-    @org.junit.jupiter.api.Test void enterpriseLightIsSpecSevenSixsLightTable() {
-        var theme = KitFixtures.enterpriseLight();
-        org.assertj.core.api.Assertions.assertThat(theme.name()).isEqualTo("Enterprise");
-        org.assertj.core.api.Assertions.assertThat(theme.dark()).isFalse();
-        org.assertj.core.api.Assertions.assertThat(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(0xECEDEF));
-        org.assertj.core.api.Assertions.assertThat(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT)).isEqualTo(new java.awt.Color(0x2F65CA));
-        org.assertj.core.api.Assertions.assertThat(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL)).isEqualTo(new java.awt.Color(0xB4B8BF));
-        org.assertj.core.api.Assertions.assertThat(dev.jasper.ui.theme.DerivedColor.SURFACE_TABLE_HEADER.color(theme)).isEqualTo(new java.awt.Color(0xF0F1F3));
-        org.assertj.core.api.Assertions.assertThat(dev.jasper.ui.theme.DerivedColor.SURFACE_ZEBRA.color(theme)).isEqualTo(new java.awt.Color(0xF7F8FA));
-        org.assertj.core.api.Assertions.assertThat(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL)).as("an unnamed role")
-            .isEqualTo(KitFixtures.light().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL));
-        // The ruled roles follow the named ones, as JasperTheme derives them for a theme file.
-        var semantic = theme.semantic();
-        for (var rule : java.util.Map.of(dev.jasper.ui.theme.SemanticColor.BORDER_FOCUS, dev.jasper.ui.theme.SemanticColor.ACCENT,
-                dev.jasper.ui.theme.SemanticColor.SURFACE_STATUS, dev.jasper.ui.theme.SemanticColor.SURFACE_APP,
-                dev.jasper.ui.theme.SemanticColor.BORDER_IDENTITY, dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL,
-                dev.jasper.ui.theme.SemanticColor.HUE_BLUE_SURFACE, dev.jasper.ui.theme.SemanticColor.HUE_BLUE,
-                dev.jasper.ui.theme.SemanticColor.HUE_GREEN_SURFACE, dev.jasper.ui.theme.SemanticColor.HUE_GREEN,
-                dev.jasper.ui.theme.SemanticColor.HUE_AMBER_SURFACE, dev.jasper.ui.theme.SemanticColor.HUE_AMBER,
-                dev.jasper.ui.theme.SemanticColor.HUE_PURPLE_SURFACE, dev.jasper.ui.theme.SemanticColor.HUE_PURPLE,
-                dev.jasper.ui.theme.SemanticColor.HUE_NEUTRAL_SURFACE, dev.jasper.ui.theme.SemanticColor.HUE_NEUTRAL).entrySet())
-            org.assertj.core.api.Assertions.assertThat(semantic.color(rule.getKey())).as(rule.getKey().key()).isEqualTo(semantic.color(rule.getValue()));
-        org.assertj.core.api.Assertions.assertThat(semantic.color(dev.jasper.ui.theme.SemanticColor.HUE_BLUE_SURFACE)).isEqualTo(new java.awt.Color(0x2F65CA));
+    /** The Enterprise fixtures are the shipped theme file's Light and Dark variants. */
+    @org.junit.jupiter.api.Test void theEnterpriseFixturesAreTheShippedThemeFile() throws Exception {
+        var file = java.nio.file.Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize()
+            .resolve("plugins/enterprise/src/main/resources/themes/enterprise.json");
+        var shipped = dev.jasper.ui.theme.JasperTheme.parse(java.nio.file.Files.readString(file), "enterprise");
+        for (var fixture : java.util.List.of(KitFixtures.enterpriseLight(), KitFixtures.enterpriseDark())) {
+            var variant = shipped.generated(fixture.dark());
+            org.assertj.core.api.Assertions.assertThat(fixture.name()).isEqualTo("Enterprise");
+            org.assertj.core.api.Assertions.assertThat(fixture.semantic()).isEqualTo(variant.semantic());
+            org.assertj.core.api.Assertions.assertThat(fixture.derivedOverrides()).isEqualTo(variant.derivedOverrides());
+        }
+        org.assertj.core.api.Assertions.assertThat(KitFixtures.enterpriseLight().dark()).isFalse();
+        org.assertj.core.api.Assertions.assertThat(KitFixtures.enterpriseDark().dark()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(KitFixtures.themes()).as("the theme set ends with them")
+            .endsWith(KitFixtures.enterpriseDark(), KitFixtures.enterpriseLight());
     }
 }

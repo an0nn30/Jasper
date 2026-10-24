@@ -8,6 +8,14 @@ class FakeKitTest { @Test void kitOwnsCreatedViews() throws Exception {
   assertThat(kit.views()).containsExactly(view); view.close(); assertThat(kit.views()).isEmpty(); kit.close();
  });
 }
+ @Test void specializedContentFollowsFakeHostFontChanges() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
+  var kit=new FakeKit("editor");kit.contentFont(new java.awt.Font("Serif",0,17));
+  var view=kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Custom("custom",dev.jasper.sdk.ui.ControlState.READY,"content",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"Document")),event -> {});
+  var content=new javax.swing.JComponent() {};var changes=new java.util.ArrayList<java.awt.Font>();content.addPropertyChangeListener("font",event -> changes.add((java.awt.Font)event.getNewValue()));
+  view.registerContent(new dev.jasper.sdk.ui.CustomContent("content",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,content,() -> {}));
+  assertThat(content.getFont().getFamily()).isEqualTo("Serif");kit.contentFont(new java.awt.Font("SansSerif",0,20));
+  assertThat(content.getFont().getFamily()).isEqualTo("SansSerif");assertThat(changes).hasSize(2);kit.close();
+ });}
  @Test void plugInTestsSimulateAnInputMethodComposingInAField() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
   var kit=new FakeKit("sample");var view=(FakeKitView)kit.create(KitContractTest.results("new",5),e -> {});
   assertThat(view.composing("query")).isFalse();

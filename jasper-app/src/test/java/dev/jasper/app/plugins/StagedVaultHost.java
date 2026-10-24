@@ -1,10 +1,14 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.presentation.Projections;
+import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.ui.Presentation;
 import java.awt.Component;
 import java.awt.Container;
 import java.nio.file.Path;
@@ -48,7 +52,14 @@ final class StagedVaultHost implements AutoCloseable {
 
     StagedVaultHost(Path data, boolean dark) throws Exception { this(data, dark, null); }
 
-    StagedVaultHost(Path data, boolean dark, WorkspaceAppearanceFixture appearance) throws Exception {
+    StagedVaultHost(Path data, boolean dark, WorkspaceAppearanceFixture appearance) throws Exception { this(data, dark, appearance, false); }
+
+    /**
+     * {@code enterprise}: the host reports {@link #enterprisePresentation()} before the Vault starts, so it composes its
+     * classic layout (plan 10b, plan 15a). The caller installs the Enterprise kit and theme first
+     * ({@code EnterpriseLook.controller}).
+     */
+    StagedVaultHost(Path data, boolean dark, WorkspaceAppearanceFixture appearance, boolean enterprise) throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins")).resolve(UnboundVault.ID);
         UnboundVault.settings(data);
         contributions = onEdtValue(Contributions::new);
@@ -60,14 +71,27 @@ final class StagedVaultHost implements AutoCloseable {
         host = AppContractTest.host(data, Duration.ofMillis(200), contributions, new AtomicBoolean(dark), auxiliary, terminals.registry,
             new NotificationsFixture(problems), new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(),
             PluginRuntime.ShellProfiles.NONE, new CopyOnWriteArrayList<>(), appearance, GlassSource.NONE);
+        if (enterprise) host.presentation = enterprisePresentation();
         loader = new PluginClassLoader(UnboundVault.ID, ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(), Map.of());
         plugin = (Plugin) loader.loadClass("dev.jasper.vault.VaultPlugin").getConstructor().newInstance();
         var opened = new AtomicReference<UUID>();
         onEdt(() -> {
             host.start(new HostedPlugin(VAULT, Set.of(), Set.of(), Set.of("dev.jasper.vault.api"), loader, () -> plugin));
-            opened.set(terminals.addWindow()); terminals.activateWindow(opened.get());
+            // The main window: the Vault's manager is a dialog over it.
+            opened.set(terminals.addMainWindow()); terminals.activateWindow(opened.get());
         });
         window = opened.get();
+    }
+
+    /**
+     * What the Enterprise look on Linux reports to plugins: its chrome's plugin projection, its kit and its defaults.
+     *
+     * @return the presentation a staged consumer reads under Enterprise
+     */
+    static Presentation enterprisePresentation() {
+        return HostedPresentation.of(Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise",
+            new Projections.Host(Projections.Platform.LINUX, false)).plugins(), EnterpriseLook.kit(),
+            EnterpriseResources.facts().parsed().orElseThrow().defaults());
     }
 
     /** Starts another plugin (on the test class loader) after the Vault, for example an API consumer. */
@@ -160,12 +184,12 @@ final class StagedVaultHost implements AutoCloseable {
         readyImport.accept(review);
         onEdt(() -> click(review,"commit")); pending.get(20, java.util.concurrent.TimeUnit.SECONDS);
         await(() -> review.closed(),"managed import closed");
-        var managerWindowField = plugin.getClass().getDeclaredField("managerWindow"); managerWindowField.setAccessible(true);
+        var managerDialogField = plugin.getClass().getDeclaredField("managerDialog"); managerDialogField.setAccessible(true);
         onEdt(() -> {
             try {
-                Object windowOwner = managerWindowField.get(plugin);
-                windowOwner.getClass().getMethod("show",dev.jasper.sdk.terminal.WindowHandle.class,Optional.class)
-                    .invoke(windowOwner,consumer.get().terminals().window(window).orElseThrow(),Optional.of(selected));
+                Object managerDialog = managerDialogField.get(plugin);
+                managerDialog.getClass().getMethod("show",dev.jasper.sdk.terminal.WindowHandle.class,Optional.class)
+                    .invoke(managerDialog,consumer.get().terminals().window(window).orElseThrow(),Optional.of(selected));
             } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
             var rows = (dev.jasper.ui.model.Nodes.ItemList)node(surface("Credential Vault"),"rows");
             assertThat(rows.items()).hasSize(5);
@@ -179,6 +203,40 @@ final class StagedVaultHost implements AutoCloseable {
             catch (ReflectiveOperationException e) { throw new AssertionError(e); }
         });
         result.get(20,java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    /** Saves synthetic logins ({name, username, password}) through the Vault's own manager, as an editor's Save does (plan 10b). */
+    List<UUID> seedLogins(String[][] logins) throws Exception {
+        var managerField = plugin.getClass().getDeclaredField("manager"); managerField.setAccessible(true);
+        Object manager = onEdtValue(() -> { try { return managerField.get(plugin); } catch (ReflectiveOperationException e) { throw new AssertionError(e); } });
+        Class<?> account = loader.loadClass("dev.jasper.vault.model.Account"), auth = loader.loadClass("dev.jasper.vault.model.Auth");
+        Class<?> password = loader.loadClass("dev.jasper.vault.model.Auth$Password");
+        var modified = java.time.Instant.parse("2026-09-24T12:00:00Z");
+        var ids = new java.util.ArrayList<UUID>();
+        for (String[] login : logins) {
+            UUID id = UUID.randomUUID(); ids.add(id);
+            Object value = account.getConstructor(UUID.class, String.class, String.class, auth, java.time.Instant.class, java.time.Instant.class)
+                .newInstance(id, login[0], login[1], password.getConstructor(char[].class).newInstance((Object) login[2].toCharArray()), modified, modified);
+            invokeSave(manager, "saveAccount", account, value);
+        }
+        settle();
+        return List.copyOf(ids);
+    }
+
+    /** Delivers {@code event} to the open manager's view, as its kit would from a click or a key (plan 10b). */
+    void dispatchToManager(dev.jasper.sdk.ui.UiEvent event) throws InterruptedException {
+        onEdt(() -> {
+            try {
+                Object managerDialog = field(plugin, "managerDialog"), panel = field(managerDialog, "panel");
+                var view = panel.getClass().getDeclaredMethod("view"); view.setAccessible(true);
+                ((HostedKitView) view.invoke(panel)).dispatch(event);
+            } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        });
+        settle();
+    }
+
+    private static Object field(Object owner, String name) throws ReflectiveOperationException {
+        var declared = owner.getClass().getDeclaredField(name); declared.setAccessible(true); return declared.get(owner);
     }
 
     static Component named(Container root, String name) {
@@ -267,9 +325,11 @@ final class StagedVaultHost implements AutoCloseable {
 
     @Override public void close() throws Exception {
         var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
+        var workers = PluginShutdownTestSupport.capture(host);
         try {
             onEdt(() -> pending.set(host.stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).join();
+            workers.await();
         } finally {
             onEdt(auxiliary::close);
             loader.close();

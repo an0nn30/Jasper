@@ -38,7 +38,7 @@ class ErrorsViewTest {
     private final Incidents incidents = new Incidents(clock);
     private final List<String> copied = new ArrayList<>();
     private final List<String> disabled = new ArrayList<>();
-    private int logFolders, dones;
+    private int logFolders;
 
     /** Views a test opens; each is closed afterwards, so no stale view (or its UI listeners) outlives its test. */
     private final List<ErrorsView> opened = new ArrayList<>();
@@ -50,9 +50,9 @@ class ErrorsViewTest {
     private ErrorsView track(ErrorsView view) { opened.add(view); return view; }
 
     private ErrorsView view() {
-        return track(new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.context(), incidents, new ErrorsView.Hooks(id -> id.equals("dev.jasper.remote") ? "Remote" : id,
+        return track(new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.workspaceContext(), incidents, new ErrorsView.Hooks(id -> id.equals("dev.jasper.remote") ? "Remote" : id,
             id -> id.equals("dev.jasper.remote") ? "2.1.0" : "", HERE, copied::add, disabled::add, () -> logFolders++),
-            ZoneOffset.UTC, () -> dones++));
+            ZoneOffset.UTC));
     }
 
     private Incident record(String source, String operation, Throwable failure) {
@@ -62,8 +62,8 @@ class ErrorsViewTest {
     @Test void enlargedNarrowFooterKeepsAllActionsSeparateAndListUsable() {
         var themes = ThemeTestSupport.controller(true);
         themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults());
-        var view = new ErrorsView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),incidents,
-            new ErrorsView.Hooks(id->"Plugin",id->"",HERE,copied::add,disabled::add,()->{}),ZoneOffset.UTC,()->{});
+        var view = new ErrorsView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.WORKSPACE),incidents,
+            new ErrorsView.Hooks(id->"Plugin",id->"",HERE,copied::add,disabled::add,()->{}),ZoneOffset.UTC);
         try {
             var incident=record("dev.fixture","operation",new IllegalStateException("failure"));
             var originalTrace=view.traceArea();var document=originalTrace.getDocument();originalTrace.select(1,4);
@@ -71,7 +71,7 @@ class ErrorsViewTest {
             themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system",32));
             view.setSize(600,320);for(int i=0;i<5;i++)dev.jasper.app.testsupport.KitTestSupport.layout(view);
             var heading=List.of(view.disableButton(),view.copyButton());
-            var footer=List.of(view.logFolderButton(),view.clearButton(),view.doneButton());
+            var footer=List.of(view.logFolderButton(),view.clearButton());
             for(var group:List.of(heading,footer))for(int i=0;i<group.size();i++) {
                 var box=bounds(group.get(i),view);
                 assertThat(box.width).isGreaterThanOrEqualTo(group.get(i).getPreferredSize().width);
@@ -84,7 +84,7 @@ class ErrorsViewTest {
             reveal(viewport.getParent());
             trace.scrollRectToVisible(new java.awt.Rectangle(0,0,1,trace.getFontMetrics(trace.getFont()).getHeight()));
             assertThat(trace.getVisibleRect().height).as("trace %s viewport %s visible %s",trace.getBounds(),viewport.getBounds(),trace.getVisibleRect()).isGreaterThanOrEqualTo(trace.getFontMetrics(trace.getFont()).getHeight());
-            for(var action:List.of(view.disableButton(),view.copyButton(),view.logFolderButton(),view.clearButton(),view.doneButton())) {
+            for(var action:List.of(view.disableButton(),view.copyButton(),view.logFolderButton(),view.clearButton())) {
                 reveal(action);
                 assertThat(action.getVisibleRect().height).isEqualTo(action.getHeight());
             }
@@ -99,8 +99,8 @@ class ErrorsViewTest {
     @Test void freshEnlargedSplitLeavesTraceViewportReachable() {
         var themes=ThemeTestSupport.controller(true);
         themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new dev.jasper.app.config.UiFontConfig("system",32));
-        var view=new ErrorsView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),incidents,
-            new ErrorsView.Hooks(id->"Plugin",id->"",HERE,copied::add,disabled::add,()->{}),ZoneOffset.UTC,()->{});
+        var view=new ErrorsView(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.WORKSPACE),incidents,
+            new ErrorsView.Hooks(id->"Plugin",id->"",HERE,copied::add,disabled::add,()->{}),ZoneOffset.UTC);
         try {
             record("dev.fixture","operation",new IllegalStateException("failure"));
             view.setSize(600,320);for(int i=0;i<6;i++)dev.jasper.app.testsupport.KitTestSupport.layout(view);
@@ -231,26 +231,28 @@ class ErrorsViewTest {
     }
 
     /**
-     * The window is a manager window: a WINDOW form whose body is a list column beside the detail column (the Vault
-     * manager's arrangement without its rail), the incident's heading with its actions, the message and the trace in
-     * detail cards, the sightings caption, and Open Log Folder, Clear and the right-most primary Done in the footer band.
+     * The tab is a manager: a WINDOW form whose body is a list column beside the detail column (the Vault manager's
+     * arrangement without its rail), the incident's heading with its actions, the message and the trace in detail cards,
+     * the sightings caption, and Open Log Folder and Clear in the footer band. The tab strip closes it: no Done, and
+     * Escape cancels nothing.
      */
-    @Test void theWindowIsAManagerListAndDetailWithTheFooterBand() {
+    @Test void theTabIsAManagerListAndDetailWithTheFooterBand() {
         var view = view();
         record("dev.jasper.remote", "panel remote.sftp", new IllegalStateException("broke"));
         view.setSize(900, 560);
         for (int pass = 0; pass < 3; pass++) dev.jasper.app.testsupport.KitTestSupport.layout(view);
         var form = (dev.jasper.ui.model.Nodes.Form) view.kitView().spec().root();
         assertThat(form.kind()).isEqualTo(dev.jasper.ui.model.Nodes.FormKind.WINDOW);
-        assertThat(form.submission()).as("Enter on a row never closes the window").isEqualTo(dev.jasper.ui.model.Nodes.FormSubmission.NONE);
-        assertThat(form.cancelAction()).as("Escape is Done").isEqualTo(ErrorsView.DONE);
+        assertThat(form.submission()).as("Enter on a row submits nothing").isEqualTo(dev.jasper.ui.model.Nodes.FormSubmission.NONE);
+        assertThat(form.cancelAction()).as("Escape leaves the tab open").isEmpty();
+        assertThat(view.kitView().route()).isEqualTo(dev.jasper.ui.theme.ThemeRoute.WORKSPACE);
+        assertThat(view.kitView().isOpaque()).as("a content tab paints its surface").isTrue();
         var columns = (dev.jasper.ui.model.Nodes.Split) form.sections().getFirst();
         assertThat(columns.kind()).isEqualTo(dev.jasper.ui.model.Nodes.SplitKind.SIDEBAR_DETAIL);
         var listColumn = dev.jasper.app.testsupport.KitTestSupport.require(view, "errors.list", javax.swing.JComponent.class);
         assertThat(listColumn.getWidth()).as("the manager list width").isEqualTo(com.formdev.flatlaf.util.UIScale.scale(
             dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.MANAGER_LIST_WIDTH)));
-        assertThat(form.actions()).extracting(dev.jasper.ui.model.Nodes.Button::label).containsExactly("Open Log Folder", "Clear", "Done");
-        assertThat(form.actions().getLast().kind()).isEqualTo(dev.jasper.ui.model.Nodes.ButtonKind.PRIMARY);
+        assertThat(form.actions()).extracting(dev.jasper.ui.model.Nodes.Button::label).containsExactly("Open Log Folder", "Clear");
         var title = bounds(view.titleLabel(), view);
         var source = bounds(view.headerLabel(), view);
         var copy = bounds(view.copyButton(), view);
@@ -263,15 +265,11 @@ class ErrorsViewTest {
         assertThat(copy.x + copy.width).isLessThanOrEqualTo(view.getWidth());
         assertThat(trace.y).as("the trace card under the heading").isGreaterThan(copy.y + copy.height);
         assertThat(sightings.y).as("when it was seen follows the cards").isGreaterThanOrEqualTo(trace.y + trace.height);
-        var done = bounds(view.doneButton(), view);
         var clear = bounds(view.clearButton(), view);
         var folder = bounds(view.logFolderButton(), view);
         assertThat(folder.x + folder.width).isLessThanOrEqualTo(clear.x);
-        assertThat(clear.x + clear.width).isLessThanOrEqualTo(done.x);
-        assertThat(done.y).as("one footer row").isEqualTo(clear.y).isEqualTo(folder.y);
+        assertThat(clear.y).as("one footer row").isEqualTo(folder.y);
         assertThat(view.statusText()).isEqualTo("1 error this session");
-        view.doneButton().doClick();
-        assertThat(dones).as("Done closes the window").isEqualTo(1);
     }
 
     private static java.awt.Rectangle bounds(java.awt.Component component, java.awt.Component root) {
@@ -301,8 +299,8 @@ class ErrorsViewTest {
     }
 
     @Test void textIsNeverMarkup() {
-        var view = track(new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.context(), incidents, new ErrorsView.Hooks(id -> "<html><b>Evil</b>", id -> "", HERE, copied::add,
-            disabled::add, () -> { }), ZoneOffset.UTC, () -> { }));
+        var view = track(new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.workspaceContext(), incidents, new ErrorsView.Hooks(id -> "<html><b>Evil</b>", id -> "", HERE, copied::add,
+            disabled::add, () -> { }), ZoneOffset.UTC));
         record("dev.example.evil", "<html><i>op</i>", new IllegalStateException("<html><u>message</u>"));
         assertThat(view.headerText()).isEqualTo("<html><b>Evil</b> · <html><i>op</i>");
         for (JLabel label : List.of(view.headerLabel(), view.rowLabels(0).get(0), view.rowLabels(0).get(1))) {
@@ -315,8 +313,8 @@ class ErrorsViewTest {
     @Test void theListIsAKitListAndTheTextsStaySelectableAcrossAThemeSwitch() {
         var bindings = dev.jasper.app.testsupport.KitTestSupport.bindings(true);
         try {
-            var kit = bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME);
-            var view = new ErrorsView(kit, incidents, new ErrorsView.Hooks(id -> id, id -> "", HERE, copied::add, disabled::add, () -> { }), ZoneOffset.UTC, () -> { });
+            var kit = bindings.context(dev.jasper.ui.theme.ThemeRoute.WORKSPACE);
+            var view = new ErrorsView(kit, incidents, new ErrorsView.Hooks(id -> id, id -> "", HERE, copied::add, disabled::add, () -> { }), ZoneOffset.UTC);
             Incident first = record("jasper", "a", new IllegalStateException("first"));
             Incident second = record("jasper", "b", new IllegalStateException("second"));
             view.select(first.id());
@@ -335,6 +333,12 @@ class ErrorsViewTest {
             assertThat(second.id()).isNotEqualTo(first.id());
             view.close();
         } finally { bindings.close(); }
+    }
+
+    @Test void aChromeContextIsRefused() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.context(), incidents,
+            new ErrorsView.Hooks(id -> id, id -> "", HERE, copied::add, disabled::add, () -> { }), ZoneOffset.UTC))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("workspace route");
     }
 
     @Test void closingStopsListening() {

@@ -9,11 +9,13 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * One open terminal window, as functions over it. EDT only. {@code openTab} returns the new tab's pane, or empty
- * when the window is closing or the spec cannot be opened.
+ * One open Jasper window, as functions over it: {@code tabs} lists every tab, terminal and content, in workspace order,
+ * and {@code selectedTab} is the active group's selected tab; {@code main} says whether it is the main window rather
+ * than a child window (workspace tabs spec 6). EDT only. {@code openTab} returns the new tab's pane, or empty when the
+ * window is closing or the spec cannot be opened.
  */
 public record WindowEntry(UUID id, Supplier<List<TabEntry>> tabs, Supplier<Optional<TabEntry>> selectedTab, BooleanSupplier active,
-                          Runnable toFront, Function<OpenSpec, Optional<PaneEntry>> openTab) {
+                          BooleanSupplier main, Runnable toFront, Function<OpenSpec, Optional<PaneEntry>> openTab) {
     /** A window is its id. */
     @Override public boolean equals(Object other) { return other instanceof WindowEntry entry && entry.id.equals(id); }
     @Override public int hashCode() { return id.hashCode(); }

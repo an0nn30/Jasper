@@ -29,6 +29,31 @@ def verifySupport = tasks.register('verifyPackagingSupport') {
 }
 tasks.named('check') { dependsOn(verifySupport) }
 
+// Inspect only resolved graph data, never another project's mutable state under --parallel.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.hasTask("${project.path}:installWindowsUser")) {
+        assert !graph.allTasks.any { it.name in ['packageApp', 'packageDist', 'buildLauncher', 'buildWatcher',
+            'buildCommandClient', 'trainAotCache', 'compileCygwinRelayProbe', 'compileConPtyRelayProbe', 'refreshCygwinSeed'] || it.name.startsWith('compileMac') } :
+            'Run installWindowsUser separately from native build and packaging tasks.'
+    }
+}
+verifySupport.configure {
+    doLast {
+        def dependencies = { String name -> tasks.getByName(name).taskDependencies.getDependencies(tasks.getByName(name))*.name }
+        assert dependencies('installWindowsUser').toSet() == ['packageWindowsUser', 'compileWindowsUserInstaller'].toSet()
+        assert dependencies('packageWindowsUser') == ['stageWindowsUser']
+        if (System.getProperty('os.name').startsWith('Windows')) {
+            assert dependencies('stageWindowsUser').containsAll(['stageCygwinSeed', 'cygwinToolJar'])
+            assert dependencies('stageCygwinSeed').contains('acquireCygwinSeed')
+        }
+
+        assert dependencies('uninstallWindowsUser') == ['compileWindowsUserInstaller']
+        assert tasks.named('installWindowsUser').get().mainClass.get() == 'UserInstall'
+        assert tasks.named('uninstallWindowsUser').get().mainClass.get() == 'UserInstall'
+        logger.lifecycle('Verified Windows user installation task wiring')
+    }
+}
+
 verifySupport.configure {
     doLast {
         def mac = bundledNatives('macos', 'aarch64')
@@ -181,6 +206,8 @@ printf '%s\\n' "$@" > "${cache%/*}/options.txt"
         assert trainingConfig.contains('run_in_background = false') && trainingConfig.contains('program = "/bin/sh"')
         assert trainingConfig.contains('args = ["' + new File(work, 'training-shell.sh').absolutePath + '"]')
         assert new File(work, 'training-shell.sh').canExecute()
+        assert new File(work, 'home/.config/jasper/workspace.toml').bytes == aotTrainingWorkspace.bytes
+        assert aotTrainingWorkspace.getText('UTF-8').contains('kind = "terminal"')
         assert aotTrainingConfig(new File('/w/say "hi"/s.sh')).contains('args = ["/w/say \\"hi\\"/s.sh"]')
         expectFailure('Jasper exited (3) before start-up settled') { runAotTraining(fake('exits', 'exit 3\n'), work, 20, 20) }
         expectFailure('start-up settled without OUTPUT_PAINTED, so the cache would miss') {

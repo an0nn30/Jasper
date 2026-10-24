@@ -1,0 +1,259 @@
+<section class="guide" id="contributions">
+<h2>Contributions</h2>
+<p>Everything a plugin adds to the workstation goes through its {@link PluginContext}. Jasper draws all of it in its own
+style and the current look, so a contribution looks built in, and removes all of it when the plugin stops. Ids are
+namespaced: they start with the plugin's id and a dot. Registration needs the UI thread and an open context.</p>
+
+<h3>Map</h3>
+<table>
+<thead><tr><th>Contribution</th><th>Entry point</th><th>Capability</th><th>Where it appears</th></tr></thead>
+<tbody>
+<tr><td>Actions</td><td>{@link Actions#register(ActionSpec,Consumer)}</td><td></td><td>The command palette of every window, Settings › Keymap and its default shortcut; then wherever the plugin places it</td></tr>
+<tr><td>Menu entries</td><td>{@link Menus#standard(StandardMenu)}, {@link Menus#create(String,String)}, {@link Menus#terminalContext()}</td><td></td><td>A section at the end of a built-in menu, a top-level menu of its own, the pane right-click menu</td></tr>
+<tr><td>Toolbar items</td><td>{@link Toolbar#add(ToolbarItem)}</td><td></td><td>In the main window's toolbar, after Jasper's Split and Maximize buttons and before Find and Settings</td></tr>
+<tr><td>Status items and progress</td><td>{@link StatusBar#add(StatusItemSpec)}, {@link StatusBar#addProgress(StatusItemSpec)}</td><td></td><td>Either end of the main window's status bar</td></tr>
+<tr><td>Rail buttons</td><td>{@link Rail#add(String)}</td><td></td><td>The left tool window stripe, after the tool window buttons</td></tr>
+<tr><td>Tool windows</td><td>{@link Panels#register(PanelSpec,PanelFactory)}, {@link Panels#toggle(String,WindowHandle)}</td><td></td><td>A stripe button and a tool window in one of six dock slots of the main window; View › Tool Windows</td></tr>
+<tr><td>Dialogs</td><td>{@link Windows#dialog(DialogSpec)}, {@link Windows#overlay(OverlaySpec)}, {@link Windows#popover(UiAnchor)}</td><td></td><td>Dialogs and sheets, in-window overlays, popovers below a control</td></tr>
+<tr><td>Content tabs</td><td>{@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)}</td><td></td><td>A document in a new tab, a new pane beside the focused one or a new child window, beside terminals</td></tr>
+<tr><td>Split items</td><td>{@link Windows#splitItem(SplitItemSpec,BiConsumer)}</td><td></td><td>Every Split list, after the terminal, with two bindable actions</td></tr>
+<tr><td>Restorers</td><td>{@link Windows#restorer(String,TabRestorer)}</td><td></td><td>The plugin's saved tabs coming back when Jasper restores its windows</td></tr>
+<tr><td>File choosers</td><td>{@link Windows#choose(FileChoice)}, {@link Windows#chooseFiles(WindowOwner,String,Optional)}, {@link Windows#chooseDirectory(WindowOwner,String,Optional)}, {@link Windows#chooseSaveFile(WindowOwner,String,Optional)}</td><td></td><td>Jasper's file chooser, over a Jasper window or one of the plugin's content tabs</td></tr>
+<tr><td>Places in the file chooser</td><td>{@link FileSources#register(FileSource)}</td><td>{@code files.source}</td><td>A section in the chooser's navigation pane, such as Remote's saved hosts</td></tr>
+<tr><td>Palette scopes</td><td>{@link Palette#register(PaletteScope)}</td><td>{@code palette.contribute}</td><td>The command palette and the Run window; see <a href="#palette">Palette</a></td></tr>
+<tr><td>Notifications</td><td>{@link Notifications#group()}, {@link Notifications#group(GroupSpec)}</td><td></td><td>Cards, history and Settings › Appearance &amp; Behavior › Notifications</td></tr>
+<tr><td>Activities and connections</td><td>{@link Activities#begin(ActivitySpec)}, {@link Activities#connection(ConnectionSpec)}</td><td></td><td>Desk Buddy's cards, and outcome notifications</td></tr>
+<tr><td>Local tabs, splits and programs</td><td>{@link Terminals#openTab(WindowHandle,OpenRequest)}, {@link Terminals#split(PaneHandle,Direction,OpenRequest)} with a local request</td><td>{@code terminal.open}</td><td>Terminal tabs and panes; see <a href="#terminals">Terminals</a></td></tr>
+<tr><td>Provided sessions</td><td>The same calls with {@link dev.jasper.sdk.terminal.OpenRequest#session(SessionSpec)}</td><td>{@code session.provide}</td><td>A pane whose session the plugin connects, such as SSH</td></tr>
+<tr><td>Shell environment</td><td>{@link Terminals#environment(Function)}</td><td>{@code terminal.environment}</td><td>Variables in new local shells (not WSL profiles) and programs</td></tr>
+<tr><td>Subcommands</td><td>{@code [[subcommands]]} in the manifest and {@link CommandLine#handle(String,CommandHandler)}</td><td></td><td>{@code jasper <name>} in a shell</td></tr>
+<tr><td>The editor role</td><td>{@link Platform#editor(FileEditor)}</td><td>{@code editor.provide}</td><td>The files Jasper opens for editing, and Cmd-click (Ctrl-click on Linux and Windows) on paths in terminals</td></tr>
+<tr><td>Settings</td><td>{@link PluginSettings#declare(SettingSpec)}, {@link PluginSettings#page(SettingsPanel)}</td><td></td><td>The plugin's page in Settings › Tools; see <a href="#settings">Settings</a></td></tr>
+<tr><td>Icons</td><td>{@link UiKit#registerIcon(IconAsset)}</td><td></td><td>Anywhere the plugin names an icon</td></tr>
+<tr><td>Services and topics</td><td>{@link Services#publish(Class,Object)}, {@link Events#publish(Topic,Object)}</td><td></td><td>Other plugins; see <a href="#services">Services</a></td></tr>
+<tr><td>Quit and close guards</td><td>{@link Windows#onQuitting(Supplier)}, {@link Windows#onTabsClosing(BiFunction)}, {@link WindowSurface#onClosing(BooleanSupplier)}</td><td></td><td>Asked before Jasper quits, a tab closes or a dialog closes</td></tr>
+<tr><td>A look and themes</td><td>{@code presentation} and {@code themes} in the manifest</td><td>{@code presentation.provide} for a look</td><td>The chrome and controls, and themes in Settings › Appearance &amp; Behavior › Appearance; see <a href="looks.md">looks</a> and <a href="creating-themes.md">creating themes</a></td></tr>
+</tbody>
+</table>
+
+<h3>Actions and shortcuts</h3>
+<p>An action is a command: an id, a title, an optional icon and keywords, and a handler that runs on the UI thread with
+an {@link ActionContext}, which names the window it was invoked in and the pane it concerns (the pane under a context
+menu, otherwise the window's focused pane). Registering an action lists it in every window's command palette and in
+Settings › Keymap under the plugin's name; then place it:</p>
+<pre><code class="language-java">String run = "dev.example.tool.run";
+PluginAction action = context.actions().register(ActionSpec.of(run, "Run Deploy Checks")
+        .withIcon("play").withKeywords(List.of("deploy", "check")).withDefaultBinding("cmd+alt+d"),
+    invoked -&gt; invoked.pane().ifPresent(pane -&gt;
+        context.log().log(System.Logger.Level.INFO, "Checks requested for pane " + pane.id())));
+context.menus().standard(StandardMenu.TOOLS).add(run);
+context.menus().terminalContext().add(run);
+context.toolbar().add(ToolbarItem.action(run));
+context.rail().add(run);</code></pre>
+<p>{@link PluginAction#setEnabled(boolean)} and {@link PluginAction#setTitle(String)} change it everywhere it appears;
+closing it removes it and every placement. Placements may name only the plugin's own actions.</p>
+<p>A default shortcut is written in the configuration syntax ({@code cmd}, {@code ctrl}, {@code alt}, {@code shift} and a
+key, such as {@code cmd+alt+d}). On macOS it applies as written. On Linux and Windows {@code cmd} means Ctrl+Shift, and a
+default that names {@code cmd} and {@code shift} also gets Alt: {@code cmd+alt+d} is Cmd+Option+D on macOS and
+Ctrl+Alt+Shift+D on Linux and Windows. {@link ActionSpec#withDefaultBindings(String,String)} gives a separate Linux and
+Windows default instead, naming {@code ctrl}, {@code alt} and {@code shift} literally, or {@code null} for none there. The
+user's {@code [keybindings]} entry for the action's id wins over the default; a default that collides with a shortcut
+already in use is dropped, and Jasper's log records "Default shortcut '…' is already used by '…'; bind the action under
+[keybindings] to give it one." See <a href="keyboard-shortcuts.md">keyboard shortcuts</a>.</p>
+<p>{@link ActionSpec#withContext(ShortcutContext)} limits where the shortcut applies:</p>
+<table>
+<thead><tr><th>Context</th><th>Applies</th></tr></thead>
+<tbody>
+<tr><td>{@link ShortcutContext#global()}</td><td>Anywhere in a Jasper window; the default.</td></tr>
+<tr><td>{@link ShortcutContext#terminal()}</td><td>In a terminal pane, including its find bar.</td></tr>
+<tr><td>{@link ShortcutContext#content()}</td><td>In a content tab the plugin opened.</td></tr>
+<tr><td>{@link ShortcutContext#panel(String)}</td><td>Inside one of the plugin's tool windows.</td></tr>
+</tbody>
+</table>
+<p>Where focus is, the most specific applicable action runs: a panel or content action, then a terminal one,
+then a global one. A key whose action does not apply there reaches the focused component, such as the shell. So does a
+disabled action's key, except in a terminal pane, where it does nothing.</p>
+
+<h3>Menus</h3>
+<p>{@link Menus#standard(StandardMenu)} returns a new section at the end of File, Edit, View, Tab, Tools, Session or Transfer,
+after a separator. Jasper has no Tools, Session or Transfer items of its own, so those menus show only while a
+plugin has entries in them: Tools for utility commands, Session for connecting to hosts and working with sessions,
+Transfer for file browsers, transfers and file servers. {@link Menus#create(String,String)} adds a top-level menu, placed
+with the other plugins' menus. {@link Menus#terminalContext()} is a section at the end of every pane's right-click menu;
+an action run from it receives that pane. A section is a {@link PluginMenu}: add actions, separators and submenus, and
+rebuild it at any time with {@link PluginMenu#clear()}.</p>
+
+<h3>Toolbar</h3>
+<p>{@link ToolbarItem#action(String)} is a button for one action, {@link ToolbarItem#menu(String,String,List)} a button
+that opens a menu of actions, and {@link ToolbarItem#view(ToolbarViewFactory)} a small group of the plugin's own
+controls in the main window's toolbar (a child window has none). A toolbar view's root is an INLINE {@link Nodes.Stack} of LABEL texts, DROPDOWN,
+SEARCHABLE or PICKER choices, at most one PRIMARY button, icon-only GHOST buttons (a blank label with an icon and a
+tooltip), menu buttons and separators; any other tree is refused, and the window shows
+no view.
+When the toolbar is too narrow, buttons move into its "More actions" menu and a view hides.</p>
+
+<h3>Status bar</h3>
+<pre><code class="language-java">StatusItem status = context.statusBar().add(new StatusItemSpec("dev.example.tool.status", Side.RIGHT, 100));
+status.setText("Deploys: 3");
+status.setTooltip("Run the deploy checks");
+status.setAction("dev.example.tool.run");</code></pre>
+<p>One handle drives the item in the main window's status bar; a child window has none. {@link Side#LEFT} items follow the shell and folder,
+{@link Side#RIGHT} items precede the terminal size and configuration state, and items on a side are ordered by ascending
+priority. An item with an action is a button; without one it is plain text. {@link StatusBar#addProgress(StatusItemSpec)}
+adds a progress control that {@link StatusProgress#update(StatusProgressState)} drives, with a fraction or none and up to
+two actions.</p>
+
+<h3>Tool windows and the rail</h3>
+<p>A registered panel gets a stripe button in the main window, the only window with tool windows: its icon, or under
+the Enterprise look's labelled stripes a label that starts with the icon and reads its title. Its {@link PanelFactory}
+builds its view on the UI thread the first time the panel shows in the main window, and again after the main window
+closed and opened anew; a toggle from a child window shows it in the main
+window and brings that window to the front. The
+{@link PanelSpec}'s anchor and {@link PanelSpec#withSplit()} pick the default slot (Left Top, Left Bottom, Bottom Left,
+Right Top, Right Bottom or Bottom Right); the user can move it with the header's Options menu, and Jasper remembers where.
+Unless the spec names a toggle action of the plugin's own ({@link PanelSpec#withToggleActionId(String)}), Jasper
+registers {@code <panel id>.toggle}, titled "Toggle <i>title</i>", with no default shortcut, and View › Tool Windows lists
+it. {@link PanelHost} is the panel's place in the main window: {@link PanelHost#show()}, {@link PanelHost#hide()},
+{@link PanelHost#setHeader(PanelHeader)} for a detail, a status dot and icon actions in the header. A factory that throws
+shows "This panel could not be loaded." Under the Enterprise look, whose tool windows are flush, the
+toggle action makes the tool window it shows the active one, which takes the keyboard, and activates a showing tool
+window that is not the active one instead of hiding it; a plugin's own toggle action does this when its handler calls
+{@link Panels#toggle(String,WindowHandle)} or {@link PanelHost#show()} for its panel, and any other call only shows or
+hides. {@link Rail#add(String)} adds a plain button for an action, for example one that opens a plugin's tab.</p>
+
+<h3>Dialogs, overlays and popovers</h3>
+<p>Jasper builds the frame, title bar, icon and theme of every surface; the plugin fills it with a
+<a href="#ui">view</a> through {@link WindowSurface#setContent(UiView)} and shows it with {@link WindowSurface#show()}.
+A view of the plugin's own that is not a tool window is a content tab.</p>
+<ul>
+<li>{@link Windows#dialog(DialogSpec)}: a dialog over a Jasper window, a content tab or an anchor, closed with its window,
+presented {@link DialogSpec.Presentation#CENTERED}, as an {@link DialogSpec.Presentation#ATTACHED_SHEET} or as an
+in-window {@link DialogSpec.Presentation#OVERLAY}; the look may place it another way. {@code show} returns after a modal dialog closes.
+A modeless dialog whose content is a {@link Nodes.FormKind#WINDOW} form, as the Credential Vault manager's is, opens at
+a window's size, can be resized and remembers its bounds.</li>
+<li>{@link Windows#overlay(OverlaySpec)}: progress content centred inside a Jasper window, one per window. Escape and
+outside clicks do not dismiss it, so give it a Cancel action.</li>
+<li>{@link Windows#popover(UiAnchor)}: a popup below (or above) a button or picker, from {@link UiView#anchor(String)};
+Escape and clicks outside close it.</li>
+</ul>
+
+<h3>Content tabs</h3>
+<p>{@link Windows#openTab(ContentSpec,WindowOwner,UiView)} opens a view as a document in a new tab of the owner's window,
+or of the main window, as the Editor does; {@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)} opens it
+where a {@link TabPlacement} says: a new tab, a new pane beside the focused one, or a new child window. The {@link ContentSpec}'s key identifies the document: opening a key the plugin
+already has open selects that tab and returns its handle. Through the {@link ContentTab} the plugin sets the tab's
+title, detail, icon, unsaved marker and location ({@link ContentTab#setPresentation(ContentPresentation)}), its commands
+({@link ContentTab#setCommands(List)}), which its context menu lists and whose shortcuts apply while it is active, and
+its status bar items ({@link ContentTab#setStatus(List)}). Commands with the ids {@code find}, {@code find-next},
+{@code find-previous}, {@code copy}, {@code paste}, {@code font-bigger}, {@code font-smaller} and {@code font-reset}
+answer Jasper's own Find, Find Next, Find Previous, Copy, Paste, Increase Font Size, Decrease Font Size and Reset Font
+Size.
+The user can move the tab to a new window and back, as {@link ContentTab#moveToNewWindow()} and
+{@link ContentTab#moveToMainWindow()} do, give its pane a tab of its own ({@link ContentTab#moveToNewTab()}), and move
+its pane into another tab of its window ({@link ContentTab#moveToTab(int)}, one of {@link ContentTab#tabChoices()}). A
+{@link TabChoice} carries its tab's title only when the plugin holds {@code terminal.observe} or the tab shows the
+plugin's own content; otherwise its title is empty and {@link TabChoice#label()} reads "Tab 2".
+{@link Windows#onTabsClosing(BiFunction)} decides whether tabs with unsaved work may close.</p>
+<p>{@link Windows#splitItem(SplitItemSpec,BiConsumer)} puts a view of the plugin's in every Split list (the Tab menu's and
+the right-click menus' Split submenus), after the terminal, with two actions, "Split Right with" and "Split Down with"
+its label; the opener receives the window and the placement. An item whose actions ask something first, as a file
+chooser does ({@link SplitItemSpec#asking()}), ends its entries and its actions' titles with an ellipsis.
+{@link Windows#splitChoices()} lists the choices for a menu the plugin builds itself, each worded by
+{@link SplitChoice#rightLabel()} and {@link SplitChoice#downLabel()}, and {@link ContentTab#split(SplitChoice,Direction)}
+runs one beside the item.</p>
+<p>A tab comes back when Jasper restores its windows if its {@link ContentSpec} carries a {@link RestoreState}
+({@link ContentSpec#withRestore(RestoreState)}, later {@link ContentTab#setRestore(Optional)}) and the plugin registered a
+{@link TabRestorer} for its kind with {@link Windows#restorer(String,TabRestorer)}. The restorer gets a
+{@link RestoreRequest} on the UI thread, opens the tab as the plugin always does without blocking or asking the user
+anything, and returns empty, or why the tab cannot come back, which its placeholder then says.</p>
+
+<h3>File choosers and places</h3>
+<p>{@link Windows#chooseFiles(WindowOwner,String,Optional)}, {@link Windows#chooseDirectory(WindowOwner,String,Optional)}
+and {@link Windows#chooseSaveFile(WindowOwner,String,Optional)} show Jasper's file chooser for local paths and return
+absolute, normalised paths, or nothing when the user cancels; saving over an existing file asks first.
+{@link Windows#choose(FileChoice)} also offers the roots of the file sources the {@link FileChoice} names and returns
+{@link FileLocation.Local} and {@link FileLocation.Sourced} values. A {@link FileChoice} opens one or several files, saves
+to one file with a suggested name, or picks a folder; without an initial location the chooser starts where the owner's
+focused pane is (in a named source's root when that source locates the pane, otherwise in its local folder), else in the
+home folder. The owner is an open Jasper window or one of the plugin's content tabs. Call them on
+the UI thread: they pump UI events until the user answers, so recheck what the result depends on. Closing the owner or
+stopping the plugin cancels them.</p>
+<p>With {@code files.source}, {@link FileSources#register(FileSource)} adds places to the chooser, as Remote does with its
+saved hosts. The source's roots appear under its {@link FileSourceSpec}'s heading in every chooser whose
+{@link FileChoice} names its id, which starts with the plugin's id and a dot. {@link FileSource#spec()} is read once;
+{@link FileSource#roots()} lists the {@link FileRoot}s (an id, a label, a detail shown as the tooltip, and whether opening
+it needs no connection or sign-in first); {@link FileSource#onChanged(Runnable)} tells the chooser that the roots or their
+connected state changed; {@link FileSource#locate(PaneHandle)} says where a terminal pane is in one of the roots, so a
+chooser opened from that pane starts there ({@link FileLocation.Sourced#HOME} when only the root is known). These run on
+the UI thread and do no I/O.</p>
+<p>When the user opens a root, Jasper calls {@link FileSource#connect(String,WindowOwner)}. It may ask the user to sign in
+over the owner it receives: the Jasper window the chooser belongs to (a content tab's, for a chooser the tab owns), or
+{@code null} when it belongs to none. It returns a stage that completes, on any thread, with a {@link FileBrowser}; when the stage is a
+{@code CompletableFuture}, Jasper cancels it to abandon the attempt. Jasper owns the browser and closes it once, when the
+chooser closes. It calls {@link FileBrowser#home()}, {@link FileBrowser#list(String,Consumer)},
+{@link FileBrowser#stat(String)}, {@link FileBrowser#read(String,int)} (the start of a file, for the preview) and
+{@link FileBrowser#mkdir(String)} on the chooser's worker thread, one call at a time and never on the UI thread, so they
+may block; {@link FileBrowser#abort()} interrupts a call from any thread. Paths are absolute and use {@code /}. A source
+method that throws shows no roots, locates nothing or fails to connect ("The plugin could not connect.").</p>
+
+<h3>Notifications</h3>
+<pre><code class="language-java">NotificationGroup deploys = context.notifications().group(
+    new GroupSpec("dev.example.tool.deploys", "Deploys", DisplayMode.CARD));
+deploys.post(NotificationSpec.of(Severity.WARNING, "Deploy checks failed")
+    .withContent("2 of 14 checks failed on staging.")
+    .withAction(NotificationAction.of("Show Log",
+        () -&gt; context.platform().openInEditor(context.dataDirectory().resolve("deploy.log")))));</code></pre>
+<p>A plugin posts in its default group ({@link Notifications#group()}, named after the plugin) or in groups it declares
+during {@code start}, which the user can set to show cards, sticky cards, history only or nothing in Settings ›
+Appearance &amp; Behavior › Notifications. Text is plain: a title of up to 200 characters, content up to 4,000, and up to eight actions.
+{@link NotificationGroup#error(String,Throwable)} attaches the failure, which Jasper records as the plugin's incident and
+offers with <b>Show more…</b>. Plugins cannot see other notifications. See <a href="notifications.md">notifications</a>.</p>
+
+<h3>Activities and connections</h3>
+<pre><code class="language-java">context.background().execute(() -&gt; {
+    ActivityHandle activity = context.activities().begin(ActivitySpec.of("Deploy checks"));
+    for (int check = 1; check &lt;= 14; check++) activity.progress(check / 14.0, "Check " + check + " of 14");
+    activity.succeed("All 14 checks passed");
+});</code></pre>
+<p>A running activity shows as a card on Desk Buddy, with its fraction and detail. When it succeeds or fails, Jasper
+posts the outcome in the plugin's {@code <id>.activities} group, so the user can mute outcomes without muting the plugin's
+other notifications; a cancelled activity posts nothing. {@link ActivitySpec}'s action, one of the plugin's own, runs when
+the user clicks the card. A connection ({@link Activities#connection(ConnectionSpec)}) has a state instead of an end, up,
+degraded or down, until the plugin closes it; Desk Buddy shows a card per connection. Both are published on
+{@link Activities#TOPIC} and {@link Activities#CONNECTIONS}, which any plugin may follow.</p>
+
+<h3 id="contributions-subcommands">Subcommands</h3>
+<p>A plugin declares each {@code jasper} subcommand in its manifest and answers it while it runs:</p>
+<pre><code class="language-toml">[[subcommands]]
+name = "deploy-check"
+summary = "Run the deploy checks for the current folder"</code></pre>
+<pre><code class="language-java">context.commandLine().handle("deploy-check", call -&gt; {
+    call.out("Checking " + call.workingDirectory() + "\n");
+    return CompletableFuture.completedFuture(0);
+});</code></pre>
+<p>{@code jasper deploy-check …} in a shell reaches the running Jasper, which runs the handler on the UI thread with a
+{@link CommandCall}: the arguments after the name, the caller's working directory, the Jasper window the command ran in,
+and the caller's standard output and error. The stage's value is the exit code (0 to 255; anything else is 1); a handler
+that throws, or a stage that fails, prints {@code jasper: <name> failed: <message>} and exits 1.
+{@link CommandCall#onCancelled(Runnable)} hears Ctrl+C. While no handler is registered, the command prints
+{@code jasper: <name> is unavailable (the <Name> plugin is off)} and exits 1; an unknown name exits 2. The Jasper that
+owns the home answers {@code jasper}, one started with {@code --plugin-dir} too, so a plugin's subcommand can be tried
+from any shell. {@code jasper --help} lists the subcommands of the plugins that were running when Jasper
+last started.
+{@link CommandLine#client()} is the path of the {@code jasper} command itself, for a plugin that writes it into another
+program's settings. See <a href="command-line.md">the command line</a>.</p>
+
+<h3>The editor role</h3>
+<p>{@link Platform#editor(FileEditor)} makes the plugin the editor Jasper opens files with: its configuration files,
+every {@link Platform#openInEditor(Path)} and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local
+terminal pane reach the plugin's {@link FileEditor} first; returning {@code false} hands the file to the desktop. One plugin at a time holds the role: a bundled plugin's registration
+replaces one that is not bundled; otherwise the first stays and a later one throws. The Editor plugin takes it. Shell
+variables ({@link Terminals#environment(Function)}) and program tabs ({@link LocalSpec#running(List,Optional)}) are
+described in <a href="#terminals">Terminals</a>.</p>
+
+<h3>Desktop integration</h3>
+<p>{@link Platform#copy(String)} puts text on the clipboard; {@link Platform#copySecret(String)} also clears it 30 seconds
+later if it is still there. {@link Platform#browse(URI)} opens an http or https address in the browser, and
+{@link Platform#openInEditor(Path)} opens a file in the user's editor. Their failures are posted in the plugin's default
+notification group, never thrown.</p>
+</section>

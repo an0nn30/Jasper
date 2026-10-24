@@ -352,7 +352,7 @@ class PaletteScopesTest {
                 dev.jasper.app.palette.PaletteTestSupport.query(card).setText("new tab");
                 PaletteTestSupport.executeSelected(card, 1);
                 assertThat(palette.isOpen()).as("Commands has no second verb").isTrue();
-                assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+                assertThat(owner.tabCount()).isEqualTo(1);
             }
         });
     }
@@ -648,7 +648,7 @@ class PaletteScopesTest {
                     if (mode == 0) palette.dismiss();
                     else if (mode == 1) { registration.close(); content.scopes().register(fake); }
                     else {
-                        var oldTab = content.currentTab();
+                        var oldTab = content.currentTerminal();
                         content.newTab(DesktopTestSupport.HOME); content.closeTab(oldTab);
                     }
                     palette.open(fake.id()); dev.jasper.app.palette.PaletteTestSupport.query(palette.component()).setText("beta");

@@ -23,8 +23,8 @@ import java.util.UUID;
 
 /**
  * The application's notification surfaces: Jasper's own groups, the built-in Notifications panel with its unread
- * badge and actions, and one card layer per terminal window, routing each requested card to its target window or the
- * window used last. EDT only; the application closes it at shutdown.
+ * badge and actions, and one card layer per attached window (the application attaches the main window's), routing each
+ * requested card to its target window or the window used last. EDT only; the application closes it at shutdown.
  */
 final class NotificationsFeature implements AutoCloseable {
     static final String PANEL_ID = "jasper.notifications";
@@ -61,11 +61,13 @@ final class NotificationsFeature implements AutoCloseable {
         contributions.addAction(SHOW_HISTORY, "Notifications: Show History", icon,
             List.of("notifications", "history", "messages", "errors", "panel"), Optional.empty(),
             invocation -> contributions.requestPanel(new Contributions.PanelRequest(invocation.windowId(), PANEL_ID,
-                Contributions.PanelRequest.Op.TOGGLE)));
+                Contributions.PanelRequest.Op.ACTIVATING_TOGGLE)));
         contributions.addAction(DISMISS_CARDS, "Notifications: Dismiss Cards", null,
             List.of("notifications", "close", "clear", "balloons", "cards"), Optional.empty(), invocation -> {
+                // Cards show in the main window only, so a child window's Dismiss Cards closes them there.
                 Attached attached = windows.get(invocation.windowId());
                 if (attached != null) attached.layer().dismissAll();
+                else windows.values().forEach(each -> each.layer().dismissAll());
             });
         panel = contributions.addPanel(PANEL_ID, panels.notificationsTitle(), icon, panels.notificationsSlot(), Optional.of(SHOW_HISTORY),
             site -> new HistoryPanel(kit.get(), center, site, focused(site.windowId()), panels.notificationsTitle()));
@@ -92,7 +94,10 @@ final class NotificationsFeature implements AutoCloseable {
         if (content.id().equals(lastActive)) lastActive = windows.isEmpty() ? null : windows.keySet().iterator().next();
     }
 
-    /** A terminal window was activated: it is the default target, and cards that waited for focus show now. */
+    /**
+     * A Jasper window was activated: the main window, which holds the cards, is the default target, and cards that
+     * waited for focus show now.
+     */
     void activated(WindowContent content) {
         if (closed || !windows.containsKey(content.id())) return;
         lastActive = content.id();

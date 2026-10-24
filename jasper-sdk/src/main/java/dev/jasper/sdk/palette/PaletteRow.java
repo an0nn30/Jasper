@@ -12,7 +12,7 @@ import java.util.Optional;
  * @param title   the main text
  * @param detail  text shown after the title on the same line, such as a directory
  * @param tag     a short right-aligned marker, such as a shortcut or "2 fields"
- * @param icon    a row icon
+ * @param icon    a semantic icon name the command palette draws before the title
  * @param enabled false paints the row dimmed and makes it unavailable
  * @param token   scope-private, may be null
  */

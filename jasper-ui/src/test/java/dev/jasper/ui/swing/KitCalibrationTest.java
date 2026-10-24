@@ -39,7 +39,7 @@ class KitCalibrationTest {
                 FlatLafInstaller.install(context.theme(), dev.jasper.ui.kit.Kit.DEFAULT);
                 try (var view = new KitView(context, new ViewSpec(new Nodes.Button("button", ControlState.READY, "Continue", "", ButtonKind.PRIMARY, "continue", "")), e -> {})) {
                     var button = view.control("button").component;
-                    int width = UIScale.scale(120), height = UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT));
+                    int width = UIScale.scale(120), height = FormsTest.contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT,dev.jasper.ui.metrics.Typography.Role.LABEL);
                     button.setSize(width, height);
                     var image = ButtonsTest.paint(button);
                     int fill = context.theme().semantic().color(SemanticColor.ACCENT).getRGB();
@@ -63,7 +63,7 @@ class KitCalibrationTest {
                     var before = KitFixtures.render(view, UIScale.scale(540), UIScale.scale(180), 1);
                     var control = (TextFields.FieldControl)view.control("field");
                     var bounds = SwingUtilities.convertRectangle(control.surface.getParent(), control.surface.getBounds(), view);
-                    assertThat(bounds.height).as("font=%s, typography=%s, line=%s, input=%s, surface=%s", control.input.getFont(), context.typography().family(), context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getLineMetrics("Ag", new java.awt.font.FontRenderContext(null,true,true)).getHeight(), control.input.getPreferredSize(), control.surface.getPreferredSize()).isEqualTo(UIScale.scale(m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)));
+                    assertThat(bounds.height).as("font=%s, typography=%s, line=%s, input=%s, surface=%s", control.input.getFont(), context.typography().family(), context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getLineMetrics("Ag", new java.awt.font.FontRenderContext(null,true,true)).getHeight(), control.input.getPreferredSize(), control.surface.getPreferredSize()).isEqualTo(FormsTest.contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY));
                     manager.target = control.input;
                     var event = new FocusEvent(control.input, FocusEvent.FOCUS_GAINED, false, null, FocusEvent.Cause.TRAVERSAL_FORWARD);
                     for (var listener : control.input.getFocusListeners()) listener.focusGained(event);

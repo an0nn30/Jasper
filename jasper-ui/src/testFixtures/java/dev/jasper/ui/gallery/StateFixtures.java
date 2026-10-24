@@ -70,10 +70,10 @@ public final class StateFixtures {
         // A command palette: a search field over a RESULTS list with headings, one-line rows and five visible rows.
         var results = new ArrayList<ListItem>();
         results.add(new ListItem("results-commands", Optional.empty(), List.of(text("results-commands-title", "Commands", TextRole.CAPTION)), List.of(), List.of(), true));
-        for (String name : List.of("New Tab", "Split Right", "Close Pane")) {
+        for (String name : List.of("New Tab", "Split Right", "Close Tab")) {
             String id = "results-" + name.toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
             results.add(new ListItem(id, Optional.of(new Icon(id + "-icon", READY, "play", Hue.NONE, IconSize.RAIL, "Command")),
-                List.of(text(id + "-title", name, TextRole.BODY)), List.of(text(id + "-detail", "Panes", TextRole.DESCRIPTION)), List.of(text(id + "-tag", "Cmd+T", TextRole.CAPTION))));
+                List.of(text(id + "-title", name, TextRole.BODY)), List.of(text(id + "-detail", "Tabs", TextRole.DESCRIPTION)), List.of(text(id + "-tag", "Cmd+T", TextRole.CAPTION))));
         }
         results.add(new ListItem("results-history", Optional.empty(), List.of(text("results-history-title", "History", TextRole.CAPTION)), List.of(), List.of(), true));
         results.add(new ListItem("results-ls", Optional.empty(), List.of(text("results-ls-title", "ls -la", TextRole.MONO)), List.of(), List.of()));

@@ -1,0 +1,117 @@
+<section class="guide" id="threading">
+<h2>Threading</h2>
+<p>Jasper's UI thread is the Swing event dispatch thread. It draws every window and runs every plugin's
+{@code start}, {@code stop}, handlers and callbacks, one at a time. That gives plugins a simple model: code that
+Jasper calls runs on the UI thread unless its documentation says otherwise, never at the same time as other UI-thread
+code, and must return promptly. Slow work goes to the plugin's background executor, and results come back to the UI
+thread before they touch the SDK.</p>
+
+<h3>The UI thread rule</h3>
+<p>Registering anything (actions, menus, toolbar and status items, tool windows, content tabs, split items, restorers, palette scopes, file sources,
+subcommands, event subscriptions, services), creating and updating views, and every query or command on
+{@link Terminals} and its handles must happen on the UI thread. A call from another thread throws
+{@code IllegalStateException}: "<i>what</i> must be called on the UI thread: <i>plugin id</i>", or "Kit requires EDT" from the
+view kit. The exceptions are
+listed per type in the API reference; the main ones:</p>
+<table>
+<thead><tr><th>Safe from any thread</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>{@link Events#publish(Topic,Object)}</td><td>Publication only enqueues; handlers run later on the UI thread.</td></tr>
+<tr><td>{@link Subscription#close()}</td><td>Idempotent and never throws. On the UI thread the contribution is gone when it returns; from another thread at most one delivery already under way may still complete.</td></tr>
+<tr><td>{@link Activities#begin(ActivitySpec)}, {@link ActivityHandle}, {@link ConnectionHandle}</td><td>Report progress and state from the thread doing the work.</td></tr>
+<tr><td>{@link NotificationGroup#post(NotificationSpec)} and its shortcuts, {@link NotificationHandle}</td><td>Posting returns at once.</td></tr>
+<tr><td>{@link Setting#get()}, {@link Setting#set(Object)}</td><td>A successful save completes its future on the UI thread; a failed one may complete it on another thread, so hop to the UI thread before touching the UI.</td></tr>
+<tr><td>{@link Services#find(Class)}, {@link Services#require(Class)}</td><td>Cache reads that run no provider code.</td></tr>
+<tr><td>{@link PaneHandle#sendText(String)}, {@link PaneHandle#sendBytes(byte[])}, {@link PaneHandle#paste(String)}</td><td>Calls from one thread keep their order.</td></tr>
+<tr><td>{@link PendingSession}</td><td>Every method, also after the plugin stopped.</td></tr>
+<tr><td>{@link CommandCall#out(String)}, {@link CommandCall#err(String)}</td><td>Write to the caller's terminal while the call runs.</td></tr>
+<tr><td>{@link Platform#openInEditor(Path)}, {@link Platform#browse(URI)}</td><td>They do their work in the background.</td></tr>
+<tr><td>{@link Appearance#variant()}, {@link Appearance#workspaceVariant()}</td><td>Whether the chrome or the workspace is dark or light.</td></tr>
+<tr><td>{@link Appearance#presentation()}</td><td>The look Jasper runs with, the same value until it restarts.</td></tr>
+<tr><td>{@link Appearance#terminalTypography()}</td><td>The saved terminal font; it already returns a new value when its change handlers run.</td></tr>
+</tbody>
+</table>
+<p>A few callbacks run off the UI thread, and must not touch Swing or UI-thread-only SDK methods:</p>
+<ul>
+<li>{@link FileBrowser}'s methods run on one of Jasper's worker threads, one call at a time, and may block.</li>
+<li>{@link TerminalConnection}: {@code output} is read on the session's reader thread, {@code input} and {@code resize}
+are used on its writer thread, and {@code close} runs on Jasper's cleanup thread.</li>
+<li>{@link PendingSession#onCancelled(Runnable)} handlers run on the cleanup thread.</li>
+<li>The future {@link PaneHandle#foregroundJob()} returns completes on a worker thread.</li>
+</ul>
+
+<h3>Containment</h3>
+<p>Every call Jasper makes into plugin code is contained: an {@code Exception} or {@code LinkageError} is caught, logged
+against the plugin, counted on its Details tab in Settings › Plugins and recorded as an incident, and Jasper carries on.
+The failure is posted in the Plugin problems group as "<i>Name</i> failed in <i>what</i>" with <b>Disable Plugin</b> and
+<b>Show more…</b>. A failing callback fails only itself: a throwing event handler does not affect other subscribers, a
+throwing palette search shows no rows, a throwing panel factory shows "This panel could not be loaded." A UI-thread
+callback that takes more than 100 ms is logged at INFO with its duration.</p>
+
+<h3>Background work</h3>
+<p>{@link PluginContext#background()} is the plugin's executor. In Jasper each task runs on a virtual thread of its own
+(named {@code jasper-plugin-<id>-<n>}), so tasks may run at the same time; a task that throws is contained like any other
+callback. To come back to the UI thread, post to the event dispatch thread, as the bundled plugins do:</p>
+<pre><code class="language-java">context.actions().register(ActionSpec.of("dev.example.tool.count", "Count Log Lines"), invoked -&gt;
+    context.background().execute(() -&gt; {
+        long lines;
+        try (var stream = Files.lines(context.dataDirectory().resolve("events.log"))) { lines = stream.count(); }
+        catch (IOException failure) {
+            context.notifications().group().error("Could not count the lines", failure);
+            return;
+        }
+        SwingUtilities.invokeLater(() -&gt; context.notifications().group().info("Log lines", lines + " lines"));
+    }));</code></pre>
+<p>Posting a notification is safe from any thread, so this example would work without {@code invokeLater}; anything that
+needs the UI thread, such as updating a view or a status item, does need it.</p>
+
+<h3>Subscriptions and lifetimes</h3>
+<p>Most registrations return a {@link Subscription}, or a handle that is one: {@link PluginAction}, {@link PluginMenu},
+{@link StatusItem}, {@link StatusProgress}, {@link UiView}, {@link UiAnchor}, {@link PluginPopover} and every dialog
+({@link WindowSurface}). Closing it ends that one registration. Declared settings, a settings page, published
+services and notification groups are not; they last until the plugin stops. A {@link ContentTab} closes, without
+asking, with {@link ContentTab#close()} or when the plugin stops. A plugin rarely needs to close anything: when it stops, Jasper
+closes whatever it left open, newest first. Close a subscription when the contribution should go away while the plugin
+keeps running, such as a menu entry for a host the user deleted, or rebuild a menu section with
+{@link PluginMenu#clear()} and {@link PluginMenu#add(String)}.</p>
+<p>Some handles end on their own: a {@link PanelHost} when the main window closes ({@link PanelHost#onClosed(Runnable)}), a
+{@link ContentTab} when the user closes it ({@link ContentTab#onClosed(Runnable)}), a {@link UiAnchor} when its control
+is hidden, disabled, made busy, removed or closed ({@link UiAnchor#onClosed(Runnable)}), and a dialog when the user or
+its window closes it ({@link WindowSurface#onClosed(Runnable)}). Pane, tab and window handles keep only an id: a closed target
+is simply absent, queries return the last known value, and commands to it are ignored.</p>
+
+<h3>Window owners</h3>
+<p>A {@link WindowOwner} is something a dialog, chooser or tab belongs to. Three handles are owners: a Jasper window
+({@link WindowHandle}), one of the plugin's content tabs ({@link ContentTab}) and an anchor on a mounted control
+({@link UiAnchor}). The owner decides where the surface appears
+and how long it lives:</p>
+<ul>
+<li>{@link DialogSpec}'s owner must be open when the dialog is created. A dialog owned by an anchor closes when the
+anchor closes; one owned by a content tab closes with the tab, and while a modal one is open the tab can neither close
+nor move to another window.</li>
+<li>An overlay ({@link Windows#overlay(OverlaySpec)}) closes with its Jasper window.</li>
+<li>A file chooser ({@link Windows#choose(FileChoice)} and the {@code choose*} methods) is cancelled, and its result
+discarded, when its owner closes or the plugin stops.</li>
+<li>{@link Windows#openTab(ContentSpec,WindowOwner,UiView)} opens the tab in the owner's window, or the main window.</li>
+</ul>
+
+<h3>Shutdown</h3>
+<p>Before Jasper quits or restarts it asks the closing guards: the content tabs' {@link Windows#onTabsClosing(BiFunction)}
+guards, then the {@link Windows#onQuitting(Supplier)} guards, one at a time. One that refuses cancels the quit, and nothing has closed yet.
+Then, on the UI thread, for each plugin that started, in reverse start order:</p>
+<ol class="steps">
+<li>Jasper calls its {@link Plugin#stop()}.</li>
+<li>Jasper closes everything the plugin left open: registrations, dialogs, content tabs, views, provided sessions still connecting,
+notifications, activities ("Plugin stopped") and connections. A secret it copied with
+{@link Platform#copySecret(String)} is cleared from the clipboard if it is still there, and a subcommand call still
+running ends with exit code 1.</li>
+<li>The plugin's background executor stops accepting tasks. Tasks already running get 1.5 seconds to finish, then are
+interrupted.</li>
+</ol>
+<p>The whole shutdown is bounded: a {@code stop} or handler that blocks the UI thread ends the process at the exit
+deadline, and the log names the plugin callback that was running. A connection a session plugin attached belongs to its
+pane, which Jasper closes with its window.</p>
+<div class="callout"><p>On macOS a resident Jasper answers Cmd+Q, <b>Jasper › Quit</b>, the Dock's Quit and a Jasper
+window's <b>File › Quit</b> by closing its windows and staying in the background. That asks the tabs' closing guards but
+not the quit guards, and the plugins keep running until Jasper really quits.</p></div>
+</section>

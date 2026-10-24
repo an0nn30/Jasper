@@ -9,7 +9,6 @@ import dev.jasper.ui.swing.KitView;
 import dev.jasper.ui.theme.ThemeRoute;
 import java.awt.Component;
 import java.awt.Container;
-import java.awt.Dimension;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
@@ -19,7 +18,7 @@ import static org.assertj.core.api.Assertions.*;
 /**
  * Plan 2 Task 9-kit ruling G1/G1b: a plugin's kit view mounted as a workspace content tab takes the workspace theme slot
  * on an opaque workspace surface, and its specialized content follows that slot, under a light chrome and a dark
- * workspace (the mixed chrome/workspace regression); windows and dialogs keep the chrome slot; a move keeps all of it
+ * workspace (the mixed chrome/workspace regression); dialogs keep the chrome slot; a move keeps all of it
  * and resamples opacity.
  */
 class WorkspaceContentRouteTest {
@@ -31,24 +30,30 @@ class WorkspaceContentRouteTest {
         return null;
     }
 
+    /** The plugin's view of {@code fixture}'s windows, so a dialog can name one as its owner. */
+    static HostedTerminals terminals(TerminalFixture fixture, Containment containment) {
+        return new HostedTerminals("test.kit", new CapabilityGate("test.kit", java.util.Set.of()), fixture.registry, Runnable::run, () -> true, () -> true,
+            new HostedSessions("test.kit", containment, Runnable::run, id -> null, name -> new javax.swing.ImageIcon()));
+    }
+
     static ViewSpec document() {
         return new ViewSpec(new Nodes.Split("tab", ControlState.READY, Nodes.SplitKind.DOCUMENT, List.of(
             new Nodes.Text("banner", ControlState.READY, "notes.txt changed on disk.", Nodes.TextRole.BODY),
             new Nodes.Custom("document", ControlState.READY, "text", Nodes.CustomKind.EDITOR, "Document"))));
     }
 
-    @Test void aContentTabTakesTheWorkspaceSlotOverAnOpaqueSurfaceWhileWindowsKeepChrome() throws Exception {
+    @Test void aContentTabTakesTheWorkspaceSlotOverAnOpaqueSurfaceWhileDialogsKeepChrome() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var chrome = ThemeTestSupport.generated(false); var workspace = ThemeTestSupport.generated(true);
             var mixed = ThemeTestSupport.mixed(chrome, workspace);
             var containment = new Containment(() -> true); var model = new dev.jasper.app.contributions.Contributions();
-            var main = java.util.UUID.randomUUID(); var separate = java.util.UUID.randomUUID();
+            var fixture = new TerminalFixture(); var main = fixture.addMainWindow(); var separate = fixture.addWindow();
             var mainHolder = new JPanel(); var separateHolder = new JPanel();
-            model.content().addHost(new dev.jasper.app.contributions.ContentHost(main, false, e -> mainHolder.add(e.component()), e -> mainHolder.remove(e.component()), e -> {}, () -> {}));
-            model.content().addHost(new dev.jasper.app.contributions.ContentHost(separate, true, e -> separateHolder.add(e.component()), e -> separateHolder.remove(e.component()), e -> {}, () -> {}));
-            model.content().setFactory(detached -> detached ? separate : main);
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, e -> mainHolder.add(e.component()), e -> mainHolder.remove(e.component()), e -> {}, () -> {}));
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(separate, e -> separateHolder.add(e.component()), e -> separateHolder.remove(e.component()), e -> {}, () -> {}));
+            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> model.tabs().move(tab, separate)));
             var ui = new HostedUi("test.kit", model, containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(), () -> dev.jasper.sdk.Variant.LIGHT,
-                h -> () -> {}, AppContractTest.headlessWindows(), null, () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}),
+                h -> () -> {}, AppContractTest.headlessWindows(), terminals(fixture, containment), () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}),
                 new GlassSource(c -> SwingUtilities.isDescendingFrom(c, separateHolder) ? .4 : 1, h -> new dev.jasper.app.lifecycle.Subscription(() -> {})));
             var kit = new HostedKit("test.kit", () -> true, ui::kitThemes, ui.appearance(), containment); ui.kit(kit);
             var disposed = new AtomicInteger();
@@ -76,22 +81,22 @@ class WorkspaceContentRouteTest {
             component.setSize(60, 60); var g = image.createGraphics(); try { component.paint(g); } finally { g.dispose(); }
             assertThat(image.getRGB(59, 0) >>> 24).as("the surface paints opaque").isEqualTo(255);
 
-            tab.move(true);
+            tab.moveToNewWindow();
             assertThat(component.route()).as("a move keeps the slot").isEqualTo(ThemeRoute.WORKSPACE);
             assertThat(scroll.getBackground().getAlpha()).as("and resamples the destination's opacity").isEqualTo(102);
             assertThat(scroll.getBackground().getRGB() & 0xffffff).isEqualTo(workspace.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT).getRGB() & 0xffffff);
             assertThat(text.getText()).isEqualTo("unsaved"); assertThat(text.getCaretPosition()).isEqualTo(3); assertThat(disposed.get()).isZero();
 
-            var window = ui.windows().create(new WindowSpec("test.kit.form", "Form", new Dimension(400, 300), false));
+            var dialog = ui.windows().dialog(new DialogSpec("Form", tab, false));
             var form = kit.create(new ViewSpec(new Nodes.Text("label", ControlState.READY, "Name", Nodes.TextRole.BODY)), e -> {});
-            window.setContent(form);
+            dialog.setContent(form);
             KitView formComponent = ((HostedKitView) form).component();
-            assertThat(formComponent.route()).as("windows keep chrome").isEqualTo(ThemeRoute.CHROME);
+            assertThat(formComponent.route()).as("dialogs keep chrome").isEqualTo(ThemeRoute.CHROME);
             assertThat(formComponent.isOpaque()).isFalse();
             assertThat(named(formComponent, "label", JLabel.class).getForeground()).isEqualTo(chromeText);
 
             tab.close(); assertThat(disposed.get()).isEqualTo(1);
-            window.close(); ui.closeAll(); kit.close();
+            dialog.close(); ui.closeAll(); kit.close();
         });
     }
 
@@ -101,12 +106,13 @@ class WorkspaceContentRouteTest {
             var chrome = ThemeTestSupport.generated(false); var workspace = ThemeTestSupport.generated(true);
             var mixed = ThemeTestSupport.mixed(chrome, workspace);
             var containment = new Containment(() -> true); var model = new dev.jasper.app.contributions.Contributions();
-            var main = java.util.UUID.randomUUID(); var holder = new JPanel();
-            model.content().addHost(new dev.jasper.app.contributions.ContentHost(main, false,
+            var fixture = new TerminalFixture(); var main = fixture.addMainWindow(); var holder = new JPanel();
+            var terminals = terminals(fixture, containment);
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main,
                 e -> { holder.add(e.component()); holder.remove(e.component()); throw new IllegalStateException("mount failed"); }, e -> {}, e -> {}, () -> {}));
-            model.content().setFactory(detached -> main);
+            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> { }));
             var ui = new HostedUi("test.kit", model, containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(), () -> dev.jasper.sdk.Variant.LIGHT,
-                h -> () -> {}, AppContractTest.headlessWindows(), null, () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}), GlassSource.NONE);
+                h -> () -> {}, AppContractTest.headlessWindows(), terminals, () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}), GlassSource.NONE);
             var kit = new HostedKit("test.kit", () -> true, ui::kitThemes, ui.appearance(), containment); ui.kit(kit);
             var view = kit.create(document(), e -> {});
             var scroll = new JScrollPane(new JTextArea("kept"));
@@ -116,9 +122,11 @@ class WorkspaceContentRouteTest {
             KitView component = ((HostedKitView) view).component();
             assertThat(component.route()).isEqualTo(ThemeRoute.CHROME); assertThat(component.isOpaque()).isFalse();
             assertThat(scroll.getBackground().getRGB()).as("its content is back on chrome without waiting for a reparent").isEqualTo(chromeInput);
-            var window = ui.windows().create(new WindowSpec("test.kit.form", "Form", new Dimension(400, 300), false));
-            window.setContent(view);
-            window.close(); ui.closeAll(); kit.close();
+            // The caller can still mount the refused view elsewhere.
+            var dialog = ui.windows().dialog(new DialogSpec("Form", terminals.window(main).orElseThrow(), false));
+            dialog.setContent(view);
+            assertThat(component.route()).as("on a dialog, still chrome").isEqualTo(ThemeRoute.CHROME);
+            dialog.close(); ui.closeAll(); kit.close();
         });
     }
 

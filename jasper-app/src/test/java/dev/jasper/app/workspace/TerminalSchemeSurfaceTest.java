@@ -25,7 +25,7 @@ class TerminalSchemeSurfaceTest {
         WindowContent[] owner = new WindowContent[1];
         edt(() -> {
             owner[0] = content(launcher(pending), new ThemeController(false, TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow()));
-            owner[0].currentTab().rename("other"); owner[0].newTab(HOME); owner[0].currentTab().rename("selected");
+            owner[0].currentTerminal().rename("other"); owner[0].newTab(HOME); owner[0].currentTerminal().rename("selected");
             owner[0].update();
         });
         while (!pending.isEmpty()) pending.remove().run();

@@ -30,7 +30,7 @@ class EditChannelsTest {
     final List<Optional<WindowHandle>> owners = new CopyOnWriteArrayList<>();
     final List<TestEndpoint> opened = new CopyOnWriteArrayList<>();
     volatile boolean connected = true;
-    EditChannels channels = new EditChannels((identity, owner) -> {
+    EditChannels channels = channels((identity, owner) -> {
         owners.add(owner);
         var endpoint = new TestEndpoint(new LocalEndpoint());
         opened.add(endpoint);
@@ -42,6 +42,13 @@ class EditChannelsTest {
         ui.shutdownNow(); background.shutdownNow();
     }
 
+    /** Channels through the full constructor, as Remote makes them; here quiet jobs open with the same opener. */
+    static EditChannels channels(java.util.function.BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>> opener,
+                                 java.util.function.Predicate<ConnectionIdentity> authenticated, java.util.concurrent.Executor background,
+                                 java.util.concurrent.Executor ui) {
+        return new EditChannels(opener, opener, authenticated, background, ui);
+    }
+
     static ConnectionIdentity identity(String name) {
         return new ConnectionIdentity(List.of(new ConnectionIdentity.Hop(
             RemoteHost.create(name, "127.0.0.1", 22, "deploy", Auth.AGENT, "", Optional.empty()), "deploy")));
@@ -49,6 +56,22 @@ class EditChannelsTest {
     <T> T onUi(Callable<T> work) throws Exception { return ui.submit(work).get(10, TimeUnit.SECONDS); }
     <T> CompletableFuture<T> submit(ConnectionIdentity identity, EditChannels.Work<T> work) throws Exception {
         return onUi(() -> channels.submit(identity, Optional::empty, work));
+    }
+
+    /**
+     * Workspace plan 6b Rulings 29: a quiet job, a restored document's first read, opens its channel with the quiet opener,
+     * which asks nothing; any other job opens one with the opener, which may ask.
+     */
+    @Test void aQuietJobOpensItsChannelWithTheQuietOpener() throws Exception {
+        List<String> openedBy = new CopyOnWriteArrayList<>();
+        java.util.function.Function<String, java.util.function.BiFunction<ConnectionIdentity, Optional<WindowHandle>, CompletableFuture<FileEndpoint>>> opener =
+            name -> (identity, owner) -> { openedBy.add(name + "|" + identity.host().name()); return CompletableFuture.completedFuture(new LocalEndpoint()); };
+        var routed = new EditChannels(opener.apply("asks"), opener.apply("quiet"), identity -> true, background, ui);
+        try {
+            assertThat(onUi(() -> routed.submitQuietly(identity("prod"), Optional::empty, endpoint -> "read")).get(10, TimeUnit.SECONDS)).isEqualTo("read");
+            assertThat(onUi(() -> routed.submit(identity("build"), Optional::empty, endpoint -> "read")).get(10, TimeUnit.SECONDS)).isEqualTo("read");
+            assertThat(openedBy).containsExactly("quiet|prod", "asks|build");
+        } finally { onUi(() -> { routed.close(); return null; }); }
     }
 
     @Test void oneIdentityRunsOneOperationAtATimeOnOneChannelThenClosesIt() throws Exception {
@@ -122,11 +145,11 @@ class EditChannelsTest {
         assertThat(opened).hasSize(1);
     }
 
-    @Test void reconnectingWithoutATerminalWindowFailsWithTheSignInMessage() throws Exception {
+    @Test void reconnectingWithoutAJasperWindowFailsWithTheSignInMessage() throws Exception {
         connected = false;
         var failure = submit(identity("prod-web"), endpoint -> "never");
         assertThatThrownBy(() -> failure.get(10, TimeUnit.SECONDS))
-            .hasRootCauseMessage("Reconnecting to prod-web needs an open terminal window for the sign-in prompt.");
+            .hasRootCauseMessage("Reconnecting to prod-web needs an open Jasper window for the sign-in prompt.");
         assertThat(owners).as("nothing was opened").isEmpty();
     }
 
@@ -147,7 +170,7 @@ class EditChannelsTest {
         onUi(() -> { channels.close(); return null; });
         var opening = new CompletableFuture<FileEndpoint>();
         var asked = new AtomicInteger();
-        channels = new EditChannels((identity, owner) -> { asked.incrementAndGet(); return opening; }, identity -> true, background, ui);
+        channels = channels((identity, owner) -> { asked.incrementAndGet(); return opening; }, identity -> true, background, ui);
         var prod = identity("prod");
         var reads = List.of(submit(prod, endpoint -> "a"), submit(prod, endpoint -> "b"), submit(prod, endpoint -> "c"));
         onUi(() -> opening.completeExceptionally(new IOException("Permission denied (publickey)")));
@@ -178,7 +201,7 @@ class EditChannelsTest {
         var firstOpening = new CompletableFuture<FileEndpoint>();
         var secondEndpoint = new TestEndpoint(new LocalEndpoint());
         var attempts = new AtomicInteger();
-        var direct = new EditChannels((identity, owner) -> attempts.incrementAndGet() == 1
+        var direct = channels((identity, owner) -> attempts.incrementAndGet() == 1
             ? firstOpening : CompletableFuture.completedFuture(secondEndpoint), identity -> true, background, Runnable::run);
         var first = direct.submit(prod, Optional::empty, endpoint -> "first");
         var second = direct.submit(prod, Optional::empty, endpoint -> "second");

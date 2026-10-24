@@ -46,7 +46,6 @@ tasks.register<JavaExec>("gallery") {
         require(scale.get() in listOf("1", "2")) { "jasper.galleryScale must be 1 or 2" }
         require(theme.get() in listOf("dark", "light")) { "Unknown jasper.galleryTheme" }
         require(kit.get() in listOf("default", "enterprise")) { "jasper.galleryKit must be default or enterprise" }
-        require(kit.get() == "default" || theme.get() == "light") { "The Enterprise gallery renders Enterprise Light only" }
     }
     systemProperty("java.awt.headless", "true")
     systemProperty("flatlaf.uiScale", scale.get())
@@ -67,18 +66,20 @@ tasks.named("check") { dependsOn(tasks.named("javadoc")) }
 // This portable distribution task never launches the application or trains AOT.
 val verifyUiDistribution = tasks.register("verifyUiDistribution") {
     dependsOn(":jasper-app:installDist", tasks.jar)
+    val plugins = rootProject.subprojects.filter { it.name.startsWith("jasper-plugin-") }
+        .associate { it.path to it.tasks.named("stagePlugin") }
+    inputs.files(plugins.values)
     doLast {
         val lib = rootProject.file("jasper-app/build/install/jasper-app/lib")
         val uiJar = tasks.jar.get().archiveFile.get().asFile
         require(lib.resolve(uiJar.name).isFile) { "Application distribution is missing ${uiJar.name}" }
-        val plugins = rootProject.subprojects.filter { it.name.startsWith("jasper-plugin-") }
         require(plugins.isNotEmpty()) { "No bundled plugin runtimes were checked" }
-        for (plugin in plugins) {
-            for (artifact in plugin.configurations.getByName("runtimeClasspath").files) {
-                require(artifact.name != uiJar.name) { "${plugin.path} exposes the UI engine" }
+        for ((plugin, stage) in plugins) {
+            for (artifact in stage.get().outputs.files.asFileTree.files) {
+                require(artifact.name != uiJar.name) { "${plugin} exposes the UI engine" }
                 if (artifact.extension == "jar") JarFile(artifact).use { jar ->
                     require(jar.entries().asSequence().none { it.name.startsWith("dev/jasper/ui/") }) {
-                        "${plugin.path} embeds UI implementation classes in ${artifact.name}"
+                        "${plugin} embeds UI implementation classes in ${artifact.name}"
                     }
                 }
             }

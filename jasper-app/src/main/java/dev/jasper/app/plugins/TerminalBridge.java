@@ -29,6 +29,8 @@ final class TerminalBridge {
                 case TerminalEvent.TabOpened fact -> bus.publish(EventBus.APP, TerminalEvents.TAB_OPENED, new TerminalEvents.TabEvent(fact.windowId(), fact.tabId()));
                 case TerminalEvent.TabClosed fact -> bus.publish(EventBus.APP, TerminalEvents.TAB_CLOSED, new TerminalEvents.TabEvent(fact.windowId(), fact.tabId()));
                 case TerminalEvent.TabSelected fact -> bus.publish(EventBus.APP, TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(fact.windowId(), fact.tabId()));
+                case TerminalEvent.TabMoved fact -> bus.publish(EventBus.APP, TerminalEvents.TAB_MOVED,
+                    new TerminalEvents.TabMoved(fact.tabId(), fact.fromWindowId(), fact.toWindowId()));
                 case TerminalEvent.PaneOpened fact -> bus.publish(EventBus.APP, TerminalEvents.PANE_OPENED, new TerminalEvents.PaneEvent(fact.tabId(), fact.paneId()));
                 case TerminalEvent.PaneClosed fact -> bus.publish(EventBus.APP, TerminalEvents.PANE_CLOSED, new TerminalEvents.PaneEvent(fact.tabId(), fact.paneId()));
                 case TerminalEvent.PaneFocused fact -> bus.publish(EventBus.APP, TerminalEvents.PANE_FOCUSED, new TerminalEvents.PaneEvent(fact.tabId(), fact.paneId()));

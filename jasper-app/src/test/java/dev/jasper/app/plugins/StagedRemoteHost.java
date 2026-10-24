@@ -77,11 +77,25 @@ final class StagedRemoteHost implements AutoCloseable {
             loader, () -> plugin)));
         window = onEdtValue(() -> {
             var content = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
-            // A terminal window of the registry, so Remote's dialogs may name it as their owner.
+            // A Jasper window of the registry, so Remote's dialogs may name it as their owner.
             content.connectTerminals(terminals.registry, () -> { });
             content.connectContributions(contributions);
             return content;
         });
+        awaitTransferStore();
+    }
+
+    /**
+     * Waits until the plugin's transfer queue has opened its store, which its control loop does at start: sqlite-jdbc then
+     * loads a fresh copy of its native library for this plugin class loader, which a stop cannot interrupt and which takes
+     * seconds on a loaded machine. Until then a test that stopped the plugin waited on that load in {@link #close}. A
+     * command runs only once the store is open, so one answered snapshot means it is.
+     */
+    private void awaitTransferStore() throws Exception {
+        Object transfers = field(plugin, "transfers");
+        var snapshot = (CompletableFuture<?>) transfers.getClass().getMethod("snapshot", long.class, int.class).invoke(transfers, 0L, 1);
+        try { snapshot.get(60, TimeUnit.SECONDS); }
+        catch (java.util.concurrent.TimeoutException slow) { throw new AssertionError("The Remote plugin's transfer store did not open", slow); }
     }
 
     /**
@@ -138,9 +152,9 @@ final class StagedRemoteHost implements AutoCloseable {
      */
     void sessionsState(java.util.function.ToIntFunction<Object> sessions, String credential) {
         try {
-            // The plugin's per-window panel map: its method table names optional Vault types, which are absent here.
-            var panels = plugin.getClass().getDeclaredField("panels"); panels.setAccessible(true);
-            Object panel = ((Map<?, ?>) panels.get(plugin)).get(window.id());
+            // The plugin's Sessions panel: its method table names optional Vault types, which are absent here.
+            var sessionsField = plugin.getClass().getDeclaredField("sessionsPanel"); sessionsField.setAccessible(true);
+            Object panel = sessionsField.get(plugin);
             panel.getClass().getMethod("setCredentialLabels", Function.class).invoke(panel, (Function<Object, String>) host -> credential);
             panel.getClass().getMethod("setHostDetails", Function.class, java.util.function.ToIntFunction.class)
                 .invoke(panel, (Function<Object, String>) host -> "Ubuntu 24.04", sessions);
@@ -166,7 +180,7 @@ final class StagedRemoteHost implements AutoCloseable {
     void tunnelStates(String stage) {
         try {
             Object tunnelsUi = field(plugin, "tunnelsUi");
-            Object panel = ((Map<?, ?>) field(tunnelsUi, "panels")).get(window.id());
+            Object panel = field(tunnelsUi, "panel");
             Object store = field(tunnelsUi, "store");
             var tunnels = (List<?>) store.getClass().getMethod("tunnels").invoke(store);
             Object starting = loader.loadClass("dev.jasper.remote.tunnels.TunnelState$Starting").getConstructor(String.class).newInstance(stage);
@@ -237,8 +251,8 @@ final class StagedRemoteHost implements AutoCloseable {
     Object sftpPanel() {
         try {
             Object sftpUi = field(plugin, "sftpUi");
-            var panel = sftpUi.getClass().getDeclaredMethod("panel", java.util.UUID.class); panel.setAccessible(true);
-            return panel.invoke(sftpUi, window.id());
+            var panel = sftpUi.getClass().getDeclaredMethod("panel"); panel.setAccessible(true);
+            return panel.invoke(sftpUi);
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
@@ -391,8 +405,10 @@ final class StagedRemoteHost implements AutoCloseable {
     @Override public void close() throws Exception {
         var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
         try {
+            var pluginWorkers = PluginShutdownTestSupport.capture(host);
             onEdt(() -> pending.set(host.stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+            pluginWorkers.await();
         } finally {
             onEdt(auxiliary::close);
             loader.close();

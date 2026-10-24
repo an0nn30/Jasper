@@ -1,0 +1,62 @@
+<section class="guide" id="capabilities">
+<h2>Capabilities</h2>
+<p>A capability names something a plugin does that the user cannot see in the window, such as reading what a terminal
+runs or typing into it, or a role only one plugin at a time can take. Adding actions, menu items, tool windows, content tabs,
+dialogs, status items, notifications, settings and services needs none. A plugin declares its capabilities in
+{@code plugin.toml}:</p>
+<pre><code class="language-toml">capabilities = ["terminal.observe", "terminal.inject", "palette.contribute"]</code></pre>
+<p>The names are the constants of {@link Capabilities}; {@link Capabilities#ALL} lists them. An unknown name makes the
+manifest invalid.</p>
+<!-- generated:capabilities -->
+
+<h3>Consent</h3>
+<p>A plugin the user installed loads only after the user has allowed every capability it declares. The review sheet in
+Settings › Plugins lists them in the user's words (in the table below), each followed by its name in brackets, with the warning that a plugin
+is not sandboxed; <b>Allow and Enable</b> records exactly the capabilities shown. A later version that declares a
+capability the user has not allowed waits for a new review and does not load until then; one that declares the same or
+fewer keeps the consent. Bundled plugins and the {@code --plugin-dir} plugin need no review.</p>
+<p>So the capabilities a running plugin holds are exactly those it declares: {@link PluginInfo#capabilities()} from
+{@link PluginContext#plugin()} lists them, and a plugin that can do without one checks before it calls:</p>
+<pre><code class="language-java">if (!context.plugin().capabilities().contains(Capabilities.TERMINAL_INJECT)) {
+    context.log().log(System.Logger.Level.INFO, "Typing into panes needs terminal.inject");
+    return;
+}</code></pre>
+
+<h3>What each capability guards</h3>
+<table>
+<thead><tr><th>Capability</th><th>The review sheet says</th><th>Calls that need it</th><th>Audit log</th></tr></thead>
+<tbody>
+<tr><td>{@code terminal.observe}</td><td>See your terminals: titles, folders, the commands you run and how they end</td><td>{@link PaneHandle#info()}, {@link PaneHandle#foregroundJob()}, {@link TabHandle#title()}, other tabs' titles in {@link ContentTab#tabChoices()} (without it a choice reads "Tab N"), and subscribing to any {@link TerminalEvents} topic (every id starting {@code jasper.terminal.})</td><td>The first terminal subscription, and the first {@code tabChoices()} answer with other tabs' titles</td></tr>
+<tr><td>{@code terminal.selection}</td><td>Read the text you select in a terminal</td><td>{@link PaneHandle#selection()}</td><td>Each read, with the number of characters</td></tr>
+<tr><td>{@code terminal.inject}</td><td>Type into your terminals</td><td>{@link PaneHandle#sendText(String)}, {@link PaneHandle#sendBytes(byte[])}, {@link PaneHandle#paste(String)}, also on a palette query's target pane</td><td>Each call, with the number of bytes</td></tr>
+<tr><td>{@code terminal.open}</td><td>Open terminal tabs, splits and windows, and run programs in them</td><td>{@link Terminals#openTab(WindowHandle,OpenRequest)} and {@link Terminals#split(PaneHandle,Direction,OpenRequest)} with a local request (a shell, a shell profile or a program), {@link ContentTab#split(SplitChoice,Direction)} with {@link SplitChoice#TERMINAL}, {@link Terminals#profiles()}, {@link Terminals#onProfilesChanged(Runnable)}</td><td>Each open, with the program's file name when it runs one</td></tr>
+<tr><td>{@code session.provide}</td><td>Run its own terminal sessions, such as remote connections</td><td>{@code openTab} and {@code split} with {@link dev.jasper.sdk.terminal.OpenRequest#session(SessionSpec)}</td><td>Each open</td></tr>
+<tr><td>{@code palette.contribute}</td><td>Add scopes to the command palette and open it</td><td>{@link Palette#register(PaletteScope)} and {@link Palette#open(WindowHandle,String,Optional,Optional)}</td><td>The first use</td></tr>
+<tr><td>{@code files.source}</td><td>Add places, such as saved hosts, to the file chooser</td><td>{@link FileSources#register(FileSource)}</td><td>The first registration</td></tr>
+<tr><td>{@code network.listen}</td><td>Accept connections from other programs or computers, such as serving files</td><td>No call. It tells the user, before they allow the plugin, that it accepts connections.</td><td></td></tr>
+<tr><td>{@code clipboard.read}</td><td>Read text you copied to the clipboard</td><td>{@link Platform#clipboardText()}; writing to the clipboard needs nothing</td><td>Each read, with the number of characters</td></tr>
+<tr><td>{@code terminal.environment}</td><td>Set environment variables in new terminal shells</td><td>{@link Terminals#environment(Function)}</td><td>The registration</td></tr>
+<tr><td>{@code editor.provide}</td><td>Open the files Jasper opens for editing</td><td>{@link Platform#editor(FileEditor)}</td><td>The registration</td></tr>
+<tr><td>{@code presentation.provide}</td><td>Change Jasper's window chrome and controls after a restart</td><td>No call. It goes with the manifest's {@code presentation} key, each requiring the other; see <a href="looks.md">looks</a>.</td><td></td></tr>
+</tbody>
+</table>
+<p>Finding windows, tabs and panes, focusing and selecting them, and reading an action's window and pane need no
+capability; what a handle may then do does.</p>
+
+<h3>MissingCapabilityException</h3>
+<p>A gated call by a plugin that does not hold the capability throws {@link MissingCapabilityException} with the message
+"Plugin <i>id</i> needs the capability <i>capability</i>; declare it in plugin.toml";
+{@link MissingCapabilityException#pluginId()} and {@link MissingCapabilityException#capability()} name both. Pane,
+tab and terminal calls check the capability before anything else, so a missing declaration shows even on a closed pane
+or from the wrong thread. Thrown inside a callback, it is contained and reported like any other failure.</p>
+
+<h3>The audit log</h3>
+<p>Jasper logs the gated calls marked above on the logger {@code dev.jasper.app.plugins.audit}, at INFO, as
+"Plugin <i>id</i> used <i>capability</i>: <i>what</i>", for example "Plugin dev.example.tool used terminal.inject: typed
+12 bytes into pane …". It records amounts and targets, never content.</p>
+
+<div class="callout warn"><p>Capabilities cover the calls a plugin makes to Jasper. They do not limit what the plugin's
+own code does with the Java runtime: it can read and write the user's files, open connections and start programs like any
+program the user runs. The class loader that hides Jasper's internals keeps plugins on the public API; it is not a
+security boundary either. Declare only what you use: the list is what the user is asked to allow.</p></div>
+</section>

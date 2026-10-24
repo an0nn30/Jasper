@@ -1,10 +1,10 @@
 name: ci
 
-# A push or pull request that changes only documentation runs nothing: every run is billed against the account's
-# Actions minutes (macOS ten times, Windows twice), and ./gradlew check, which also checks the docs, runs before
-# every merge. The example external plugin under docs/examples is code and still runs.
+# Test PRs and main only; documentation-only changes remain excluded.
+# The example external plugin under docs/examples is code and still runs.
 on:
   push:
+    branches: [main]
     paths:
       - '**'
       - '!docs/**'
@@ -17,6 +17,13 @@ on:
       - 'docs/examples/**'
       - '!**/*.md'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
     strategy:
@@ -24,7 +31,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
-    # A full run takes about five minutes; a hang should not hold the runner for GitHub's six hours.
+    # Full Windows checks take about 20 minutes; bound hangs while retaining time for diagnostics.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -36,17 +43,35 @@ jobs:
         with:
           python-version: '3.12'
       - uses: gradle/actions/setup-gradle@v6
-      - name: Linux desktop probe dependencies
+      - name: Install Linux fonts and desktop probe dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libglib2.0-dev libgtk-3-dev libgtk-4-dev libadwaita-1-dev xvfb xauth dbus
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-dejavu-core fonts-noto-cjk build-essential pkg-config libglib2.0-dev libgtk-3-dev libgtk-4-dev libadwaita-1-dev xvfb xauth dbus
       - name: Check
         shell: bash
-        run: ./gradlew check --continue --stacktrace
+        # Windows subprocess/cleanup tests hit deadlines with concurrent test JVMs.
+        # Keep its worker count at one; Unix runners parallelize independent projects.
+        # Each project keeps its default single test JVM and sequential JUnit execution.
+        env:
+          GRADLE_WORKERS: ${{ runner.os == 'Windows' && '1' || '2' }}
+        run: ./gradlew check --parallel --max-workers="$GRADLE_WORKERS" --continue --stacktrace
       # check built the release jars; the example plugin must keep building from them.
       - name: Example external plugin
         if: runner.os == 'Linux'
         shell: bash
         run: ./gradlew -p docs/examples/external-plugin -PjasperSdkDir="$PWD/build/sdk-release" check pluginZip --stacktrace
+      - name: Upload test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-diagnostics-${{ matrix.os }}
+          path: |
+            **/build/test-results/**
+            **/build/reports/tests/**
+            jasper-app/build/enterprise-settings/**
+            jasper-app/build/chrome-renders/**
+          retention-days: 7
 
   desktop-gtk-modern:
     runs-on: ubuntu-24.04

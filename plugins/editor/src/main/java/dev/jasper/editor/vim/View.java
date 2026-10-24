@@ -28,6 +28,18 @@ final class View {
     /** 'scroll': lines for CTRL-D and CTRL-U, half the window unless a count set it. */
     private int scroll = 12;
     private int clineRow, clineHeight;
+    private boolean physical;
+    private int physicalColumnOffset = -1;
+    private float physicalColumn;
+
+    /** A mounted editor uses its shaped rows; standalone corpus windows retain explicit cell geometry. */
+    void physical(boolean value) { physical = value; }
+    boolean physical() { return physical; }
+    int rowPosition(int offset,int delta,char which) { return geometry().rowPosition(offset,delta,which); }
+    private dev.jasper.editor.textview.EditorTextView geometry() { return editor.area().textView(); }
+    private int cursorOffset() { return editor.buffer().offset(editor.cursor()); }
+    private int cellWidth() { return Math.max(1, editor.area().getFontMetrics(editor.area().getFont()).charWidth('m')); }
+
 
     View(VimEditor editor) { this.editor = editor; }
 
@@ -96,6 +108,7 @@ final class View {
 
     /** plines_win_nofold: screen rows the line takes. */
     int plinesNofold(int lnum) {
+        if (physical) return geometry().rowsForLine(lnum - 1);
         if (line(lnum).isEmpty()) return 1;
         int col = linetabsize(lnum);
         if (col <= width) return 1;
@@ -135,6 +148,8 @@ final class View {
 
     /** w_virtcol: the cursor's display column; outside Insert mode a tab's cursor is on its last column. */
     private int virtcol() {
+        if (physical) return (wrap() ? geometry().rowInLine(cursorOffset()) * width : 0)
+            + Math.round(geometry().xForOffset(cursorOffset()) / cellWidth());
         Pos p = editor.cursor();
         String text = editor.buffer().line(p.line);
         int col = Math.min(p.col, text.length());
@@ -157,8 +172,8 @@ final class View {
         Pos p = editor.cursor();
         String text = editor.buffer().line(p.line);
         int col = Math.min(p.col, text.length());
-        int startcol = Text.virtcol(text, col, ts());
-        int endcol = col < text.length() ? startcol + Text.width(text, col, startcol, ts()) - 1 : startcol;
+        int startcol = physical ? Math.round(geometry().xForOffset(cursorOffset()) / cellWidth()) : Text.virtcol(text, col, ts());
+        int endcol = physical ? startcol : col < text.length() ? startcol + Text.width(text, col, startcol, ts()) - 1 : startcol;
         int siso = editor.options().number("sidescrolloff"), ss = editor.options().number("sidescroll");
         int offLeft = startcol - leftcol - siso;
         int offRight = endcol - (leftcol + width - siso) + 1;
@@ -1006,6 +1021,16 @@ final class View {
      * @return false when it could not move as far
      */
     boolean screengo(boolean forward, long dist) {
+        if (physical && wrap()) {
+            int offset = cursorOffset();
+            if (offset != physicalColumnOffset) physicalColumn = geometry().xForOffset(offset);
+            int delta = (int)Math.min(Integer.MAX_VALUE, dist) * (forward ? 1 : -1);
+            int next = geometry().moveRows(offset, delta, physicalColumn);
+            editor.setCursor(editor.buffer().pos(next), true);
+            physicalColumnOffset = cursorOffset();
+            editor.curswant(Text.virtcol(line(lnum()), editor.cursor().col, ts()));
+            return next != offset;
+        }
         int linelen = linetabsize(lnum());
         boolean ok = true, atend = false;
         int width1 = width, width2 = width;

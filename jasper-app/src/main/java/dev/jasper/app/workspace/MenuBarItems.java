@@ -9,7 +9,7 @@ import javax.swing.JRadioButtonMenuItem;
 import javax.swing.KeyStroke;
 
 /**
- * Terminal-window menu-bar items. They show their accelerators but never fire them from the keyboard: the root input
+ * Jasper-window menu-bar items. They show their accelerators but never fire them from the keyboard: the root input
  * map is the only key path, so a key it declines (no applicable enabled action where focus is) reaches the focused
  * component instead of the menu bar's copy of the action. Clicks and mnemonics still work. Popup and context menus
  * keep ordinary items, which bind only while they are showing.
@@ -25,7 +25,12 @@ final class MenuBarItems {
     private static boolean accelerator(int condition) { return condition == JComponent.WHEN_IN_FOCUSED_WINDOW; }
 
     static final class Item extends JMenuItem {
-        Item(Action action) { super(action); style(this); }
+        Item(Action action) {
+            // A plugin's action name is plain text: html.disable first, as the UI reads it only when the text changes.
+            putClientProperty("html.disable", true);
+            setAction(action);
+            style(this);
+        }
 
         @Override protected boolean processKeyBinding(KeyStroke stroke, KeyEvent event, int condition, boolean pressed) {
             return !accelerator(condition) && super.processKeyBinding(stroke, event, condition, pressed);

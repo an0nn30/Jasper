@@ -28,10 +28,12 @@ public final class ShellProfileCatalog implements AutoCloseable {
     private final Supplier<TerminalConfig.Shell> shell;
     private final Supplier<List<WslDistro>> distros;
     private final Supplier<Optional<String>> pwsh;
+    private final Supplier<Optional<String>> cygwin;
     private final Executor background;
     private final List<Runnable> listeners = new ArrayList<>();
     private List<WslDistro> detectedDistros = List.of();
     private Optional<String> detectedPwsh = Optional.empty();
+    private Optional<String> detectedCygwin = Optional.empty();
     private boolean complete;
     private long generation;
     private boolean closed;
@@ -45,11 +47,17 @@ public final class ShellProfileCatalog implements AutoCloseable {
      */
     public ShellProfileCatalog(String osName, Map<String, String> environment, Supplier<TerminalConfig.Shell> shell,
                                Supplier<List<WslDistro>> distros, Supplier<Optional<String>> pwsh, Executor background) {
+        this(osName, environment, shell, distros, pwsh, Optional::empty, background);
+    }
+    public ShellProfileCatalog(String osName, Map<String, String> environment, Supplier<TerminalConfig.Shell> shell,
+                               Supplier<List<WslDistro>> distros, Supplier<Optional<String>> pwsh,
+                               Supplier<Optional<String>> cygwin, Executor background) {
         this.osName = Objects.requireNonNull(osName, "osName");
         this.environment = Map.copyOf(environment);
         this.shell = Objects.requireNonNull(shell, "shell");
         this.distros = Objects.requireNonNull(distros, "distros");
         this.pwsh = Objects.requireNonNull(pwsh, "pwsh");
+        this.cygwin = Objects.requireNonNull(cygwin, "cygwin");
         this.background = Objects.requireNonNull(background, "background");
     }
 
@@ -59,13 +67,14 @@ public final class ShellProfileCatalog implements AutoCloseable {
         Map<String, String> environment = System.getenv();
         return new ShellProfileCatalog(os, environment, shell, () -> WslDistributions.detect(os),
             () -> ShellProfiles.findPwsh(os, environment, ShellProfiles::exists),
+            () -> dev.jasper.app.cygwin.CygwinDiscovery.bash(),
             task -> Thread.ofVirtual().name("jasper-shell-profiles").start(task));
     }
 
     /** The profiles now, platform default first and Custom last. */
     public List<ShellProfile> current() {
         requireEdt();
-        return ShellProfiles.available(osName, environment, detectedDistros, detectedPwsh, shell.get());
+        return ShellProfiles.available(osName, environment, detectedDistros, detectedPwsh, detectedCygwin, shell.get());
     }
 
     /** Whether detection has finished at least once; until then WSL and PowerShell 7 ids are trusted. */
@@ -77,7 +86,7 @@ public final class ShellProfileCatalog implements AutoCloseable {
     /** The profile to start for {@code requested} (empty: the configured one) under {@code configured} settings. */
     public ShellProfiles.Resolution resolve(Optional<String> requested, TerminalConfig.Shell configured) {
         requireEdt();
-        return ShellProfiles.resolve(requested, ShellProfiles.available(osName, environment, detectedDistros, detectedPwsh, configured),
+        return ShellProfiles.resolve(requested, ShellProfiles.available(osName, environment, detectedDistros, detectedPwsh, detectedCygwin, configured),
             complete, osName, environment, configured);
     }
 
@@ -94,9 +103,13 @@ public final class ShellProfileCatalog implements AutoCloseable {
                 catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "WSL detection failed", failure); found = List.of(); }
                 try { shell7 = pwsh.get(); }
                 catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "PowerShell 7 detection failed", failure); shell7 = Optional.empty(); }
+                Optional<String> foundCygwin;
+                try { foundCygwin = cygwin.get(); }
+                catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "Cygwin detection failed", failure); foundCygwin = Optional.empty(); }
+                Optional<String> cygwinProgram = foundCygwin;
                 List<WslDistro> distributions = found;
                 Optional<String> program = shell7;
-                SwingUtilities.invokeLater(() -> detected(ticket, distributions, program));
+                SwingUtilities.invokeLater(() -> detected(ticket, distributions, program, cygwinProgram));
             });
             detecting = true;
         } catch (RuntimeException rejected) {
@@ -104,11 +117,12 @@ public final class ShellProfileCatalog implements AutoCloseable {
         }
     }
 
-    private void detected(long ticket, List<WslDistro> found, Optional<String> program) {
+    private void detected(long ticket, List<WslDistro> found, Optional<String> program, Optional<String> cygwinProgram) {
         if (closed || ticket != generation) return;
-        boolean changed = !complete || !found.equals(detectedDistros) || !program.equals(detectedPwsh);
+        boolean changed = !complete || !found.equals(detectedDistros) || !program.equals(detectedPwsh) || !cygwinProgram.equals(detectedCygwin);
         detectedDistros = found;
         detectedPwsh = program;
+        detectedCygwin = cygwinProgram;
         complete = true;
         firstDetection.complete(true);
         if (changed) for (Runnable listener : List.copyOf(listeners)) listener.run();

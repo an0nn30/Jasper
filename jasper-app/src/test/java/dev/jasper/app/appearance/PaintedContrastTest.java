@@ -179,8 +179,10 @@ class PaintedContrastTest {
                     new Sampled("count", listView, "h.count"), new Sampled("selected detail", listView, "a.detail"));
                 var pairs = RunWindowPresentation.pairs(enterprise);
                 assertThat(guarded).as("every declared Run window text pair is sampled").hasSameSizeAs(pairs);
-                // The muted texts the mocks draw under 4.5:1 in Enterprise Light; every other text pair holds there as authored.
-                var mutedInEnterprise = java.util.Set.of(RunWindowPresentation.ROW_DETAIL, RunWindowPresentation.COUNT, RunWindowPresentation.SELECTED_DETAIL);
+                // The muted texts Enterprise Light (the user's 2026-10-18 direction: the IntelliJ Light port) authors under 4.5:1;
+                // every other text pair holds there as authored.
+                var mutedInEnterprise = java.util.Set.of(RunWindowPresentation.SHORTCUT, RunWindowPresentation.valuePair(enterprise),
+                    RunWindowPresentation.ROW_DETAIL, RunWindowPresentation.COUNT, RunWindowPresentation.SELECTED_DETAIL);
                 var window = new SurfacePanel(kit, SurfacePanel.Kind.RUN_WINDOW, () -> 24, () -> 40);
                 var box = new SurfacePanel(kit, SurfacePanel.Kind.BOX);
                 var field = new SurfacePanel(kit, SurfacePanel.Kind.FIELD);
@@ -458,9 +460,7 @@ class PaintedContrastTest {
 
     /** Spec 16.1.2 for plan 9a's classic Settings frame: each window rule it declares is painted as its guard makes it, everywhere. */
     @Test void theClassicSettingsFramePaintsEachRuleAsItsGuardMakesItOverEveryPalette() {
-        var palettes = palettes();
-        palettes.add(KitFixtures.enterpriseLight());
-        for (var theme : palettes) {
+        for (var theme : palettes()) {
             var context = KitFixtures.context(theme, KitFixtures.enterprise());
             var parts = new JComponent[6];
             for (int i = 0; i < parts.length; i++) { parts[i] = new JPanel(); parts[i].setOpaque(false); }
@@ -543,21 +543,29 @@ class PaintedContrastTest {
         } finally { context.icons().close(); context.binding().close(); }
     }
 
-    /** The preview tiles' selected caption: its most opaque ink below the tile, painted over nothing. */
+    /** The selected caption's opaque glyph interiors below the tile, sampled at 4x like the header text. */
     private static boolean selectedPreview(GeneratedTheme theme, Color expected) {
         var context = KitFixtures.context(theme);
         var choice = new Nodes.Choice("theme", ControlState.READY, Nodes.ChoiceKind.PREVIEWS,
             List.of(new Option("a", "Alpha", Optional.empty()), new Option("b", "Beta", Optional.empty())), "a", "Theme", "choose");
         try (var view = new KitView(context, new ViewSpec(choice), event -> { })) {
             KitFixtures.render(view, 400, 200, 1);
-            var image = paint(KitTestSupport.require(view, "theme.option.a", JButton.class));
-            int strongest = 0, ink = 0;
-            for (int y = Math.min(scaled(DesignMetrics.Role.THEME_PREVIEW_HEIGHT), image.getHeight()); y < image.getHeight(); y++)
+            var button = KitTestSupport.require(view, "theme.option.a", JButton.class);
+            var image = new BufferedImage(4 * button.getWidth(), 4 * button.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics();
+            try { graphics.scale(4, 4); button.paint(graphics); } finally { graphics.dispose(); }
+            // Small antialiased glyphs can have no fully covered pixel at 1x. Partial alpha also rounds
+            // unpremultiplied RGB; inspect opaque interiors, without a colour tolerance or platform branch.
+            int opaque = 0;
+            for (int y = Math.min(4 * scaled(DesignMetrics.Role.THEME_PREVIEW_HEIGHT), image.getHeight()); y < image.getHeight(); y++)
                 for (int x = 0; x < image.getWidth(); x++) {
                     int argb = image.getRGB(x, y);
-                    if (argb >>> 24 > strongest) { strongest = argb >>> 24; ink = argb & 0xFFFFFF; }
+                    if (argb >>> 24 == 255) {
+                        if (argb != expected.getRGB()) return false;
+                        opaque++;
+                    }
                 }
-            return strongest > 0 && ink == (expected.getRGB() & 0xFFFFFF);
+            return opaque >= 4;
         } finally { context.icons().close(); context.binding().close(); }
     }
 
@@ -619,7 +627,6 @@ class PaintedContrastTest {
     /** Spec 16.1.2 for the classic faces (plan 4c Rulings 17): every pair they declare meets its guard as painted, everywhere. */
     @Test void everyClassicPairMeetsItsGuardOverEveryPaletteAndEnterpriseLight() {
         var palettes = palettes();
-        palettes.add(KitFixtures.enterpriseLight());
         for (var kit : List.of(Kit.CLASSIC, KitFixtures.enterprise()))
             for (var pair : KitFaces.declared(kit).stream().distinct().toList())
                 for (var theme : palettes) {

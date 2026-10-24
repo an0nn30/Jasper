@@ -1,60 +1,56 @@
 # Jasper UI
 
-Standalone theme engine and Swing UI kit. `jasper-ui` has no dependency on the
-application, terminal, Buddy, SDK or plugins. The app adapts its configuration
-and library APIs into these values; plugins use SDK contracts and host adapters.
+`jasper-ui` is Jasper's theme engine and Swing UI kit. Every window, dialog, tool window, Settings page and plugin
+view of the workstation is drawn with it. The application uses it directly. Plugins never load it: they describe their
+UI with the JDK-only SDK values in [`dev.jasper.sdk.ui`](../docs/sdk-reference.html#package-dev.jasper.sdk.ui), and the
+application translates those into this module's model and renders them here, so a plugin's dialogs and panels take
+the same theme and look as Jasper's own ([plugin UI](../docs/plugin-ui.md)).
 
-The engine is `dev.jasper.ui.theme`: `JasperTheme` reads a Jasper theme file (the bundled Slate Cobalt is `slate-cobalt.json`) and gives
-each variant's semantic palette, terminal and editor schemes, syntax styles and glass levels as an immutable
-`GeneratedTheme` (`UiColorKeys` derives FlatLaf's UI keys from its roles when it is installed); `DerivedPalette` computes its
-derived roles and `SurfaceContrast` holds the paint-time contrast guards; the app reads installed theme files with the same
-loader. The app and plugins use this authority; [completion evidence](../docs/design/theme-engine/completion.md)
-separates source migration from Plan 3 composition.
+The module depends on FlatLaf 3.7, FlatLaf Extras 3.7 and JSVG 2.0.0, and on no other Jasper module.
 
-`TerminalColors` takes background before foreground and defensively copies exactly
-16 nonnull ANSI colors. The terminal library's palette constructor takes foreground
-before background; adapters must map these by meaning. `GlassLevels` validates opacity
-from 0.1 to 1; saved app configuration is translated by the app adapter.
+| Package | Holds |
+| --- | --- |
+| `dev.jasper.ui.theme` | Jasper theme files and their colours: semantic palettes, derived roles, terminal and editor schemes, syntax styles, glass levels, FlatLaf colour keys, paint-time contrast guards and the appearance binding |
+| `dev.jasper.ui.model` | Immutable view descriptors (`Nodes`, `ViewSpec`) and the events views report (`UiEvent`) |
+| `dev.jasper.ui.metrics` | Geometry catalogs (`DesignMetrics`), the public metric tokens (`MetricTokens`), type scales, faces, typography and the motion policy |
+| `dev.jasper.ui.kit` | The look: `Kit`, its control variants (`ControlVariants`) and colour slots (`ColorSlots`) |
+| `dev.jasper.ui.icons` | Named artwork: the built-in glyphs, the bundled IntelliJ Platform icons (New UI and classic) and scoped registrations |
+| `dev.jasper.ui.swing` | Views (`KitView`), contexts, FlatLaf installation, dialogs, the Settings shell and the native chrome's painters |
 
-Package contracts live in each `package-info.java`. Theme and model packages
-never import Swing. Themes supply colors; geometry and typography roles belong to
-the kit. Views and bindings are EDT-confined and their owner closes them.
+`theme`, `model` and `kit` are JDK-only. Each package-info names the packages it may use, and views and bindings are
+confined to the Event Dispatch Thread and closed by their owner.
 
-Use Java 25 on JetBrains Runtime and the repository wrapper:
+## Themes and looks
+
+A theme supplies colours and nothing else. `JasperTheme` reads a Jasper theme file; seven are built in: Slate Cobalt,
+Catppuccin Latte, Catppuccin Frappé, Catppuccin Macchiato, Catppuccin Mocha, Ubuntu Yaru and Jasper Meadow (the
+default of both appearances). The app reads installed and plugin theme files with the same loader.
+[Themes](../docs/themes.md) describes the format.
+
+A kit is the look: the geometry, type scale, faces, control variants, colour slots and FlatLaf key set that controls
+and the native chrome draw with. `Kit.DEFAULT` is the standard look and `Kit.CLASSIC` the classic base. A look plugin,
+such as the bundled [Enterprise](../docs/enterprise.md) plugin, ships a kit file that starts from one of the two and
+tunes it ([looks](../docs/looks.md)). One kit serves a process: it is chosen before the first window and changes only
+after a restart.
+
+## Build and test
+
+Use Java 25 on the JetBrains Runtime and the repository wrapper. Every check is headless.
 
 ```sh
+./gradlew :jasper-ui:check
 ./gradlew :jasper-ui:test --tests '*SlateCobalt*' --tests '*JasperTheme*'
-./gradlew :jasper-ui:check verifyUiArchitecture
-```
-
-Checks are headless. The bytecode architecture gate rejects other Jasper modules,
-Swing dependencies in pure packages, edges a package's package-info does not list and package cycles. It requires only UI classes,
-so it introduces no circular dependency on application checks.
-
-The kit foundation now provides immutable `Nodes`/`ViewSpec`/`UiEvent` values, a `Kit` (`Kit.DEFAULT`, and the classic base `Kit.CLASSIC`) of
-logical `DesignMetrics`, a `TypeScale`, a `FaceSet`, `ControlVariants` and `ColorSlots`, centrally resolved `Typography`, and monochrome `IconRegistry` artwork.
-`ThemeBinding` publishes complete chrome/workspace pairs on EDT; subscriptions replay and
-close independently. `AppearanceTransaction` installs real FlatLaf global defaults before
-publication and restores the old LAF, LAF defaults and developer overrides on failure.
-`KitContext.of(kit, …)` carries a kit, selects each view's theme route and supplies host-owned values.
-`KitFaces` holds one face per control point, chosen from the kit's `ControlVariants`: the toggle, buttons (with the
-field policy built with them), exclusive choice, tabs, group, form label, stepper, prompt, empty state, table, tree
-(the two share a header face), ordered list, tag and route faces.
-Every node renderer and four working panel controllers are implemented. The headless gallery
-now exercises the eight initial mock compositions, panel transitions and state variants; final
-whole-branch review remains Plan 1 Task 14. Existing consumers migrate in Plans 2/3.
-
-Public usage, package/lifetime boundaries and compiled examples are in
-[UI architecture](../docs/ui-architecture.md). [Maintenance](../docs/ui-maintenance.md)
-documents gallery/distribution checks; [calibration](../docs/design/theme-engine/calibration.md)
-records original crop/scale anchors and the inspected capture matrix (its calibration themes are retired; the gallery
-renders Slate Cobalt Dark or Light).
-
-```sh
 ./gradlew :jasper-ui:gallery -Pjasper.galleryScale=2 -Pjasper.galleryTheme=dark
 ./gradlew :jasper-ui:verifyUiDistribution
 ```
 
-Panel `SINGLE` lists use inset rounded selection. A `DETAIL` stack in a panel footer uses compact identity and action metrics; a manager detail retains its own inset and category scale. `CONTEXTUAL_EMBEDDED` buttons reserve their full interactive geometry while painting only for selected, hovered, keyboard-active rows or direct control focus. Ordinary `EMBEDDED` remains persistently painted.
+`:jasper-ui:check` runs the tests, Javadoc with doclint, the architecture gate `verifyUiArchitecture` and the theme
+converter's tests, which need Python 3.11 to 3.13 (`-Pjasper.python=<interpreter>` picks one). The gallery renders every fixture headlessly into
+`jasper-ui/build/gallery/`. `verifyUiDistribution`, which builds the application distribution and is not part of
+`check`, confirms that the application ships the engine jar and that no plugin carries its classes.
 
-Borrowed panel headers may explicitly provide immutable `PanelHostHeader.Artwork(name, pathData)` for monochrome semantic tint and canonical panel optics. Custom paths retain their authored stroke; receiving controls own validated snapshots and replacement lifetimes. The compatible three-argument `Action` preserves arbitrary host `Icon` identity, colors, alpha and dimensions.
+[UI architecture](../docs/ui-architecture.md) covers the packages, the theme engine, kits, metrics and density, type,
+views, the descriptor vocabulary, keyboard behaviour and icons. [UI maintenance](../docs/ui-maintenance.md) covers the
+gallery, the rendering matrix, the golden tables, the rules the tests enforce, how to change the kit and the
+distribution check. [Calibration](../docs/design/theme-engine/calibration.md) records the reference crops and scale
+anchors the kit was measured against.

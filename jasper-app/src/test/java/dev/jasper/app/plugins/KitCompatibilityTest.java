@@ -54,6 +54,39 @@ class KitCompatibilityTest {
         assertThatThrownBy(() -> PluginLoader.load(candidate,Map.of(),Plugin.class.getClassLoader())).hasMessage("plugin.jar!test/kit/Probe.class references removed SDK member "
             +"dev/jasper/sdk/ui/Nodes$ChoiceKind#SEGMENTEDLdev/jasper/sdk/ui/Nodes$ChoiceKind;; rebuild it for SDK 0.18");
     }
+    /** Workspace tabs plan 3b: a plugin built on 0.18 that claims 0.19 and still reads a tab's pane list is refused at load. */
+    @Test void theTabMembersSdkZeroNineteenRemovedAreRefused() throws Exception {
+        rejects(reference("dev.jasper.sdk.terminal.TabHandle","panes","()Ljava/util/List;"),"dev/jasper/sdk/terminal/TabHandle#panes()Ljava/util/List;","0.19");
+        rejects(reference("dev.jasper.sdk.terminal.TabHandle","activePane","()Ljava/util/Optional;"),"dev/jasper/sdk/terminal/TabHandle#activePane()Ljava/util/Optional;","0.19");
+        var current=candidate(">=0.19.0, <0.20",Map.of("test/kit/Probe.class",reference("dev.jasper.sdk.terminal.TabHandle","terminal","()Ljava/util/Optional;")),false);
+        try(var loader=PluginLoader.load(current,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the member that took their place").isNotNull();}
+    }
+    /** Workspace tabs plan 3b: a constant SDK 0.19 removed, the Pane menu or the pane exit policy, is refused at load. */
+    @Test void theConstantsSdkZeroNineteenRemovedAreRefused() throws Exception {
+        rejects(constant("dev.jasper.sdk.ui.StandardMenu","PANE"),"dev/jasper/sdk/ui/StandardMenu#PANELdev/jasper/sdk/ui/StandardMenu;","0.19");
+        rejects(constant("dev.jasper.sdk.terminal.ExitPolicy","CLOSE_PANE"),"dev/jasper/sdk/terminal/ExitPolicy#CLOSE_PANELdev/jasper/sdk/terminal/ExitPolicy;","0.19");
+        var current=candidate(">=0.19.0, <0.20",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.terminal.ExitPolicy","CLOSE")),false);
+        try(var loader=PluginLoader.load(current,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the constant that took its place").isNotNull();}
+    }
+    /**
+     * Workspace tabs plan 4b: a plugin built on 0.19 that claims 0.20 and still names a plugin window's type, moves a tab
+     * with {@code move(boolean)} or names the window shortcut context is refused at load. A {@code Windows.create}
+     * reference names the removed types in its descriptor, which the check reads first.
+     */
+    @Test void thePluginWindowsSdkZeroTwentyRemovedAreRefused() throws Exception {
+        for (String type : List.of("dev.jasper.sdk.ui.PluginWindow", "dev.jasper.sdk.ui.WindowSpec", "dev.jasper.sdk.ui.WindowSpec$SizeBasis"))
+            rejects(ClassFile.of().build(ClassDesc.of("test.kit.Probe"), b -> b.constantPool().classEntry(ClassDesc.of(type))),
+                "references removed SDK type " + type.replace('.', '/') + ";", "0.20");
+        rejects(reference("dev.jasper.sdk.ui.Windows","create","(Ldev/jasper/sdk/ui/WindowSpec;)Ldev/jasper/sdk/ui/PluginWindow;"),
+            "references removed SDK type dev/jasper/sdk/ui/","0.20");
+        rejects(reference("dev.jasper.sdk.ui.ContentTab","move","(Z)V"),"dev/jasper/sdk/ui/ContentTab#move(Z)V","0.20");
+        rejects(reference("dev.jasper.sdk.ui.ContentTab","isSeparate","()Z"),"dev/jasper/sdk/ui/ContentTab#isSeparate()Z","0.20");
+        rejects(reference("dev.jasper.sdk.ui.ShortcutContext","window","(Ljava/lang/String;)Ldev/jasper/sdk/ui/ShortcutContext;"),
+            "dev/jasper/sdk/ui/ShortcutContext#window(Ljava/lang/String;)Ldev/jasper/sdk/ui/ShortcutContext;","0.20");
+        rejects(constant("dev.jasper.sdk.ui.ShortcutContext$Kind","WINDOW"),"dev/jasper/sdk/ui/ShortcutContext$Kind#WINDOWLdev/jasper/sdk/ui/ShortcutContext$Kind;","0.20");
+        var current=candidate(">=0.21.0, <0.22",Map.of("test/kit/Probe.class",reference("dev.jasper.sdk.ui.ContentTab","moveToNewWindow","()V")),false);
+        try(var loader=PluginLoader.load(current,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the member that took its place").isNotNull();}
+    }
     @Test void theNamesSdkZeroEighteenGaveThemAreAdmitted() throws Exception {
         for(var renamed:RENAMED_TO) {
             var candidate=candidate(">=0.18.0, <0.19",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$"+renamed.get(0),renamed.get(1))),false);
@@ -62,12 +95,12 @@ class KitCompatibilityTest {
         var own=candidate(">=0.18.0, <0.19",Map.of("test/kit/Probe.class",constant("test.kit.Mode","HERO")),false);
         try(var loader=PluginLoader.load(own,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the plugin's own constant").isNotNull();}
     }
-    /** Spec 8.1: a 0.17 manifest is skipped by its range before any class is read. */
-    @Test void aZeroSeventeenRangeIsSkippedBeforeItLoads() throws Exception {
-        var candidate=candidate(">=0.17.0, <0.18",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$ChoiceKind","SEGMENTED")),false);
+    /** Workspace tabs plan 6a: a manifest of the previous minor, 0.20, is skipped by its range before any class is read. */
+    @Test void aZeroTwentyRangeIsSkippedBeforeItLoads() throws Exception {
+        var candidate=candidate(">=0.20.0, <0.21",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$ChoiceKind","SEGMENTED")),false);
         var result=PluginResolver.resolve(List.of(candidate),Map.of(),Version.parse(JasperSdk.VERSION),false);
         assertThat(result.load()).isEmpty();
-        assertThat(result.rejected()).singleElement().satisfies(value -> assertThat(value.reason()).isEqualTo("needs SDK >=0.17.0, <0.18.0; this is SDK 0.18.0"));
+        assertThat(result.rejected()).singleElement().satisfies(value -> assertThat(value.reason()).isEqualTo("needs SDK >=0.20.0, <0.21.0; this is SDK " + JasperSdk.VERSION));
     }
     @Test void truthfulOldRangeIsRejectedByPureResolver() throws Exception {
         var candidate=candidate(">=0.14, <0.15",Map.of(),false);
@@ -135,9 +168,9 @@ class KitCompatibilityTest {
                 var host=new dev.jasper.sdk.testing.FakePluginHost();
                 host.start(new dev.jasper.sdk.PluginInfo("test.kit","Kit","1.0.0",Set.of()),Set.of(),Set.of(),plugin);
                 assertThat(host.panels()).contains("test.kit.panel|Panel|LEFT");
-                var window=host.addTerminalWindow();
-                host.openPanel("test.kit.panel",window);
-                assertThat(host.panelView("test.kit.panel",window)).isPresent();
+                host.addTerminalWindow();
+                host.openPanel("test.kit.panel");
+                assertThat(host.panelView("test.kit.panel")).isPresent();
                 host.close();
             });
         }

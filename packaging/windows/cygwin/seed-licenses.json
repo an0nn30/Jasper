@@ -1,0 +1,686 @@
+{
+  "_autorebase": {
+    "expression": "LicenseRef-Upstream-_autorebase",
+    "reviewed": true,
+    "notice": "seed-support/notices/_autorebase.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/_autorebase/_autorebase-001091-1-src.tar.zst"
+  },
+  "alternatives": {
+    "expression": "GPL-2.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/alternatives.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/alternatives/alternatives-1.31-1-src.tar.xz"
+  },
+  "base-cygwin": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/base-cygwin.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/base-cygwin/base-cygwin-3.8-2-src.tar.xz"
+  },
+  "base-files": {
+    "expression": "LicenseRef-Upstream-base-files",
+    "reviewed": true,
+    "notice": "seed-support/notices/base-files.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/base-files/base-files-4.3-3-src.tar.zst"
+  },
+  "bash": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/bash.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bash/bash-5.2.21-1-src.tar.xz"
+  },
+  "bzip2": {
+    "expression": "BSD",
+    "reviewed": true,
+    "notice": "seed-support/notices/bzip2.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bzip2/bzip2-1.0.8-2-src.tar.xz"
+  },
+  "ca-certificates": {
+    "expression": "MIT AND GPL-2.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/ca-certificates.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/ca-certificates/ca-certificates-2026.2.90_v9.0.317-1-src.tar.zst"
+  },
+  "coreutils": {
+    "expression": "LicenseRef-Upstream-coreutils",
+    "reviewed": true,
+    "notice": "seed-support/notices/coreutils.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/coreutils/coreutils-9.0-1-src.tar.xz"
+  },
+  "crypto-policies": {
+    "expression": "LicenseRef-Upstream-crypto-policies",
+    "reviewed": true,
+    "notice": "seed-support/notices/crypto-policies.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/crypto-policies/crypto-policies-20190218-1-src.tar.xz"
+  },
+  "csih": {
+    "expression": "LGPL-2.1-or-later AND BSD-2-Clause AND MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/csih.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/csih/csih-0.9.14-1-src.tar.xz"
+  },
+  "curl": {
+    "expression": "LicenseRef-Upstream-curl",
+    "reviewed": true,
+    "notice": "seed-support/notices/curl.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/curl/curl-8.23.0-1-src.tar.xz"
+  },
+  "cygrunsrv": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/cygrunsrv.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/cygrunsrv/cygrunsrv-1.65-1-src.tar.xz"
+  },
+  "cygutils": {
+    "expression": "GPL-2.0",
+    "reviewed": true,
+    "notice": "seed-support/notices/cygutils.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cygutils/cygutils-1.4.17-4-src.tar.xz"
+  },
+  "cygwin": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/cygwin.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/cygwin/cygwin-3.6.11-1-src.tar.xz"
+  },
+  "dash": {
+    "expression": "BSD-3-Clause AND GPL-2.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/dash.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/dash/dash-0.5.12-5-src.tar.xz"
+  },
+  "diffutils": {
+    "expression": "GPL-3.0-or-later AND GFDL-1.3-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/diffutils.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/diffutils/diffutils-3.12-1-src.tar.xz"
+  },
+  "editrights": {
+    "expression": "BSD-3-Clause",
+    "reviewed": true,
+    "notice": "seed-support/notices/editrights.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/editrights/editrights-1.04-1-src.tar.xz"
+  },
+  "file": {
+    "expression": "BSD-2-Clause",
+    "reviewed": true,
+    "notice": "seed-support/notices/file.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/file/file-5.46-1-src.tar.xz"
+  },
+  "findutils": {
+    "expression": "GPL-3.0-or-later AND GFDL-1.3-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/findutils.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/findutils/findutils-4.11.0-1-src.tar.xz"
+  },
+  "gawk": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/gawk.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/gawk/gawk-5.4.0-1-src.tar.xz"
+  },
+  "getent": {
+    "expression": "LGPL-2.1-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/getent.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/getent/getent-2.18.90-5-src.tar.xz"
+  },
+  "gettext": {
+    "expression": "GPL-3.0-or-later AND LGPL-2.1-or-later AND GFDL-1.3-or-later AND MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/gettext.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/gettext-0.22.5-1-src.tar.xz"
+  },
+  "gettext-locale-alias": {
+    "expression": "GPL-3.0-or-later AND LGPL-2.1-or-later AND GFDL-1.3-or-later AND MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/gettext-locale-alias.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/gettext-0.26-1-src.tar.xz"
+  },
+  "git": {
+    "expression": "GPL-2.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/git.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/git/git-2.51.0-1-src.tar.zst"
+  },
+  "grep": {
+    "expression": "LicenseRef-Upstream-grep",
+    "reviewed": true,
+    "notice": "seed-support/notices/grep.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/grep/grep-3.12-1-src.tar.xz"
+  },
+  "groff": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/groff.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/groff/groff-1.24.2-1-src.tar.zst"
+  },
+  "gzip": {
+    "expression": "LicenseRef-Upstream-gzip",
+    "reviewed": true,
+    "notice": "seed-support/notices/gzip.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/gzip/gzip-1.15-1-src.tar.xz"
+  },
+  "hostname": {
+    "expression": "LicenseRef-Upstream-hostname",
+    "reviewed": true,
+    "notice": "seed-support/notices/hostname.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/hostname/hostname-3.13-1-src.tar.bz2"
+  },
+  "info": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/info.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/texinfo/texinfo-7.3-1-src.tar.zst"
+  },
+  "ipc-utils": {
+    "expression": "BSD-3-Clause AND BSD-4-Clause",
+    "reviewed": true,
+    "notice": "seed-support/notices/ipc-utils.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ipc-utils/ipc-utils-1.1-1-src.tar.xz"
+  },
+  "less": {
+    "expression": "GPL-3.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/less.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/less/less-710-1-src.tar.xz"
+  },
+  "libargp": {
+    "expression": "LGPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/libargp.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libargp/libargp-20250917-2-src.tar.xz"
+  },
+  "libattr1": {
+    "expression": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/libattr1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/attr/attr-2.5.2-2-src.tar.xz"
+  },
+  "libblkid1": {
+    "expression": "GPL-2.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/libblkid1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz"
+  },
+  "libbrotlicommon1": {
+    "expression": "MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/libbrotlicommon1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/brotli/brotli-1.2.0-2-src.tar.xz"
+  },
+  "libbrotlidec1": {
+    "expression": "MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/libbrotlidec1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/brotli/brotli-1.2.0-2-src.tar.xz"
+  },
+  "libbz2_1": {
+    "expression": "BSD",
+    "reviewed": true,
+    "notice": "seed-support/notices/libbz2_1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/bzip2/bzip2-1.0.8-2-src.tar.xz"
+  },
+  "libcom_err2": {
+    "expression": "LicenseRef-Upstream-libcom_err2",
+    "reviewed": true,
+    "notice": "seed-support/notices/libcom_err2.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/e2fsprogs/e2fsprogs-1.44.5-1-src.tar.xz"
+  },
+  "libcrypt2": {
+    "expression": "LGPL-2.1-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/libcrypt2.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libxcrypt/libxcrypt-4.5.2-1-src.tar.xz"
+  },
+  "libcurl4": {
+    "expression": "LicenseRef-Upstream-curl",
+    "reviewed": true,
+    "notice": "seed-support/notices/libcurl4.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/curl/curl-8.23.0-1-src.tar.xz"
+  },
+  "libdb5.3": {
+    "expression": "LicenseRef-Upstream-libdb5.3",
+    "reviewed": true,
+    "notice": "seed-support/notices/libdb5.3.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/db/db-5.3.28-2-src.tar.xz"
+  },
+  "libedit0": {
+    "expression": "BSD-3-Clause AND BSD-2-Clause AND ISC",
+    "reviewed": true,
+    "notice": "seed-support/notices/libedit0.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libedit/libedit-20251016-1-src.tar.xz"
+  },
+  "libexpat1": {
+    "expression": "MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/libexpat1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/expat/expat-2.9.0-1-src.tar.xz"
+  },
+  "libfdisk1": {
+    "expression": "GPL-2.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/libfdisk1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz"
+  },
+  "libffi8": {
+    "expression": "MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/libffi8.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libffi/libffi-3.8.0-1-src.tar.xz"
+  },
+  "libfido2": {
+    "expression": "BSD-2-Clause",
+    "reviewed": true,
+    "notice": "seed-support/notices/libfido2.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libfido2/libfido2-1.17.0-1-src.tar.xz"
+  },
+  "libgcc1": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/libgcc1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gcc/gcc-14.4.0-1-src.tar.zst"
+  },
+  "libgdbm6": {
+    "expression": "GPL-3.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/libgdbm6.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gdbm/gdbm-1.26-1-src.tar.xz"
+  },
+  "libgmp10": {
+    "expression": "LicenseRef-Upstream-libgmp10",
+    "reviewed": true,
+    "notice": "seed-support/notices/libgmp10.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gmp/gmp-6.3.0-1-src.tar.zst"
+  },
+  "libgssapi_krb5_2": {
+    "expression": "LicenseRef-Upstream-libgssapi_krb5_2",
+    "reviewed": true,
+    "notice": "seed-support/notices/libgssapi_krb5_2.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz"
+  },
+  "libiconv2": {
+    "expression": "LGPL-2.1-or-later AND GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/libiconv2.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libiconv/libiconv-1.19-2-src.tar.xz"
+  },
+  "libidn2_0": {
+    "expression": "LGPL-3.0-or-later AND GPL-2.0-or-later AND GPL-3.0-or-later AND Unicode-TOU AND Unicode-DFS-2016",
+    "reviewed": true,
+    "notice": "seed-support/notices/libidn2_0.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libidn2/libidn2-2.3.8-1-src.tar.xz"
+  },
+  "libintl8": {
+    "expression": "GPL-3.0-or-later AND LGPL-2.1-or-later AND GFDL-1.3-or-later AND MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/libintl8.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/gettext-0.22.5-1-src.tar.xz"
+  },
+  "libk5crypto3": {
+    "expression": "LicenseRef-Upstream-libgssapi_krb5_2",
+    "reviewed": true,
+    "notice": "seed-support/notices/libk5crypto3.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz"
+  },
+  "libkrb5_3": {
+    "expression": "LicenseRef-Upstream-libgssapi_krb5_2",
+    "reviewed": true,
+    "notice": "seed-support/notices/libkrb5_3.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz"
+  },
+  "libkrb5support0": {
+    "expression": "LicenseRef-Upstream-libgssapi_krb5_2",
+    "reviewed": true,
+    "notice": "seed-support/notices/libkrb5support0.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/krb5/krb5-1.15.2-2-src.tar.xz"
+  },
+  "liblastlog2": {
+    "expression": "GPL-2.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/liblastlog2.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz"
+  },
+  "liblz4_1": {
+    "expression": "BSD-2-Clause AND GPL-2.0",
+    "reviewed": true,
+    "notice": "seed-support/notices/liblz4_1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/lz4/lz4-1.9.4-1-src.tar.xz"
+  },
+  "liblzma5": {
+    "expression": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/liblzma5.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/xz/xz-5.8.4-1-src.tar.zst"
+  },
+  "libmpfr6": {
+    "expression": "LGPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/libmpfr6.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/mpfr/mpfr-4.2.2-1-src.tar.zst"
+  },
+  "libncursesw10": {
+    "expression": "LicenseRef-Upstream-libncursesw10",
+    "reviewed": true,
+    "notice": "seed-support/notices/libncursesw10.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz"
+  },
+  "libnghttp2_14": {
+    "expression": "LicenseRef-Upstream-libnghttp2_14",
+    "reviewed": true,
+    "notice": "seed-support/notices/libnghttp2_14.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/nghttp2/nghttp2-1.69.0-1-src.tar.xz"
+  },
+  "libopenldap2": {
+    "expression": "OLDAP-2.8",
+    "reviewed": true,
+    "notice": "seed-support/notices/libopenldap2.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openldap/openldap-2.6.15-1-src.tar.zst"
+  },
+  "libopenldap2_4_2": {
+    "expression": "OLDAP-2.8",
+    "reviewed": true,
+    "notice": "seed-support/notices/libopenldap2_4_2.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openldap/openldap-2.6.15-1-src.tar.zst"
+  },
+  "libp11-kit0": {
+    "expression": "LicenseRef-Upstream-libp11-kit0",
+    "reviewed": true,
+    "notice": "seed-support/notices/libp11-kit0.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz"
+  },
+  "libpcre1": {
+    "expression": "LicenseRef-Upstream-libpcre1",
+    "reviewed": true,
+    "notice": "seed-support/notices/libpcre1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/pcre/pcre-8.45-1-src.tar.zst"
+  },
+  "libpcre2_8_0": {
+    "expression": "BSD-3-Clause",
+    "reviewed": true,
+    "notice": "seed-support/notices/libpcre2_8_0.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/pcre2/pcre2-10.49-1-src.tar.zst"
+  },
+  "libpipeline1": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/libpipeline1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libpipeline/libpipeline-1.5.8-1-src.tar.xz"
+  },
+  "libpopt-common": {
+    "expression": "MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/libpopt-common.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/popt/popt-1.19-1-src.tar.xz"
+  },
+  "libpopt0": {
+    "expression": "MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/libpopt0.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/popt/popt-1.19-1-src.tar.xz"
+  },
+  "libpsl5": {
+    "expression": "MIT",
+    "reviewed": true,
+    "notice": "seed-support/notices/libpsl5.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libpsl/libpsl-0.23.3-1-src.tar.xz"
+  },
+  "libreadline7": {
+    "expression": "LicenseRef-Upstream-libreadline7",
+    "reviewed": true,
+    "notice": "seed-support/notices/libreadline7.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/readline/readline-8.2-2-src.tar.xz"
+  },
+  "libreadline8": {
+    "expression": "LicenseRef-Upstream-libreadline8",
+    "reviewed": true,
+    "notice": "seed-support/notices/libreadline8.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/readline/readline-8.3-1-src.tar.xz"
+  },
+  "libsasl2_3": {
+    "expression": "LicenseRef-Upstream-libsasl2_3",
+    "reviewed": true,
+    "notice": "seed-support/notices/libsasl2_3.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cyrus-sasl/cyrus-sasl-2.1.27-1-src.tar.xz"
+  },
+  "libsmartcols1": {
+    "expression": "GPL-2.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/libsmartcols1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz"
+  },
+  "libsqlite3_0": {
+    "expression": "LicenseRef-Upstream-libsqlite3_0",
+    "reviewed": true,
+    "notice": "seed-support/notices/libsqlite3_0.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/sqlite3/sqlite3-3.49.1-1-src.tar.xz"
+  },
+  "libssh2_1": {
+    "expression": "LicenseRef-Upstream-libssh2_1",
+    "reviewed": true,
+    "notice": "seed-support/notices/libssh2_1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libssh2/libssh2-1.11.0-1-src.tar.xz"
+  },
+  "libssl1.1": {
+    "expression": "OpenSSL",
+    "reviewed": true,
+    "notice": "seed-support/notices/libssl1.1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/openssl/openssl-1.1.1w-1-src.tar.zst"
+  },
+  "libssl3": {
+    "expression": "OpenSSL",
+    "reviewed": true,
+    "notice": "seed-support/notices/libssl3.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/openssl/openssl-3.5.9-1-src.tar.zst"
+  },
+  "libstdc++6": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/libstdc++6.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gcc/gcc-14.4.0-1-src.tar.zst"
+  },
+  "libtasn1_6": {
+    "expression": "LGPL-2.1-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/libtasn1_6.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libtasn1/libtasn1-4.21.0-1-src.tar.xz"
+  },
+  "libuchardet0": {
+    "expression": "GPL-2.0-or-later OR MPL-1.1 OR LGPL-2.1-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/libuchardet0.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/uchardet/uchardet-0.0.8-1-src.tar.zst"
+  },
+  "libunistring5": {
+    "expression": "LGPL-3.0-or-later OR GPL-2.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/libunistring5.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/libunistring/libunistring-1.4.1-1-src.tar.xz"
+  },
+  "libuuid1": {
+    "expression": "GPL-2.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/libuuid1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz"
+  },
+  "libxxhash0": {
+    "expression": "BSD-2-Clause",
+    "reviewed": true,
+    "notice": "seed-support/notices/libxxhash0.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/xxhash/xxhash-0.8.4-1-src.tar.xz"
+  },
+  "libzstd1": {
+    "expression": "BSD-3-Clause AND GPL-2.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/libzstd1.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zstd/zstd-1.5.7-1-src.tar.zst"
+  },
+  "login": {
+    "expression": "LicenseRef-Upstream-login",
+    "reviewed": true,
+    "notice": "seed-support/notices/login.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/login/login-1.13-1-src.tar.xz"
+  },
+  "man-db": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/man-db.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/man-db/man-db-2.13.1-1-src.tar.zst"
+  },
+  "mintty": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/mintty.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/mintty/mintty-3.8.3-1-src.tar.xz"
+  },
+  "ncurses": {
+    "expression": "LicenseRef-Upstream-libncursesw10",
+    "reviewed": true,
+    "notice": "seed-support/notices/ncurses.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz"
+  },
+  "openssh": {
+    "expression": "BSD-2-Clause",
+    "reviewed": true,
+    "notice": "seed-support/notices/openssh.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/openssh/openssh-10.6p1-1-src.tar.xz"
+  },
+  "openssl": {
+    "expression": "OpenSSL",
+    "reviewed": true,
+    "notice": "seed-support/notices/openssl.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/openssl/openssl-3.5.9-1-src.tar.zst"
+  },
+  "p11-kit": {
+    "expression": "LicenseRef-Upstream-libp11-kit0",
+    "reviewed": true,
+    "notice": "seed-support/notices/p11-kit.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz"
+  },
+  "p11-kit-trust": {
+    "expression": "LicenseRef-Upstream-libp11-kit0",
+    "reviewed": true,
+    "notice": "seed-support/notices/p11-kit-trust.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/p11-kit/p11-kit-0.26.5-1-src.tar.xz"
+  },
+  "perl-Error": {
+    "expression": "Artistic-1.0-Perl OR GPL-1.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/perl-Error.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/noarch/release/perl-Error/perl-Error-0.17030-2-src.tar.zst"
+  },
+  "perl-TermReadKey": {
+    "expression": "Artistic-1.0-Perl OR GPL-1.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/perl-TermReadKey.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl-TermReadKey/perl-TermReadKey-2.380.0-1-src.tar.zst"
+  },
+  "perl_autorebase": {
+    "expression": "Artistic-1.0-Perl OR GPL-1.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/perl_autorebase.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl/perl-5.44.0-1-src.tar.zst"
+  },
+  "perl_base": {
+    "expression": "Artistic-1.0-Perl OR GPL-1.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/perl_base.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/perl/perl-5.44.0-1-src.tar.zst"
+  },
+  "publicsuffix-list-dafsa": {
+    "expression": "LicenseRef-Upstream-publicsuffix-list-dafsa",
+    "reviewed": true,
+    "notice": "seed-support/notices/publicsuffix-list-dafsa.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/publicsuffix-list/publicsuffix-list-20260724-1-src.tar.xz"
+  },
+  "rebase": {
+    "expression": "LicenseRef-Upstream-rebase",
+    "reviewed": true,
+    "notice": "seed-support/notices/rebase.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/rebase/rebase-4.6.6-1-src.tar.xz"
+  },
+  "rsync": {
+    "expression": "LicenseRef-Upstream-rsync",
+    "reviewed": true,
+    "notice": "seed-support/notices/rsync.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/rsync/rsync-3.3.0-1-src.tar.xz"
+  },
+  "run": {
+    "expression": "LicenseRef-Upstream-run",
+    "reviewed": true,
+    "notice": "seed-support/notices/run.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/run/run-1.3.4-2-src.tar.xz"
+  },
+  "sed": {
+    "expression": "LicenseRef-Upstream-sed",
+    "reviewed": true,
+    "notice": "seed-support/notices/sed.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/sed/sed-4.10-1-src.tar.xz"
+  },
+  "tar": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/tar.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/tar/tar-1.35-2-src.tar.zst"
+  },
+  "terminfo": {
+    "expression": "LicenseRef-Upstream-libncursesw10",
+    "reviewed": true,
+    "notice": "seed-support/notices/terminfo.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/ncurses/ncurses-6.5+20240427-1-src.tar.xz"
+  },
+  "tzcode": {
+    "expression": "LicenseRef-Upstream-tzcode",
+    "reviewed": true,
+    "notice": "seed-support/notices/tzcode.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/tzcode/tzcode-2026e-1-src.tar.xz"
+  },
+  "tzdata": {
+    "expression": "LicenseRef-Upstream-tzdata",
+    "reviewed": true,
+    "notice": "seed-support/notices/tzdata.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/tzdata/tzdata-2026e-1-src.tar.xz"
+  },
+  "unzip": {
+    "expression": "LicenseRef-Upstream-unzip",
+    "reviewed": true,
+    "notice": "seed-support/notices/unzip.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/unzip/unzip-6.0-18-src.tar.xz"
+  },
+  "util-linux": {
+    "expression": "GPL-2.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/util-linux.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/util-linux-2.40.2-2-src.tar.xz"
+  },
+  "vim-minimal": {
+    "expression": "Vim",
+    "reviewed": true,
+    "notice": "seed-support/notices/vim-minimal.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/vim/vim-9.1.1825-1-src.tar.xz"
+  },
+  "which": {
+    "expression": "GPL-3.0-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/which.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/src/release/which/which-2.25-1-src.tar.xz"
+  },
+  "xz": {
+    "expression": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+    "reviewed": true,
+    "notice": "seed-support/notices/xz.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/xz/xz-5.8.4-1-src.tar.zst"
+  },
+  "zlib0": {
+    "expression": "Zlib",
+    "reviewed": true,
+    "notice": "seed-support/notices/zlib0.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zlib/zlib-1.3.2-1-src.tar.zst"
+  },
+  "zstd": {
+    "expression": "BSD-3-Clause AND GPL-2.0-only",
+    "reviewed": true,
+    "notice": "seed-support/notices/zstd.txt",
+    "origin": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/zstd/zstd-1.5.7-1-src.tar.zst"
+  }
+}

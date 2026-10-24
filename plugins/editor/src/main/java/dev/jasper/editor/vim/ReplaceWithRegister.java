@@ -61,7 +61,7 @@ final class ReplaceWithRegister {
      * @return whether the register was changed and must be put back
      */
     private static boolean correctForRegtype(VimEditor editor, String type, char register, String regType, String pasteText) {
-        boolean block = type.equals("visual") ? editor.marks().visualMode == Mode.VISUAL_BLOCK : type.equals("block");
+        boolean block = type.equals("visual") ? editor.marks().visualMode() == Mode.VISUAL_BLOCK : type.equals("block");
         if (block) {
             int lines = pasteText.isEmpty() ? 0 : pasteText.split("\n", -1).length - (pasteText.endsWith("\n") ? 1 : 0);
             if (regType.equals("v") || regType.equals("V") && lines == 1) {

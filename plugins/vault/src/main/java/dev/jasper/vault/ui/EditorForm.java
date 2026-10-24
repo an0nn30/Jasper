@@ -7,6 +7,7 @@ import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.sdk.ui.ViewSpec;
+import dev.jasper.vault.workstation.Layout;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -54,6 +55,18 @@ public class EditorForm implements AutoCloseable {
     private final List<Group> groups = new ArrayList<>();
     private boolean discreet;
     protected final void discreetInputs() { discreet=true; }
+    private Layout layout = Layout.ROWS;
+    private String classicTitle = "";
+    private final Map<String, String> classicLabels = new HashMap<>();
+    /** The composition this form takes (plan 10b); its presenter sets it before the form's view is made. */
+    final void layout(Layout value) { layout = Objects.requireNonNull(value); render(); }
+    /** Under CLASSIC, the title of the form's untitled group (plan 10b Rulings 10). */
+    protected final void classicGroup(String title) { classicTitle = Objects.requireNonNull(title); }
+    /** Under CLASSIC, row {@code id}'s label in the label column (plan 10b Rulings 7 and 10). */
+    protected final void classicLabel(String id, String label) { classicLabels.put(id, label); }
+    /** The entry's hue for its sheet's swatch; NONE without an identity. */
+    final Nodes.Hue swatch() { return icon.isEmpty() ? Nodes.Hue.NONE : hue; }
+    private String label(Row row) { return layout == Layout.CLASSIC ? classicLabels.getOrDefault(row.id(), row.label()) : row.label(); }
     private BooleanSupplier ready = () -> true;
     private String icon = "";
     private Nodes.Hue hue = Nodes.Hue.NEUTRAL;
@@ -205,25 +218,32 @@ public class EditorForm implements AutoCloseable {
     private Nodes.Node section(Row row) {
         return switch (row) {
             case DisplayRow display when display.label().isBlank() -> control(display);
-            case ChoiceRow choice when choice.kind() == Nodes.ChoiceKind.EXCLUSIVE -> control(row);
+            // The classic label column holds the choice's label too (plan 10b Rulings 10).
+            case ChoiceRow choice when choice.kind() == Nodes.ChoiceKind.EXCLUSIVE -> layout == Layout.CLASSIC
+                ? new Nodes.FormRow("row." + row.id(), state(row.id()), label(row), "", control(row), Optional.empty(), false) : control(row);
             case ToggleRow toggle -> new Nodes.SettingRow("row." + toggle.id(), state(toggle.id()), toggle.label(), "", control(toggle), false);
-            default -> new Nodes.FormRow("row." + row.id(), state(row.id()), row.label(), "", control(row), Optional.empty(), false);
+            default -> new Nodes.FormRow("row." + row.id(), state(row.id()), label(row), "", control(row), Optional.empty(), false);
         };
     }
 
     private Nodes.Form form() {
         var sections = new ArrayList<Nodes.Node>();
-        if (groups.isEmpty()) sections.add(new Nodes.Card("fields", ControlState.READY, Nodes.CardKind.FORM, rows.stream().map(this::section).toList()));
-        else for (Group group : groups) {
+        boolean classic = layout == Layout.CLASSIC;
+        if (groups.isEmpty()) {
+            Nodes.Node card = new Nodes.Card("fields", ControlState.READY, Nodes.CardKind.FORM, rows.stream().map(this::section).toList());
+            sections.add(classic && !classicTitle.isEmpty() ? new Nodes.Section("fields.section", ControlState.READY, classicTitle, card) : card);
+        } else for (Group group : groups) {
             Nodes.Node card = new Nodes.Card(group.id(), ControlState.READY, Nodes.CardKind.FORM,
                 group.rows().stream().map(id -> rows.stream().filter(row -> row.id().equals(id)).findFirst().orElseThrow()).map(this::section).toList());
-            sections.add(group.title().isEmpty() ? card : new Nodes.Section(group.id() + ".section", ControlState.READY, group.title(), card));
+            String heading = classic && group.title().isEmpty() ? classicTitle : group.title();
+            sections.add(heading.isEmpty() ? card : new Nodes.Section(group.id() + ".section", ControlState.READY, heading, card));
         }
         sections.add(new Nodes.Text(MESSAGE, new ControlState(!message.isEmpty(), true, false, ""), message, Nodes.TextRole.BODY));
         var actions = List.of(
             new Nodes.Button(CANCEL, new ControlState(true, cancelEnabled, false, ""), cancelLabel, "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
             new Nodes.Button(SAVE, new ControlState(true, !busy && ready.getAsBoolean(), busy, ""), saveLabel, "", Nodes.ButtonKind.PRIMARY, SAVE, ""));
-        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, title, icon.isEmpty() ? Optional.empty() : Optional.of(
+        // The classic dialog's header strip shows the swatch and title (spec 10.8), so the form has no hero.
+        return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, title, icon.isEmpty() || classic ? Optional.empty() : Optional.of(
             new Nodes.Stack("identity", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
                 new Nodes.Icon("identity.icon", ControlState.READY, icon, hue, Nodes.IconSize.PROMPT, title),
                 new Nodes.Text("identity.title", ControlState.READY, title, Nodes.TextRole.PROMPT_TITLE)))), sections, Optional.empty(), actions,

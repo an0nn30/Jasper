@@ -59,7 +59,7 @@ public interface ContractHarness extends AutoCloseable {
     void clickToolbarViewButton(java.util.UUID windowId, String buttonId);
 
     /**
-     * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code TOOLS},
+     * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code TAB}, {@code TOOLS},
      * {@code SESSION}, {@code TRANSFER}, {@code context},
      * {@code top:<menuId>}): {@code item:id}, {@code ---}, {@code submenu:title}, children indented two
      * spaces, sections separated by {@code ===}; items of closed actions omitted.
@@ -76,21 +76,24 @@ public interface ContractHarness extends AutoCloseable {
      */
     List<String> panels();
 
-    /** UI thread: invokes the panel's factory as a window showing it would; null when there is no such panel or the factory failed. */
-    javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId);
+    /**
+     * UI thread: invokes the panel's factory as the main window showing it would, or returns the panel built there;
+     * null when no main window is open, there is no such panel or the factory failed.
+     */
+    javax.swing.JComponent openPanel(String panelId);
 
     /**
-     * UI thread: the header metadata an open panel instance published through {@code PanelHost.setHeader}, as
-     * {@code detail|active|label;label} with {@code -} for no actions; {@code |false|-} when it published none or no
-     * instance is open.
+     * UI thread: the header metadata the open panel published through {@code PanelHost.setHeader}, as
+     * {@code detail|active|label;label} with {@code -} for no actions; {@code |false|-} when it published none or the
+     * panel is not open.
      */
-    String panelHeader(String panelId, java.util.UUID windowId);
+    String panelHeader(String panelId);
 
-    /** UI thread: activates the labelled header action of an open panel instance as its header would; false when there is none. */
-    boolean runPanelHeaderAction(String panelId, java.util.UUID windowId, String label);
+    /** UI thread: activates the labelled header action of the open panel as its header would; false when there is none. */
+    boolean runPanelHeaderAction(String panelId, String label);
 
-    /** UI thread: discards an open panel instance as its window would when the window or registration goes away. */
-    void closePanel(String panelId, java.util.UUID windowId);
+    /** UI thread: discards the open panel as the main window would when it closes or the registration goes away. */
+    void closePanel(String panelId);
     /**
      * UI thread: the theme slot the host paints a kit view of this runtime from, {@code CHROME} or {@code WORKSPACE}. A view
      * mounted as a workspace content tab ({@code Windows.openTab}) takes {@code WORKSPACE}, as terminals and editors do;
@@ -101,41 +104,72 @@ public interface ContractHarness extends AutoCloseable {
     /** Rail buttons as action ids in placement order; buttons of closed actions omitted. */
     List<String> rail();
 
-    /** Open plugin windows and dialogs as {@code id|title|shown} in creation order; a dialog's id is {@code dialog}. */
+    /** Open plugin dialogs and overlays as {@code id|title|shown} in creation order; the id is {@code dialog} or {@code overlay}. */
     List<String> windows();
 
     /** UI thread: the hue name of the square an open plugin dialog with this title draws before its title, or {@code -} when there is none. */
     String dialogSwatch(String pluginId, String title);
 
-    /** UI thread: closes the first open window with this id as the user would; false when vetoed or absent. */
+    /** UI thread: closes the first open dialog ({@code dialog}) or overlay ({@code overlay}) as the user would; false when vetoed or absent. */
     boolean requestClose(String windowId);
 
-    /**
-     * UI thread: runs the Close Window command of the first open window with this id: its close-command
-     * handlers newest first, then its closing guards. True when the window closed.
-     */
-    boolean closeCommand(String windowId);
-
-    /** UI thread: asks every open plugin window's closing guards, then every quit guard, as quitting Jasper does, closing nothing; true when the quit may go ahead. */
+    /** UI thread: asks every plugin's content tabs' closing guard, then every quit guard, as quitting Jasper does, closing nothing; true when the quit may go ahead. */
     boolean requestQuit();
 
-    /** UI thread: adds a terminal window, which announces itself on the terminal topics. */
+    /**
+     * UI thread: adds a Jasper window, which announces itself on the terminal topics: the main window when none is open,
+     * which stays open when its last tab leaves, else a child window, which closes with its last tab.
+     */
     java.util.UUID addTerminalWindow();
 
-    /** UI thread: adds and selects a tab in an open window. */
+    /** UI thread: adds and selects a terminal tab in an open window; {@link #addTerminalPane} gives it its one pane. */
     java.util.UUID addTerminalTab(java.util.UUID windowId, String title);
 
-    /** UI thread: adds a running local pane, 80 by 24, with shell integration; a tab's first pane is its focused pane. */
+    /** UI thread: adds a terminal tab's one pane: running, local, 80 by 24, with shell integration. */
     java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory);
+
+    /**
+     * UI thread: the local pane waits as a restored terminal tab not yet shown does (workspace tabs spec 13): not started,
+     * with no grid, dropping what is sent to it; it starts on its tab's next selection or focus.
+     */
+    void holdTerminalPane(java.util.UUID paneId);
 
     /** UI thread: the user turned to this window. */
     void activateTerminalWindow(java.util.UUID windowId);
 
-    /** UI thread: the user focused this pane. */
+    /** UI thread: the user focused this pane, which selects its tab. */
     void focusTerminalPane(java.util.UUID paneId);
 
-    /** UI thread: closes a pane; the last pane takes its tab with it, and the last tab its window. */
+    /** UI thread: closes a pane with its tab; a child window's last tab takes the window with it. */
     void closeTerminalPane(java.util.UUID paneId);
+
+    /** UI thread: adds and selects a content tab, as the application or another plugin shows a document; it has no pane. */
+    java.util.UUID addContentTab(java.util.UUID windowId, String title);
+
+    /**
+     * UI thread: a window's tabs as its strip shows them (tabs and panes spec 4), each tab's items pane by pane, by the
+     * ids {@code TabHandle.id()} reports; empty for a window that is not open.
+     */
+    List<List<java.util.UUID>> windowTabs(java.util.UUID windowId);
+
+    /** UI thread: moves a tab the test added to another open window, where it is selected; a child window left with no tab closes. */
+    void moveTab(java.util.UUID tabId, java.util.UUID windowId);
+
+    /**
+     * UI thread: restores one saved tab through its plugin's restorer, as Jasper does when it restores its windows (workspace
+     * tabs spec 13).
+     *
+     * @return the tab the restorer opened in the window, whatever it then returned or threw; empty when the plugin has no
+     *     restorer for the kind, or its restorer opened nothing before it returned or threw. An {@link Error} other than a
+     *     {@link LinkageError} closes the tab, and gives empty; a {@link VirtualMachineError} is thrown on.
+     */
+    java.util.Optional<java.util.UUID> restoreTab(String pluginId, java.util.UUID windowId, String title, dev.jasper.sdk.RestoreState state);
+
+    /** UI thread: the restore state a tab gives, a content tab's or a provided session's; empty when it does not come back. */
+    java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(java.util.UUID tabId);
+
+    /** UI thread: closes a tab the test added, of either kind, its pane with it; a child window's last tab takes the window with it. */
+    void closeTab(java.util.UUID tabId);
 
     /** UI thread: sets the text selected in a pane. */
     void selectInPane(java.util.UUID paneId, String text);
@@ -146,7 +180,8 @@ public interface ContractHarness extends AutoCloseable {
     /**
      * What plugins asked to open: {@code tab|<window id>|<directory or ->} or {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->},
      * each followed by {@code |<profile id>} when the request named a shell profile, then by
-     * {@code |run:<the command's words joined by spaces>} when it runs a program.
+     * {@code |run:<the command's words joined by spaces>} when it runs a program; or
+     * {@code beside|<content tab id>|<RIGHT or DOWN>}, a content tab's Terminal Right or Terminal Down.
      */
     List<String> openRequests();
 
@@ -177,6 +212,16 @@ public interface ContractHarness extends AutoCloseable {
     /** Changes the look and announces it. */
     void setVariant(Variant variant);
 
+    /** Sets the presentation every plugin reads; called before any plugin starts.
+     * @param presentation the look the runtime runs with
+     */
+    void setPresentation(dev.jasper.sdk.ui.Presentation presentation);
+
+    /** Publishes saved terminal typography; its change handlers have run once {@link #flush()} returns.
+     * @param typography the saved terminal typography
+     */
+    void setTerminalTypography(dev.jasper.sdk.ui.TerminalTypography typography);
+
     /** Sets independently chosen workspace values.
      * @param variant workspace variant
      * @param palette workspace controls
@@ -205,6 +250,18 @@ public interface ContractHarness extends AutoCloseable {
 
     /** The problems reported for a plugin's settings file and not yet cleared, as {@code key: message}. */
     List<String> settingsReports(String pluginId);
+
+    /**
+     * Gives a plugin's setting a look default, as a kit's {@code [defaults."<plugin id>"]} table would; called before
+     * any plugin starts. Raw values are what TOML reads: String, Long, Double, Boolean or List of String.
+     */
+    void setKitDefault(String pluginId, String key, Object rawValue);
+
+    /**
+     * The look defaults a plugin could not use, in the order reported: a value its declared kind rejects, or a key it
+     * never declares. Each line starts with the plugin's id and a colon.
+     */
+    List<String> lookDefaultProblems(String pluginId);
 
     @Override void close();
 

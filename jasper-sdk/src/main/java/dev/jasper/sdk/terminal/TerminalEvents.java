@@ -9,7 +9,8 @@ import java.util.OptionalInt;
 import java.util.UUID;
 
 /**
- * What happens in terminals. Subscribing to any of these topics needs {@code terminal.observe}. Payloads
+ * What happens in Jasper's windows, their tabs and terminal tabs' panes. Subscribing to any of these topics needs
+ * {@code terminal.observe}. Payloads
  * name windows, tabs and panes by id, because a handle belongs to the plugin that obtained it; ask
  * {@link Terminals} for one. Like every event they arrive later, on the event thread, and are not
  * replayed: read the current state first, then listen.
@@ -29,7 +30,7 @@ public final class TerminalEvents {
     }
 
     /**
-     * A tab.
+     * A tab, terminal or content.
      *
      * @param windowId its window
      * @param tabId the tab
@@ -48,6 +49,26 @@ public final class TerminalEvents {
     public record PaneEvent(UUID tabId, UUID paneId) {
         /** Rejects nulls. */
         public PaneEvent { Objects.requireNonNull(tabId, "tabId"); Objects.requireNonNull(paneId, "paneId"); }
+    }
+
+    /**
+     * A tab moved to another window, keeping its id, its content and a terminal tab's pane, whose id stays too: the move
+     * reports no {@code TAB_CLOSED} or {@code TAB_OPENED} and no {@code PANE_OPENED} or {@code PANE_CLOSED}. A window
+     * opened for the move reports {@code WINDOW_OPENED} before it, and a window the move empties {@code WINDOW_CLOSED}
+     * after it.
+     *
+     * @param tabId the tab
+     * @param fromWindowId the window it left
+     * @param toWindowId the window it is in now
+     * @since 0.19.0
+     */
+    public record TabMoved(UUID tabId, UUID fromWindowId, UUID toWindowId) {
+        /** Rejects nulls and a move to the window the tab is in. */
+        public TabMoved {
+            Objects.requireNonNull(tabId, "tabId"); Objects.requireNonNull(fromWindowId, "fromWindowId");
+            Objects.requireNonNull(toWindowId, "toWindowId");
+            if (fromWindowId.equals(toWindowId)) throw new IllegalArgumentException("A move goes to another window");
+        }
     }
 
     /**
@@ -132,18 +153,24 @@ public final class TerminalEvents {
         }
     }
 
-    /** A terminal window opened. */
+    /** A Jasper window, the main window or a child window, opened. */
     public static final Topic<WindowEvent> WINDOW_OPENED = Topic.of(PREFIX + "window_opened", WindowEvent.class);
-    /** A terminal window closed. */
+    /** A Jasper window closed; the main window stays open when its last tab closes. */
     public static final Topic<WindowEvent> WINDOW_CLOSED = Topic.of(PREFIX + "window_closed", WindowEvent.class);
-    /** The user turned to a terminal window. */
+    /** The user turned to a Jasper window. */
     public static final Topic<WindowEvent> WINDOW_ACTIVATED = Topic.of(PREFIX + "window_activated", WindowEvent.class);
-    /** A tab opened. */
+    /** A tab opened: a terminal tab or a content tab. */
     public static final Topic<TabEvent> TAB_OPENED = Topic.of(PREFIX + "tab_opened", TabEvent.class);
-    /** A tab closed. */
+    /** A tab closed; a tab that moved to another window reports {@link #TAB_MOVED} instead. */
     public static final Topic<TabEvent> TAB_CLOSED = Topic.of(PREFIX + "tab_closed", TabEvent.class);
-    /** A window's selected tab changed. */
+    /** A window's active tab, the focused pane's item in its shown tab, changed. */
     public static final Topic<TabEvent> TAB_SELECTED = Topic.of(PREFIX + "tab_selected", TabEvent.class);
+    /**
+     * A tab moved to another window; see {@link TabMoved}.
+     *
+     * @since 0.19.0
+     */
+    public static final Topic<TabMoved> TAB_MOVED = Topic.of(PREFIX + "tab_moved", TabMoved.class);
     /** A pane opened. */
     public static final Topic<PaneEvent> PANE_OPENED = Topic.of(PREFIX + "pane_opened", PaneEvent.class);
     /** A pane closed. */
@@ -160,7 +187,10 @@ public final class TerminalEvents {
     public static final Topic<CommandStarted> COMMAND_STARTED = Topic.of(PREFIX + "command_started", CommandStarted.class);
     /** A command finished. */
     public static final Topic<CommandFinished> COMMAND_FINISHED = Topic.of(PREFIX + "command_finished", CommandFinished.class);
-    /** A pane's session started or ended. */
+    /**
+     * A pane's session changed state: {@code CONNECTING} when a provided session begins a connection attempt,
+     * {@code RUNNING} when a session starts, {@code EXITED} when a running session ends.
+     */
     public static final Topic<SessionStateChanged> SESSION_STATE_CHANGED = Topic.of(PREFIX + "session_state_changed", SessionStateChanged.class);
     /** A pane rang the bell. */
     public static final Topic<PaneEvent> BELL = Topic.of(PREFIX + "bell", PaneEvent.class);

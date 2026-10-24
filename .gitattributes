@@ -3,3 +3,6 @@
 # default) breaks both the tests and a jar built on Windows.
 * text=auto eol=lf
 *.bat -text
+
+# Hash-locked upstream artifacts must retain their exact bytes and original formatting.
+packaging/windows/cygwin/seed-support/** -text -whitespace

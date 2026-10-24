@@ -61,6 +61,7 @@ final class Panels {
         void refresh() {
             state();
             footer.inline = statusLine();
+            footer.band = columnBand();
             footer.refresh();
             ((Surface)component).column = column;
             ((Surface)component).painted = view.panelSurface();
@@ -71,8 +72,10 @@ final class Panels {
             Nodes.Node first = panel.body() instanceof Nodes.Stack stack && stack.role()==Nodes.LayoutRole.VERTICAL && !stack.children().isEmpty() ? stack.children().getFirst() : panel.body();
             boolean compact = column < 0 && first instanceof Nodes.ItemList list && list.kind()==Nodes.ListKind.DOUBLE;
             int side = column == 0 || column == 1 ? context().metrics().value(DesignMetrics.Role.COLUMN_LIST_SIDE) : single || compact ? context().metrics().value(DesignMetrics.Role.PANEL_ROW_SIDE) : 0;
-            // A rail, and a list column without its search row, start their rows at the rail's top inset.
-            int top = column == 0 || column == 1 && panel.searchOrNavigation().isEmpty() ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP)
+            // A rail, and a list column without its search row, start their rows at the rail's top inset; a table's header
+            // band is its column's top edge (plan 10b, the Credential Vault mock's Items).
+            int top = column == 0 || column == 1 && panel.searchOrNavigation().isEmpty() && !(panel.body() instanceof Nodes.Table)
+                ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP)
                 : compact && panel.searchOrNavigation().isEmpty() ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_LIST_TOP) : 0;
             contentSide = side; contentTop = top;
             contentInsets();
@@ -121,6 +124,7 @@ final class Panels {
                     footerControl = c;
                     footer.detail = c.node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL;
                     footer.inline = statusLine();
+                    footer.band = columnBand();
                     footer.refresh();
                     footer.mount(c.component);
                 } else if (childParent(c.node) == content) {
@@ -141,6 +145,16 @@ final class Panels {
             var p = (Nodes.Panel) node;
             return column < 0 && ThemePainting.metric(context(), DesignMetrics.Role.PANEL_STATUS_RULE) > 0
                 && p.footer().filter(n -> n instanceof Nodes.Text).isPresent() && (p.body() instanceof Nodes.Table || p.body() instanceof Nodes.Tree);
+        }
+
+        /**
+         * A manager list column's single text footer under a table, under a table face that bands it
+         * ({@link TableFace#columnFooterBand}, the classic Credential Vault's "2 of 2 items").
+         */
+        boolean columnBand() {
+            var p = (Nodes.Panel) node;
+            return column == 1 && p.body() instanceof Nodes.Table && p.footer().filter(n -> n instanceof Nodes.Text).isPresent()
+                && context().faces().table.columnFooterBand();
         }
 
         /** The body's logical side inset and its top inset in pixels, from the last refresh. */
@@ -340,7 +354,7 @@ final class Panels {
                 if (column >= 0) {
                     g.fillRect(0,0,getWidth(),getHeight());
                     if (column < 2) {
-                        g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
+                        g.setColor(context.faces().separators.rule(context));
                         int stroke=ThemePainting.metric(context,DesignMetrics.Role.HAIRLINE);
                         g.fillRect(getWidth()-stroke,0,stroke,getHeight());
                     }

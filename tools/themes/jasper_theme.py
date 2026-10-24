@@ -73,7 +73,7 @@ EDITOR_REFERENCES = {
     "attribute": "terminal.ansi.yellow", "regex": "terminal.ansi.cyan", "error": "terminal.ansi.red",
 }
 # Import refuses a theme file with a built-in theme's id
-BUILT_IN = ("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru")
+BUILT_IN = ("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "jasper-meadow")
 KEY = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 HEX = re.compile(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?")
 EDITOR_VALUE = re.compile(r"(#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9.]*)( @ \d{1,3}%)?(, italic)?(, bold)?")
@@ -1038,6 +1038,45 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
                f"editor {from_scheme} of {len(EDITOR_SURFACES) + len(SYNTAX_ROLES)} from the scheme"
                + (f"; chrome from {islands[0]}" if islands is not None else ""))
     return Result(doc, summary, warnings, provenance + provenance_overrides)
+
+
+def exact_key(lookup: Lookup, name: str):
+    """The colour of IntelliJ key ``name`` when it resolves through an exact key at some level, as Lookup.key resolves it;
+    None when a "*." wildcard wins first or nothing sets it."""
+    for _, ui in lookup.effective.levels:
+        if name in ui and lookup.colour(ui[name]) is not None:
+            return lookup.colour(ui[name])
+        if any(key.startswith("*.") and name.endswith(key[1:]) and lookup.colour(ui[key]) is not None for key in ui):
+            return None
+    return None
+
+
+def convert_port(spec: dict, where: str) -> dict:
+    """A Jasper theme ported from IntelliJ's own bundled themes in tools/themes/intellij (the Enterprise theme,
+    tools/themes/enterprise/port.json): for each of "light" and "dark", the named theme converted with its editor scheme and
+    the spec's chosen roles; then every override key whose IntelliJ key IntelliJ's own theme sets exactly (not through a
+    "*." wildcard), laid over the role it stands on; then the spec's overrides. The terminal schemes are named by the spec."""
+    doc = {"jasper-theme": FORMAT, "name": spec["name"], "author": spec["author"], "ui": {}, "terminal": {}, "editor": {}}
+    for variant in ("light", "dark"):
+        part = spec[variant]
+        data = parse_json(read_file(INTELLIJ / part["theme"], part["theme"]), part["theme"])
+        theme = ThemeFile(part["scheme_name"], part["theme"], data, None)
+        result = convert_intellij_theme(theme, [], part["scheme_name"], INTELLIJ / part["scheme"], None, part.get("roles"))
+        effective = resolve(theme, [], [], INTELLIJ / part["scheme"], None)
+        if ("dark" if effective.dark else "light") != variant:
+            raise ConversionError(f"{where}: {part['theme']} is not a {variant} theme")
+        roles = {key: value for key, value in result.doc["ui"][variant].items() if key not in OVERRIDE_KEYS}
+        lookup, filled = Lookup(effective), {}
+        for key, intellij, under in OVERRIDES:
+            colour = exact_key(lookup, intellij)
+            if colour is not None:
+                filled[key] = hex_of(colour if colour[3] == 255 else over(colour, parse_hex(roles[under])))
+        filled.update(part.get("overrides", {}))
+        doc["ui"][variant] = roles | {key: filled[key] for key in OVERRIDE_KEYS if key in filled}
+        doc["terminal"][variant] = result.doc["terminal"][variant]
+        doc["editor"][variant] = result.doc["editor"][variant]
+    validate(doc, where)
+    return doc
 
 
 # ---------------------------------------------------------------------------------------------------------------

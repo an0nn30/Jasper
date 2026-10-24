@@ -26,7 +26,7 @@ class GroupedFormGeometryTest {
                 // The field sits below the section label's line (45 with the macOS faces), its gap and the card's padded stroke.
                 int top=m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_TOP)+find(view,"general.title",javax.swing.JComponent.class).getHeight()+m(dev.jasper.ui.metrics.DesignMetrics.Role.SECTION_LABEL_GAP)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE);
                 if(com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(top).isEqualTo(45);
-                assertThat(bounds).isEqualTo(new Rectangle((m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))+m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)+m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP),top,540-2*(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))-m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)-m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP),m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)));
+                assertThat(bounds).isEqualTo(new Rectangle((m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))+m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)+m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP),top,540-2*(m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_SIDES)+m(dev.jasper.ui.metrics.DesignMetrics.Role.CARD_PADDING)+m(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE))-m(dev.jasper.ui.metrics.DesignMetrics.Role.FORM_LABEL_WIDTH)-m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP),FormsTest.contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY)));
                 var normal=find(view,"plain.title",javax.swing.JComponent.class);var child=find(view,"dependent.title",javax.swing.JComponent.class);
                 assertThat(child.getX()-normal.getX()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_DEPENDENT_INDENT));
                 assertThat(find(view,"dependent",javax.swing.JComponent.class).getHeight()).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1);
@@ -99,7 +99,7 @@ class GroupedFormGeometryTest {
                 for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.PROMPT,FormKind.FULL)) {
                     view.update(new ViewSpec(FormsTest.form(kind,List.of())));KitFixtures.render(view,540,300,1);
                     var cancel=find(view,"cancel",javax.swing.JButton.class);
-                    assertThat(cancel.getHeight()).as("%s footer action",kind).isEqualTo(kind==FormKind.FULL?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT):kind==FormKind.PROMPT?m(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_BUTTON_HEIGHT):m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT));
+                    assertThat(cancel.getHeight()).as("%s footer action",kind).isEqualTo(kind==FormKind.FULL?FormsTest.contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT,dev.jasper.ui.metrics.Typography.Role.LABEL):kind==FormKind.PROMPT?FormsTest.contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_BUTTON_HEIGHT,dev.jasper.ui.metrics.Typography.Role.LABEL):FormsTest.contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT,dev.jasper.ui.metrics.Typography.Role.LABEL));
                     if(kind==FormKind.FULL)assertThat(((javax.swing.JComponent)cancel.getParent().getParent()).getInsets().top).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_FOOTER_TOP));
                 }
             }finally{release(context);}
@@ -156,12 +156,18 @@ class GroupedFormGeometryTest {
                 for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.FULL)) {
                     view.update(new ViewSpec(FormsTest.form(kind,List.of(card))));KitFixtures.render(view,540,400,1);
                     boolean full=kind==FormKind.FULL;
-                    assertThat(find(view,"group.choice.input",javax.swing.JComponent.class).getHeight()).as("%s choice",kind).isEqualTo(full?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT):m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT));
+                    assertThat(find(view,"group.choice.input",javax.swing.JComponent.class).getHeight()).as("%s choice",kind).isEqualTo(full?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT):FormsTest.contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY));
                                         // A grouped row is its choice plus its padding: the compact FULL choice, or a field in a Settings form.
-                    int rowHeight=full?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT)+2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_GROUP_ROW_PADDING):m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT)+2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_VERTICAL_PADDING);
+                    int rowHeight=full?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT)+2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_GROUP_ROW_PADDING):FormsTest.contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY)+2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_VERTICAL_PADDING);
                     assertThat(find(view,"group",javax.swing.JComponent.class).getHeight()).as("%s row",kind).isEqualTo(rowHeight);
+                    // The switch row keeps its own text/control height when a native font grows the choice row.
+                    int favoriteHeight=full?rowHeight:Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ROW_HEIGHT),
+                        2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_VERTICAL_PADDING)+Math.max(
+                            find(view,"favorite.title",javax.swing.JComponent.class).getPreferredSize().height,
+                            find(view,"favorite.toggle",javax.swing.JComponent.class).getPreferredSize().height));
+                    assertThat(find(view,"favorite",javax.swing.JComponent.class).getHeight()).as("%s switch row",kind).isEqualTo(favoriteHeight);
                     // A FULL card closes with its stroke; a Settings card does not.
-                    assertThat(find(view,"options.card",javax.swing.JComponent.class).getHeight()).as("%s card",kind).isEqualTo(2*rowHeight+(full?1:0));
+                    assertThat(find(view,"options.card",javax.swing.JComponent.class).getHeight()).as("%s card",kind).isEqualTo(rowHeight+favoriteHeight+(full?1:0));
                 }
             }finally{release(context);}
         });
@@ -254,9 +260,9 @@ class GroupedFormGeometryTest {
                 for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.PROMPT,FormKind.FULL)) {
                     view.update(new ViewSpec(FormsTest.form(kind,List.of(setting))));KitFixtures.render(view,540,400,1);
                     assertThat(find(view,"setting",javax.swing.JComponent.class).getInsets().left).isEqualTo(kind==FormKind.FULL?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_SIDE_PADDING):m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_SIDE_PADDING));
-                    if(kind==FormKind.SETTINGS) {
+                    if(kind==FormKind.SETTINGS || kind==FormKind.PROMPT) {
                         int lines=find(view,"setting.title",javax.swing.JComponent.class).getHeight()+m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_DESCRIPTION_GAP)+find(view,"setting.description",javax.swing.JComponent.class).getHeight();
-                        expected[at]=Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT),2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_VERTICAL_PADDING)+lines);
+                        expected[at]=Math.max(m(kind==FormKind.PROMPT?dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_SETTING_HEIGHT:dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT),2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_VERTICAL_PADDING)+lines);
                         if(com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(expected[at]).isEqualTo(44);
                     }
                     assertThat(find(view,"setting",javax.swing.JComponent.class).getHeight()).as("%s current context",kind).isEqualTo(expected[at++]);

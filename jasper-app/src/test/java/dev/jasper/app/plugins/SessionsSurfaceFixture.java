@@ -60,8 +60,7 @@ public final class SessionsSurfaceFixture implements AutoCloseable {
             .newInstance(new UUID(0x4000L, 0x8000000000000001L + i),values[i][0],values[i][1],22,"ubuntu",credential,"",false,Optional.empty(),Instant.EPOCH,Instant.EPOCH));
         site = onEdtValue(() -> new PanelSite(vault.window, () -> {}, () -> {}, () -> true, state -> {
             header = state;
-            var panels = field(remote, "panels");
-            Object panel = ((Map<?,?>)panels).get(vault.window);
+            Object panel = field(remote, "sessionsPanel");
             if (panel != null) hostHeader(((HostedKitView)invoke(panel, "view")).component());
         }));
         view = onEdtValue(() -> (KitView)vault.contributions.panels().stream().filter(p -> p.id().equals(StagedRemoteHost.PANEL)).findFirst().orElseThrow().factory().apply(site));
@@ -97,7 +96,7 @@ public final class SessionsSurfaceFixture implements AutoCloseable {
             var graphics = image.createGraphics();try{graphics.scale(scale,scale);view.printAll(graphics);}finally{graphics.dispose();}return image;
         });
     }
-    public Object panel() { return ((Map<?,?>)field(remote,"panels")).get(vault.window); }
+    public Object panel() { return field(remote,"sessionsPanel"); }
     public static void layout(Container parent) { parent.doLayout();for(var child:parent.getComponents())if(child instanceof Container nested)layout(nested); }
     private static Object field(Object object,String name) {try{var f=object.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(object);}catch(ReflectiveOperationException e){throw new AssertionError(e);}}
     private static Object invoke(Object object,String name) {return invoke(object,name,new Class<?>[0]);}

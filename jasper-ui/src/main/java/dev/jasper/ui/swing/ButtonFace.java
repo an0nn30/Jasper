@@ -4,6 +4,7 @@ import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import javax.swing.JComponent;
@@ -34,6 +35,8 @@ interface ButtonFace extends Face {
     /** Paints a rich picker or dropdown face. */
     void paintPicker(JComponent owner, Graphics graphics, KitContext context, Nodes.PickerFace face, boolean empty, boolean focus,
                      boolean hover, boolean expanded);
+    /** The closed size of a rich dropdown in a toolbar strip, or null to keep the standard face's. */
+    Dimension toolbarCombo(Choices.ChoiceCombo combo);
     /** Whether picker menu rows draw their icon tiles. */
     boolean tiles();
     /** The rule above a picker menu's footer row. */
@@ -50,4 +53,15 @@ interface ButtonFace extends Face {
      * top, on the title's line; otherwise they are centred on the title block.
      */
     boolean titleLine();
+    /** A DOCUMENT bar's text button's side padding, scaled, or -1 to keep the standard padding. */
+    int barPadding(KitContext context);
+    /**
+     * The lane, scaled, a DOCUMENT bar's menu button that only opens its menu keeps after its label for its arrow, or -1
+     * for the standard chevron in {@code MENU_ARROW_WIDTH}.
+     */
+    int barMenuLane(KitContext context);
+    /** Paints that arrow in {@code main}'s trailing lane, where {@link #barMenuLane} gives one. */
+    void paintBarMenuArrow(Buttons.KitButton main, Graphics2D g);
+    /** The colour of a DOCUMENT bar's caption standing after a button (that action's shortcut), or null to keep the caption's. */
+    SemanticColor barShortcut();
 }

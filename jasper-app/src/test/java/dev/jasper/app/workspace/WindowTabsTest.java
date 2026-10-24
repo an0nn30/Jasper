@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.commands.ActionId;
 import java.awt.*;
+import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
@@ -15,18 +16,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WindowTabsTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    @Test void oneTabHidesTheBarAndTwoTabsRestoreIt() throws Exception {
+    @Test void oneTabHidesTheStripAndASecondTabShowsIt() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var strip = owner.windowTabs();
-            assertThat(strip.isVisible()).isFalse();
-            assertThat(strip.getPreferredSize().height).isZero();
-            owner.invoke(ActionId.NEW_TAB);
+            assertThat(strip.isVisible()).as("workspace tabs spec 1, decision 4: a window's only tab shows no strip").isFalse();
+            owner.newTab(HOME);
             assertThat(strip.isVisible()).isTrue();
             assertThat(strip.getPreferredSize().height).isEqualTo(owner.tabHeight());
-            owner.closeTab(owner.currentTab());
+            assertThat(strip.getMinimumSize().height).isEqualTo(owner.tabHeight());
+            owner.closeTab(owner.currentTerminal());
             assertThat(strip.isVisible()).isFalse();
-            assertThat(strip.getMinimumSize().height).isZero();
             assertThat(named(strip, "newTab")).isNull();
             assertThat(named(strip, "tabList")).isNull();
         });
@@ -36,8 +36,8 @@ class WindowTabsTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
-            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second");
-            owner.newTab(HOME); owner.currentTab().rename("a long title ".repeat(20)); owner.update();
+            owner.currentTerminal().rename("first"); owner.newTab(HOME); owner.currentTerminal().rename("second");
+            owner.newTab(HOME); owner.currentTerminal().rename("a long title ".repeat(20)); owner.update();
             var strip = owner.windowTabs();
             for (int width : new int[]{801, 800, 151, 8}) {
                 layout(strip, width, 30);
@@ -63,7 +63,7 @@ class WindowTabsTest {
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
             for (int i = 0; i < 16; i++) {
                 if (i > 0) owner.newTab(HOME);
-                owner.currentTab().rename("tab-" + i);
+                owner.currentTerminal().rename("tab-" + i);
             }
             owner.update(); var strip = owner.windowTabs(); layout(strip, 800, 30);
             for (int i = 0; i < 16; i++) {
@@ -81,8 +81,8 @@ class WindowTabsTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
-            var first = owner.currentTab(); first.rename("first");
-            owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
+            var first = owner.currentTerminal(); first.rename("first");
+            owner.newTab(HOME); owner.currentTerminal().rename("second"); owner.update();
             var strip = owner.windowTabs(); layout(strip, 800, 30);
             var label = (AbstractButton) named(strip, "select:first");
             var close = (AbstractButton) named(strip, "close:first");
@@ -91,9 +91,9 @@ class WindowTabsTest {
             mouse(label, MouseEvent.MOUSE_ENTERED, 10, 10, MouseEvent.NOBUTTON);
             assertThat(close.isVisible()).isTrue();
             assertThat(label.getBounds()).isEqualTo(before);
-            label.doClick(); assertThat(owner.currentTab()).isSameAs(first);
+            label.doClick(); assertThat(owner.currentTerminal()).isSameAs(first);
             close.doClick(); assertThat(owner.terminalTabs()).doesNotContain(first);
-            assertThat(strip.isVisible()).isFalse();
+            assertThat(strip.isVisible()).as("one tab hides its strip").isFalse();
         });
     }
 
@@ -101,7 +101,7 @@ class WindowTabsTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
-            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
+            owner.currentTerminal().rename("first"); owner.newTab(HOME); owner.currentTerminal().rename("second"); owner.update();
             var strip = owner.windowTabs(); layout(strip, 800, 30);
             var before = render(strip);
             assertThat(before.getRGB(410, 5)).isNotEqualTo(before.getRGB(10, 5));
@@ -119,7 +119,7 @@ class WindowTabsTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
+            owner.currentTerminal().rename("other"); owner.newTab(HOME); owner.currentTerminal().rename("selected"); owner.update();
             for (boolean chromeDark : new boolean[]{true, false}) {
                 owner.selectVariant(chromeDark);
                 for (var scheme : dev.jasper.app.appearance.ThemeTestSupport.SCHEME_CHOICES) {
@@ -153,17 +153,17 @@ class WindowTabsTest {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             JComponent strip = named(owner, "windowTabs");
-            var first = owner.currentTab(); first.rename("first"); owner.update();
+            var first = owner.currentTerminal(); first.rename("first"); owner.update();
             JComponent control = named(strip, "select:first");
-            owner.newTab(HOME); var second = owner.currentTab();
-            owner.reorderTab(1, 0);
-            assertThat(owner.currentTab()).isSameAs(second);
+            owner.newTab(HOME); var second = owner.currentTerminal();
+            owner.reorderParentTab(owner.parentTabOf(owner.tabs().get(1)).orElseThrow(), 0);
+            assertThat(owner.currentTerminal()).isSameAs(second);
             first.rename("<html>literal title"); owner.update();
             owner.selectVariant(false);
             assertThat(named(strip, "select:<html>literal title")).isSameAs(control);
             assertThat(control.getClientProperty("html.disable")).isEqualTo(true);
             assertThat(control.getToolTipText()).startsWith("<html>literal title");
-            assertThat(owner.currentTab()).isSameAs(second);
+            assertThat(owner.currentTerminal()).isSameAs(second);
         });
     }
 
@@ -172,7 +172,7 @@ class WindowTabsTest {
             var owner = content(launcher(new ArrayDeque<>()), true);
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             String title = "<html><img src=http://example.invalid/x.png>" + "x".repeat(1000);
-            owner.currentTab().rename(title); owner.update();
+            owner.currentTerminal().rename(title); owner.update();
             var strip = owner.windowTabs();
             var select = named(strip, "select:" + title);
             JToolTip tip = select.createToolTip();
@@ -181,8 +181,11 @@ class WindowTabsTest {
             assertThat(select.getToolTipText()).hasSizeLessThanOrEqualTo(210).startsWith("<html><img").contains("\u2026");
             var item = (JMenuItem) strip.tabList().getComponent(0);
             assertThat(item.getText()).hasSizeLessThanOrEqualTo(201).startsWith("<html><img").endsWith("\u2026");
-            owner.currentTab().rename("short"); owner.update();
-            assertThat(select.getToolTipText()).isEqualTo("short (\u23181)");
+            assertThat(item.getClientProperty(BasicHTML.propertyKey)).as("the tab list renders the title literally").isNull();
+            // Select Tab 1's shortcut follows the Keymap: rebind it.
+            owner.setBindings(dev.jasper.app.config.KeyBindings.withOverrides(true, java.util.Map.of("select_tab_1", "alt+1")));
+            owner.currentTerminal().rename("short"); owner.update();
+            assertThat(select.getToolTipText()).isEqualTo("short (\u23251)");
             assertThat(((JMenuItem) strip.tabList().getComponent(0)).getText()).isEqualTo("short");
         });
     }
@@ -191,19 +194,40 @@ class WindowTabsTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            JComponent strip = named(owner, "windowTabs");
-            var first = owner.currentTab(); first.rename("first"); owner.newTab(HOME);
-            var second = owner.currentTab(); second.rename("second"); owner.update();
-            layout(strip, 600, 38);
+            JComponent strip = owner.tabBar().component();
+            var first = owner.currentTerminal(); first.rename("first"); owner.newTab(HOME);
+            var second = owner.currentTerminal(); second.rename("second"); owner.update();
+            // The whole window lays out, so the tab drag finds the strip inside it (workspace tabs spec 12).
+            layout(owner, 800, 600);
             JComponent one = named(strip, "select:first"), two = named(strip, "select:second");
-            Point target = SwingUtilities.convertPoint(two, 10, 10, one);
+            Point target = SwingUtilities.convertPoint(two, two.getWidth() - 10, 10, one);
             mouse(one, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
+            // A drag event names the button it holds: only the left one drags a tab.
+            mouse(one, MouseEvent.MOUSE_DRAGGED, target.x, target.y, MouseEvent.NOBUTTON, InputEvent.BUTTON1_DOWN_MASK);
             mouse(one, MouseEvent.MOUSE_RELEASED, target.x, target.y, MouseEvent.BUTTON1);
-            assertThat(owner.tabStrip().getComponentAt(1)).isSameAs(first);
-            assertThat(owner.currentTab()).isSameAs(first);
+            assertThat(owner.tabs().get(1).component()).isSameAs(first);
+            assertThat(owner.currentTerminal()).isSameAs(first);
             mouse(two, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON2);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
-            assertThat(owner.currentTab()).isSameAs(first);
+            assertThat(owner.tabCount()).isEqualTo(1);
+            assertThat(owner.currentTerminal()).isSameAs(first);
+        });
+    }
+
+    /** Workspace plan 8c Rulings 3: an equal entry's outer quarters are new-tab places, before and after it. */
+    @Test void anEntrysOuterQuartersAreNewTabPlaces() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
+            owner.newTab(HOME); owner.newTab(HOME); owner.update();
+            var strip = owner.windowTabs();
+            layout(strip, 900, 30);
+            assertThat(strip.tabBounds()).containsExactly(new Rectangle(0, 0, 300, 30), new Rectangle(300, 0, 300, 30),
+                new Rectangle(600, 0, 300, 30));
+            assertThat(strip.newTabPlace(new Point(10, 15))).hasValue(0);
+            assertThat(strip.newTabPlace(new Point(150, 15))).as("the middle half shows its tab").isEmpty();
+            assertThat(strip.newTabPlace(new Point(290, 15))).hasValue(1);
+            assertThat(strip.newTabPlace(new Point(310, 15))).hasValue(1);
+            assertThat(strip.newTabPlace(new Point(899, 15))).as("the strip's end").hasValue(3);
         });
     }
 
@@ -222,7 +246,10 @@ class WindowTabsTest {
         for (Component child : component.getComponents()) if (child instanceof Container container) layoutTree(container);
     }
     private static void mouse(Component component, int id, int x, int y, int button) {
-        component.dispatchEvent(new MouseEvent(component, id, 1, 0, x, y, 1, false, button));
+        mouse(component, id, x, y, button, 0);
+    }
+    private static void mouse(Component component, int id, int x, int y, int button, int modifiers) {
+        component.dispatchEvent(new MouseEvent(component, id, 1, modifiers, x, y, 1, false, button));
     }
     private static Color pixel(Container entry, int x, int y) { return new Color(render(entry).getRGB(x, y)); }
     private static BufferedImage render(Container entry) {

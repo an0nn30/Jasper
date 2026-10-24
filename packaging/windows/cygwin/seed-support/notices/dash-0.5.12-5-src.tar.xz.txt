@@ -1,0 +1,165 @@
+Package source: x86_64/release/dash/dash-0.5.12-5-src.tar.xz
+License identifier: BSD-3-Clause AND GPL-2.0-or-later
+
+--- dash-0.5.12-5.src/dash.cygport ---
+#|/usr/bin/cygport
+# dash.cygport - dash Cygwin package build control script
+
+# Copyright (C) 2009-2011, 2014, 2017 Eric Blake
+# This file is free software; I give unlimited permission to copy and/or
+# distribute it, with or without modifications, as long as this notice is
+# preserved.
+
+NAME=dash
+VERSION=0.5.12
+RELEASE=5
+
+CATEGORY="Base Shells"
+SUMMARY="dash shell"
+DESCRIPTION="DASH is a POSIX-compliant implementation of /bin/sh that aims
+to be as small as possible. It does this without sacrificing speed where
+possible. In fact, it is significantly faster than bash (the GNU
+Bourne-Again SHell) for most tasks."
+
+HOMEPAGE=http://gondor.apana.org.au/~herbert/$NAME/
+SRC_URI=$HOMEPAGE/files/$NAME-$VERSION.tar.gz
+#SRC_URI+=" $SRC_URI.sha512sum" # Cygport doesn't know how to validate sha512sum
+GIT_URI=https://git.kernel.org/pub/scm/utils/$NAME/$NAME.git/snapshot/$NAME-$VERSION.tar.gz
+PATCH_URI=dash-0.5.12-compile.patch
+# dash-0.5.9.1-1.cygwin.patch
+
+export LDFLAGS=-static-libgcc
+
+DEPEND="autoconf automake binutils coreutils gcc-core gzip xz"	# libedit-devel
+BUILD_REQUIRES="$DEPEND"
+
+# Cygwin >= 3.5.0-0 adds fnmatch(3) and glob(3) locale dependent character
+# [[:...:]] class, equivalence [[=v=]] class, and collating symbol [[.s.]]
+# filename matching patterns
+REQUIRES_VERSION=' ( >= 3.5.0-0 )'
+REQUIRES="cygwin$REQUIRES_VERSION"
+
+CYGCONF_ARGS=
+#	 --enable-dependency-tracking	do not reject slow dependency extractors
+#	--disable-dependency-tracking	speeds up one-time build
+#	 --enable-fnmatch		Use fnmatch(3) from libc
+#	 --enable-glob			Use glob(3) from libc
+#	--disable-lineno		Disable LINENO support
+#	--disable-option-checking	ignore unrecognized --enable/--with options
+#	 --enable-silent-rules		less verbose build output (undo: "make V=1")
+#	--disable-silent-rules		verbose build output (undo: "make V=0")
+#	 --enable-static		Build statically linked program
+#	 --enable-test-workaround	Guard against faccessat(2) that tells root all files are executable
+#	   --with-libedit		Compile with libedit support
+
+
+# version and date stamp man page
+CYGPORT_USE_UNSTABLE_API=1
+
+src_patch_hook()
+{
+    local ts=`date +'%B %e, %Y'` os=${OSTYPE^}
+    local p='s@^\.Dd.*$@.Dd '$ts'@
+	    s@^\.Dt.*$@.Dt dash 1 "'$os' User Commands"@
+	    s@^\.Os.*$@.Os '$os' "'$NAME' '$PVR'"@'
+    inform "applying dynamic patch to version and date stamp man page $os $NAME $PVR $ts"
+    echo patching file src/dash.1
+    sed -i -e "$p" -- src/dash.1
+}
+
+
+src_install()
+{
+    cd $B
+    cyginstall
+    ln $D/usr/bin/dash{,-$PVR}	# add dash-VER-R link as no version info or query
+    ln $D/usr/bin/{d,}ash	# link ash name
+    ln -s $D/usr/share/man/man1/{d,}ash.1	# ash man symlink to .so in postinstall
+}
+
+
+# SPDX-License-Identifier: BSD-3-Clause AND GPL-2.0-or-later
+LICENSE_SPDX="SPDX-License-Identifier: BSD-3-Clause AND GPL-2.0-or-later"
+LICENSE="BSD-3-Clause AND GPL-2.0-or-later"
+LICENSE_URI=COPYING
+
+CYGWIN_MAINTAINER=Eric%20Blake
+CYGWIN_MAINTAINER_EMAIL=eblake@redhat.com
+
+CYGWIN_CO_MAINTAINER=Brian%20Inglis
+CYGWIN_CO_MAINTAINER_EMAIL=Brian.Inglis@SystematicSW.ab.ca
+
+UPSTREAM_MAINTAINER=Herbert%20Xu
+UPSTREAM_MAINTAINER_EMAIL=dash@vger.kernel.org
+
+SUBJECT=${OSTYPE^}%20Package%20$NAME%20$VERSION
+MAILTO=mailto:$UPSTREAM_MAINTAINER%20%3C$UPSTREAM_MAINTAINER_EMAIL%3E\
+?from=$CYGWIN_MAINTAINER%20%3C$CYGWIN_MAINTAINER_EMAIL%3E\
+\&cc=$CYGWIN_CO_MAINTAINER%20%3C$CYGWIN_CO_MAINTAINER_EMAIL%3E\
+\&subject=$SUBJECT\&body=Hi%20$UPSTREAM_MAINTAINER,%20$SUBJECT
+
+# Local Variables:
+# fill-column: 72
+# mode: sh
+# sh-indentation: 2
+# End:
+
+Source archive: x86_64/release/dash/dash-0.5.12-5-src.tar.xz
+
+--- dash-0.5.12-5.src/dash-0.5.12.tar.gz!/dash-0.5.12/COPYING ---
+Copyright (c) 1989-1994
+	The Regents of the University of California.  All rights reserved.
+Copyright (c) 1997 Christos Zoulas.  All rights reserved.
+Copyright (c) 1997-2005
+	Herbert Xu <herbert@gondor.apana.org.au>.  All rights reserved.
+
+This code is derived from software contributed to Berkeley by Kenneth Almquist.
+
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. Neither the name of the University nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+
+mksignames.c:
+
+This file is not directly linked with dash.  However, its output is.
+
+Copyright (C) 1992 Free Software Foundation, Inc.
+
+This file is part of GNU Bash, the Bourne Again SHell.
+
+Bash is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
+
+Bash is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+You should have received a copy of the GNU General Public License with
+your Debian GNU/Linux system, in /usr/share/common-licenses/GPL, or with the
+Debian GNU/Linux hello source package as the file COPYING.  If not,
+write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330,
+Boston, MA 02111 USA.

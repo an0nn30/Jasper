@@ -190,9 +190,9 @@ class WindowCommandPaletteTest {
     @Test void overlayDoesNotResizeTerminalAndTheCardDropsFromTheTitleField() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
-                var root = install(owner); var before = owner.tabStrip().getBounds();
+                var root = install(owner); var before = owner.workspace().getBounds();
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
-                assertThat(owner.tabStrip().getBounds()).isEqualTo(before);
+                assertThat(owner.workspace().getBounds()).isEqualTo(before);
                 var palette = owner.commandPalette().component();
                 var search = owner.chrome().search();
                 var field = SwingUtilities.convertRectangle(search.getParent(), search.getBounds(), palette.getParent());
@@ -588,7 +588,7 @@ class WindowCommandPaletteTest {
             owner.commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("status bar");
             // "Status Bar Height…" matches too; follow the visibility toggle's own row.
             java.util.function.Supplier<String> toggle = () -> dev.jasper.app.palette.PaletteTestSupport.rows(owner.commandPalette().component())
-                .stream().filter(row -> row.id().equals("view.status_bar")).findFirst().orElseThrow().title();
+                .stream().filter(row -> row.id().equals("toggle_status_bar")).findFirst().orElseThrow().title();
             assertThat(toggle.get()).isEqualTo("Hide Status Bar");
             owner.setStatusVisible(false);
             assertThat(toggle.get()).isEqualTo("Show Status Bar");
@@ -690,7 +690,7 @@ class WindowCommandPaletteTest {
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(content[0].commandPalette().component());
                 assertThat(history[0].recent()).containsExactly(quit ? "quit" : "close_tab");
                 assertThat(history[0].closedFuture()).isNotDone();
-                assertThat(application.newWindow(DesktopTestSupport.HOME)).isNull();
+                assertThat(application.windows().openTerminalWindow(DesktopTestSupport.HOME)).isEmpty();
                 application.quit(); // Repeated shutdown requests retain the accepted dispatch.
             });
             history[0].closedFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
@@ -793,13 +793,13 @@ class WindowCommandPaletteTest {
                 LayoutTestSupport.layoutTree(root[0]); var before = origin.view().getBounds();
                 content.commandPalette().dismiss(); assertThat(origin.allowLaunchFocus.getAsBoolean()).isTrue();
                 content.commandPalette().toggle(); LayoutTestSupport.layoutTree(root[0]); assertThat(origin.view().getBounds()).isEqualTo(before);
-                content.currentTab().split(SplitTree.Axis.RIGHT); assertThat(content.commandPalette().isOpen()).isFalse();
-                content.commandPalette().toggle(); content.currentTab().focus(origin); assertThat(content.commandPalette().isOpen()).isFalse();
+                content.split(dev.jasper.app.layout.Side.RIGHT); assertThat(content.commandPalette().isOpen()).isFalse();
+                content.commandPalette().toggle(); content.selectTab(content.terminalOf(origin)); assertThat(content.commandPalette().isOpen()).isFalse();
                 content.commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(content.commandPalette().component()).setText("zoom");
-                content.currentTab().toggleZoom();
+                content.toggleMaximize();
                 assertThat(content.commandPalette().isOpen()).isTrue();
-                assertThat(content.action(ActionId.ZOOM_PANE).getValue(Command.TITLE)).isEqualTo("Restore Pane");
-                content.currentTab().closePane(origin); assertThat(content.commandPalette().isOpen()).isFalse();
+                assertThat(content.action(ActionId.MAXIMIZE_PANE).getValue(Command.TITLE)).isEqualTo("Restore Pane");
+                content.closeTab(content.terminalOf(origin)); assertThat(content.commandPalette().isOpen()).isFalse();
             });
         } finally { DesktopTestSupport.edt(() -> { if (owner[0] != null) owner[0].close(); }); }
     }
@@ -860,15 +860,16 @@ class WindowCommandPaletteTest {
                 owner[0] = DesktopTestSupport.content(DesktopTestSupport.launcher(pending)); install(owner[0]);
             });
             pending.remove().run(); DesktopTestSupport.until(() -> owner[0].currentPane().view() != null);
-            DesktopTestSupport.edt(() -> owner[0].currentTab().split(SplitTree.Axis.RIGHT));
+            DesktopTestSupport.edt(() -> owner[0].split(dev.jasper.app.layout.Side.RIGHT));
             pending.remove().run(); DesktopTestSupport.until(() -> owner[0].currentPane().view() != null);
             DesktopTestSupport.edt(() -> {
-                var tab = owner[0].currentTab(); var original = tab.panes().getFirst(); var destination = tab.panes().getLast();
+                var window = owner[0];
+                var original = window.terminalTabs().getFirst().pane(); var destination = window.terminalTabs().getLast().pane();
                 // Record requests on a real focusable child of the old pane. Like TerminalPane's
                 // focus listener, accepting a stale request would select that pane again.
                 var prior = new JTextField() {
                     @Override public boolean requestFocusInWindow() {
-                        oldRequests.incrementAndGet(); tab.focus(original); return true;
+                        oldRequests.incrementAndGet(); window.selectTab(window.terminalOf(original)); return true;
                     }
                 };
                 prior.removeCaretListener((javax.swing.event.CaretListener) prior.getAccessibleContext());
@@ -886,13 +887,13 @@ class WindowCommandPaletteTest {
                 KeyboardFocusManager.setCurrentKeyboardFocusManager(new DefaultKeyboardFocusManager() {
                     @Override public Component getFocusOwner() { return prior; }
                 });
-                tab.focus(original); owner[0].commandPalette().toggle();
-                if (navigate) tab.navigate(SplitTree.Direction.RIGHT); else tab.focus(destination);
+                window.selectTab(window.terminalOf(original)); owner[0].commandPalette().toggle();
+                if (navigate) window.focusGroup(dev.jasper.app.layout.Side.RIGHT); else window.selectTab(window.terminalOf(destination));
                 assertThat(owner[0].commandPalette().isOpen()).isFalse();
                 assertThat(oldRequests.get()).isZero();
-                assertThat(tab.focusedPane()).isSameAs(destination);
+                assertThat(window.currentPane()).isSameAs(destination);
                 // Cancellation with a still-valid origin must retain normal synchronous restoration.
-                tab.focus(original); owner[0].commandPalette().toggle(); owner[0].commandPalette().dismiss();
+                window.selectTab(window.terminalOf(original)); owner[0].commandPalette().toggle(); owner[0].commandPalette().dismiss();
                 assertThat(oldRequests.get()).isEqualTo(1);
             });
             DesktopTestSupport.edt(() -> assertThat(oldRequests.get()).isEqualTo(1));

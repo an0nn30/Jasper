@@ -31,7 +31,6 @@ import dev.jasper.sdk.ui.Panels;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginMenu;
-import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.Rail;
 import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
@@ -44,7 +43,6 @@ import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.Toolbar;
 import dev.jasper.sdk.ui.ToolbarItem;
-import dev.jasper.sdk.ui.WindowSpec;
 import dev.jasper.sdk.ui.WindowSurface;
 import dev.jasper.sdk.ui.Windows;
 import java.util.ArrayList;
@@ -75,6 +73,34 @@ final class HostedUi {
 
     private HostedKit kit;
     void kit(HostedKit value) { kit = java.util.Objects.requireNonNull(value); kit.anchorHost=windows; }
+    /** Where this plugin's appearance reads the presentation, on each call and from any thread. */
+    private volatile Supplier<dev.jasper.sdk.ui.Presentation> presentation = HostedPresentation::standard;
+    void presentation(Supplier<dev.jasper.sdk.ui.Presentation> source) { presentation = java.util.Objects.requireNonNull(source, "source"); }
+    /** The installed themes, read on the UI thread; the bundled ones until the host gives its own. */
+    private Supplier<dev.jasper.app.appearance.ThemeLibrary> themes = dev.jasper.app.appearance.ThemeLibrary::bundledOnly;
+    /** The library the schemes were converted from, and the one the last appearance publication found. */
+    private dev.jasper.app.appearance.ThemeLibrary schemesFrom, seenLibrary;
+    private List<dev.jasper.sdk.ui.EditorScheme> schemes = List.of();
+    void themes(Supplier<dev.jasper.app.appearance.ThemeLibrary> source) {
+        themes = java.util.Objects.requireNonNull(source, "source");
+        seenLibrary = null;
+    }
+
+    /** The installed editor schemes, converted again only when the library changes. */
+    private List<dev.jasper.sdk.ui.EditorScheme> editorSchemes() {
+        var library = themes.get();
+        if (seenLibrary == null) seenLibrary = library;
+        if (library != schemesFrom) { schemes = HostedPalettes.editorSchemes(library); schemesFrom = library; }
+        return schemes;
+    }
+
+    /** Whether the installed themes changed since the last publication or read. */
+    private boolean libraryChanged() {
+        var library = themes.get();
+        boolean changed = seenLibrary != null && library != seenLibrary;
+        seenLibrary = library;
+        return changed;
+    }
     private final String pluginId;
     private final Contributions model;
     private final Containment containment;
@@ -86,8 +112,29 @@ final class HostedUi {
     private final AuxiliaryWindows windows;
     private final HostedTerminals terminals;
     private final GlassSource glass;
+    private final HostedTypography typography;
     private final Set<String> ownActions = new HashSet<>();
     private final List<Runnable> closers = new ArrayList<>();
+    /** Whether this plugin ships with Jasper, which puts its split items first (workspace plan 8b Rulings 5); its context sets it. */
+    BooleanSupplier bundled = () -> false;
+    /**
+     * The {@code terminal.open} gate for a terminal a content tab opens beside itself (workspace plan 8b Rulings 19):
+     * applying it requires the capability at once and gives what audits {@code what} once the terminal has opened. Its
+     * context sets it; unset, it refuses every such terminal.
+     */
+    java.util.function.Function<String, Runnable> terminalOpen = what -> { throw new IllegalStateException("terminal.open gate not set: " + what); };
+    /**
+     * Whether this plugin may read the title of a tab whose shown item is not its own content: it holds
+     * {@code terminal.observe}, as {@code TabHandle.title()} requires (pane flexibility spec 4, for the choices of
+     * {@code ContentTab.tabChoices()}). Asking it for an answer that carries titles audits the plugin's first such
+     * answer. Its context sets it; unset, no plugin may.
+     */
+    java.util.function.BooleanSupplier tabTitles = () -> false;
+    /**
+     * The id of this plugin's action whose handler is running on the UI thread, or null: a toggle or show its panel's
+     * own toggle action makes as it runs activates the panel (plan 15b Rulings 1).
+     */
+    private String running;
 
     HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
              BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
@@ -110,6 +157,17 @@ final class HostedUi {
              Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
              Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> subscribe,
              GlassSource glass) {
+        this(pluginId, model, containment, ui, onUi, open, loader, variant, themeSubscriber, windows, terminals,
+            appearance, subscribe, glass, new HostedTypography());
+    }
+
+    HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
+             BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
+             Function<Consumer<Variant>, Subscription> themeSubscriber, AuxiliaryWindows windows, HostedTerminals terminals,
+             Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
+             Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> subscribe,
+             GlassSource glass, HostedTypography typography) {
+        this.typography = java.util.Objects.requireNonNull(typography, "typography");
         this.pluginId = pluginId; this.model = model; this.containment = containment; this.ui = ui; this.onUi = onUi;
         this.open = open; this.variant = variant; this.themeSubscriber = themeSubscriber;
         this.windows = windows;
@@ -121,7 +179,9 @@ final class HostedUi {
                 var previous = appearanceSnapshot;
                 appearanceSnapshot = next;
                 if (!previous.equals(next)) for(var handler:List.copyOf(themeHandlers)) if(themeHandlers.contains(handler) && open.getAsBoolean()) containment.run(pluginId,"appearance",() -> handler.accept(next.chrome().dark()?Variant.DARK:Variant.LIGHT));
-                if (!previous.workspace().equals(next.workspace())) announceWorkspace();
+                // An imported or removed theme changes the editor schemes, so it is a workspace change too.
+                boolean library = libraryChanged();
+                if (!previous.workspace().equals(next.workspace()) || library) announceWorkspace();
             });
             closers.add(registration::close);
         }
@@ -195,12 +255,15 @@ final class HostedUi {
             guard("register");
             java.util.Objects.requireNonNull(handler, "handler");
             requireNamespace(spec.id(), "An action");
-            spec.context().id().ifPresent(owned -> requireNamespace(owned,
-                spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
+            spec.context().id().ifPresent(owned -> requireNamespace(owned, "A panel context"));
             ActionEntry entry = model.addAction(spec.id(), spec.title(), spec.icon().map(HostedUi.this::icon).orElse(null), spec.keywords(),
                 spec.defaultBinding(), spec.otherDefaultBinding(), keyContext(spec.context()),
-                invocation -> containment.run(pluginId, "action " + spec.id(), () ->
-                    handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle)))));
+                invocation -> containment.run(pluginId, "action " + spec.id(), () -> {
+                    String previous = running;
+                    running = spec.id();
+                    try { handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle))); }
+                    finally { running = previous; }
+                }));
             ownActions.add(spec.id());
             Subscription removal = tracked(() -> { ownActions.remove(spec.id()); entry.close(); });
             return new PluginAction() {
@@ -218,7 +281,6 @@ final class HostedUi {
             case TERMINAL -> KeyContext.TERMINAL;
             case CONTENT -> KeyContext.content(pluginId);
             case PANEL -> KeyContext.panel(context.id().orElseThrow());
-            case WINDOW -> KeyContext.window(context.id().orElseThrow());
         };
     }
 
@@ -241,7 +303,7 @@ final class HostedUi {
         return tracked(registration::close);
     }
 
-    /** A toolbar view's mount: the main toolbar of one terminal window. */
+    /** A toolbar view's mount: the main window's toolbar. */
     private record ToolbarMount(java.util.UUID windowId) { }
 
     /**
@@ -379,6 +441,10 @@ final class HostedUi {
                 requireUi("syntaxPalette");
                 return HostedPalettes.syntax(kitThemes().workspace());
             }
+            @Override public List<dev.jasper.sdk.ui.EditorScheme> editorSchemes() {
+                requireUi("editorSchemes");
+                return HostedUi.this.editorSchemes();
+            }
             @Override public double workspaceOpacity(java.awt.Component component) {
                 requireUi("workspaceOpacity");
                 return glass.opacity().applyAsDouble(java.util.Objects.requireNonNull(component, "component"));
@@ -400,6 +466,18 @@ final class HostedUi {
                 var closed=new AtomicBoolean();Consumer<Variant> guarded=v -> {if(!closed.get())handler.accept(v);};themeHandlers.add(guarded);
                 var removal=tracked(() -> {closed.set(true);themeHandlers.remove(guarded);});return () -> {closed.set(true);removal.close();};
             }
+            @Override public dev.jasper.sdk.ui.TerminalTypography terminalTypography() {
+                return typography.current();
+            }
+            @Override public Subscription onTerminalTypographyChanged(Consumer<dev.jasper.sdk.ui.TerminalTypography> handler) {
+                guard("onTerminalTypographyChanged"); java.util.Objects.requireNonNull(handler, "handler");
+                var registration = typography.subscribe(value -> {
+                    if (open.getAsBoolean()) containment.run(pluginId, "terminal typography", () -> handler.accept(value));
+                });
+                var removal = tracked(registration::close);
+                return () -> { registration.close(); removal.close(); };
+            }
+            @Override public dev.jasper.sdk.ui.Presentation presentation() { return presentation.get(); }
         };
     }
 
@@ -418,7 +496,7 @@ final class HostedUi {
                 Slot.of(dev.jasper.app.dock.Side.valueOf(spec.defaultAnchor().name()), spec.split()),
                 spec.toggleActionId(), site -> {
                 JComponent[] built = {null};
-                containment.run(pluginId, "panel " + spec.id(), () -> { var host=host(site);var view=kit.requireOwned(factory.create(host));view.mount(host);host.onClosed(view::close);built[0]=view.component(); });
+                containment.run(pluginId, "panel " + spec.id(), () -> { var host=host(site, spec);var view=kit.requireOwned(factory.create(host));view.mount(host);host.onClosed(view::close);built[0]=view.component(); });
                 return built[0];
             });
             return tracked(entry::close);
@@ -426,14 +504,17 @@ final class HostedUi {
           @Override public void toggle(String panelId, WindowHandle window) {
             guard("toggle");
             requireNamespace(panelId, "A panel");
-            if (model.panels().stream().noneMatch(panel -> panel.id().equals(panelId)))
-                throw new IllegalArgumentException("Panel not registered: " + panelId);
-            model.requestPanel(new Contributions.PanelRequest(window.id(), panelId, Contributions.PanelRequest.Op.TOGGLE));
+            var entry = model.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Panel not registered: " + panelId));
+            // The panel's own declared toggle action, as its handler runs, is the user's gesture: IntelliJ's Cmd+1.
+            var op = entry.namedToggle() && entry.toggleActionId().equals(running)
+                ? Contributions.PanelRequest.Op.ACTIVATING_TOGGLE : Contributions.PanelRequest.Op.TOGGLE;
+            model.requestPanel(new Contributions.PanelRequest(window.id(), panelId, op));
           }
         };
     }
 
-    private PanelHost host(PanelSite site) {
+    private PanelHost host(PanelSite site, dev.jasper.sdk.ui.PanelSpec spec) {
         return new PanelHost() {
             private boolean closed;
             { site.onClosed(() -> closed=true); }
@@ -445,7 +526,13 @@ final class HostedUi {
                     header.actions().stream().map(action -> new dev.jasper.app.contributions.PanelHeaderState.Action(
                         action.label(), icon(action.icon()), () -> containment.run(pluginId, "panel header action", action.invoke()))).toList()));
             }
-            @Override public void show() { requireUi("show"); site.show(); }
+            @Override public void show() {
+                requireUi("show");
+                // Inside the panel's own toggle action the show activates, as that action's toggle does.
+                if (!closed && spec.toggleActionId().filter(id -> id.equals(running)).isPresent())
+                    model.requestPanel(new Contributions.PanelRequest(site.windowId(), spec.id(), Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+                else site.show();
+            }
             @Override public void hide() { requireUi("hide"); site.hide(); }
             @Override public boolean visible() { return site.visible(); }
             @Override public Subscription onVisibility(Consumer<Boolean> handler) {
@@ -468,12 +555,12 @@ final class HostedUi {
         };
     }
 
-    /** One SDK view of an application surface; windows and dialogs differ only in their SDK type. */
+    /** One SDK view of an application surface: a plugin's dialog or overlay. */
     private class Surface implements WindowSurface {
         final AuxiliarySurface surface;
         HostedKitView mounted;
         final SurfaceMount bodyMount;
-        Surface(AuxiliarySurface surface) { this.surface = surface; bodyMount = new SurfaceMount(surface, false); surface.onClosed(() -> { if(mounted!=null){mounted.close();mounted=null;} }); }
+        Surface(AuxiliarySurface surface) { this.surface = surface; bodyMount = new SurfaceMount(surface); surface.onClosed(() -> { if(mounted!=null){mounted.close();mounted=null;} }); }
         @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
             guard("setContent");
             var next = kit.requireOwned(content);
@@ -510,62 +597,86 @@ final class HostedUi {
         @Override public void close() { subscription(surface::close).close(); }
     }
 
-    private static dev.jasper.sdk.ui.ViewSpec titleSpec(dev.jasper.sdk.ui.ViewSpec value) {
-        if (!(value.root() instanceof dev.jasper.sdk.ui.Nodes.Stack stack)
-                || stack.role() != dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE
-                || stack.children().stream().anyMatch(node -> !(node instanceof dev.jasper.sdk.ui.Nodes.Button)
-                    && !(node instanceof dev.jasper.sdk.ui.Nodes.MenuButton)))
-            throw new IllegalArgumentException("Title actions require an INLINE Stack of Buttons and MenuButtons");
-        return value;
-    }
-
-    private final class OwnedWindow extends Surface implements PluginWindow {
-        private final SurfaceMount titleMount;
-        private HostedKitView titleActions;
-        OwnedWindow(AuxiliarySurface surface) {
-            super(surface); titleMount = new SurfaceMount(surface, true);
-            surface.onClosed(() -> { if (titleActions != null) { titleActions.close(); titleActions = null; } });
-        }
-        @Override public void setTitleActions(Optional<dev.jasper.sdk.ui.UiView> actions) {
-            guard("setTitleActions"); java.util.Objects.requireNonNull(actions, "actions");
-            if (surface.closed()) throw new IllegalStateException("Surface is closed");
-            var next = actions.map(kit::requireOwned).orElse(null);
-            if (next == titleActions) return;
-            if (next != null) { titleSpec(next.spec()); next.mount(titleMount); }
-            var previous = titleActions;
-            var component = next == null ? null : next.component();
-            titleActions = next;
-            if (next != null) { next.hostSpec = HostedUi::titleSpec; next.updated = surface::titleActionsChanged; }
-            // Removing the previous anchor can synchronously close an owned child and this window.
-            surface.setTitleActions(component);
-            if (previous != null) previous.close();
-        }
-        @Override public Subscription onCloseCommand(BooleanSupplier handler) {
-            requireUi("onCloseCommand");
-            return wrap(surface.onCloseCommand(() -> {
-                boolean[] handled = {false};
-                containment.run(pluginId, "close command", () -> handled[0] = handler.getAsBoolean());
-                return handled[0];
-            }));
+    private final class OwnedDialog extends Surface implements PluginDialog {
+        OwnedDialog(AuxiliarySurface surface) { super(surface); }
+        /**
+         * A modeless dialog showing a WINDOW form is a window (the Credential Vault manager): from its first show it can be
+         * resized, opens at least a window's size and remembers its bounds under this plugin's id and its title.
+         */
+        @Override public void show() {
+            requireUi("show");
+            if (surface.kind() == AuxiliarySurface.Kind.DIALOG && !surface.modal() && !surface.shown() && mounted != null && !mounted.closed()
+                    && mounted.component().spec().root() instanceof dev.jasper.ui.model.Nodes.Form form
+                    && form.kind() == dev.jasper.ui.model.Nodes.FormKind.WINDOW)
+                surface.windowSized(windowKey(surface.title()));
+            surface.show();
         }
     }
-    private final class OwnedDialog extends Surface implements PluginDialog { OwnedDialog(AuxiliarySurface surface) { super(surface); } }
 
-    private final java.util.Map<AuxiliarySurface, OwnedWindow> ownedWindows = new java.util.HashMap<>();
+    /** A window-sized dialog's key: this plugin's id and the title, cut to what UiState keeps, never inside a surrogate pair. */
+    private String windowKey(String title) {
+        String key = pluginId + "|" + title;
+        int length = dev.jasper.app.persistence.UiState.WINDOW_KEY_LENGTH;
+        if (key.length() <= length) return key;
+        return key.substring(0, Character.isHighSurrogate(key.charAt(length - 1)) ? length - 1 : length);
+    }
 
-    private final java.util.Map<dev.jasper.app.contributions.ContentEntry, OwnedContent> ownedContent = new java.util.IdentityHashMap<>();
+    private final java.util.Map<dev.jasper.app.contributions.Tab, OwnedContent> ownedContent = new java.util.IdentityHashMap<>();
     private final class OwnedContent implements dev.jasper.sdk.ui.ContentTab {
-        final dev.jasper.app.contributions.ContentEntry entry;
-        OwnedContent(dev.jasper.app.contributions.ContentEntry entry) { this.entry = entry; }
+        final dev.jasper.app.contributions.Tab entry;
+        OwnedContent(dev.jasper.app.contributions.Tab entry) { this.entry = entry; }
         public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) { requireUi("content presentation"); if(entry.closed())return; entry.presentation(v.title(), v.detail(), icon(v.icon()), v.dirty(), v.location(), v.host()); }
         public void setCommands(List<dev.jasper.sdk.ui.ContentCommand> values) { requireUi("content commands"); entry.commands(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentCommand(v.id(), v.title(), v.shortcut(), v.enabled(), () -> containment.run(pluginId, "content command", v.run()))).toList()); }
         public void setStatus(List<dev.jasper.sdk.ui.ContentStatus> values) { requireUi("content status"); entry.status(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentStatus(v.text(), v.tooltip(), v.run() == null ? null : () -> containment.run(pluginId, "content status", v.run()))).toList()); }
         public void setFocusTarget(Runnable focus) { requireUi("content focus"); entry.focusTarget(() -> containment.run(pluginId, "content focus", focus)); }
+        public void setRestore(Optional<dev.jasper.sdk.RestoreState> state) { requireUi("content restore"); entry.restore(state.map(HostedUi::restore)); }
         public void select() { requireUi("select content"); entry.select(); }
-        public void move(boolean separate) { requireUi("move content"); entry.move(separate); }
-        public boolean isSeparate() { requireUi("content host"); return entry.detached(); }
+        public void moveToNewWindow() { requireUi("move content"); entry.moveToNewWindow(); }
+        public void moveToMainWindow() { requireUi("move content"); entry.moveToMainWindow(); }
+        public void moveToNewTab() { requireUi("move content"); model.tabs().moveToNewTab(entry); }
+        public boolean mayMoveToNewTab() { requireUi("move content"); return model.tabs().mayMoveToNewTab(entry); }
+        /** Each tab's title goes to a plugin that observes terminals or whose own content the tab shows, and no other. */
+        public List<dev.jasper.sdk.ui.TabChoice> tabChoices() {
+            requireUi("move content");
+            var others = model.tabs().tabChoices(entry);
+            boolean observes = !others.isEmpty() && tabTitles.getAsBoolean();
+            return others.stream().map(other -> new dev.jasper.sdk.ui.TabChoice(other.number(),
+                observes || ownContent(other.shown()) ? other.title() : "")).toList();
+        }
+        private boolean ownContent(dev.jasper.app.layout.TabId shown) {
+            return model.tabs().tab(shown).filter(tab -> tab.kind() == dev.jasper.app.contributions.Tab.Kind.HOSTED
+                && tab.plugin().equals(pluginId)).isPresent();
+        }
+        public void moveToTab(int number) { requireUi("move content"); model.tabs().moveToTab(entry, number); }
+        public void split(dev.jasper.sdk.ui.SplitChoice choice, dev.jasper.sdk.terminal.Direction direction) {
+            requireUi("split content");
+            java.util.Objects.requireNonNull(choice, "choice");
+            java.util.Objects.requireNonNull(direction, "direction");
+            if (!splitChoices().contains(choice)) throw new IllegalArgumentException("Not one of Jasper's split choices: " + choice.label());
+            boolean right = direction == dev.jasper.sdk.terminal.Direction.RIGHT;
+            if (choice.equals(dev.jasper.sdk.ui.SplitChoice.TERMINAL)) {
+                // A local shell, as Terminals.split opens one: terminal.open before anything else, whatever the tab's
+                // state (workspace plan 8b Rulings 19), and audited only once a window opened it, as Terminals.split is
+                // once its target resolves. A closed tab, or one being closed, opens nothing.
+                Runnable audit = terminalOpen.apply("opened a terminal beside content tab " + entry.id().value());
+                if (model.tabs().splitTerminal(entry, right ? dev.jasper.app.layout.Side.RIGHT : dev.jasper.app.layout.Side.DOWN)) audit.run();
+                return;
+            }
+            // A closed tab, or one waiting on a close decision, splits nothing, as it moves nowhere.
+            if (!model.tabs().splittable(entry)) return;
+            // A plugin's choice opens beside the focused pane, so the item is selected first (workspace plan 8b Rulings 18).
+            model.tabs().select(entry);
+            java.util.UUID window = entry.window();
+            String action = right ? choice.rightAction() : choice.downAction();
+            if (window != null) model.action(action).ifPresent(found -> found.invoke(new Contributions.Invocation(window, Optional.empty())));
+        }
+        public WindowHandle window() {
+            requireUi("content window");
+            // A tab no window could take back (its move failed everywhere) names no window.
+            return terminals.windowHandle(entry.window() != null ? entry.window() : new java.util.UUID(0, 0));
+        }
         public boolean isActive() { requireUi("content active"); return entry.active(); }
         public boolean isClosed() { requireUi("content closed"); return entry.closed(); }
         public java.util.concurrent.CompletableFuture<Boolean> requestClose() { requireUi("close content"); return entry.requestClose(); }
@@ -573,6 +684,17 @@ final class HostedUi {
         public Subscription onClosed(Runnable listener) { requireUi("content disposal"); return wrap(entry.onClosed(()->containment.run(pluginId,"content disposal",listener))); }
         public void close() { subscription(entry::close).close(); }
     }
+    /** The application's twin of a plugin's restore state (workspace tabs spec 13). */
+    private static dev.jasper.app.layout.TabRestore restore(dev.jasper.sdk.RestoreState state) {
+        return new dev.jasper.app.layout.TabRestore(state.kind(), state.values());
+    }
+
+    /** Why a restorer that threw restored nothing, as a placeholder words it. */
+    private static String problem(Throwable failure) {
+        String message = failure.getMessage();
+        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+    }
+
     private WindowOwner resolveContentOwner(WindowOwner owner) {
         if (owner instanceof OwnedContent content) {
             if (ownedContent.get(content.entry) != content || content.entry.closed()) throw new IllegalArgumentException("Closed or foreign content owner");
@@ -594,15 +716,11 @@ final class HostedUi {
         Runnable cancel = () -> { if (cancelled.compareAndSet(false, true)) cancelAction.get().run(); };
         dev.jasper.app.windows.PathChoice choice;
         Subscription ownerClosed;
-        if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window && window.surface.shown()) {
-            choice = new dev.jasper.app.windows.PathChoice(null, window.surface, title, initial, mode, multiple,
-                terminalStart(null, sources), suggestedName, sources);
-            ownerClosed = wrap(window.surface.onClosed(cancel));
-        } else if (owner instanceof WindowHandle terminal && terminals.ownsOpenWindow(terminal)) {
+        if (owner instanceof WindowHandle terminal && terminals.ownsOpenWindow(terminal)) {
             choice = new dev.jasper.app.windows.PathChoice(terminal.id(), null, title, initial, mode, multiple,
                 terminalStart(terminal.id(), sources), suggestedName, sources);
             ownerClosed = wrap(terminals.onWindowClosed(terminal.id(), cancel));
-        } else throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
+        } else throw new IllegalArgumentException("Picker requires an open Jasper window or content tab from this host");
         Subscription stopped = tracked(cancel);
         var pin = document == null ? null : document.entry.pin();
         var documentClosed = document == null ? null : document.entry.onClosed(cancel);
@@ -648,20 +766,44 @@ final class HostedUi {
             : new FileLocation.Sourced(location.source(), location.root(), location.path());
     }
 
+    /**
+     * One of a split item's two actions (workspace plan 8b Rulings 3): no default, the palette's words for it, and a
+     * contained call of the opener with the window it ran in and {@code placement}.
+     */
+    private ActionEntry splitAction(String id, String title, Icon icon, String side, String label,
+                                    java.util.function.BiConsumer<WindowHandle, dev.jasper.sdk.ui.TabPlacement> opener,
+                                    dev.jasper.sdk.ui.TabPlacement placement) {
+        var keywords = new ArrayList<>(List.of("split", side, "new", "pane"));
+        for (String word : label.toLowerCase(java.util.Locale.ROOT).split(" ")) if (!word.isBlank()) keywords.add(word.strip());
+        return model.addAction(id, title, icon, keywords, Optional.empty(), invocation -> containment.run(pluginId, "split item " + id,
+            () -> opener.accept(terminals.windowHandle(invocation.windowId()), placement)));
+    }
+
+    /** The Split lists' choices (tabs and panes spec 2.10; workspace plan 8b Rulings 4 and 5): the terminal, then every split item. */
+    private List<dev.jasper.sdk.ui.SplitChoice> splitChoices() {
+        var choices = new ArrayList<dev.jasper.sdk.ui.SplitChoice>();
+        choices.add(dev.jasper.sdk.ui.SplitChoice.TERMINAL);
+        for (var item : model.splitItems())
+            choices.add(new dev.jasper.sdk.ui.SplitChoice(item.label(), item.rightAction(), item.downAction(), item.asks()));
+        return List.copyOf(choices);
+    }
+
     Windows windows() {
         return new Windows() {
-            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content) {
+            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content,
+                    dev.jasper.sdk.ui.TabPlacement placement) {
                 guard("openTab");
+                java.util.Objects.requireNonNull(placement, "placement");
                 var view = kit.requireOwned(content);
                 var existing = ownedContent.values().stream().filter(c -> c.entry.key().equals(spec.key())).findFirst();
-                if(existing.isPresent()) return openComponent(spec, owner, existing.get().entry.component());
+                if(existing.isPresent()) return openComponent(spec, owner, existing.get().entry.component(), placement);
                 // Reserve before publishing: a view cannot be owned by two surface lifetimes.
                 view.mount(spec);
                 // Workspace content takes the workspace theme slot, as terminals and editors do, on an opaque workspace
                 // surface; its specialized content paints its own background or glass above that. Moves keep both.
                 view.route(dev.jasper.ui.theme.ThemeRoute.WORKSPACE, true);
                 try {
-                    var tab = openComponent(spec, owner, view.component());
+                    var tab = openComponent(spec, owner, view.component(), placement);
                     tab.onClosed(view::close);
                     return tab;
                 } catch(RuntimeException | Error failure) {
@@ -669,7 +811,8 @@ final class HostedUi {
                     view.unmount(spec);throw failure;
                 }
             }
-            private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
+            private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component,
+                    dev.jasper.sdk.ui.TabPlacement placement) {
                 guard("openTab");
                 java.util.UUID window = null;
                 if (owner != null) {
@@ -678,17 +821,57 @@ final class HostedUi {
                     if (terminals.ownsOpenWindow(handle)) window = handle.id();
                     else if (!terminals.ownsWindow(handle)) throw new IllegalArgumentException("Foreign workspace owner");
                 }
-                var entry = model.content().open(pluginId, spec.key(), spec.title(), window, component);
+                var entry = model.tabs().open(pluginId, spec.key(), spec.title(), window, component, switch (placement) {
+                    case NEW_TAB -> dev.jasper.app.contributions.TabRegistry.Placement.NEW_TAB;
+                    case SPLIT_RIGHT -> dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT;
+                    case SPLIT_DOWN -> dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_DOWN;
+                    case NEW_WINDOW -> dev.jasper.app.contributions.TabRegistry.Placement.NEW_WINDOW;
+                });
                 var existing = ownedContent.get(entry); if (existing != null) return existing;
                 var owned = new OwnedContent(entry); ownedContent.put(entry, owned);
+                entry.restore(spec.restore().map(HostedUi::restore));
                 Runnable cleanup = entry::close;
                 closers.add(cleanup);
                 entry.onClosed(() -> { ownedContent.remove(entry); closers.remove(cleanup); });
                 return owned;
             }
+            @Override public Subscription splitItem(dev.jasper.sdk.ui.SplitItemSpec spec,
+                    java.util.function.BiConsumer<WindowHandle, dev.jasper.sdk.ui.TabPlacement> opener) {
+                guard("splitItem");
+                java.util.Objects.requireNonNull(spec, "spec");
+                java.util.Objects.requireNonNull(opener, "opener");
+                requireNamespace(spec.id(), "A split item");
+                Icon icon = spec.icon().map(HostedUi.this::icon).orElse(null);
+                if (model.splitItems().stream().anyMatch(item -> item.id().equals(spec.id())))
+                    throw new IllegalArgumentException("Split item already registered: " + spec.id());
+                // An item that asks first ends its actions' titles with an ellipsis (workspace plan 9a Rulings 1).
+                String asks = spec.asks() ? "…" : "";
+                ActionEntry right = splitAction(spec.rightAction(), "Split Right with " + spec.label() + asks, icon, "right",
+                    spec.label(), opener, dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT);
+                ActionEntry down;
+                try {
+                    down = splitAction(spec.downAction(), "Split Down with " + spec.label() + asks, icon, "down", spec.label(),
+                        opener, dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN);
+                } catch (RuntimeException failure) { right.close(); throw failure; }
+                var listed = model.addSplitItem(new dev.jasper.app.contributions.SplitItem(spec.id(), spec.label(), icon,
+                    spec.rightAction(), spec.downAction(), bundled.getAsBoolean(), spec.asks()));
+                ownActions.add(spec.rightAction());
+                ownActions.add(spec.downAction());
+                return tracked(() -> {
+                    ownActions.remove(spec.rightAction());
+                    ownActions.remove(spec.downAction());
+                    listed.close();
+                    right.close();
+                    down.close();
+                });
+            }
+            @Override public List<dev.jasper.sdk.ui.SplitChoice> splitChoices() {
+                guard("splitChoices");
+                return HostedUi.this.splitChoices();
+            }
             @Override public Subscription onTabsClosing(java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean,java.util.concurrent.CompletableFuture<Boolean>> guard) {
                 HostedUi.this.guard("content close guard");
-                var registration = model.content().guard(pluginId, (entries,batch) -> {
+                var registration = model.tabs().guard(pluginId, (entries,batch) -> {
                     var result = new java.util.concurrent.CompletableFuture<Boolean>();
                     boolean invoked = containment.run(pluginId, "content close guard", () -> {
                         try { guard.apply(entries.stream().map(ownedContent::get).map(v -> (dev.jasper.sdk.ui.ContentTab)v).toList(),batch)
@@ -697,6 +880,42 @@ final class HostedUi {
                     });
                     if (!invoked) result.complete(false);
                     return result;
+                });
+                return tracked(registration::close);
+            }
+            @Override public Subscription restorer(String kind, dev.jasper.sdk.ui.TabRestorer restorer) {
+                HostedUi.this.guard("tab restorer");
+                java.util.Objects.requireNonNull(restorer, "restorer");
+                // The kind's rules are the restore state's (workspace tabs spec 14).
+                new dev.jasper.sdk.RestoreState(kind, java.util.Map.of());
+                var registration = model.tabs().restorer(pluginId, kind, saved -> {
+                    dev.jasper.sdk.RestoreState state;
+                    try {
+                        state = new dev.jasper.sdk.RestoreState(saved.state().kind(), saved.state().state());
+                    } catch (IllegalArgumentException | NullPointerException invalid) {
+                        // A file this build did not write may hold a state the SDK refuses: no restorer sees it, and it
+                        // is no failure (workspace plan 6b Rulings 30).
+                        return Optional.of("its saved state is not valid");
+                    }
+                    var request = new dev.jasper.sdk.ui.RestoreRequest(terminals.windowHandle(saved.window()), saved.title(), state);
+                    // A reason the restorer gives is expected, and no failure; what it throws is the plugin's failure.
+                    var said = new java.util.concurrent.atomic.AtomicReference<Optional<String>>(Optional.empty());
+                    Throwable thrown;
+                    try {
+                        thrown = containment.attempt(pluginId, "tab restorer", () -> {
+                            Optional<String> declined = restorer.restore(request);
+                            said.set(declined == null ? Optional.empty() : declined.filter(reason -> !reason.isBlank()));
+                            return null;
+                        });
+                    } catch (VirtualMachineError fatal) {
+                        throw fatal;
+                    } catch (Error failure) {
+                        // The plugin's restore failure, reported as a throw is; the registry closes the item it opened and
+                        // the rest of the windows restore (workspace plan 6b's final review, M1).
+                        containment.record(pluginId, "tab restorer", failure);
+                        throw failure;
+                    }
+                    return thrown == null ? said.get() : Optional.of(problem(thrown));
                 });
                 return tracked(registration::close);
             }
@@ -735,23 +954,10 @@ final class HostedUi {
                 return chooseLocations(choice.owner(), choice.title(), choice.initial().map(HostedUi::location), mode, choice.multiple(),
                     choice.suggestedName(), choice.sources()).stream().map(HostedUi::fileLocation).toList();
             }
-            @Override public PluginWindow create(WindowSpec spec) {
-                guard("create");
-                requireNamespace(spec.id(), "A window");
-                AuxiliarySurface surface = windows.window(spec.id(), spec.title(), spec.preferredSize(), spec.singleton());
-                OwnedWindow existing = ownedWindows.get(surface);
-                if (existing != null) return existing;
-                surface.contentSize(spec.sizeBasis() == WindowSpec.SizeBasis.CONTENT);
-                var window = new OwnedWindow(surface);
-                ownedWindows.put(surface, window);
-                surface.onClosed(() -> ownedWindows.remove(surface));
-                closers.add(surface::close);
-                return window;
-            }
             @Override public PluginDialog overlay(OverlaySpec spec) {
                 guard("overlay");
                 if (!terminals.ownsOpenWindow(spec.owner()))
-                    throw new IllegalArgumentException("An overlay needs an open terminal window from this host");
+                    throw new IllegalArgumentException("An overlay needs an open Jasper window from this host");
                 AuxiliarySurface surface = windows.overlay(spec.title(), spec.owner().id());
                 var ownerClosed = terminals.onWindowClosed(spec.owner().id(), () -> windows.closeOwned(spec.owner().id()));
                 surface.onClosed(ownerClosed::close);
@@ -774,16 +980,13 @@ final class HostedUi {
                         ? overlay ? windows.modalOverlay(spec.title(),anchor.ownerSurface()) : windows.dialog(spec.title(),spec.modal(),anchor.ownerSurface())
                         : overlay ? windows.modalOverlay(spec.title(),anchor.target) : windows.dialog(spec.title(),spec.modal(),anchor.target);
                     var registration=anchor.onClosed(surface::close);surface.onClosed(registration::close);
-                } else if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window)
-                    surface = overlay ? windows.modalOverlay(spec.title(), window.surface) : windows.dialog(spec.title(), spec.modal(), window.surface);
-                else if (owner instanceof WindowHandle terminalWindow && terminals.ownsOpenWindow(terminalWindow)) {
-                    surface = overlay ? windows.modalOverlay(spec.title(), terminalWindow.id()) : windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
-                    if (overlay) {
-                        var ownerClosed = terminals.onWindowClosed(terminalWindow.id(), surface::close);
-                        surface.onClosed(ownerClosed::close);
-                    }
+                } else if (owner instanceof WindowHandle jasperWindow && terminals.ownsOpenWindow(jasperWindow)) {
+                    surface = overlay ? windows.modalOverlay(spec.title(), jasperWindow.id()) : windows.dialog(spec.title(), spec.modal(), jasperWindow.id());
+                    // A dialog dies with its Jasper window, as an overlay does (its native dialog already has).
+                    var ownerClosed = terminals.onWindowClosed(jasperWindow.id(), surface::close);
+                    surface.onClosed(ownerClosed::close);
                 }
-                else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
+                else throw new IllegalArgumentException("A dialog's owner must be a Jasper window, a content tab or an anchor from this host");
                 surface.attachedSheet(spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET);
                 surface.swatch(dev.jasper.ui.model.Nodes.Hue.valueOf(spec.swatch().name()));
                 if (spec.owner() instanceof OwnedContent content) {

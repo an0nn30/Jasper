@@ -19,6 +19,6 @@ public final class ErrorsViewTestSupport {
     /** The incident's mounted summary label in the list, or null while its row is not mounted. */
     public static javax.swing.JComponent summary(ErrorsView view, UUID id) { return view.part("summary:" + id); }
 
-    /** Done in the window footer band. */
-    public static javax.swing.AbstractButton done(ErrorsView view) { return view.doneButton(); }
+    /** The view's one kit view. */
+    public static dev.jasper.ui.swing.KitView kitView(ErrorsView view) { return view.kitView(); }
 }

@@ -26,7 +26,7 @@ final class ShortcutCatalog {
         var resolved = base.withExtensions(actions.stream().filter(a -> KeyBindings.extensionId(a.id()))
             .map(ActionEntry::extension).toList());
         var rows = new ArrayList<ShortcutEntry>();
-        for (ActionId id : ActionId.values()) rows.add(new ShortcutEntry(id.id(), category(id), id.label(),
+        for (ActionId id : ActionId.values()) if (id.availableOn(System.getProperty("os.name", ""))) rows.add(new ShortcutEntry(id.id(), category(id), id.label(),
             resolved.bindings().strokeFor(id).orElse(null), description(id.context(), plugins, panels), id.id().replace('_', ' '),
             true, KeyBindings.effectiveDefaultBinding(id, macOs), where(id.context(), plugins, panels),coreIcon(category(id))));
         for (ActionEntry action : actions) {
@@ -43,22 +43,21 @@ final class ShortcutCatalog {
         return List.copyOf(rows);
     }
 
-    /** The Where column: Global, Terminal, a plugin's tabs, a panel or a window. */
+    /** The Where column: Global, Terminal, a plugin's tabs or a panel. */
     static String where(KeyContext context, Map<String, String> plugins, Map<String, String> panels) {
         return switch (context.kind()) {
             case GLOBAL -> "Global";
             case TERMINAL -> "Terminal";
             case CONTENT -> plugins.getOrDefault(context.owner(), context.owner()) + " tabs";
             case PANEL -> panels.getOrDefault(context.owner(), context.owner()) + " panel";
-            case WINDOW -> context.owner() + " window";
         };
     }
 
     private static String description(KeyContext context, Map<String, String> plugins, Map<String, String> panels) {
         return switch (context.kind()) {
-            case GLOBAL -> "Anywhere in a terminal window";
+            case GLOBAL -> "Anywhere in a Jasper window";
             case TERMINAL -> "In a terminal pane";
-            case CONTENT, PANEL, WINDOW -> "Only in the " + where(context, plugins, panels);
+            case CONTENT, PANEL -> "Only in the " + where(context, plugins, panels);
         };
     }
 
@@ -82,10 +81,14 @@ final class ShortcutCatalog {
     }; }
     private static String category(ActionId id) {
         return switch (id) {
-            case NEW_TAB, CLOSE_TAB, NEXT_TAB, PREVIOUS_TAB, RENAME_TAB, SELECT_TAB_1, SELECT_TAB_2,
+            case NEW_TAB, CLOSE_TAB, NEXT_TAB, PREVIOUS_TAB, RENAME_TAB, MOVE_TAB_TO_NEW_WINDOW, SELECT_TAB_1, SELECT_TAB_2,
                 SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5, SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 -> "Tabs";
-            case SPLIT_RIGHT, SPLIT_DOWN, CLOSE_PANE, ZOOM_PANE, FOCUS_PANE_LEFT, FOCUS_PANE_RIGHT,
-                FOCUS_PANE_UP, FOCUS_PANE_DOWN -> "Panes";
+            case SPLIT_RIGHT, SPLIT_DOWN, CLOSE_PANE, MAXIMIZE_PANE, FOCUS_PANE_LEFT, FOCUS_PANE_RIGHT,
+                FOCUS_PANE_UP, FOCUS_PANE_DOWN, MOVE_PANE_TO_NEW_TAB, MOVE_PANE_TO_TAB_1, MOVE_PANE_TO_TAB_2, MOVE_PANE_TO_TAB_3,
+                MOVE_PANE_TO_TAB_4, MOVE_PANE_TO_TAB_5, MOVE_PANE_TO_TAB_6, MOVE_PANE_TO_TAB_7, MOVE_PANE_TO_TAB_8,
+                MOVE_PANE_TO_TAB_9, MOVE_TAB_INTO_TAB_1, MOVE_TAB_INTO_TAB_2, MOVE_TAB_INTO_TAB_3, MOVE_TAB_INTO_TAB_4,
+                MOVE_TAB_INTO_TAB_5, MOVE_TAB_INTO_TAB_6, MOVE_TAB_INTO_TAB_7, MOVE_TAB_INTO_TAB_8,
+                MOVE_TAB_INTO_TAB_9 -> "Panes";
             case FIND, FIND_NEXT, FIND_PREVIOUS -> "Search";
             case COPY, PASTE -> "Clipboard";
             case FONT_BIGGER, FONT_SMALLER, FONT_RESET -> "Appearance";
@@ -97,7 +100,7 @@ final class ShortcutCatalog {
 
     private static void contextual(List<ShortcutEntry> rows, List<ActionEntry> actions, Map<String, String> plugins, boolean macOs) {
         int primary = macOs ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
-        add(rows, "auxiliary.close", "Application", "Close auxiliary window", KeyEvent.VK_W, primary, "Plugin and help windows");
+        add(rows, "auxiliary.close", "Application", "Close auxiliary window", KeyEvent.VK_W, primary, "Help windows");
         add(rows, "plugins.menu", "Application", "Open selected plugin menu", KeyEvent.VK_CONTEXT_MENU, 0, "Plugins manager list");
         add(rows, "plugins.menu.shift", "Application", "Open selected plugin menu", KeyEvent.VK_F10, InputEvent.SHIFT_DOWN_MASK, "Plugins manager list");
         add(rows, "find.next", "Search", "Next match", KeyEvent.VK_ENTER, 0, "Find field");

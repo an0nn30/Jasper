@@ -19,6 +19,19 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ShortcutHelpTest {
+    /** Tabs and panes spec 10: the tab actions are Tabs, and the pane actions are Panes. */
+    @Test void theTabAndPaneActionsHaveTheirCategories() {
+        var rows = ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true);
+        for (String id : List.of("new_tab", "close_tab", "next_tab", "select_tab_1", "move_tab_to_new_window"))
+            assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Tabs"));
+        for (String id : List.of("close_pane", "maximize_pane", "focus_pane_left", "move_pane_to_new_tab", "move_pane_to_tab_1",
+                "move_pane_to_tab_9", "move_tab_into_tab_1", "move_tab_into_tab_9"))
+            assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Panes"));
+        // Workspace plan 7b Rulings 13: the window commands, with New Terminal Window and Close Window.
+        for (String id : List.of("move_to_main_window", "new_terminal_window"))
+            assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Application"));
+    }
+
     @Test void catalogIncludesEveryBuiltInAndUsesEffectivePluginBindings() throws Exception {
         edt(() -> {
             var contributions = new Contributions();
@@ -27,7 +40,7 @@ class ShortcutHelpTest {
             var base = KeyBindings.withOverrides(true, Map.of("new_tab", "cmd+y", "copy", "none",
                 "dev.test.remote.connect", "ctrl+alt+h"));
             var rows = ShortcutCatalog.rows(base, contributions.actions(), Map.of("dev.test.remote", "Remote"), true);
-            assertThat(rows.stream().map(ShortcutEntry::id)).containsAll(List.of(ActionId.values()).stream().map(ActionId::id).toList());
+            assertThat(rows.stream().map(ShortcutEntry::id)).containsAll(List.of(ActionId.values()).stream().filter(id -> id.availableOn(System.getProperty("os.name", ""))).map(ActionId::id).toList());
             assertThat(rows).filteredOn(row -> row.id().equals("new_tab")).singleElement()
                 .satisfies(row -> assertThat(ShortcutText.format(row.stroke())).isEqualTo("Cmd+Y"));
             assertThat(rows).filteredOn(row -> row.id().equals("copy")).singleElement()
@@ -92,8 +105,8 @@ class ShortcutHelpTest {
             var panel = panel(true, changes -> { throw new AssertionError("Unexpected save"); });
             var root = new JRootPane(); root.setContentPane(panel);
             var stroke = KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK);
-            panel.setRows(List.of(new ShortcutEntry("remote.hosts", "Remote", "SSH Hosts", stroke, "Terminal window", "connect"),
-                new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Terminal window", "")));
+            panel.setRows(List.of(new ShortcutEntry("remote.hosts", "Remote", "SSH Hosts", stroke, "Jasper window", "connect"),
+                new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Jasper window", "")));
             search(panel).setText("remote"); assertThat(panel.tree.rowCount()).isEqualTo(2);
             search(panel).setText("shift+command+h"); assertThat(panel.tree.rowCount()).isEqualTo(2);
             search(panel).setText("cmd+h"); assertThat(panel.tree.rowCount()).isZero();

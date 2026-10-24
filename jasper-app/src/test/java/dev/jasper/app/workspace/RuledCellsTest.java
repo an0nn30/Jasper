@@ -7,8 +7,8 @@ import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.contributions.ContentHost;
-import dev.jasper.app.contributions.ContentRegistry;
+import dev.jasper.app.contributions.WorkspaceHost;
+import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.contributions.ContentStatus;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.terminals.PaneSnapshot;
@@ -180,13 +180,41 @@ class RuledCellsTest {
         });
     }
 
+    /**
+     * The 06 Run Dialog mock: under ruled cells the open Run window's item lies on {@code surface.header.active}, its
+     * accent ink held readable on it by its pair's guard.
+     */
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void theOpenRunWindowsItemTakesTheMocksHeaderTintUnderRuledCells(boolean dark) throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(dark);
+            try {
+                var run = new RunItem(new AbstractAction("Command Palette") { @Override public void actionPerformed(ActionEvent event) { } }, () -> true);
+                var bar = new WindowStatusBar(new RuledCells(), run);
+                bar.setMetadata(local("Mac"), "130 × 69", true);
+                var image = MockProfile.print(bar, 800, 24);
+                var theme = themes.current().chrome();
+                var tint = DerivedColor.SURFACE_HEADER_ACTIVE.color(theme);
+                assertThat(tint).as("the shipped theme's surface.header.active").isEqualTo(MockProfile.role(dark, "surface.header.active"));
+                assertThat(MockProfile.at(image, 4, 24)).as("the open Run window's item").isEqualTo(tint);
+                if (!dark) assertThat(MockProfile.deltaE(MockProfile.at(image, 4, 22), MockProfile.role(dark, "surface.header.active")))
+                    .as("the Run Dialog mock's item, on the tint").isLessThanOrEqualTo(2.5);
+                var pair = WindowPairs.run(true, true);
+                assertThat(pair.against()).as("its ink's pair lies on the tint").isEqualTo(DerivedColor.SURFACE_HEADER_ACTIVE);
+                var ink = dev.jasper.ui.theme.SurfaceContrast.painted(theme, pair);
+                assertThat(pair.guard().holds(ink, tint)).as("the accent ink meets its guard").isTrue();
+                assertThat(WindowPairsTest.has(image, ink)).as("the accent ink is painted").isTrue();
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
     @Test void aContentTabsItemsAreCellsRuledBetweenTheirLabels() throws Exception {
         edt(() -> {
             var themes = EnterpriseLook.controller(false);
             try {
-                var registry = new ContentRegistry();
+                var registry = new TabRegistry();
                 var window = UUID.randomUUID();
-                registry.addHost(new ContentHost(window, false, entry -> { }, entry -> { }, entry -> { }, () -> { }));
+                registry.addHost(new WorkspaceHost(window, entry -> { }, entry -> { }, entry -> { }, () -> { }));
                 var entry = registry.open("dev.x.editor", "notes", "notes.txt", window, new JPanel());
                 entry.presentation("notes.txt", "", null, false, "/work/notes.txt", "");
                 entry.status(List.of(new ContentStatus("Ln 12, Col 4", null, null), new ContentStatus("Plain Text", null, null),

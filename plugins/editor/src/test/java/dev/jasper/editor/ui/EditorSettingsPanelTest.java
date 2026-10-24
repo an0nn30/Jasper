@@ -49,7 +49,7 @@ class EditorSettingsPanelTest {
                     settings.customInTerminal(), settings.keepEnvironmentEditor()),
                 () -> new Detection.Probe("Mac OS X", List.of(bin), home, Map.of(), programs::contains), context.background(), Runnable::run,
                 context.terminals(), (file, line, window) -> false, (command, program) -> false, Optional.empty(), "Mac OS X", context.log());
-            context.settings().page(new EditorSettingsPanel(context.kit(), settings, defaults, environment));
+            context.settings().page(new EditorSettingsPanel(context.kit(), context.appearance(), settings, defaults, environment));
         });
         host.settingsPanel(ID).orElseThrow();
         return host.settingsPanelView(ID).orElseThrow();
@@ -64,13 +64,16 @@ class EditorSettingsPanelTest {
         FakeKitView view = page(Map.of());
         var page = (Nodes.Stack) view.spec().root();
         assertThat(page.role()).isEqualTo(Nodes.LayoutRole.SETTINGS_PAGE);
-        assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title()).containsExactly("Font", "Editing", "Files", "Default editor");
-        assertThat(rows(view, EditorSettingsPanel.FONT)).containsExactly("settings:font_family:row", "settings:font_size:row");
+        assertThat(page.children()).extracting(node -> ((Nodes.Section) node).title()).containsExactly("Font", "Colors", "Editing", "Markdown", "Files", "Default editor");
+        assertThat(rows(view, EditorSettingsPanel.COLORS)).containsExactly(EditorSettingsPanel.SCHEME + ":row");
+        assertThat(rows(view, EditorSettingsPanel.FONT)).containsExactly("settings:follow_terminal_font:row", "settings:font_family:row", "settings:font_size:row",
+            "settings:font_fallback:row", "settings:font_ligatures:row", "settings:font_line_height:row");
         assertThat(rows(view, EditorSettingsPanel.EDITING)).containsExactly("settings:tab_size:row", "settings:soft_wrap:row", "settings:vim:row");
+        assertThat(rows(view, EditorSettingsPanel.MARKDOWN)).containsExactly("settings:markdown_view_mode:row");
         assertThat(rows(view, EditorSettingsPanel.FILES)).containsExactly("settings:max_file_mib:row", "settings:recent_files_days:row");
         assertThat(rows(view, EditorSettingsPanel.DEFAULT))
             .containsExactly(EditorSettingsPanel.CHOICE + ":row", "settings:keep_environment_editor:row", EditorSettingsPanel.ENVIRONMENT);
-        for (String section : List.of(EditorSettingsPanel.FONT, EditorSettingsPanel.EDITING, EditorSettingsPanel.FILES, EditorSettingsPanel.DEFAULT))
+        for (String section : List.of(EditorSettingsPanel.FONT, EditorSettingsPanel.COLORS, EditorSettingsPanel.EDITING, EditorSettingsPanel.MARKDOWN, EditorSettingsPanel.FILES, EditorSettingsPanel.DEFAULT))
             assertThat(node(view, section + ".card", Nodes.Card.class).kind()).as(section).isEqualTo(Nodes.CardKind.SETTINGS);
         assertThat(node(view, "settings:font_family", Nodes.Choice.class).kind()).as("the font picker, as on the generated page")
             .isEqualTo(Nodes.ChoiceKind.SEARCHABLE);
@@ -129,6 +132,43 @@ class EditorSettingsPanelTest {
         assertThat(host.failures()).isEmpty();
     }
 
+    @Test void colorSchemeDropdownListsWorkspaceThenEverySchemeVariant() {
+        host.setEditorSchemes(List.of(scheme("ash/dark", "Ash", dev.jasper.sdk.Variant.DARK), scheme("ash/light", "Ash", dev.jasper.sdk.Variant.LIGHT),
+            scheme("birch/light", "Birch", dev.jasper.sdk.Variant.LIGHT)));
+        host.flush();
+        FakeKitView view = page(Map.of());
+        var dropdown = node(view, EditorSettingsPanel.SCHEME, Nodes.Choice.class);
+        assertThat(dropdown.kind()).isEqualTo(Nodes.ChoiceKind.DROPDOWN);
+        assertThat(dropdown.options().stream().map(option -> option.id() + "=" + option.label()).toList()).containsExactly(
+            "workspace=Follow Workspace Scheme", "ash/dark=Ash (Dark)", "ash/light=Ash (Light)", "birch/light=Birch (Light)");
+        assertThat(dropdown.selectedId()).isEqualTo("workspace");
+        assertThat(node(view, EditorSettingsPanel.SCHEME + ":row", Nodes.SettingRow.class).title()).isEqualTo("Color scheme");
+        view.emit(new UiEvent.Selected(EditorSettingsPanel.SCHEME, Set.of("ash/light")));
+        assertThat(host.pendingSettings(ID)).containsEntry("color_scheme", "ash/light");
+        assertThat(node(view, EditorSettingsPanel.SCHEME, Nodes.Choice.class).selectedId()).isEqualTo("ash/light");
+        view.emit(new UiEvent.Action(EditorSettingsPanel.SCHEME + ":reset"));
+        assertThat(host.pendingSettings(ID)).doesNotContainKey("color_scheme");
+        assertThat(node(view, EditorSettingsPanel.SCHEME, Nodes.Choice.class).selectedId()).as("Reset").isEqualTo("workspace");
+        assertThat(host.failures()).isEmpty();
+    }
+
+    @Test void aSavedSchemeThatIsNotInstalledIsListedAsNotFound() {
+        host.setSetting(ID, "color_scheme", "gone/dark");
+        FakeKitView view = page(Map.of());
+        var dropdown = node(view, EditorSettingsPanel.SCHEME, Nodes.Choice.class);
+        assertThat(dropdown.options().stream().map(option -> option.id() + "=" + option.label()).toList())
+            .containsExactly("workspace=Follow Workspace Scheme", "gone/dark=gone/dark (not found)");
+        assertThat(dropdown.selectedId()).isEqualTo("gone/dark");
+    }
+
+    private static dev.jasper.sdk.ui.EditorScheme scheme(String id, String name, dev.jasper.sdk.Variant variant) {
+        var color = java.awt.Color.DARK_GRAY;
+        var styles = new java.util.EnumMap<dev.jasper.sdk.ui.SyntaxRole, dev.jasper.sdk.ui.SyntaxStyle>(dev.jasper.sdk.ui.SyntaxRole.class);
+        for (var role : dev.jasper.sdk.ui.SyntaxRole.values()) styles.put(role, new dev.jasper.sdk.ui.SyntaxStyle(color, false, false));
+        return new dev.jasper.sdk.ui.EditorScheme(id, name, variant, new dev.jasper.sdk.ui.EditorPalette(color, color, color, color, color, color, color),
+            new dev.jasper.sdk.ui.SyntaxPalette(styles));
+    }
+
     @Test void theNoticeSaysWhatJaspersEnvironmentHolds() {
         assertThat(EditorSettingsPanel.environmentText(Map.of("EDITOR", "nvim"))).isEqualTo("Jasper's environment has EDITOR=nvim");
         assertThat(EditorSettingsPanel.environmentText(Map.of("VISUAL", "code --wait"))).isEqualTo("Jasper's environment has VISUAL=code --wait");
@@ -167,6 +207,69 @@ class EditorSettingsPanelTest {
         detect();
         assertThat(defaults.detected()).hasSize(1);
         assertThat(host.failures()).as("the closed page was not rendered").isEmpty();
+    }
+
+    @Test void terminalChangesShowFollowedValuesWithoutOverwritingIndependentDrafts() {
+        FakeKitView view = page(Map.of());
+        view.emit(new UiEvent.Edited("settings:font_size", "13.5"));
+        view.emit(new UiEvent.Toggled("settings:follow_terminal_font", true));
+        var pending = host.pendingSettings(ID);
+        host.setTerminalTypography(new dev.jasper.sdk.ui.TerminalTypography("DialogInput", 19.5, List.of("Dialog"), true, 1.6));
+        host.flush();
+        assertThat(node(view, "editor.followed.font_size", Nodes.Field.class).value()).isEqualTo("19.5");
+        assertThat(node(view, "editor.followed.font_family", Nodes.Field.class).value()).isEqualTo("DialogInput");
+        assertThat(node(view, "editor.followed.font_fallback", Nodes.Field.class).value()).isEqualTo("Dialog");
+        assertThat(node(view, "editor.followed.font_ligatures", Nodes.Toggle.class).checked()).isTrue();
+        assertThat(node(view, "editor.followed.font_line_height", Nodes.Field.class).value()).isEqualTo("1.6");
+        assertThat(node(view, "editor.followed.font_size", Nodes.Field.class).state().enabled()).isFalse();
+        assertThat(host.pendingSettings(ID)).isEqualTo(pending);
+        assertThat(host.savedSettings(ID)).isEmpty();
+        view.emit(new UiEvent.Toggled("settings:follow_terminal_font", false));
+        assertThat(node(view, "settings:font_size", Nodes.Field.class).value()).isEqualTo("13.5");
+        host.applySettingsPanel(ID);
+        assertThat(host.savedSettings(ID)).containsEntry("font_size", 13.5);
+        assertThat(host.savedSettings(ID)).doesNotContainKey("font_family");
+    }
+
+    @Test void cancelDropsStagedFollowAndFontChangesAndClosedPageStopsFollowing() {
+        FakeKitView view = page(Map.of());
+        view.emit(new UiEvent.Edited("settings:font_size", "17.5"));
+        view.emit(new UiEvent.Toggled("settings:follow_terminal_font", true));
+        host.closeSettingsPanel(ID);
+        host.setTerminalTypography(new dev.jasper.sdk.ui.TerminalTypography("DialogInput", 19, List.of(), true, 1.6));
+        host.flush();
+        host.settingsPanel(ID).orElseThrow();
+        view = host.settingsPanelView(ID).orElseThrow();
+        assertThat(node(view, "settings:follow_terminal_font", Nodes.Toggle.class).checked()).isFalse();
+        assertThat(node(view, "settings:font_size", Nodes.Field.class).value()).isEqualTo("13.0");
+        assertThat(host.savedSettings(ID)).isEmpty();
+        assertThat(host.failures()).isEmpty();
+    }
+
+    @Test void independentFontResetReturnsToKitDefaults() {
+        host.setKitDefault(ID, "font_size", 14.5);
+        host.setSetting(ID, "font_size", 17.5);
+        FakeKitView view = page(Map.of());
+        view.emit(new UiEvent.Action("settings:font_size:reset"));
+        assertThat(node(view, "settings:font_size", Nodes.Field.class).value()).isEqualTo("14.5");
+        view.emit(new UiEvent.Toggled("settings:follow_terminal_font", true));
+        view.emit(new UiEvent.Toggled("settings:follow_terminal_font", false));
+        assertThat(node(view, "settings:font_size", Nodes.Field.class).value()).isEqualTo("14.5");
+        host.applySettingsPanel(ID);
+        assertThat(host.savedSettings(ID)).doesNotContainKey("font_size");
+    }
+
+    @Test void followResetReturnsToKitDefaultAndRebuildsDependentRows() {
+        host.setKitDefault(ID, "follow_terminal_font", true);
+        FakeKitView view = page(Map.of());
+        assertThat(node(view, "editor.followed.font_size", Nodes.Field.class)).isNotNull();
+        view.emit(new UiEvent.Toggled("settings:follow_terminal_font", false));
+        view.emit(new UiEvent.Edited("settings:font_size", "15.5"));
+        view.emit(new UiEvent.Action("settings:follow_terminal_font:reset"));
+        assertThat(node(view, "settings:follow_terminal_font", Nodes.Toggle.class).checked()).isTrue();
+        assertThat(node(view, "editor.followed.font_size", Nodes.Field.class)).isNotNull();
+        view.emit(new UiEvent.Toggled("settings:follow_terminal_font", false));
+        assertThat(node(view, "settings:font_size", Nodes.Field.class).value()).isEqualTo("15.5");
     }
 
     private static List<String> rows(FakeKitView view, String section) {

@@ -41,7 +41,7 @@ class VaultRenderEvidenceTest {
                     vault.createVault("synthetic-companion-password");
                     vault.seedReferenceItems(root.resolve("keys-"+theme),form->natural(theme,"import-ready",form));
                     var manager=vault.surface("Credential Vault");
-                    onEdt(()->menu(manager.titleActions(),"add","Secure Note"));
+                    onEdt(()->menu(manager.holder(),"add","Secure Note"));
                     var note=vault.awaitSurface("Add Secure Note");natural(theme,"note",note);onEdt(note::requestClose);
                     onEdt(()->click(manager,"delete"));var delete=vault.awaitSurface("Delete entry");natural(theme,"delete",delete);onEdt(delete::requestClose);
                     vault.invoke("dev.jasper.vault.change_password");
@@ -55,7 +55,7 @@ class VaultRenderEvidenceTest {
                     Object managed=credentials.stream().filter(c->reflect(c.getClass(),c,"name",new Class<?>[0]).equals("work_rsa")).findFirst().orElseThrow();
                     var managedId=(java.util.UUID)reflect(managed.getClass(),managed,"id",new Class<?>[0]);
                     onEdt(()->{
-                        try {var field=vault.plugin.getClass().getDeclaredField("managerWindow");field.setAccessible(true);Object window=field.get(vault.plugin);reflect(window.getClass(),window,"show",new Class<?>[]{dev.jasper.sdk.terminal.WindowHandle.class,java.util.Optional.class},owner,java.util.Optional.of(managedId));}
+                        try {var field=vault.plugin.getClass().getDeclaredField("managerDialog");field.setAccessible(true);Object window=field.get(vault.plugin);reflect(window.getClass(),window,"show",new Class<?>[]{dev.jasper.sdk.terminal.WindowHandle.class,java.util.Optional.class},owner,java.util.Optional.of(managedId));}
                         catch(ReflectiveOperationException e){throw new AssertionError(e);}
                         click(manager,"edit");
                     });

@@ -1,5 +1,6 @@
 package dev.jasper.editor.ui;
 
+import dev.jasper.editor.api.ContextRequest;
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.editor.api.OpenRequest;
 import dev.jasper.editor.api.LocationResolver;
@@ -48,16 +49,33 @@ import org.fife.ui.rsyntaxtextarea.RSyntaxTextAreaEditorKit;
 
 /** Document sessions and commands for app-owned tabs, including closing and quitting. UI thread only. */
 public final class EditorWindow {
-    private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment");
+    /** The restorer kind of a document tab, and the key its restore state names the document by (workspace tabs spec 13). */
+    public static final String RESTORE_KIND = "document", RESTORE_KEY = "key";
+    // Revert to Saved too: the tab strip's menu, its other place, hides with one tab (workspace plan 8b Rulings 20). Split
+    // File Right and Down too (pane flexibility spec 6).
+    private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment", "revert", "split-file-right",
+        "split-file-down");
 
     private final EditorEnvironment environment;
+    private final dev.jasper.editor.markdown.resources.ImageLoader imageLoader;
+    private final boolean ownsImageLoader;
     private final PluginContext context;
     private final Runnable onClosed;
     private final java.util.function.Consumer<EditorDocument> opened;
     private final Predicate<OpenRequest> openers;
     private final Locations locations;
+    private final ContextItems contextItems;
     private final EditorModel model = new EditorModel();
     private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
+    /** Every view, the most recently active first (pane flexibility spec 6): a file's first here is the one an open selects. */
+    private final List<EditorTab> recent = new ArrayList<>();
+    /** Each file's question owner: the tab of its most recently active view, over which its prompts show. */
+    private final java.util.Map<DocumentSession, java.util.concurrent.atomic.AtomicReference<WindowOwner>> questionOwners = new java.util.HashMap<>();
+    /** What {@link #closed} handed out for a file, completed when its last view closes. */
+    private final java.util.Map<DocumentSession, List<CompletableFuture<Void>>> lastViewClosed = new java.util.HashMap<>();
+    /** Each view's listener on its file's session, which goes with the view: the session outlives it while others show it. */
+    private final java.util.Map<EditorTab, Runnable> sessionListeners = new java.util.HashMap<>();
+    private final java.util.Map<EditorTab, Boolean> markdownCommandsReady = new java.util.HashMap<>();
     private EditorTab selectedTab;
     private WindowOwner origin;
     private WindowOwner promptOwner;
@@ -66,6 +84,7 @@ public final class EditorWindow {
     private final Function<Question, String> ask;
     private final BiFunction<String, CompletableFuture<Boolean>, Boolean> await;
     private final FindBar findBar;
+    private final MarkdownNavigation navigation;
     private final StatusLine status;
     private final List<Command> commands;
     private final LocalWatcher watcher;
@@ -75,15 +94,17 @@ public final class EditorWindow {
     private boolean showingEmpty = true;
     private boolean guarding;
     private final Vim vim;
-    /** Each tab's Vim buffer number (Vim spec 6.2), kept while it is open. */
+    /** Each file's Vim buffer number (Vim spec 6.2), kept while it is open, however many views show it. */
     private final java.util.Map<DocumentSession, Integer> numbers = new java.util.HashMap<>();
     private int nextNumber = 1;
-    /** The tab selected before the current one: Vim's alternate buffer. */
-    private EditorTab previous;
+    /** The file selected before the current one, another than it: Vim's alternate buffer. */
+    private DocumentSession previous;
     /** Untitled tabs {@code :e} opened for files that do not exist yet: their first save creates the file. */
     private final java.util.Map<DocumentSession, Path> newFiles = new java.util.HashMap<>();
     /** Tabs {@code :q!} closes: their changes go without asking. */
     private final Set<EditorTab> discarding = new java.util.HashSet<>();
+    /** The sessions whose document key is too long to restore, each warned of once (workspace plan 6b's review). */
+    private final Set<DocumentSession> unrestorable = new java.util.HashSet<>();
     /** Vim mode as toggled in this session, until the settings file says the same; null to follow the settings. */
     private Boolean vimToggled;
     /** Whether the vimrc has been read into {@link #vim}: the first time Vim turns on, and again on Reload vimrc. */
@@ -132,7 +153,32 @@ public final class EditorWindow {
      */
     public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
                         Predicate<OpenRequest> openers, Locations locations) {
+        this(environment, onClosed, opened, openers, locations,
+            new dev.jasper.editor.markdown.resources.ImageLoader(new dev.jasper.editor.markdown.resources.ImageBudget(64L * 1024 * 1024)), true);
+    }
+
+    /** Uses the plugin-wide image loader across every hosted window and tab. */
+    public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                        Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader) {
+        this(environment, onClosed, opened, openers, locations, imageLoader, new ContextItems(failure -> { }));
+    }
+    /** As above, with the items other plugins add to each tab's right-click menu. */
+    public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                        Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader,
+                        ContextItems contextItems) {
+        this(environment, onClosed, opened, openers, locations, imageLoader, false, contextItems);
+    }
+    private EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                         Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader, boolean ownsImageLoader) {
+        this(environment, onClosed, opened, openers, locations, imageLoader, ownsImageLoader, new ContextItems(failure -> { }));
+    }
+    private EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                         Predicate<OpenRequest> openers, Locations locations, dev.jasper.editor.markdown.resources.ImageLoader imageLoader, boolean ownsImageLoader,
+                         ContextItems contextItems) {
+        this.imageLoader = java.util.Objects.requireNonNull(imageLoader);
+        this.ownsImageLoader = ownsImageLoader;
         this.locations = java.util.Objects.requireNonNull(locations);
+        this.contextItems = java.util.Objects.requireNonNull(contextItems);
         this.environment = environment;
         this.context = environment.context();
         this.onClosed = onClosed;
@@ -142,7 +188,8 @@ public final class EditorWindow {
         serverIcon = "server";
         ask = question -> environment.askers().apply(owner()).apply(question);
         await = (message, saves) -> environment.waits().apply(owner()).apply(message, saves);
-        findBar = new FindBar(() -> selected().map(EditorTab::area), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }));
+        navigation = new MarkdownNavigation(this, context.platform()::browse);
+        findBar = new FindBar(() -> selected().flatMap(EditorTab::findTarget), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }), () -> selected().ifPresent(EditorTab::revealSource));
         status = new StatusLine(this::chooseLanguage, this::toggleWrap, this::toggleVim);
         commands = List.of(
             command("save", "Save", KeyEvent.VK_S, 0, this::save),
@@ -150,14 +197,19 @@ public final class EditorWindow {
             command("save-all", "Save All", KeyEvent.VK_S, InputEvent.ALT_DOWN_MASK, () -> saveAll()),
             new Command("open", "Open…", Optional.empty(), false, this::openChooser),
             command("new", "New File", KeyEvent.VK_N, 0, this::newUntitled),
-            new Command("close-tab", "Close Tab", Optional.of(KeyNames.stroke(KeyEvent.VK_W, 0)), false, this::closeCurrent),
+            new Command("close-pane", "Close Pane", Optional.empty(), false, this::closeCurrent),
             command("find", "Find…", KeyEvent.VK_F, 0, () -> findBar.open(false)),
-            command("replace", "Replace…", KeyEvent.VK_F, InputEvent.ALT_DOWN_MASK, () -> findBar.open(true)),
-            command("find-next", "Find Next", KeyEvent.VK_G, 0, findBar::next),
-            command("find-previous", "Find Previous", KeyEvent.VK_G, InputEvent.SHIFT_DOWN_MASK, findBar::previous),
+            command("replace", "Replace…", KeyEvent.VK_F, InputEvent.ALT_DOWN_MASK, () -> { selected().ifPresent(EditorTab::revealSource); findBar.open(true); }),
+            new Command("find-next", "Find Next", Optional.of(KeyNames.findAgain(false)), true, findBar::next),
+            new Command("find-previous", "Find Previous", Optional.of(KeyNames.findAgain(true)), true, findBar::previous),
             command("go-to-line", "Go to Line…", KeyEvent.VK_L, 0, this::goToLine),
             command("toggle-comment", "Toggle Comment", KeyEvent.VK_SLASH, 0, this::toggleComment),
+            new Command("markdown.source", "Markdown: Source", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.SOURCE)),
+            new Command("markdown.split", "Markdown: Source and Preview", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.SPLIT)),
+            new Command("markdown.preview", "Markdown: Preview", Optional.empty(), false, () -> markdownMode(dev.jasper.editor.markdown.MarkdownMode.PREVIEW)),
             new Command("revert", "Revert to Saved", Optional.empty(), false, this::revert),
+            new Command("split-file-right", "Split File Right", Optional.empty(), false, () -> splitFile(dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT)),
+            new Command("split-file-down", "Split File Down", Optional.empty(), false, () -> splitFile(dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN)),
             new Command("language", "Language…", Optional.empty(), false, this::chooseLanguage),
             new Command("wrap", "Toggle Soft Wrap", Optional.empty(), false, this::toggleWrap),
             new Command("toggle-vim", "Toggle Vim Mode", Optional.empty(), false, this::toggleVim),
@@ -165,33 +217,147 @@ public final class EditorWindow {
         vim = new Vim(new VimHost(SystemClipboard::read, SystemClipboard::write, documents(), actions()));
         watcher = new LocalWatcher(context.background(), environment.ui(), model::sessions);
         ticker = new Timer(2000, event -> watcher.tick());
-        noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> tab.session().clearNotice()));
+        noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> {tab.navigationNotice("");tab.session().clearNotice();}));
         noticeTimer.setRepeats(false);
-        closeRegistration = context.windows().onTabsClosing((handles, batch) -> {
-            var closing = hosted.entrySet().stream().filter(e -> handles.contains(e.getValue())).map(java.util.Map.Entry::getKey).toList();
-            if (closing.isEmpty()) return CompletableFuture.completedFuture(true);
-            if (!batch && closing.size() == 1) return approveTab(closing.getFirst());
-            promptOwner = handles.getFirst();
-            try { return CompletableFuture.completedFuture(mayClose(closing)); }
-            finally { promptOwner = null; }
-        });
+        closeRegistration = context.windows().onTabsClosing(this::tabsClosing);
         if (environment.timers()) ticker.start();
     }
 
-    /** @param document opened in a new tab, or its open tab selected; the window comes to the front */
+    /**
+     * The closing guard Jasper asks before content tabs close: a close the user asked for ({@code batch} false), of one
+     * content tab or, by Close Tab, of every pane of a tab at once (the app's {@code TabRegistry.requestClose} of a
+     * list), or a window's, a quit's or a restart's batch. One content tab's own close asks about its file; several ask
+     * once about each file every view of which is among them. A view of a file another view still shows closes without
+     * a question (pane flexibility spec 6).
+     *
+     * @param handles the closing tabs, the Editor's among them
+     * @param batch false for a close the user asked for, of one content tab or of a tab's panes; true for a window, a
+     *     quit or a restart
+     * @return whether they may close
+     */
+    CompletableFuture<Boolean> tabsClosing(List<ContentTab> handles, boolean batch) {
+        var closing = hosted.entrySet().stream().filter(e -> handles.contains(e.getValue())).map(java.util.Map.Entry::getKey).toList();
+        if (closing.isEmpty()) return CompletableFuture.completedFuture(true);
+        if (!batch && closing.size() == 1) return approveTab(closing.getFirst());
+        promptOwner = handles.getFirst();
+        try { return CompletableFuture.completedFuture(mayClose(closing)); }
+        finally { promptOwner = null; }
+    }
+
+    /**
+     * Opens a document Jasper restores with its windows (workspace tabs spec 13): its tab is placed where it was saved, not
+     * selected. A document on another host waits until its tab is first active, or Load is pressed, and then reads without
+     * asking anything ({@code EditorDocument.readQuietly}); Retry then reads it as usual, which may sign in. Recent Files
+     * does not record it: coming back is not an open (workspace plan 6b's review). A document already open comes back as
+     * another view of it (pane flexibility spec 6), which reads nothing: a file's views share one read, which waits for
+     * the first of them to be active when the file is on another host.
+     *
+     * @param document the saved document
+     * @param owner the window being restored
+     */
+    public void openRestored(EditorDocument document, WindowOwner owner) {
+        Optional<DocumentSession> open = model.find(document.key());
+        var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
+        DocumentSession created = open.isPresent() ? null : new DocumentSession(document, sessionEnvironment(ref));
+        // The tab opens in the window being restored, which the user did not choose: the Editor's prompts and its own
+        // open command keep the window they used before (workspace plan 6b's final review, M4).
+        WindowOwner chosen = origin;
+        origin = owner;
+        try {
+            if (created == null) addView(open.get(), dev.jasper.sdk.ui.TabPlacement.NEW_TAB, views(open.get()).getFirst());
+            else add(created, ref);
+        }
+        finally { origin = chosen; }
+        if (created == null) return;
+        if (document.host().isPresent()) created.defer(); else created.load();
+    }
+
+    /** @param document opened in a new tab, or its open tab selected, of several the one focused last; the window comes to the front */
     public void open(EditorDocument document) { open(document, null); }
 
-    /** Opens a file in the originating workspace; null chooses the last main workspace. */
+    /**
+     * Opens a file in the window the request came from; null chooses the main window. A file already open has its view
+     * selected, of several the one focused last (pane flexibility spec 6).
+     */
     public void open(EditorDocument document, WindowOwner owner) {
         origin = owner;
         Optional<DocumentSession> existing = model.find(document.key());
-        DocumentSession session = existing.orElseGet(() -> {
-            var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
-            var created = new DocumentSession(document, sessionEnvironment(ref));
-            add(created, ref); reportWhenLoaded(created); created.load(); return created;
-        });
-        if (existing.isPresent() && session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
+        if (existing.isPresent()) {
+            selectOpen(existing.get());
+            return;
+        }
+        openSession(document, dev.jasper.sdk.ui.TabPlacement.NEW_TAB);
+    }
+
+    /**
+     * Open File Right and Open File Down, and the File menu's Open in Editor Pane… (pane flexibility spec 3; workspace plan
+     * 9a Rulings 2): the Editor's chooser for one file, local or in a file source, starting in the folder of the Editor
+     * file active in {@code owner}'s window, else where the host locates its focused pane; then
+     * {@link #openDocumentBeside} with the file chosen. Cancelling the chooser opens nothing.
+     *
+     * @param owner the window the command ran in
+     * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     * @throws IllegalArgumentException for another placement, before the chooser shows
+     */
+    public void openBeside(WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
+        requireBeside(placement);
+        java.util.UUID shown = owner instanceof WindowHandle window ? window.id() : null;
+        Optional<FileLocation> near = hosted.entrySet().stream()
+            .filter(entry -> entry.getValue().isActive() && entry.getValue().window().id().equals(shown))
+            .findFirst().flatMap(entry -> folderOf(entry.getKey().session()));
+        var choice = new FileChoice(owner, "Open in Editor Pane", FileChoice.Mode.OPEN, false, near, Optional.empty(), locations.sources());
+        context.windows().choose(choice).stream().findFirst()
+            .ifPresent(chosen -> withDocument(chosen, owner, document -> openDocumentBeside(document, owner, placement)));
+    }
+
+    /**
+     * Opens {@code document} in a new pane at {@code placement} beside the focused pane of {@code owner}'s window, which
+     * the new pane then has, as Split Right with Editor opens an untitled one (pane flexibility spec 3). A document that is
+     * open already shows there in another view of it (pane flexibility spec 6), reported again as {@link #open} reports it.
+     *
+     * @param document the document
+     * @param owner the window
+     * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     * @throws IllegalArgumentException for another placement
+     */
+    public void openDocumentBeside(EditorDocument document, WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
+        requireBeside(placement);
+        origin = owner;
+        Optional<DocumentSession> existing = model.find(document.key());
+        if (existing.isPresent()) {
+            // Pane flexibility spec 6: another view of the file, beside the focused pane.
+            openView(existing.get(), owner, placement);
+            return;
+        }
+        openSession(document, placement);
+    }
+
+    /** A file opens in a pane to the right or below: {@code placement} is {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}. */
+    private static void requireBeside(dev.jasper.sdk.ui.TabPlacement placement) {
+        if (placement != dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT && placement != dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN)
+            throw new IllegalArgumentException("A file opens in a pane to the right or below, not " + placement);
+    }
+
+    /**
+     * Shows {@code session}, a document that is open already, as Open in Editor… does: its pane is selected, and a document
+     * that has loaded is reported opened again, so Recent Files records it.
+     */
+    private void selectOpen(DocumentSession session) {
+        if (session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
         select(session);
+    }
+
+    /** A new session of {@code document}, its pane where {@code placement} puts it, reported once its first read succeeds, loaded and selected. */
+    private void openSession(EditorDocument document, dev.jasper.sdk.ui.TabPlacement placement) {
+        var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
+        var created = new DocumentSession(document, sessionEnvironment(ref));
+        add(created, ref, placement); reportWhenLoaded(created); created.load();
+        select(created);
+    }
+
+    EditorTab openLinked(EditorTab originTab, EditorDocument document) {
+        open(document, hosted.get(originTab));
+        return views(model.find(document.key()).orElseThrow()).getFirst();
     }
 
     /** Reports a new tab's document the first time it becomes ready: a failed read reports nothing, a successful retry does. */
@@ -206,7 +372,13 @@ public final class EditorWindow {
             question -> owner.get() instanceof ContentTab tab && tab.isClosed() ? question.dismissed() : environment.askers().apply(owner.get()).apply(question), () -> environment.settings().get().maxFileBytes());
     }
     private WindowOwner owner() { return promptOwner != null ? promptOwner : selectedTab == null ? origin : hosted.get(selectedTab); }
-    private WindowOwner owner(DocumentSession session) { return hosted.entrySet().stream().filter(e -> e.getKey().session() == session).map(e -> (WindowOwner)e.getValue()).findFirst().orElseGet(this::owner); }
+    private WindowOwner owner(DocumentSession session) { return views(session).stream().findFirst().map(hosted::get).map(WindowOwner.class::cast).orElseGet(this::owner); }
+    /**
+     * The owner another plugin's code is handed: the window, never the Editor's tab, whose handle carries the Editor's
+     * authority over the tab, its {@code terminal.open} for Terminal Right and Down included (workspace plan 8b's final
+     * review). Jasper's own picker and prompts keep the tab.
+     */
+    private static WindowOwner forOthers(WindowOwner owner) { return owner instanceof ContentTab tab ? tab.window() : owner; }
     public void openLocal(Path file) { openLocal(file, null); }
     public void openLocal(Path file, WindowOwner owner) { open(new LocalDocument(file, context.background()), owner); }
 
@@ -260,7 +432,7 @@ public final class EditorWindow {
     /**
      * Opens a local file for the default editor ({@code FileEditor.edit}): an existing file with the caret on
      * {@code line}, a missing one whose folder exists as a tab its first save creates. The tab opens in {@code window}
-     * when that is a terminal window, else in the last main window.
+     * when that is a Jasper window, else in the main window.
      *
      * @return false for a folder or a file whose folder does not exist, which the desktop then opens or reports
      */
@@ -277,19 +449,20 @@ public final class EditorWindow {
         return true;
     }
 
-    /** Completes once the session's tab has closed: when the user closes it, its window closes or the Editor stops. */
+    /**
+     * Completes once the session's last view has closed: when the user closes it, its window closes or the Editor stops
+     * (pane flexibility spec 6).
+     */
     public CompletableFuture<Void> closed(DocumentSession session) {
         var done = new CompletableFuture<Void>();
-        var handle = hosted.entrySet().stream().filter(entry -> entry.getKey().session() == session)
-            .map(Map.Entry::getValue).findFirst();
-        if (handle.isEmpty() || handle.get().isClosed()) done.complete(null);
-        else handle.get().onClosed(() -> done.complete(null));
+        if (views(session).isEmpty()) done.complete(null);
+        else lastViewClosed.computeIfAbsent(session, waiting -> new ArrayList<>()).add(done);
         return done;
     }
 
     private void moveCaret(DocumentSession session, int line, int column) {
         if (line <= 0) return;
-        hosted.keySet().stream().filter(tab -> tab.session() == session).findFirst().ifPresent(tab -> {
+        views(session).stream().findFirst().ifPresent(tab -> {
             var area = tab.area();
             int index = Math.min(line, area.getLineCount()) - 1;
             try {
@@ -307,11 +480,13 @@ public final class EditorWindow {
     public void openLocalFiles(List<Path> files) { openLocalFiles(files, owner()); }
     public void openLocalFiles(List<Path> files, WindowOwner owner) { for (Path file : files) openLocal(file, owner); }
     public void newUntitled() { newUntitled(owner()); }
-    public void newUntitled(WindowOwner owner) {
+    public void newUntitled(WindowOwner owner) { newUntitled(owner, dev.jasper.sdk.ui.TabPlacement.NEW_TAB); }
+    /** A new untitled document whose tab opens where {@code placement} puts it: New Editor Window's is a new child window. */
+    public void newUntitled(WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
         origin = owner;
         var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
         var session = DocumentSession.untitled(model.nextUntitledName(), sessionEnvironment(ref));
-        add(session, ref); select(session);
+        add(session, ref, placement); select(session);
     }
     public void show() { if (selectedTab == null) newUntitled(); else hosted.get(selectedTab).select(); }
     public void dispose() {
@@ -327,10 +502,18 @@ public final class EditorWindow {
         if (vimToggled != null && vimToggled == settings.vim()) vimToggled = null;
         for (EditorTab tab : editorTabs()) {
             tab.settings(settings);
+            tab.typography(environment.typography());
             tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         }
         readVimrcOnce();
         refreshStatus();
+    }
+
+    /** Reapplies effective typography to every tab after saved terminal typography changes. */
+    public void typography() {
+        if (disposed) return;
+        var font = environment.typography();
+        for (EditorTab tab : editorTabs()) tab.typography(font);
     }
 
     /** @return whether Vim mode is on: as toggled here, or as the settings say */
@@ -368,6 +551,14 @@ public final class EditorWindow {
         vimrcRead = false;
         readVimrcOnce();
     }
+
+    /**
+     * Reload vimrc as an action run in {@code window} does it, from the palette or a key: as {@link #reloadVimrc()}, its
+     * lines running in the file {@link #revert(WindowHandle)} would revert; nothing while the window shows no file.
+     *
+     * @param window the window the action ran in
+     */
+    public void reloadVimrc(WindowHandle window) { fileIn(window).ifPresent(tab -> { activate(tab); reloadVimrc(); }); }
 
     /** @return the vimrc: {@code vimrc} in the Editor's data folder, {@code <home>/plugins/dev.jasper.editor/data} */
     public Path vimrcFile() { return context.dataDirectory().resolve("vimrc"); }
@@ -463,22 +654,29 @@ public final class EditorWindow {
 
     /** Opens what the chooser returned: local files directly, a source's files through its resolver. */
     public void openLocations(List<FileLocation> chosen, WindowOwner owner) {
-        for (FileLocation location : chosen) {
-            switch (location) {
-                case FileLocation.Local local -> openLocal(local.path(), owner);
-                case FileLocation.Sourced sourced -> locations.resolver(sourced.sourceId()).ifPresent(resolver -> {
-                    try {
-                        open(resolver.document(sourced, owner), owner);
-                    } catch (RuntimeException failure) {
-                        context.notifications().group().error("Could not open a file", sourced.path() + ": "
-                            + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);
-                    }
-                });
-            }
+        for (FileLocation location : chosen) withDocument(location, owner, document -> open(document, owner));
+    }
+
+    /**
+     * Runs {@code use} with the document at {@code location}: a local file's, or a file source's through its resolver,
+     * which is handed the window, never the Editor's tab; a resolver's failure, or {@code use}'s on a source's file, is
+     * reported, and a source with no resolver gives nothing.
+     */
+    private void withDocument(FileLocation location, WindowOwner owner, java.util.function.Consumer<EditorDocument> use) {
+        switch (location) {
+            case FileLocation.Local local -> use.accept(new LocalDocument(local.path(), context.background()));
+            case FileLocation.Sourced sourced -> locations.resolver(sourced.sourceId()).ifPresent(resolver -> {
+                try {
+                    use.accept(resolver.document(sourced, forOthers(owner)));
+                } catch (RuntimeException failure) {
+                    context.notifications().group().error("Could not open a file", sourced.path() + ": "
+                        + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);
+                }
+            });
         }
     }
 
-    /** @return the terminal window the Editor was last opened from, else the active one; null when there is none */
+    /** @return the Jasper window the Editor was last opened from, else the active one; null when there is none */
     private WindowHandle lastWindow() {
         if (origin instanceof WindowHandle window && window.isOpen()) return window;
         return context.terminals().activeWindow().orElse(null);
@@ -493,6 +691,8 @@ public final class EditorWindow {
         if (!hosted.containsKey(tab)) return CompletableFuture.completedFuture(true);
         if (discarding.remove(tab)) return CompletableFuture.completedFuture(true);
         DocumentSession session = tab.session();
+        // Pane flexibility spec 6: the file's other views keep its changes, so only its last view asks.
+        if (views(session).size() > 1) return CompletableFuture.completedFuture(true);
         var pending = session.pendingSave();
         if (pending.isPresent()) return pending.get().thenCompose(saved -> saved ? approveTab(tab) : CompletableFuture.completedFuture(false));
         if (!session.dirty()) return CompletableFuture.completedFuture(true);
@@ -502,8 +702,13 @@ public final class EditorWindow {
         return saveSession(session).thenCompose(saved -> saved ? approveTab(tab) : CompletableFuture.completedFuture(false));
     }
 
+    private void markdownMode(dev.jasper.editor.markdown.MarkdownMode mode) {
+        selected().ifPresent(tab -> { tab.markdownMode(mode, true); refreshStatus(); });
+    }
+
     public void goToLine() {
         selected().filter(tab -> tab.session().state() == DocumentSession.State.READY).ifPresent(tab -> {
+            tab.revealSource();
             RSyntaxTextArea area = tab.area();
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Go to Line", owner(), true));
             var panel = new GoToLinePanel(context.kit(), area.getCaretLineNumber() + 1, area.getLineCount(), line -> {
@@ -532,12 +737,30 @@ public final class EditorWindow {
 
     public void toggleComment() {
         selected().ifPresent(tab -> {
+            tab.revealSource();
             Action action = tab.area().getActionMap().get(RSyntaxTextAreaEditorKit.rstaToggleCommentAction);
             if (action != null) action.actionPerformed(new ActionEvent(tab.area(), ActionEvent.ACTION_PERFORMED, "toggle-comment"));
         });
     }
 
-    public void revert() { selected().ifPresent(tab -> tab.session().revert()); }
+    public void revert() { selected().ifPresent(tab -> { tab.revealSource(); tab.session().revert(); }); }
+
+    /**
+     * Revert to Saved as an action run in {@code window} does it, from the palette or a key, so that its question shows
+     * there (workspace plan 8b Task 6 review): the window's focused file, else the Editor's selected file while that
+     * window shows it; nothing otherwise.
+     *
+     * @param window the window the action ran in
+     */
+    public void revert(WindowHandle window) { fileIn(window).ifPresent(tab -> { activate(tab); revert(); }); }
+
+    /** The file an action run in {@code window} acts on: its focused file, else the selected file while it shows it. */
+    private Optional<EditorTab> fileIn(WindowHandle window) {
+        var shown = hosted.entrySet().stream()
+            .filter(entry -> !entry.getValue().isClosed() && entry.getValue().window().id().equals(window.id())).toList();
+        return shown.stream().filter(entry -> entry.getValue().isActive()).map(Map.Entry::getKey).findFirst()
+            .or(() -> shown.stream().map(Map.Entry::getKey).filter(tab -> tab == selectedTab).findFirst());
+    }
 
     public List<DocumentSession> sessions() { return model.sessions(); }
 
@@ -550,13 +773,14 @@ public final class EditorWindow {
     boolean showingEmpty() { return showingEmpty; }
 
     /**
-     * The closing guard (spec 2.3), asked when the window closes and when Jasper quits: waits for running saves,
-     * then asks about unsaved tabs, and saves them all when asked to. Re-checks after each wait, since edits made
-     * during it can leave a tab saving again or dirty again, rather than trusting a single pass to still hold.
+     * The closing guard (spec 2.3) for several tabs, asked when a window closes, when Jasper quits and by Close Tab:
+     * waits for running saves, then asks about unsaved tabs, and saves them all when asked to. Re-checks after each
+     * wait, since edits made during it can leave a tab saving again or dirty again, rather than trusting a single pass
+     * to still hold.
      * Refuses while it is already asking or waiting: a quit or close that arrives during its prompt or wait
-     * would otherwise wait on saves that cannot finish until the outer prompt returns.
+     * would otherwise wait on saves that cannot finish until the outer prompt returns. It asks about a file only when
+     * every view of it closes (pane flexibility spec 6), and then once.
      */
-    boolean mayClose() { return mayClose(editorTabs()); }
     private boolean mayClose(List<EditorTab> closing) {
         if (guarding) {
             if (selectedTab != null) hosted.get(selectedTab).select();
@@ -565,7 +789,7 @@ public final class EditorWindow {
         guarding = true;
         try {
             while (true) {
-                List<DocumentSession> running = closing.stream().map(EditorTab::session).filter(model.sessions()::contains).filter(DocumentSession::saving).toList();
+                List<DocumentSession> running = lastViews(closing).stream().filter(DocumentSession::saving).toList();
                 if (!running.isEmpty()) {
                     // Waits only on the saves already in flight; it starts none of its own, so a tab whose save
                     // finishes and is then edited again is not silently written without asking.
@@ -573,7 +797,7 @@ public final class EditorWindow {
                     if (!await.apply(saving(running.size()), allSucceeded(inFlight))) return false;
                     continue;
                 }
-                List<DocumentSession> dirty = closing.stream().map(EditorTab::session).filter(model.sessions()::contains).filter(DocumentSession::dirty).toList();
+                List<DocumentSession> dirty = lastViews(closing).stream().filter(DocumentSession::dirty).toList();
                 if (dirty.isEmpty()) return true;
                 String answer = ask.apply(new Question("Unsaved changes", unsaved(dirty), List.of("Save All", "Discard", "Cancel")));
                 if ("Discard".equals(answer)) return true;
@@ -592,10 +816,17 @@ public final class EditorWindow {
         }
     }
 
+    /** The open files every view of which is among {@code closing}, each once: only they lose their changes. */
+    private List<DocumentSession> lastViews(List<EditorTab> closing) {
+        return closing.stream().map(EditorTab::session).distinct().filter(model.sessions()::contains)
+            .filter(session -> closing.containsAll(views(session))).toList();
+    }
+
     private void shutDown() {
         ticker.stop();
         noticeTimer.stop();
         for (DocumentSession session : model.sessions()) session.cancelLoad();
+        if (ownsImageLoader) imageLoader.close();
         onClosed.run();
     }
 
@@ -609,17 +840,19 @@ public final class EditorWindow {
         return session.untitled() ? saveAsSession(session) : session.save();
     }
 
-    /** The tabs as Vim's buffers (Vim spec 6.2): numbered, and saved, closed, selected and opened the Editor's way. */
+    /**
+     * The open files as Vim's buffers (Vim spec 6.2), their views as its windows (pane flexibility spec 6): numbered, and
+     * saved, closed, selected and opened the Editor's way.
+     */
     private VimHost.Documents documents() {
         return new VimHost.Documents(this::buffers,
             number -> tabNumbered(number).map(tab -> saveSession(tab.session())).orElse(CompletableFuture.completedFuture(false)),
             (number, file) -> tabNumbered(number).map(tab -> tab.session().saveAs(new LocalDocument(file, context.background())))
                 .orElse(CompletableFuture.completedFuture(false)),
-            (number, discard) -> tabNumbered(number).ifPresent(tab -> {
-                if (discard) discarding.add(tab);
-                closeTab(tab);
-            }),
+            (number, discard) -> tabNumbered(number).ifPresent(tab -> { for (EditorTab view : views(tab.session())) close(view, discard); }),
+            (editor, discard) -> tabOf(editor).ifPresent(tab -> close(tab, discard)),
             number -> tabNumbered(number).ifPresent(tab -> select(tab.session())),
+            editor -> tabOf(editor).ifPresent(this::show),
             number -> tabNumbered(number).ifPresent(tab -> tab.session().reload()),
             (editor, file) -> {
                 WindowOwner owner = tabOf(editor).map(hosted::get).map(WindowOwner.class::cast).orElseGet(this::owner);
@@ -630,18 +863,33 @@ public final class EditorWindow {
             EditorWindow::readText);
     }
 
+    /** Closes a view for Vim; {@code discard} lets its file's changes go without asking when it is the file's last view. */
+    private void close(EditorTab tab, boolean discard) {
+        if (discard) discarding.add(tab);
+        closeTab(tab);
+    }
+
+    /**
+     * The open files as Vim's buffers, one each however many views show it, as Vim shows one buffer in many windows
+     * (pane flexibility spec 6): the current one is {@code editor}'s, and its line is the caret's in {@code editor}'s view,
+     * another's in its most recently active view.
+     */
     private List<VimHost.Buffer> buffers(dev.jasper.editor.vim.VimEditor editor) {
         var current = tabOf(editor).orElse(null);
-        return editorTabs().stream().map(tab -> {
-            DocumentSession session = tab.session();
+        DocumentSession here = current == null ? null : current.session();
+        return model.sessions().stream().filter(session -> !views(session).isEmpty()).map(session -> {
             Optional<Path> file = localFile(session).or(() -> Optional.ofNullable(newFiles.get(session)));
-            return new VimHost.Buffer(numbers.get(session), session.location(), file, tab == current, tab == previous && tab != current,
-                session.dirty(), session.untitled() && !newFiles.containsKey(session), tab.area().getCaretLineNumber() + 1);
+            EditorTab view = session == here ? current : views(session).getFirst();
+            return new VimHost.Buffer(numbers.get(session), session.location(), file, session == here, session == previous && session != here,
+                session.dirty(), session.untitled() && !newFiles.containsKey(session), view.area().getCaretLineNumber() + 1,
+                views(session).size());
         }).toList();
     }
 
+    /** @return the most recently active view of the file with buffer {@code number} */
     private Optional<EditorTab> tabNumbered(int number) {
-        return editorTabs().stream().filter(tab -> numbers.get(tab.session()) == number).findFirst();
+        return model.sessions().stream().filter(session -> numbers.get(session) == number).findFirst()
+            .flatMap(session -> views(session).stream().findFirst());
     }
 
     private Optional<EditorTab> tabOf(dev.jasper.editor.vim.VimEditor editor) {
@@ -695,7 +943,7 @@ public final class EditorWindow {
         Optional<LocationResolver> resolver = locations.resolver(location.sourceId());
         if (resolver.isEmpty()) return Optional.empty();
         try {
-            return Optional.of(resolver.get().document(location, owner));
+            return Optional.of(resolver.get().document(location, forOthers(owner)));
         } catch (RuntimeException failure) {
             context.notifications().group().error("Could not save a file", location.path() + ": "
                 + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);
@@ -740,11 +988,47 @@ public final class EditorWindow {
     }
 
     private void add(DocumentSession session, java.util.concurrent.atomic.AtomicReference<WindowOwner> ownerRef) {
+        add(session, ownerRef, dev.jasper.sdk.ui.TabPlacement.NEW_TAB);
+    }
+
+    /** A newly open file and its first view, where {@code placement} puts it; {@code ownerRef} is its question owner. */
+    private void add(DocumentSession session, java.util.concurrent.atomic.AtomicReference<WindowOwner> ownerRef,
+                     dev.jasper.sdk.ui.TabPlacement placement) {
+        session.setWrap(environment.settings().get().softWrap());
+        model.add(session);
+        numbers.put(session, nextNumber++);
+        questionOwners.put(session, ownerRef);
+        addView(session, placement, null);
+    }
+
+    /**
+     * A view of an open file where {@code placement} puts it: its first, or with {@code sharing} another, which shows the
+     * same text and undo history (pane flexibility spec 6).
+     *
+     * @param sharing an open view of the file, or null for its first
+     * @return the new view
+     */
+    private EditorTab addView(DocumentSession session, dev.jasper.sdk.ui.TabPlacement placement, EditorTab sharing) {
         EditorSettings settings = environment.settings().get();
-        session.setWrap(settings.softWrap());
-        var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
+        var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers(), sharing);
+        tab.previews(context.background(), environment.ui(), imageLoader);
+        tab.markdownPreferences(environment.markdownPreferences(), failed -> environment.ui().execute(() -> {
+            if (!disposed) context.notifications().group().error("Could not save the Markdown default view", failed);
+        }));
+        tab.modeChanged(() -> activate(tab));
+        // Vim's file marks are the file's (Rulings 12): a closing view's go to the file's view active last with Vim on.
+        tab.marksHeir(() -> views(session).stream().filter(view -> view != tab).map(EditorTab::vimEditor).flatMap(Optional::stream).findFirst());
+        tab.noticeChanged(this::refreshStatus);
+        tab.surface().previewCallbacks(id -> {
+            // Resolve IDs only against the currently installed, generation-validated controller result.
+            if (tab.markdown() == null || tab.closed()) return;
+            tab.markdown().currentResult().stream().flatMap(result -> result.links().stream())
+                .filter(link -> link.id() == id).findFirst()
+                .ifPresent(link -> navigation.follow(tab, dev.jasper.editor.markdown.resources.Destinations.parse(link.destination())));
+        }, () -> {});
         tab.appearance(context.appearance());
         tab.settings(settings);
+        tab.typography(environment.typography());
         tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         var tabCommands = commands.stream().map(command -> new Command(command.id(), command.title(), command.stroke(), command.bound(),
             () -> { activate(tab); command.run().run(); })).toList();
@@ -752,58 +1036,183 @@ public final class EditorWindow {
         tab.addToPopup(tabCommands.stream().filter(command -> POPUP.contains(command.id())).toList());
         tab.area().setTransferHandler(new FileDrop(tab.area().getTransferHandler(), this::openLocalFiles));
         tab.area().addCaretListener(event -> { if (selected().orElse(null) == tab) refreshStatus(); });
-        session.addListener(() -> {
+        Runnable refreshing = () -> {
             if (!hosted.containsKey(tab)) return;
+            refreshCommands(tab);
             refreshHeaders();
             if (selected().orElse(null) == tab) refreshStatus();
-        });
-        model.add(session);
-        numbers.put(session, nextNumber++);
-        var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab.view());
-        hosted.put(tab, handle); ownerRef.set(handle);
-        handle.setFocusTarget(tab::focusText);
-        handle.onActive(active -> { if (active) activate(tab); });
+        };
+        session.addListener(refreshing);
+        sessionListeners.put(tab, refreshing);
+        var spec = new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name());
+        var handle = context.windows().openTab(restoreState(session).map(spec::withRestore).orElse(spec), origin, tab.view(), placement);
+        hosted.put(tab, handle); recent.addFirst(tab); questionOwners.get(session).set(handle);
+        handle.setFocusTarget(tab::focusContent);
+        // A restored document on another host reads when its tab is first active (workspace tabs spec 13).
+        handle.onActive(active -> { if (active) { activate(tab); if (session.deferred()) session.load(); } });
+        // The preview follows whether its view shows, not which pane has the focus: it is active while hosted, and its
+        // controller suspends it, releasing its pixels, while its view does not show, as when another tab of its window shows.
+        tab.active(true);
         handle.onClosed(() -> remove(tab));
-        var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
-        for (var command : commands) {
-            if (command.id().equals("next-tab") || command.id().equals("previous-tab")) continue;
-            descriptions.add(new dev.jasper.sdk.ui.ContentCommand(command.id(), command.title(), command.stroke().orElse(null), true,
-                () -> { activate(tab); command.run().run(); }));
-        }
-        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("copy", "Copy", KeyNames.stroke(KeyEvent.VK_C, 0), true, tab.area()::copy));
-        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("paste", "Paste", KeyNames.stroke(KeyEvent.VK_V, 0), true, tab.area()::paste));
-        handle.setCommands(descriptions);
+        // Tabs and panes spec 2.10 and 9: the right-click menu's Split submenu and Move Pane to New Tab.
+        PaneItems.install(tab.area().getPopupMenu(), context.windows()::splitChoices, handle);
+        // Other plugins' items end the menu (Editor.contextItem); they get the selection and leave the document alone.
+        contextItems.install(tab.area().getPopupMenu(), handle, () -> new ContextRequest(handle.window(), session.key(),
+            java.util.Objects.requireNonNullElse(tab.area().getSelectedText(), "")));
         activate(tab);
         readVimrcOnce();
         refresh();
+        return tab;
+    }
+
+    /**
+     * Split File Right and Split File Down (pane flexibility spec 6): the selected file in another view, in a new pane
+     * beside its own, which it selects first, so the new pane opens there though another pane had the focus. The new view
+     * starts at its source's caret, selection and scroll position.
+     *
+     * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     */
+    public void splitFile(dev.jasper.sdk.ui.TabPlacement placement) {
+        selected().ifPresent(tab -> {
+            ContentTab handle = hosted.get(tab);
+            if (handle == null || handle.isClosed()) return;
+            handle.select();
+            origin = handle.window();
+            EditorTab view = addView(tab.session(), placement, tab);
+            // Vim's win_init: the new window starts with its source's jumplist, '' mark, change-list place and window options.
+            tab.vimEditor().ifPresent(source -> view.vimEditor().ifPresent(split -> split.splitFrom(source)));
+            // Rulings 19: the new view starts where its source is, as VS Code's Split Editor and IntelliJ's Split Vertically do.
+            view.startAt(tab);
+        });
+    }
+
+    /**
+     * Split File Right or Down as an action run in {@code window} does it, from the palette or a key: as
+     * {@link #splitFile(dev.jasper.sdk.ui.TabPlacement)}, for the file {@link #revert(WindowHandle)} would revert; nothing
+     * while the window shows no file.
+     *
+     * @param window the window the action ran in
+     * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     */
+    public void splitFile(WindowHandle window, dev.jasper.sdk.ui.TabPlacement placement) {
+        fileIn(window).ifPresent(tab -> { activate(tab); splitFile(placement); });
+    }
+
+    /**
+     * Open File Right or Down of a file that is already open (pane flexibility spec 6): another view of it, in a new pane
+     * beside the focused pane of {@code owner}'s window, as Open in Editor… of an open file reports it again. The view
+     * starts where the file's view active last is, as a split view starts where its source is.
+     *
+     * @param session the open file
+     * @param owner the window or tab it was asked in
+     * @param placement {@code SPLIT_RIGHT} or {@code SPLIT_DOWN}
+     */
+    private void openView(DocumentSession session, WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
+        origin = owner;
+        EditorTab last = views(session).getFirst();
+        // As IntelliJ opens a file again at its last caret.
+        addView(session, placement, last).startAt(last);
+        if (session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
+    }
+
+    /** A file's open views, the most recently active first (pane flexibility spec 6). */
+    private List<EditorTab> views(DocumentSession session) {
+        return recent.stream().filter(tab -> tab.session() == session).toList();
+    }
+
+    private void refreshCommands(EditorTab tab) {
+        var handle = hosted.get(tab);
+        if (handle == null || handle.isClosed()) return;
+        boolean ready = tab.showingText() && tab.markdownEligible();
+        if (Boolean.valueOf(ready).equals(markdownCommandsReady.put(tab, ready))) return;
+        handle.setCommands(contentCommands(tab));
+    }
+
+    /** Publishes document actions; the host supplies Close Pane, Close Tab and tab navigation. */
+    List<dev.jasper.sdk.ui.ContentCommand> contentCommands(EditorTab tab) {
+        boolean ready = tab.showingText() && tab.markdownEligible();
+        var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
+        for (var command : commands) {
+            if (command.id().equals("close-pane")) continue;
+            descriptions.add(new dev.jasper.sdk.ui.ContentCommand(command.id(), command.title(), command.stroke().orElse(null),
+                !command.id().startsWith("markdown.") || ready,
+                () -> runHosted(tab, command.run())));
+        }
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("copy", "Copy", KeyNames.stroke(KeyEvent.VK_C, 0), true, () -> runHosted(tab, () -> selected().ifPresent(EditorTab::copy))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("paste", "Paste", KeyNames.stroke(KeyEvent.VK_V, 0), true, () -> runHosted(tab, () -> selected().ifPresent(EditorTab::paste))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("select-all", "Select All", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(EditorTab::selectAll))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("cut", "Cut", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().cut(); }))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("delete", "Delete", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().replaceSelection(""); }))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("undo", "Undo", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().undoLastAction(); }))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("redo", "Redo", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> { value.revealSource(); value.area().redoLastAction(); }))));
+        // Jasper's Increase, Decrease and Reset Font Size run these, with the keys the window's keymap gives them.
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("font-bigger", "Increase Font Size", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> value.changeFontSize(1)))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("font-smaller", "Decrease Font Size", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(value -> value.changeFontSize(-1)))));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("font-reset", "Reset Font Size", null, true,
+            () -> runHosted(tab, () -> selected().ifPresent(EditorTab::resetFontSize))));
+        return descriptions;
+    }
+
+    private void runHosted(EditorTab captured, Runnable action) {
+        var owner = hosted.get(captured);
+        if (owner == null || owner.isClosed()) return;
+        if (!owner.isActive()) return;
+        activate(captured); action.run();
     }
 
     private void remove(EditorTab tab) {
         if (hosted.remove(tab) == null) return;
-        tab.dispose(); tab.session().cancelLoad(); model.remove(tab.session());
-        numbers.remove(tab.session());
-        newFiles.remove(tab.session());
+        markdownCommandsReady.remove(tab);
+        recent.remove(tab);
         discarding.remove(tab);
-        if (previous == tab) previous = null;
-        if (selectedTab == tab) selectedTab = hosted.keySet().stream().findFirst().orElse(null);
+        DocumentSession session = tab.session();
+        Runnable refreshing = sessionListeners.remove(tab);
+        if (refreshing != null) session.removeListener(refreshing);
+        tab.dispose();
+        if (views(session).isEmpty()) forget(session);
+        else questionOwners.get(session).set(hosted.get(views(session).getFirst()));
+        // The view active before it, not the first opened: recent stays most recent first (pane flexibility spec 6).
+        if (selectedTab == tab) selectedTab = recent.stream().findFirst().orElse(null);
         if (selectedTab != null) activate(selectedTab);
         refresh();
     }
-    private void select(DocumentSession session) {
-        for (var entry : hosted.entrySet()) if (entry.getKey().session() == session) { activate(entry.getKey()); entry.getValue().select(); return; }
+
+    /** A file's last view has closed (pane flexibility spec 6): the file is no longer open. */
+    private void forget(DocumentSession session) {
+        session.cancelLoad(); model.remove(session);
+        numbers.remove(session);
+        newFiles.remove(session);
+        unrestorable.remove(session);
+        questionOwners.remove(session);
+        if (previous == session) previous = null;
+        var waiting = lastViewClosed.remove(session);
+        if (waiting != null) waiting.forEach(done -> done.complete(null));
     }
+
+    /** Selects the file's most recently active view (pane flexibility spec 6). */
+    private void select(DocumentSession session) { views(session).stream().findFirst().ifPresent(this::show); }
+
+    /** Selects a view: it becomes the active one and its pane shows. */
+    private void show(EditorTab tab) { activate(tab); hosted.get(tab).select(); }
     private void activate(EditorTab tab) {
         if (!hosted.containsKey(tab)) return;
         if (selectedTab != tab && selectedTab != null) {
             selectedTab.find(null);
-            previous = selectedTab;
+            if (selectedTab.session() != tab.session()) previous = selectedTab.session();
         }
+        recent.remove(tab);
+        recent.addFirst(tab);
+        questionOwners.get(tab.session()).set(hosted.get(tab));
         selectedTab = tab; tab.find(findBar); refreshStatus();
     }
     private void refreshFind() { if (!disposed && selectedTab != null) selectedTab.render(); }
-    private void step(int delta) {
-        var all = editorTabs(); if (all.size() > 1) select(all.get(Math.floorMod(all.indexOf(selectedTab) + delta, all.size())).session());
-    }
     private List<EditorTab> editorTabs() { return List.copyOf(hosted.keySet()); }
     private void refresh() { showingEmpty = hosted.isEmpty(); refreshHeaders(); refreshStatus(); }
 
@@ -812,6 +1221,8 @@ public final class EditorWindow {
             DocumentSession session = entry.getKey().session();
             entry.getValue().setPresentation(new ContentPresentation(session.name(), model.detail(session),
                 session.host().isPresent() ? serverIcon : fileIcon, session.dirty(), session.location(), session.host().orElse("")));
+            // A document saved under a new name, or an untitled one saved for the first time, comes back as that file.
+            entry.getValue().setRestore(restoreState(session));
         }
     }
 
@@ -819,17 +1230,38 @@ public final class EditorWindow {
         status.display(selected(), environment.settings().get().tabSize(), vimOn());
         if (selectedTab != null && hosted.containsKey(selectedTab)) {
             var tab = selectedTab;
+            refreshCommands(tab);
             hosted.get(tab).setStatus(status.items().stream().map(item -> new dev.jasper.sdk.ui.ContentStatus(
                 item.text(), item.tooltip(), item.run() == null ? null : () -> {
                     if (!hosted.containsKey(tab)) return;
                     activate(tab); item.run().run();
                 })).toList());
         }
-        if (environment.timers() && selected().flatMap(tab -> tab.session().notice()).isPresent()) noticeTimer.restart();
+        if (environment.timers() && selected().flatMap(tab -> tab.navigationNotice().or(() -> tab.session().notice())).isPresent()) noticeTimer.restart();
     }
 
     private static Command command(String id, String title, int keyCode, int extraModifiers, Runnable run) {
         return new Command(id, title, Optional.of(KeyNames.stroke(keyCode, extraModifiers)), true, run);
+    }
+
+    /**
+     * How a document's tab comes back when Jasper restores its windows (workspace tabs spec 13): by its document's key, as
+     * Recent Files reopens it. An untitled document has none: an unsaved untitled buffer is not kept. A key too long for a
+     * restore state (a path of thousands of characters) gives none either, with one warning that names its length: opening
+     * or saving a file never fails because of its restore state (workspace plan 6b's review).
+     */
+    private Optional<dev.jasper.sdk.RestoreState> restoreState(DocumentSession session) {
+        Optional<EditorDocument> document = session.document();
+        if (document.isEmpty()) return Optional.empty();
+        String key = document.get().key();
+        try {
+            return Optional.of(dev.jasper.sdk.RestoreState.of(RESTORE_KIND, RESTORE_KEY, key));
+        } catch (IllegalArgumentException | NullPointerException refused) {
+            if (unrestorable.add(session)) context.log().log(System.Logger.Level.WARNING, "A document whose key holds "
+                + (key == null ? 0 : key.length()) + " characters does not come back at the next start: a restore state holds at most "
+                + dev.jasper.sdk.RestoreState.MAX_CHARACTERS);
+            return Optional.empty();
+        }
     }
 
     private static Optional<Path> localFile(DocumentSession session) {

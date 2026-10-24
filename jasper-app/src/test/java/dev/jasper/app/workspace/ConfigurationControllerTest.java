@@ -20,7 +20,6 @@ import dev.jasper.app.config.FontConfig;
 import dev.jasper.app.config.TerminalConfig;
 import dev.jasper.app.launch.LaunchSettings;
 import dev.jasper.app.launch.ShellLauncher;
-import dev.jasper.app.workspace.TerminalTab;
 import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -92,7 +91,7 @@ class ConfigurationControllerTest {
             assertThat(first.tabHeight()).isEqualTo(44);
             assertThat(((JButton) first.toolbar().getComponent(0)).getText()).isNull();
             assertThat(first.status().isVisible()).isFalse();
-            assertThat(first.theme().chrome()).isSameAs(JasperTheme.bundled().generated(false));
+            assertThat(first.theme().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false));
             assertThat(retained.view().fontSize()).isEqualTo(19);
             retained.findBar().open(); retained.findBar().queryField().setText("alpha");
             first.newTab(HOME); // pending and hides the retained terminal
@@ -125,18 +124,18 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(first.tabHeight()).as("the saved chrome is reapplied").isEqualTo(30);
             assertThat(first.toolbar().isVisible()).isTrue();
-            assertThat(first.status().isVisible()).isTrue(); assertThat(first.theme().chrome()).isSameAs(JasperTheme.bundled().generated(true));
+            assertThat(first.status().isVisible()).isTrue(); assertThat(first.theme().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true));
             assertThat(first.currentPane().view().fontSize()).as("a pane's own size stays").isEqualTo(28);
             var next = owner(); assertThat(next.tabHeight()).isEqualTo(30);
             assertThat(next.toolbar().isVisible()).isTrue(); assertThat(next.status().isVisible()).isTrue();
-            assertThat(next.theme().chrome()).isSameAs(JasperTheme.bundled().generated(true));
+            assertThat(next.theme().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true));
         }); launchAll();
         edt(() -> assertThat(owners.get(1).currentPane().view().fontSize()).isEqualTo(19));
         reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=20\n[ui]\nappearance='light'\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(45); assertThat(first.toolbar().isVisible()).isTrue();
             assertThat(first.currentPane().view().fontSize()).isEqualTo(20);
-            assertThat(first.theme().chrome()).as("the saved appearance applies").isSameAs(JasperTheme.bundled().generated(false));
+            assertThat(first.theme().chrome()).as("the saved appearance applies").isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false));
         });
     }
 
@@ -151,7 +150,7 @@ class ConfigurationControllerTest {
             Object key = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(stroke);
             assertThat(key).isEqualTo("new_tab");
             root.getActionMap().get(key).actionPerformed(new java.awt.event.ActionEvent(root, 0, "test"));
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.tabCount()).isEqualTo(2);
             assertThat(((JButton) owner.toolbar().getComponent(0)).getAction().getValue(Action.ACCELERATOR_KEY)).isEqualTo(stroke);
             assertThat(owner.dispatchShortcut(old, owner)).isFalse();
             var field = new JTextField();
@@ -256,16 +255,16 @@ class ConfigurationControllerTest {
             var state = new ConfigService.State(snapshot, List.of(), directory.resolve("config.toml"), true);
             controller.accept(state);
             assertThat(owners.getFirst().tabHeight()).isEqualTo(53);
-            assertThat(owners.getFirst().theme().chrome()).isSameAs(JasperTheme.bundled().generated(true));
+            assertThat(owners.getFirst().theme().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true));
             // A theme that fails to install is also a configuration warning now, not just a toast: the
             // status bar reflects it and shown() carries the diagnostic (both still keep the other
             // settings that theme accompanied, per this test's name).
             assertThat(owners.getFirst().status().getText()).contains("Config warnings");
             assertThat(controller.shown().diagnostics()).anySatisfy(diagnostic -> {
                 assertThat(diagnostic.key()).isEqualTo("ui.appearance");
-                assertThat(diagnostic.message()).contains("Could not apply Slate Cobalt Light").contains("keeping the current appearance");
+                assertThat(diagnostic.message()).contains("Could not apply Jasper Meadow Light").contains("keeping the current appearance");
             });
-            assertThat(errors).singleElement().asString().contains("Slate Cobalt Light");
+            assertThat(errors).singleElement().asString().contains("Jasper Meadow Light");
         });
     }
 
@@ -290,7 +289,7 @@ class ConfigurationControllerTest {
             var published=new ArrayList<ResolvedTheme>();
             var listening=themes.subscribe((value,changed) -> published.add(value));published.clear();
             assertThatCode(() -> controller.accept(next)).doesNotThrowAnyException();
-            assertThat(themes.current().chrome()).isSameAs(JasperTheme.bundled().generated(false));
+            assertThat(themes.current().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false));
             assertThat(published).containsExactly(themes.current());
             assertThat(controller.shown().snapshot()).isEqualTo(next.snapshot());
             assertThat(controller.shown().diagnostics()).noneMatch(diagnostic -> diagnostic.message().contains("Could not apply"));
@@ -300,9 +299,9 @@ class ConfigurationControllerTest {
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
-    void existingTerminalHandlerUsesReloadedBindingsAndPreservesSelectionAndZoomedHiddenPanes() throws Exception {
+    void existingTerminalHandlerUsesReloadedBindingsAndPreservesSelectionAndTheMaximizedGroup() throws Exception {
         start(""); edt(this::owner); launchAll();
-        var owner = owners.getFirst(); var tab = owner.currentTab(); var retained = owner.currentPane();
+        var owner = owners.getFirst(); var tab = owner.currentTerminal(); var retained = owner.currentPane();
         until(() -> {
             retained.view().dispatchEvent(new java.awt.event.MouseEvent(retained.view(), java.awt.event.MouseEvent.MOUSE_PRESSED,
                 0, 0, 2, 2, 2, false, java.awt.event.MouseEvent.BUTTON1));
@@ -313,10 +312,10 @@ class ConfigurationControllerTest {
             owner.invoke(ActionId.SPLIT_RIGHT);
         }); launchAll();
         var sibling = owner.currentPane();
-        edt(() -> { tab.toggleZoom(); owner.newTab(HOME); });
+        edt(() -> { owner.toggleMaximize(); owner.newTab(HOME); });
         reload("[terminal.font]\nsize=20\n[keybindings]\nnew_tab='Ctrl+F12'\n"); launchAll();
         edt(() -> {
-            assertThat(tab.tree().zoomed()).isTrue();
+            assertThat(owner.parentTabs().views().getFirst().model().maximized()).as("the first tab's maximize").isPresent();
             assertThat(retained.view().selectedText()).contains("alpha");
             assertThat(retained.view().fontSize()).isEqualTo(20);
             assertThat(sibling.view().fontSize()).isEqualTo(20);
@@ -324,7 +323,7 @@ class ConfigurationControllerTest {
                 java.awt.event.InputEvent.CTRL_DOWN_MASK, java.awt.event.KeyEvent.VK_F12, java.awt.event.KeyEvent.CHAR_UNDEFINED);
             terminalKey(retained.view(), key);
             assertThat(key.isConsumed()).isTrue();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(3);
+            assertThat(owner.tabCount()).as("the split is a tab of its own").isEqualTo(4);
             assertThat(retained.view().selectedText()).contains("alpha");
         });
     }
@@ -332,15 +331,15 @@ class ConfigurationControllerTest {
     @Test @DisabledOnOs(OS.WINDOWS)
     void fullLiveOptionsReachEveryRetainedAndPendingPaneWithStableSessions() throws Exception {
         start(""); edt(() -> { owner(); owner(); }); launchAll();
-        var first = owners.getFirst(); var retained = first.currentPane(); var tab = first.currentTab();
+        var first = owners.getFirst(); var retained = first.currentPane(); var tab = first.currentTerminal();
         var session = retained.session();
         edt(() -> first.invoke(ActionId.SPLIT_RIGHT)); launchAll();
         var sibling = first.currentPane();
-        edt(() -> { tab.toggleZoom(); first.newTab(HOME); });
+        edt(() -> { first.toggleMaximize(); first.newTab(HOME); });
         reload(liveSettings(18));
         launchAll();
         edt(() -> {
-            assertThat(tab.tree().zoomed()).isTrue();
+            assertThat(first.parentTabs().views().getFirst().model().maximized()).as("the first tab's maximize").isPresent();
             assertThat(retained.session()).isSameAs(session);
             for (var pane : List.of(retained, sibling, first.currentPane(), owners.get(1).currentPane())) {
                 var options = pane.view().options();
@@ -365,7 +364,7 @@ class ConfigurationControllerTest {
             assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
             first.setActive(true);
             assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(0f);
-            first.selectTab(tab); tab.toggleZoom(); tab.focus(retained);
+            first.selectTab(tab); first.toggleMaximize(); first.selectTab(tab);
             assertThat(field(sibling.view(), "inactiveDim")).isEqualTo(.65f);
         });
     }
@@ -380,12 +379,12 @@ class ConfigurationControllerTest {
             assertThat(pane.view().fontSize()).isEqualTo(27);
             assertThat(pane.view().options().fontFamily()).isEqualTo("Monospaced");
             assertThat(pane.view().options().lineHeight()).isEqualTo(1.5f);
-            assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(slateCobaltDarkPalette());
+            assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(meadowDarkPalette());
             owner.newTab(HOME);
         }); launchAll();
         edt(() -> {
             assertThat(owner.currentPane().view().fontSize()).isEqualTo(18);
-            owner.selectTab((TerminalTab) owner.tabStrip().getComponentAt(0));
+            owner.selectTab(owner.tabs().get(0));
             owner.invoke(ActionId.FONT_RESET);
             assertThat(pane.view().fontSize()).isEqualTo(18);
             pane.view().setFontSize(29);
@@ -393,7 +392,7 @@ class ConfigurationControllerTest {
         reload(liveSettings(20));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(20);
-            assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(slateCobaltDarkPalette());
+            assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(meadowDarkPalette());
         });
     }
 
@@ -444,7 +443,7 @@ class ConfigurationControllerTest {
                 java.awt.event.InputEvent.CTRL_DOWN_MASK, java.awt.event.KeyEvent.VK_F12, java.awt.event.KeyEvent.CHAR_UNDEFINED);
             terminalKey(view, event);
             assertThat(event.isConsumed()).isTrue();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.tabCount()).isEqualTo(2);
         });
     }
 
@@ -548,7 +547,7 @@ class ConfigurationControllerTest {
         };
         var broken = new java.util.concurrent.atomic.AtomicBoolean(false);
         var attempts = new ArrayList<GeneratedTheme>();
-        var dark = JasperTheme.bundled().generated(true); var light = JasperTheme.bundled().generated(false);
+        var dark = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true); var light = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false);
         var errors = new ArrayList<String>();
         service = new ConfigService(file, false, configWorker, SwingUtilities::invokeLater);
         edt(() -> {
@@ -556,7 +555,7 @@ class ConfigurationControllerTest {
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = (title, message) -> errors.add(message);
             assertThat(themes.current().chrome()).isSameAs(dark);
-            assertThat(attempts).containsExactly(dark);
+            assertThat(attempts).containsExactly(JasperTheme.bundled().generated(true), dark);
             broken.set(true);
         });
         Files.writeString(file, "ui.appearance='light'");
@@ -564,7 +563,7 @@ class ConfigurationControllerTest {
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         edt(() -> {
             assertThat(themes.current().chrome()).isSameAs(dark);
-            assertThat(attempts).containsExactly(dark, light);
+            assertThat(attempts).containsExactly(JasperTheme.bundled().generated(true), dark, light);
             assertThat(errors).hasSize(1);
             broken.set(false);
         });
@@ -575,8 +574,8 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(themes.current().chrome()).isSameAs(light);
             assertThat(owners.getFirst().theme()).isEqualTo(themes.current());
-            assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateCobalt(false, JasperTheme.bundled().matching(false)));
-            assertThat(attempts).containsExactly(dark, light, light);
+            assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(false)));
+            assertThat(attempts).containsExactly(JasperTheme.bundled().generated(true), dark, light, light);
             assertThat(errors).hasSize(1);
             owners.getFirst().selectVariant(true);
             owners.getFirst().invoke(ActionId.RELOAD_CONFIG);
@@ -587,12 +586,17 @@ class ConfigurationControllerTest {
         edt(() -> {
             // A reload re-applies the configured theme over a window's own choice.
             assertThat(themes.current().chrome()).isSameAs(light);
-            assertThat(attempts).containsExactly(dark, light, light, dev.jasper.app.appearance.ThemeTestSupport.generated(true), light);
+            assertThat(attempts).containsExactly(JasperTheme.bundled().generated(true), dark, light, light, dark, light);
         });
     }
 
-    private static Palette slateCobaltDarkPalette() {
-        return dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(JasperTheme.bundled().matching(true));
+    private static dev.jasper.app.appearance.ResolvedTheme meadowResolved(dev.jasper.ui.theme.TerminalScheme scheme) {
+        var light = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false);
+        return new dev.jasper.app.appearance.ResolvedTheme(light, light, dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(scheme));
+    }
+
+    private static Palette meadowDarkPalette() {
+        return dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(true));
     }
 
     private static String liveSettings(int size) {
@@ -669,10 +673,10 @@ class ConfigurationControllerTest {
 
     @Test void savedTerminalSchemeAppliesLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
         start("[ui]\nappearance='light'\n[terminal]\nscheme='slate-cobalt/dark'\n");
-        edt(() -> assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateCobalt(false, JasperTheme.bundled().matching(true))));
+        edt(() -> assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.bundled().matching(true))));
         reload("[ui]\nappearance='light'\n[terminal]\nscheme='match'\n");
         edt(() -> {
-            assertThat(themes.current()).isEqualTo(dev.jasper.app.appearance.ResolvedTheme.slateCobalt(false, JasperTheme.bundled().matching(false)));
+            assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(false)));
             assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.") || d.key().startsWith("terminal."));
         });
     }
@@ -687,7 +691,7 @@ class ConfigurationControllerTest {
         });
         reload("[ui]\nappearance='dark'\n[ui.theme]\ndark='nord'\n");
         edt(() -> {
-            assertThat(themes.current().chrome()).isSameAs(JasperTheme.bundled().generated(true));
+            assertThat(themes.current().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true));
             assertThat(controller.shown().diagnostics()).filteredOn(d -> d.key().equals("ui.theme.dark")).singleElement()
                 .satisfies(d -> assertThat(d.message()).startsWith("\"nord\" is not an installed theme."));
         });
@@ -695,7 +699,7 @@ class ConfigurationControllerTest {
 
     @Test void reloadReadsTheThemesFolderAgainAndReportsAFileItSkips() throws Exception {
         startWithThemes("[ui]\nappearance='dark'\n[ui.theme]\ndark='ocean'\n");
-        edt(() -> assertThat(themes.current().chrome()).isSameAs(JasperTheme.bundled().generated(true)));
+        edt(() -> assertThat(themes.current().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true)));
         var folder = Files.createDirectories(directory.resolve("themes"));
         Files.writeString(folder.resolve("ocean.json"), ThemeTestSupport.uiThemeJson("Ocean"));
         Files.writeString(folder.resolve("broken.json"), "{ \"jasper-theme\": 1 }");
@@ -798,7 +802,7 @@ class ConfigurationControllerTest {
             first.windowCommands().view("view.toolbar.hidden").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu"));
         });
         until(() -> !seen.isEmpty() && seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_TOOLBAR) == ToolbarMode.HIDDEN);
-        edt(() -> first.windowCommands().view("view.status_bar").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
+        edt(() -> first.action(dev.jasper.app.commands.ActionId.TOGGLE_STATUS_BAR).actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
         until(() -> Boolean.FALSE.equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_STATUS_BAR)));
         edt(() -> first.windowCommands().view("view.terminal_scheme.slate-cobalt.dark").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
         until(() -> "slate-cobalt/dark".equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.TERMINAL_SCHEME)));
@@ -819,12 +823,11 @@ class ConfigurationControllerTest {
         edt(() -> {
             owner.onError = (title, message) -> errors.add(title + ": " + message);
             owner.setActive(true);
-            var status = owner.windowCommands().view("view.status_bar");
-            status.putValue(javax.swing.Action.SELECTED_KEY, false); // what a clicked check box does before the action runs
-            status.actionPerformed(new java.awt.event.ActionEvent(owner, 0, "menu"));
+            var status = ZenModeTest.item(ZenModeTest.child(ZenModeTest.view(owner), "Show/Hide"), "Status Bar");
+            status.doClick();
             assertThat(errors).containsExactly("Settings not saved: config.toml has errors, so changes can't be saved until they're fixed.");
             assertThat(owner.status().isVisible()).isTrue();
-            assertThat(status.getValue(javax.swing.Action.SELECTED_KEY)).isEqualTo(true);
+            assertThat(status.isSelected()).isTrue();
         });
     }
 

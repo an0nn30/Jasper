@@ -9,7 +9,6 @@ import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiView;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Owner-package access to the SFTP explorer for plugin tests in other packages: each call is the event a user's gesture
@@ -20,8 +19,8 @@ import java.util.UUID;
 public final class SftpTestAccess {
     private SftpTestAccess() { }
 
-    /** The window's explorer once its panel was opened there. */
-    public static SftpPanel panel(SftpUi sftp, UUID window) throws Exception { return Kits.value(() -> sftp.panel(window)); }
+    /** The explorer once the SFTP panel was opened in the main window. */
+    public static SftpPanel panel(SftpUi sftp) throws Exception { return Kits.value(sftp::panel); }
 
     public static List<String> rows(SftpPanel panel) throws Exception { return Kits.value(panel::rowNames); }
     public static String directory(SftpPanel panel) throws Exception { return Kits.value(panel::directory); }
@@ -68,6 +67,9 @@ public final class SftpTestAccess {
             Kits.press(panel.view(), item.action());
         });
     }
+
+    /** The host chooser's Browse button, which browses the host it has selected (the first saved host at first). */
+    public static void browse(UiView chooser) throws Exception { Kits.edt(() -> Kits.click(chooser, HostChooser.BROWSE)); }
 
     /** The Upload button's menu item with this label, which acts on the selection. */
     public static void menu(SftpPanel panel, String label) throws Exception {

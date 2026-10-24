@@ -77,14 +77,14 @@ class WindowChromeTest {
                 .filter(JButton.class::isInstance).map(JButton.class::cast).toList();
 
             assertThat(buttons).extracting(JButton::getText)
-                .containsExactly(null, null, "Split", null, null, null, null);
+                .containsExactly(null, null, "Split", null, null, null, null, null);
             assertThat(buttons).allSatisfy(button -> {
                 assertThat(button.getIcon().getIconWidth()).isEqualTo(16);
                 assertThat(button.getIcon().getIconHeight()).isEqualTo(16);
                 assertThat(button.getAccessibleContext().getAccessibleName()).isNotBlank();
                 assertThat(button.getToolTipText()).isNotBlank();
             });
-            assertThat(buttons.get(2).getAccessibleContext().getAccessibleName()).isEqualTo("Split pane");
+            assertThat(buttons.get(2).getAccessibleContext().getAccessibleName()).isEqualTo("Split");
 
             List<Icon> icons = buttons.stream().map(AbstractButton::getIcon).toList();
 
@@ -96,7 +96,7 @@ class WindowChromeTest {
             owner.setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
             assertThat(owner.toolbar().isVisible()).isTrue();
             assertThat(buttons).extracting(JButton::getText)
-                .containsExactly(null, null, "Split", null, null, null, null);
+                .containsExactly(null, null, "Split", null, null, null, null, null);
         });
     }
 
@@ -110,10 +110,13 @@ class WindowChromeTest {
                 if (child instanceof JButton button) shape.add((String) button.getClientProperty("label"));
                 else if (child instanceof JSeparator separator) shape.add(separator.isVisible() ? "|" : "(|)");
             }
-            assertThat(shape).containsExactly("New tab", "New window", "|", "Split", "Zoom pane", "(|)", "|", "Find", "Settings", "More actions");
+            // Workspace plan 7b Rulings 16: the window's ⋮ follows Settings; the overflow button, last in the row's order,
+            // lays out before the ⋮.
+            assertThat(shape).containsExactly("New tab", "New terminal window", "|", "Split", "Maximize pane", "(|)", "|", "Find", "Settings",
+                "View Options", "More actions");
             var find = (JButton) java.util.Arrays.stream(toolbar.getComponents())
                 .filter(child -> child instanceof JButton button && "Find".equals(button.getClientProperty("label"))).findFirst().orElseThrow();
-            var settings = toolbar.getComponent(toolbar.getComponentCount() - 2);
+            var settings = toolbar.getComponent(toolbar.getComponentCount() - 3);
             assertThat(settings.getX() + settings.getWidth()).isGreaterThan(900);
             assertThat(find.getX()).isGreaterThan(700);
             assertThat(find.getHeight()).isEqualTo(24);

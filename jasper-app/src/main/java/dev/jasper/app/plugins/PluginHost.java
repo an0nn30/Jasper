@@ -32,6 +32,8 @@ import dev.jasper.app.terminals.TerminalRegistry;
  * stop in reverse. It knows nothing about jars or descriptors; see {@link HostedPlugin}.
  */
 final class PluginHost {
+    private static final System.Logger LOG = System.getLogger(PluginHost.class.getName());
+
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
@@ -96,6 +98,14 @@ final class PluginHost {
     record Outcome(PluginStatus.State state, String reason) { }
 
     java.util.function.BooleanSupplier animations = () -> true;
+    /** The installed themes, whose editor schemes every plugin's appearance lists; read on the UI thread. */
+    java.util.function.Supplier<dev.jasper.app.appearance.ThemeLibrary> themes = dev.jasper.app.appearance.ThemeLibrary::bundledOnly;
+    /** The look every plugin's appearance reports; set before plugins start. */
+    volatile dev.jasper.sdk.ui.Presentation presentation = HostedPresentation.standard();
+    /** The look's defaults, whose table for a plugin defaults its declared settings (spec 5.8); set before plugins start. */
+    volatile dev.jasper.app.config.DefaultSource defaults = dev.jasper.app.config.DefaultSource.CORE;
+    /** Hears each look default a plugin cannot use: one line naming the plugin, the key and why. */
+    Consumer<String> lookDefaultProblem = message -> LOG.log(System.Logger.Level.WARNING, message);
     /** The kit plugins' views are made with: the presentation's, or the installed look and feel's for a runtime given none. */
     java.util.function.Supplier<dev.jasper.ui.kit.Kit> kit = dev.jasper.ui.swing.FlatLafInstaller::installedKit;
     /** The keymap text a plugin's menus show beside an item's action. */
@@ -103,6 +113,7 @@ final class PluginHost {
     /** The clipboard every plugin's Platform writes to; the application shares it with its own copies. */
     dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
     final Environment environment;
+    final HostedTypography typography;
     /** Runs cancellation handlers and connection closes off the EDT; outlives every plugin's own executor. */
     final CleanupWorker cleanup = new CleanupWorker();
     private final dev.jasper.app.lifecycle.Subscription terminalBridge;
@@ -122,7 +133,10 @@ final class PluginHost {
     private final Map<String, HostedContext> contexts = new LinkedHashMap<>();
     private final Map<String, PluginStatus.State> notRunning = new HashMap<>();
 
-    PluginHost(Environment environment) {
+    PluginHost(Environment environment) { this(environment, new HostedTypography()); }
+
+    PluginHost(Environment environment, HostedTypography typography) {
+        this.typography = Objects.requireNonNull(typography, "typography");
         this.environment = Objects.requireNonNull(environment);
         this.containment = new Containment(environment.onUi(), environment.failures());
         this.commands = new PluginCommands(environment.ui(), containment);
@@ -151,7 +165,7 @@ final class PluginHost {
                 + (why == PluginStatus.State.FAILED ? "failed to start" : why == PluginStatus.State.SKIPPED ? "was skipped" : "is not running"));
         }
         var declared = new DeclaredSettings(id, environment.settingsFiles(), containment, environment.ui(), environment.configReport(),
-            () -> settingsWritten(id));
+            () -> settingsWritten(id), defaults.plugin(id), lookDefaultProblem);
         var context = new HostedContext(this, hosted, declared);
         contexts.put(id, context);
         Set<String> providers = new HashSet<>(hosted.requires());
@@ -225,6 +239,13 @@ final class PluginHost {
         }
         pending.add(cleanup.drained());
         return pending;
+    }
+
+    /** Waits for workers, then cleanup callbacks queued by late session attachments. Called on the UI thread. */
+    CompletableFuture<Void> workersTerminated() {
+        requireUi();
+        return CompletableFuture.allOf(contexts.values().stream().map(HostedContext::terminated)
+            .toArray(CompletableFuture[]::new)).thenCompose(ignored -> cleanup.drained());
     }
 
     /** Settings pages for running plugins that declared settings or gave a page of their own, in start order. UI thread. */

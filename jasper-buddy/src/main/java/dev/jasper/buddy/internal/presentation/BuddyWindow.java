@@ -29,10 +29,10 @@ import javax.swing.Timer;
 /** The floating translucent utility window; every rule lives in the Buddy* helpers it drives. */
 public final class BuddyWindow {
     private static final System.Logger LOG = System.getLogger(BuddyWindow.class.getName());
-    private static final int SCALE = 2;
+    private static final double SCALE = 2.5;
     private static final int DRAG_THRESHOLD = 3;
 
-    private final JWindow window = new JWindow();
+    private final JWindow window = new BuddySurfaceWindow();
     private final BuddySprite sprite;
     private final BuddyAnimator animator = new BuddyAnimator(new Random());
     private BuddyOptions options;

@@ -34,6 +34,16 @@ public interface SettingsPanel {
     default void highlight(String query) { }
 
     /**
+     * Called after a standard row from {@link SettingsPanelHost#row} handles the user's input: a typed edit, a
+     * switch, a choice, a list action, a file from Browse… or Reset. {@link SettingsPanelHost#pending} already returns
+     * the resulting value and the row shows its validation; an invalid edit leaves the pending value as it was.
+     * Rebuild the descriptors that depend on pending values here. The plugin's own {@link SettingsPanelHost#stage}
+     * calls do not trigger it. Runs on the UI thread while the page is shown.
+     * @since 0.18.3
+     */
+    default void pendingChanged() { }
+
+    /**
      * Whether state of the plugin's own, beyond its declared settings, has unsaved changes.
      *
      * @return true when Apply would save something of the plugin's own

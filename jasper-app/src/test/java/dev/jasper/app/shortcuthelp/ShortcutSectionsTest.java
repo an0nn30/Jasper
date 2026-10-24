@@ -72,7 +72,7 @@ class ShortcutSectionsTest {
         edt(() -> {
             var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });
             try {
-                var rows = List.of(new ShortcutEntry("alpha", "First", "Alpha", KeyStroke.getKeyStroke("meta A"), "Terminal window", ""),
+                var rows = List.of(new ShortcutEntry("alpha", "First", "Alpha", KeyStroke.getKeyStroke("meta A"), "Jasper window", ""),
                     new ShortcutEntry("beta", "Second", "Beta", KeyStroke.getKeyStroke("meta B"), "Other window", ""));
                 panel.setRows(rows);
                 layout(panel);
@@ -142,7 +142,7 @@ class ShortcutSectionsTest {
             var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });
             try {
                 panel.setRows(List.of(new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"),
-                    "Terminal window", "", true, "cmd+c")));
+                    "Jasper window", "", true, "cmd+c")));
                 button(panel, "expand").doClick(0);
                 panel.setSize(900, 500); layout(panel);
                 var binding = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/copy/keys", JLabel.class);
@@ -150,7 +150,7 @@ class ShortcutSectionsTest {
                     .as("the chord sits at the right").isGreaterThan(canvas(panel).getWidth() * 3 / 4);
                 click(binding, 1);
                 assertThat(panel.editor.isVisible()).as("clicking the chord at the right opens the editor").isTrue();
-                assertThat(binding.getToolTipText()).contains("Terminal window", "Click to edit");
+                assertThat(binding.getToolTipText()).contains("Jasper window", "Click to edit");
                 button(panel, "editor.cancel").doClick(0);
                 click(canvas(panel), 1);
                 assertThat(panel.editor.isVisible()).as("blank space below the final row is not a target").isFalse();
@@ -163,9 +163,9 @@ class ShortcutSectionsTest {
             var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });
             try {
                 panel.setRows(List.of(
-                    new ShortcutEntry("new_tab", "Tabs", "New tab", KeyStroke.getKeyStroke("meta Y"), "Terminal window", "", true, "cmd+t"),
-                    new ShortcutEntry("close_tab", "Tabs", "Close tab", KeyStroke.getKeyStroke("meta W"), "Terminal window", "", true, "cmd+w"),
-                    new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Terminal window", "", true, "cmd+c")));
+                    new ShortcutEntry("new_tab", "Tabs", "New tab", KeyStroke.getKeyStroke("meta Y"), "Jasper window", "", true, "cmd+t"),
+                    new ShortcutEntry("close_tab", "Tabs", "Close tab", KeyStroke.getKeyStroke("meta W"), "Jasper window", "", true, "cmd+w"),
+                    new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Jasper window", "", true, "cmd+c")));
                 button(panel, "expand").doClick(0);
                 layout(panel);
                 var palette = KitTestSupport.context().theme().semantic();
@@ -212,7 +212,7 @@ class ShortcutSectionsTest {
         edt(() -> {
             var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });
             try {
-                panel.setRows(List.of(new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Terminal window", "", true, "cmd+c")));
+                panel.setRows(List.of(new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Jasper window", "", true, "cmd+c")));
                 button(panel, "expand").doClick(0);
                 layout(panel);
                 int rows = panel.tree.rowCount();
@@ -236,7 +236,7 @@ class ShortcutSectionsTest {
         edt(() -> {
             var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });
             try {
-                panel.setRows(List.of(new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Terminal window", "", true, "cmd+c")));
+                panel.setRows(List.of(new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Jasper window", "", true, "cmd+c")));
                 layout(panel);
                 int closed = panel.tree.rowCount();
                 var section = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/group/Clipboard/title", JLabel.class);

@@ -17,14 +17,14 @@ public interface Terminals {
     Optional<WindowHandle> activeWindow();
 
     /**
-     * The focused pane of the active window's selected tab.
+     * The pane of the active window's active tab (the focused pane's, in its shown tab), when that tab is a terminal tab.
      *
-     * @return the pane, or empty
+     * @return the pane, or empty while a content tab is active or there is no active window ({@link #activeWindow()})
      */
     Optional<PaneHandle> activePane();
 
     /**
-     * Every open terminal window, in opening order.
+     * Every open Jasper window, in opening order.
      *
      * @return the windows
      */
@@ -55,7 +55,9 @@ public interface Terminals {
     Optional<WindowHandle> window(UUID id);
 
     /**
-     * Opens and selects a new tab. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
+     * Opens a terminal in a new tab of the window, at the end of its tab strip, and shows it. A local request needs
+     * {@code terminal.open} and a session request {@code session.provide}; a local request naming a profile the host does
+     * not list opens nothing.
      * A request with a command ({@link LocalSpec#command()}) runs that program instead of the shell, with the shell's
      * environment, and its pane closes when the program exits with status 0.
      *
@@ -66,23 +68,29 @@ public interface Terminals {
     Optional<PaneHandle> openTab(WindowHandle window, OpenRequest request);
 
     /**
-     * Splits a pane. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
+     * Opens a terminal in a new pane beside the target pane, in the target's tab, and selects it. A local request needs
+     * {@code terminal.open} and a session request {@code session.provide}; a local request naming a profile the host does
+     * not list opens nothing.
      * A request with a command ({@link LocalSpec#command()}) runs that program instead of the shell, with the shell's
      * environment, and its pane closes when the program exits with status 0.
      *
-     * @param target the pane to split
-     * @param direction where the new pane goes
+     * @param target the pane the new pane goes beside
+     * @param direction which side of the target pane the new pane takes
      * @param request what to run
-     * @return the new pane, or empty when the target is gone, its session has ended or the profile is unknown
+     * @return the new tab's pane, or empty when the target is gone, its session has ended or the profile is unknown
      */
     Optional<PaneHandle> split(PaneHandle target, Direction direction, OpenRequest request);
 
     /**
-     * The shells Jasper detected for local panes, in the order its settings list them: on Windows PowerShell,
-     * PowerShell 7, Command Prompt and each WSL distribution, elsewhere the login shell, and the user's custom
-     * command when one is configured. Needs {@code terminal.open}. UI thread only.
+     * The shell profiles Jasper offers for local panes, platform default first: on Windows PowerShell ({@code powershell}),
+     * PowerShell 7 ({@code pwsh}), Command Prompt ({@code cmd}), Cygwin Bash ({@code cygwin}, from Jasper's own Cygwin)
+     * and each WSL distribution ({@code wsl:<name>}); on macOS and Linux the login shell ({@code login}); then Custom
+     * ({@code custom}), always last, which runs the program and arguments the user's settings name, or the platform's
+     * default shell when they name none. PowerShell 7, Cygwin Bash and the WSL distributions appear once a shell
+     * detection has found them. Needs
+     * {@code terminal.open}. UI thread only.
      *
-     * @return the profiles; empty when the host lists none, or has not finished detecting them
+     * @return the profiles; empty when the host lists none
      * @since 0.9.1
      */
     default List<ShellProfileInfo> profiles() { return List.of(); }

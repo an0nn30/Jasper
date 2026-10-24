@@ -71,7 +71,7 @@ public final class KitViewTestAccess implements AutoCloseable {
                 var manager = vault.awaitSurface("Credential Vault");
                 if (id.equals("vault-manager")) { surface = manager; return; }
                 onEdt(() -> {
-                    var menu = ((javax.swing.JComponent)StagedVaultHost.named(manager.titleActions(), "add")).getComponentPopupMenu();
+                    var menu = ((javax.swing.JComponent)StagedVaultHost.named(manager.holder(), "add")).getComponentPopupMenu();
                     String label = id.equals("vault-login") ? "Login" : "SSH Key";
                     java.util.Arrays.stream(menu.getComponents()).filter(c -> c instanceof AbstractButton b && b.getText().equals(label))
                         .map(AbstractButton.class::cast).findFirst().orElseThrow().doClick(0);

@@ -37,6 +37,13 @@ class FormsTest {
 
     static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return s(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role)); }
 
+    /** The design minimum grows to contain the current native face's full line and prescribed padding. */
+    static int contentHeight(KitContext context, dev.jasper.ui.metrics.DesignMetrics.Role role, dev.jasper.ui.metrics.Typography.Role text) {
+        var font = ThemePainting.font(context, text);
+        int line = (int) Math.ceil(font.getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
+        return Math.max(s(context.metrics().value(role)), line + s(context.metrics().value(context.metrics().contentPadding(role))));
+    }
+
     static int s(int value) {
         return com.formdev.flatlaf.util.UIScale.scale(value);
     }
@@ -57,7 +64,7 @@ class FormsTest {
             try (var view = new KitView(context, new ViewSpec(spec), e -> {})) {
                 view.setSize(s(900), s(555)); layout(view);
                 var columns = find(view, "columns", JPanel.class);
-                assertThat(SwingUtilities.convertRectangle(columns.getParent(), columns.getBounds(), view)).isEqualTo(new Rectangle(0, 0, s(900), s(555) - (2*m(dev.jasper.ui.metrics.DesignMetrics.Role.WINDOW_FOOTER_VERTICAL)+m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT))));
+                assertThat(SwingUtilities.convertRectangle(columns.getParent(), columns.getBounds(), view)).isEqualTo(new Rectangle(0, 0, s(900), s(555) - (2*m(dev.jasper.ui.metrics.DesignMetrics.Role.WINDOW_FOOTER_VERTICAL)+contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT,dev.jasper.ui.metrics.Typography.Role.LABEL))));
                 assertThat(find(view, "left", JPanel.class).getWidth()).isEqualTo(s(192));
                 assertThat(find(view, "middle", JPanel.class).getWidth()).isEqualTo(s(272));
                 var input = find(view, "left.input", JTextField.class); var document = input.getDocument();
@@ -79,7 +86,7 @@ class FormsTest {
             try(var view=new KitView(context,new ViewSpec(spec),e->{})) {
                 view.setSize(s(900),s(555));layout(view);
                 var owner=(Forms.FormControl)view.control("form");
-                assertThat(owner.footerScroll.getHeight()).isEqualTo((2*m(dev.jasper.ui.metrics.DesignMetrics.Role.WINDOW_FOOTER_VERTICAL)+m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT)));
+                assertThat(owner.footerScroll.getHeight()).isEqualTo((2*m(dev.jasper.ui.metrics.DesignMetrics.Role.WINDOW_FOOTER_VERTICAL)+contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT,dev.jasper.ui.metrics.Typography.Role.LABEL)));
                 assertThat(find(view,"path",JLabel.class).getToolTipText()).isEqualTo(status.text());
                 assertThat(find(view,"path",JLabel.class).getAccessibleContext().getAccessibleName()).isEqualTo(status.text());
             }finally{release(context);}
@@ -107,7 +114,7 @@ class FormsTest {
                 assertThat(((InteractiveRows.RowsControl)view.control("list.rows")).gutter).isEqualTo(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_LIST_SIDE));
                 // A row is its role's height, or its lines plus the one-line row padding when that is taller.
                 int line=((InteractiveRows.RowsControl)view.control("rail.rows")).canvas.getFontMetrics(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.BODY)).getHeight();
-                assertThat(((InteractiveRows.RowsControl)view.control("rail.rows")).rowHeight).isEqualTo(Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_RAIL_ROW), line + m(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING)));
+                assertThat(((InteractiveRows.RowsControl)view.control("rail.rows")).rowHeight).isEqualTo(Math.max(contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.LABEL), Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_RAIL_ROW), line + m(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING))));
                 assertThat(((InteractiveRows.RowsControl)view.control("list.rows")).rowHeight).isEqualTo(Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_ITEM_ROW), 2 * line + m(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING)));
             }finally{release(context);}
         });
@@ -167,7 +174,7 @@ class FormsTest {
                 if(com.formdev.flatlaf.util.SystemInfo.isMacOS)assertThat(owner.title.getY()).isEqualTo(s(11));
                 var revealBounds=SwingUtilities.convertRectangle(reveal.getParent(),reveal.getBounds(),owner.component);
                 var valueBounds=SwingUtilities.convertRectangle(value.getParent(),value.getBounds(),owner.component);
-                assertThat(revealBounds.y+revealBounds.height/2).isEqualTo(owner.component.getHeight()/2);
+                assertThat(revealBounds.y).isEqualTo((owner.component.getHeight()-revealBounds.height)/2);
                 assertThat(valueBounds.y).isEqualTo(owner.title.getY()+owner.title.getHeight()+s(2));
                 assertThat(secret.getWidth()).isGreaterThan(s(300));
                 assertThat(owner.title.getFont()).isEqualTo(ThemePainting.font(context,dev.jasper.ui.metrics.Typography.Role.SETTING_DESCRIPTION));

@@ -33,9 +33,10 @@ class EnterpriseHomeTest {
         try (var service = new ConfigService(root.resolve("config.toml"), false, on.presentation().defaults())) {
             var snapshot = service.initialState().snapshot();
             assertThat(snapshot.visibleRows()).isEqualTo(8);
-            assertThat(snapshot.toolbarHeight()).isEqualTo(34);
-            assertThat(snapshot.lightTheme()).isEqualTo("enterprise");
-            assertThat(snapshot.darkTheme()).isEqualTo("enterprise");
+            // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar.
+            assertThat(snapshot.toolbarHeight()).isEqualTo(28);
+            assertThat(snapshot.lightTheme()).isEqualTo("jasper-meadow");
+            assertThat(snapshot.darkTheme()).isEqualTo("jasper-meadow");
         }
         var library = ThemeLibrary.of(on.themes());
         assertThat(library.theme("enterprise")).hasValueSatisfying(theme -> assertThat(theme.name()).isEqualTo("Enterprise"));

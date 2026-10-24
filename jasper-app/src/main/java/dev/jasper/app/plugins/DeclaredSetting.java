@@ -32,6 +32,9 @@ final class DeclaredSetting<T> implements Setting<T> {
     @SuppressWarnings("unchecked")
     T sdkValue(Object appValue) { return (T) translated.toSdk().apply(appValue); }
 
+    /** The effective default in the plugin's terms: the look's when it gave one the kind accepts, else the declared one. */
+    T defaultValue() { return sdkValue(appSetting().defaultValue()); }
+
     @Override public String key() { return translated.spec().key(); }
 
     @Override public T get() { return value(owner.values()); }

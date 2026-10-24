@@ -1,18 +1,59 @@
 package dev.jasper.editor.vim;
 
+import java.awt.AWTEvent;
+import java.awt.Component;
+import java.awt.EventQueue;
+import java.awt.Point;
+import java.awt.event.HierarchyEvent;
+import java.awt.event.HierarchyListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
+import javax.swing.JViewport;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.event.UndoableEditEvent;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
+import javax.swing.text.Position;
 import javax.swing.undo.CompoundEdit;
 import javax.swing.undo.UndoableEdit;
 import org.fife.ui.rtextarea.RTextArea;
 import org.fife.ui.rtextarea.RUndoManager;
 
 /**
- * The text area's undo manager (spec 3.3). With Vim off it groups edits as RSyntaxTextArea's own manager does
- * (neighbouring typed characters form one step). With Vim on it never guesses: each Vim change the engine brackets
- * with {@link #beginStep} and {@link #endStep} is one step, and any other edit (the Editor's Replace, a paste
- * through ⌘V) is a step of its own. RSyntaxTextArea's atomic edits inside a Vim step join that step.
+ * A document's undo history (spec 3.3), shared by every text area that shows the document (pane flexibility spec 6):
+ * an undo in any of them undoes the last edit made in any of them. With Vim off it groups edits as RSyntaxTextArea's
+ * own manager does (neighbouring typed characters form one step). With Vim on it never guesses: each Vim change the
+ * engine brackets with {@link #beginStep} and {@link #endStep} is one step, and any other edit (the Editor's Replace, a
+ * paste through ⌘V) is a step of its own. RSyntaxTextArea's atomic edits inside a Vim step join that step.
+ *
+ * <p>Each view brackets its own steps. The view that edits now is the one the user last typed in, clicked or focused,
+ * or whose Vim engine last asked ({@link #view(RTextArea)}); when another view edits, the open steps of the one before
+ * end there, as Vim's u_sync ends a change when the cursor goes to another window. An edit that code makes into another
+ * view without any of those first (a Vim mapping's timeout after the focus moved) is the current view's: its caret
+ * groups it and its Vim step takes it.
+ *
+ * <p>Every other view stays on the text it showed. An edit that adds or removes lines above a view's first shown line
+ * moves the view with its text, as Vim's mark_adjust moves another window's topline; an edit inside or below its window
+ * leaves it where it is. Two edits depart from mark_adjust: lines added just above a view's first line, including an
+ * insert at its start, keep the old line on top, where Vim shows the new line ({@code O}, {@code :put!}, {@code o} on
+ * the line above, a split at column 0), and an edit that takes away the first shown line's start shows the text after
+ * the deletion, where Vim shows the line before it. Text replaced whole (a reload) leaves each view on its line's
+ * number, as each caret keeps its line. A view that does not show is put back once it shows, and the user's scroll of a
+ * view's pane before its put-back runs stands. A Vim view's cursor, which moves with its text as Vim's w_cursor
+ * does, stays on it: when the edit leaves it outside the window, the window scrolls as little as Vim's update_topline
+ * scrolls it into sight, with 'scrolloff'; a view without Vim keeps its first line, and its caret may leave it. An undo
+ * or redo moves only its own view's caret to the change: every other view keeps its caret, its selection and its
+ * place on the text.
  */
 final class VimUndoManager extends RUndoManager {
     /** One undo step, remembering where the cursor was before it, for Vim's cursor placement after undo. */
@@ -32,29 +73,353 @@ final class VimUndoManager extends RUndoManager {
             edits++;
         }
 
+        /**
+         * @param undo whether the step is undone, or else redone
+         * @param length the document's length now
+         * @return whether undoing or redoing the step takes away the whole text at some point, as undoing a paste over
+         *     Select All does
+         */
+        boolean takesWhole(boolean undo, int length) {
+            // CompoundEdit's list of edits: this class's own field of that name counts them.
+            List<UndoableEdit> order = new ArrayList<>(super.edits);
+            if (undo) java.util.Collections.reverse(order);
+            for (UndoableEdit edit : order) {
+                if (!(edit instanceof DocumentEvent change)) continue;
+                // An attribute change (RSyntaxTextArea's token changes) adds and takes no text.
+                if (change.getType() == DocumentEvent.EventType.CHANGE) continue;
+                // An undo takes out what an insert put in, a redo what a removal took.
+                if ((change.getType() == DocumentEvent.EventType.INSERT) == undo) {
+                    if (change.getOffset() == 0 && change.getLength() == length) return true;
+                    length -= change.getLength();
+                } else {
+                    length += change.getLength();
+                }
+            }
+            return false;
+        }
+
         // The manager treats a step as finished; addEdit above still works until end() because it reads the field.
         @Override public boolean isInProgress() { return false; }
         @Override public String getUndoPresentationName() { return UIManager.getString("AbstractUndoableEdit.undoText"); }
         @Override public String getRedoPresentationName() { return UIManager.getString("AbstractUndoableEdit.redoText"); }
     }
 
-    private final RTextArea area;
-    private boolean vim;
-    private Step vimStep, internal, typing;
-    private int stepDepth, internalDepth, lastOffset;
+    /** One view's open steps, whether Vim groups its edits, and its place on the text while another view edits. */
+    private static final class View {
+        final RTextArea area;
+        boolean vim;
+        Step vimStep, internal;
+        int stepDepth, internalDepth;
+        /** Where the view showed the text before the edits its put-back answers; null when none waits. */
+        private Place held;
+        /** The event its latest put-back was queued in, and that put-back's number: only the latest one acts. */
+        AWTEvent queuedIn;
+        int queued;
+        /** Whether its put-back waits for the view to show, as it did not show when the put-back would have run. */
+        boolean waiting;
+        /** Whether the view has been displayable: from then on, while it does not show, it is hidden. */
+        private boolean realized;
+        /** While a place is held: listens for the user's scroll of the view's pane, which lets go of the place. */
+        private UserScroll scrolls;
+        private final HierarchyListener hierarchy = this::hierarchyChanged;
+
+        View(RTextArea area) {
+            this.area = area;
+            area.addHierarchyListener(hierarchy);
+        }
+
+        /** Notes when the view becomes displayable, and queues a waiting put-back once the view shows. */
+        private void hierarchyChanged(HierarchyEvent event) {
+            if ((event.getChangeFlags() & (HierarchyEvent.SHOWING_CHANGED | HierarchyEvent.DISPLAYABILITY_CHANGED
+                    | HierarchyEvent.PARENT_CHANGED)) == 0) return;
+            if (area.isDisplayable()) realized = true;
+            if (waiting && !hidden()) {
+                waiting = false;
+                queue(this, ++queued);
+            }
+        }
+
+        Place held() { return held; }
+
+        /** @param place where the view shows the text, held for its put-back; the user's scroll of its pane lets go of it */
+        void hold(Place place) {
+            held = place;
+            if (place != null && scrolls == null && place.port().getParent() instanceof JScrollPane pane) scrolls = new UserScroll(this, pane);
+        }
+
+        /** The view holds no place: a put-back queued for it does nothing. */
+        void letGo() {
+            held = null;
+            waiting = false;
+            if (scrolls != null) scrolls.remove();
+            scrolls = null;
+        }
+
+        /** The view's text area stops showing the document: nothing here listens to it any more. */
+        void close() {
+            letGo();
+            area.removeHierarchyListener(hierarchy);
+        }
+
+        /**
+         * @return whether the view does not show, though it has been displayable: in a tab that is not shown, or its
+         *     source while a Markdown preview takes its place
+         */
+        boolean hidden() {
+            if (area.isDisplayable()) realized = true;
+            return realized && !area.isShowing();
+        }
+    }
+
+    /**
+     * The user scrolls a view's pane while its put-back waits, with the wheel or a scroll bar: the view stays where the
+     * user put it, and its put-back does nothing.
+     */
+    private static final class UserScroll extends MouseAdapter {
+        private final View view;
+        private final JScrollPane pane;
+        /** The pane's scroll bars and their parts (the arrow buttons), which a press reaches. */
+        private final List<Component> bars = new ArrayList<>();
+
+        UserScroll(View view, JScrollPane pane) {
+            this.view = view;
+            this.pane = pane;
+            for (JScrollBar bar : new JScrollBar[] { pane.getVerticalScrollBar(), pane.getHorizontalScrollBar() }) {
+                if (bar == null) continue;
+                bars.add(bar);
+                bars.addAll(List.of(bar.getComponents()));
+            }
+            pane.addMouseWheelListener(this);
+            for (Component bar : bars) bar.addMouseListener(this);
+        }
+
+        void remove() {
+            pane.removeMouseWheelListener(this);
+            for (Component bar : bars) bar.removeMouseListener(this);
+        }
+
+        @Override public void mouseWheelMoved(MouseWheelEvent event) { view.letGo(); }
+        @Override public void mousePressed(MouseEvent event) { view.letGo(); }
+    }
+
+    /**
+     * Where a view shows the text: its viewport's position, the start of the first line it shows, as a position that
+     * moves with the text, and how far below that line's top the viewport begins. When the whole text is replaced
+     * (a reload), there is no text to follow, and the place keeps the line's number instead, as each caret keeps its
+     * line.
+     *
+     * @param number the line's number, which the place keeps once the whole text is replaced; -1 before
+     * @param cursor the caret's line number then, to which a Vim view's cursor goes back, as a reload puts each caret
+     *     back on its line; -1 before
+     */
+    private record Place(JViewport port, Point shown, Position line, int number, int cursor, int below) {
+        /** @return where {@code area} shows the text now, or null when it is not in a viewport */
+        static Place of(RTextArea area) {
+            if (!(area.getParent() instanceof JViewport port)) return null;
+            Point shown = port.getViewPosition();
+            try {
+                int line = area.getLineOfOffset(Math.max(0, area.viewToModel2D(new Point(0, shown.y))));
+                int top = area.yForLine(line);
+                Position start = area.getDocument().createPosition(area.getLineStartOffset(line));
+                return new Place(port, shown, start, -1, -1, top < 0 ? 0 : shown.y - top);
+            } catch (BadLocationException impossible) {
+                // The offsets are the document's own; Swing's own scrolling then stands.
+                return null;
+            }
+        }
+
+        /** @return this place on the line that starts at {@code start} */
+        Place at(Position start) { return new Place(port, shown, start, number, cursor, below); }
+
+        /**
+         * @return this place, keeping its line's number and the caret's from now on: the whole text is about to be
+         *     replaced, and Swing's caret then goes past the text put in
+         */
+        Place byNumber(RTextArea area) {
+            if (number >= 0) return this;
+            int at = area.getDocument().getDefaultRootElement().getElementIndex(line.getOffset());
+            return new Place(port, shown, line, at, area.getCaretLineNumber(), below);
+        }
+
+        /** @return the viewport position that shows the place's line where it was shown, wherever the line is now */
+        Point now(RTextArea area) {
+            try {
+                int at = number >= 0 ? Math.min(number, area.getLineCount() - 1) : area.getLineOfOffset(line.getOffset());
+                int top = area.yForLine(at);
+                // A line folded away has no place: the view stays where it was.
+                return top < 0 ? shown : new Point(shown.x, top + below);
+            } catch (BadLocationException impossible) {
+                return shown;
+            }
+        }
+    }
+
+    /**
+     * While several views show the document, it hands each edit here first: each view but the one that edits notes its
+     * place before the edit and queues its put-back after it. Any filter the document had goes on working inside it.
+     */
+    private final class Places extends DocumentFilter {
+        private interface Edit { void run() throws BadLocationException; }
+
+        private final AbstractDocument document;
+        private final DocumentFilter inner;
+        /**
+         * Text inserted at the document's start, by an edit or an undo: a Swing position at offset 0 stays there, where
+         * one anywhere else moves past text inserted at it, so a place held at the start moves past it here.
+         */
+        private final DocumentListener start = new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent event) { if (event.getOffset() == 0) insertedAtStart(event.getLength()); }
+            @Override public void removeUpdate(DocumentEvent event) { }
+            @Override public void changedUpdate(DocumentEvent event) { }
+        };
+
+        Places(AbstractDocument document) {
+            this.document = document;
+            inner = document.getDocumentFilter();
+            document.setDocumentFilter(this);
+            document.addDocumentListener(start);
+        }
+
+        /** The document hands its edits to the filter it had before, and nothing here listens to it. */
+        void lift() {
+            if (document.getDocumentFilter() == this) document.setDocumentFilter(inner);
+            document.removeDocumentListener(start);
+        }
+
+        private void insertedAtStart(int length) {
+            for (View other : views) {
+                Place held = other.held();
+                if (held == null || held.number() >= 0 || held.line().getOffset() != 0) continue;
+                try { other.hold(held.at(document.createPosition(length))); }
+                catch (BadLocationException impossible) {
+                    // The inserted text is in the document.
+                }
+            }
+        }
+
+        /** @param whole whether the edit takes away the whole text */
+        private void around(boolean whole, Edit edit) throws BadLocationException {
+            View acting = view;
+            hold(acting, whole);
+            try { edit.run(); }
+            finally { release(acting); }
+        }
+
+        @Override public void insertString(FilterBypass bypass, int offset, String text, AttributeSet attributes) throws BadLocationException {
+            around(false, () -> {
+                if (inner == null) bypass.insertString(offset, text, attributes);
+                else inner.insertString(bypass, offset, text, attributes);
+            });
+        }
+
+        @Override public void remove(FilterBypass bypass, int offset, int length) throws BadLocationException {
+            around(offset == 0 && length == document.getLength(), () -> {
+                if (inner == null) bypass.remove(offset, length);
+                else inner.remove(bypass, offset, length);
+            });
+        }
+
+        @Override public void replace(FilterBypass bypass, int offset, int length, String text, AttributeSet attributes) throws BadLocationException {
+            around(offset == 0 && length == document.getLength(), () -> {
+                if (inner == null) bypass.replace(offset, length, text, attributes);
+                else inner.replace(bypass, offset, length, text, attributes);
+            });
+        }
+    }
+
+    private final List<View> views = new ArrayList<>();
+    /** The document's filter while several views show it. */
+    private Places places;
+    /** How many put-backs have been queued: one for each other view in each event that edits. */
+    private int putBacksQueued;
+    /** The view that edits now. */
+    private View view;
+    private Step typing;
+    private int lastOffset;
     /** The change numbers of the steps on the stack, oldest first; the first {@link #done} are done. */
-    private final java.util.List<Integer> seqs = new java.util.ArrayList<>();
+    private final List<Integer> seqs = new ArrayList<>();
     private int done, seqLast;
+    /** The last edit taken: every view registers this history with the document, which hands it each edit once per view. */
+    private UndoableEdit heard;
+    /** While a view lets go of the document ({@link #leave}): its text area's swap discards nothing here. */
+    private boolean leaving;
 
     VimUndoManager(RTextArea area) {
-        super(area);
-        this.area = area;
+        // RUndoManager keeps its area only for the grouping and atomic edits this class overrides, so it is given none: the
+        // history outlives the view it was made for, which may close first.
+        super(null);
+        view = new View(area);
+        views.add(view);
         setLimit(1000);
     }
 
-    /** @param on whether Vim mode groups the edits */
+    /**
+     * {@code area} shows this history's document too, and edits through it from now on.
+     *
+     * @param area a text area that has not shown the document before
+     */
+    void join(RTextArea area) {
+        find(area);
+        if (places == null && views.size() > 1) places = new Places((AbstractDocument) views.getFirst().area.getDocument());
+    }
+
+    /** @return whether more than one text area shows the document */
+    boolean shared() { return views.size() > 1; }
+
+    /** Its text area shows another document with that document's history from now on: nothing here listens to it. */
+    void abandon() { for (View each : views) each.close(); }
+
+    /**
+     * {@code area} stops showing the document. Its open steps end here, and {@code swap}, which gives it a document of
+     * its own, discards nothing of this history; the first of the other views edits next.
+     *
+     * @param area one of the views, not the only one
+     * @param swap gives the area another document
+     */
+    void leave(RTextArea area, Runnable swap) {
+        View leaving = views.stream().filter(candidate -> candidate.area == area).findFirst().orElse(null);
+        if (leaving == null || views.size() == 1) return;
+        closeAll(leaving);
+        typing = seal(typing);
+        // Its queued put-back, if any, does nothing: the place is on the document it leaves.
+        leaving.close();
+        views.remove(leaving);
+        if (view == leaving) view = views.getFirst();
+        if (views.size() == 1) {
+            places.lift();
+            places = null;
+        }
+        this.leaving = true;
+        try { swap.run(); } finally { this.leaving = false; }
+    }
+
+    /**
+     * {@code area} edits from now on. When another view edited before, its open steps that changed something end here
+     * and open again, empty, at the same depth, so its engine's own {@link #endStep} still balances; the typing step ends
+     * too.
+     *
+     * @param area the text area that edits now
+     */
+    void view(RTextArea area) {
+        if (view.area == area) return;
+        View next = find(area);
+        sync(view);
+        typing = seal(typing);
+        view = next;
+    }
+
+    /** @return whether {@code area} is the view that edits now */
+    boolean editsNow(RTextArea area) { return view.area == area; }
+
+    /** @return whether {@code area}'s view holds its place on the text for a put-back that has not run yet */
+    boolean holds(RTextArea area) {
+        for (View each : views) if (each.area == area) return each.held() != null;
+        return false;
+    }
+
+    /** @param on whether Vim mode groups the edits of the view that edits now */
     void vim(boolean on) {
-        vim = on;
+        view.vim = on;
         typing = seal(typing);
     }
 
@@ -63,25 +428,29 @@ final class VimUndoManager extends RUndoManager {
      * do_pending_operator does before u_save): the step records the cursor there.
      */
     void stepCursor(int cursorLine, int cursorCol) {
-        if (vimStep != null && vimStep.edits == 0) {
-            vimStep.cursorLine = cursorLine;
-            vimStep.cursorCol = cursorCol;
+        if (view.vimStep != null && view.vimStep.edits == 0) {
+            view.vimStep.cursorLine = cursorLine;
+            view.vimStep.cursorCol = cursorCol;
         }
     }
 
     /** Opens a Vim step, or nests inside the open one. */
-    void beginStep(int cursorLine, int cursorCol) {
-        if (stepDepth++ == 0) {
+    void beginStep(int cursorLine, int cursorCol) { beginStep(view, cursorLine, cursorCol); }
+
+    private void beginStep(View in, int cursorLine, int cursorCol) {
+        if (in.stepDepth++ == 0) {
             typing = seal(typing);
-            vimStep = new Step(cursorLine, cursorCol);
+            in.vimStep = new Step(cursorLine, cursorCol);
         }
     }
 
     /** Closes one level; the outermost close puts the step on the undo stack if it changed anything. */
-    void endStep() {
-        if (stepDepth == 0 || --stepDepth > 0) return;
-        Step step = vimStep;
-        vimStep = null;
+    void endStep() { endStep(view); }
+
+    private void endStep(View in) {
+        if (in.stepDepth == 0 || --in.stepDepth > 0) return;
+        Step step = in.vimStep;
+        in.vimStep = null;
         step.end();
         if (step.edits > 0) add(step);
         updateActions();
@@ -100,20 +469,25 @@ final class VimUndoManager extends RUndoManager {
         addEdit(step);
     }
 
+    /** @return how many put-backs have been queued, one for each other view in each event that edits the document */
+    int putBacksQueued() { return putBacksQueued; }
+
     /** @return the change numbers of the done steps, oldest first */
-    java.util.List<Integer> doneSeqs() { return java.util.List.copyOf(seqs.subList(0, done)); }
+    List<Integer> doneSeqs() { return List.copyOf(seqs.subList(0, done)); }
 
     /** @return the change numbers of the undone steps, in the order redo brings them back */
-    java.util.List<Integer> undoneSeqs() { return java.util.List.copyOf(seqs.subList(done, seqs.size())); }
+    List<Integer> undoneSeqs() { return List.copyOf(seqs.subList(done, seqs.size())); }
 
-    boolean stepOpen() { return stepDepth > 0; }
+    boolean stepOpen() { return view.stepDepth > 0; }
 
     /** u_sync: the open step ends here if it changed anything, and a new one goes on at the same depth. */
-    void sync() {
-        if (vimStep == null || vimStep.edits == 0) return;
-        int depth = stepDepth;
-        closeAll();
-        reopen(depth);
+    void sync() { sync(view); }
+
+    private void sync(View in) {
+        if (in.vimStep == null || in.vimStep.edits == 0) return;
+        int depth = in.stepDepth;
+        closeAll(in);
+        reopen(in, depth);
     }
 
     /** @return the step {@link #undo} would undo, or null when there is none or it is not a Vim step */
@@ -124,15 +498,17 @@ final class VimUndoManager extends RUndoManager {
 
     @Override public void undoableEditHappened(UndoableEditEvent event) {
         UndoableEdit edit = event.getEdit();
-        if (vimStep != null) {
-            vimStep.take(edit);
+        if (edit == heard) return;
+        heard = edit;
+        if (view.vimStep != null) {
+            view.vimStep.take(edit);
             return;
         }
-        if (internalDepth > 0) {
-            internal.take(edit);
+        if (view.internalDepth > 0) {
+            view.internal.take(edit);
             return;
         }
-        if (vim) {
+        if (view.vim) {
             Step step = new Step(-1, -1);
             step.take(edit);
             step.end();
@@ -141,7 +517,7 @@ final class VimUndoManager extends RUndoManager {
             return;
         }
         // RSyntaxTextArea's grouping: an edit next to the previous one continues its step.
-        int caret = area.getCaretPosition();
+        int caret = view.area.getCaretPosition();
         if (typing != null && Math.abs(caret - lastOffset) <= 1) {
             typing.take(edit);
             lastOffset = caret;
@@ -156,16 +532,18 @@ final class VimUndoManager extends RUndoManager {
     }
 
     @Override public void beginInternalAtomicEdit() {
-        if (internalDepth++ == 0 && vimStep == null) {
+        if (view.internalDepth++ == 0 && view.vimStep == null) {
             typing = seal(typing);
-            internal = new Step(-1, -1);
+            view.internal = new Step(-1, -1);
         }
     }
 
-    @Override public void endInternalAtomicEdit() {
-        if (internalDepth == 0 || --internalDepth > 0 || internal == null) return;
-        Step step = internal;
-        internal = null;
+    @Override public void endInternalAtomicEdit() { endInternal(view); }
+
+    private void endInternal(View in) {
+        if (in.internalDepth == 0 || --in.internalDepth > 0 || in.internal == null) return;
+        Step step = in.internal;
+        in.internal = null;
         step.end();
         if (step.edits > 0) add(step);
         updateActions();
@@ -173,7 +551,12 @@ final class VimUndoManager extends RUndoManager {
 
     /** Counts an open step's edits, since RTextArea asks before it undoes (⌘Z in the middle of an insert). */
     @Override public synchronized boolean canUndo() {
-        return vimStep != null && vimStep.edits > 0 || internal != null && internal.edits > 0 || super.canUndo();
+        return view.vimStep != null && view.vimStep.edits > 0 || view.internal != null && view.internal.edits > 0 || super.canUndo();
+    }
+
+    /** An open step is undoable before the stack holds anything ({@link #canUndo}), and RTextArea names the undo on every focus gain. */
+    @Override public synchronized String getUndoPresentationName() {
+        return editToBeUndone() == null ? UIManager.getString("AbstractUndoableEdit.undoText") : super.getUndoPresentationName();
     }
 
     /**
@@ -181,64 +564,184 @@ final class VimUndoManager extends RUndoManager {
      * trim the redo stack, so the redo would fail (an outside ⌘⇧Z in the middle of an insert).
      */
     @Override public synchronized boolean canRedo() {
-        if (vimStep != null && vimStep.edits > 0 || internal != null && internal.edits > 0) return false;
+        if (view.vimStep != null && view.vimStep.edits > 0 || view.internal != null && view.internal.edits > 0) return false;
         return super.canRedo();
     }
 
     /**
      * An outside undo (⌘Z) while the engine has a step open: closes it so it is undoable, then reopens the same
      * nesting once the undo runs, so the engine's own {@link #endStep} later balances (spec: the rest of an insert
-     * in progress stays one step).
+     * in progress stays one step). The other views keep their carets, selections and places on the text.
      */
     @Override public void undo() {
-        int depth = stepDepth;
-        closeAll();
+        View in = view;
+        int depth = in.stepDepth;
+        closeAll(in);
+        Runnable keep = keepOthers(in, editToBeUndone() instanceof Step step && step.takesWhole(true, in.area.getDocument().getLength()));
         try {
             super.undo();
             done--;
-        } finally { reopen(depth); }
+        } finally {
+            keep.run();
+            reopen(in, depth);
+        }
     }
 
     /** The redo counterpart of {@link #undo}. */
     @Override public void redo() {
-        int depth = stepDepth;
-        closeAll();
+        View in = view;
+        int depth = in.stepDepth;
+        closeAll(in);
+        Runnable keep = keepOthers(in, editToBeRedone() instanceof Step step && step.takesWhole(false, in.area.getDocument().getLength()));
         try {
             super.redo();
             done++;
-        } finally { reopen(depth); }
+        } finally {
+            keep.run();
+            reopen(in, depth);
+        }
+    }
+
+    /**
+     * Before an edit: each view but {@code acting} that holds no place yet notes where it shows the text. A place held
+     * from an edit before, whose put-back has not run, stays: its line has moved with the text since.
+     *
+     * @param whole whether the edit takes away the whole text, so that the places keep their lines' numbers
+     */
+    private void hold(View acting, boolean whole) {
+        for (View other : views) {
+            if (other == acting) continue;
+            if (other.held() == null) other.hold(Place.of(other.area));
+            if (whole && other.held() != null) other.hold(other.held().byNumber(other.area));
+        }
+    }
+
+    /**
+     * After an edit: each view but {@code acting} that holds a place queues its put-back, once in each event. Swing
+     * scrolls a view's moved caret into sight later, through the event queue, after each edit of the event; the put-back
+     * runs after everything the event queued ({@link #queue}), its later edits' scrolling among it, and only the last
+     * one queued puts the view back. A view that does not show queues nothing: its place waits, and it is put back once
+     * it shows, so that the put-back lays out none of its text while another view is typed in. Swing's caret still lays
+     * out a hidden view whose caret an edit moves, one whose caret is below the edits, to scroll it into sight.
+     */
+    private void release(View acting) {
+        AWTEvent now = EventQueue.getCurrentEvent();
+        for (View other : views) {
+            if (other == acting || other.held() == null) continue;
+            if (other.hidden()) {
+                other.waiting = true;
+                continue;
+            }
+            if (now != null && now == other.queuedIn) continue;
+            other.queuedIn = now;
+            putBacksQueued++;
+            queue(other, ++other.queued);
+        }
+    }
+
+    /** Queues {@code view}'s put-back numbered {@code number}: it goes through the queue twice, after what is queued now. */
+    private static void queue(View view, int number) {
+        SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> putBack(view, number)));
+    }
+
+    /**
+     * Shows {@code other}'s held place's line where it was shown, unless a later put-back is queued for it; a Vim view's
+     * engine then keeps its cursor in sight. A view that does not show waits to show first.
+     */
+    private static void putBack(View other, int number) {
+        Place place = other.held();
+        if (number != other.queued || place == null) return;
+        // The event goes with the put-back: for typing, its source is the text area that edited.
+        other.queuedIn = null;
+        if (other.hidden()) {
+            other.waiting = true;
+            return;
+        }
+        other.letGo();
+        RTextArea area = other.area;
+        if (area.getParent() != place.port()) return;
+        Point position = place.now(area);
+        if (area instanceof VimTextArea text) text.keepPlace(position, place.cursor());
+        else place.port().setViewPosition(position);
+    }
+
+    /**
+     * Where each view but {@code acting} has its caret, selection and place on the text: an undo or redo sets every
+     * caret on the document to the change (Swing's {@code DefaultCaret} reads it from the undo's event), and the views
+     * that did not undo go back to the text they were on, as an edit elsewhere leaves them. An undo does not reach the
+     * document's filter, so the places are held here.
+     *
+     * @param whole whether the undo or redo takes away the whole text, so that the places keep their lines' numbers
+     * @return puts them back
+     */
+    private Runnable keepOthers(View acting, boolean whole) {
+        hold(acting, whole);
+        List<Runnable> back = new ArrayList<>();
+        for (View other : views) {
+            if (other == acting) continue;
+            RTextArea area = other.area;
+            try {
+                Position dot = area.getDocument().createPosition(area.getCaret().getDot());
+                Position mark = area.getDocument().createPosition(area.getCaret().getMark());
+                back.add(() -> {
+                    area.getCaret().setDot(mark.getOffset());
+                    area.getCaret().moveDot(dot.getOffset());
+                });
+            } catch (BadLocationException impossible) {
+                // The caret's offsets are in the document.
+            }
+        }
+        return () -> {
+            back.forEach(Runnable::run);
+            // After the carets: each shows itself later, through the event queue, and the put-backs run after that.
+            release(acting);
+        };
     }
 
     /** Reopens {@code depth} levels of Vim step after an outside undo/redo, cursor taken from the area's caret now. */
-    private void reopen(int depth) {
+    private void reopen(View in, int depth) {
         if (depth == 0) return;
         int line = 0, col = 0;
         try {
-            int offset = area.getCaretPosition();
-            line = area.getLineOfOffset(offset);
-            col = offset - area.getLineStartOffset(line);
+            int offset = in.area.getCaretPosition();
+            line = in.area.getLineOfOffset(offset);
+            col = offset - in.area.getLineStartOffset(line);
         } catch (BadLocationException ignored) {
             // Falls back to (0, 0); the reopened step's remembered cursor is only advisory.
         }
-        for (int n = 0; n < depth; n++) beginStep(line, col);
+        for (int n = 0; n < depth; n++) beginStep(in, line, col);
     }
 
     @Override public void discardAllEdits() {
-        stepDepth = internalDepth = 0;
-        vimStep = internal = typing = null;
+        if (leaving) return;
+        for (View each : views) {
+            each.stepDepth = each.internalDepth = 0;
+            each.vimStep = each.internal = null;
+        }
+        typing = null;
+        heard = null;
         seqs.clear();
         done = 0;
+        seqLast = 0;
         super.discardAllEdits();
     }
 
-    /** Ends every open step, as an undo from outside Vim (⌘Z during an insert) must. */
-    private void closeAll() {
-        while (stepDepth > 0) endStep();
-        if (internal != null) {
-            internalDepth = 1;
-            endInternalAtomicEdit();
+    /** Ends every open step of a view, as an undo from outside Vim (⌘Z during an insert) must. */
+    private void closeAll(View in) {
+        while (in.stepDepth > 0) endStep(in);
+        if (in.internal != null) {
+            in.internalDepth = 1;
+            endInternal(in);
         }
         typing = seal(typing);
+    }
+
+    /** @return the view for {@code area}, a new one when it has none */
+    private View find(RTextArea area) {
+        for (View each : views) if (each.area == area) return each;
+        View added = new View(area);
+        views.add(added);
+        return added;
     }
 
     private static Step seal(Step step) {

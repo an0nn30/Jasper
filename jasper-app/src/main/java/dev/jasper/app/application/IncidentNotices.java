@@ -62,7 +62,7 @@ final class IncidentNotices implements AutoCloseable {
     /** The notification system: a failure whose first Jasper frame is in one of these is only logged. */
     private static final List<String> OWN_PACKAGES = List.of("dev.jasper.app.notifications.", "dev.jasper.app.notificationui.");
     private static final List<String> OWN_CLASSES = List.of(IncidentNotices.class.getName(), NotificationsFeature.class.getName(),
-        ErrorsWindow.class.getName(), ConfigProblemNotices.class.getName());
+        ErrorsTab.class.getName(), ConfigProblemNotices.class.getName());
 
     /** Sightings of one Jasper or plugin failure waiting for the EDT: the first one's capture, and how many there are. */
     private record Waiting(String source, String operation, String thread, Capture capture, AtomicInteger count) {
@@ -110,7 +110,7 @@ final class IncidentNotices implements AutoCloseable {
      *     application)
      * @param pluginName a plugin's display name by id
      * @param disable disables a plugin from the next launch, then reports on the EDT: empty, or why it could not
-     * @param openErrors opens the Errors window at an incident
+     * @param openErrors opens the Errors tab at an incident
      */
     IncidentNotices(NotificationCenter center, Incidents incidents, Executor ui, BiFunction<Duration, Runnable, Runnable> later,
                     Function<String, String> pluginName, BiConsumer<String, Consumer<Optional<String>>> disable,

@@ -34,11 +34,11 @@ final class ExFiles {
         write(cmd, () -> { });
     }
 
-    /** {@code :wq [file]}: writes, then closes the tab once the write succeeded. */
+    /** {@code :wq [file]}: writes, then closes the pane once the write succeeded. */
     static void writeQuit(ExCommand cmd) {
         if (partial(cmd)) throw new VimFailure("E319: Sorry, the command is not available in this version");
-        int number = current(buffers(cmd)).number();
-        write(cmd, () -> documents(cmd).close().accept(number, false));
+        VimEditor editor = cmd.editor;
+        write(cmd, () -> documents(cmd).quit().accept(editor, false));
     }
 
     /** {@code :x} and {@code :exit}: as {@code :wq}, but writes only when there are changes or a file is named. */
@@ -47,7 +47,7 @@ final class ExFiles {
         Buffer buffer = current(buffers(cmd));
         String arg = fileArg(cmd);
         if (!buffer.modified() && arg == null) {
-            cmd.editor.afterKey(() -> documents(cmd).close().accept(buffer.number(), false));
+            cmd.editor.afterKey(() -> documents(cmd).quit().accept(cmd.editor, false));
             return;
         }
         writeQuit(cmd);
@@ -117,11 +117,14 @@ final class ExFiles {
         chain.thenAccept(saved -> { if (saved) then.run(); });
     }
 
-    /** {@code :q}: closes the tab; with changes only with {@code !}, which discards them. */
+    /**
+     * {@code :q}: closes the pane. A buffer with changes loses its last pane only with {@code !}, which discards them; a
+     * pane of one that another pane shows closes, as Vim closes a window of a buffer another window shows.
+     */
     static void quit(ExCommand cmd) {
         Buffer buffer = current(buffers(cmd));
-        if (buffer.modified() && !cmd.forceit) throw new VimFailure("E37: No write since last change (add ! to override)");
-        cmd.editor.afterKey(() -> documents(cmd).close().accept(buffer.number(), cmd.forceit));
+        if (buffer.modified() && buffer.windows() <= 1 && !cmd.forceit) throw new VimFailure("E37: No write since last change (add ! to override)");
+        cmd.editor.afterKey(() -> documents(cmd).quit().accept(cmd.editor, cmd.forceit));
     }
 
     /** {@code :qa}: closes every tab; with changes in any only with {@code !}. */

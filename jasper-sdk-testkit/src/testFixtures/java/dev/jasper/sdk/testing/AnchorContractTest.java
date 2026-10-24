@@ -1,7 +1,6 @@
 package dev.jasper.sdk.testing;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.*;
-import java.awt.Dimension;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
@@ -13,7 +12,8 @@ public abstract class AnchorContractTest {
  public interface Fixture extends AutoCloseable {Endpoint endpoint(String id);void close();}
  protected abstract Fixture fixture();
  static ViewSpec picker(ControlState state){return new ViewSpec(new Nodes.Choice("pick",state,Nodes.ChoiceKind.PICKER,List.of(),"","Credential","pick"));}
- static PluginWindow mount(Endpoint e,UiView view,String id){var w=e.windows().create(new WindowSpec(id+".owner","Owner",new Dimension(300,200),false));w.setContent(view);w.show();return w;}
+ /** Mounts {@code view} where anchors may be taken from it: a content tab of the plugin, which closing disposes. */
+ static ContentTab mount(Endpoint e,UiView view,String id){return e.windows().openTab(new ContentSpec(id+".owner","Owner"),null,view);}
  @Test void delegatedAttachmentDoesNotDelegateContentOwnershipAndCloseIsOnce()throws Exception{SwingUtilities.invokeAndWait(()->{
   try(var f=fixture()){
    var source=f.endpoint("source");var producer=f.endpoint("producer");var view=source.kit().create(picker(ControlState.READY),e->{});
@@ -65,51 +65,19 @@ public abstract class AnchorContractTest {
   }
  });}
  static ViewSpec actions(){return new ViewSpec(new Nodes.Stack("actions",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(new Nodes.Button("lock",ControlState.READY,"Lock","lock",Nodes.ButtonKind.GHOST,"lock",""))));}
- static void title(PluginWindow window,Optional<UiView> view){window.setTitleActions(view);}
- @Test void titleAndBodyHaveIndependentAdmissionUpdateAndLifetime()throws Exception{SwingUtilities.invokeAndWait(()->{
-  try(var f=fixture()){
-   var source=f.endpoint("source");var foreign=f.endpoint("foreign");var body=source.kit().create(actions(),e->{});
-   var window=mount(source,body,"source");
-   assertThatThrownBy(()->title(window,Optional.of(body))).isInstanceOf(IllegalArgumentException.class);
-   var action=source.kit().create(actions(),e->{});title(window,Optional.of(action));var anchor=action.anchor("lock");
-   title(window,Optional.of(action));assertThat(anchor.isOpen()).isTrue();
-   assertThatThrownBy(()->window.setContent(action)).isInstanceOf(IllegalArgumentException.class);
-   var wrong=foreign.kit().create(actions(),e->{});assertThatThrownBy(()->title(window,Optional.of(wrong))).isInstanceOf(IllegalArgumentException.class);assertThat(wrong.spec()).isEqualTo(actions());
-   var bad=source.kit().create(picker(ControlState.READY),e->{});assertThatThrownBy(()->title(window,Optional.of(bad))).isInstanceOf(IllegalArgumentException.class);assertThat(bad.spec()).isEqualTo(picker(ControlState.READY));
-   assertThatThrownBy(()->action.update(picker(ControlState.READY))).isInstanceOf(IllegalArgumentException.class);assertThat(action.spec()).isEqualTo(actions());assertThat(anchor.isOpen()).isTrue();
-   var child=foreign.windows().dialog(new DialogSpec("Title child",anchor,true));var closed=new AtomicInteger();child.onClosed(closed::incrementAndGet);child.show();
-   var replacement=source.kit().create(picker(ControlState.READY),e->{});window.setContent(replacement);assertThat(anchor.isOpen()).isTrue();assertThatThrownBy(body::spec).isInstanceOf(IllegalStateException.class);
-   title(window,Optional.empty());assertThat(anchor.isOpen()).isFalse();assertThat(closed).hasValue(1);assertThat(replacement.spec()).isEqualTo(picker(ControlState.READY));assertThatThrownBy(action::spec).isInstanceOf(IllegalStateException.class);
-   var last=source.kit().create(actions(),e->{});title(window,Optional.of(last));window.close();assertThatThrownBy(last::spec).isInstanceOf(IllegalStateException.class);
-  }
- });}
- @Test void unshownAndClosedTitleActionsCannotIssueAnchors()throws Exception{SwingUtilities.invokeAndWait(()->{
-  try(var f=fixture()){var source=f.endpoint("source");var action=source.kit().create(actions(),e->{});var w=source.windows().create(new WindowSpec("source.owner","Owner",new Dimension(300,200),false));title(w,Optional.of(action));
-   assertThatThrownBy(()->action.anchor("lock")).isInstanceOf(IllegalArgumentException.class);w.show();var anchor=action.anchor("lock");assertThat(anchor.isOpen()).isTrue();source.stop().run();assertThat(anchor.isOpen()).isFalse();
-  }
- });}
- @Test void attachedSheetRejectsAnUnshownParentAtShowAndReleasesItsView()throws Exception{SwingUtilities.invokeAndWait(()->{
-  try(var f=fixture()){var e=f.endpoint("source");var w=e.windows().create(new WindowSpec("source.window","Owner",new Dimension(300,200),false));
-   var child=e.windows().dialog(new DialogSpec("Sheet",w,true,DialogSpec.Presentation.ATTACHED_SHEET));var view=e.kit().create(picker(ControlState.READY),event->{});child.setContent(view);
-   assertThatThrownBy(child::show).isInstanceOf(IllegalArgumentException.class);assertThatThrownBy(view::spec).isInstanceOf(IllegalStateException.class);
-  }
- });}
- @Test void titleReplacementClosedReentrantlyByOwnedChildStillReleasesAcceptedReplacement()throws Exception{SwingUtilities.invokeAndWait(()->{
-  try(var f=fixture()){var e=f.endpoint("source");var body=e.kit().create(picker(ControlState.READY),event->{});var w=mount(e,body,"source");
-   var old=e.kit().create(actions(),event->{});title(w,Optional.of(old));var anchor=old.anchor("lock");var child=e.windows().dialog(new DialogSpec("Child",anchor,true));child.onClosed(w::close);child.show();
-   var next=e.kit().create(actions(),event->{});title(w,Optional.of(next));assertThatThrownBy(next::spec).isInstanceOf(IllegalStateException.class);assertThatThrownBy(old::spec).isInstanceOf(IllegalStateException.class);
-  }
- });}
+ /** A dialog's content replaced while a child its old content owns closes the dialog still releases both views. */
  @Test void bodyReplacementClosedReentrantlyByOwnedChildStillReleasesAcceptedReplacement()throws Exception{SwingUtilities.invokeAndWait(()->{
-  try(var f=fixture()){var e=f.endpoint("source");var old=e.kit().create(actions(),event->{});var w=mount(e,old,"source");
+  try(var f=fixture()){var e=f.endpoint("source");var tab=mount(e,e.kit().create(actions(),event->{}),"source");
+   var old=e.kit().create(actions(),event->{});var w=e.windows().dialog(new DialogSpec("Surface",tab,false));w.setContent(old);w.show();
    var anchor=old.anchor("lock");var child=e.windows().dialog(new DialogSpec("Child",anchor,true));child.onClosed(w::close);child.show();
    var closed=new AtomicInteger();w.onClosed(closed::incrementAndGet);
    var next=e.kit().create(actions(),event->{});w.setContent(next);w.close();next.close();assertThat(closed).hasValue(1);assertThatThrownBy(next::spec).isInstanceOf(IllegalStateException.class);assertThatThrownBy(old::spec).isInstanceOf(IllegalStateException.class);
   }
  });}
-
+ /** A dialog is a surface: a cleanup registered after it closed runs at once, and once. */
  @Test void closedSurfaceImmediatelyRunsLateCleanupRegistrationOnce()throws Exception{SwingUtilities.invokeAndWait(()->{
-  try(var f=fixture()){var e=f.endpoint("source");var view=e.kit().create(actions(),event->{});var w=mount(e,view,"source");w.close();
+  try(var f=fixture()){var e=f.endpoint("source");var view=e.kit().create(actions(),event->{});mount(e,view,"source");
+   var w=e.windows().dialog(new DialogSpec("Surface",view.anchor("lock"),false));w.setContent(e.kit().create(picker(ControlState.READY),event->{}));w.show();w.close();
    var called=new AtomicInteger();var registration=w.onClosed(called::incrementAndGet);assertThat(called).hasValue(1);
    registration.close();w.close();assertThat(called).hasValue(1);
   }

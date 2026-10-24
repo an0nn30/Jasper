@@ -51,6 +51,17 @@ class CommandNotifierTest {
     private static final CommandNotice.Origin FOCUSED_PANE = new CommandNotice.Origin(true, true, true, true);
     private static final CommandNotice.Origin UNFOCUSED_SPLIT = new CommandNotice.Origin(true, true, true, false);
 
+    /** Workspace tabs spec 9.3: a click resolves the pane's window from the notification's producer. */
+    @Test void aNotificationNamesThePaneThatPostedItUntilThePaneCloses() {
+        var notifier = notifier(10);
+        notifier.finished("pane", "make", OptionalInt.of(0), Duration.ofSeconds(30), HIDDEN_TAB, window, () -> {});
+        UUID posted = center.history().getFirst().id();
+        assertThat(notifier.producer(posted)).contains("pane");
+        assertThat(notifier.producer(UUID.randomUUID())).isEmpty();
+        notifier.closed("pane");
+        assertThat(notifier.producer(posted)).as("the pane is gone").isEmpty();
+    }
+
     @Test void theGroupIsLongRunningCommandsShownAsCards() {
         notifier(10);
         assertThat(center.group("jasper.commands")).contains(CommandNotifier.GROUP);

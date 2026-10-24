@@ -218,6 +218,10 @@ class HostedKitTest {
    public WorkspacePalette workspacePalette(){return source.workspacePalette();}
    public EditorPalette editorPalette(){return source.editorPalette();}
    public SyntaxPalette syntaxPalette(){return source.syntaxPalette();}
+   public java.util.List<dev.jasper.sdk.ui.EditorScheme> editorSchemes(){return source.editorSchemes();}
+   public dev.jasper.sdk.ui.TerminalTypography terminalTypography(){return source.terminalTypography();}
+   public dev.jasper.sdk.Subscription onTerminalTypographyChanged(java.util.function.Consumer<dev.jasper.sdk.ui.TerminalTypography> handler){return source.onTerminalTypographyChanged(handler);}
+   public dev.jasper.sdk.ui.Presentation presentation(){return HostedPresentation.standard();}
    public dev.jasper.sdk.Subscription onChanged(java.util.function.Consumer<dev.jasper.sdk.Variant> handler){var subscription=source.onChanged(handler);themeSubscriptions.incrementAndGet();return () -> {subscription.close();themeSubscriptions.decrementAndGet();};}
    public dev.jasper.sdk.Subscription onWorkspaceChanged(java.util.function.Consumer<dev.jasper.sdk.Variant> handler){var subscription=source.onWorkspaceChanged(handler);workspaceSubscriptions.incrementAndGet();return () -> {subscription.close();workspaceSubscriptions.decrementAndGet();};}
   };

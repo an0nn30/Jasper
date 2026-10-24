@@ -24,6 +24,25 @@ class TerminalBridgeTest {
 
     private void deliver() { while (!queued.isEmpty()) queued.remove(0).run(); }
 
+    @Test void aMoveAndAContentTabBecomeTheirTopics() {
+        TerminalBridge.connect(fixture.registry, bus);
+        for (var topic : List.of(TerminalEvents.TAB_OPENED, TerminalEvents.TAB_MOVED, TerminalEvents.TAB_CLOSED, TerminalEvents.PANE_CLOSED))
+            bus.subscribe("dev.x.tool", topic, heard::add);
+        UUID first = fixture.addWindow(), keep = fixture.addTab(first, "keep");
+        fixture.addPane(keep, "zsh", null);
+        UUID second = fixture.addWindow(), shell = fixture.addTab(second, "zsh");
+        fixture.addPane(shell, "zsh", null);
+        UUID notes = UUID.randomUUID();
+        fixture.addContentTab(first, notes, () -> "notes.txt");
+        deliver();
+        assertThat(heard).endsWith(new TerminalEvents.TabEvent(first, notes));
+        heard.clear();
+        fixture.moveTab(notes, second);
+        fixture.closeTab(notes);
+        deliver();
+        assertThat(heard).containsExactly(new TerminalEvents.TabMoved(notes, first, second), new TerminalEvents.TabEvent(second, notes));
+    }
+
     @Test void everyRegistryFactBecomesItsTopic() {
         var bridge = TerminalBridge.connect(fixture.registry, bus);
         for (var topic : List.of(TerminalEvents.WINDOW_OPENED, TerminalEvents.WINDOW_ACTIVATED, TerminalEvents.TAB_OPENED, TerminalEvents.TAB_SELECTED,

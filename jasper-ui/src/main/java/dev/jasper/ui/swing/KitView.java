@@ -323,18 +323,6 @@ public final class KitView extends JPanel implements AutoCloseable {
     /** The reconciler's column index for the host-assigned column: -1 none, 0 rail, 1 list. */
     int hostColumn() { return switch (managerColumn) { case NONE -> -1; case RAIL -> 0; case LIST -> 1; }; }
     /**
-     * App-only: this view is a native window's title action strip. Its icon-only menu buttons show their menu
-     * indicator on the borderless control surface, as the window title references paint them. EDT confined.
-     */
-    public void titleStrip(boolean value) {
-        requireOpen();
-        if (titleStrip == value) return;
-        titleStrip = value; refresh(); repaint();
-    }
-    /** Whether this view is presented as a window title action strip. */
-    public boolean titleStrip() { return titleStrip; }
-    private boolean titleStrip;
-    /**
      * App-only: the host shows this view's form title (a classic dialog's header strip, or a title bar the system draws),
      * so the form draws neither its title label nor a hero that only repeats it (Enterprise presentation spec 10.8). EDT
      * confined.
@@ -348,9 +336,9 @@ public final class KitView extends JPanel implements AutoCloseable {
     public boolean hostTitled() { return hostTitled; }
     private boolean hostTitled;
     /**
-     * App-only: this view's form is a dialog's content under the classic mapping, so its footer is the dialog's band on
-     * {@code surface.footer} under a {@code border.window} rule (spec 10.8), in a classic dialog or a native one. EDT
-     * confined.
+     * App-only: this view's form is a dialog's or a window's content under the classic mapping, so its footer is the
+     * band on {@code surface.footer} under a {@code border.window} rule (spec 10.8), in a classic dialog, a native one or
+     * a window. EDT confined.
      */
     public void dialogBand(boolean value) {
         requireOpen();
@@ -405,7 +393,7 @@ public final class KitView extends JPanel implements AutoCloseable {
     private boolean runWindow;
     /**
      * App-only: this view is a toolbar strip, a contributed view in a window's main toolbar. Its icon-only menu buttons
-     * show their menu indicator on the borderless control surface, as a title strip's do, and its controls keep the
+     * show their menu indicator on the borderless control surface, and its controls keep the
      * kit's control height, which the toolbar row centres. EDT confined.
      */
     public void toolbarStrip(boolean value) {
@@ -416,6 +404,26 @@ public final class KitView extends JPanel implements AutoCloseable {
     /** Whether this view is presented as a toolbar strip. */
     public boolean toolbarStrip() { return toolbarStrip; }
     private boolean toolbarStrip;
+    /**
+     * App-only: this view sits in a window whose chrome draws IntelliJ's classic icons. In a toolbar strip and in a
+     * panel's header (its own controls and the host's actions with canonical artwork), a button or menu button named
+     * one of {@link dev.jasper.ui.icons.IconRegistry#classicChromeNames()} draws that classic art; every other name, and
+     * every control in a panel's body, keeps its own. EDT confined.
+     *
+     * @param value whether the classic chrome icons apply
+     */
+    public void classicChromeIcons(boolean value) {
+        requireOpen();
+        if (classicChromeIcons == value) return;
+        classicChromeIcons = value; refresh(); repaint();
+    }
+    /**
+     * Whether this view draws the classic chrome icons.
+     *
+     * @return whether {@link #classicChromeIcons(boolean)} is set
+     */
+    public boolean classicChromeIcons() { return classicChromeIcons; }
+    private boolean classicChromeIcons;
     @Override protected void paintComponent(Graphics graphics) {
         if (!surface) { super.paintComponent(graphics); return; }
         graphics.setColor(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));

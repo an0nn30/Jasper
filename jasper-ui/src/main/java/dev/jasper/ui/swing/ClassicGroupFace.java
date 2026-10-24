@@ -17,10 +17,13 @@ import javax.swing.border.EmptyBorder;
  * 1 px {@code border.window} edge whose top line the semibold title breaks; the card inside is transparent, a SETTINGS
  * card pads its rows 8 above and below, a MIXED card draws one {@code border.row} divider where its content gives way to
  * its settings, and a Settings page's card pads its rows 6 above and below and divides every row with a rule that stops
- * short of the box.
+ * short of the box. A manager detail's titled card of label and value rows is a grid (the Credential Vault mock's Fields): a
+ * {@code surface.card} box with a {@code border.divider} edge inside the group's, its rows divided by {@code border.row}.
  */
 final class ClassicGroupFace implements GroupFace {
     private final PaintPair box, title;
+    /** A grid's edge on its {@code surface.card} box ({@link #paintGrid}). */
+    static final PaintPair GRID_EDGE = new PaintPair(DerivedColor.BORDER_DIVIDER, SemanticColor.SURFACE_CARD, SurfaceContrast.Guard.STRUCTURAL);
 
     /** A face whose boxes stand on {@code surface}, the kit's dialog surface. */
     ClassicGroupFace(SemanticColor surface) {
@@ -28,7 +31,7 @@ final class ClassicGroupFace implements GroupFace {
         title = new PaintPair(SemanticColor.TEXT_PRIMARY, surface, SurfaceContrast.Guard.TEXT);
     }
 
-    @Override public List<PaintPair> pairs() { return List.of(box, title); }
+    @Override public List<PaintPair> pairs() { return List.of(box, title, GRID_EDGE); }
 
     @Override public LayoutManager sectionLayout(Cards.SectionControl section) { return new TitledBoxLayout(section.context()); }
 
@@ -54,6 +57,7 @@ final class ClassicGroupFace implements GroupFace {
 
     @Override public void paintCard(Cards.CardSurface card, Graphics2D g) {
         var c = card.context;
+        if (card.grid) { paintGrid(card, g); return; }
         int line = ThemePainting.metric(c, DesignMetrics.Role.HAIRLINE), pad = ThemePainting.metric(c, DesignMetrics.Role.CARD_PADDING);
         int rule = ThemePainting.metric(c, DesignMetrics.Role.SETTINGS_ROW_SIDE);
         g.setColor(ThemePainting.role(c, DerivedColor.BORDER_ROW));
@@ -98,6 +102,28 @@ final class ClassicGroupFace implements GroupFace {
      * description, as the Shell, Font &amp; Colors and Project Index mocks draw it (plan 9b Task 6).
      */
     @Override public boolean listUnderTitle(KitContext context) { return true; }
+
+    @Override public boolean detailGrid() { return true; }
+
+    /** The box's top line, not its title, stands the gap below what precedes it; the title rides over the gap. */
+    @Override public int sectionGap(Cards.SectionSurface section, int standard) {
+        return section.getComponentCount() < 2 ? standard : Math.max(0, standard - section.getComponent(0).getPreferredSize().height / 2);
+    }
+
+    /** The grid's box inside the card ({@link Cards.GridRows}) and a rule between each two of its rows. */
+    private static void paintGrid(Cards.CardSurface card, Graphics2D g) {
+        var c = card.context;
+        int inset = ThemePainting.metric(c, DesignMetrics.Role.DETAIL_GRID_INSET), top = ThemePainting.metric(c, DesignMetrics.Role.DETAIL_GRID_TOP);
+        int line = ThemePainting.metric(c, DesignMetrics.Role.HAIRLINE);
+        int width = Math.max(0, card.getWidth() - 2 * inset), height = Math.max(0, card.getHeight() - top - inset);
+        g.setColor(ThemePainting.color(c, SemanticColor.SURFACE_CARD));
+        g.fillRect(inset, top, width, height);
+        g.setColor(ThemePainting.painted(c, GRID_EDGE));
+        g.fillRect(inset, top, width, line); g.fillRect(inset, top + height - line, width, line);
+        g.fillRect(inset, top, line, height); g.fillRect(inset + width - line, top, line, height);
+        g.setColor(ThemePainting.role(c, DerivedColor.BORDER_ROW));
+        for (int y : Cards.GridRows.rules(card)) g.fillRect(inset + line, y, Math.max(0, width - 2 * line), line);
+    }
 
     /** A Settings page's rows keep their first line clear for the rule {@link #paintCard} draws there. */
     @Override public int rowRule(KitContext context) { return ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE); }

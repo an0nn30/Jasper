@@ -14,7 +14,7 @@ import java.awt.Font;
 import java.util.Optional;
 
 /**
- * What cards, history rows and the Errors window share: the severity glyph and module values read from the chrome
+ * What cards, history rows and the Errors tab share: the severity glyph and module values read from the chrome
  * KitContext (colours, fonts and the former geometry as named metrics). Nothing here reads UIManager. Named poster artwork retains the severity tint; absent artwork uses the severity glyph.
  * EDT only.
  */

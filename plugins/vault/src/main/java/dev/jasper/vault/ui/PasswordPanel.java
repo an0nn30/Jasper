@@ -7,6 +7,7 @@ import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.sdk.ui.ViewSpec;
 import dev.jasper.vault.service.UnlockPrompt;
+import dev.jasper.vault.workstation.Layout;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -42,6 +43,9 @@ public final class PasswordPanel implements AutoCloseable {
     private String status = "";
     private Runnable onSubmit = () -> { }, onCancel = () -> { };
     private Host host;
+    /** The standalone unlock form's composition and its footer line (plan 10b Rulings 11). */
+    private Layout layout = Layout.ROWS;
+    private String footnote = "";
     private UiView own;
 
     private PasswordPanel(String prefix, String primaryTitle, boolean creating, boolean bindDefault, String introText) {
@@ -53,6 +57,18 @@ public final class PasswordPanel implements AutoCloseable {
     /** The unlock form in its own view, bound to {@code prompt}: Enter submits, errors show, the prompt's dismissal is the dialog's. */
     public static PasswordPanel unlock(UiKit kit, UnlockPrompt prompt) {
         var panel = unlockPanel("", prompt);
+        panel.own(kit);
+        return panel;
+    }
+
+    /**
+     * The unlock form in its own view in {@code layout}'s composition (plan 10b Rulings 11); under CLASSIC
+     * {@code footnote} is the footer's one line ("Auto-locks after 15 min idle"), blank for none.
+     */
+    public static PasswordPanel unlock(UiKit kit, UnlockPrompt prompt, Layout layout, String footnote) {
+        var panel = unlockPanel("", prompt);
+        panel.layout = Objects.requireNonNull(layout);
+        panel.footnote = Objects.requireNonNull(footnote);
         panel.own(kit);
         return panel;
     }
@@ -150,6 +166,7 @@ public final class PasswordPanel implements AutoCloseable {
 
     /** The standalone prompt; domain policy remains in the submit handler. */
     Nodes.Form node() {
+        if (layout == Layout.CLASSIC && !creating) return classicNode();
         var hero = new Nodes.Stack(form + ".hero", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, List.of(
             new Nodes.Icon(form + ".icon", ControlState.READY, creating ? "shield" : "lock.keyhole", Nodes.Hue.BLUE, Nodes.IconSize.PROMPT, creating ? "Protect credentials" : "Locked vault"),
             new Nodes.Text(form + ".heading", ControlState.READY, creating ? "Create Vault" : "Unlock Vault", Nodes.TextRole.PROMPT_TITLE),
@@ -173,6 +190,22 @@ public final class PasswordPanel implements AutoCloseable {
         sections.add(statusLine());
         return new Nodes.Form(form, ControlState.READY, creating ? Nodes.FormKind.PROMPT : Nodes.FormKind.PROMPT_COMPACT, primaryTitle, Optional.of(hero), sections, Optional.empty(),
             List.of(cancelButton(), submitButton()), cancel);
+    }
+
+    /**
+     * The classic Unlock Vault (spec 14.8): the lock tile beside the intro (the classic prompt face draws a PROMPT_HEADER
+     * that way; the dialog's header strip carries the title), the password in the label column with no hint, the footnote.
+     */
+    private Nodes.Form classicNode() {
+        var top = new Nodes.Stack(form + ".hero", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, List.of(
+            new Nodes.Icon(form + ".icon", ControlState.READY, "lock.keyhole", Nodes.Hue.BLUE, Nodes.IconSize.PROMPT, "Locked vault"),
+            new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.BODY)));
+        var sections = List.<Nodes.Node>of(
+            new Nodes.FormRow(form + ".row", ControlState.READY, "Master password", "",
+                new Nodes.Secret(password, state(password), "", "Master password", REVEAL_GROUP, Nodes.SecretKind.INPUT, "", submit), Optional.empty(), false),
+            statusLine());
+        return new Nodes.Form(form, ControlState.READY, Nodes.FormKind.PROMPT_COMPACT, primaryTitle, Optional.of(top), sections, Optional.empty(),
+            List.of(cancelButton(), submitButton()), cancel, Nodes.FormSubmission.PRIMARY, footnote);
     }
 
     /**

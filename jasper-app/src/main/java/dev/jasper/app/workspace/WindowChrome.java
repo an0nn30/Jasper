@@ -13,6 +13,7 @@ import dev.jasper.app.commands.Command;
 import dev.jasper.app.contributions.MenuEntry;
 import dev.jasper.app.contributions.MenuSection;
 import dev.jasper.app.contributions.MenuTarget;
+import dev.jasper.app.contributions.OtherTab;
 import dev.jasper.app.contributions.ToolbarEntry;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -43,6 +44,8 @@ final class WindowChrome {
     private final JCheckBoxMenuItem statusVisible = new MenuBarItems.CheckBox("Status Bar", true);
     private final JCheckBoxMenuItem railVisible = new MenuBarItems.CheckBox("Rail", true);
     private final java.util.EnumMap<MenuTarget.Slot, JMenu> standardMenus = new java.util.EnumMap<>(MenuTarget.Slot.class);
+    /** The built-once Tab menu's Split submenu, filled again on every contribution pass (workspace plan 8b Rulings 6). */
+    private final JMenu tabSplit;
     private final List<Component> contributedToolbar = new ArrayList<>();
     private final Map<JMenu, List<Component>> contributedSections = new LinkedHashMap<>();
     private final List<JMenu> contributedMenus = new ArrayList<>();
@@ -71,14 +74,15 @@ final class WindowChrome {
             new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, "titleSearch")),
             owner::paletteShortcut, composition);
         header = new WindowHeader(search, toolbar, composition);
+        dev.jasper.app.platform.AppIcons.chromeReceiver(header, owner.look().chromeArtwork());
         // With a native title the toolbar row is chrome, not a title-bar zone (spec 10.1).
         if (composition.titleBarZone()) dev.jasper.app.platform.ThemeZone.titleBar(header);
         header.setOpaque(true);
         // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.
         toolbar.putClientProperty(com.formdev.flatlaf.FlatClientProperties.COMPONENT_TITLE_BAR_CAPTION,
             (java.util.function.Function<Point, Boolean>) point -> null);
-        JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.OPEN_FILE, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
-            ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
+        JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_TERMINAL_WINDOW, ActionId.OPEN_FILE, ActionId.CLOSE_PANE, ActionId.CLOSE_TAB,
+            ActionId.CLOSE_WINDOW, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
             ActionId.FIND_PREVIOUS, ActionId.CLEAR_SCROLLBACK);
         JMenu view = menu("View", ActionId.COMMAND_PALETTE);
@@ -88,19 +92,18 @@ final class WindowChrome {
         zen.setAction(owner.action(ActionId.TOGGLE_ZEN_MODE));
         viewModes.add(zen);
         view.add(viewModes);
-        view.add(new MenuBarItems.Item(owner.action(ActionId.ZOOM_PANE)));
+        view.add(new MenuBarItems.Item(owner.action(ActionId.MAXIMIZE_PANE)));
         view.addSeparator();
         JMenu visibility = menu("Show/Hide");
         view.add(visibility);
         view.add(menu("Font Size", ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET));
-        JMenu pane = paneMenu();
-        JMenu tab = tabMenu();
+        tabSplit = splitMenu();
+        JMenu tab = tabMenu(tabSplit);
         // The look's layout decides which built-in menus the bar shows from the start (spec 10.2).
-        for (JMenu fixed : owner.look().menus().fixed(new MenuBarLayout.BuiltIn(file, edit, view, pane, tab))) menuBar.add(fixed);
+        for (JMenu fixed : owner.look().menus().fixed(new MenuBarLayout.BuiltIn(file, edit, view, tab))) menuBar.add(fixed);
         owner.look().menus().style(menuBar);
         standardMenus.put(MenuTarget.Slot.FILE, file); standardMenus.put(MenuTarget.Slot.EDIT, edit);
-        standardMenus.put(MenuTarget.Slot.VIEW, view); standardMenus.put(MenuTarget.Slot.PANE, pane);
-        standardMenus.put(MenuTarget.Slot.TAB, tab);
+        standardMenus.put(MenuTarget.Slot.VIEW, view); standardMenus.put(MenuTarget.Slot.TAB, tab);
         JMenu modes = menu("Toolbar");
         for (ToolbarMode mode : ToolbarMode.values()) {
             JRadioButtonMenuItem item = new MenuBarItems.Radio(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));
@@ -108,8 +111,8 @@ final class WindowChrome {
             toolbarModes.add(item); modes.add(item);
         }
         visibility.add(modes); visibility.add(statusVisible); visibility.add(railVisible);
-        statusVisible.setAction(owner.windowCommands().view("view.status_bar"));
-        railVisible.setAction(owner.windowCommands().view("view.rail"));
+        statusVisible.setAction(owner.action(ActionId.TOGGLE_STATUS_BAR));
+        railVisible.setAction(owner.action(ActionId.TOGGLE_RAIL));
         pluginSeparator.setName("pluginSeparator");
         composition.build(this);
         owner.action(ActionId.COMMAND_PALETTE).addPropertyChangeListener(event -> {
@@ -119,30 +122,32 @@ final class WindowChrome {
 
     /** IntelliJ grouping: tab and window, pane, plugin items, then Find and Settings, all packed right. */
     void buildUnifiedToolbar() {
-        addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
+        addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_TERMINAL_WINDOW, "app-window");
         toolbar.add(new ToolbarSeparator());
         addSplitButton();
-        addButton(ActionId.ZOOM_PANE, "maximize");
+        addButton(ActionId.MAXIMIZE_PANE, "maximize");
         pluginSeparator.setVisible(false);
         toolbar.add(pluginSeparator);
         toolbar.add(new ToolbarSeparator());
         addButton(ActionId.FIND, "search");
         addButton(ActionId.OPEN_SETTINGS, "settings");
+        // The window's ⋮ ends the toolbar and never gives way to its overflow menu (parent tabs spec 6).
+        toolbar.add(new WindowMenuButton(owner));
         toolbar.finish();
     }
 
-    /** A classic toolbar button for {@code id} in {@code into} (spec 10.3), its icon {@code icon} under icons only. */
-    ClassicToolbarButton classicButton(WindowToolbar into, ActionId id, String label, ClassicToolbarButton.Glyph glyph, String icon, int priority) {
-        var button = new ClassicToolbarButton(owner.action(id), label, glyph, false, AppIcons.icon(icon));
+    /** A classic toolbar button for {@code id} in {@code into} (spec 10.3): the icon {@code icon}, then its label when shown. */
+    ClassicToolbarButton classicButton(WindowToolbar into, ActionId id, String label, String icon, int priority) {
+        var button = new ClassicToolbarButton(owner.action(id), label, false, AppIcons.icon(icon));
         WindowToolbar.entry(button, priority, () -> WindowToolbar.menuItem(owner.action(id)));
         into.add(button);
         return button;
     }
 
-    /** The classic "Split ▾": a label and a caret opening Split Right and Split Down. */
+    /** The classic "Split ▾": its icon, label and caret (a corner ▼ under icons only) opening Split Right and Split Down. */
     void classicSplit() {
-        var split = new ClassicToolbarButton(null, "Split", ClassicToolbarButton.Glyph.NONE, true, AppIcons.icon("columns-2"));
-        split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");
+        var split = new ClassicToolbarButton(null, "Split", true, AppIcons.icon("columns-2"));
+        split.setToolTipText("Split right or down"); split.getAccessibleContext().setAccessibleName("Split");
         WindowToolbar.entry(split, 90, () -> {
             var menu = new JMenu("Split");
             menu.add(WindowToolbar.menuItem(owner.action(ActionId.SPLIT_RIGHT)));
@@ -161,6 +166,24 @@ final class WindowChrome {
         toolbar.add(split);
     }
 
+    /** The classic row's ⋮ in {@code into} ({@link #classicWindowMenu(WindowContent)}). */
+    void classicWindowMenu(WindowToolbar into) { into.add(classicWindowMenu(owner)); }
+
+    /**
+     * The classic ⋮ (parent tabs spec 6; workspace plan 7b Rulings 16): a 22 px classic icon button that opens
+     * {@code owner}'s window menu, with no label in any toolbar mode and no overflow entry. The classic row ends with it,
+     * and so does a child window's title row under a classic title.
+     */
+    static ClassicToolbarButton classicWindowMenu(WindowContent owner) {
+        var button = new ClassicToolbarButton(null, WindowMenuButton.LABEL, false, AppIcons.semantic("more.vertical"));
+        button.setName(WindowMenuButton.NAME);
+        button.putClientProperty("keepLabel", false);
+        button.setText(null);
+        WindowToolbar.pin(button);
+        button.addActionListener(event -> owner.showWindowMenu(button));
+        return button;
+    }
+
     /** A toolbar rule; a classic one is a 1 px {@code border.window} line. */
     JSeparator separator(boolean classic) { var rule = new ToolbarSeparator(); rule.classic = classic; return rule; }
 
@@ -173,6 +196,8 @@ final class WindowChrome {
 
     WindowToolbar windowToolbar() { return toolbar; }
     HeaderComposition composition() { return composition; }
+    /** The palette's shortcut as the window shows it, or blank when it has none. */
+    String paletteShortcut() { return owner.paletteShortcut(); }
 
     /** Today's contributed button, as UnifiedHeader draws it; a dropdown's shows its chevron and keeps its label. */
     JButton referenceButton(Action action, String label, Icon icon, boolean dropdown) {
@@ -197,7 +222,7 @@ final class WindowChrome {
     private void addSplitButton() {
         JButton split = addButton(ActionId.SPLIT_RIGHT, "columns-2");
         split.setAction(null); split.setText("Split"); split.setIcon(AppIcons.icon("columns-2"));
-        split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");
+        split.setToolTipText("Split right or down"); split.getAccessibleContext().setAccessibleName("Split");
         split.putClientProperty("keepLabel", true);
         WindowToolbar.entry(split, 90, () -> {
             var menu = new JMenu("Split");
@@ -299,15 +324,14 @@ final class WindowChrome {
                         if (live.isEmpty()) break;
                         JButton button = composition.contributed(this, null, dropdown.title(), dropdown.icon(), true);
                         WindowToolbar.entry(button, 80, () -> {
-                            var menu = new JMenu(dropdown.title());
-                            menu.putClientProperty("html.disable", true);
+                            var menu = PlainText.menu(dropdown.title());
                             live.forEach(action -> menu.add(WindowToolbar.menuItem(action)));
                             return menu;
                         });
                         button.addActionListener(event -> {
                             owner.updateActions();
                             JPopupMenu popup = new JPopupMenu();
-                            live.forEach(popup::add);
+                            live.forEach(action -> popup.add(PlainText.item(action)));
                             popup.show(button, 0, button.getHeight());
                         });
                         contributedToolbar.add(button);
@@ -326,6 +350,7 @@ final class WindowChrome {
                         // in a title-bar zone, the window chrome's in a classic row or under a native title.
                         if (mounted.component() instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) {
                             kit.toolbarStrip(true);
+                            kit.classicChromeIcons(owner.look().chromeArtwork() == dev.jasper.ui.icons.ChromeArtwork.CLASSIC);
                             kit.route(headerIsTitleBar() ? dev.jasper.ui.theme.ThemeRoute.TITLE_BAR : dev.jasper.ui.theme.ThemeRoute.CHROME);
                         }
                         WindowToolbar.view(mounted.component(), VIEW_PRIORITY);
@@ -357,7 +382,7 @@ final class WindowChrome {
                 case MenuEntry.Submenu submenu -> {
                     List<Component> children = build(submenu.entries(), item);
                     if (children.stream().noneMatch(child -> child instanceof JMenuItem)) break;
-                    JMenu menu = new JMenu(submenu.title());
+                    JMenu menu = PlainText.menu(submenu.title());
                     children.forEach(menu::add);
                     NativeStyles.installed().menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
                     built.add(menu);
@@ -391,6 +416,7 @@ final class WindowChrome {
         contributedMenus.clear();
         MenuBarLayout layout = owner.look().menus();
         if (contributions != null) {
+            fillSplit(tabSplit, MenuBarItems.Item::new);
             var sections = contributions.model().menus();
             // Session, Transfer and Tools hold only plugin entries and, like a plugin's own menu, are built fresh on
             // every pass and added to the bar only while they have any: a stale one would keep an old look and feel,
@@ -398,8 +424,8 @@ final class WindowChrome {
             standardMenus.put(MenuTarget.Slot.SESSION, menu("Session"));
             standardMenus.put(MenuTarget.Slot.TRANSFER, menu("Transfer"));
             standardMenus.put(MenuTarget.Slot.TOOLS, menu("Tools"));
-            // A layout that gathers Pane and Tab into another menu builds them fresh too.
-            layout.fresh(standardMenus, this::paneMenu, this::tabMenu);
+            // A layout that gathers Tab into another menu builds it fresh too.
+            layout.fresh(standardMenus, this::tabMenu);
             var toolWindows = contributions.model().toolWindowsSection();
             for (MenuSection section : sections) {
                 if (section.target().type() != MenuTarget.Type.STANDARD) continue;
@@ -420,7 +446,7 @@ final class WindowChrome {
                 if (section.target().type() != MenuTarget.Type.TOP_LEVEL) continue;
                 List<Component> built = build(section.entries(), MenuBarItems.Item::new);
                 if (built.isEmpty()) continue;
-                JMenu menu = observe(new JMenu(section.target().title()));
+                JMenu menu = observe(PlainText.menu(section.target().title()));
                 built.forEach(menu::add);
                 topLevel.add(new MenuBarLayout.TopMenu(menu, MenuTarget.HELP.equals(section.target().key())));
             }
@@ -434,13 +460,150 @@ final class WindowChrome {
         menuBar.revalidate(); menuBar.repaint();
     }
 
-    private static final ActionId[] PANE_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_PANE_LEFT,
+    /** The Tab menu's pane and prompt items after its Split submenu, before Rename Tab and its tab items (plan 8b Rulings 10). */
+    private static final ActionId[] GROUP_ITEMS = {ActionId.MOVE_PANE_TO_NEW_TAB, ActionId.FOCUS_PANE_LEFT,
         ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN, ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
-    private static final ActionId[] TAB_ITEMS = {ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.RENAME_TAB,
-        ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4,
-        ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6, ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9};
-    private JMenu paneMenu() { return menu("Pane", PANE_ITEMS); }
-    private JMenu tabMenu() { return menu("Tab", TAB_ITEMS); }
+    /** The tab items (tabs and panes spec 10): Next Tab, Previous Tab and Select Tab 1 to 9 switch the window's tabs. */
+    private static final ActionId[] TAB_ITEMS = {ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.SELECT_TAB_1,
+        ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4, ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6,
+        ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9};
+
+    /** Tab, built afresh for a layout that gathers it into another menu on every pass, with a Split submenu of its own. */
+    private JMenu tabMenu() { return tabMenu(splitMenu()); }
+
+    /**
+     * Tab (workspace plan 8b Rulings 10): the Split submenu {@code split}, Move Pane to New Tab, Move Pane to Tab (pane
+     * flexibility spec 4), Move Tab Into (spec 5; workspace plan 9a Rulings 22), focusing panes and moving between
+     * prompts, a rule, Rename Tab, a rule, the tab commands.
+     */
+    private JMenu tabMenu(JMenu split) {
+        JMenu menu = menu("Tab");
+        menu.add(split);
+        for (ActionId id : GROUP_ITEMS) {
+            menu.add(new MenuBarItems.Item(owner.action(id)));
+            // Move Pane to Tab follows Move Pane to New Tab (pane flexibility spec 4), and Move Tab Into follows it
+            // (spec 5); the menu fills them as it opens, since the window's tabs are not there yet while its chrome is
+            // built.
+            if (id == ActionId.MOVE_PANE_TO_NEW_TAB) {
+                JMenu moves = menu("Move Pane to Tab");
+                moves.setName(PANE_MOVES);
+                menu.add(moves);
+                JMenu into = menu("Move Tab Into");
+                into.setName(TAB_MOVES);
+                menu.add(into);
+            }
+        }
+        menu.addSeparator();
+        menu.add(new MenuBarItems.Item(owner.action(ActionId.RENAME_TAB)));
+        menu.addSeparator();
+        for (ActionId id : TAB_ITEMS) menu.add(new MenuBarItems.Item(owner.action(id)));
+        return menu;
+    }
+
+    /** A Split submenu for the menu bar, filled with the window's Split list. */
+    private JMenu splitMenu() {
+        JMenu split = menu("Split");
+        fillSplit(split, MenuBarItems.Item::new);
+        return split;
+    }
+
+    /**
+     * Fills {@code split} with the window's Split list (tabs and panes spec 2.10 and 8; workspace plan 8b Rulings 5 and 6):
+     * Terminal Right and Terminal Down, then each split item's Right and Down, the bundled plugins' first. Each entry is
+     * its action, showing its shortcut and no icon (Rulings 22), under the list's own label; an entry whose action this
+     * window no longer has is left out.
+     *
+     * @param split the submenu
+     * @param item makes a menu-bar item or an ordinary popup item for an action
+     */
+    private void fillSplit(JMenu split, java.util.function.Function<Action, JMenuItem> item) {
+        split.removeAll();
+        var entries = new ArrayList<Map.Entry<String, Action>>();
+        entries.add(Map.entry("Terminal Right", owner.action(ActionId.SPLIT_RIGHT)));
+        entries.add(Map.entry("Terminal Down", owner.action(ActionId.SPLIT_DOWN)));
+        if (contributions != null) for (var listed : contributions.model().splitItems()) {
+            Action right = contributions.action(listed.rightAction()), down = contributions.action(listed.downAction());
+            // An item that asks first ends its entries with an ellipsis (pane flexibility spec 3).
+            if (right != null) entries.add(Map.entry(listed.rightLabel(), right));
+            if (down != null) entries.add(Map.entry(listed.downLabel(), down));
+        }
+        for (var entry : entries) {
+            JMenuItem built = item.apply(entry.getValue());
+            built.setHideActionText(true);
+            // A plugin's label is plain text: html.disable first, as the UI reads it only when the text changes.
+            built.putClientProperty("html.disable", true);
+            built.setText(entry.getKey());
+            built.setIcon(null);
+            split.add(built);
+        }
+    }
+
+    /** The name of a Move Pane to Tab submenu, which the menu holding it fills as it opens ({@link #observe}). */
+    static final String PANE_MOVES = "movePaneToTab";
+    /** The name of the Tab menu's Move Tab Into submenu, which the menu holding it fills as it opens. */
+    static final String TAB_MOVES = "moveTabInto";
+
+    /**
+     * Fills {@code moves}, a Move Pane to Tab submenu (pane flexibility spec 4; workspace plan 9a Rulings 5 and 6), for
+     * the focused pane: an entry for each other tab of the window, its number and title as plain text, that moves the
+     * pane there; the first nine run Move Pane to Tab 1 to 9 and show their keys. Disabled while there is none: one tab,
+     * or a pane that may not move.
+     *
+     * @param moves the submenu
+     * @param item makes a menu-bar item or an ordinary popup item for an action
+     * @return the submenu
+     */
+    private JMenu paneMoves(JMenu moves, java.util.function.Function<Action, JMenuItem> item) {
+        return fillMoves(moves, owner.paneTargets(owner.selectedTab()), ActionId.MOVE_PANE_TO_TAB_1,
+            index -> owner.moveToTab(owner.selectedTab(), index), item);
+    }
+
+    /**
+     * Fills {@code moves}, the Tab menu's Move Tab Into submenu (pane flexibility spec 5; workspace plan 9a Rulings
+     * 22), for the window's shown tab, as {@link #paneMoves} fills Move Pane to Tab: an entry for each other tab, its
+     * number and title as plain text, that moves every pane of the shown tab there; the first nine run Move Tab Into
+     * Tab 1 to 9 and show their keys. Disabled while there is none: one tab, or a tab holding an item that may not
+     * move.
+     */
+    private JMenu tabMoves(JMenu moves) {
+        return fillMoves(moves, owner.tabTargets(owner.activeParentTab()), ActionId.MOVE_TAB_INTO_TAB_1,
+            index -> owner.moveTabIntoTab(owner.activeParentTab(), index), MenuBarItems.Item::new);
+    }
+
+    /**
+     * Fills {@code moves} with an entry for each of {@code targets}, its number and title as plain text: the first nine
+     * run the action numbered as it from {@code first} and show its keys, a later one runs {@code beyond} with its
+     * place in the strip. Disabled while there is no target.
+     */
+    private JMenu fillMoves(JMenu moves, List<OtherTab> targets, ActionId first, java.util.function.IntConsumer beyond,
+                            java.util.function.Function<Action, JMenuItem> item) {
+        moves.removeAll();
+        for (var target : targets) {
+            int index = target.number() - 1;
+            Action run = index < 9 ? owner.action(ActionId.values()[first.ordinal() + index])
+                : new AbstractAction() {
+                    @Override public void actionPerformed(ActionEvent event) { beyond.accept(index); }
+                };
+            JMenuItem built = item.apply(run);
+            built.setHideActionText(true);
+            // A tab's title is plain text: html.disable first, as the UI reads it only when the text changes.
+            built.putClientProperty("html.disable", true);
+            built.setText(target.label());
+            built.setIcon(null);
+            moves.add(built);
+        }
+        moves.setEnabled(!targets.isEmpty());
+        return moves;
+    }
+
+    /** Fills each Move Pane to Tab and Move Tab Into submenu {@code menu} holds, as {@code menu} opens. */
+    private void refreshPaneMoves(JMenu menu) {
+        for (Component child : menu.getMenuComponents()) {
+            if (!(child instanceof JMenu moves)) continue;
+            if (PANE_MOVES.equals(moves.getName())) paneMoves(moves, MenuBarItems.Item::new);
+            else if (TAB_MOVES.equals(moves.getName())) tabMoves(moves);
+        }
+    }
 
     /** One item per tool window whose toggle action this window has, in registration order. */
     private List<JMenuItem> toolWindowItems() {
@@ -462,7 +625,7 @@ final class WindowChrome {
     private JMenu observe(JMenu menu) {
         NativeStyles.installed().menu(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         menu.addMenuListener(new MenuListener() {
-            @Override public void menuSelected(MenuEvent event) { owner.updateActions(); }
+            @Override public void menuSelected(MenuEvent event) { owner.updateActions(); refreshPaneMoves(menu); }
             @Override public void menuDeselected(MenuEvent event) {}
             @Override public void menuCanceled(MenuEvent event) {}
         });
@@ -471,8 +634,8 @@ final class WindowChrome {
 
     private JButton addButton(ActionId id, String icon) {
         String label = switch (id) {
-            case NEW_TAB -> "New tab"; case NEW_WINDOW -> "New window";
-            case SPLIT_RIGHT -> "Split"; case ZOOM_PANE -> "Zoom pane";
+            case NEW_TAB -> "New tab"; case NEW_TERMINAL_WINDOW -> "New terminal window";
+            case SPLIT_RIGHT -> "Split"; case MAXIMIZE_PANE -> "Maximize pane";
             case RELOAD_CONFIG -> "Reload config"; case QUIT -> "Exit"; default -> id.label();
         };
         ReferenceButton button = new ReferenceButton(owner.action(id), id);
@@ -501,7 +664,14 @@ final class WindowChrome {
         private final ActionId id;
 
         private boolean chevron;
-        ReferenceButton(Action action, ActionId id) { super(action); this.id = id; setRolloverEnabled(true); }
+        ReferenceButton(Action action, ActionId id) {
+            this.id = id;
+            // A plugin's action name is plain text: html.disable first, as the UI reads it only when the text changes.
+            putClientProperty("html.disable", true);
+            setAction(action);
+            setRolloverEnabled(true);
+        }
+        @Override public JToolTip createToolTip() { return PlainText.plain(super.createToolTip()); }
         private boolean labels() { return getText() != null; }
         private boolean menu() { return id == ActionId.SPLIT_RIGHT || chevron; }
 
@@ -563,12 +733,23 @@ final class WindowChrome {
     JPopupMenu contextMenu() {
         owner.updateActions();
         JPopupMenu menu = new JPopupMenu();
-        for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.CLEAR_TERMINAL,
-            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.ZOOM_PANE, ActionId.CLOSE_PANE}) menu.add(owner.action(id));
+        for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.CLEAR_TERMINAL})
+            menu.add(owner.action(id));
+        // The Split list, as the Tab menu has it (tabs and panes spec 2.10; workspace plan 8b Rulings 6).
+        JMenu split = new JMenu("Split");
+        fillSplit(split, PlainText::item);
+        menu.add(split);
+        menu.add(owner.action(ActionId.MOVE_PANE_TO_NEW_TAB));
+        // Move Pane to Tab follows Move Pane to New Tab (pane flexibility spec 4).
+        menu.add(paneMoves(new JMenu("Move Pane to Tab"), PlainText::item));
+        for (ActionId id : new ActionId[]{ActionId.MAXIMIZE_PANE, ActionId.CLOSE_PANE}) menu.add(owner.action(id));
+        // The window menu's entries, for a window whose strip hides (tabs and panes spec 6).
+        menu.addSeparator();
+        for (ActionId id : owner.windowMenuItems()) menu.add(owner.action(id));
         if (contributions != null) {
             for (MenuSection section : contributions.model().menus()) {
                 if (section.target().type() != MenuTarget.Type.CONTEXT) continue;
-                List<Component> built = build(section.entries(), JMenuItem::new);
+                List<Component> built = build(section.entries(), PlainText::item);
                 if (built.isEmpty()) continue;
                 menu.addSeparator();
                 built.forEach(menu::add);

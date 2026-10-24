@@ -2,7 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.terminals.PaneEntry;
 import dev.jasper.app.terminals.PaneSnapshot;
-import dev.jasper.app.terminals.SplitAxis;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.terminals.TabEntry;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
@@ -55,10 +55,11 @@ class WindowTerminalsTest {
         edt(() -> {
             WindowEntry window = registry.windows().get(0);
             TabEntry tab = window.tabs().get().get(0);
-            PaneEntry pane = tab.panes().get().get(0);
+            PaneEntry pane = tab.terminal().get().orElseThrow();
             assertThat(window.id()).isEqualTo(owner.id());
             assertThat(window.selectedTab().get()).contains(tab);
-            assertThat(tab.focusedPane().get()).contains(pane);
+            assertThat(tab.terminal().get()).contains(pane);
+            assertThat(tab.kind()).isEqualTo(TabEntry.Kind.TERMINAL);
             assertThat(tab.windowId()).isEqualTo(window.id());
             assertThat(pane.tabId()).isEqualTo(tab.id());
             assertThat(events).containsExactly(new TerminalEvent.WindowOpened(window.id()), new TerminalEvent.TabOpened(window.id(), tab.id()),
@@ -71,7 +72,7 @@ class WindowTerminalsTest {
             pane.paste().accept("ignored");
             assertThat(pane.selection().get()).isEmpty();
             assertThat(pane.foregroundJob().get()).isCompletedWithValue(Optional.empty());
-            assertThat(pane.split().apply(SplitAxis.RIGHT, new OpenSpec.Local(Optional.empty()))).as("nothing runs there yet").isEmpty();
+            assertThat(pane.split().apply(Side.RIGHT, new OpenSpec.Local(Optional.empty()))).as("nothing runs there yet").isEmpty();
             registry.windowActivated(window.id());
             assertThat(registry.activePane()).contains(pane);
             window.toFront().run();
@@ -79,10 +80,45 @@ class WindowTerminalsTest {
         });
     }
 
+    @Test void aPluginsTabIsListedOpenedMovedAndClosedLikeATerminalTab() throws Exception {
+        open();
+        WindowContent[] other = new WindowContent[1];
+        edt(() -> {
+            var model = new dev.jasper.app.contributions.Contributions();
+            owner.connectContributions(model);
+            other[0] = content(launcher(pending));
+            other[0].connectContributions(model);
+            other[0].connectTerminals(registry, () -> { });
+            UUID windowId = owner.id(), otherId = other[0].id();
+            registry.windowActivated(windowId);
+            events.clear();
+            var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", windowId, new javax.swing.JPanel());
+            UUID tabId = view.id().value();
+            assertThat(events).containsSubsequence(new TerminalEvent.TabOpened(windowId, tabId), new TerminalEvent.TabSelected(windowId, tabId),
+                new TerminalEvent.ActivePaneChanged(Optional.empty()));
+            WindowEntry window = registry.window(windowId).orElseThrow();
+            assertThat(window.tabs().get()).extracting(TabEntry::kind).containsExactly(TabEntry.Kind.TERMINAL, TabEntry.Kind.CONTENT);
+            TabEntry entry = window.selectedTab().get().orElseThrow();
+            assertThat(entry.id()).isEqualTo(tabId);
+            assertThat(entry.terminal().get()).isEmpty();
+            assertThat(entry.title().get()).isEqualTo("notes.txt");
+            assertThat(registry.activePane()).as("a plugin's tab has no terminal").isEmpty();
+            events.clear();
+            model.tabs().move(view, otherId);
+            assertThat(events).filteredOn(TerminalEvent.TabMoved.class::isInstance).containsExactly(new TerminalEvent.TabMoved(tabId, windowId, otherId));
+            assertThat(events).contains(new TerminalEvent.TabSelected(otherId, tabId));
+            assertThat(events).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
+            assertThat(registry.tab(tabId).orElseThrow().windowId()).isEqualTo(otherId);
+            events.clear();
+            view.close();
+            assertThat(events).contains(new TerminalEvent.TabClosed(otherId, tabId));
+        });
+    }
+
     @Test void tabsSplitsInjectionAndExitAreReported() throws Exception {
         open();
         UUID windowId = owner.id();
-        PaneEntry first = onEdt(() -> registry.windows().get(0).tabs().get().get(0).panes().get().get(0));
+        PaneEntry first = onEdt(() -> registry.windows().get(0).tabs().get().get(0).terminal().get().orElseThrow());
         pending.remove().run();
         until(() -> first.snapshot().get().state() == PaneSnapshot.State.RUNNING);
         edt(() -> {
@@ -90,11 +126,15 @@ class WindowTerminalsTest {
             assertThat(first.snapshot().get().columns()).isPositive();
         });
 
-        Optional<PaneEntry> split = onEdt(() -> first.split().apply(SplitAxis.DOWN, new OpenSpec.Local(Optional.empty())));
+        Optional<PaneEntry> split = onEdt(() -> first.split().apply(Side.DOWN, new OpenSpec.Local(Optional.empty())));
         assertThat(split).isPresent();
         edt(() -> {
-            assertThat(events).contains(new TerminalEvent.PaneOpened(first.tabId(), split.get().id()));
-            assertThat(registry.tab(first.tabId()).orElseThrow().panes().get()).containsExactly(first, split.get());
+            UUID splitTab = split.get().tabId();
+            assertThat(splitTab).as("a split is a terminal tab of its own").isNotEqualTo(first.tabId());
+            assertThat(events).contains(new TerminalEvent.TabOpened(windowId, splitTab), new TerminalEvent.PaneOpened(splitTab, split.get().id()));
+            assertThat(registry.tab(splitTab).orElseThrow().terminal().get()).contains(split.get());
+            assertThat(registry.tab(first.tabId()).orElseThrow().terminal().get()).contains(first);
+            assertThat(owner.workspace().model().groups()).as("in a new group below").hasSize(2);
         });
 
         Optional<PaneEntry> opened = onEdt(() -> registry.window(windowId).orElseThrow().openTab().apply(new OpenSpec.Local(Optional.of(HOME))));
@@ -118,11 +158,11 @@ class WindowTerminalsTest {
         edt(() -> {
             events.clear();
             registry.windowActivated(windowId);
-            owner.closeTab(owner.currentTab());
+            owner.closeTab(owner.currentTerminal());
             assertThat(events).containsExactly(new TerminalEvent.WindowActivated(windowId),
                 new TerminalEvent.ActivePaneChanged(Optional.of(opened.get().id())),
                 new TerminalEvent.PaneClosed(secondTab, opened.get().id()), new TerminalEvent.TabClosed(windowId, secondTab),
-                new TerminalEvent.TabSelected(windowId, first.tabId()),
+                new TerminalEvent.TabSelected(windowId, split.get().tabId()),
                 new TerminalEvent.ActivePaneChanged(registry.activePane().map(PaneEntry::id)));
             events.clear();
             owner.close();

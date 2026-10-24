@@ -177,7 +177,7 @@ class PanelSurfacesTest {
                 for (int width : new int[] {s(462), s(240)}) {
                     KitFixtures.render(view, width, s(120), 1);
                     var strip = find(view, "route", JComponent.class);
-                    assertThat(strip.getHeight()).isEqualTo(metric(DesignMetrics.Role.ROUTE_TOP) + metric(DesignMetrics.Role.ROUTE_HEIGHT));
+                    assertThat(strip.getHeight()).isEqualTo(metric(DesignMetrics.Role.ROUTE_TOP) + Math.max(metric(DesignMetrics.Role.ROUTE_HEIGHT), find(view,"from",JComponent.class).getPreferredSize().height + 2 * (metric(DesignMetrics.Role.HAIRLINE) + metric(DesignMetrics.Role.ROUTE_VERTICAL_PADDING))));
                     assertThat(((Stacks.StackSurface) strip).arrows).as("an arrow before each later step").hasSize(2);
                     var from = find(view, "from", JComponent.class); var via = find(view, "via", JComponent.class); var to = find(view, "to", JComponent.class);
                     int column = (strip.getWidth() - 2 * (metric(DesignMetrics.Role.HAIRLINE) + metric(DesignMetrics.Role.ROUTE_PADDING))) / 3;
@@ -211,6 +211,20 @@ class PanelSurfacesTest {
             } finally { release(ctx); }
             assertThatThrownBy(() -> new Nodes.Choice("bad", READY, ChoiceKind.EXCLUSIVE, options, "a", "Bad", "", "", Optional.empty(), Optional.of(face)))
                 .hasMessageContaining("PICKER or DROPDOWN");
+        });
+    }
+
+    @Test void aFormRowCaptionsTooltipIsPlainText() {
+        Edt.run(() -> {
+            var ctx = KitFixtures.context();
+            var row = new FormRow("row", READY, "Forward To", "<html><b>x</b>",
+                new Field("host", READY, FieldKind.TEXT, "localhost", "", "Target host", ""), Optional.empty());
+            try (var view = new KitView(ctx, new ViewSpec(new Stack("root", READY, LayoutRole.VERTICAL, List.of(row))), e -> {})) {
+                var caption = find(view, "row.caption", JComponent.class);
+                var tip = caption.createToolTip(); tip.setTipText(caption.getToolTipText());
+                assertThat(tip.getTipText()).isEqualTo("<html><b>x</b>");
+                assertThat(tip.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).as("a plugin's caption builds no HTML view").isNull();
+            } finally { release(ctx); }
         });
     }
 

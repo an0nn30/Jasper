@@ -18,7 +18,7 @@ public record ShellProfileInfo(String id, String name, Kind kind, Optional<Strin
     public enum Kind {
         /** The platform's login shell, which Jasper starts when nothing else is configured (macOS and Linux, id {@code login}). */
         LOGIN_SHELL,
-        /** A shell installed on this machine, such as PowerShell, PowerShell 7 or Command Prompt. */
+        /** A shell installed on this machine, such as PowerShell, PowerShell 7, Command Prompt or Cygwin Bash. */
         LOCAL_SHELL,
         /** A Windows Subsystem for Linux distribution. */
         WSL,

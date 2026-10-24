@@ -18,7 +18,7 @@ public final class IconRegistry implements AutoCloseable {
         java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> new IconArtwork(entry.getValue())));
     // Only explicitly authored built-ins opt into silhouette fill. Public registrations retain
     // the validated outline stroke contract; a name suffix does not grant filled painting.
-    private static final Set<String> FILLED_BUILT_INS = Set.of("folder.filled", "play.filled", "triangle.down");
+    private static final Set<String> FILLED_BUILT_INS = Set.of("folder.filled", "play.filled", "triangle.down", "run");
     // Original compact-panel sources establish lighter plus/search/pencil/import outlines. Other built-ins
     // retain the common optical stroke; custom registrations never enter this catalog.
     private static final Set<String> FINE_PANEL_BUILT_INS = Set.of("add", "search", "edit", "import");
@@ -31,7 +31,7 @@ public final class IconRegistry implements AutoCloseable {
     public IconRegistry() { prepareBuiltIns(); artworks.putAll(BUILT_INS); }
     /** Optional off-EDT production prewarm; standalone construction remains self-contained. */
     public static void prepareBuiltIns() { BuiltInArtwork.catalog(); BuiltInArtwork.chrome(); }
-    public synchronized Set<String> names() { requireOpen(); var names = new java.util.HashSet<>(artworks.keySet()); names.addAll(encoded.keySet()); names.addAll(BuiltInArtwork.catalog().keySet()); return Set.copyOf(names); }
+    public synchronized Set<String> names() { requireOpen(); var names = new java.util.HashSet<>(artworks.keySet()); names.addAll(encoded.keySet()); names.addAll(BuiltInArtwork.EDITOR_NAMES); names.addAll(BuiltInArtwork.catalog().keySet()); return Set.copyOf(names); }
     public synchronized IconRegistration register(String name, String pathData) {
         requireOpen(); Objects.requireNonNull(name);
         if (!name.matches("[a-z][a-z0-9.-]*:[a-z][a-z0-9.-]*")) throw new IllegalArgumentException("Icon name must be namespace:name");
@@ -59,7 +59,7 @@ public final class IconRegistry implements AutoCloseable {
     public synchronized boolean authored(String name) { return authored(name,false); }
     /** Whether this ordinary/compact context retains authored ink instead of re-tinting on hover. */
     public synchronized boolean authored(String name, boolean compact) {
-        return encoded.containsKey(name) || (compact ? BuiltInArtwork.IDENTITIES.contains(name) : BuiltInArtwork.catalog().containsKey(name));
+        return encoded.containsKey(name) || BuiltInArtwork.EDITOR_NAMES.contains(name) || (compact ? BuiltInArtwork.IDENTITIES.contains(name) : BuiltInArtwork.catalog().containsKey(name));
     }
     public Icon icon(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
         return ordinary(name, null, palette, tint(palette,hue), logicalSize);
@@ -76,6 +76,8 @@ public final class IconRegistry implements AutoCloseable {
         return painted(name,foreground,null,size,size,false,false,0,false,select(name,theme,palette,true),false);
     }
     private DecodedArtwork select(String name, GeneratedTheme theme, SemanticPalette palette, boolean ordinary) {
+        var editor = BuiltInArtwork.editor(name);
+        if (editor != null) return editor.select(theme != null ? theme.dark() : ColorMath.luminance(palette.color(SemanticColor.SURFACE_PANEL)) < .5);
         var pair=BuiltInArtwork.catalog().get(name);
         // Palette-only compatibility admits identity meanings, preserving the legacy settings/chevron contexts.
         if(pair==null || (!BuiltInArtwork.IDENTITIES.contains(name) && (!ordinary || theme==null)))return null;
@@ -83,19 +85,66 @@ public final class IconRegistry implements AutoCloseable {
         return pair.select(dark);
     }
     /** Prepared native receiving snapshot. Both siblings are retained independently of the decoder size cache. */
-    public PreparedIcon themedIcon(String name, int logicalSize) { return prepared(name, logicalSize, false); }
+    public PreparedIcon themedIcon(String name, int logicalSize) { return prepared(name, logicalSize, null); }
     /**
      * As {@link #themedIcon}, for the native workspace chrome's own receiving contexts (title bar, toolbar, tool window
      * stripes and status bar): the meanings that chrome depicts use their original desktop artwork. Every other name, and
-     * every descriptor, panel, tile or plugin-registered context, is unchanged.
+     * every descriptor, panel, tile or plugin-registered context, is unchanged. The same as
+     * {@code chromeIcon(name, logicalSize, ChromeArtwork.NEW_UI)}.
      */
-    public PreparedIcon chromeIcon(String name, int logicalSize) { return prepared(name, logicalSize, true); }
-    private PreparedIcon prepared(String name, int logicalSize, boolean chrome) {
+    public PreparedIcon chromeIcon(String name, int logicalSize) { return chromeIcon(name, logicalSize, ChromeArtwork.NEW_UI); }
+    /**
+     * As {@link #chromeIcon(String, int)}, for a receiver marked with the given chrome artwork: under
+     * {@link ChromeArtwork#CLASSIC} the meanings the classic set has use IntelliJ's classic icons, and every other name
+     * falls back to the New UI originals, then the catalog.
+     */
+    public PreparedIcon chromeIcon(String name, int logicalSize, ChromeArtwork artwork) {
+        return prepared(name, logicalSize, Objects.requireNonNull(artwork));
+    }
+    /**
+     * IntelliJ's classic chrome art for {@code name} when it is one of {@link #classicChromeNames()}: the same as
+     * {@code chromeIcon(name, logicalSize, ChromeArtwork.CLASSIC)}. Every other name gives empty, so a tool window header
+     * or toolbar view under the classic chrome icons keeps its own art for it.
+     *
+     * @param name the icon's name
+     * @param logicalSize the icon's size
+     * @return the prepared classic art, or empty for a name outside the classic set
+     */
+    public java.util.Optional<PreparedIcon> classicChromeIcon(String name, int logicalSize) {
+        return BuiltInArtwork.CLASSIC_NAMES.contains(name)
+            ? java.util.Optional.of(chromeIcon(name, logicalSize, ChromeArtwork.CLASSIC)) : java.util.Optional.empty();
+    }
+    /**
+     * The six names IntelliJ's classic chrome set draws. Asking decodes nothing.
+     *
+     * @return the classic chrome names
+     */
+    public static java.util.Set<String> classicChromeNames() { return BuiltInArtwork.CLASSIC_NAMES; }
+    /**
+     * IntelliJ's classic 13 px tool-window icon for {@code name}, light and dark, authored and untinted, for a labelled
+     * tool window stripe under {@link ChromeArtwork#CLASSIC}. Every other name has no file here, and the caller draws its
+     * own glyph; an unknown or plugin name gives empty. {@link #chromeIcon(String, int, ChromeArtwork)} never returns
+     * these files: the header's and status bar's classic set is unchanged.
+     */
+    public synchronized java.util.Optional<PreparedIcon> stripeIcon(String name, int logicalSize) {
+        requireOpen();
+        var pair = BuiltInArtwork.classicStripes().get(name);
+        if (pair == null) return java.util.Optional.empty();
+        Icon light = painted(name, Color.BLACK, null, logicalSize, logicalSize, false, false, 0, false, pair.light(), false);
+        Icon dark = painted(name, Color.BLACK, null, logicalSize, logicalSize, false, false, 0, false, pair.dark(), false);
+        return java.util.Optional.of(new PreparedIcon(name, logicalSize, artworks.get(name), light, dark));
+    }
+    /** {@code artwork} is null for an ordinary native context, which never receives chrome artwork. */
+    private PreparedIcon prepared(String name, int logicalSize, ChromeArtwork artwork) {
         synchronized(this) {
             requireOpen();
             if(!names().contains(name))throw new IllegalArgumentException("Unknown icon: "+name);
             // Chrome originals are keyed by built-in meanings; namespaced registrations can never collide with them.
-            var pair=chrome && BuiltInArtwork.chrome().containsKey(name) ? BuiltInArtwork.chrome().get(name) : BuiltInArtwork.catalog().get(name);
+            BuiltInArtwork.Pair pair=null;
+            if(artwork==ChromeArtwork.CLASSIC)pair=BuiltInArtwork.classicChrome().get(name);
+            if(pair==null && artwork!=null)pair=BuiltInArtwork.chrome().get(name);
+            if(pair==null)pair=BuiltInArtwork.editor(name);
+            if(pair==null)pair=BuiltInArtwork.catalog().get(name);
             var path=artworks.get(name);
             var registration=encoded.get(name);
             var received=registration==null?null:registration.artwork();
@@ -242,7 +291,7 @@ public final class IconRegistry implements AutoCloseable {
             case RAIL -> DesignMetrics.Role.ICON_RAIL;
             case EMPTY -> DesignMetrics.Role.ICON_EMPTY;
             case PROMPT -> DesignMetrics.Role.ICON_PROMPT;
-            case SWATCH -> DesignMetrics.Role.ICON_CAPTION;
+            case SWATCH -> DesignMetrics.Role.ICON_SWATCH;
         });
     }
     private Icon painted(String name, Color foreground, Color background, int size, boolean tile) {
@@ -413,6 +462,9 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("chevron.left", "M 10 4 L 6 8 L 10 12"),
             Map.entry("terminal", "M 2 3 H 14 V 13 H 2 Z M 4 6 L 7 8 L 4 10 M 9 10 H 12"),
             Map.entry("play", "M 5 2 L 14 8 L 5 14 Z"),
+            // Vector fallbacks for the authored run and application artwork in panel, prompt and tile contexts (Jasper originals).
+            Map.entry("run", "M 4.5 2.5 L 13.5 8 L 4.5 13.5 Z"),
+            Map.entry("application", "M 1.5 2.5 H 14.5 V 13.5 H 1.5 Z M 1.5 5.5 H 14.5"),
             // The Run window's solid help glyph and its Open field's menu arrow (plan 8a), as the mocks draw them.
             Map.entry("play.filled", "M 4 3 L 13 8 L 4 13 Z"),
             Map.entry("triangle.down", "M 4.5 4.5 L 11.5 4.5 L 8 12.5 Z"),

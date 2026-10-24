@@ -2,7 +2,7 @@ package dev.jasper.sdk.ui;
 
 import dev.jasper.sdk.Subscription;
 
-/** The main toolbar's plugin section, which follows the built-in buttons in every window. */
+/** The main toolbar's plugin section, which follows the built-in buttons in the main window, the only window with a toolbar. */
 public interface Toolbar {
     /**
      * Adds an item on the UI thread.

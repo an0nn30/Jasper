@@ -51,7 +51,7 @@ final class PluginPanelPage implements SettingsPage {
                     PageContext context) {
         this.pluginId = pluginId; this.title = title; this.declared = declared; this.panel = panel;
         this.containment = containment; this.context = context;
-        kitRows = new KitSettingRows(rowHost, this::settingSpec, rowHost::unset, this::chooseFile, context.chrome().inlineReset());
+        kitRows = new KitSettingRows(rowHost, this::settingSpec, setting -> declared.handle(setting).defaultValue(), rowHost::unset, this::chooseFile, context.chrome().inlineReset());
         draft = new SettingsDraft(declared.values());
         stopListening = declared.onReloaded(() -> {
             draft.rebase(declared.values());
@@ -95,7 +95,15 @@ final class PluginPanelPage implements SettingsPage {
         var made = new AtomicReference<JComponent>();
         Throwable failure = containment.attempt(pluginId, "settings page", () -> { var owned=java.util.Objects.requireNonNull(panel.create(rowHost),"Settings view");
             var next=kit.requireOwned(owned);next.mount(this);view=next;view.hostSpec=kitRows::refresh;view.hostModule=kitRows::menus;
-                view.hostEvents=event -> {boolean handled=kitRows.event(event);if(handled)refreshRows();return handled;};
+                view.hostEvents=event -> {
+                    if (disposed) return false;
+                    boolean handled = kitRows.event(event);
+                    if (handled) {
+                        refreshRows();
+                        containment.run(pluginId, "settings page pending changed", panel::pendingChanged);
+                    }
+                    return handled;
+                };
                 // The plugin's first view has no host menus yet (spec 12.1): project it once now.
                 if(!context.chrome().inlineReset())refreshRows();
                 made.set(view.component());

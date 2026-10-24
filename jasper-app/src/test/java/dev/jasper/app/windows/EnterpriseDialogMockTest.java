@@ -96,16 +96,32 @@ class EnterpriseDialogMockTest {
         } finally { themes.close(); EnterpriseLook.restoreDefault(); }
     }
 
-    /** The body, 12 px (2×) inside the frame's left edge and 64 below its top (under the strip): the kit's dialog surface, the mock's #ECEDEF. */
-    static void body(String what, Rendered rendered, int x, int y, BufferedImage mock, int mockX, int mockY) {
+    /** The body, 12 px (2×) inside the frame's left edge and 64 below its top (under the strip): the kit's dialog surface. */
+    static void body(String what, Rendered rendered, int x, int y) {
         var at = MockProfile.at(rendered.image(), x, y);
         assertThat(at).as(what + " body is the kit's dialog surface").isEqualTo(new Color(rendered.dialogSurface().getRGB() & 0xFFFFFF));
-        assertThat(MockProfile.deltaE(at, MockProfile.at(mock, mockX, mockY))).as(what + " body against the mock").isLessThanOrEqualTo(2.5);
+        assertThat(MockProfile.deltaE(at, MockProfile.role(false, dialogSurface().key()))).as(what + " body is the shipped theme's").isLessThanOrEqualTo(2.5);
     }
 
-    static void same(String what, MockProfile.Run actual, MockProfile.Run expected, int tolerance) {
+    /** The kit's dialog surface, which the frame, the strip's rule and the body are held against. */
+    static SemanticColor dialogSurface() { return EnterpriseLook.kit().colors().dialogSurface(); }
+
+    /** The frame, the header strip and its rule from the top, as the shipped Light theme paints them. */
+    static Color[] top() {
+        return new Color[] {MockProfile.painted(false, ClassicDialog.frame(dialogSurface())), MockProfile.role(false, "surface.header.active"),
+            MockProfile.painted(false, ClassicDialog.stripRule(dialogSurface()))};
+    }
+
+    /** The frame, the footer band and the band's rule from the bottom, as the shipped Light theme paints them. */
+    static Color[] bottom() {
+        return new Color[] {MockProfile.painted(false, ClassicDialog.frame(dialogSurface())), MockProfile.role(false, "surface.footer"),
+            MockProfile.painted(false, ClassicDialog.BAND_RULE)};
+    }
+
+    /** The run is the mock's length (within {@code tolerance}) in the colour the shipped theme paints there, {@code colour}. */
+    static void same(String what, MockProfile.Run actual, MockProfile.Run expected, int tolerance, Color colour) {
         assertThat(actual.length()).as(what + " length").isCloseTo(expected.length(), within(tolerance));
-        assertThat(MockProfile.deltaE(actual.color(), expected.color())).as(what + " colour").isLessThanOrEqualTo(2.5);
+        assertThat(MockProfile.deltaE(actual.color(), colour)).as(what + " colour").isLessThanOrEqualTo(2.5);
     }
 
     @Test void unlockVaultIsCredentialVaultOnesChrome() {
@@ -123,18 +139,20 @@ class EnterpriseDialogMockTest {
         var expected = MockProfile.solid(MockProfile.column(mock, UNLOCK_FRAME.x + UNLOCK_FRAME.width - 16, UNLOCK_FRAME.y, UNLOCK_FRAME.y + UNLOCK_FRAME.height), 2);
         var actual = MockProfile.solid(MockProfile.column(image, 2 * (card.x + card.width) - 16, 2 * card.y, 2 * (card.y + card.height)), 2);
         String[] top = {"frame", "header strip", "strip rule"};
-        for (int i = 0; i < 3; i++) same("unlock " + top[i], actual.get(i), expected.get(i), 2);
+        for (int i = 0; i < 3; i++) same("unlock " + top[i], actual.get(i), expected.get(i), 2, top()[i]);
         String[] bottom = {"frame", "footer band", "band rule"};
-        for (int i = 1; i <= 3; i++) same("unlock bottom " + bottom[i - 1], actual.get(actual.size() - i), expected.get(expected.size() - i), 2);
-        body("unlock", rendered, 2 * card.x + 12, 2 * card.y + 64, mock, UNLOCK_FRAME.x + 12, UNLOCK_FRAME.y + 64);
+        for (int i = 1; i <= 3; i++)
+            same("unlock bottom " + bottom[i - 1], actual.get(actual.size() - i), expected.get(expected.size() - i), 2, bottom()[i - 1]);
+        body("unlock", rendered, 2 * card.x + 12, 2 * card.y + 64);
         // The title, 10 in and 8 down in the strip, in the semibold UI face (mock ink 1128-1265, from y 800).
         var mockTitle = MockProfile.inks(mock, new Rectangle(UNLOCK_FRAME.x + 8, UNLOCK_FRAME.y + 4, 560, 46), 12, 25).getFirst();
         var title = MockProfile.inks(image, new Rectangle(2 * card.x + 8, 2 * card.y + 4, 560, 46), 12, 25).getFirst();
         assertThat(title.start() - 2 * card.x).as("the title's inset").isCloseTo(mockTitle.start() - UNLOCK_FRAME.x, within(3));
         assertThat(title.top() - 2 * card.y).as("the title's top").isCloseTo(mockTitle.top() - UNLOCK_FRAME.y, within(3));
         MockProfile.fonts("Unlock Vault's title width", title.width(), mockTitle.width(), 6);
-        // The still scrim: white reads #C9CACC.
-        assertThat(MockProfile.deltaE(MockProfile.at(image, 200, 1600), MockProfile.at(mock, 1500, 1400))).as("the scrim").isLessThanOrEqualTo(2.5);
+        // The still scrim over the white window.
+        var scrim = new Color(dev.jasper.ui.testsupport.KitFixtures.over(MockProfile.role(false, "surface.scrim"), Color.WHITE) & 0xFFFFFF);
+        assertThat(MockProfile.deltaE(MockProfile.at(image, 200, 1600), scrim)).as("the scrim").isLessThanOrEqualTo(2.5);
         MockProfile.write(image.getSubimage(2 * card.x, 2 * card.y, 560, 56), "enterprise-unlock-strip");
         MockProfile.write(image.getSubimage(2 * card.x, 2 * (card.y + card.height) - 86, 560, 86), "enterprise-unlock-footer");
     }
@@ -159,11 +177,12 @@ class EnterpriseDialogMockTest {
         // Down a column 280 px (2×) inside the frame: no top frame, so the strip and its rule come first.
         var expected = MockProfile.solid(MockProfile.column(mock, frame.x + 280, frame.y, frame.y + frame.height), 2);
         var actual = MockProfile.solid(MockProfile.column(image, 2 * card.x + 280, 0, 2 * card.height), 2);
-        same(name + " header strip", actual.get(0), expected.get(0), 2);
-        same(name + " strip rule", actual.get(1), expected.get(1), 2);
+        same(name + " header strip", actual.get(0), expected.get(0), 2, top()[1]);
+        same(name + " strip rule", actual.get(1), expected.get(1), 2, top()[2]);
         String[] bottom = {"frame", "footer band", "band rule"};
-        for (int i = 1; i <= 3; i++) same(name + " bottom " + bottom[i - 1], actual.get(actual.size() - i), expected.get(expected.size() - i), 2);
-        body(name, rendered, 2 * card.x + 12, 64, mock, frame.x + 12, frame.y + 64);
+        for (int i = 1; i <= 3; i++)
+            same(name + " bottom " + bottom[i - 1], actual.get(actual.size() - i), expected.get(expected.size() - i), 2, bottom()[i - 1]);
+        body(name, rendered, 2 * card.x + 12, 64);
         // The swatch, 8 square at 10, 9 down (mock 402-417, y 76-91), then the title 7 after it.
         var mockInks = MockProfile.inks(mock, new Rectangle(frame.x + 4, frame.y + 2, 560, 46), 12, 25);
         var inks = MockProfile.inks(image, new Rectangle(2 * card.x + 4, 2, 560, 46), 12, 25);

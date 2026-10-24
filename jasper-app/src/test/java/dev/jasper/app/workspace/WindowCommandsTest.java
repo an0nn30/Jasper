@@ -14,7 +14,8 @@ class WindowCommandsTest {
             try (var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()))) {
                 var entries = owner.commands().entries();
                 assertThat(CommandSearch.find(entries, "new tab", java.util.List.of(), 5)).isNotEmpty();
-                assertThat(CommandSearch.find(entries, "split", java.util.List.of(), 5).stream().map(Command::id)).doesNotContain("split_right", "split_down");
+                assertThat(CommandSearch.find(entries, "split", java.util.List.of(), 5).stream().map(Command::id))
+                    .as("a split opens whenever a tab can (Rulings 11)").contains("split_right", "split_down");
                 assertThat(CommandSearch.find(entries, "paste", java.util.List.of(), 5).stream().map(Command::id)).doesNotContain("paste");
                 assertThat(owner.action(ActionId.SPLIT_RIGHT).getValue(Action.NAME)).isEqualTo(ActionId.SPLIT_RIGHT.label());
                 assertThat(owner.action(ActionId.SPLIT_RIGHT).getValue(Command.TITLE)).isEqualTo("Split Right \u00b7 Vertical");
@@ -25,6 +26,20 @@ class WindowCommandsTest {
                 assertThat(windowSettings.title()).isEqualTo("Window Settings\u2026");
                 owner.updateActions();
                 assertThat(windowSettings.action().isEnabled()).as("nothing to open without a configuration").isFalse();
+            }
+        });
+    }
+
+    @Test void railAndStatusBarAreFoundByTheirViewMenuNames() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()))) {
+                var entries = owner.commands().entries();
+                assertThat(CommandSearch.find(entries, "view rail", java.util.List.of(), 5).stream().map(Command::id))
+                    .contains("toggle_rail");
+                assertThat(CommandSearch.find(entries, "tool window bars", java.util.List.of(), 5).stream().map(Command::id))
+                    .contains("toggle_rail");
+                assertThat(CommandSearch.find(entries, "view status bar", java.util.List.of(), 5).stream().map(Command::id))
+                    .contains("toggle_status_bar");
             }
         });
     }

@@ -11,10 +11,8 @@ import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.PluginDialog;
-import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.sdk.ui.UiView;
-import dev.jasper.sdk.ui.WindowSpec;
 import dev.jasper.ui.swing.KitView;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -42,8 +40,8 @@ import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
  * The staged Editor jar in the application's real plugin host (Plan 2 Task 9a, the {@link StagedRemoteHost} shape): the
  * production {@code EditorPlugin} starts with headless windows, and its dialogs are mounted from its own classes as the
  * Editor mounts them (the question sheet as {@code DialogAsker} does, Go to Line and Language as the Editor window does,
- * Saving through the plugin's own {@code SaveWait}), owned by a plugin window of the Editor's (production owns them by
- * the selected content tab; the owner does not change the dialog's content). Plugin dialogs are packed stand-ins that
+ * Saving through the plugin's own {@code SaveWait}), owned by the main window (production owns them by the selected
+ * content tab, which resolves to its window; the owner does not change the dialog's content). Plugin dialogs are packed stand-ins that
  * follow the production {@link DialogFit} rule. No document, file or terminal is touched. Call from the test thread.
  */
 final class StagedEditorHost implements AutoCloseable {
@@ -58,7 +56,7 @@ final class StagedEditorHost implements AutoCloseable {
     final List<String> problems = new CopyOnWriteArrayList<>();
     final Plugin plugin;
     final PluginContext context;
-    final PluginWindow owner;
+    final dev.jasper.sdk.terminal.WindowHandle owner;
     final javax.swing.JPanel mainHolder = new javax.swing.JPanel(new java.awt.BorderLayout());
     final javax.swing.JPanel separateHolder = new javax.swing.JPanel(new java.awt.BorderLayout());
     private final Map<AuxiliarySurface, StagedRemoteHost.PackedDialog> dialogs = new HashMap<>();
@@ -73,12 +71,13 @@ final class StagedEditorHost implements AutoCloseable {
         auxiliary = onEdtValue(() -> new AuxiliaryWindows(dev.jasper.app.persistence.UiState.inMemory(), this::shell));
         terminals = onEdtValue(TerminalFixture::new);
         onEdt(() -> {
-            var main = terminals.addWindow(); var separate = terminals.addWindow();
-            contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(main, false,
+            var main = terminals.addMainWindow(); var separate = terminals.addWindow();
+            contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main,
                 e -> mainHolder.add(e.component()), e -> mainHolder.remove(e.component()), e -> e.active(true), () -> { }));
-            contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(separate, true,
+            contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(separate,
                 e -> separateHolder.add(e.component()), e -> separateHolder.remove(e.component()), e -> e.active(true), () -> { }));
-            contributions.content().setFactory(detached -> detached ? separate : main);
+            contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals,
+                tab -> contributions.tabs().move(tab, separate)));
         });
         host = AppContractTest.host(data.resolve("home"), Duration.ofMillis(200), contributions, new AtomicBoolean(dark), auxiliary,
             terminals.registry, new NotificationsFixture(problems), new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(),
@@ -97,11 +96,7 @@ final class StagedEditorHost implements AutoCloseable {
                 return (PluginContext) environment.getClass().getMethod("context").invoke(environment);
             } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
         });
-        owner = onEdtValue(() -> {
-            var window = context.windows().create(new WindowSpec("dev.jasper.editor.window", "Editor", new Dimension(900, 600), true));
-            window.show();
-            return window;
-        });
+        owner = onEdtValue(() -> context.terminals().windows().getFirst());
     }
 
     /** The production controller, created lazily as its commands do; UI thread. */
@@ -239,8 +234,10 @@ final class StagedEditorHost implements AutoCloseable {
     @Override public void close() {
         var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
         try {
+            var pluginWorkers = PluginShutdownTestSupport.capture(host);
             onEdt(() -> pending.set(host.stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+            pluginWorkers.await();
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt(); throw new IllegalStateException("Interrupted stopping staged Editor", interrupted);
         } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException failure) {

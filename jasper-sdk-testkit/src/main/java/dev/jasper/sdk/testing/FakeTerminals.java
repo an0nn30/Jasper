@@ -42,14 +42,15 @@ final class FakeTerminals implements Terminals {
         @Override public UUID id() { return id; }
         @Override public List<TabHandle> tabs() {
             context.requireOpen();
-            return workspace.window(id).map(window -> window.tabs.stream().<TabHandle>map(tab -> new Tab(tab.id, id)).toList()).orElse(List.of());
+            return workspace.window(id).map(window -> window.tabs.stream().<TabHandle>map(tab -> new Tab(tab.id, id, tab.kind)).toList()).orElse(List.of());
         }
         @Override public Optional<TabHandle> activeTab() {
             context.requireOpen();
-            return workspace.window(id).map(window -> window.selected).map(tab -> new Tab(tab.id, id));
+            return workspace.window(id).map(window -> window.selected).map(tab -> new Tab(tab.id, id, tab.kind));
         }
         @Override public boolean isActive() { context.requireOpen(); return workspace.lastActive != null && workspace.lastActive.open && workspace.lastActive.id.equals(id); }
         @Override public boolean isOpen() { context.requireOpen(); return workspace.window(id).isPresent(); }
+        @Override public boolean isMain() { context.requireOpen(); return workspace.window(id).map(window -> window.main).orElse(false); }
         @Override public void toFront() { context.requireOpen(); workspace.window(id).ifPresent(window -> workspace.openRequests.add("front|" + id)); }
         @Override public boolean equals(Object other) { return other instanceof WindowHandle handle && handle.id().equals(id); }
         @Override public int hashCode() { return id.hashCode(); }
@@ -57,9 +58,10 @@ final class FakeTerminals implements Terminals {
 
     private final class Tab implements TabHandle {
         private final UUID id;
+        private final TabHandle.Kind kind;
         private UUID windowId;
         private String title = "";
-        Tab(UUID id, UUID windowId) { this.id = id; this.windowId = windowId; }
+        Tab(UUID id, UUID windowId, TabHandle.Kind kind) { this.id = id; this.windowId = windowId; this.kind = kind; }
         private Optional<FakeWorkspace.Tab> model() {
             Optional<FakeWorkspace.Tab> found = workspace.tab(id);
             found.ifPresent(tab -> windowId = tab.window.id);
@@ -67,11 +69,11 @@ final class FakeTerminals implements Terminals {
         }
         @Override public UUID id() { return id; }
         @Override public WindowHandle window() { context.requireOpen(); model(); return new Window(windowId); }
-        @Override public List<PaneHandle> panes() {
+        @Override public TabHandle.Kind kind() { return kind; }
+        @Override public Optional<PaneHandle> terminal() {
             context.requireOpen();
-            return model().map(tab -> tab.panes.stream().<PaneHandle>map(pane -> new Pane(pane.id, id)).toList()).orElse(List.of());
+            return model().map(tab -> tab.pane).filter(pane -> pane.open).map(pane -> new Pane(pane.id, id));
         }
-        @Override public Optional<PaneHandle> activePane() { context.requireOpen(); return model().map(tab -> tab.focused).map(pane -> new Pane(pane.id, id)); }
         @Override public String title() {
             require(Capabilities.TERMINAL_OBSERVE);
             context.requireOpen();
@@ -98,7 +100,7 @@ final class FakeTerminals implements Terminals {
         @Override public TabHandle tab() {
             context.requireOpen();
             model();
-            return new Tab(tabId, workspace.tab(tabId).map(tab -> tab.window.id).orElse(new UUID(0, 0)));
+            return new Tab(tabId, workspace.tab(tabId).map(tab -> tab.window.id).orElse(new UUID(0, 0)), TabHandle.Kind.TERMINAL);
         }
         @Override public PaneInfo info() {
             require(Capabilities.TERMINAL_OBSERVE);
@@ -122,7 +124,8 @@ final class FakeTerminals implements Terminals {
         private void send(String line) {
             require(Capabilities.TERMINAL_INJECT);
             if (context.state == FakePluginContext.State.CLOSED) return;
-            synchronized (workspace) { model().ifPresent(pane -> pane.sent.add(line)); }
+            // A pane that has not started drops what is sent to it, as Jasper's does (workspace tabs spec 13).
+            synchronized (workspace) { model().filter(pane -> pane.held == null).ifPresent(pane -> pane.sent.add(line)); }
         }
         @Override public Optional<String> selection() {
             require(Capabilities.TERMINAL_SELECTION);
@@ -151,7 +154,7 @@ final class FakeTerminals implements Terminals {
     @Override public Optional<PaneHandle> activePane() { context.requireOpen(); return workspace.activePane().map(pane -> new Pane(pane.id, pane.tab.id)); }
     @Override public List<WindowHandle> windows() { context.requireOpen(); return workspace.windows.stream().<WindowHandle>map(window -> new Window(window.id)).toList(); }
     @Override public Optional<PaneHandle> pane(UUID id) { context.requireOpen(); return workspace.pane(id).map(pane -> new Pane(pane.id, pane.tab.id)); }
-    @Override public Optional<TabHandle> tab(UUID id) { context.requireOpen(); return workspace.tab(id).map(tab -> new Tab(tab.id, tab.window.id)); }
+    @Override public Optional<TabHandle> tab(UUID id) { context.requireOpen(); return workspace.tab(id).map(tab -> new Tab(tab.id, tab.window.id, tab.kind)); }
     @Override public Optional<WindowHandle> window(UUID id) { context.requireOpen(); return workspace.window(id).map(window -> new Window(window.id)); }
 
     @Override public Optional<PaneHandle> openTab(WindowHandle window, OpenRequest request) {
@@ -159,19 +162,32 @@ final class FakeTerminals implements Terminals {
         requireFor(request);
         context.requireOpen();
         if (!knownProfile(request)) return Optional.empty();
-        return workspace.window(window.id()).map(target -> switch (request) {
+        return workspace.window(window.id())
+            // While a restorer runs, the window being restored takes only the saved tab (workspace plan 6b Rulings 24).
+            .filter(target -> workspace.slot == null || workspace.slot.window != target
+                || request instanceof OpenRequest.Session && workspace.slot.taken == null && workspace.slot.owner == context)
+            .map(target -> switch (request) {
             case OpenRequest.Local local -> {
                 workspace.openRequests.add("tab|" + target.id + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-") + profile(local) + program(local));
-                FakeWorkspace.Tab tab = workspace.addTab(target, "opened");
-                FakeWorkspace.Pane pane = workspace.addPane(tab, openedInfo(local));
-                yield new Pane(pane.id, tab.id);
+                FakeWorkspace.Pane pane = workspace.openTerminal(target, "opened", openedInfo(local));
+                yield new Pane(pane.id, pane.tab.id);
             }
             case OpenRequest.Session session -> {
-                workspace.openRequests.add("session-tab|" + target.id + "|" + session.spec().title());
-                FakeWorkspace.Tab tab = workspace.addTab(target, session.spec().title());
-                FakeWorkspace.Pane pane = workspace.addPane(tab, sessionInfo(session));
-                workspace.sessions.connect(context, pane, session.spec());
-                yield new Pane(pane.id, tab.id);
+                // A session a restorer opens in the window being restored is the saved tab: it comes back there, placed and
+                // not shown, and waits, not started, until its tab is shown (workspace tabs spec 13).
+                var slot = workspace.takeSlot(context).filter(found -> found.window == target);
+                FakeWorkspace.Window into = target;
+                workspace.openRequests.add("session-tab|" + into.id + "|" + session.spec().title());
+                FakeWorkspace.Pane pane;
+                if (slot.isPresent()) {
+                    pane = workspace.placeTerminal(into, session.spec().title(), sessionInfo(session));
+                    slot.get().taken = pane.tab;
+                    workspace.sessions.hold(context, pane, session.spec());
+                } else {
+                    pane = workspace.openTerminal(target, session.spec().title(), sessionInfo(session));
+                    workspace.sessions.connect(context, pane, session.spec());
+                }
+                yield new Pane(pane.id, pane.tab.id);
             }
         });
     }
@@ -182,22 +198,39 @@ final class FakeTerminals implements Terminals {
         requireFor(request);
         context.requireOpen();
         if (!knownProfile(request)) return Optional.empty();
-        return workspace.pane(target.id()).map(model -> {
+        return workspace.pane(target.id())
+            // While a restorer runs, the window being restored takes only the saved tab, a split there too, as the application's
+            // window decides it (workspace plan 6b Rulings 24).
+            .filter(model -> workspace.slot == null || workspace.slot.window != model.tab.window
+                || request instanceof OpenRequest.Session && workspace.slot.taken == null && workspace.slot.owner == context)
+            .map(model -> {
+            // A split is a terminal tab of its own in a new pane right after the target, in its tab (tabs and panes spec 4).
+            FakeWorkspace.Window window = model.tab.window;
+            // A session a restorer splits off in the window being restored is the saved tab, placed as openTab places it.
+            var slot = request instanceof OpenRequest.Session ? workspace.takeSlot(context).filter(found -> found.window == window)
+                : Optional.<FakeWorkspace.Slot>empty();
             FakeWorkspace.Pane pane = switch (request) {
                 case OpenRequest.Local local -> {
                     workspace.openRequests.add("split|" + model.id + "|" + direction + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-")
                         + profile(local) + program(local));
-                    yield workspace.addPane(model.tab, openedInfo(local));
+                    yield workspace.openTerminal(window, "opened", openedInfo(local), model.tab);
                 }
                 case OpenRequest.Session session -> {
                     workspace.openRequests.add("session-split|" + model.id + "|" + direction + "|" + session.spec().title());
-                    FakeWorkspace.Pane created = workspace.addPane(model.tab, sessionInfo(session));
+                    if (slot.isPresent()) {
+                        FakeWorkspace.Pane placed = workspace.placeTerminal(window, session.spec().title(), sessionInfo(session));
+                        slot.get().taken = placed.tab;
+                        workspace.sessions.hold(context, placed, session.spec());
+                        yield placed;
+                    }
+                    FakeWorkspace.Pane created = workspace.openTerminal(window, session.spec().title(), sessionInfo(session), model.tab);
                     workspace.sessions.connect(context, created, session.spec());
                     yield created;
                 }
             };
-            workspace.focus(pane);
-            return new Pane(pane.id, model.tab.id);
+            // A restored session is not shown: its tab connects when it is.
+            if (slot.isEmpty()) workspace.focus(pane);
+            return new Pane(pane.id, pane.tab.id);
         });
     }
 
@@ -240,7 +273,7 @@ final class FakeTerminals implements Terminals {
         return local.spec().command().map(command -> "|run:" + String.join(" ", command)).orElse("");
     }
 
-    private static PaneInfo openedInfo(OpenRequest.Local local) {
+    static PaneInfo openedInfo(OpenRequest.Local local) {
         PaneInfo blank = PaneInfo.unknown();
         return new PaneInfo("", local.spec().workingDirectory(), Optional.empty(), 80, 24, false, blank.kind(), Optional.empty(),
             SessionState.RUNNING, blank.exitStatus(), "sh");
@@ -249,6 +282,12 @@ final class FakeTerminals implements Terminals {
     private PaneInfo sessionInfo(OpenRequest.Session session) {
         return new PaneInfo(session.spec().title(), Optional.empty(), Optional.empty(), 80, 24, false, SessionKind.PLUGIN,
             Optional.of(context.plugin().id()), SessionState.CONNECTING, OptionalInt.empty(), session.spec().title());
+    }
+
+    /** A held pane's snapshot: not started, with no grid and no shell integration, as Jasper reports a restored pane. */
+    static PaneInfo notStarted(PaneInfo info) {
+        return new PaneInfo(info.title(), info.workingDirectory(), info.remoteDirectory(), 0, 0, false, info.kind(),
+            info.providerPluginId(), SessionState.NOT_STARTED, OptionalInt.empty(), info.shell());
     }
 
     /** A copy of a snapshot in another session state; an exit status is kept only for an exited session. */

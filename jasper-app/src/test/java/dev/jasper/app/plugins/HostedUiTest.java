@@ -89,6 +89,32 @@ class HostedUiTest {
         assertThat(seen).hasSize(1);
     }
 
+    /** Importing or removing a theme changes the editor schemes plugins list: a workspace change even when the shown theme stays. */
+    @Test void libraryChangeIsAWorkspaceChange(@org.junit.jupiter.api.io.TempDir java.nio.file.Path folder) throws java.io.IOException {
+        var themes = new WorkspaceAppearanceFixture();
+        var hosted = new HostedUi("dev.x.tool", model, containment, Runnable::run,
+            javax.swing.SwingUtilities::isEventDispatchThread, open::get, getClass().getClassLoader(), () -> Variant.DARK,
+            handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary, terminals,
+            themes::current, themes::subscribe);
+        var bundled = dev.jasper.app.appearance.ThemeLibrary.bundledOnly();
+        var library = new java.util.concurrent.atomic.AtomicReference<>(bundled);
+        hosted.themes(library::get);
+        var appearance = hosted.appearance();
+        assertThat(appearance.editorSchemes()).isEqualTo(HostedPalettes.editorSchemes(bundled));
+        var seen = new java.util.concurrent.atomic.AtomicInteger();
+        appearance.onWorkspaceChanged(value -> seen.incrementAndGet());
+        themes.setPair(themes.current());
+        assertThat(seen).as("the same theme and library").hasValue(0);
+        java.nio.file.Files.writeString(folder.resolve("ocean.json"), dev.jasper.app.appearance.ThemeTestSupport.uiThemeJson("Ocean"));
+        var imported = dev.jasper.app.appearance.ThemeLibrary.read(folder, bundled);
+        library.set(imported);
+        themes.setPair(themes.current());
+        assertThat(seen).hasValue(1);
+        assertThat(appearance.editorSchemes()).isEqualTo(HostedPalettes.editorSchemes(imported))
+            .extracting(dev.jasper.sdk.ui.EditorScheme::id).contains("ocean/dark");
+        hosted.closeAll();
+    }
+
     @Test void workspaceOpacityFollowsTheGlassSourceAndItsChangesAreWorkspaceChanges() {
         var themes = ThemeTestSupport.controller(true);
         double[] value = {0.6};
@@ -172,14 +198,11 @@ class HostedUiTest {
         hosted.closeAll();
     }
 
-    @Test void fileChooserIsAvailableOnBothSurfacesAndStopsWithThePlugin() {
-        var window = ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.x.tool.manager", "Manager", new java.awt.Dimension(640, 480), true));
-        var dialog = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Edit", window, true));
-        for (var surface : List.<dev.jasper.sdk.ui.WindowSurface>of(window, dialog)) {
-            assertThatIllegalStateException().isThrownBy(() -> surface.chooseFile("Choose key", Optional.empty()));
-            surface.show();
-            assertThat(surface.chooseFile("Choose key", Optional.empty())).isEmpty();
-        }
+    @Test void fileChooserIsAvailableOnADialogAndStopsWithThePlugin() {
+        var dialog = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Edit", terminals.windowHandle(terminalFixture.addWindow()), true));
+        assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", Optional.empty()));
+        dialog.show();
+        assertThat(dialog.chooseFile("Choose key", Optional.empty())).isEmpty();
         open.set(false);
         assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", Optional.empty()));
         ui.closeAll();
@@ -404,6 +427,65 @@ class HostedUiTest {
         assertThat(model.railActions()).isEmpty();
     }
 
+    /** Plan 15b (Rulings 1): the panel's own toggle action activates it, as IntelliJ's ⌘1; anything else toggles. */
+    @Test void aPanelsOwnToggleActionActivatesAndAnythingElseToggles() {
+        var window = UUID.randomUUID();
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        dev.jasper.sdk.terminal.WindowHandle[] handle = {null};
+        ui.actions().register(ActionSpec.of("dev.x.tool.hosts.show", "Hosts"), context -> { handle[0] = context.window(); ui.panels().toggle("dev.x.tool.hosts", context.window()); });
+        ui.actions().register(ActionSpec.of("dev.x.tool.other", "Other"), context -> ui.panels().toggle("dev.x.tool.hosts", context.window()));
+        ui.panels().register(new PanelSpec("dev.x.tool.hosts", "Hosts", "file", Anchor.RIGHT).withToggleActionId("dev.x.tool.hosts.show"), host -> view());
+        model.action("dev.x.tool.hosts.show").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        model.action("dev.x.tool.other").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        ui.panels().toggle("dev.x.tool.hosts", handle[0]);
+        assertThat(requests).extracting(Contributions.PanelRequest::op).containsExactly(
+            Contributions.PanelRequest.Op.ACTIVATING_TOGGLE, Contributions.PanelRequest.Op.TOGGLE, Contributions.PanelRequest.Op.TOGGLE);
+        assertThat(requests).extracting(Contributions.PanelRequest::windowId).containsOnly(window);
+    }
+
+    /** Inside the panel's own toggle action only that panel's toggle activates, into whichever window it names. */
+    @Test void insideAPanelsToggleActionAnotherPanelsToggleStaysPlainAndAnotherWindowIsKept() {
+        var window = UUID.randomUUID();
+        var other = UUID.randomUUID();
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        ui.actions().register(ActionSpec.of("dev.x.tool.hosts.show", "Hosts"), context -> {
+            ui.panels().toggle("dev.x.tool.files", context.window());
+            ui.panels().toggle("dev.x.tool.hosts", terminals.windowHandle(other));
+        });
+        ui.panels().register(new PanelSpec("dev.x.tool.hosts", "Hosts", "file", Anchor.RIGHT).withToggleActionId("dev.x.tool.hosts.show"), host -> view());
+        ui.panels().register(new PanelSpec("dev.x.tool.files", "Files", "file", Anchor.LEFT), host -> view());
+        model.action("dev.x.tool.hosts.show").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        assertThat(requests).containsExactly(
+            new Contributions.PanelRequest(window, "dev.x.tool.files", Contributions.PanelRequest.Op.TOGGLE),
+            new Contributions.PanelRequest(other, "dev.x.tool.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
+    }
+
+    /** Plan 15b (Rulings 1): a show inside the panel's own toggle action activates it; any other show goes to the site. */
+    @Test void aShowInsideThePanelsOwnToggleActionActivates() {
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        dev.jasper.sdk.ui.PanelHost[] hosts = {null};
+        ui.actions().register(ActionSpec.of("dev.x.tool.queue.show", "Queue"), context -> hosts[0].show());
+        ui.actions().register(ActionSpec.of("dev.x.tool.queue.other", "Other"), context -> hosts[0].show());
+        ui.panels().register(new PanelSpec("dev.x.tool.queue", "Queue", "file", Anchor.BOTTOM).withToggleActionId("dev.x.tool.queue.show"),
+            host -> { hosts[0] = host; return view(); });
+        UUID window = UUID.randomUUID();
+        int[] shows = {0};
+        var site = new dev.jasper.app.contributions.PanelSite(window, () -> shows[0]++, () -> { }, () -> false);
+        assertThat(model.panels().getFirst().factory().apply(site)).isNotNull();
+
+        model.action("dev.x.tool.queue.show").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        assertThat(requests).containsExactly(new Contributions.PanelRequest(window, "dev.x.tool.queue", Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+        assertThat(shows[0]).as("the activating show goes through the window").isZero();
+
+        model.action("dev.x.tool.queue.other").orElseThrow().invoke(new Contributions.Invocation(window, Optional.empty()));
+        hosts[0].show();
+        assertThat(requests).as("another action's show and one outside any action").hasSize(1);
+        assertThat(shows[0]).isEqualTo(2);
+    }
+
     @Test void panelHeadersAreWindowOwnedContainFailuresAndBecomeInertWhenDiscarded() {
         var hosts = new ArrayList<dev.jasper.sdk.ui.PanelHost>();
         var calls = new ArrayList<String>();
@@ -458,29 +540,149 @@ class HostedUiTest {
                     .isEqualTo(each.slot()));
     }
 
-    @Test void windowsAndDialogsAreBuiltByTheApplicationAndClosedWithThePlugin() {
-        var manager = ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.x.tool.manager", "Manager", new java.awt.Dimension(640, 480), true));
-        assertThat(ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.x.tool.manager", "Manager", new java.awt.Dimension(640, 480), true)))
-            .as("an open singleton is the same window").isSameAs(manager);
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.other.window", "Foreign", new java.awt.Dimension(10, 10), false)));
-        manager.setContent(view());
-        manager.show();
+    /** Workspace plan 6b Rulings 30: a saved state the SDK refuses restores nothing, runs no restorer and raises no incident. */
+    @Test void aSavedStateTheSdkRefusesRestoresNothingAndRaisesNoIncident() {
+        int[] restored = {0};
+        ui.windows().restorer("note", request -> { restored[0]++; return java.util.Optional.empty(); });
+        var outcome = model.tabs().restore(dev.jasper.app.layout.TabId.random(), "dev.x.tool",
+            new dev.jasper.app.contributions.TabRegistry.Restoring(java.util.UUID.randomUUID(), "Too long",
+                new dev.jasper.app.layout.TabRestore("note", java.util.Map.of("text", "x".repeat(dev.jasper.sdk.RestoreState.MAX_CHARACTERS)))));
+        assertThat(outcome.tab()).isEmpty();
+        assertThat(outcome.problem()).isEqualTo("its saved state is not valid");
+        assertThat(restored[0]).as("the plugin never sees it").isZero();
+        assertThat(containment.failures("dev.x.tool")).as("no incident").isZero();
+    }
+
+    /**
+     * Workspace plan 6b Rulings 5, through the plugin's restorer: a reason it returns is the placeholder's, with no
+     * incident; what it throws is the placeholder's reason and an incident; a blank or null return gives no reason; and an
+     * Error that no containment holds takes the item it opened with it (6b Task 1's review).
+     */
+    @Test void aRestorersReasonIsNoIncidentWhatItThrowsIsAndAnErrorClosesItsItem() {
+        var windows = ui.windows();
+        var owner = terminals.windowHandle(terminalFixture.addWindow());
+        var opened = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        windows.restorer("declined", request -> java.util.Optional.of("its file is gone"));
+        windows.restorer("thrown", request -> { throw new IllegalStateException("the disk is unreadable"); });
+        windows.restorer("unsaid", request -> { throw new IllegalStateException(); });
+        windows.restorer("blank", request -> java.util.Optional.of("  "));
+        windows.restorer("null", request -> null);
+        windows.restorer("fatal", request -> {
+            opened.set(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("fatal", request.title()), request.window(), view()));
+            throw new InternalError("the restorer broke");
+        });
+        java.util.function.Function<String, dev.jasper.app.contributions.TabRegistry.Restored> restore = kind ->
+            model.tabs().restore(dev.jasper.app.layout.TabId.random(), "dev.x.tool", new dev.jasper.app.contributions.TabRegistry.Restoring(
+                owner.id(), "Saved", new dev.jasper.app.layout.TabRestore(kind, java.util.Map.of())));
+        try (var log = dev.jasper.app.testsupport.LogRecorder.of("dev.jasper.plugins.dev.x.tool")) {
+            assertThat(restore.apply("declined").problem()).isEqualTo("its file is gone");
+            assertThat(containment.failures("dev.x.tool")).as("a reason is no incident").isZero();
+            assertThat(restore.apply("thrown").problem()).isEqualTo("the disk is unreadable");
+            assertThat(containment.failures("dev.x.tool")).as("a throw is one").isEqualTo(1);
+            assertThat(restore.apply("unsaid").problem()).as("a throw without a message names its class").isEqualTo("IllegalStateException");
+            assertThat(restore.apply("blank").problem()).as("a blank reason is none").isEqualTo("it opened no tab");
+            assertThat(restore.apply("null").problem()).as("a null return is none").isEqualTo("it opened no tab");
+            assertThat(containment.failures("dev.x.tool")).isEqualTo(2);
+            assertThat(log.warnings()).hasSize(2);
+        }
+        assertThatThrownBy(() -> restore.apply("fatal")).isInstanceOf(InternalError.class).hasMessage("the restorer broke");
+        assertThat(opened.get().isClosed()).as("its item closed").isTrue();
+        assertThat(model.tabs().tabs()).as("nothing registered").isEmpty();
+    }
+
+    /**
+     * Workspace plan 6b's final review M1: an Error other than a VirtualMachineError from a restorer is the plugin's restore
+     * failure, as a throw is: an incident, its item closed, and its message the placeholder's reason, so the rest restores.
+     */
+    @Test void aRestorersErrorIsAnIncidentClosesItsItemAndGivesItsReason() {
+        var windows = ui.windows();
+        var owner = terminals.windowHandle(terminalFixture.addWindow());
+        var opened = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        windows.restorer("broken", request -> {
+            opened.set(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("broken", request.title()), request.window(), view()));
+            throw new AssertionError("the index is broken");
+        });
+        try (var log = dev.jasper.app.testsupport.LogRecorder.of("dev.jasper.plugins.dev.x.tool")) {
+            var outcome = model.tabs().restore(dev.jasper.app.layout.TabId.random(), "dev.x.tool", new dev.jasper.app.contributions.TabRegistry.Restoring(
+                owner.id(), "Saved", new dev.jasper.app.layout.TabRestore("broken", java.util.Map.of())));
+            assertThat(outcome.tab()).isEmpty();
+            assertThat(outcome.problem()).isEqualTo("the index is broken");
+            assertThat(containment.failures("dev.x.tool")).as("an incident").isEqualTo(1);
+            assertThat(log.warnings()).hasSize(1);
+        }
+        assertThat(opened.get().isClosed()).as("its item closed").isTrue();
+        assertThat(model.tabs().tabs()).as("nothing registered").isEmpty();
+    }
+
+    @Test void dialogsAreBuiltByTheApplicationAndClosedWithThePlugin() {
+        var owner = terminals.windowHandle(terminalFixture.addWindow());
         List<String> events = new ArrayList<>();
-        manager.onClosing(() -> { throw new IllegalStateException("guard failure"); });
-        manager.onClosed(() -> events.add("closed"));
-        var prompt = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Unlock", manager, true));
-        var trust = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Trust?", terminals.windowHandle(terminalFixture.addWindow()), false));
+        var prompt = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Unlock", owner, true));
+        prompt.setContent(view());
+        prompt.onClosing(() -> { throw new IllegalStateException("guard failure"); });
+        prompt.onClosed(() -> events.add("closed"));
+        var trust = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Trust?", owner, false));
         assertThatIllegalArgumentException().as("an owner this application did not create")
             .isThrownBy(() -> ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Bad", new dev.jasper.sdk.WindowOwner() { }, true)));
-        assertThat(auxiliary.open()).hasSize(3);
+        assertThat(auxiliary.open()).hasSize(2);
         assertThat(auxiliary.open().get(0).requestClose()).as("a throwing guard is contained and allows the close").isTrue();
         assertThat(events).containsExactly("closed");
         assertThat(containment.failures("dev.x.tool")).isEqualTo(1);
-        assertThat(auxiliary.open()).as("the owner took its dialog with it").hasSize(1);
+        assertThat(auxiliary.open()).hasSize(1);
         ui.closeAll();
         assertThat(auxiliary.open()).isEmpty();
-        assertThatCode(() -> { prompt.close(); trust.close(); manager.setTitle("after close"); }).doesNotThrowAnyException();
+        assertThatCode(() -> { prompt.close(); trust.close(); prompt.setTitle("after close"); }).doesNotThrowAnyException();
+    }
+
+    /** Workspace plan 8b Rulings 13: a split item's two actions carry the palette's words, the label's included. */
+    @Test void aSplitItemsActionsCarryThePalettesWords() {
+        ui.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("dev.x.tool.notes", "Code Notes"), (window, placement) -> { });
+        assertThat(model.action("dev.x.tool.split_right_notes").orElseThrow().keywords()).as("Split Right with Code Notes")
+            .contains("split", "right", "new", "pane", "code", "notes");
+        assertThat(model.action("dev.x.tool.split_down_notes").orElseThrow().keywords()).as("Split Down with Code Notes")
+            .contains("split", "down", "new", "pane", "code", "notes");
+        ui.closeAll();
+    }
+
+    /**
+     * Workspace plan 8b Task 4 review: Terminal Right beside a content tab is audited once its window opened it, as
+     * {@code Terminals.split} is once its target resolves, and a split its window did not open (the final review) or a
+     * closed tab's is not; with no gate set, as before its context sets one, the split is refused before anything opens.
+     */
+    @Test void aContentTabsTerminalSplitIsAuditedOnlyWhenItOpens() {
+        UUID window = terminalFixture.addWindow();
+        List<String> heard = new ArrayList<>();
+        boolean[] splits = {true};
+        java.util.function.BiPredicate<dev.jasper.app.contributions.Tab, dev.jasper.app.layout.Side> split = (tab, side) -> {
+            heard.add(side.name());
+            return splits[0];
+        };
+        model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(window, tab -> { }, tab -> { }, tab -> { }, () -> { },
+            tab -> Optional.empty(), (tab, group, side) -> { }, split::test, tab -> false, tab -> { }, tab -> java.util.List.of(),
+            (tab, number) -> { }));
+        var notes = ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), terminals.windowHandle(window), view());
+        UUID id = model.tabs().inWindow(window).getFirst().id().value();
+        assertThatIllegalStateException().as("no gate set")
+            .isThrownBy(() -> notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.RIGHT))
+            .withMessageContaining("terminal.open gate not set");
+        assertThat(heard).isEmpty();
+        // As its context sets it (HostedContext).
+        var gate = new CapabilityGate("dev.x.tool", java.util.Set.of(dev.jasper.sdk.Capabilities.TERMINAL_OPEN));
+        ui.terminalOpen = what -> {
+            gate.require(dev.jasper.sdk.Capabilities.TERMINAL_OPEN);
+            return () -> gate.audit(dev.jasper.sdk.Capabilities.TERMINAL_OPEN, what);
+        };
+        List<String> lines = HostedTerminalsTest.audited(() -> {
+            notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.RIGHT);
+            splits[0] = false;
+            notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.DOWN);
+            notes.close();
+            notes.split(dev.jasper.sdk.ui.SplitChoice.TERMINAL, dev.jasper.sdk.terminal.Direction.DOWN);
+        });
+        assertThat(heard).as("a window that split nothing, then the closed tab's split, which reaches no window")
+            .containsExactly("RIGHT", "DOWN");
+        assertThat(lines).as("one line, for the split that opened")
+            .containsExactly("Plugin dev.x.tool used terminal.open: opened a terminal beside content tab " + id);
     }
 
 

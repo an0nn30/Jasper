@@ -53,6 +53,12 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     private Optional<String> launchedProfile = Optional.empty();
     /** The program this local pane runs instead of the shell; such a pane closes when it exits with status 0. */
     private final Optional<java.util.List<String>> program;
+    /** A restored pane whose tab has not been shown: nothing runs until {@link #start()} (workspace tabs spec 13). */
+    private boolean waiting;
+    /** Jasper restored this pane with its tab: a saved directory gone by the time it starts starts it where a new shell starts. */
+    private boolean restored;
+    /** {@link #start()} ran: a pane starts once. */
+    private boolean started;
     private final ShellLauncher launcher;
     private final AtomicBoolean updateQueued = new AtomicBoolean();
     private volatile String shellLabel;
@@ -66,6 +72,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     private boolean jobQueryPending;
     private final Timer jobTimer = new Timer(500, event -> refreshJob());
     private TerminalView view;
+    private final AutoCloseable scaleSubscription;
     private FindBar findBar;
     private boolean closed;
     private boolean active;
@@ -104,8 +111,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     Runnable onClosed = () -> {};
 
     /**
-     * This pane took keyboard focus. Separate from {@link #onFocused}, which the tab owns to track
-     * its active pane; this one is for whoever cares that the user is now looking here.
+     * This pane took keyboard focus. Separate from {@link #onFocused}, with which its window makes the pane's tab
+     * the active tab; this one is for whoever cares that the user is now looking here.
      */
     Runnable onPaneFocused = () -> {};
 
@@ -231,6 +238,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         noticeSecondary.addActionListener(event -> secondaryAction.run());
         droppedTimer.setRepeats(false);
         setActive(false);
+        scaleSubscription = NativeStyles.installed().observeTypography(this::updateUserScale);
     }
 
     /**
@@ -244,9 +252,23 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         return new Dimension(Math.max(140, layout.width), Math.max(90, layout.height));
     }
 
+    /**
+     * A pane Jasper restored with its tab (workspace tabs spec 13): it reports {@code NOT_STARTED} and runs nothing until
+     * {@link #start()}, which its window calls when the tab is first shown; a saved directory that is gone by then starts
+     * its shell where a new shell starts.
+     */
+    void restored() { waiting = true; restored = true; }
+
+    /** Whether this pane is restored and waits for its tab to be shown. */
+    boolean waiting() { return waiting; }
+
+    /** Starts the pane's shell, or connects its provided session; a pane starts once, and a closed one never. */
     void start() {
+        if (closed || started) return;
+        started = true;
+        waiting = false;
         if (request != null) { connect(); return; }
-        ShellLauncher.Launch launched = launcher.launch(defaultDirectory ? Optional.empty() : Optional.of(launchDirectory),
+        ShellLauncher.Launch launched = launcher.launch(defaultDirectory ? Optional.empty() : Optional.of(launchDirectory), restored,
                 requestedProfile, program, Optional.of(id), replaced -> {
             // Detection showed the profile resolved before it completed is missing: the default starts instead.
             if (closed) return;
@@ -279,6 +301,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         if (session != null) session.removeListener(listener);
         session = created;
         view = new TerminalView(session, applicationOptions());
+        view.setUserScaleFactor(com.formdev.flatlaf.util.UIScale.getUserScaleFactor());
         view.setBackgroundOpacity(backgroundOpacity);
         setFocusable(false);
         findBar = new FindBar(view);
@@ -358,14 +381,16 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     }
 
     private void showDisconnected(String message) {
-        showNotice(message, view == null ? "Retry" : "Reconnect", this::connect, "Close", () -> onClose.run());
+        // A restored session was connected when its tab was saved: connecting it again is a Reconnect (workspace tabs spec 13).
+        showNotice(message, view == null && !restored ? "Retry" : "Reconnect", this::connect, "Close", () -> onClose.run());
         onChanged.run();
     }
 
     private void cancelAttempt() {
         if (attempt != null) attempt.cancel();
-        // Nothing was ever shown in a pane whose first attempt is cancelled; a reconnect returns to the banner.
-        if (view == null) onClose.run(); else showDisconnected("Connection cancelled");
+        // Nothing was ever shown in a pane whose first attempt is cancelled; a reconnect returns to the banner, and so does
+        // a restored session's first attempt: its tab came back to be reconnected (workspace tabs spec 13).
+        if (view == null && !restored) onClose.run(); else showDisconnected("Connection cancelled");
     }
 
     private void showDropped() {
@@ -459,10 +484,12 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     PaneSnapshot snapshot() {
         Optional<String> provider = request == null ? Optional.empty() : Optional.of(request.providerId());
         boolean connecting = attempt != null && attempt.state() == SessionAttempt.State.PENDING;
-        if (session == null || connecting) {
-            boolean failedBeforeAnySession = request != null && !connecting;
+        if (waiting || session == null || connecting) {
+            boolean failedBeforeAnySession = !waiting && request != null && !connecting;
+            PaneSnapshot.State state = waiting ? PaneSnapshot.State.NOT_STARTED
+                : failedBeforeAnySession ? PaneSnapshot.State.EXITED : PaneSnapshot.State.STARTING;
             return new PaneSnapshot(title(), request == null ? Optional.of(launchDirectory) : Optional.empty(), 0, 0, false,
-                failedBeforeAnySession ? PaneSnapshot.State.EXITED : PaneSnapshot.State.STARTING, OptionalInt.empty(), provider, Optional.empty(), shellLabel);
+                state, OptionalInt.empty(), provider, Optional.empty(), shellLabel);
         }
         CompletableFuture<Integer> exit = session.exitFuture();
         boolean exited = exit.isDone();
@@ -538,8 +565,14 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     void focusTerminal() { if (!closed) (view == null ? this : view).requestFocusInWindow(); }
     void setActive(boolean selected) {
         active = selected;
-        setBorder(BorderFactory.createEmptyBorder(PADDING, PADDING, PADDING, PADDING));
+        updateUserScale();
         if (view != null) view.setInactiveDim(selected ? 0 : configuredDim);
+    }
+
+    private void updateUserScale() {
+        int padding = com.formdev.flatlaf.util.UIScale.scale(PADDING);
+        setBorder(BorderFactory.createEmptyBorder(padding, padding, padding, padding));
+        if (view != null) view.setUserScaleFactor(com.formdev.flatlaf.util.UIScale.getUserScaleFactor());
     }
 
     /**
@@ -592,6 +625,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        try { scaleSubscription.close(); }
+        catch (Exception failure) { LOG.log(System.Logger.Level.WARNING, "Could not remove terminal scale listener", failure); }
         jobTimer.stop();
         Runnable closedHook = onClosed;
         onClosed = () -> {};

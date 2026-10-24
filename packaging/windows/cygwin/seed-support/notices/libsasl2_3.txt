@@ -1,0 +1,261 @@
+Package source: x86_64/release/cyrus-sasl/cyrus-sasl-2.1.27-1-src.tar.xz
+License identifier: LicenseRef-Upstream-libsasl2_3
+
+--- cyrus-sasl-2.1.27-1.src/cyrus-sasl.cygport ---
+NAME=cyrus-sasl
+VERSION=2.1.27
+RELEASE=1
+DESCRIPTION="sasl2"
+HOMEPAGE="http://cyrusimap.org/"
+
+#SRC_URI="ftp://ftp.cyrusimap.org/cyrus-sasl/${P}.tar.gz"
+SRC_URI="https://github.com/cyrusimap/cyrus-sasl/releases/download/${P}/${P}.tar.gz"
+SRC_URI+=" series libsasl2_3.postinstall"
+
+PATCH_URI="$(grep -v '^#' series)"
+#PATCH_URI=
+
+CATEGORY=Utils
+SUMMARY="The Cyrus SASL API implementation."
+DESCRIPTION="The Cyrus SASL library allows for client/server authentication in conformance with RFC 2222."
+
+PKG_NAMES="cyrus-sasl libsasl2_3 libsasl2_3-sql libsasl2_3-ldap libsasl2-devel"
+
+cyrus_sasl_SUMMARY="${SUMMARY} (Documentation and Utilities)"
+cyrus_sasl_CONTENTS='--exclude=saslauthd.exe --exclude=saslauthd.8.gz --exclude=man3 usr/sbin usr/share'
+
+libsasl2_3_SUMMARY="${SUMMARY} (Runtime library and Daemon)"
+libsasl2_3_CONTENTS=' --exclude=*ldapdb* --exclude=*sql*
+                     etc/sasl2 etc/postinstall usr/bin/*.dll 
+                     usr/sbin/saslauthd.exe usr/share/man/man8/saslauthd.8.gz
+                     usr/lib/sasl2_3'
+
+libsasl2_devel_SUMMARY="${SUMMARY} (Development files)"
+libsasl2_devel_CONTENTS='usr/include usr/lib/libsasl2.dll.a usr/lib/pkgconfig/ usr/share/man/man3'
+if defined ARCH_i686; then
+  libsasl2_devel_CONTENTS+=' usr/lib/*.la'
+fi
+
+libsasl2_3_ldap_SUMMARY="${SUMMARY} (LDAP Plugin)"
+libsasl2_3_ldap_CONTENTS='usr/lib/sasl2_3/*ldapdb*'
+
+libsasl2_3_sql_SUMMARY="${SUMMARY} (SQL Plugin)"
+libsasl2_3_sql_CONTENTS='usr/lib/sasl2_3/*sql*'
+
+DISTCLEANFILES="config/libtool.m4 config/ltconfig"
+DIFF_EXCLUDES="saslauthd.h.in .git"
+
+DEPEND="pkgconfig(openssl) pkgconfig(sqlite3) openldap-devel libpq-devel libdb-devel pkgconfig(krb5-gssapi) libcrypt-devel"
+
+# The configure test for detecting whether dlsym appends a leading
+# underscore to the symbol is broken. Override the test by passing
+# 'sasl_cv_dlsym_adds_uscore=yes'.
+CYGCONF_ARGS="
+  --with-configdir=/etc/sasl2
+  --with-plugindir=/usr/lib/sasl2_3
+  --disable-static --enable-shared
+  --enable-sql --with-sqlite3=/usr --with-pgsql=/usr --without-mysql
+  --enable-ldapdb --with-ldap=/usr
+  --enable-login
+  sasl_cv_dlsym_adds_uscore=yes
+"
+
+# Build with debugging
+if false; then
+  inform "Debugging build"
+  CFLAGS="-O0 -g"
+  CXXFLAGS="-O0 -g"
+  RESTRICT=strip debuginfo
+fi
+
+#MAKEOPTS+=" -j1"
+
+if defined ARCH_i686; then
+  # The ldap .la files reference the sasl2 .la file.
+  KEEP_LA_FILES=all
+else
+  KEEP_LA_FILES=module
+fi
+
+ACLOCAL_FLAGS="-I config"
+
+src_install() {
+  cd ${B}
+  cyginstall
+
+  mv ${D}/usr/lib/sasl2 ${D}/usr/lib/sasl2_3
+
+  dodoc ${S}/saslauthd/LDAP_SASLAUTHD
+  dodoc *.html *.txt *.fig
+
+  exeinto /etc/postinstall
+  newexe ${S}/libsasl2_3.postinstall libsasl2_3.sh
+
+  # Create an empty /etc/sasl2 as a clue that this is where the
+  # config files go.
+  dodir /etc/sasl2
+  keepdir /etc/sasl2
+}
+
+src_test() {
+  cd ${B}/utils
+
+  { rm -f sasldb \
+    && echo 1234 | ./saslpasswd2 -p -c -f sasldb ken \
+    && make testsuite.exe \
+    && ./testsuite -a -r 25; } \
+  || error "testsuite failed"
+}
+
+# Local Variables:
+# fill-column: 72
+# mode: sh
+# sh-indentation: 2
+# End:
+
+Source archive: x86_64/release/cyrus-sasl/cyrus-sasl-2.1.27-1-src.tar.xz
+
+--- cyrus-sasl-2.1.27-1.src/cyrus-sasl-2.1.27.tar.gz!/cyrus-sasl-2.1.27/mac/libdes/src/COPYRIGHT ---
+Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
+All rights reserved.
+
+This package is an DES implementation written by Eric Young (eay@mincom.oz.au).
+The implementation was written so as to conform with MIT's libdes.
+
+This library is free for commercial and non-commercial use as long as
+the following conditions are aheared to.  The following conditions
+apply to all code found in this distribution.
+
+Copyright remains Eric Young's, and as such any Copyright notices in
+the code are not to be removed.
+If this package is used in a product, Eric Young should be given attribution
+as the author of that the SSL library.  This can be in the form of a textual
+message at program startup or in documentation (online or textual) provided
+with the package.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. All advertising materials mentioning features or use of this software
+   must display the following acknowledgement:
+   This product includes software developed by Eric Young (eay@mincom.oz.au)
+
+THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+
+The license and distribution terms for any publically available version or
+derivative of this code cannot be changed.  i.e. this code cannot simply be
+copied and put under another distrubution license
+[including the GNU Public License.]
+
+The reason behind this being stated in this direct manner is past
+experience in code simply being copied and the attribution removed
+from it and then being distributed as part of other packages. This
+implementation was a non-trivial and unpaid effort.
+
+--- cyrus-sasl-2.1.27-1.src/cyrus-sasl-2.1.27.tar.gz!/cyrus-sasl-2.1.27/saslauthd/COPYING ---
+/* CMU libsasl
+ * Tim Martin
+ * Rob Earhart
+ * Rob Siemborski
+ */
+/* 
+ * Copyright (c) 2001 Carnegie Mellon University.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer. 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ *
+ * 3. The name "Carnegie Mellon University" must not be used to
+ *    endorse or promote products derived from this software without
+ *    prior written permission. For permission or any other legal
+ *    details, please contact  
+ *      Office of Technology Transfer
+ *      Carnegie Mellon University
+ *      5000 Forbes Avenue
+ *      Pittsburgh, PA  15213-3890
+ *      (412) 268-4387, fax: (412) 268-7395
+ *      tech-transfer@andrew.cmu.edu
+ *
+ * 4. Redistributions of any form whatsoever must retain the following
+ *    acknowledgment:
+ *    "This product includes software developed by Computing Services
+ *     at Carnegie Mellon University (http://www.cmu.edu/computing/)."
+ *
+ * CARNEGIE MELLON UNIVERSITY DISCLAIMS ALL WARRANTIES WITH REGARD TO
+ * THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS, IN NO EVENT SHALL CARNEGIE MELLON UNIVERSITY BE LIABLE
+ * FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
+ * OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+
+--- cyrus-sasl-2.1.27-1.src/cyrus-sasl-2.1.27.tar.gz!/cyrus-sasl-2.1.27/COPYING ---
+/* CMU libsasl
+ * Tim Martin
+ * Rob Earhart
+ * Rob Siemborski
+ */
+/* 
+ * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer. 
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ *
+ * 3. The name "Carnegie Mellon University" must not be used to
+ *    endorse or promote products derived from this software without
+ *    prior written permission. For permission or any other legal
+ *    details, please contact  
+ *      Office of Technology Transfer
+ *      Carnegie Mellon University
+ *      5000 Forbes Avenue
+ *      Pittsburgh, PA  15213-3890
+ *      (412) 268-4387, fax: (412) 268-7395
+ *      tech-transfer@andrew.cmu.edu
+ *
+ * 4. Redistributions of any form whatsoever must retain the following
+ *    acknowledgment:
+ *    "This product includes software developed by Computing Services
+ *     at Carnegie Mellon University (http://www.cmu.edu/computing/)."
+ *
+ * CARNEGIE MELLON UNIVERSITY DISCLAIMS ALL WARRANTIES WITH REGARD TO
+ * THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS, IN NO EVENT SHALL CARNEGIE MELLON UNIVERSITY BE LIABLE
+ * FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
+ * OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */

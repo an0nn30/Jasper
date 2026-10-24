@@ -7,3 +7,5 @@ unified	system	{context}	stripes	classic	segments	run_window	as_requested	none
 unified	system	Workstation — {session} — {directory}	stripes	equal	cells	anchored	classic	standard
 native	system	{context}	rails	equal	cells	run_window	classic	none
 native	window	Workstation — {session} — {directory}	stripes	classic	segments	anchored	classic	standard
+classic	system	{context}	rails	equal	segments	anchored	as_requested	standard
+classic	window	Workstation — {session} — {directory}	stripes	classic	cells	run_window	classic	none

@@ -46,6 +46,12 @@ public final class DesignMetrics {
         // A port field's resting width: New File Server and New Tunnel agree on 83; Add Host's older 71 is a recorded residual.
         PORT_FIELD_WIDTH(83),
         FOOTER_STATUS_GAP(11), WINDOW_ACTION_MIN_WIDTH(72), MENU_ICON_ARROW_WIDTH(21), TITLE_PAIR_GAP(3), DETAIL_MASK_PITCH(7), DETAIL_MASK_COUNT(12), DETAIL_ROW_SIDE(12),
+        // A manager detail's grid of label and value rows (a group face's, spec 14.8's Fields): its box inside the card's
+        // sides and bottom and its rows inside the box, and the box's top line under the card's top.
+        DETAIL_GRID_INSET(9), DETAIL_GRID_TOP(11),
+        // A grid's rows end this far inside its box's trailing edge; its rows' Show and Copy (and a value's Copy) stand this
+        // far inside their faces; a manager detail's row of text buttons keeps this minimum width (0: none).
+        DETAIL_GRID_TRAILING(9), DETAIL_ACTION_PADDING(8), DETAIL_ACTION_MIN_WIDTH(0),
         CONTROL_RADIUS(4), CARD_RADIUS(6), WINDOW_RADIUS(8), SEGMENT_TRACK_RADIUS(4), SEGMENT_ITEM_RADIUS(3),
         // Title rows measured on the 2026-10-10 Desktop references: a window's row above its rule (Credential Vault, and
         // the Settings header that stands in for it), a dialog's band before its content (Add Host, New File Server, New
@@ -65,7 +71,7 @@ public final class DesignMetrics {
         FOCUS_HALO_PERCENT_DARK(32), FOCUS_HALO_PERCENT_LIGHT(25), ERROR_HALO_PERCENT(22), TILE_PERCENT_DARK(17), TILE_PERCENT_LIGHT(13),
         FOCUS_RING(3), PANEL_HEADER(35), PANEL_HEADER_BOTTOM_GAP(5), PANEL_HEADER_ACTION(24), PANEL_HEADER_ACTION_GAP(2), PANEL_HEADER_TRAILING_PADDING(6), PANEL_HEADER_CONTRIBUTED_GLYPH(18), PANEL_SEARCH_SIDE(7), PANEL_SEARCH_BOTTOM(6), PANEL_SEARCH_HEIGHT(24), PANEL_SEARCH_VERTICAL_PADDING(8), PANEL_HEADER_ACTION_VERTICAL(7), PANEL_SEARCH_PADDING(5), PANEL_SEARCH_GAP(3), PANEL_SEARCH_TEXT_BASELINE(1), PANEL_SEARCH_TOP(0), PANEL_SEARCH_RULE(0), PANEL_STATUS_RULE(0), PANEL_FOOTER(30), SWITCH_WIDTH(32), SWITCH_HEIGHT(18), SWITCH_KNOB(14),
         COMPACT_SWITCH_WIDTH(28), COMPACT_SWITCH_HEIGHT(16), COMPACT_SWITCH_KNOB(12),
-        ICON_CAPTION(12), ICON_CONTROL(14), ICON_RAIL(16), ICON_EMPTY(20), ICON_PROMPT(24),
+        ICON_CAPTION(12), ICON_CONTROL(14), ICON_RAIL(16), ICON_EMPTY(20), ICON_PROMPT(24), ICON_SWATCH(12),
         FIELD_VERTICAL_PADDING(8), BUTTON_VERTICAL_PADDING(8), BUTTON_GAP(6), ICON_GAP(6),
         TRANSPARENT_FIELD_PADDING(5), TRANSPARENT_FIELD_RADIUS(3), TRANSPARENT_FIELD_FOCUS_RADIUS(4), FIELD_HORIZONTAL_PADDING(8), BUTTON_HORIZONTAL_PADDING(14), PRIMARY_BUTTON_HORIZONTAL_PADDING(14),
         TEXTAREA_PADDING(7), PORT_PREFIX_GAP(2), SEGMENT_PADDING(2), SEGMENT_HORIZONTAL_PADDING(10), CHIP_HEIGHT(16), CHIP_PADDING(4),
@@ -88,13 +94,17 @@ public final class DesignMetrics {
         // Native adapter geometry preserved exactly until Plan 3 Task 10; each use has its own name so that
         // changing a kit or icon role cannot silently move workspace tabs, rails, status or find-bar layout.
         RAIL_BUTTON_ARC(8), NATIVE_TOOLBAR_HOVER_ARC(6), NATIVE_TOOLBAR_DISABLED_PERCENT(38),
-        TAB_REVEAL_INSET(100), TAB_CLOSE_FIT_WIDTH(80), TAB_CLOSE_GUTTER(28), TAB_COMPACT_GUTTER(4), TAB_CLOSE_WIDTH(16),
+        TAB_CLOSE_FIT_WIDTH(80), TAB_CLOSE_GUTTER(28), TAB_COMPACT_GUTTER(4), TAB_CLOSE_WIDTH(16),
         NATIVE_SPLIT_DIVIDER(8), TAB_CLOSE_TRAILING(6), TAB_DIVIDER(1), TAB_INDICATOR(2), TAB_REORDER_THRESHOLD(5),
         STATUS_RUNNING_DOT(5), STATUS_PROGRESS_BAR_HEIGHT(8), STATUS_PROGRESS_MIN_HEIGHT(24),
         TOOL_HEADER_LEADING_PADDING(10), TOOL_HEADER_TRAILING_PADDING(6), TOOL_HEADER_DETAIL_GAP(6), TOOL_HEADER_ACTIVE_DOT(6), RAIL_BADGE_DOT(6),
         FIND_GAP(6), FIND_SIDE_PADDING(6), FIND_CONTROL_GAP(4), FIND_CLOSE_SPACER(16),
         // Compact document bars (an editor's find/replace rows, notice and command strip) inside a DOCUMENT split.
-        DOCUMENT_BAR_VERTICAL_PADDING(4), DOCUMENT_BAR_SIDE_PADDING(6), DOCUMENT_BAR_GAP(8), DOCUMENT_BAR_ACTION_GAP(3), DOCUMENT_BAR_STATUS_WIDTH(84), DOCUMENT_BAR_FILL_MIN_WIDTH(120), DOCUMENT_BAR_LINE_GAP(4),
+        DOCUMENT_BAR_VERTICAL_PADDING(4), DOCUMENT_BAR_SIDE_PADDING(6), DOCUMENT_BAR_GAP(8), DOCUMENT_BAR_ACTION_GAP(3), DOCUMENT_BAR_STATUS_WIDTH(84), DOCUMENT_BAR_FILL_MIN_WIDTH(120), DOCUMENT_BAR_LINE_GAP(4), DOCUMENT_BAR_SEARCH_WIDTH(0), SEPARATOR_HEIGHT(18), DOCUMENT_RULE_GAP(0),
+        // A document bar's text button's side padding under a face that pads them so (the 07 Credential Vault toolbar's verbs).
+        DOCUMENT_BAR_BUTTON_PADDING(7),
+        // The gap on each side of a document bar's separator, which the 07 Credential Vault toolbar draws a little tighter.
+        DOCUMENT_BAR_RULE_GAP(8),
         TITLE_SEARCH_PADDING(8), TITLE_SEARCH_GAP(6), NATIVE_MENU_ARROW_GAP(3),
         NOTICE_VERTICAL_PADDING(8), NOTICE_HORIZONTAL_PADDING(12), NOTICE_BUTTON_GAP(8), BREADCRUMB_COLLAPSED_HEIGHT(16),
         // Kit breadcrumbs and the opt-in overlay scroll policy (Plan 2 Task 6b), keeping the chooser's former geometry.
@@ -119,7 +129,7 @@ public final class DesignMetrics {
         PLUGIN_DETAILS_GAP(10), PLUGIN_DETAILS_EDGE_PADDING(7), PLUGIN_DETAILS_LEADING_PADDING(15), PLUGIN_DETAIL_ICON(52),
         PLUGIN_TEXT_VERTICAL_PADDING(6), PLUGIN_TEXT_SIDE_PADDING(0),
         NOTIFICATION_WIDTH(360), NOTIFICATION_ICON(16), NOTIFICATION_GAP(6), NOTIFICATION_CLOSE(16),
-        // App-unmocked surfaces (Plan 3 Task 9): the Errors window's trace card shows at most this many lines before it scrolls.
+        // App-unmocked surfaces (Plan 3 Task 9): the Errors tab's trace card shows at most this many lines before it scrolls.
         ERRORS_TRACE_ROWS(12),
         // A manager detail heading's title block keeps this width (or its own, if narrower) before its actions wrap.
         DETAIL_IDENTITY_MIN_WIDTH(160),
@@ -140,9 +150,6 @@ public final class DesignMetrics {
         RUN_WINDOW_RADIUS(4), RUN_WINDOW_TITLE_HEIGHT(24), RUN_WINDOW_TITLE_SIDE(10), RUN_WINDOW_CLOSE(16), RUN_WINDOW_CLOSE_SIDE(5), RUN_WINDOW_SHORTCUT_GAP(10), RUN_WINDOW_SIDE(12), RUN_WINDOW_HELP_TOP(10), RUN_WINDOW_TILE(32), RUN_WINDOW_TILE_GLYPH(13), RUN_WINDOW_TILE_GAP(10), RUN_WINDOW_HELP_LINE(18), RUN_WINDOW_FIELD_TOP(11), RUN_WINDOW_LABEL_COLUMN(48), RUN_WINDOW_FIELD_SIDE(6), RUN_WINDOW_MENU_WIDTH(20), RUN_WINDOW_LIST_TOP(10), RUN_WINDOW_ROW_HEIGHT(21), RUN_WINDOW_HEADING_HEIGHT(18), RUN_WINDOW_ROW_SIDE(8), RUN_WINDOW_SWATCH(7), RUN_WINDOW_ROW_GAP(7), RUN_WINDOW_DETAIL_GAP(7), RUN_WINDOW_DETAIL_TOP(10), RUN_WINDOW_DETAIL_LABEL_GAP(6), RUN_WINDOW_CHECK_TOP(10), RUN_WINDOW_BOTTOM(10), RUN_WINDOW_FOOTER_HEIGHT(40), RUN_WINDOW_BUTTON_WIDTH(70), RUN_WINDOW_BUTTON_GAP(6),
         // Plan 5b: the help text's block under the help row's top, where the mocks set its first line (16 under the body's top).
         RUN_WINDOW_HELP_TEXT_TOP(1),
-        // Plan 8b: the Run window's home inset from the dock work area's left and bottom edges (06 Run Dialog mocks: 6 px
-        // right of the left stripe's rule, 5 px above the bottom strip's rule); read only by the Run window's home.
-        RUN_WINDOW_HOME_SIDE(6), RUN_WINDOW_HOME_BOTTOM(5),
         // Plan 8b: the Run window's button label padding, so every footer label the mocks show fits their 70 px buttons
         // (RUN_WINDOW_BUTTON_WIDTH); a longer label grows its button. Read only by the Run window's kit views.
         RUN_WINDOW_BUTTON_PADDING(8),
@@ -174,7 +181,16 @@ public final class DesignMetrics {
         KEYCAP_DETAIL_EDGE_ALPHA(0),
         // Plan 9b: an item list's heading row with its two rules where the table face bands list headings, and a two-line
         // item list's row; 0 keeps a heading as tall as the rows and measures a row from its lines (the classic Plugins list).
-        LIST_HEADING_HEIGHT(0), LIST_TWO_LINE_ROW_HEIGHT(0);
+        LIST_HEADING_HEIGHT(0), LIST_TWO_LINE_ROW_HEIGHT(0),
+        // Plan 12: the classic toolbar's icon-only button (IntelliJ's 22 px ActionButton) and the ▼ in an icon-only
+        // dropdown's corner; only ClassicToolbarButton reads them.
+        CHROME_ICON_BUTTON(22), CHROME_ICON_CARET(4),
+        // Plan 12: IntelliJ's run-configuration combo (ComboBoxButton) in a toolbar strip; only the classic buttons face reads them.
+        TOOLBAR_COMBO_HEIGHT(24), TOOLBAR_COMBO_LEADING(10), TOOLBAR_COMBO_ICON_GAP(4), TOOLBAR_COMBO_ARROW(16), TOOLBAR_COMBO_TRAILING(7),
+        TOOLBAR_COMBO_RADIUS(3), TOOLBAR_COMBO_TEXT_MAX(240),
+        // Plan 13: a labelled stripe button's icon (IntelliJ's classic 13 px tool-window icons) and its gap to the text
+        // (StripeButton's iconTextGap); only the labelled stripes read them.
+        STRIPE_ICON(13), STRIPE_ICON_GAP(4);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
@@ -220,6 +236,20 @@ public final class DesignMetrics {
         values.put(Role.FOCUS_RING, 2);
         values.put(Role.NATIVE_TOOL_HEADER_HEIGHT, 24);
         values.put(Role.PANEL_HEADER, 24);
+        // Plan 10b: a manager rail's rows start 4 under its header strip (the Credential Vault mock's Categories).
+        values.put(Role.COLUMN_RAIL_TOP, 4);
+        // Plan 10b: a manager detail's content stands 12 inside its column, its parts 12 apart (the Credential Vault
+        // mock's Details pane).
+        values.put(Role.DETAIL_PADDING, 12);
+        values.put(Role.DETAIL_SECTION_GAP, 12);
+        // Plan 10b final review: the Item selected mock's Fields: its Show and Copy 4 apart and 6 inside their faces, the
+        // lane ending 4 inside the grid's box, and Edit… and Delete… 86 wide.
+        values.put(Role.DETAIL_GRID_TRAILING, 4);
+        values.put(Role.DETAIL_ACTION_PADDING, 6);
+        values.put(Role.DETAIL_ACTION_GAP, 4);
+        values.put(Role.DETAIL_ACTION_MIN_WIDTH, 86);
+        // Plan 10b: a swatch is a 10 px square (the Credential Vault mocks' Name cells and Details heading).
+        values.put(Role.ICON_SWATCH, 10);
         values.put(Role.CARD_PADDING, 12);
         values.put(Role.FULL_SETTING_SIDE_PADDING, 12);
         values.put(Role.SETTINGS_ROW_SIDE, 12);
@@ -239,11 +269,19 @@ public final class DesignMetrics {
         values.put(Role.TITLE_SEARCH_ARC, 0);
         values.put(Role.PROMPT_TILE_RADIUS, 0);
         values.put(Role.PROMPT_TILE, 30);
+        // Plan 10b: a prompt is the Unlock Vault mock's: 400 wide (PROMPT_COMPACT), its content 14 inside the dialog's
+        // card, the tile's row 14 under the header strip and 12 above the 22 px field.
+        values.put(Role.PROMPT_COMPACT_WIDTH, 400);
+        values.put(Role.PROMPT_SIDES, 14);
+        values.put(Role.PROMPT_TOP, 14);
+        values.put(Role.PROMPT_COMPACT_INTRO_GAP, 12);
+        values.put(Role.PROMPT_FIELD_HEIGHT, 22);
         values.put(Role.ICON_PROMPT, 16);
         values.put(Role.FORM_LABEL_WIDTH, 100);
         values.put(Role.COLUMN_GAP, 12);
         values.put(Role.SECTION_GAP, 12);
-        values.put(Role.SHEET_SECTION_GAP, 12);
+        // Plan 10b: a sheet's groups stand 18 apart, rule to rule (the 07 Add Login mock).
+        values.put(Role.SHEET_SECTION_GAP, 10);
         values.put(Role.FORM_SIDES, 16);
         // Plan 10a: a FULL form's first group stands 10 under the dialog's top and a mixed card's rows 8 apart (the Add
         // Host and New Tunnel mocks: the first group's rule 18 below the title bar, Authentication's rows 8 apart).
@@ -355,6 +393,15 @@ public final class DesignMetrics {
         // The overview 14 below the folder tabs, its lines 17.5 apart.
         values.put(Role.PLUGIN_DETAILS_GAP, 4);
         values.put(Role.PLUGIN_TEXT_LINE_SPACING, 3);
+        // Plan 10b: the classic manager (Rulings 4), the 07 Credential Vault mocks' columns, bar padding and search width.
+        values.put(Role.MANAGER_SIDEBAR_WIDTH, 171);
+        values.put(Role.MANAGER_LIST_WIDTH, 348);
+        values.put(Role.DOCUMENT_BAR_VERTICAL_PADDING, 6);
+        values.put(Role.DOCUMENT_BAR_SEARCH_WIDTH, 200);
+        // A document split's rule stands between its bar and its body, not inside the bar (the 34 px toolbar row over its rule).
+        values.put(Role.DOCUMENT_RULE_GAP, 1);
+        // The 07 toolbar's rules: 7 either side, so its verbs meet the mock's positions (plan 10b final review).
+        values.put(Role.DOCUMENT_BAR_RULE_GAP, 7);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);
         return new DesignMetrics(table);

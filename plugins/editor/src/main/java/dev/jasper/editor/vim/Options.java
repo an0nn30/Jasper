@@ -8,10 +8,12 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Vim options (spec 3.8). The global instance holds global values; each editor has a local instance whose
- * buffer- and window-local options keep their own values. Setting an option on a local instance sets it there and
- * globally, as {@code :set} does. Defaults are Vim's with {@code -u NONE -N}, except where the Editor supplies them
- * ({@link EditorDefaults}) and 'showcmd', 'incsearch' and 'hlsearch', which are on (spec 3.8).
+ * Vim options (spec 3.8). The global instance holds global values; each editor has a local instance, its window's,
+ * whose window-local options keep their own values and whose buffer-local options are its buffer's, which every
+ * editor of the same document shares (pane flexibility spec 6), as Vim keeps them per window and per buffer. Setting an
+ * option on a local instance sets it there and globally, as {@code :set} does. Defaults are Vim's with
+ * {@code -u NONE -N}, except where the Editor supplies them ({@link EditorDefaults}) and 'showcmd', 'incsearch' and
+ * 'hlsearch', which are on (spec 3.8).
  */
 public final class Options {
     enum Type { BOOLEAN, NUMBER, STRING }
@@ -90,22 +92,57 @@ public final class Options {
         new Def("wrap", "wrap", Type.BOOLEAN, true, true),
         new Def("wrapscan", "ws", Type.BOOLEAN, true, false));
 
+    /** The local options each window keeps (Vim's window options); the other local options are the buffer's. */
+    private static final java.util.Set<String> WINDOW = java.util.Set.of("number", "relativenumber", "wrap");
+
     private final Options global;
+    /** A window's instance: its buffer's, which holds the buffer-local values; null for the global and a buffer's instance. */
+    private final Options buffer;
     private final Map<String, Object> values = new HashMap<>();
     private final List<Runnable> listeners = new ArrayList<>();
+    /** A window's instance tells its own listeners about a change to its buffer's values. */
+    private final Runnable relay = this::changed;
     private String keywordSpec;
     private Keywords keywords;
 
     /** A global instance with Vim's defaults. */
-    public Options() { this(null); }
+    public Options() { this(null, null); }
 
-    private Options(Options global) { this.global = global; }
+    private Options(Options global, Options buffer) {
+        this.global = global;
+        this.buffer = buffer;
+        if (buffer != null) buffer.listeners.add(relay);
+    }
 
-    /** @return a local instance for one editor, backed by this global one */
+    /** @return a local instance for one editor of a buffer of its own, backed by this global one */
     Options local() {
         if (global != null) throw new IllegalStateException("Only the global options have local copies");
-        return new Options(this);
+        return new Options(this, new Options(this, null));
     }
+
+    /**
+     * @return a local instance for another editor of this one's buffer (Vim's split window): it shares the buffer-local
+     *     values, and starts with a copy of this one's window-local values (win_copy_options)
+     */
+    Options window() {
+        if (buffer == null) throw new IllegalStateException("Only an editor's options have other windows");
+        var other = new Options(global, buffer);
+        other.values.putAll(values);
+        return other;
+    }
+
+    /** win_copy_options: this window's window-local values become a copy of {@code source}'s, a window of its buffer. */
+    void windowFrom(Options source) {
+        values.clear();
+        values.putAll(source.values);
+        changed();
+    }
+
+    /** The editor goes: its window no longer hears about its buffer's values. */
+    void close() { if (buffer != null) buffer.listeners.remove(relay); }
+
+    /** @return the instance that holds {@code def}'s local value: a window's buffer's for a buffer-local option */
+    private Options holder(Def def) { return buffer != null && !WINDOW.contains(def.name()) ? buffer : this; }
 
     /** @param listener runs after any value of this instance changes */
     void onChanged(Runnable listener) { listeners.add(listener); }
@@ -136,7 +173,8 @@ public final class Options {
 
     Object get(String name) {
         Def def = def(name).orElseThrow(() -> new IllegalArgumentException("E518: Unknown option: " + name));
-        if (global != null && def.local() && values.containsKey(def.name())) return values.get(def.name());
+        Options holder = holder(def);
+        if (global != null && def.local() && holder.values.containsKey(def.name())) return holder.values.get(def.name());
         Options root = global != null ? global : this;
         return root.values.getOrDefault(def.name(), def.fallback());
     }
@@ -147,7 +185,7 @@ public final class Options {
         Object checked = check(def, value);
         if (global != null) {
             global.put(def, checked);
-            if (def.local()) put(def, checked);
+            if (def.local()) holder(def).put(def, checked);
         } else put(def, checked);
     }
 
@@ -156,7 +194,7 @@ public final class Options {
         Def def = def(name).orElseThrow(() -> new IllegalArgumentException("E518: Unknown option: " + name));
         Object checked = check(def, value);
         if (global != null && !def.local()) global.put(def, checked);
-        else put(def, checked);
+        else holder(def).put(def, checked);
     }
 
     /** Which values {@code :set}, {@code :setlocal} and {@code :setglobal} read and write (Vim's opt_flags). */
@@ -421,7 +459,8 @@ public final class Options {
             case LOCAL -> setLocal(def.name(), value);
             case GLOBAL -> {
                 // The editor keeps its own value of a local option (each Vim window and buffer has a copy).
-                if (global != null && def.local() && !values.containsKey(def.name())) values.put(def.name(), get(def.name()));
+                Options holder = holder(def);
+                if (global != null && def.local() && !holder.values.containsKey(def.name())) holder.values.put(def.name(), get(def.name()));
                 global().put(def, check(def, value));
             }
         }
@@ -539,8 +578,10 @@ public final class Options {
 
     private void put(Def def, Object value) {
         Object old = values.put(def.name(), value);
-        if (!value.equals(old)) for (Runnable listener : List.copyOf(listeners)) listener.run();
+        if (!value.equals(old)) changed();
     }
+
+    private void changed() { for (Runnable listener : List.copyOf(listeners)) listener.run(); }
 
 
 

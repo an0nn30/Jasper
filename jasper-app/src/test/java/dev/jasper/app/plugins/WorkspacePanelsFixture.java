@@ -107,9 +107,9 @@ public final class WorkspacePanelsFixture implements AutoCloseable {
         StagedVaultHost.settle();
     }
 
-    /** Selects a synthetic host in the Sessions panel Remote built for {@code window}; false while it has none. */
+    /** Selects a synthetic host in Remote's Sessions panel, in the main window; false while it has none. */
     public boolean select(UUID window, UUID host) {
-        Object panel = onEdtValue(() -> ((Map<?, ?>) field(remote, "panels")).get(window));
+        Object panel = onEdtValue(() -> field(remote, "sessionsPanel"));
         if (panel == null) return false;
         onEdt(() -> {
             try { panel.getClass().getMethod("select", UUID.class).invoke(panel, host); }

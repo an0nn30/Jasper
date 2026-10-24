@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * The steps a branded look's splash shows while Jasper starts (spec 10.11), as start-up reaches them:
+ * The steps the startup splash shows while Jasper starts (spec 10.11), as start-up reaches them:
  * {@value #RUNTIME} as the splash opens, {@value #CONFIGURATION} while the application is made, "Loading plugin: "
  * with each selected plugin's name just before it loads, {@value #WORKSPACE} as the first window is composed, and
  * "Starting" with the product name and "Workstation…" just before it shows. The count, four plus the selected plugins,

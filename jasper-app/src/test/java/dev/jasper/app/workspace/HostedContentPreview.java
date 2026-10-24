@@ -27,12 +27,12 @@ public final class HostedContentPreview {
                 WindowContent.installTitleBar(root, owner, true, title -> {});
                 owner.installRootBindings(root);
                 var model = new Contributions(); owner.connectContributions(model);
-                ContentEntry selected = null;
+                Tab selected = null;
                 for (int index = 0; index < 12; index++) {
                     var text = new JTextArea("#!/usr/bin/env bash\n\n# Remote configuration\nserver=jasper\necho \"Ready: $server\"\n");
                     text.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
                     var scroll = new JScrollPane(text); scroll.setBorder(BorderFactory.createEmptyBorder());
-                    var entry = model.content().open("dev.jasper.editor", "file:" + index,
+                    var entry = model.tabs().open("dev.jasper.editor", "file:" + index,
                         index == 11 ? "server-config.sh" : "document-" + index + ".txt", owner.id(), scroll);
                     entry.presentation(entry.title(), index == 11 ? "prod" : "", AppIcons.named("FILE"), index == 11,
                         index == 11 ? "deploy@prod:/etc/jasper/server-config.sh" : "/projects/jasper/" + entry.title(), index == 11 ? "prod" : "");
@@ -42,7 +42,7 @@ public final class HostedContentPreview {
                 }
                 for (boolean themeDark : new boolean[]{true, false}) {
                     owner.selectVariant(themeDark);
-                    for (var entry : model.content().entries()) {
+                    for (var entry : model.tabs().hosted()) {
                         var scroll = (JScrollPane)entry.component();
                         var text = (JTextArea)scroll.getViewport().getView();
                         text.setBackground(dev.jasper.ui.theme.JasperTheme.bundled().editor(dev.jasper.app.platform.ThemeZone.theme(text).dark()).background());

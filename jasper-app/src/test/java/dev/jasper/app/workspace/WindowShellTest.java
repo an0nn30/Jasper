@@ -11,7 +11,7 @@ import javax.swing.JRootPane;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-/** Spec 10.1 and 10.10: a terminal frame's chrome under the look, through the one mount TerminalWindow uses. */
+/** Spec 10.1 and 10.10, and workspace tabs spec 6.3: a window frame's chrome under the look, through the mounts WindowFrame uses. */
 class WindowShellTest {
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
@@ -82,6 +82,44 @@ class WindowShellTest {
                 standard.followAppearance(other);
                 assertThat(other.getClientProperty("apple.awt.windowAppearance")).as("the default look keeps JOptionPane's own dialogs").isNull();
             }
+        });
+    }
+
+    /**
+     * Workspace tabs spec 6.3 and parent tabs spec 6: a title bar ending in the window's ⋮ over the workspace alone; its
+     * menus only where macOS's screen menu bar shows them.
+     */
+    @Test void aChildWindowMountsItsWorkspaceUnderItsTabsTitleWithItsWindowMenuAndNoMenuRow() throws Exception {
+        edt(() -> {
+            var child = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), WindowRole.CHILD,
+                DesktopTestSupport.HOME, false, () -> { });
+            var root = new JRootPane();
+            String[] title = {""};
+            try (var bar = WindowContent.mountChild(root, child, new WindowLook(WorkspaceChrome.STANDARD, true, false), true,
+                    value -> title[0] = value)) {
+                assertThat(bar).as("the unified bar, with a title and no header").isNotNull();
+                assertThat(bar.style()).isEqualTo(dev.jasper.app.platform.MacTitleBar.Style.WINDOW);
+                assertThat(root.getJMenuBar()).as("the screen menu bar shows the main window's menus, built for this window")
+                    .isSameAs(child.menuBar());
+                child.update();
+                assertThat(title[0]).as("the active tab's title").isEqualTo(child.tabTitle(child.selectedTab()));
+            }
+            var other = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), WindowRole.CHILD,
+                DesktopTestSupport.HOME, false, () -> { });
+            var plain = new JRootPane();
+            assertThat(WindowContent.mountChild(plain, other, new WindowLook(WorkspaceChrome.STANDARD, false, false), false, value -> { }))
+                .as("the system's title bar").isNull();
+            // Workspace plan 7b Rulings 17: off macOS the root's menu bar is the window's ⋮ alone, after a glue.
+            if (System.getProperty("os.name").startsWith("Mac")) assertThat(plain.getJMenuBar()).as("no menu row in a child window").isNull();
+            else assertThat(plain.getJMenuBar().getName()).as("no menu row: the window's ⋮ alone").isEqualTo("windowBar");
+            assertThat(plain.getContentPane()).as("its workspace alone").isSameAs(other);
+            var compact = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), WindowRole.CHILD,
+                DesktopTestSupport.HOME, false, () -> { });
+            compact.applyConfiguration(ConfigSnapshot.defaults().toBuilder().viewMode(ViewMode.COMPACT).build(), true);
+            var compactRoot = new JRootPane();
+            assertThat(WindowContent.mountChild(compactRoot, compact, new WindowLook(WorkspaceChrome.STANDARD, true, false), true, value -> { }))
+                .as("Compact: the system's title bar, as the main window's").isNull();
+            assertThat(compactRoot.getContentPane()).isSameAs(compact);
         });
     }
 

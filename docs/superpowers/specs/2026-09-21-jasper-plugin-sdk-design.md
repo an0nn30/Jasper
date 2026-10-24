@@ -2,6 +2,7 @@
 
 **Date:** 2026-09-21  
 **Status:** Design approved section by section in conversation on 2026-09-21; revised the same day after an external review (section 15); awaiting the user's review of this written spec. Nothing is implemented.  
+**Amended 2026-10-19** by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md) (plan 15): `Appearance.presentation()` (SDK 0.18.2) reports the active presentation; everything else in this document stands.  
 **Baseline:** `1f8ba74` on `main`, after the app/Buddy refactor and documentation audit.  
 **Scope:** A supported plugin SDK (`jasper-sdk`), the application runtime that loads third-party plugins, the UI, terminal, event and service extension surfaces, and the verification and documentation that keep them honest. The Credential Vault and SSH plugins are consumers of this SDK and get their own specs.
 

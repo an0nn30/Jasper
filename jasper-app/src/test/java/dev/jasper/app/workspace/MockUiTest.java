@@ -30,7 +30,7 @@ class MockUiTest {
                 int toolbar = owner.toolbar().getHeight(), tabs = owner.windowTabs().getHeight();
                 assertThat(toolbar).isEqualTo(30);
                 assertThat(title.getHeight()).isEqualTo(30);
-                assertThat(tabs).isZero();
+                assertThat(tabs).as("a window's only tab shows no strip").isZero();
                 assertThat(owner.windowTabs().isVisible()).isFalse();
                 assertThat(owner.status().getHeight()).isEqualTo(24);
                 assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 958 - toolbar - tabs - 24));
@@ -131,18 +131,21 @@ class MockUiTest {
             var owner = content(launcher(pending)); owner.setSize(400, 500); layoutTree(owner);
             var buttons = java.util.Arrays.stream(owner.toolbar().getComponents()).filter(JButton.class::isInstance)
                 .map(JButton.class::cast).toList();
-            assertThat(buttons).hasSize(7);
+            // Six buttons, the window's ⋮ (workspace plan 7b Rulings 20) and the overflow button.
+            assertThat(buttons).hasSize(8);
             assertThat(buttons.stream().filter(java.awt.Component::isVisible)).allSatisfy(button -> {
                 assertThat(button.getWidth()).isGreaterThanOrEqualTo(16);
                 assertThat(button.getX() + button.getWidth()).isLessThanOrEqualTo(400);
                 assertThat(button.getHeight()).isEqualTo(24);
             });
             buttons.getFirst().doClick();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.tabCount()).isEqualTo(2);
+            layoutTree(owner);
+            int height = owner.currentPane().getHeight();
             owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).as("the header row, with its search field, stays when the toolbar is hidden").isEqualTo(416);
+            assertThat(owner.currentPane().getHeight()).as("the header row, with its search field, stays when the toolbar is hidden").isEqualTo(height);
             owner.setToolbarMode(ToolbarMode.ICONS); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(416);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(height);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
         });
     }

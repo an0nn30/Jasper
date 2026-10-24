@@ -9,5 +9,8 @@ import java.nio.file.Path;
 public final class BootstrapTestSupport {
     public static AutoCloseable installUnexpectedExceptionHandler() { return ApplicationBootstrap.installUnexpectedExceptionHandler(); }
     public static void closeLogAfterStartupFailure(AppLog log, Runnable after) { ApplicationBootstrap.closeLogAfterStartupFailure(log, after); }
-    public static java.util.function.Function<LaunchRequest, LaunchRequest.Response> handoffHandler(JasperApplication app, Path source, long modified) { return ApplicationBootstrap.handoffHandler(app, source, modified); }
+    public static java.util.function.Function<LaunchRequest, LaunchRequest.Response> handoffHandler(JasperApplication app, Path source, long modified) { return dev.jasper.app.residency.HandoffSocket.answering((request, updated) -> {
+        javax.swing.SwingUtilities.invokeLater(() -> ApplicationBootstrap.handoffHandler(app).accept(request, updated));
+        return true;
+    }, source, modified); }
 }

@@ -15,9 +15,6 @@ import java.util.function.Supplier;
  * (spec 12.2: the kit's body size when the look's row offers the look's default, the setting's example otherwise).
  */
 final class PlatformFontSize implements ValueEditor<Float> {
-    /** The default look's font row copy: the row offers the platform's size, not a size the look's kit names. */
-    static final String PLATFORM_COPY = "Use platform font size";
-
     private final Editors.NumberField<Float> number;
     private final SettingsDraft draft;
     private final String copy;
@@ -37,12 +34,12 @@ final class PlatformFontSize implements ValueEditor<Float> {
     static String toggleCopy(String copy) { return copy.replace(" font size", " size"); }
 
     /**
-     * The look's standard interface size: the kit's body size when the look's font row offers the look's default (spec
-     * 9.1 words it so exactly when the kit names a UI face), else the setting's example. Only the first reads the kit, so a
+     * The look's standard interface size: the kit's body size when the look's font row offers the look's default
+     * ({@code SettingsChrome.kitFontSize}, spec 9.1), else the setting's example. Only the first reads the kit, so a
      * context without a kit (its 5- and 6-argument forms) keeps working under the default look.
      */
     static float standardSize(PageContext context) {
-        if (context.chrome().fontRowCopy().equals(PLATFORM_COPY)) return UI_FONT_SIZE.example().orElse(13f);
+        if (!context.chrome().kitFontSize()) return UI_FONT_SIZE.example().orElse(13f);
         return context.kit().get().kit().type().body();
     }
 

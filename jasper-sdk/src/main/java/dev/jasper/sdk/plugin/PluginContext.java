@@ -24,12 +24,16 @@ import dev.jasper.sdk.ui.Platform;
 
 /**
  * Everything the application offers one plugin. Each plugin has its own context, so every
- * registration is attributed to it. After a failed start, and after shutdown, the context is closed:
- * contributing calls throw {@link IllegalStateException}, {@link #background()} rejects tasks and
- * handles already issued do nothing. {@link #log()} keeps working.
+ * registration is attributed to it. After a failed start, and after shutdown, the context is closed: the
+ * runtime closes what the plugin left open, contributing calls throw {@link IllegalStateException} and
+ * {@link #background()} rejects tasks. {@link #log()} keeps working.
  */
 public interface PluginContext {
-    /** Plugin-owned declarative view factory. @return the kit */
+    /**
+     * Plugin-owned declarative view factory.
+     *
+     * @return the kit
+     */
     dev.jasper.sdk.ui.UiKit kit();
     /**
      * This plugin's verified identity.
@@ -46,7 +50,8 @@ public interface PluginContext {
     System.Logger log();
 
     /**
-     * The plugin's private data directory, created on first use. The plugin owns its contents.
+     * The plugin's private data directory, {@code plugins/<id>/data} under Jasper's home, created when missing. The
+     * plugin owns its contents.
      *
      * @return an existing directory
      */
@@ -60,8 +65,9 @@ public interface PluginContext {
     PluginSettings settings();
 
     /**
-     * A plugin-scoped executor for slow work. It stops admitting tasks at shutdown; tasks already
-     * accepted are interrupted when the shutdown wait elapses.
+     * A plugin-scoped executor for slow work. Each task runs on its own virtual thread, so tasks may run at the
+     * same time; a task that throws is logged against the plugin. It stops admitting tasks at shutdown; tasks
+     * already accepted are interrupted when the shutdown wait elapses, or at once after a failed start.
      *
      * @return the executor
      */
@@ -117,14 +123,16 @@ public interface PluginContext {
     StatusBar statusBar();
 
     /**
-     * The application's look, change notifications and theme-aware icons.
+     * Theme colours for custom content and the look Jasper runs with: semantic colours, the chrome and workspace
+     * variants, the workspace, editor and syntax palettes, the workspace opacity, change notifications, the
+     * presentation and the saved terminal typography.
      *
      * @return the appearance service
      */
     Appearance appearance();
 
     /**
-     * Side and bottom panels.
+     * Tool windows, docked left, right or bottom.
      *
      * @return the panels service
      */
@@ -138,20 +146,25 @@ public interface PluginContext {
     Rail rail();
 
     /**
-     * Application-built windows and dialogs.
+     * Dialogs, overlays, popovers, content tabs, split items, restorers and file choosers.
      *
      * @return the windows service
      */
     Windows windows();
 
     /**
-     * The terminal windows, tabs and panes. Finding them needs no capability; what a handle may do does.
+     * The Jasper windows, tabs and panes. Finding them needs no capability; what a handle may do does.
      *
      * @return the terminals service
      */
     Terminals terminals();
 
-        /** @return the command palette; registering needs {@code palette.contribute} */
+        /**
+         * The command palette: scopes this plugin adds to it, and opening it on a scope. Both need
+         * {@code palette.contribute}.
+         *
+         * @return the command palette
+         */
         Palette palette();
 
     /**
@@ -179,6 +192,12 @@ public interface PluginContext {
      */
     CommandLine commandLine();
 
-        /** @return desktop integration such as opening a file in the editor */
+        /**
+         * Desktop integration: opening a file in an editor or a web address in the browser, copying to and reading the
+         * clipboard, and becoming the editor Jasper opens files with. Reading the clipboard needs
+         * {@code clipboard.read} and providing the editor {@code editor.provide}; the rest needs no capability.
+         *
+         * @return the platform service
+         */
         Platform platform();
 }

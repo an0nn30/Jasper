@@ -57,7 +57,7 @@ class RunWindowModelessTest {
     }
 
     static Opened open(PaletteLook look) {
-        var owner = CornerHomeTest.owner(look);
+        var owner = UpperHomeTest.owner(look);
         var root = WindowCommandPaletteTest.install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
         owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
         var window = owner.commandPalette().component();
@@ -80,9 +80,9 @@ class RunWindowModelessTest {
                 o.owner().action(ActionId.COMMAND_PALETTE).actionPerformed(new ActionEvent(o.owner(), 0, "status item"));
                 assertThat(palette.isOpen()).as("the COMMAND_PALETTE action (▶ Run…, Search everywhere) focuses too").isTrue();
                 assertThat(palette.blocksActions()).isFalse();
-                int tabs = o.owner().tabStrip().getTabCount();
+                int tabs = o.owner().tabCount();
                 o.owner().action(ActionId.NEW_TAB).actionPerformed(new ActionEvent(o.owner(), 0, "menu"));
-                assertThat(o.owner().tabStrip().getTabCount()).as("the window's actions run").isEqualTo(tabs + 1);
+                assertThat(o.owner().tabCount()).as("the window's actions run").isEqualTo(tabs + 1);
                 assertThat(palette.isOpen()).as("a tab switch keeps it").isTrue();
                 var inside = new Point(o.window().getX() + 5, o.window().getY() + 5);
                 var outside = new Point(o.window().getX() + o.window().getWidth() + 40, o.window().getY() + 5);

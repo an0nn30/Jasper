@@ -35,6 +35,8 @@ final class HostedKitView implements UiView {
  HostedKitView(HostedKit owner,KitContext context,ViewSpec spec,Consumer<UiEvent> events){this.owner=owner;this.context=context;this.events=Objects.requireNonNull(events);view=new KitView(context,KitValues.toModule(spec),e -> dispatch(KitValues.toSdk(e)));this.spec=spec;sourceSpec=spec;}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  KitView component(){guard();return view;}
+ /** Whether the plugin or its host closed this view. */
+ boolean closed(){return closed.get();}
  void dispatch(UiEvent event){if(closed.get()||!owner.live())return;try{if(hostEvents.test(event))return;events.accept(event);}catch(Throwable failure){owner.failed();}}
  @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{owner.validateIcons(next);var projected=hostSpec.apply(next);if(projected!=next)owner.validateIcons(projected);view.update(hostModule.apply(KitValues.toModule(projected)));sourceSpec=next;spec=projected;}finally{updating=false;}checkAnchors();updated.run();}
  @Override public UiAnchor anchor(String id){guard();if(mount==null || owner.anchorHost==null)throw new IllegalArgumentException("Unmounted view");var anchor=new HostedAnchor(this,id);anchors.add(anchor);anchor.onClosed(() -> anchors.remove(anchor));return anchor;}

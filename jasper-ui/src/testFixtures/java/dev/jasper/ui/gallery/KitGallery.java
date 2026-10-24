@@ -129,10 +129,12 @@ public final class KitGallery {
         });
         return new Fixture(name, "", state, name.contains("short") ? 240 : 264, name.contains("short") ? 180 : 424, spec[0]);
     }
-    /** The Enterprise gallery's theme: Enterprise Light (plan 4c Rulings 21; Enterprise Dark is plan 5's). */
+    /** The Enterprise gallery's theme: the shipped Enterprise theme's Light or Dark variant. */
     static GeneratedTheme enterpriseTheme(String name) {
-        if (!name.equals("light")) throw new IllegalArgumentException("The Enterprise gallery renders Enterprise Light only");
-        return KitFixtures.enterpriseLight();
+        return switch (name) {
+            case "dark" -> KitFixtures.enterpriseDark(); case "light" -> KitFixtures.enterpriseLight();
+            default -> throw new IllegalArgumentException("Unknown gallery theme: " + name);
+        };
     }
     public static GeneratedTheme theme(String name) {
         return switch (name) {
@@ -198,7 +200,13 @@ public final class KitGallery {
      */
     public static void installed(GeneratedTheme theme, dev.jasper.ui.kit.Kit kit, java.util.function.BiConsumer<KitContext, GalleryFocus> action) {
         var priorLaf = UIManager.getLookAndFeel();
-        Object priorFont = UIManager.get("defaultFont");
+        Object[] developerFont = {null};
+        UIManager.getDefaults().forEach((key, value) -> { if ("defaultFont".equals(key)) developerFont[0] = value; });
+        Object priorFont = developerFont[0];
+        String priorScaleProperty = System.getProperty("flatlaf.uiScale");
+        // Capture the requested scale before a fixture font can change FlatLaf font-derived scaling.
+        float renderScale = UIScale.getUserScaleFactor();
+        System.setProperty("flatlaf.uiScale", Float.toString(renderScale));
         Object priorCaps = UIManager.get("PasswordField.showCapsLock");
         Object priorOverride = UIManager.get("Jasper.uiFontFamilyOverride");
         var priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager();
@@ -218,6 +226,8 @@ public final class KitGallery {
             }
         } finally {
             KeyboardFocusManager.setCurrentKeyboardFocusManager(priorFocus);
+            if (priorScaleProperty == null) System.clearProperty("flatlaf.uiScale");
+            else System.setProperty("flatlaf.uiScale", priorScaleProperty);
             UIManager.put("defaultFont", priorFont);
             UIManager.put("PasswordField.showCapsLock", priorCaps);
             UIManager.put("Jasper.uiFontFamilyOverride", priorOverride);

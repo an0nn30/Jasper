@@ -63,8 +63,8 @@ public final class DesktopTestSupport {
         return owner;
     }
     /** A window like a new one from the application: its tab starts where a new shell starts, not in a named directory. */
-    public static WindowContent content(ShellLauncher launcher, java.util.function.Consumer<Path> newWindow) {
-        WindowContent owner = new WindowContent(launcher, null, false, newWindow, () -> {}, () -> {}, ThemeTestSupport.controller(true),
+    public static WindowContent content(ShellLauncher launcher, java.util.function.Consumer<Path> newTerminalWindow) {
+        WindowContent owner = new WindowContent(launcher, null, false, newTerminalWindow, () -> {}, () -> {}, ThemeTestSupport.controller(true),
             KeyBindings.defaults(false), new CommandHistory(), false);
         OWNERS.add(owner);
         return owner;
@@ -76,9 +76,30 @@ public final class DesktopTestSupport {
     }
     /** A window under {@code look}'s chrome, with this host's keymap. */
     public static WindowContent content(ShellLauncher launcher, ThemeController themes, WorkspaceChrome look) {
-        boolean macOs = System.getProperty("os.name").startsWith("Mac");
+        return content(launcher, themes, look, System.getProperty("os.name").startsWith("Mac"));
+    }
+    /** A window under {@code look}'s chrome, with one platform's keymap and shortcut text, whatever the host is. */
+    public static WindowContent content(ShellLauncher launcher, ThemeController themes, WorkspaceChrome look, boolean macOs) {
         WindowContent owner = new WindowContent(launcher, HOME, false, path -> {}, () -> {}, () -> {}, themes,
             KeyBindings.defaults(macOs), new CommandHistory(), macOs, look);
+        OWNERS.add(owner);
+        return owner;
+    }
+    /** As above, in {@code role}. */
+    public static WindowContent content(ShellLauncher launcher, ThemeController themes, WorkspaceChrome look, boolean macOs, WindowRole role) {
+        WindowContent owner = new WindowContent(role, launcher, HOME, false, path -> {}, () -> {}, () -> {}, themes,
+            KeyBindings.defaults(macOs), new CommandHistory(), macOs, look);
+        OWNERS.add(owner);
+        return owner;
+    }
+    /**
+     * A window in {@code role} with this host's keymap: its first tab starts in {@code directory} (null: where a new shell
+     * starts) unless it is {@code empty}, and {@code emptied} runs when its last tab has closed or moved out.
+     */
+    public static WindowContent content(ShellLauncher launcher, WindowRole role, Path directory, boolean empty, Runnable emptied) {
+        boolean macOs = System.getProperty("os.name").startsWith("Mac");
+        WindowContent owner = new WindowContent(role, launcher, directory, empty, path -> {}, () -> {}, emptied, ThemeTestSupport.controller(true),
+            KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD);
         OWNERS.add(owner);
         return owner;
     }

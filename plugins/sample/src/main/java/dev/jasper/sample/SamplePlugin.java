@@ -8,22 +8,24 @@ import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Anchor;
+import dev.jasper.sdk.RestoreState;
+import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.ui.ContentSpec;
+import dev.jasper.sdk.ui.ContentTab;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
-import dev.jasper.sdk.ui.PluginWindow;
+import dev.jasper.sdk.ui.Presentation;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
-import dev.jasper.sdk.ui.WindowSpec;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.ViewSpec;
-import java.awt.Dimension;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -64,7 +66,7 @@ public final class SamplePlugin implements Plugin {
         context.kit().registerIcon(new dev.jasper.sdk.ui.IconAsset("dev.jasper.sample:flask", "M 6 2 H 10 M 6.67 6 H 9.33 M 6.67 2 V 6 L 4 13.33 Q 3.8 14 4.33 14 H 11.67 Q 12.2 14 12 13.33 L 9.33 6 V 2"));
         context.log().log(System.Logger.Level.INFO, "Sample plugin " + context.plugin().version() + " started");
         context.events().subscribe(AppEvents.THEME_CHANGED,
-            event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
+            event -> context.log().log(System.Logger.Level.INFO, "The theme is now " + event.variant()));
         var settings = new SampleSettings(context.settings());
         context.settings().page(new SampleSettingsPanel(context.kit(), settings));
         long stepMillis = settings.stepMillis.get();
@@ -102,15 +104,15 @@ public final class SamplePlugin implements Plugin {
             status.setText(event.terminal() ? "Sample: ready" : "Sample: " + Math.round(event.fraction().orElse(0) * 100) + "%");
             if (event.terminal()) demo[0].setEnabled(true);
         });
-        installPanelAndWindow(context, stepMillis);
+        installPanelAndAboutTab(context, stepMillis);
     }
     // example:pluginui:end
 
     // example:pluginpanels:start
-    private static void installPanelAndWindow(PluginContext context, long stepMillis) {
-        // One instance per window, built the first time the panel is shown there. Its body is the kit's empty state:
+    private static void installPanelAndAboutTab(PluginContext context, long stepMillis) {
+        // Built the first time the panel shows in the main window, the only window with tool windows. Its body is the kit's empty state:
         // a tile, a title, one sentence and one secondary action, centered in the panel.
-        context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
+        context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host ->
             context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
                 new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
                 Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
@@ -122,16 +124,17 @@ public final class SamplePlugin implements Plugin {
                         context.background().execute(() -> demo(context, stepMillis));
                 }));
 
-        context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(FLASK), invoked -> {
-            // The application builds the frame, title bar and menu bar; a singleton comes back while it is open.
-            PluginWindow window = context.windows().create(
-                new WindowSpec("dev.jasper.sample.about-window", "About Sample", new Dimension(360, 200), true));
+        ContentTab[] about = {null};
+        // A tab in the given window, which Jasper draws with its strip; an open About is selected again.
+        java.util.function.Consumer<WindowOwner> showAbout = owner -> {
+            if (about[0] != null && !about[0].isClosed()) { about[0].select(); return; }
             var content = context.kit().create(new ViewSpec(new Nodes.Empty("sample.about", ControlState.READY,
                 new Nodes.Icon("sample.about.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"), "Sample Plugin",
-                "This window's chrome belongs to Jasper; its content to the plugin.",
+                "This tab's strip and window belong to Jasper; its content to the plugin.",
                 List.of(new Nodes.Button(DETAILS_BUTTON, ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, DETAILS_BUTTON, "")))), event -> {
                 if (!(event instanceof UiEvent.Action action) || !action.id().equals(DETAILS_BUTTON)) return;
-                PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample Details", window, true));
+                // The tab owns the modal sheet, which opens over the tab's window; the tab cannot move until the sheet closes.
+                PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample Details", about[0], true));
                 // A sheet's canonical body: a form card of label/value rows, then the one primary action.
                 var body = context.kit().create(new ViewSpec(new Nodes.Form("sample.details", ControlState.READY,
                     Nodes.FormKind.SHEET, "Sample Details", Optional.empty(), List.of(new Nodes.Card("sample.details.card", ControlState.READY,
@@ -144,13 +147,27 @@ public final class SamplePlugin implements Plugin {
                 dialog.setContent(body);
                 dialog.show();
             });
-            window.setContent(content);
-            window.show();
-            window.toFront();
+            // Jasper saves the tab with its windows, and the "about" restorer below opens it again (SDK 0.21.0).
+            about[0] = context.windows().openTab(new ContentSpec("about", "About Sample")
+                .withRestore(new RestoreState("about", java.util.Map.of())), owner, content);
+        };
+        context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(FLASK),
+            invoked -> showAbout.accept(invoked.window()));
+        context.windows().restorer("about", request -> {
+            showAbout.accept(request.window());
+            return java.util.Optional.empty();
         });
         context.rail().add("dev.jasper.sample.about");
     }
     // example:pluginpanels:end
+
+    // example:pluginlook:start
+    /** IntelliJ's classic layout keeps a tool window like this one in the bottom strip: under labelled stripes it starts there. */
+    private static Anchor panelAnchor(PluginContext context) {
+        var look = context.appearance().presentation();
+        return look.toolWindows() == Presentation.ToolWindows.STRIPES ? Anchor.BOTTOM : Anchor.LEFT;
+    }
+    // example:pluginlook:end
 
     // example:pluginterminal:start
     private static void installTerminalDemo(PluginContext context) {
@@ -211,7 +228,7 @@ public final class SamplePlugin implements Plugin {
         }
         // Register the action first: the scope names it, and its shortcut then reaches the scope both ways.
         // Closed, this handler opens the palette on the scope; open, the palette switches to it or dismisses.
-        context.actions().register(ActionSpec.of(GREETINGS_OPEN, "Sample Greetings…").withDefaultBinding("cmd+alt+g"), invoked ->
+        context.actions().register(ActionSpec.of(GREETINGS_OPEN, "Sample Greetings…").withDefaultBinding("cmd+alt+y"), invoked ->
             context.palette().open(invoked.window(), GREETINGS, Optional.empty(), Optional.empty()));
         List<String> greetings = List.of("good morning", "hello", "hi there");
         context.palette().register(new PaletteScope() {

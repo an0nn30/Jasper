@@ -44,21 +44,22 @@ class CommandPaletteShortcutsTest {
         for (boolean mac : new boolean[]{true, false}) edt(() -> {
             try (var owner = owner(mac)) {
                 var root = new BindingRoot(); root.setContentPane(owner); owner.installRootBindings(root);
-                var first = owner.currentTab(); owner.newTab(HOME); var second = owner.currentTab();
+                // The digits select parent tabs (parent tabs spec 8): the second terminal is a parent tab of its own.
+                var first = owner.currentTerminal(); owner.newTab(HOME); var second = owner.currentTerminal();
                 int primary = primary(mac);
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, primary | InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isTrue();
                 dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("no such command");
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_1, primary))).isTrue();
-                assertThat(owner.currentTab()).isSameAs(second);
+                assertThat(owner.currentTerminal()).isSameAs(second);
                 owner.action(ActionId.NEW_TAB).actionPerformed(new ActionEvent(root, 0, "menu"));
-                owner.windowCommands().view("view.status_bar").actionPerformed(new ActionEvent(root, 0, "menu"));
-                assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+                owner.action(ActionId.TOGGLE_STATUS_BAR).actionPerformed(new ActionEvent(root, 0, "menu"));
+                assertThat(owner.tabCount()).isEqualTo(2);
                 assertThat(owner.status().isVisible()).isTrue();
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, primary | InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isFalse();
                 root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_1, primary));
-                assertThat(owner.currentTab()).isSameAs(first);
+                assertThat(owner.currentTerminal()).isSameAs(first);
                 assertThat(owner.commands().entries()).noneMatch(e -> e.command().id().equals("command_palette"));
                 var view = owner.chrome().menuBar().getMenu(2);
                 assertThat(view.getItem(0).getAction()).isSameAs(owner.action(ActionId.COMMAND_PALETTE));
@@ -284,6 +285,8 @@ class CommandPaletteShortcutsTest {
                 if (dispatcher.dispatchKeyEvent(event)) return true;
             return false;
         }
+        /** Sets the permanent focus owner as a click into a component does, without a native window. */
+        void own(Component component) { setGlobalPermanentFocusOwner(component); }
         @Override public void addKeyEventDispatcher(KeyEventDispatcher dispatcher) {
             super.addKeyEventDispatcher(dispatcher); dispatchers.add(dispatcher);
         }

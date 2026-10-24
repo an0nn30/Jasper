@@ -52,8 +52,9 @@ final class ClassicHeaders {
      * The 1 px box around a table or tree that is not in a panel body (Rulings 2), its edge through {@code edge}'s guard,
      * around the rows' {@code surface.card} (the mocks' white list). A border paints before the pane's children, so the
      * fill lies under the header band and the rows. The Settings navigation tree, a manager's rail and a table in a
-     * manager's rail or list column stand unboxed on their surface, as the Settings and Vault mocks draw them; a table in
-     * the detail column keeps its box. In a panel's body the rows stand on {@code surface.card} without the box, edge to
+     * manager's rail stand unboxed on their surface, as the Settings and Vault mocks draw them; a table in a manager's list
+     * column stands unboxed on {@code surface.card} (the Credential Vault mock's Items, plan 10b); a table in the detail
+     * column keeps its box. In a panel's body the rows stand on {@code surface.card} without the box, edge to
      * edge, as the Workstation mock's Sessions and Tunnels panels draw them (plan 10a).
      */
     static final class Box implements Border {
@@ -72,8 +73,14 @@ final class ClassicHeaders {
         /** Whether {@code c} is a panel's body, whose rows stand on {@code surface.card} without the box. */
         boolean panelBody(Component c) { return !unboxed() && SwingUtilities.getAncestorOfClass(Panels.Body.class, c) != null; }
 
-        /** The Settings navigation tree, a manager's rail and a rail or list column's table stand on their own surface. */
-        private boolean unboxed() { return owner instanceof Trees.TreeControl tree ? tree.settingsNavigation || tree.rail() : owner.column == 0 || owner.column == 1; }
+        /**
+         * Whether the owner is a table in a manager's list column, whose rows stand on {@code surface.card} without the box
+         * (plan 10b); a host's own list column (the file chooser's listing) stands on its pane as before.
+         */
+        boolean listColumn() { return owner instanceof Tables.TableControl && owner.column == 1 && owner.view.hostColumn() < 0; }
+
+        /** The Settings navigation tree, a manager's rail and a rail or list column's table stand without the box. */
+        private boolean unboxed() { return owner instanceof Trees.TreeControl tree ? tree.settingsNavigation || tree.column == 0 : owner.column == 0 || owner.column == 1; }
 
         @Override public Insets getBorderInsets(Component c) {
             int line = drawn(c) ? ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE) : 0;
@@ -83,7 +90,7 @@ final class ClassicHeaders {
         @Override public boolean isBorderOpaque() { return false; }
 
         @Override public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
-            if (panelBody(c)) {
+            if (panelBody(c) || listColumn()) {
                 g.setColor(ThemePainting.color(context, dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));
                 g.fillRect(x, y, width, height);
                 return;

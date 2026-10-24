@@ -88,4 +88,24 @@ class ConfigEditorTest {
         assertThat(thrown.get()).isInstanceOf(IllegalStateException.class);
         assertThat(calls).isEmpty();
     }
+
+    /** Workspace-tabs plan 1, Ruling 26: a file another program asked Jasper to open is revealed, never edited or opened. */
+    @Test void revealOnlyNeverEditsOrOpensAndRefusesTheEdt() throws Exception {
+        Path file = Path.of("/tmp/notes.txt");
+        var calls = new ArrayList<String>();
+        new ConfigEditor(path -> calls.add("edit:" + path), path -> calls.add("open:" + path), path -> calls.add("reveal:" + path))
+            .revealOnly(file);
+        assertThat(calls).containsExactly("reveal:" + file);
+        var broken = new ConfigEditor(path -> calls.add("edit"), path -> calls.add("open"),
+            path -> { throw new UnsupportedOperationException("reveal"); });
+        assertThatThrownBy(() -> broken.revealOnly(file)).isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining(file.toString())
+            .satisfies(failure -> assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("reveal"));
+        assertThat(calls).as("nothing else was tried").containsExactly("reveal:" + file);
+        var thrown = new AtomicReference<Throwable>();
+        SwingUtilities.invokeAndWait(() -> {
+            try { broken.revealOnly(file); } catch (Throwable failure) { thrown.set(failure); }
+        });
+        assertThat(thrown.get()).isInstanceOf(IllegalStateException.class).hasMessageContaining("worker thread");
+    }
 }

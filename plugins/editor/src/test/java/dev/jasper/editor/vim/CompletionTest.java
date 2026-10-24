@@ -18,11 +18,12 @@ class CompletionTest {
     private VimEditor editor() {
         Path file = folder.resolve("main.txt");
         var documents = new VimHost.Documents(
-            editor -> List.of(new Buffer(1, file.toString(), Optional.of(file), true, false, false, false, 1),
-                new Buffer(2, "/elsewhere/notes todo.md", Optional.of(Path.of("/elsewhere/notes todo.md")), false, false, false, false, 1),
-                new Buffer(3, "Untitled 1", Optional.empty(), false, false, false, true, 1)),
+            editor -> List.of(new Buffer(1, file.toString(), Optional.of(file), true, false, false, false, 1, 1),
+                new Buffer(2, "/elsewhere/notes todo.md", Optional.of(Path.of("/elsewhere/notes todo.md")), false, false, false, false, 1, 1),
+                new Buffer(3, "Untitled 1", Optional.empty(), false, false, false, true, 1, 1)),
             number -> CompletableFuture.completedFuture(true), (number, target) -> CompletableFuture.completedFuture(true),
-            (number, discard) -> { }, number -> { }, number -> { }, (editor, target) -> { }, path -> Optional.empty());
+            (number, discard) -> { }, (editor, discard) -> { }, number -> { }, editor -> { }, number -> { }, (editor, target) -> { },
+            path -> Optional.empty());
         var area = new VimTextArea();
         area.setText("x\n");
         return new VimEditor(new Vim(new VimHost(r -> Optional.empty(), (r, t) -> { }, documents)), area, EditorDefaults.VIM);

@@ -26,8 +26,8 @@ import javax.swing.plaf.UIResource;
  * The classic menu row (Enterprise presentation spec 10.1 and 10.2), the mocks' row: 24 px of titles on
  * {@code surface.app} over a 1 px {@code border.divider} rule; a hovered closed title on {@code surface.control.hover},
  * an open one in the accent, square. The titles stand side by side at their {@link #titleWidth}, as the mocks set them,
- * so whole-pixel text widths do not add up along the row. Terminal windows and the auxiliary frames of a classic look
- * share it. EDT only.
+ * so whole-pixel text widths do not add up along the row. A classic look's main window
+ * shows it. EDT only.
  */
 public final class ClassicMenuRow {
     /** An open title on the accent (spec 16.1.1), declared for the window chrome's pairs ({@code WindowPairs}). */
@@ -41,7 +41,7 @@ public final class ClassicMenuRow {
 
     /**
      * Styles {@code bar} under the installed theme and kit; call it again after a theme change. A bar that lays out its
-     * own titles (the terminal window's folding bar) keeps its layout and places them at their {@link #titleWidth} while
+     * own titles (the main window's folding bar) keeps its layout and places them at their {@link #titleWidth} while
      * {@link #styled} says so; a plain bar's look-and-feel layout gives way to the row's.
      *
      * @param bar the menu row

@@ -70,7 +70,7 @@ class PluginPanelPageTest {
     @Test void withoutAnInlineResetAHostRowHasResetToDefaultInItsMenu() throws Exception {
         var classic = new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> changes[0]++, () -> null,
             dev.jasper.app.testsupport.KitTestSupport::context,
-            new dev.jasper.app.presentation.SettingsChrome(false, true, false, Set.of(), "Use the default font size"), dev.jasper.app.presentation.Composition.CLASSIC);
+            new dev.jasper.app.presentation.SettingsChrome(false, true, false, Set.of(), true), dev.jasper.app.presentation.Composition.CLASSIC);
         var view=new AtomicReference<HostedKitView>();var rows=new AtomicReference<SettingsPanelHost>();
         var wrap=new AtomicReference<Setting<Boolean>>();
         onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> context -> {
@@ -90,6 +90,39 @@ class PluginPanelPageTest {
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action(changed.contextActions().getFirst().action()));
             assertThat(rows.get().pending(wrap.get())).as("the menu's Reset to Default").isFalse();
             page.dispose();
+        });
+    }
+
+    @Test void standardDraftEventsNotifyThePageAfterPublishingPendingValues() throws Exception {
+        var view = new AtomicReference<HostedKitView>();
+        var rows = new AtomicReference<SettingsPanelHost>();
+        var wrap = new AtomicReference<Setting<Boolean>>();
+        var observed = new ArrayList<Boolean>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
+            getClass().getClassLoader(), () -> plugin -> {
+                wrap.set(plugin.settings().declare(SettingSpec.of("wrap", SettingKind.bool(), false).label("Wrap lines")));
+                plugin.settings().page(new SettingsPanel() {
+                    @Override public dev.jasper.sdk.ui.UiView create(SettingsPanelHost h) {
+                        rows.set(h);
+                        var made = (HostedKitView) plugin.kit().create(new dev.jasper.sdk.ui.ViewSpec(h.row(wrap.get())), e -> { });
+                        view.set(made);
+                        return made;
+                    }
+                    @Override public void pendingChanged() { observed.add(rows.get().pending(wrap.get())); }
+                });
+            })));
+        var page = onEdtValue(() -> (PluginPanelPage) host.settingsPages(context).getFirst());
+        onEdt(() -> {
+            page.component();
+            rows.get().stage(wrap.get(), true);
+            assertThat(observed).as("plugin staging does not recurse").isEmpty();
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Toggled("settings:wrap", false));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Toggled("settings:wrap", true));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:wrap:reset"));
+            assertThat(observed).containsExactly(false, true, false);
+            page.dispose();
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Toggled("settings:wrap", true));
+            assertThat(observed).containsExactly(false, true, false);
         });
     }
 
@@ -123,6 +156,41 @@ class PluginPanelPageTest {
         onEdtValue(() -> size.get().set(9)).get(5,TimeUnit.SECONDS);
         onEdt(() -> assertThatThrownBy(view.get()::spec).isInstanceOf(IllegalStateException.class));
     }
+    /** Plan 15a (spec 5.8): under a look default, staging the plugin's own default saves it, and Reset returns to the look's. */
+    @Test void stagingThePluginsOwnDefaultUnderAKitDefaultSavesItAndResetReturnsToTheKits() throws Exception {
+        host.defaults = new dev.jasper.app.config.DefaultSource(java.util.Map.of(), java.util.Map.of(ID, java.util.Map.of("size", 15L)));
+        var view=new AtomicReference<HostedKitView>();var rows=new AtomicReference<SettingsPanelHost>();
+        var size=new AtomicReference<Setting<Integer>>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> context -> {
+            size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(8,48),13).label("Size")));
+            context.settings().page((SettingsPanel) h -> {rows.set(h);var made=(HostedKitView)context.kit().create(new dev.jasper.sdk.ui.ViewSpec(h.row(size.get())),e -> {});view.set(made);return made;});
+        })));
+        assertThat(size.get().get()).isEqualTo(15);
+        java.util.function.Supplier<dev.jasper.sdk.ui.Nodes.Button> reset = () -> (dev.jasper.sdk.ui.Nodes.Button)
+            ((dev.jasper.sdk.ui.Nodes.Stack) ((dev.jasper.sdk.ui.Nodes.SettingRow) view.get().spec().root()).control()).children().getLast();
+        var page=onEdtValue(() -> (PluginPanelPage)host.settingsPages(context).getFirst());
+        onEdt(() -> {
+            page.component();
+            assertThat(reset.get().state().visible()).as("at the look's default").isFalse();
+            rows.get().stage(size.get(),13);
+            assertThat(page.modified()).as("the plugin's own default differs from the look's").isTrue();
+            assertThat(reset.get().state().visible()).isTrue();
+        });
+        onEdtValue(page::apply).get(5,TimeUnit.SECONDS);
+        var file=host.environment.settingsFiles().file(ID);
+        assertThat(org.tomlj.Toml.parse(Files.readString(file)).getLong("size")).as("an explicit value").isEqualTo(13);
+        assertThat(size.get().get()).isEqualTo(13);
+        onEdt(() -> {
+            assertThat(reset.get().state().visible()).isTrue();
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:size:reset"));
+            assertThat(rows.get().pending(size.get())).as("Reset returns to the look's default").isEqualTo(15);
+        });
+        onEdtValue(page::apply).get(5,TimeUnit.SECONDS);
+        assertThat(org.tomlj.Toml.parse(Files.readString(file)).contains("size")).as("Reset removes the saved value").isFalse();
+        assertThat(size.get().get()).isEqualTo(15);
+        onEdt(() -> {assertThat(reset.get().state().visible()).as("no longer resettable").isFalse();page.dispose();});
+    }
+
     @Test void integerHostRowStepsAcrossItsRangeAndKeepsSearchHighlightThroughDraftRefresh() throws Exception {
         var view = new AtomicReference<HostedKitView>();
         onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),

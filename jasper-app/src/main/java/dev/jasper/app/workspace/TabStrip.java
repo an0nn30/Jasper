@@ -1,24 +1,47 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.AnimationSettings;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.util.List;
+import java.util.OptionalInt;
 import javax.swing.JComponent;
 import javax.swing.JPopupMenu;
 
 /**
- * A window's editor tab strip over its {@code TerminalDeck} (Enterprise presentation spec 10.5): today's equal tabs or
- * the classic tabs. Both drive the window's own select, close, menu and reorder callbacks. EDT only.
+ * A window's tab strip (tabs and panes spec 5; Enterprise presentation spec 10.5): the equal tabs, hidden while the
+ * window holds one tab, or the classic tabs, always shown. It lists, selects, closes and opens through its
+ * {@link ParentTabBar} only, a press on an entry starts the tab drag of a whole tab (spec 6), and it shows as active
+ * while its window is. The equal tabs open and close with the configured motion where the look has it (workspace plan
+ * 8a Rulings 20); the classic tabs never move. EDT only.
  */
 sealed interface TabStrip extends AutoCloseable permits WindowTabs, ClassicTabs {
-    /** The component mounted above the deck. */
+    /** The component mounted above the window's tabs' workspaces. */
     JComponent component();
-    /** Takes the deck's tabs, titles, selection and states. */
+    /** Takes the window's tabs, titles, selection and states. */
     void refresh();
-    /** Whether the window is active. */
+    /** Whether the strip shows as active: its window active. */
     void setActive(boolean active);
-    /** The configured animations; classic tabs never move. */
+    /** The configured animations; the classic tabs never move. */
     void setAnimations(AnimationSettings settings);
-    /** Every tab, as a menu of literal titles of at most {@code WindowTabs.TITLE_LIMIT} characters. */
+    /** The window's tabs, as a menu of literal titles of at most {@code WindowTabs.TITLE_LIMIT} characters. */
     JPopupMenu tabList();
+    /** Each tab's rectangle in this strip's coordinates, in strip order: a tab drag drops between them. */
+    List<Rectangle> tabBounds();
+    /**
+     * Where a dragged pane at {@code point}, in this strip's coordinates, becomes a new tab (tabs and panes spec 7;
+     * workspace plan 8c Rulings 3): an entry's leading quarter is the place before it and its trailing quarter the place
+     * after it, and under the classic tabs the "+" and the room after the last entry are the end, and a divider the
+     * place between the entries either side of it; empty over an entry's middle half, which shows its tab, and off the
+     * strip. The caller passes a point it found on the strip, of which the classic tabs read the x alone.
+     */
+    OptionalInt newTabPlace(Point point);
+    /**
+     * Whether {@code point}, in this strip's coordinates, is on its new-tab button, the classic tabs' "+", which is no
+     * tab's entry even where it stands over the tabs a crowded strip clips (workspace plan 9a Rulings 23); the equal
+     * tabs have none. The caller passes a point it found on the strip, of which the classic tabs read the x alone.
+     */
+    boolean onNewTabButton(Point point);
     /** Releases the tabs. */
     @Override void close();
 }

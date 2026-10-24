@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 import java.util.function.*;
 
 /** FakePluginHost drains finite work manually; long-lived loops need actual threads and a bounded test join. */
-final class TestRemotePlugin extends RemotePlugin {
+class TestRemotePlugin extends RemotePlugin {
     TestRemotePlugin(Executor ui,Function<PluginContext,Optional<AgentClient>> agents,BiFunction<Duration,Runnable,Runnable> schedule,Path ssh) {
         super(ui,agents,schedule,ssh,context->command->Thread.ofVirtual().name("remote-test-loop").start(command));
     }

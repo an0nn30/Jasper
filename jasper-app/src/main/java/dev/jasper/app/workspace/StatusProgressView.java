@@ -41,8 +41,7 @@ final class StatusProgressView extends JPanel {
     }
 
     private static JButton button() {
-        var result = new JButton();
-        result.putClientProperty("html.disable", true);
+        var result = PlainText.button();
         NativeStyles.installed().unframed(result);
         return result;
     }

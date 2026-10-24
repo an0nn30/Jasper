@@ -60,6 +60,12 @@ class AppDirsTest {
             .isEqualTo(home.resolve(".config/jasper/buddy.toml"));
     }
 
+    @Test void theWorkspaceStateLivesInTheRootBesideTheUiState() {
+        AppDirs dirs = AppDirs.resolve("Mac OS X", Map.of(), home);
+        assertThat(dirs.workspaceState()).isEqualTo(home.resolve(".config/jasper/workspace.toml"));
+        assertThat(dirs.workspaceState().getParent()).isEqualTo(dirs.uiState().getParent());
+    }
+
     @Test void daemonFilesShareOwnTheirOwnSubdirectoryOfTheRoot() {
         AppDirs dirs = AppDirs.resolve("Mac OS X", Map.of(), home);
         Path daemon = home.resolve(".config/jasper/daemon");
@@ -68,7 +74,7 @@ class AppDirsTest {
         assertThat(dirs.daemonDir()).isEqualTo(daemon);
         assertThat(dirs.daemonSocket()).isEqualTo(daemon.resolve("socket"));
         assertThat(dirs.daemonToken()).isEqualTo(daemon.resolve("token"));
-        assertThat(dirs.daemonLock()).isEqualTo(daemon.resolve("lock"));
+        assertThat(dirs.instanceLock()).isEqualTo(daemon.resolve("instance.lock"));
         assertThat(daemon).doesNotExist();
     }
 
@@ -77,7 +83,6 @@ class AppDirsTest {
         AppDirs dirs = AppDirs.resolve("Mac OS X", Map.of(), home);
         Path daemon = dirs.daemonSocket().getParent();
         assertThat(dirs.commandSocket()).isEqualTo(daemon.resolve("commands"));
-        assertThat(dirs.commandSocket(42)).isEqualTo(daemon.resolve("commands-42"));
         assertThat(dirs.subcommandList()).isEqualTo(daemon.resolve("subcommands"));
     }
 

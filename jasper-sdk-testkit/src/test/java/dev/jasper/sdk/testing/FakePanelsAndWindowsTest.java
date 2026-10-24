@@ -6,8 +6,6 @@ import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
-import dev.jasper.sdk.ui.WindowSpec;
-import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -20,7 +18,7 @@ import static org.assertj.core.api.Assertions.*;
 class FakePanelsAndWindowsTest {
     private static final PluginInfo INFO = new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of());
 
-    @Test void panelHeadersAreIndependentContainFailuresAndIgnoreRetainedActionsAfterClose() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+    @Test void panelHeadersContainFailuresAndIgnoreRetainedActionsAfterClose() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
             var panels = new ArrayList<PanelHost>();
@@ -28,51 +26,49 @@ class FakePanelsAndWindowsTest {
             String id = "dev.x.tool.headers";
             var registration = context.panels().register(new PanelSpec(id, "Headers", "file", Anchor.LEFT),
                 panel -> { panels.add(panel); return KitFixtures.view(context); });
-            UUID first = UUID.randomUUID(), second = UUID.randomUUID();
-            host.openPanel(id, first); host.openPanel(id, second);
+            host.addTerminalWindow();
+            host.openPanel(id); host.openPanel(id);
+            assertThat(panels).as("one instance, in the main window").hasSize(1);
             var icon = "file";
             panels.getFirst().setHeader(new dev.jasper.sdk.ui.PanelHeader("5", false, List.of(
                 new dev.jasper.sdk.ui.PanelHeader.Action("Add", icon, () -> calls.add("first")),
                 new dev.jasper.sdk.ui.PanelHeader.Action("Failure", icon, () -> { throw new IllegalStateException("header failed"); }),
                 new dev.jasper.sdk.ui.PanelHeader.Action("Linkage failure", icon, () -> { throw new NoClassDefFoundError("header dependency"); }))));
-            panels.getLast().setHeader(new dev.jasper.sdk.ui.PanelHeader("amp", true, List.of(
-                new dev.jasper.sdk.ui.PanelHeader.Action("Add", icon, () -> calls.add("second")))));
-            var stale = host.panelHeader(id, first);
+            var stale = host.panelHeader(id);
             assertThat(stale.detail()).isEqualTo("5");
-            assertThat(host.panelHeader(id, second).detail()).isEqualTo("amp");
+            panels.getFirst().setHeader(new dev.jasper.sdk.ui.PanelHeader("amp", true, List.of(
+                new dev.jasper.sdk.ui.PanelHeader.Action("Add", icon, () -> calls.add("second")))));
+            assertThat(host.panelHeader(id).detail()).isEqualTo("amp");
             stale.actions().forEach(action -> action.invoke().run());
-            host.panelHeader(id, second).actions().getFirst().invoke().run();
+            host.panelHeader(id).actions().getFirst().invoke().run();
             assertThat(host.failures()).hasSize(2);
             registration.close();
             panels.getFirst().setHeader(new dev.jasper.sdk.ui.PanelHeader("late", false, List.of()));
             stale.actions().forEach(action -> action.invoke().run());
-            assertThat(host.panelHeader(id, first)).isEqualTo(dev.jasper.sdk.ui.PanelHeader.EMPTY);
-            assertThat(host.panelHeader(id, second)).isEqualTo(dev.jasper.sdk.ui.PanelHeader.EMPTY);
+            assertThat(host.panelHeader(id)).isEqualTo(dev.jasper.sdk.ui.PanelHeader.EMPTY);
             assertThat(calls).containsExactly("first", "second");
             assertThat(host.failures()).hasSize(2);
         }
     }); }
 
-    @Test void fileSelectionWorksForWindowsAndDialogsAndRequiresALiveShownOwner(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+    @Test void fileSelectionWorksForDialogsAndRequiresALiveShownOwner(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });
-            var window = context.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(640, 480), true));
-            var dialog = context.windows().dialog(new DialogSpec("Edit", window, true));
+            var tab = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("manager", "Manager"), null, KitFixtures.view(context));
+            var dialog = context.windows().dialog(new DialogSpec("Edit", tab, true));
             var initial = java.util.Optional.of(directory.resolve("original"));
-            for (var surface : java.util.List.<dev.jasper.sdk.ui.WindowSurface>of(window, dialog)) {
-                assertThatIllegalStateException().isThrownBy(() -> surface.chooseFile("Choose key", initial));
-                surface.show();
-                host.queueFileSelection(java.util.Optional.of(directory.resolve("selected")));
-                assertThat(surface.chooseFile("Choose key", initial)).contains(directory.resolve("selected"));
-                assertThat(surface.chooseFile("Choose key", initial)).isEmpty();
-                assertThatIllegalArgumentException().isThrownBy(() -> surface.chooseFile(" ", initial));
-            }
-            window.close();
+            assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", initial));
+            dialog.show();
+            host.queueFileSelection(java.util.Optional.of(directory.resolve("selected")));
+            assertThat(dialog.chooseFile("Choose key", initial)).contains(directory.resolve("selected"));
+            assertThat(dialog.chooseFile("Choose key", initial)).isEmpty();
+            assertThatIllegalArgumentException().isThrownBy(() -> dialog.chooseFile(" ", initial));
+            tab.close();
             assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", initial));
         }
     }); }
 
-    @Test void recordsPanelsRailAndWindows() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+    @Test void recordsPanelsRailAndDialogs() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });
             List<PanelHost> hosts = new ArrayList<>();
@@ -84,23 +80,23 @@ class FakePanelsAndWindowsTest {
             context.rail().add("dev.x.tool.open");
             assertThat(host.panels()).containsExactly("dev.x.tool.hosts|Hosts|RIGHT", "dev.x.tool.broken|Broken|LEFT");
             assertThat(host.rail()).containsExactly("dev.x.tool.open");
-            UUID window = UUID.randomUUID();
-            assertThat(host.openPanel("dev.x.tool.hosts", window)).isNotNull();
+            assertThat(host.openPanel("dev.x.tool.hosts")).as("no main window to show it in").isNull();
+            UUID window = host.addTerminalWindow();
+            assertThat(host.openPanel("dev.x.tool.hosts")).isNotNull();
             assertThat(hosts.get(0).window().id()).isEqualTo(window);
             assertThat(hosts.get(0).visible()).isTrue();
-            assertThat(host.openPanel("dev.x.tool.broken", window)).isNull();
-            assertThat(host.openPanel("dev.x.tool.absent", window)).isNull();
+            assertThat(host.openPanel("dev.x.tool.broken")).isNull();
+            assertThat(host.openPanel("dev.x.tool.absent")).isNull();
             assertThat(host.failures()).hasSize(1);
 
-            var manager = context.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(640, 480), true));
-            assertThat(context.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(640, 480), true))).isSameAs(manager);
-            var veto = manager.onClosing(() -> false);
-            context.windows().dialog(new DialogSpec("Unlock", manager, true)).show();
-            assertThat(host.windows()).containsExactly("dev.x.tool.manager|Manager|false", "dialog|Unlock|true");
-            manager.show();
-            assertThat(host.requestClose("dev.x.tool.manager")).isFalse();
+            var manager = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("manager", "Manager"), null, KitFixtures.view(context));
+            var unlock = context.windows().dialog(new DialogSpec("Unlock", manager, true));
+            var veto = unlock.onClosing(() -> false);
+            unlock.show();
+            assertThat(host.windows()).containsExactly("dialog|Unlock|true");
+            assertThat(host.requestClose("dialog")).isFalse();
             veto.close();
-            assertThat(host.requestClose("dev.x.tool.manager")).isTrue();
+            manager.close();
             assertThat(host.windows()).as("the dialog went with its owner").isEmpty();
             assertThatIllegalArgumentException().isThrownBy(() -> context.windows().dialog(new DialogSpec("Late", manager, true)));
         }
@@ -119,6 +115,30 @@ class FakePanelsAndWindowsTest {
             context.panels().toggle("dev.x.tool.hosts", window);
             assertThat(instances).singleElement().satisfies(panel -> assertThat(panel.visible()).isTrue());
             assertThatIllegalArgumentException().isThrownBy(() -> context.panels().toggle("dev.other.panel", window));
+        }
+    }); }
+
+    /** Workspace tabs spec 14: panels live in the main window; a child window's toggle shows the panel there. */
+    @Test void aChildWindowsToggleShowsThePanelInTheMainWindow() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            List<PanelHost> instances = new ArrayList<>();
+            context.panels().register(new PanelSpec("dev.x.tool.hosts", "Hosts", "file", Anchor.LEFT), panel -> { instances.add(panel); return KitFixtures.view(context); });
+            UUID main = host.addTerminalWindow(), child = host.addTerminalWindow();
+            context.panels().toggle("dev.x.tool.hosts", context.terminals().window(child).orElseThrow());
+            assertThat(instances).singleElement().satisfies(panel -> {
+                assertThat(panel.window().id()).isEqualTo(main);
+                assertThat(panel.window().isMain()).isTrue();
+                assertThat(panel.visible()).isTrue();
+            });
+            context.panels().toggle("dev.x.tool.hosts", context.terminals().window(child).orElseThrow());
+            assertThat(instances).as("a child window's toggle shows it again, as the application's does").singleElement()
+                .satisfies(panel -> assertThat(panel.visible()).isTrue());
+            context.panels().toggle("dev.x.tool.hosts", context.terminals().window(main).orElseThrow());
+            assertThat(instances).as("one instance, hidden by the main window's toggle").singleElement()
+                .satisfies(panel -> assertThat(panel.visible()).isFalse());
+            assertThat(host.openRequests()).as("each child window's toggle raises the main window; the main window's raises nothing")
+                .containsExactly("front|" + main, "front|" + main);
         }
     }); }
 

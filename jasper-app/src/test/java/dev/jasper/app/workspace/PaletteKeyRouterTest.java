@@ -152,7 +152,7 @@ class PaletteKeyRouterTest {
                 assertThat(router.dispatch(press(owner, shortcut.getKeyCode(), shortcut.getModifiers()))).isTrue();
                 assertThat(router.dispatch(typed(owner, 't'))).isTrue();
                 assertThat(router.dispatch(release(owner, shortcut.getKeyCode()))).isTrue();
-                assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+                assertThat(owner.tabCount()).isEqualTo(1);
                 assertThat(owner.commandPalette().isOpen()).isTrue();
             }
         });

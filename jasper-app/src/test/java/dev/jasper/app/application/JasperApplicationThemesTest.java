@@ -17,7 +17,7 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static dev.jasper.app.workspace.DesktopTestSupport.launcher;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** spec 5.4: start-up parses the bundled theme once and installs the configured Slate Cobalt variant. */
+/** spec 5.4: start-up parses the bundled theme once and installs the configured default variant. */
 class JasperApplicationThemesTest {
     @TempDir Path home;
 
@@ -34,7 +34,7 @@ class JasperApplicationThemesTest {
                 assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedKit()).as("no Jasper look and feel yet: the default kit")
                     .isSameAs(dev.jasper.ui.kit.Kit.DEFAULT);
                 application[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
-                var expected = JasperTheme.bundled().generated(dark);
+                var expected = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(dark);
                 assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(expected);
                 assertThat(UIManager.getLookAndFeelDefaults().get("Jasper.installedKit")).as("start-up publishes its kit with the theme")
                     .isSameAs(dev.jasper.ui.kit.Kit.DEFAULT);
@@ -57,7 +57,7 @@ class JasperApplicationThemesTest {
 
     /** The default follows the operating system; a headless run has none, so it starts Dark. */
     @Test void withNoAppearanceAHeadlessStartIsDark() throws Exception {
-        start("", true, dev.jasper.ui.theme.JasperTheme.bundled().matching(true));
+        start("", true, dev.jasper.ui.theme.JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(true));
     }
 
     /** Review Focus 1: an older install's theme folders are neither read nor changed; nothing else appears beside them. */
@@ -70,7 +70,7 @@ class JasperApplicationThemesTest {
         java.nio.file.Files.writeString(home.resolve("terminal-themes/dark.toml"), "[colors]\n");
         java.nio.file.Files.writeString(home.resolve("config.toml"), config);
         var before = snapshot(home);
-        start(config, false, dev.jasper.ui.theme.JasperTheme.bundled().matching(false));
+        start(config, false, dev.jasper.ui.theme.JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(false));
         assertThat(snapshot(home)).as("every path and byte under the home").isEqualTo(before);
     }
 

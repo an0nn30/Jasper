@@ -28,7 +28,7 @@ import javax.swing.JTextArea;
 /**
  * The Licenses window's content: Jasper and the third-party components it ships, beside the selected one's name,
  * version, license and homepage link, then its NOTICE text when it has one and its license text. One chrome kit view
- * composes it as a manager window (the Errors window's arrangement); the texts are read-only selectable text, the
+ * composes it as a manager window (the Errors tab's arrangement); the texts are read-only selectable text, the
  * license scrolling inside its card. Texts are read when a component is selected. EDT only; {@link #close} stops it.
  */
 public final class LicensesView extends JPanel {
@@ -212,7 +212,7 @@ public final class LicensesView extends JPanel {
         return new Nodes.Stack("detail.content", ControlState.READY, Nodes.LayoutRole.DETAIL, parts);
     }
 
-    /** A detail card holding one captioned value, as the Errors window's detail rows. */
+    /** A detail card holding one captioned value, as the Errors tab's detail rows. */
     private static Nodes.Card card(String id, String caption, Nodes.Node value) {
         return new Nodes.Card("detail." + id + ".card", ControlState.READY, Nodes.CardKind.FORM, List.of(
             new Nodes.Stack("detail." + id + ".row", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(

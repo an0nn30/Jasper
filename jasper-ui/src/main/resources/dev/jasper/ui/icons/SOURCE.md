@@ -1,6 +1,8 @@
 # Selected Jasper engine originals
 
-This engine catalog admits only fourteen byte-identical SVG files listed in assets-selected.tsv.
+This engine catalog admits only seventeen byte-identical SVG files: fourteen listed in assets-selected.tsv, and
+`run` (`classic/actions/execute` and its dark sibling) and `application` (`classic/runConfigurations/application`)
+listed in assets-classic.tsv.
 Recovered from Jasper revision d0f2747eb3ccb3e0fd8e01f4719cfd18aff17e38 (aab810d2 parent),
 whose upstream revision and original complete-catalog provenance follow below. The complete catalog,
 its generated SDK BundledIcon API and refresh script described below are historical provenance;
@@ -31,3 +33,30 @@ assets.tsv records source paths and SHA-256. catalog.txt and SDK BundledIcon are
 generated together. Refresh with `python3 tools/icons/fetch-intellij-icons.py`.
 The script pins tree IDs, verifies Git blob hashes, stages downloads, and only
 then replaces managed SVGs. Builds and runtime do not access the network.
+
+# IntelliJ classic artwork
+
+Twenty-six SVGs under `classic/`, listed in assets-classic.tsv with their upstream paths under `platform/icons/src/`
+and SHA-256 values: `general/add`, `actions/splitVertically`, `general/settings`, `actions/moveToWindow`,
+`actions/find` and `actions/execute`, each with its dark sibling, plus `general/expandComponent` and
+`runConfigurations/application`; and the tool-window icons `toolwindows/webToolWindow`, `toolWindowProject`,
+`toolWindowModuleDependencies`, `toolWindowAnalyzeDataflow`, `toolWindowServer` and `notifications`, each with its dark
+sibling. They come from JetBrains/intellij-community at tag `idea/2026.2.3`
+(commit `8062c061ff33e22041d9f1844db5b8b8a6b5e4d7`) and are byte-identical, each keeping its copyright comment, except
+`toolwindows/toolWindowServer.svg` and its dark sibling, which upstream ships without one; they are part of the same
+Apache-2.0 `platform/icons` module. `python3 -I tools/icons/fetch-classic-icons.py` reproduces them. A file without
+`_dark` serves both variants.
+Chrome receivers marked `ChromeArtwork.CLASSIC` get six of them (add, split, zoom, settings, window.add and search);
+the catalog's `run` and `application` get two more; `IconRegistry.stripeIcon` gives the six tool-window icons to the
+labelled stripes for network, folder, tunnel, download, server and bell.
+
+# Editor document actions
+
+Sixteen unmodified SVGs under `editor/`, recorded in `assets-editor.tsv` (destination, upstream path, SHA-256),
+come from JetBrains/intellij-community tag `idea/2026.2.3`, commit `8062c061ff33e22041d9f1844db5b8b8a6b5e4d7`.
+The installed IntelliJ IDEA 2026.2.3 build `IU-262.10968.63` supplied the bytes, verified byte-for-byte against
+that pinned upstream commit: classic `general/layoutEditorOnly`, `general/layoutEditorPreview`,
+`general/layoutPreviewOnly`, `actions/synchronizeScrolling`; modern `expui/general/editorOnly`,
+`expui/general/editorPreview`, `expui/general/previewOnly`, `expui/actions/synchronizeScrolling`; each with its
+`_dark.svg` sibling. They retain JetBrains' copyright and Apache-2.0 comments; `LICENSE.txt` and `NOTICE.txt`
+cover these files. They form a separate lazy document-action catalog. Builds and runtime use only bundled bytes.

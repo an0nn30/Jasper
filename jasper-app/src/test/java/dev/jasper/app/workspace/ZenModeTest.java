@@ -34,6 +34,12 @@ class ZenModeTest {
     private static ActionId zenAction() {
         return ActionId.forId("toggle_zen_mode").orElseThrow(() -> new AssertionError("Missing Zen action"));
     }
+    private static ActionId railAction() {
+        return ActionId.forId("toggle_rail").orElseThrow(() -> new AssertionError("Missing Rail action"));
+    }
+    private static ActionId statusAction() {
+        return ActionId.forId("toggle_status_bar").orElseThrow(() -> new AssertionError("Missing Status Bar action"));
+    }
     private static void toggle(WindowContent owner) { owner.invoke(zenAction()); }
     private static void show(Contributions model, WindowContent owner, String id) {
         model.requestPanel(new Contributions.PanelRequest(owner.id(), id, Contributions.PanelRequest.Op.SHOW));
@@ -54,22 +60,22 @@ class ZenModeTest {
             owner.dock().resize(Side.LEFT, 240); owner.dock().resize(Side.RIGHT, 310);
             owner.dock().setRatio(Side.LEFT, .37); owner.dock().setRatio(Side.BOTTOM, .62);
             LayoutTestSupport.layoutTree(owner);
-            Rectangle normal = new Rectangle(owner.tabStrip().getBounds());
+            Rectangle normal = new Rectangle(owner.workspace().getBounds());
             var panels = state.panels(); var sizes = state.dock();
             List<JComponent> contents = Arrays.stream(Slot.values()).map(owner.area()::content).toList();
-            var tab = owner.currentTab();
+            var tab = owner.currentTerminal();
             toggle(owner); LayoutTestSupport.layoutTree(owner);
             assertThat(owner.toolbar().isVisible()).isTrue(); assertThat(owner.status().isVisible()).isFalse();
             assertThat(owner.chrome().search().isVisible()).isTrue();
             assertThat(owner.leftStripe().isVisible()).isFalse(); assertThat(owner.rightStripe().isVisible()).isFalse();
             for (Slot slot : Slot.values()) assertThat(owner.area().content(slot)).isNull();
             assertThat(sites).allSatisfy(site -> assertThat(site.visible()).isFalse());
-            assertThat(owner.tabStrip().getWidth()).isGreaterThan(normal.width);
-            assertThat(owner.tabStrip().getHeight()).isGreaterThan(normal.height);
+            assertThat(owner.workspace().getWidth()).isGreaterThan(normal.width);
+            assertThat(owner.workspace().getHeight()).isGreaterThan(normal.height);
             assertThat(state.panels()).isEqualTo(panels); assertThat(state.dock()).isEqualTo(sizes);
-            assertThat(owner.currentTab()).isSameAs(tab);
+            assertThat(owner.currentTerminal()).isSameAs(tab);
             toggle(owner); LayoutTestSupport.layoutTree(owner);
-            assertThat(owner.tabStrip().getBounds()).isEqualTo(normal);
+            assertThat(owner.workspace().getBounds()).isEqualTo(normal);
             assertThat(Arrays.stream(Slot.values()).map(owner.area()::content).toList()).containsExactlyElementsOf(contents);
             assertThat(sites).hasSize(6).allSatisfy(site -> assertThat(site.visible()).isTrue());
             assertThat(notifications).allSatisfy(events -> assertThat(events).containsExactly(true, false, true));
@@ -211,12 +217,67 @@ class ZenModeTest {
         });
     }
 
+    @Test void railAndStatusBarAreUnassignedButMenuPaletteAndLiveShortcutShareTheirStateOnBothPlatforms() throws Exception {
+        edt(() -> {
+            for (boolean mac : new boolean[]{true, false}) {
+                var owner = content(launcher(new ArrayDeque<>()), mac);
+                var root = new BindingRoot(); root.setContentPane(owner); owner.installRootBindings(root);
+                var visibility = child(view(owner), "Show/Hide");
+                var rail = item(visibility, "Rail"); var status = item(visibility, "Status Bar");
+                var railKey = KeyStroke.getKeyStroke(KeyEvent.VK_F9, 0); var statusKey = KeyStroke.getKeyStroke(KeyEvent.VK_F8, 0);
+                assertThat(owner.bindings().strokeFor(railAction())).isEmpty();
+                assertThat(owner.bindings().strokeFor(statusAction())).isEmpty();
+                assertThat(rail.getAction()).isSameAs(owner.action(railAction()));
+                assertThat(status.getAction()).isSameAs(owner.action(statusAction()));
+                assertThat(rail.getAccelerator()).isNull(); assertThat(status.getAccelerator()).isNull();
+                owner.setBindings(KeyBindings.withOverrides(mac, Map.of("toggle_rail", "f9", "toggle_status_bar", "f8")));
+                assertThat(rail.getAccelerator()).isEqualTo(railKey); assertThat(status.getAccelerator()).isEqualTo(statusKey);
+                assertThat(root.activate(railKey)).isTrue();
+                assertThat(owner.railVisible()).isFalse(); assertThat(rail.isSelected()).isFalse();
+                assertThat(owner.status().isVisible()).isTrue(); assertThat(status.isSelected()).isTrue();
+                assertThat(root.activate(statusKey)).isTrue();
+                assertThat(owner.status().isVisible()).isFalse(); assertThat(status.isSelected()).isFalse();
+                assertThat(owner.railVisible()).isFalse();
+                owner.dispatchCommand(owner.commands().find("toggle_rail").orElseThrow());
+                owner.dispatchCommand(owner.commands().find("toggle_status_bar").orElseThrow());
+                assertThat(owner.railVisible()).isTrue(); assertThat(owner.status().isVisible()).isTrue();
+                rail.doClick(); status.doClick();
+                assertThat(owner.railVisible()).isFalse(); assertThat(rail.isSelected()).isFalse();
+                assertThat(owner.status().isVisible()).isFalse(); assertThat(status.isSelected()).isFalse();
+                rail.doClick(); status.doClick();
+                assertThat(owner.railVisible()).isTrue(); assertThat(rail.isSelected()).isTrue();
+                assertThat(owner.status().isVisible()).isTrue(); assertThat(status.isSelected()).isTrue();
+                assertThat(owner.commands().find("view.rail")).isEmpty();
+                assertThat(owner.commands().find("view.status_bar")).isEmpty();
+                owner.close();
+            }
+        });
+    }
+
+    @Test void railAndStatusBarActionsAreInactiveInZenAndKeepTheirOwnState() throws Exception {
+        edt(() -> {
+            var owner = window();
+            owner.invoke(railAction()); owner.invoke(statusAction());
+            assertThat(owner.railVisible()).isFalse(); assertThat(owner.status().isVisible()).isFalse();
+            toggle(owner);
+            assertThat(owner.action(railAction()).isEnabled()).isFalse();
+            assertThat(owner.action(statusAction()).isEnabled()).isFalse();
+            owner.invoke(railAction()); owner.invoke(statusAction());
+            toggle(owner);
+            assertThat(owner.action(railAction()).isEnabled()).isTrue();
+            assertThat(owner.action(statusAction()).isEnabled()).isTrue();
+            assertThat(owner.railVisible()).isFalse(); assertThat(owner.status().isVisible()).isFalse();
+            owner.invoke(railAction()); owner.invoke(statusAction());
+            assertThat(owner.railVisible()).isTrue(); assertThat(owner.status().isVisible()).isTrue();
+        });
+    }
+
     @Test void viewMenuGroupsVisibilityAndFontWhileKeepingContributedTools() throws Exception {
         edt(() -> {
             var owner = window(); var model = new Contributions(); owner.connectContributions(model);
             model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
             var view = view(owner);
-            assertThat(item(view, "Zoom Pane").getAction()).isSameAs(owner.action(ActionId.ZOOM_PANE));
+            assertThat(item(view, "Maximize Pane").getAction()).isSameAs(owner.action(ActionId.MAXIMIZE_PANE));
             assertThat(item(child(view, "Font Size"), "Increase Font Size").getAction()).isSameAs(owner.action(ActionId.FONT_BIGGER));
             item(child(view, "Tool Windows"), "Toggle Panel").doClick();
             assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();

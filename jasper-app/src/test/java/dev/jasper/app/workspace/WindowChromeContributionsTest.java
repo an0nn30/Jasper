@@ -76,7 +76,7 @@ class WindowChromeContributionsTest {
             model.addToolbar(new ToolbarEntry.Button("dev.x.never-registered"));
 
             List<String> after = buttons(owner);
-            assertThat(after).endsWith("Zoom pane", "Run Tool", "Tool", "Find", "Settings", "More actions");
+            assertThat(after).endsWith("Maximize pane", "Run Tool", "Tool", "Find", "Settings", "View Options", "More actions");
             assertThat(WindowTabsTest.named(owner.toolbar(), "pluginSeparator").isVisible()).isTrue();
             assertThat(after).hasSize(before.size() + 2);
             JButton button = null;
@@ -267,7 +267,7 @@ class WindowChromeContributionsTest {
                 owner.chrome().renderContributedMenus();
 
                 assertThat(owner.chrome().menuBar().menus().stream().map(JMenu::getText).toList())
-                    .containsExactly("File", "Edit", "View", "Pane", "Tab", "Tools", "SSH", "Help");
+                    .containsExactly("File", "Edit", "View", "Tab", "Tools", "SSH", "Help");
                 assertThat(menu(owner, "SSH").getItem(0).isEnabled()).isFalse();
                 assertThat(items(menu(owner, "SSH"))).containsExactly("Connect", "Shortcuts");
                 assertThat(items(menu(owner, "Tools"))).containsExactly("Connect");

@@ -236,8 +236,8 @@ After an operator, and in Visual mode, where they extend the area.
 | `zR` | open every fold |
 | `zM` | close every fold |
 | `:` | a command line; with a count, for that many lines (`:.,.+N`) |
-| `ZZ` | save the tab if it has changes and close it (`:x`) |
-| `ZQ` | close the tab, discarding its changes (`:q!`) |
+| `ZZ` | save the tab if it has changes and close the pane (`:x`) |
+| `ZQ` | close the pane, as `:q!` does |
 | `gt` | the next tab, or tab {count} |
 | `gT` | {count} tabs back |
 | `&` | repeat the last `:s` on the line, without its flags |
@@ -432,17 +432,17 @@ key is typed. A command Vim has and Jasper does not fails with E319.
 | `:red[o]` | redo one change |
 | `:noh[lsearch]` | hide the 'hlsearch' matches until the next search |
 | `:se[t]` | show or set options: `opt`, `noopt`, `invopt`, `opt!`, `opt&`, `opt?`, `opt=val`, `+=`, `-=`, `^=`, `all` |
-| `:setl[ocal]` | `:set` for this tab's local values only |
+| `:setl[ocal]` | `:set` for the local values only: the file's, and the pane's for `number`, `relativenumber` and `wrap` |
 | `:setg[lobal]` | `:set` for the global values only |
 | `:w[rite]` | save the tab (`:w file` saves it as the file; `!` replaces a file that exists) |
-| `:wq` | save the tab, then close it |
-| `:x[it]` | save the tab if it has changes, then close it |
+| `:wq` | save the tab, then close the pane |
+| `:x[it]` | save the tab if it has changes, then close the pane |
 | `:exi[t]` | as `:x` |
 | `:sav[eas]` | save the tab as {file} |
 | `:wa[ll]` | save every tab with changes |
 | `:xa[ll]` | save every tab with changes, then close them all |
 | `:wqa[ll]` | as `:xa` |
-| `:q[uit]` | close the tab; `!` discards its changes |
+| `:q[uit]` | close the pane; a file with changes loses its last pane only with `!`, which discards them |
 | `:qa[ll]` | close every tab; `!` discards their changes |
 | `:quita[ll]` | as `:qa` |
 | `:e[dit]` | open {file} in a tab, or read the tab's file again (`!` discards changes) |

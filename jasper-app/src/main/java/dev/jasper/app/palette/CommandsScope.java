@@ -20,7 +20,7 @@ import javax.swing.KeyStroke;
 /** The Commands scope: the existing registry, search, recents and starters behind the scope contract. */
 public final class CommandsScope implements PaletteScope {
     static final PaletteVerb RUN = new PaletteVerb("run", "Run");
-    private static final List<String> STARTERS = List.of("new_tab", "split_right", "open_settings", "new_window");
+    private static final List<String> STARTERS = List.of("new_tab", "split_right", "open_settings", "new_terminal_window");
 
     private final CommandRegistry registry;
     private final CommandHistory history;

@@ -55,12 +55,19 @@ final class Stacks {
     static final class StackControl extends ControlRegistry.Control {
         final Tile tile;
         boolean detail, sheetHeading, panelDetail, embedded, settings, identityHeader, identityGroup, hint, settingsHeader, keycapDetail;
+        /** The grid card whose row's value this INLINE stack is (set by the reconciler, cleared on every update); see {@link Cards.GridValueLayout}. */
+        Cards.CardControl gridCard;
         /** An INLINE row among a DOCUMENT split's bars, assigned by the reconciler; see {@link DocumentBarLayout}. */
         boolean documentBar;
         /** The Run window's help row inked this PROMPT_HEADER's glyph (plan 8a); turning the flag off returns it. */
         boolean helpInked;
         /** A VERTICAL group of a DOCUMENT split's bars: its rows carry their own padding, so they stack without gaps. */
         boolean documentBarGroup;
+        /**
+         * A document bar's captions that stand right after a button as its shortcut under a face that colours them
+         * ({@link ButtonFace#barShortcut}): each follows its button without a gap (set by the reconciler, cleared on every update).
+         */
+        java.util.Set<Component> barShortcuts = java.util.Set.of();
         /** Components of Field and Text children, in order: the bar's fill candidates; Text ones also hold status. */
         java.util.Set<Component> barFields = java.util.Set.of(), barTexts = java.util.Set.of();
         /** The panel footer this vertical stack is (set by its panel, cleared on every update); null otherwise. */
@@ -148,6 +155,7 @@ final class Stacks {
             if (component.getLayout() instanceof Navigation.InlineLayout inline) inline.titleLine = titleLine(stack);
             if (documentBar && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new DocumentBarLayout(this));
             if (panelRow && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new PanelRowLayout(context()));
+            if (gridCard != null && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new Cards.GridValueLayout(gridCard));
             if (documentBarGroup && stack.role() == Nodes.LayoutRole.VERTICAL) component.setLayout(new Composition.Vertical(0));
             // An entry row a classic ordered list holds keeps the face's layout across refreshes (plan 9b Task 6).
             if (entryOf != null && entryOf.entry == component) component.setLayout(new ClassicOrderedFace.EntryLayout(entryOf));
@@ -216,6 +224,17 @@ final class Stacks {
 
         /** Whether this ROUTE strip's steps lead with hue tiles (the default) rather than the classic hue edges. */
         boolean routeTiles() { return context().faces().route.tiles(); }
+    }
+
+    /**
+     * Styles {@code text}, a document bar's caption right after a button, as that action's shortcut where the buttons face
+     * colours one ({@link ButtonFace#barShortcut}), and says whether it did.
+     */
+    static boolean barShortcut(Labels.TextControl text) {
+        var role = text.context().faces().buttons.barShortcut();
+        if (role == null) return false;
+        text.styled = label -> label.setForeground(ThemePainting.color(text.context(), role));
+        return true;
     }
 
     static void mount(Container component, List<JComponent> wanted) {
@@ -841,6 +860,7 @@ final class Stacks {
         }
         int verticalGap(Component previous, Component child) {
             if (role == Nodes.LayoutRole.DETAIL && previous instanceof Cards.CardSurface && captions.contains(child)) return ThemePainting.metric(context, DesignMetrics.Role.DETAIL_METADATA_GAP);
+            if (role == Nodes.LayoutRole.DETAIL && !titlePair && child instanceof Cards.SectionSurface section) return context.faces().group.sectionGap(section, gap());
             return titlePair ? ThemePainting.metric(context, DesignMetrics.Role.TITLE_PAIR_GAP) : child instanceof Indicators.StrengthMeter
                 ? ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) : gap();
         }
@@ -851,7 +871,8 @@ final class Stacks {
      * the first visible field or text fills the width the controls after it leave, other text keeps a stable status
      * width so its neighbours do not move as it changes, and buttons keep their natural widths, closer together when
      * adjacent. Rows of one vertical group align their fills' trailing edges, so a replace field lines up under its find
-     * field. A row too narrow for its fill's minimum keeps the fill and clips what follows at the trailing edge.
+     * field. A row too narrow for its fill's minimum keeps the fill and clips what follows at the trailing edge; under a
+     * catalog search width a text fill first gives way down to its own width.
      */
     static final class DocumentBarLayout implements Composition.WidthLayout {
         final StackControl owner;
@@ -862,11 +883,22 @@ final class Stacks {
             for (Component child : children) if (owner.barFields.contains(child)) return child;
             return null;
         }
+        /** A child's height in the row: under a catalog search width a search that does not fill stands a field tall (plan 10b). */
+        int tall(Component child, Component fill) {
+            int height = child.getPreferredSize().height;
+            boolean search = metric(DesignMetrics.Role.DOCUMENT_BAR_SEARCH_WIDTH) > 0 && child != fill && owner.barFields.contains(child) && !owner.barTexts.contains(child);
+            return search ? Math.min(height, metric(DesignMetrics.Role.FIELD_HEIGHT)) : height;
+        }
         int natural(Component child, Component fill) {
             int width = child.getPreferredSize().width;
+            // A field that does not fill takes the catalog's search width where it has one (plan 10b Rulings 4).
+            int search = metric(DesignMetrics.Role.DOCUMENT_BAR_SEARCH_WIDTH);
+            if (search > 0 && child != fill && owner.barFields.contains(child) && !owner.barTexts.contains(child)) return search;
             return owner.barTexts.contains(child) && child != fill ? Math.max(width, metric(DesignMetrics.Role.DOCUMENT_BAR_STATUS_WIDTH)) : width;
         }
         int gap(Component before, Component after) {
+            if (owner.barShortcuts.contains(after)) return 0;
+            if (before instanceof Separators.Rule || after instanceof Separators.Rule) return metric(DesignMetrics.Role.DOCUMENT_BAR_RULE_GAP);
             return metric(before instanceof AbstractButton && after instanceof AbstractButton ? DesignMetrics.Role.DOCUMENT_BAR_ACTION_GAP : DesignMetrics.Role.DOCUMENT_BAR_GAP);
         }
         /** The width the children after the fill take, with their gaps; -1 without a fill. */
@@ -889,7 +921,8 @@ final class Stacks {
         }
         @Override public int height(Container parent, int width) {
             int height = 0;
-            for (Component child : visible(parent)) height = Math.max(height, child.getPreferredSize().height);
+            var children = visible(parent); Component fill = fill(children);
+            for (Component child : children) height = Math.max(height, tall(child, fill));
             Insets insets = parent.getInsets();
             return insets.top + insets.bottom + height + 2 * metric(DesignMetrics.Role.DOCUMENT_BAR_VERTICAL_PADDING);
         }
@@ -910,11 +943,14 @@ final class Stacks {
                 if (i > 0) x += gap(children.get(i - 1), child);
                 int width = natural(child, fill);
                 if (child == fill) {
-                    int minimum = Math.min(metric(DesignMetrics.Role.DOCUMENT_BAR_FILL_MIN_WIDTH), Math.max(0, right - x));
+                    // Under a catalog search width (plan 10b) a text fill gives way down to its own width before the search clips.
+                    int least = parent.getParent() instanceof SplitViews.ActionRow ? 0 : metric(DesignMetrics.Role.DOCUMENT_BAR_FILL_MIN_WIDTH);
+                    if (metric(DesignMetrics.Role.DOCUMENT_BAR_SEARCH_WIDTH) > 0 && owner.barTexts.contains(child)) least = Math.min(least, child.getPreferredSize().width);
+                    int minimum = Math.min(least, Math.max(0, right - x));
                     width = Math.max(minimum, right - aligned(parent) - x);
                 }
                 width = Math.max(0, Math.min(width, right - x));
-                int height = Math.min(inner, child.getPreferredSize().height);
+                int height = Math.min(inner, tall(child, fill));
                 child.setBounds(x, top + (inner - height) / 2, width, height);
                 x += width;
             }

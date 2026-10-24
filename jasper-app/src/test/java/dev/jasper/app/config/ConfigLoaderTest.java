@@ -248,6 +248,28 @@ class ConfigLoaderTest {
         assertDiagnostic(result, "keybindings.unknown", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
 
+    /** Parent tabs spec 8's last bullet: the group ids are a clean break, so an old one is an unknown action. */
+    @Test void aRemovedGroupIdIsReportedAsAnUnknownAction() {
+        var result = parse("[keybindings]\nclose_group = \"cmd+w\"");
+        assertThat(result.rejected()).isFalse();
+        assertThat(result.snapshot().keybindings()).doesNotContainKey("close_group");
+        assertDiagnostic(result, "keybindings.close_group", 2, 1, ConfigDiagnostic.Severity.WARNING);
+        assertThat(result.diagnostics()).singleElement().satisfies(d -> assertThat(d.message()).contains("Unknown action"));
+    }
+
+    /** Tabs and panes spec 10: the removed ids are a clean break, so each is an unknown action. */
+    @Test void aRemovedIdIsReportedAsAnUnknownAction() {
+        for (String id : new String[] {"pop_out_tab", "pop_out_pane", "pop_out_parent_tab", "bring_back", "move_tab_to_main_window",
+                "new_tab_in_pane", "close_parent_tab", "next_parent_tab", "previous_parent_tab", "select_parent_tab_1",
+                "select_parent_tab_9"}) {
+            var result = parse("[keybindings]\n" + id + " = \"cmd+w\"");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().keybindings()).doesNotContainKey(id);
+            assertDiagnostic(result, "keybindings." + id, 2, 1, ConfigDiagnostic.Severity.WARNING);
+            assertThat(result.diagnostics()).singleElement().satisfies(d -> assertThat(d.message()).contains("Unknown action"));
+        }
+    }
+
     @Test void invalidOrCollidingBindingsDefaultEntireMapAndPreserveOtherFields() {
         for (String binding : new String[]{"cmd+v", "cmd+secret-value", "cmd+{"}) {
             var result = parse("window.tab_height=44\n[keybindings]\nnew_tab='none'\ncopy='" + binding + "'");
@@ -450,7 +472,7 @@ class ConfigLoaderTest {
         assertThat(chosen.snapshot().darkTheme()).isEqualTo("ocean");
         assertThat(chosen.snapshot().lightTheme()).isEqualTo("ocean-dawn");
         var bad = parse("[ui.theme]\ndark = \"Ocean Theme\"\n");
-        assertThat(bad.snapshot().darkTheme()).isEqualTo("slate-cobalt");
+        assertThat(bad.snapshot().darkTheme()).isEqualTo("jasper-meadow");
         assertDiagnostic(bad, "ui.theme.dark", 2, 1, ConfigDiagnostic.Severity.ERROR);
         assertThat(bad.diagnostics().getFirst().message()).isEqualTo("Use a theme id such as \"slate-cobalt\"; using the default.");
     }

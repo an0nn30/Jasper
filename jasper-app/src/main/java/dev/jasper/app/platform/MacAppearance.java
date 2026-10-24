@@ -22,6 +22,17 @@ public final class MacAppearance {
     public static void follow(JRootPane root, boolean dark) {
         root.putClientProperty("apple.awt.windowAppearance", dark ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
     }
+
+    /**
+     * Gives {@code root}'s window the vibrant macOS appearance of a dark or light theme, as IntelliJ Classic's frame
+     * under its transparent title bar takes it. Other systems ignore it. EDT.
+     *
+     * @param root the window's root pane
+     * @param dark whether the window takes the vibrant dark appearance
+     */
+    public static void vibrant(JRootPane root, boolean dark) {
+        root.putClientProperty("apple.awt.windowAppearance", dark ? "NSAppearanceNameVibrantDark" : "NSAppearanceNameVibrantLight");
+    }
     static Path library(String override, String appPath, Path jar) {
         if (override != null && !override.isBlank()) return Path.of(override).toAbsolutePath();
         Path packaged = MacNative.libraryPath(appPath);

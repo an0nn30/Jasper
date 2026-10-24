@@ -11,8 +11,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * The classic Transfers bottom panel (Enterprise presentation spec 14.4): the window's transfer rows, which the default
- * look shows in the SFTP sidebar, or "No Transfers". One per window; UI thread only.
+ * The classic Transfers bottom panel (Enterprise presentation spec 14.4): the transfer rows, which the default
+ * look shows in the SFTP sidebar, or "No Transfers". One, in the main window; UI thread only.
  */
 public final class TransfersPanel implements AutoCloseable {
     /** The panel's id, its kit root, its header and its empty state. */

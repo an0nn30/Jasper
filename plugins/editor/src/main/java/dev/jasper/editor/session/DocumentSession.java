@@ -55,6 +55,10 @@ public final class DocumentSession {
     private String notice = "";
     private String reloadNotice = "";
     private CompletableFuture<Content> loading;
+    /** Restored and not read yet: it reads when its tab is first active, or Load is pressed (workspace tabs spec 13). */
+    private boolean deferred;
+    /** The next read asks nothing ({@code EditorDocument.readQuietly}): a restored document's first. */
+    private boolean quiet;
     private boolean silentReload;
     private String reloadBase = "";
     private CompletableFuture<Boolean> pendingSave;
@@ -100,9 +104,27 @@ public final class DocumentSession {
     /** @param listener runs after any change a view shows */
     public void addListener(Runnable listener) { listeners.add(Objects.requireNonNull(listener)); }
 
+    /** @param listener one {@link #addListener} added, which runs no more */
+    public void removeListener(Runnable listener) { listeners.remove(listener); }
+
+    /**
+     * Waits to read the document: Jasper restored its tab, and it reads when its tab is first active or Load is pressed,
+     * that first read asking nothing (workspace tabs spec 13).
+     */
+    public void defer() {
+        if (document == null || state != State.LOADING || loading != null) return;
+        deferred = true;
+        quiet = true;
+        changed();
+    }
+
+    /** @return whether the document waits to be read: see {@link #defer()} */
+    public boolean deferred() { return deferred; }
+
     /** Reads the document for the first time, or again after a failure. */
     public void load() {
         if (document == null) return;
+        deferred = false;
         state = State.LOADING;
         failure = "";
         changed();
@@ -277,7 +299,9 @@ public final class DocumentSession {
         cancelLoad();
         silentReload = silent;
         if (again) reloadBase = text.get();
-        CompletableFuture<Content> read = document.read(environment.limitBytes().getAsLong());
+        CompletableFuture<Content> read = quiet && !again ? document.readQuietly(environment.limitBytes().getAsLong())
+            : document.read(environment.limitBytes().getAsLong());
+        quiet = false;
         loading = read;
         read.whenComplete((content, error) -> {
             if (error != null) { environment.ui().execute(() -> fetched(read, null, null, error, again)); return; }

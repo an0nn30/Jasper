@@ -33,8 +33,8 @@ class AuxiliaryWindowsTest {
         assertThat(events).containsExactly("first", "first");
     }
 
-    /** Spec 13: File › Open File… asks for one existing local file over the terminal window, from its pane's folder. */
-    @Test void openFileAsksForOneLocalFileOverTheTerminalWindow() {
+    /** Spec 13: File › Open File… asks for one existing local file over the Jasper window, from its pane's folder. */
+    @Test void openFileAsksForOneLocalFileOverTheJasperWindow() {
         var asked = new ArrayList<PathChoice>();
         var file = java.nio.file.Path.of("notes.txt").toAbsolutePath();
         var folder = java.nio.file.Path.of("project").toAbsolutePath();
@@ -44,7 +44,7 @@ class AuxiliaryWindowsTest {
         UUID window = UUID.randomUUID();
         assertThat(host.openFile(window, java.util.Optional.of(folder))).contains(file);
         assertThat(asked).singleElement().satisfies(choice -> {
-            assertThat(choice.terminalOwner()).isEqualTo(window);
+            assertThat(choice.jasperOwner()).isEqualTo(window);
             assertThat(choice.auxiliaryOwner()).isNull();
             assertThat(choice.title()).isEqualTo("Open File");
             assertThat(choice.mode()).isEqualTo(PathChoice.Mode.OPEN);
@@ -57,7 +57,7 @@ class AuxiliaryWindowsTest {
         assertThat(cancelled.openFile(window, java.util.Optional.empty())).isEmpty();
     }
 
-    @Test void onlyOneOverlayCanOwnATerminalWindow() {
+    @Test void onlyOneOverlayCanOwnAJasperWindow() {
         UUID owner = UUID.randomUUID();
         var first = windows.overlay("Connecting", owner);
         assertThat(first.kind()).isEqualTo(AuxiliarySurface.Kind.OVERLAY);
@@ -140,12 +140,12 @@ class AuxiliaryWindowsTest {
     @Test void dialogsNeedALiveOwnerAndCloseAllClosesEverything() {
         AuxiliarySurface manager = windows.window("dev.x.manager", "Manager", new Dimension(640, 480), true);
         AuxiliarySurface prompt = windows.dialog("Unlock", true, manager);
-        UUID terminalWindow = UUID.randomUUID();
-        AuxiliarySurface trust = windows.dialog("Trust host?", false, terminalWindow);
+        UUID jasperWindow = UUID.randomUUID();
+        AuxiliarySurface trust = windows.dialog("Trust host?", false, jasperWindow);
         assertThat(prompt.kind()).isEqualTo(AuxiliarySurface.Kind.DIALOG);
         assertThat(prompt.modal()).isTrue();
         assertThat(prompt.ownerSurface()).containsSame(manager);
-        assertThat(trust.ownerWindow()).contains(terminalWindow);
+        assertThat(trust.ownerWindow()).contains(jasperWindow);
         assertThat(windows.open()).containsExactly(manager, prompt, trust);
 
         manager.onClosing(() -> false);
@@ -153,6 +153,19 @@ class AuxiliaryWindowsTest {
         assertThat(windows.open()).isEmpty();
         assertThat(manager.closed() && prompt.closed() && trust.closed()).isTrue();
         assertThatIllegalArgumentException().isThrownBy(() -> windows.dialog("Late", true, manager));
+    }
+
+    /** Headless nothing shows, so an anchor in a content tab's view owns a dialog and a modal overlay alike (plan 4b, option A). */
+    @Test void headlessAnAnchorThatDoesNotShowOwnsADialogAndAModalOverlay() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.awt.GraphicsEnvironment.isHeadless(), "only meaningful headless");
+        var anchor = new JLabel("in a content tab");
+        AuxiliarySurface dialog = windows.dialog("Details", true, anchor);
+        AuxiliarySurface overlay = windows.modalOverlay("Unlock", anchor);
+        assertThat(dialog.kind()).isEqualTo(AuxiliarySurface.Kind.DIALOG);
+        assertThat(dialog.anchorOwner()).containsSame(anchor);
+        assertThat(overlay.kind()).isEqualTo(AuxiliarySurface.Kind.OVERLAY);
+        assertThat(overlay.modal()).isTrue();
+        assertThat(overlay.anchorOwner()).containsSame(anchor);
     }
 
     @Test void reportsWhenTheLastSurfaceCloses() {
@@ -182,40 +195,6 @@ class AuxiliaryWindowsTest {
         assertThat(events).hasSize(3);
     }
 
-    @Test void theCloseCommandAsksHandlersNewestFirstThenCloses() {
-        AuxiliarySurface editor = windows.window("dev.x.editor", "Editor", new Dimension(640, 480), true);
-        List<String> asked = new ArrayList<>();
-        boolean[] handled = {true};
-        editor.onCloseCommand(() -> { asked.add("older"); return false; });
-        editor.onCloseCommand(() -> { asked.add("newer"); return handled[0]; });
-        editor.onCloseCommand(() -> { throw new IllegalStateException("boom"); });
-        editor.show();
-        assertThat(editor.closeCommand()).isFalse();
-        assertThat(asked).containsExactly("newer");
-        handled[0] = false;
-        assertThat(editor.closeCommand()).as("nothing handled it and no guard refused").isTrue();
-        assertThat(asked).containsExactly("newer", "newer", "older");
-        assertThat(editor.closed()).isTrue();
-    }
-
-    @Test void quitAsksOnlyWindowGuardsInCreationOrderAndClosesNothing() {
-        List<String> asked = new ArrayList<>();
-        boolean[] allow = {false};
-        AuxiliarySurface first = windows.window("dev.x.first", "First", new Dimension(100, 100), false);
-        first.onClosing(() -> { asked.add("first"); return true; });
-        AuxiliarySurface second = windows.window("dev.x.second", "Second", new Dimension(100, 100), false);
-        second.onClosing(() -> { asked.add("second"); return allow[0]; });
-        second.onClosing(() -> { throw new IllegalStateException("boom"); });
-        windows.dialog("Details", false, second).onClosing(() -> { asked.add("dialog"); return false; });
-        windows.overlay("Connecting", UUID.randomUUID());
-        assertThat(windows.mayQuit()).isFalse();
-        assertThat(asked).containsExactly("first", "second");
-        allow[0] = true;
-        asked.clear();
-        assertThat(windows.mayQuit()).isTrue();
-        assertThat(asked).containsExactly("first", "second");
-        assertThat(windows.open()).hasSize(4).noneMatch(AuxiliarySurface::closed);
-    }
     @Test void reentrantCloseDuringConstructionNeverShowsAndDisposesReturnedShellOnce() {
         var events = new ArrayList<String>();
         var host = new AuxiliaryWindows(UiState.inMemory(), surface -> {

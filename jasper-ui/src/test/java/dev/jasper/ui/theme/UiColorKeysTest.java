@@ -76,7 +76,7 @@ class UiColorKeysTest {
                 assertThat(keys).as(name).containsExactlyEntriesOf(expected(generated.semantic(), theme.matching(dark).colors().selection()));
                 variants++;
             }
-        assertThat(variants).as("Slate Cobalt and Ubuntu Yaru pairs and the four Catppuccin flavours").isEqualTo(8);
+        assertThat(variants).as("Slate Cobalt and Ubuntu Yaru pairs, four Catppuccin flavours, and the Meadow pair").isEqualTo(10);
     }
 
     /** A theme's keys are its own roles': a copy with another palette installs that palette's colours. */

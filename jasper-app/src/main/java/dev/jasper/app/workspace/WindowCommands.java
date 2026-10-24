@@ -37,10 +37,10 @@ final class WindowCommands implements AutoCloseable {
         owner.action(ActionId.SPLIT_RIGHT).putValue(Command.TITLE, "Split Right \u00b7 Vertical");
         owner.action(ActionId.SPLIT_DOWN).putValue(Command.TITLE, "Split Down \u00b7 Horizontal");
         for (ActionId id : ActionId.values()) {
-            if (id == ActionId.COMMAND_PALETTE) continue;
+            if (id == ActionId.COMMAND_PALETTE || !id.availableOn(System.getProperty("os.name", ""))) continue;
             String icon = switch (id) {
-                case NEW_TAB -> "square-plus"; case NEW_WINDOW -> "app-window";
-                case SPLIT_RIGHT, SPLIT_DOWN -> "columns-2"; case ZOOM_PANE -> "maximize";
+                case NEW_TAB -> "square-plus"; case NEW_TERMINAL_WINDOW -> "app-window";
+                case SPLIT_RIGHT, SPLIT_DOWN -> "columns-2"; case MAXIMIZE_PANE -> "maximize";
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> "search"; case OPEN_SETTINGS -> "settings";
                 case RELOAD_CONFIG -> "refresh"; default -> null;
             };
@@ -49,10 +49,17 @@ final class WindowCommands implements AutoCloseable {
             var keywords = new ArrayList<String>(); keywords.add(id.id().replace('_', ' '));
             keywords.addAll(switch (id) {
                 case OPEN_FILE -> List.of("open", "editor", "browse");
+                case NEW_TERMINAL_WINDOW -> List.of("new window", "shell", "child window");
+                case CLOSE_WINDOW -> List.of("window", "close");
+                case MOVE_TAB_TO_NEW_WINDOW -> List.of("detach", "separate window", "new window");
+                case MOVE_TO_MAIN_WINDOW -> List.of("attach", "main window", "merge");
+                case NEW_TAB -> List.of("terminal");
                 case OPEN_SETTINGS -> List.of("preferences", "configuration");
                 case RELOAD_CONFIG -> List.of("configuration", "refresh");
-                case ZOOM_PANE -> List.of("maximize", "restore");
+                case MAXIMIZE_PANE -> List.of("zoom", "restore");
                 case TOGGLE_ZEN_MODE -> List.of("view mode", "focus", "distraction free", "hide tools", "restore layout");
+                case TOGGLE_RAIL -> List.of("view", "panels", "sidebar", "tool window bars");
+                case TOGGLE_STATUS_BAR -> List.of("view");
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> List.of("search");
                 case CLEAR_SCROLLBACK -> List.of("history", "clear");
                 case CLEAR_TERMINAL -> List.of("clear", "screen");
@@ -62,16 +69,14 @@ final class WindowCommands implements AutoCloseable {
             registrations.add(registry.register(new Command(id.id(), owner.action(id), keywords)));
         }
         registrations.add(registry.register(new Command("split_right", owner.action(ActionId.SPLIT_RIGHT),
-            List.of("split", "vertical", "right", "side by side", "pane"))));
+            List.of("split", "vertical", "right", "side by side", "pane", "group"))));
         registrations.add(registry.register(new Command("split_down", owner.action(ActionId.SPLIT_DOWN),
-            List.of("split", "horizontal", "down", "above below", "pane"))));
+            List.of("split", "horizontal", "down", "above below", "pane", "group"))));
         for (var mode : ToolbarMode.values()) {
             String label = switch (mode) { case ICONS_AND_LABELS -> "Icons and Labels"; case ICONS -> "Icons Only"; case HIDDEN -> "Hidden"; };
             add(registry, "view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT), label,
                 "Toolbar: " + label, () -> owner.chooseToolbarMode(mode));
         }
-        add(registry, "view.status_bar", "Status Bar", "Hide Status Bar", () -> owner.chooseStatusVisible(!owner.status().isVisible()));
-        add(registry, "view.rail", "Rail", "Hide Rail", () -> owner.setRailVisible(!owner.railVisible()), List.of("panels", "sidebar"));
         add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
             List.of("jasper", "mascot", "turtle", "desk buddy"));
         themeListening = owner.themes().subscribe((theme, chrome) -> syncSchemes());
@@ -134,20 +139,23 @@ final class WindowCommands implements AutoCloseable {
         boolean zen = owner.zenMode();
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Action.SELECTED_KEY, zen);
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Command.TITLE, zen ? "Exit Zen Mode" : "Enter Zen Mode");
-        owner.action(ActionId.ZOOM_PANE).putValue(Command.TITLE,
-            owner.currentTab() != null && owner.currentTab().tree().zoomed() ? "Restore Pane" : "Zoom Pane");
-        view("view.status_bar").putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
-        view("view.status_bar").putValue(Action.SELECTED_KEY, owner.status().isVisible());
-        view("view.status_bar").setEnabled(!zen);
-        view("view.rail").putValue(Command.TITLE, !zen && owner.railVisible() ? "Hide Rail" : "Show Rail");
-        view("view.rail").putValue(Action.SELECTED_KEY, !zen && owner.railVisible());
-        view("view.rail").setEnabled(!zen);
+        owner.action(ActionId.MAXIMIZE_PANE).putValue(Command.TITLE,
+            owner.workspace().model().maximized().isPresent() ? "Restore Pane" : "Maximize Pane");
+        var status = owner.action(ActionId.TOGGLE_STATUS_BAR);
+        status.putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
+        status.putValue(Action.SELECTED_KEY, owner.status().isVisible());
+        var rail = owner.action(ActionId.TOGGLE_RAIL);
+        rail.putValue(Command.TITLE, !zen && owner.railVisible() ? "Hide Rail" : "Show Rail");
+        rail.putValue(Action.SELECTED_KEY, !zen && owner.railVisible());
+        // A child window has no toolbar of its own (workspace tabs spec 6.3); its status bar and rail actions are disabled too.
+        boolean main = owner.isMain();
         boolean buddy = owner.buddyEnabled.getAsBoolean();
         view("view.buddy").putValue(Command.TITLE, buddy ? "Hide Jasper" : "Show Jasper");
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);
         for (var mode : ToolbarMode.values()) {
             var action = view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT));
             action.putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
+            action.setEnabled(main);
         }
         syncSchemes();
         for (var scheme : schemes) {

@@ -16,10 +16,10 @@ class TerminalTabIconTest {
     @Test void localTabsShowTheTerminalIconAndProvidedSessionsShowTheirOwn() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
-            Icon local = owner.currentTab().icon();
+            Icon local = owner.currentTerminal().icon();
             assertThat(local).isNotNull();
             assertThat(local.getIconWidth()).isEqualTo(16);
-            assertThat(owner.currentTab().icon()).as("cached per tab").isSameAs(local);
+            assertThat(owner.currentTerminal().icon()).as("cached per tab").isSameAs(local);
             var provided = new ImageIcon(new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB));
             var remote = owner.openTab(HOME, new SessionRequest("dev.x", "remote", false, attempt -> {}, Runnable::run, provided));
             assertThat(remote.icon()).isSameAs(provided);

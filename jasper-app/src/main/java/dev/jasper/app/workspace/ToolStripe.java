@@ -27,9 +27,7 @@ import java.util.Optional;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
 import javax.swing.Icon;
-import javax.swing.JButton;
 import javax.swing.JSeparator;
-import javax.swing.JToggleButton;
 import javax.swing.UIManager;
 
 /**
@@ -141,7 +139,7 @@ final class ToolStripe extends DockStripe {
     }
 
     private AbstractButton toggle(Button window) {
-        var button = new JToggleButton();
+        var button = PlainText.toggle();
         style(button);
         decorate(button, window);
         button.setSelected(window.selected());
@@ -184,13 +182,19 @@ final class ToolStripe extends DockStripe {
     }
 
     private AbstractButton action(Action action) {
-        var button = new JButton(action);
-        Icon icon = action.getValue(Command.ICON) instanceof Icon contributed ? contributed : AppIcons.icon("command");
+        var button = PlainText.button();
+        button.setAction(action);
+        Icon icon = actionIcon(action);
         style(button);
         button.setIcon(icon);
         name(button, action);
         buttons.add(button);
         return button;
+    }
+
+    /** A rail action's icon: the one it contributes ({@code Command.ICON}), else the command glyph. */
+    static Icon actionIcon(Action action) {
+        return action.getValue(Command.ICON) instanceof Icon contributed ? contributed : AppIcons.icon("command");
     }
 
     /** Names the action's button after the action's current title, in its tooltip and its accessible name. */
@@ -243,8 +247,8 @@ final class ToolStripe extends DockStripe {
         doLayout(); repaint();
     }
 
-    /** A rail's gap is one button's step whatever the label. */
-    @Override void beginDrag(String id, String label) { beginDrag(id); }
+    /** A rail's gap is one button's step whatever the label and the icon. */
+    @Override void beginDrag(String id, String label, Icon icon) { beginDrag(id); }
 
     private JSeparator dragSeparator() {
         var separator = new JSeparator();

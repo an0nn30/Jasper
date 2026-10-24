@@ -1,6 +1,8 @@
 package dev.jasper.editor.ui;
 
 import dev.jasper.editor.session.DocumentSession;
+import dev.jasper.editor.markdown.MarkdownMode;
+import static org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN;
 import dev.jasper.editor.vim.EditorDefaults;
 import dev.jasper.editor.vim.Vim;
 import dev.jasper.editor.vim.VimEditor;
@@ -17,13 +19,21 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
 import org.fife.ui.rtextarea.RTextScrollPane;
 
-/** One document's descriptor controller. Only {@link DocumentArea} owns specialized Swing document content. */
+/**
+ * One view of a document: its descriptor controller. Only {@link DocumentArea} owns specialized Swing document content.
+ * A document can have several views (pane flexibility spec 6), which show one text with one undo history; each has its
+ * own caret, selection, scroll position, find bar, Vim state and Markdown mode.
+ */
 public final class EditorTab {
     static final String DOCUMENT = "document", CONTENT = "document.content", STATE = "document.state", BANNER = "document.banner";
     static final String RETRY = "document.retry", DISMISS = "document.dismiss", FIRST = "document.banner.first", SECOND = "document.banner.second";
     static final String FAILED_TITLE = "Could Not Open File";
     private final DocumentSession session;
-    private final DocumentArea document = new DocumentArea();
+    private final DocumentArea document;
+    /** The document's views, this one among them, through which its session reads and replaces the text. */
+    private final TextViews views;
+    /** The view's listener on its session, which goes when the view closes: the session may outlive it. */
+    private final Runnable refreshing = this::refresh;
     private final UiView view;
     private final Consumer<EditorTab> close;
     private final Timer edits;
@@ -34,24 +44,120 @@ public final class EditorTab {
         @Override public void changedUpdate(DocumentEvent event) { }
     };
     private boolean replacing, closed, focusPending;
+    private String navigationNotice = "";
+    private Runnable noticeChanged = () -> {};
+    boolean closed() { return closed; }
+    Optional<String> navigationNotice() { return navigationNotice.isEmpty() ? Optional.empty() : Optional.of(navigationNotice); }
+    void navigationNotice(String value) { navigationNotice = value; noticeChanged.run(); }
+    void noticeChanged(Runnable value) { noticeChanged = value; }
+    Optional<FindTarget> findTarget() {
+        if (closed || !showingText()) return Optional.empty();
+        return Optional.of(focusedContent() == area() ? new FindTarget.Source(area()) : new FindTarget.Preview(document.preview()));
+    }
+
     private Runnable focusArea = () -> area().requestFocusInWindow();
     private VimEditor vim;
+    /** The editor of the file's other view that this view's uppercase Vim marks go to when it closes, if any. */
+    private java.util.function.Supplier<Optional<VimEditor>> marksHeir = Optional::empty;
     private final VimBar vimBar = new VimBar(this::render, this::reveal);
     private int tabSize = 4;
+    private static final double MIN_FONT_SIZE = 6, MAX_FONT_SIZE = 72;
+    /** The saved typography, and this tab's own size while it is zoomed (null otherwise). */
+    private TerminalTypography typography;
+    private Double fontSize;
     private FindBar find;
+    private MarkdownController markdown;
+    private MarkdownPreferences markdownPreferences;
+    private Consumer<Throwable> markdownSaveFailed = failure -> {};
+    private MarkdownMode retainedMarkdownMode;
+    private boolean wasMarkdown;
+    private boolean linkedScrolling = true;
+    private Runnable modeChanged = () -> {};
+    void modeChanged(Runnable value) { modeChanged = value; }
+    private Presentation.Icons icons = Presentation.Icons.NEW_UI;
+    void markdownPreferences(MarkdownPreferences value) { markdownPreferences(value, failure -> {}); }
+    void markdownPreferences(MarkdownPreferences value, Consumer<Throwable> failed) {
+        markdownPreferences = value; markdownSaveFailed = failed; updateMarkdownEligibility(); render();
+    }
+    boolean markdownEligible() { return SYNTAX_STYLE_MARKDOWN.equals(session.style()); }
+    boolean linkedScrolling() { return linkedScrolling; }
+    void markdownMode(MarkdownMode mode, boolean explicit) {
+        if (closed || !showingText() || !markdownEligible() || markdown == null) return;
+        dismissHiddenFind(mode);
+        retainedMarkdownMode = mode;
+        markdown.mode(mode);
+        if (explicit && markdownPreferences != null) markdownPreferences.select(mode).whenComplete((ignored, failure) -> {
+            if (failure != null) markdownSaveFailed.accept(failure);
+        });
+        document.focusSource(mode != MarkdownMode.PREVIEW);
+        focusContent(); render(); modeChanged.run();
+    }
+    /** Reveals the existing source for an explicit command without changing the saved default. */
+    public void revealSource() {
+        if (markdown != null && markdown.mode() == MarkdownMode.PREVIEW) markdownMode(MarkdownMode.SPLIT, false);
+        document.focusSource(true); focusContent();
+    }
+    private void dismissHiddenFind(MarkdownMode mode) {
+        if (find == null) return;
+        if (mode == MarkdownMode.PREVIEW) find.paneHidden(area());
+        else if (mode == MarkdownMode.SOURCE) find.paneHidden(document.preview().editor());
+    }
+    private void updateMarkdownEligibility() {
+        if (markdown == null) return;
+        boolean eligible = markdownEligible();
+        if (eligible && (!wasMarkdown || retainedMarkdownMode == null && markdownPreferences != null)) {
+            if (retainedMarkdownMode == null && markdownPreferences != null) retainedMarkdownMode = markdownPreferences.current();
+            var mode = retainedMarkdownMode == null ? MarkdownMode.SOURCE : retainedMarkdownMode;
+            dismissHiddenFind(mode); markdown.mode(mode);
+        } else if (!eligible && wasMarkdown) {
+            dismissHiddenFind(MarkdownMode.SOURCE);
+            markdown.mode(MarkdownMode.SOURCE); document.focusSource(true);
+        }
+        wasMarkdown = eligible;
+    }
+    javax.swing.text.JTextComponent focusedContent() { return document.focusedContent(); }
+    void copy() { focusedContent().copy(); }
+    void selectAll() { focusedContent().selectAll(); }
+    void paste() { revealSource(); area().paste(); }
 
-    /** Creates an owned kit view; closing the hosted view ends document refreshes as well. */
+    void markdown(MarkdownController value) { markdown = value; updateMarkdownEligibility(); }
+    MarkdownController markdown() { return markdown; }
+    void previews(java.util.concurrent.Executor worker, java.util.concurrent.Executor ui) {
+        new MarkdownController(this, worker, ui, this::render);
+    }
+    void previews(java.util.concurrent.Executor worker, java.util.concurrent.Executor ui,
+                  dev.jasper.editor.markdown.resources.ImageLoader loader) {
+        new MarkdownController(this, worker, ui, this::render, loader);
+    }
+    void active(boolean value) { if (markdown != null) markdown.active(value); }
+
+    /** Creates an owned kit view, the session's first; closing the hosted view ends document refreshes as well. */
     public EditorTab(UiKit kit, DocumentSession session, Consumer<EditorTab> close, boolean debounce) {
+        this(kit, session, close, debounce, null);
+    }
+
+    /**
+     * Creates an owned kit view of {@code session}; with {@code sharing}, another view of it, which shows the same text
+     * and undo history (pane flexibility spec 6).
+     *
+     * @param sharing an open view of the same session, or null for its first
+     * @throws IllegalArgumentException if {@code sharing} is a view of another session, or has closed
+     */
+    EditorTab(UiKit kit, DocumentSession session, Consumer<EditorTab> close, boolean debounce, EditorTab sharing) {
+        if (sharing != null && (sharing.session != session || sharing.closed))
+            throw new IllegalArgumentException("A view shares the text of an open view of its own document");
         this.session = session;
         this.close = close;
         this.debounce = debounce;
+        document = new DocumentArea(sharing == null ? null : sharing.document);
+        views = sharing == null ? new TextViews(session) : sharing.views;
+        views.add(this);
         edits = new Timer(300, event -> { if (!closed) session.textEdited(); });
         edits.setRepeats(false);
         area().getDocument().addDocumentListener(editListener);
-        session.attach(area()::getText, this::replaceText);
         view = kit.create(spec(), this::event);
         view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.EDITOR, document, this::shutdown));
-        session.addListener(this::refresh);
+        session.addListener(refreshing);
         refresh();
     }
 
@@ -66,29 +172,70 @@ public final class EditorTab {
     private void shutdown() {
         if (closed) return;
         closed = true;
+        if (find != null) find.dismiss();
         focusPending = false;
         edits.stop();
+        if (markdown != null) markdown.close();
         area().getDocument().removeDocumentListener(editListener);
-        if (vim != null) { vimBar.detach(); vim.close(); vim = null; }
+        if (vim != null) {
+            marksHeir.get().ifPresent(vim::leaveMarksTo);
+            vimBar.detach(); vim.close(); vim = null;
+        }
         document.close();
         find = null;
+        session.removeListener(refreshing);
+        // Last: the listeners above leave the document this view shared, which its other views keep.
+        views.remove(this);
     }
 
-    void appearance(Appearance appearance) { document.appearance(appearance); }
+    void appearance(Appearance appearance) { icons = appearance.presentation().icons(); document.appearance(appearance); render(); }
     void settings(EditorSettings settings) {
         if (closed) return;
         tabSize = settings.tabSize();
         document.settings(settings);
         if (vim != null) vim.editorDefaults(defaults());
     }
-    void find(FindBar value) { if (closed) return; find = value; render(); }
+    /** Shows the saved typography; a new saved size replaces this tab's own size, as it does a terminal pane's. */
+    void typography(TerminalTypography value) {
+        if (closed) return;
+        if (typography != null && value.size() != typography.size()) fontSize = null;
+        typography = value;
+        showTypography();
+    }
+    /** Changes this tab's own font size by {@code points}, from 6 to 72 points, without saving it. */
+    void changeFontSize(double points) {
+        if (closed || typography == null) return;
+        double current = fontSize == null ? typography.size() : fontSize;
+        double next = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, current + points));
+        if (next == current) return;
+        fontSize = next;
+        showTypography();
+    }
+    /** Returns this tab to the saved font size. */
+    void resetFontSize() {
+        if (closed || fontSize == null) return;
+        fontSize = null;
+        showTypography();
+    }
+    private void showTypography() {
+        document.typography(fontSize == null ? typography : new TerminalTypography(typography.family(), fontSize,
+            typography.fallback(), typography.ligatures(), typography.lineHeight()));
+    }
+    void find(FindBar value) {
+        if (closed) return;
+        if (find != null && find != value) find.dismiss();
+        find = value; render();
+    }
     void render() { if (!closed) view.update(spec()); }
     private void reveal(String id) { if (!closed) view.reveal(id); }
 
     /** Focuses the document immediately or once its pending read succeeds. A failure drops the request. */
-    public void focusText() {
+    public void focusText() { focusContent(); }
+    /** Restores the last valid source/preview content focus after selection, activation or moves. */
+    public void focusContent() {
         if (closed) return;
-        if (showingText()) focusArea.run(); else focusPending = true;
+        if (showingText()) { if (document.focusedContent() == area()) focusArea.run(); else document.focusedContent().requestFocusInWindow(); }
+        else focusPending = true;
     }
     void focusAction(Runnable value) { focusArea = value; }
 
@@ -103,6 +250,36 @@ public final class EditorTab {
         render();
     }
     public Optional<VimEditor> vimEditor() { return Optional.ofNullable(vim); }
+
+    /**
+     * The view starts where {@code source}, another view of its file, is (Rulings 19): at its caret, selection and scroll
+     * position. With Vim on it starts as Vim's {@code :split} starts a window, once its pane has its size: the cursor on
+     * the source's, the source's first line on top, and the window scrolled as update_topline brings the cursor into
+     * sight.
+     *
+     * @param source an open view of the same file
+     */
+    void startAt(EditorTab source) {
+        if (closed) return;
+        var caret = source.area().getCaret();
+        var shown = source.scroll().getViewport().getViewPosition();
+        if (vim != null) {
+            int line;
+            try { line = source.area().getLineOfOffset(Math.max(0, source.area().viewToModel2D(new java.awt.Point(0, shown.y)))); }
+            catch (BadLocationException impossible) { line = 0; }
+            vim.startAt(caret.getDot(), line);
+            return;
+        }
+        area().getCaret().setDot(caret.getMark());
+        area().getCaret().moveDot(caret.getDot());
+        javax.swing.SwingUtilities.invokeLater(() -> { if (!closed) scroll().getViewport().setViewPosition(shown); });
+    }
+
+    /**
+     * @param heir the editor of the file's view active last, with Vim on, that this view's uppercase Vim marks go to when
+     *     it closes, as Vim's file marks are the file's (Rulings 12); empty gives them to another editor of the file
+     */
+    void marksHeir(java.util.function.Supplier<Optional<VimEditor>> heir) { marksHeir = heir; }
 
     /** Applies explicit document values; hosted tabs use their appearance subscription and settings instead. */
     public void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax) {
@@ -121,17 +298,37 @@ public final class EditorTab {
 
     private void edited() {
         if (closed || replacing) return;
+        if (markdown != null) markdown.sourceChanged();
         if (debounce) edits.restart(); else session.textEdited();
     }
-    private void replaceText(String text, boolean keepPosition) {
-        if (closed) return;
-        int line = keepPosition ? area().getCaretLineNumber() : 0;
+    /**
+     * A load or reload replaces the text every view of the document shows ({@link TextViews}): no edit is counted
+     * meanwhile, and the place a Markdown preview keeps for its source keeps its line's number.
+     *
+     * @param keepPosition whether the caret keeps its line
+     * @return the line the caret goes back to, 0-based
+     */
+    int beginReplace(boolean keepPosition) {
         replacing = true;
-        try { area().setText(text); } finally { replacing = false; }
-        area().discardAllEdits();
+        document.replacing();
+        return keepPosition ? area().getCaretLineNumber() : 0;
+    }
+
+    /** The replaced text is in: edits count again. */
+    void endReplace() { replacing = false; }
+
+    /**
+     * After a replace, the caret goes to the start of {@code line}, or of the last line when the text is shorter, Vim
+     * and the preview read the text again, and the preview's place for the source follows the new text from its line.
+     *
+     * @param line the line {@link #beginReplace} gave
+     */
+    void replaced(int line) {
+        document.replaced();
         try { area().setCaretPosition(area().getLineStartOffset(Math.min(line, area().getLineCount() - 1))); }
         catch (BadLocationException impossible) { area().setCaretPosition(0); }
         if (vim != null) vim.textReplaced();
+        if (markdown != null) markdown.sourceReloaded();
     }
     private EditorDefaults defaults() { return new EditorDefaults(tabSize, !session.tabs(), true, session.wrap()); }
     private void refresh() {
@@ -142,24 +339,43 @@ public final class EditorTab {
         area().setWrapStyleWord(vim == null);
         area().setTabsEmulated(!session.tabs());
         if (vim != null) vim.editorDefaults(defaults());
+        if (markdown != null && wasMarkdown && !markdownEligible()) retainedMarkdownMode = markdown.mode();
+        if (markdown != null) markdown.sessionChanged();
+        updateMarkdownEligibility();
         render();
-        if (showingText() && focusPending) { focusPending = false; focusArea.run(); }
+        if (showingText() && focusPending) { focusPending = false; focusContent(); }
     }
     private void event(UiEvent event) {
         if (closed) return;
         if (find != null && find.event(event)) return;
         if (!(event instanceof UiEvent.Action action)) return;
         switch (action.id()) {
-            case RETRY -> { if (session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
-            case DISMISS -> { session.cancelLoad(); close.accept(this); }
+            case "document.preview.retry" -> { if (markdown != null) markdown.retry(); }
+            case "document.preview.source", "markdown.source" -> markdownMode(MarkdownMode.SOURCE, true);
+            case "markdown.split" -> markdownMode(MarkdownMode.SPLIT, true);
+            case "markdown.preview" -> markdownMode(MarkdownMode.PREVIEW, true);
+            case "markdown.images.allow" -> { if (markdown != null) markdown.allowImages(); }
+            case "markdown.images.retry" -> { if (markdown != null) markdown.retryImages(); }
+            case "markdown.scroll-sync" -> { if (showingText() && markdownEligible()) { linkedScrolling = !linkedScrolling; document.scrollLink.linked(linkedScrolling); render(); } }
+            case RETRY -> { if (session.deferred() || session.state() == DocumentSession.State.FAILED && session.retryable()) session.load(); }
+            // A read the file's other views wait for goes on (pane flexibility spec 6); the last view's Cancel stops it.
+            case DISMISS -> { if (views.size() == 1) session.cancelLoad(); close.accept(this); }
             case FIRST -> { if (session.banner() == DocumentSession.Banner.DELETED) close.accept(this); else if (session.banner() == DocumentSession.Banner.CHANGED) session.reloadFromBanner(); }
             case SECOND -> { if (session.banner() == DocumentSession.Banner.DELETED) session.keepDeleted(); else if (session.banner() == DocumentSession.Banner.CHANGED) session.keepMine(); }
             default -> { }
         }
     }
     private ViewSpec spec() {
-        boolean ready = showingText(), failed = session.state() == DocumentSession.State.FAILED;
+        boolean ready = showingText(), failed = session.state() == DocumentSession.State.FAILED, waiting = session.deferred();
         var children = new ArrayList<Nodes.Node>();
+        children.add(MarkdownToolbar.node(markdown == null ? MarkdownMode.SOURCE : markdown.mode(), linkedScrolling, ready, markdownEligible(), icons));
+        if (markdown != null) children.add(MarkdownToolbar.resources(markdown.mode(), markdown.needsImageConsent(), markdown.imageFailures()));
+        if (markdown != null && markdown.failure().isPresent() && markdown.mode() != dev.jasper.editor.markdown.MarkdownMode.SOURCE) {
+            children.add(new Nodes.Stack("document.preview.failure", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Text("document.preview.message", ControlState.READY,
+                    (document.preview().installedResult().isPresent() ? "Preview is out of date. " : "") + markdown.failure().orElseThrow(), Nodes.TextRole.BODY),
+                button("document.preview.source", "Source", true), button("document.preview.retry", "Retry", true))));
+        }
         boolean banner = session.banner() != DocumentSession.Banner.NONE;
         boolean deleted = session.banner() == DocumentSession.Banner.DELETED;
         children.add(new Nodes.Stack(BANNER, visible(banner), Nodes.LayoutRole.INLINE, List.of(
@@ -169,9 +385,10 @@ public final class EditorTab {
         // The canonical full-body empty state: a short title over one sentence, the secondary action, then the one primary.
         children.add(new Nodes.Empty(STATE, visible(!ready), new Nodes.Icon("document.state.icon", ControlState.READY,
             failed ? "error" : "file", Nodes.Hue.NONE, Nodes.IconSize.EMPTY, failed ? "Load failed" : "Loading"),
-            failed ? FAILED_TITLE : "Loading " + session.name() + session.host().map(host -> " from " + host).orElse("") + "…", failed ? session.failure() : "",
-            List.of(button(DISMISS, failed ? "Close" : "Cancel", true),
-                new Nodes.Button(RETRY, visible(failed && session.retryable()), "Retry", "", Nodes.ButtonKind.PRIMARY, RETRY, ""))));
+            failed ? FAILED_TITLE : waiting ? session.name() + session.host().map(host -> " on " + host).orElse("") + " loads when you select it"
+                : "Loading " + session.name() + session.host().map(host -> " from " + host).orElse("") + "…", failed ? session.failure() : "",
+            List.of(button(DISMISS, failed || waiting ? "Close" : "Cancel", true),
+                new Nodes.Button(RETRY, visible(waiting || failed && session.retryable()), waiting ? "Load" : "Retry", "", Nodes.ButtonKind.PRIMARY, RETRY, ""))));
         children.add(vimBar.node(ready));
         if (find != null) children.add(find.node());
         return new ViewSpec(new Nodes.Split("document.tab", ControlState.READY, Nodes.SplitKind.DOCUMENT, children));

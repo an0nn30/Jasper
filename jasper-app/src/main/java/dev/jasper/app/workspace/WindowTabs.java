@@ -1,5 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.dock.WorkspaceDropResolver;
+import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.app.config.AnimationSettings;
@@ -15,30 +18,36 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.function.LongSupplier;
 import javax.swing.*;
 
-/** Equal-width, centered workspace tabs over the retained Swing selection model. EDT only. */
+/**
+ * The equal tabs (workspace tabs spec 10): a window's tab strip in the standard look (tabs and panes spec 5), equal
+ * cells with centred titles, each entry a tab shown as its active pane's item; hidden while the window holds one tab. A
+ * tab that opens or closes moves into or out of its place where the look has motion (spec 5; workspace plan 8a Rulings
+ * 20). A tab that arrives or leaves by a move, is reordered, or arrives while the strip is hidden takes its place at
+ * once, and an entry keeps its place while its tab shows another of its panes. EDT only.
+ */
 final class WindowTabs extends JPanel implements TabStrip {
     static final int TITLE_LIMIT = 200;
-    private final WindowContent owner;
+    private final ParentTabBar source;
     private final LongSupplier clock;
     private final List<Slot> slots = new ArrayList<>();
-    private final IdentityHashMap<Component, Entry> entries = new IdentityHashMap<>();
-    private final List<Component> order = new ArrayList<>();
+    private final IdentityHashMap<Tab, Entry> entries = new IdentityHashMap<>();
+    private final List<Tab> order = new ArrayList<>();
     private final JPanel viewport = new JPanel(null);
-    private final Value inset = new Value();
     private AnimationSettings animations = AnimationSettings.defaults();
     private Timer timer;
-    private Component selected;
+    private Tab selected;
     private int layoutWidth = -1, layoutHeight = -1;
     private boolean active = true, disposed;
 
-    WindowTabs(WindowContent owner) { this(owner, System::nanoTime); }
-    WindowTabs(WindowContent owner, LongSupplier clock) {
+    WindowTabs(ParentTabBar source) { this(source, System::nanoTime); }
+    WindowTabs(ParentTabBar source, LongSupplier clock) {
         super(null);
-        this.owner = owner; this.clock = clock;
-        setName("windowTabs"); setOpaque(false); setVisible(false);
+        this.source = source; this.clock = clock;
+        setName("windowTabs"); setOpaque(false);
         viewport.setOpaque(false); viewport.setName("tabViewport"); add(viewport);
     }
 
@@ -47,83 +56,115 @@ final class WindowTabs extends JPanel implements TabStrip {
     @Override public void refresh() {
         if (disposed) return;
         long now = clock.getAsLong(); sample(now);
-        var updated = new ArrayList<Component>();
-        for (int i = 0; i < owner.tabStrip().getTabCount(); i++) updated.add(owner.tabStrip().getComponentAt(i));
+        var updated = new ArrayList<>(source.tabs());
+        // A tab whose entry shows another of its panes (a split, a focus change, a pane closing) keeps its entry and
+        // its place: only what the entry shows changes (workspace plan 8a Rulings 20).
+        for (Tab tab : List.copyOf(order)) {
+            if (updated.contains(tab)) continue;
+            Entry entry = entries.get(tab);
+            for (Tab next : updated)
+                if (!entries.containsKey(next) && entry.parent != null && entry.parent.equals(source.id(next))) {
+                    entries.remove(tab); entry.tab = next; entries.put(next, entry);
+                    order.set(order.indexOf(tab), next);
+                    break;
+                }
+        }
+        // An entry follows its tab's id, which ParentTabsView.reid and renew change.
+        for (Tab tab : order) { Entry entry = entries.get(tab); if (entry != null) entry.parent = source.id(tab); }
         boolean changed = !updated.equals(order);
         boolean added = updated.stream().anyMatch(tab -> !entries.containsKey(tab));
         boolean removed = order.stream().anyMatch(tab -> !updated.contains(tab));
-        boolean reveal = order.size() <= 1 && updated.size() > 1;
-        if (reveal && getParent() != null) {
-            // BorderLayout does not size a hidden NORTH child. Establish its real width before starting motion.
-            Insets border = getParent().getInsets();
-            int width = Math.max(0, getParent().getWidth() - border.left - border.right);
-            setSize(width, UIScale.scale(owner.tabHeight()));
-            doLayout();
-        }
-        if (changed) {
-            for (Component tab : List.copyOf(order)) if (!updated.contains(tab)) {
+        // Only an open or a close moves: a tab that arrives or leaves by a move does not.
+        boolean opened = updated.stream().anyMatch(tab -> !entries.containsKey(tab) && !tab.moving());
+        boolean closing = order.stream().anyMatch(tab -> !updated.contains(tab) && tab.closed());
+        // The entries that stay take their tabs' order at once, as a reorder does: a merge, or a tab's last pane moving
+        // into a tab that is not its neighbour, leaves the tab it joined showing an item another entry showed, so that
+        // entry stays where it was drawn while the tab's own goes (pane flexibility spec 5).
+        boolean reslot = !drawn(updated).equals(updated.stream().filter(entries::containsKey).toList());
+        if (changed || reslot) {
+            for (Tab tab : List.copyOf(order)) if (!updated.contains(tab)) {
                 Entry entry = entries.remove(tab);
                 entry.slot.entry = null; // The shrinking gap retains no closed session, plugin or controls.
                 viewport.remove(entry);
             }
-            if (!added && !removed) { settle(); slots.clear(); }
+            if (reslot) { settle(); slots.clear(); }
             order.clear(); order.addAll(updated);
             for (int i = 0; i < order.size(); i++) {
-                Component tab = order.get(i);
+                Tab tab = order.get(i);
                 if (!entries.containsKey(tab)) {
                     var entry = new Entry(tab); entries.put(tab, entry); viewport.add(entry);
                     int at = i == 0 ? 0 : slots.indexOf(entries.get(order.get(i - 1)).slot) + 1;
                     while (at < slots.size() && slots.get(at).entry == null) at++;
                     slots.add(at, entry.slot);
-                } else if (!added && !removed) slots.add(entries.get(tab).slot);
+                } else if (reslot) slots.add(entries.get(tab).slot);
             }
-            Curve curve = reveal ? Curve.REVEAL : added ? Curve.OPEN : Curve.CLOSE;
-            int millis = reveal ? (int) Math.round(animations.tabOpenMillis() * 490.0 / 475)
-                : added ? animations.tabOpenMillis() : animations.tabCloseMillis();
-            if (order.size() <= 1 || !added && !removed || !animations.enabled() || !owner.lookAnimates() || layoutWidth <= 0) millis = 0;
-            if (reveal) {
-                // The reference first exposes the full-height rail, then expands a compact group at 100 logical px.
-                for (Slot slot : slots) slot.width.set(0);
-                inset.set(Math.min(NativeStyles.installed().metric(DesignMetrics.Role.TAB_REVEAL_INSET), Math.max(0, getWidth()) / 2.0));
-            }
-            inset.target(0, now, millis, curve);
+            Curve curve = added ? Curve.OPEN : Curve.CLOSE;
+            int millis = added ? animations.tabOpenMillis() : animations.tabCloseMillis();
+            // A strip that does not show takes its tabs at once, so it shows and hides settled.
+            if (reslot || order.size() <= 1 || !opened && !closing || !shown() || !animations.enabled() || !source.animates()
+                || layoutWidth <= 0) millis = 0;
             for (Slot slot : slots) slot.width.target(slot.entry == null ? 0 : 1.0 / order.size(), now, millis, curve);
             sample(now);
         }
-        selected = owner.selectedComponent();
-        setBackground(owner.theme().surface());
-        setVisible(order.size() > 1);
-        for (Component tab : order) entries.get(tab).refresh();
+        selected = source.selected();
+        setBackground(source.owner().theme().surface());
+        for (Tab tab : order) entries.get(tab).refresh();
         doLayout(); syncTimer(); revalidate(); repaint();
     }
 
+    /** The tabs of {@code tabs} that have entries, in the order the strip draws them. */
+    private List<Tab> drawn(List<Tab> tabs) {
+        var drawn = new ArrayList<Tab>();
+        for (Slot slot : slots) if (slot.entry != null && tabs.contains(slot.entry.tab)) drawn.add(slot.entry.tab);
+        return drawn;
+    }
+
+    /**
+     * Whether the strip and every container above it are visible. It does not ask {@code isShowing()}, so a strip outside
+     * a window, which has no parent, counts as visible.
+     */
+    private boolean shown() {
+        for (Component component = this; component != null; component = component.getParent())
+            if (!component.isVisible()) return false;
+        return true;
+    }
+
     @Override public void setActive(boolean active) { this.active = active; refresh(); }
+    /** Whether the strip shows as active. */
+    boolean active() { return active; }
 
     /** Literal bounded titles, also used by hosted-content integrations. */
     @Override public JPopupMenu tabList() {
         var menu = new JPopupMenu();
-        for (Component tab : order) {
-            var item = new JCheckBoxMenuItem(capped(owner.tabTitle(tab)), owner.tabIcon(tab), tab == selected);
-            item.putClientProperty("html.disable", true);
-            item.addActionListener(event -> { if (!disposed) owner.selectTab(tab); });
+        for (Tab tab : order) {
+            var item = PlainText.checkBox(capped(source.title(tab)), source.icon(tab), tab == selected);
+            item.addActionListener(event -> { if (!disposed) source.select(tab); });
             menu.add(item);
         }
         NativeStyles.installed().menuTree(menu, FlatLafInstaller::installedTheme);
         return menu;
     }
 
-    @Override public Dimension getMinimumSize() {
-        return new Dimension(0, order.size() > 1 ? UIScale.scale(owner.tabHeight()) : 0);
+    @Override public List<Rectangle> tabBounds() {
+        var bounds = new ArrayList<Rectangle>(order.size());
+        for (Tab tab : order) bounds.add(SwingUtilities.convertRectangle(viewport, entries.get(tab).getBounds(), this));
+        return bounds;
     }
+
+    @Override public OptionalInt newTabPlace(Point point) { return WorkspaceDropResolver.newTabPlace(point, tabBounds()); }
+
+    @Override public boolean onNewTabButton(Point point) { return false; }
+
+    @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(source.owner().tabHeight())); }
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
 
     @Override public void doLayout() {
         int width = getWidth(), height = getHeight();
-        // Revealing the bar reclaims its full height immediately; a genuine resize settles motion.
+        // A genuine resize settles motion.
         if (layoutWidth > 0 && (width != layoutWidth || layoutHeight > 0 && height > 0 && height != layoutHeight)) settle();
         layoutWidth = width; layoutHeight = height;
         viewport.setBounds(0, 0, width, height);
-        double x = inset.current;
+        double x = 0;
         for (Slot slot : slots) {
             int left = (int) Math.round(x);
             x += slot.width.current * width;
@@ -147,17 +188,20 @@ final class WindowTabs extends JPanel implements TabStrip {
             if (slot.entry != null && slot.entry.hovered) hovered = bounds.size();
             bounds.add(slot.bounds);
         }
-        ChromePainter.installed().tabStrip(this, graphics, owner.theme().workspace(), owner.workspaceSurface(), bounds, chosen, hovered, active);
+        ChromePainter.installed().tabStrip(this, graphics, source.owner().theme().workspace(), source.owner().workspaceSurface(), bounds, chosen, hovered, active);
     }
 
     private Color surface(boolean selected) {
-        return ChromePainter.installed().tabSurface(owner.theme().workspace(), owner.workspaceSurface(), selected);
+        return ChromePainter.installed().tabSurface(source.owner().theme().workspace(), source.owner().workspaceSurface(), selected);
     }
 
     /** {@code title}, or past {@code TITLE_LIMIT} characters its start and an ellipsis within that limit, for tips and menus. */
-    static String capped(String title) {
-        if (title.length() <= TITLE_LIMIT) return title;
-        int end = TITLE_LIMIT - 1;
+    static String capped(String title) { return capped(title, TITLE_LIMIT); }
+
+    /** {@code title}, or past {@code limit} characters its start and an ellipsis within that limit. */
+    static String capped(String title, int limit) {
+        if (title.length() <= limit) return title;
+        int end = limit - 1;
         if (Character.isHighSurrogate(title.charAt(end - 1))) end--; // never split an emoji
         return title.substring(0, end) + "\u2026";
     }
@@ -173,19 +217,17 @@ final class WindowTabs extends JPanel implements TabStrip {
         sample(now); doLayout(); syncTimer(); repaint();
     }
     private void sample(long now) {
-        inset.sample(now);
         for (Slot slot : slots) slot.width.sample(now);
         slots.removeIf(slot -> slot.entry == null && !slot.width.running);
     }
     private void settle() {
-        inset.set(0);
         slots.removeIf(slot -> slot.entry == null);
         for (Slot slot : slots) slot.width.set(order.isEmpty() ? 0 : 1.0 / order.size());
         syncTimer();
     }
     boolean motionRunning() { return timer != null && timer.isRunning(); }
     private void syncTimer() {
-        boolean moving = inset.running || slots.stream().anyMatch(slot -> slot.width.running);
+        boolean moving = slots.stream().anyMatch(slot -> slot.width.running);
         if (moving && !disposed && timer == null) {
             timer = new Timer(8, event -> animate(clock.getAsLong())); timer.start();
         } else if ((!moving || disposed) && timer != null) { timer.stop(); timer = null; }
@@ -204,8 +246,6 @@ final class WindowTabs extends JPanel implements TabStrip {
 
     /** Measured monotonic response, normalized to operation duration. See docs/design/alacritty-tabs.md. */
     private enum Curve {
-        REVEAL(new double[]{0, 25, 42, 58, 75, 92, 108, 125, 142, 158, 175, 192, 208, 233, 267, 300, 350, 400, 490},
-            new double[]{0, .012, .143, .263, .387, .497, .595, .678, .747, .803, .847, .884, .911, .940, .967, .982, .994, .998, 1}),
         OPEN(new double[]{0, 25, 42, 58, 75, 92, 108, 125, 142, 158, 175, 192, 208, 225, 250, 283, 317, 367, 417, 475},
             new double[]{0, .088, .201, .331, .444, .546, .637, .711, .775, .824, .863, .894, .919, .940, .958, .975, .986, .993, .997, 1}),
         CLOSE(new double[]{0, 25, 42, 58, 75, 92, 108, 125, 142, 158, 175, 200, 233, 267, 300, 350, 375, 425},
@@ -246,7 +286,10 @@ final class WindowTabs extends JPanel implements TabStrip {
         button.setContentAreaFilled(false); button.setFocusable(false);
     }
     private final class Entry extends JPanel {
-        private final Component tab;
+        /** What the entry shows: its tab's active pane's item, which changes as the tab shows another pane. */
+        private Tab tab;
+        /** The tab the entry is; it follows the tab's id, which a move between windows can change. */
+        private ParentTabId parent;
         private final Slot slot;
         private final JButton close = new JButton();
         private final JButton select = new JButton() {
@@ -255,60 +298,49 @@ final class WindowTabs extends JPanel implements TabStrip {
             }
         };
         private boolean hovered;
-        private Point origin;
 
-        Entry(Component tab) {
-            super(null); this.tab = tab; slot = new Slot(this); setOpaque(false);
+        Entry(Tab first) {
+            super(null); tab = first; parent = source.id(first); slot = new Slot(this); setOpaque(false);
             flat(select); flat(close); select.setHorizontalAlignment(SwingConstants.CENTER);
-            select.addActionListener(event -> { if (!disposed) owner.selectTab(tab); });
-            close.setRolloverEnabled(true); close.setToolTipText("Close tab");
-            close.getAccessibleContext().setAccessibleName("Close tab");
-            close.addActionListener(event -> { if (!disposed) owner.closeTab(tab); });
+            select.addActionListener(event -> { if (!disposed) source.select(tab); });
+            close.setRolloverEnabled(true); close.setToolTipText(source.closeName());
+            close.getAccessibleContext().setAccessibleName(source.closeName());
+            close.addActionListener(event -> { if (!disposed) source.close(tab); });
             MouseAdapter gestures = new MouseAdapter() {
-                private void popup(MouseEvent event) { owner.tabMenu(tab).show(event.getComponent(), event.getX(), event.getY()); }
+                private void popup(MouseEvent event) { source.menu(tab).show(event.getComponent(), event.getX(), event.getY()); }
                 @Override public void mouseEntered(MouseEvent event) { hover(true); }
                 @Override public void mouseExited(MouseEvent event) {
                     hover(contains(SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), Entry.this)));
                 }
                 @Override public void mousePressed(MouseEvent event) {
-                    origin = null;
                     if (disposed) return;
                     if (event.isPopupTrigger()) { popup(event); return; }
-                    if (SwingUtilities.isMiddleMouseButton(event)) { owner.closeTab(tab); return; }
+                    if (SwingUtilities.isMiddleMouseButton(event)) { source.close(tab); return; }
                     if (SwingUtilities.isLeftMouseButton(event) && event.getComponent() != close) {
-                        owner.selectTab(tab);
-                        origin = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), WindowTabs.this);
+                        source.select(tab);
+                        // The tab drag may start here (tabs and panes spec 6).
+                        source.pressed(tab, event);
                     }
                 }
+                @Override public void mouseDragged(MouseEvent event) { source.dragged(event); }
                 @Override public void mouseReleased(MouseEvent event) {
                     if (event.isPopupTrigger()) { popup(event); return; }
-                    Point start = origin; origin = null;
-                    if (disposed || start == null || !SwingUtilities.isLeftMouseButton(event)) return;
-                    Point end = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), WindowTabs.this);
-                    if (start.distance(end) <= NativeStyles.installed().metric(DesignMetrics.Role.TAB_REORDER_THRESHOLD)
-                        || !viewport.getBounds().contains(end)) return;
-                    settle(); doLayout();
-                    for (int i = 0; i < order.size(); i++) {
-                        Entry target = entries.get(order.get(i));
-                        if (target.isVisible() && SwingUtilities.convertRectangle(viewport, target.getBounds(), WindowTabs.this).contains(end)) {
-                            owner.reorderTab(owner.tabStrip().indexOfComponent(tab), i); break;
-                        }
-                    }
+                    source.released(event);
                 }
             };
             addMouseListener(gestures); select.addMouseListener(gestures); close.addMouseListener(gestures);
+            addMouseMotionListener(gestures); select.addMouseMotionListener(gestures); close.addMouseMotionListener(gestures);
             add(close); add(select);
         }
         private void hover(boolean value) { hovered = value; doLayout(); repaint(); }
         void refresh() {
-            String text = owner.tabTitle(tab);
+            String text = source.title(tab);
             select.setText(text); select.getAccessibleContext().setAccessibleName(text);
             select.setName("select:" + text); close.setName("close:" + text);
-            String shortcut = owner.tabShortcut(order.indexOf(tab));
-            String tip = capped(owner.tabTooltip(tab));
+            String shortcut = source.shortcut(order.indexOf(tab));
+            String tip = capped(source.tooltip(tab));
             select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
-            boolean running = tab instanceof TerminalTab terminal && terminal.focusedPane() != null && terminal.focusedPane().running();
-            select.getAccessibleContext().setAccessibleDescription(running ? "Session running" : null);
+            select.getAccessibleContext().setAccessibleDescription(source.running(tab) ? "Session running" : null);
             Color surface = surface(tab == selected), ink = ThemeZone.color(this, SemanticColor.TEXT_PRIMARY);
             close.setIcon(AppIcons.forSurface(AppIcons.named("CLOSE"), surface, ink));
             close.setRolloverIcon(AppIcons.forSurface(AppIcons.named("CLOSE_HOVERED"), surface, ink));

@@ -1,0 +1,40 @@
+<section class="guide" id="versions">
+<h2>Versions</h2>
+<p>This reference documents SDK {@sdk.version}. The release jars carry the version in their names
+({@code jasper-sdk-{@sdk.version}.jar}) and as their manifests' {@code Implementation-Version}, and
+{@link JasperSdk#VERSION} holds it in code. That field is a compile-time constant, so a plugin that reads it gets the
+version it was compiled against, not the version of the Jasper it runs in. The SDK is at 0.x, which carries no
+compatibility promise. Javadoc {@code @since} tags in the API reference name the SDK version that added a type or
+member.</p>
+
+<h3>The sdk range</h3>
+<p>Every manifest says which SDK versions the plugin runs on, as a range. Build against SDK {@sdk.version} and declare:</p>
+<pre><code class="language-toml">sdk = "&gt;=0.21.0, &lt;0.22"</code></pre>
+<p>That admits 0.21.0 and every later 0.21 version, and nothing from 0.22 on. A plugin that uses something only a later
+0.21 version has starts its range there. Every bundled plugin declares {@code sdk = ">=0.21.0, <0.22"}.</p>
+<table>
+<thead><tr><th>Form</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>{@code >=0.21.0}, {@code >0.21.0}, {@code <=0.21.2}, {@code <0.22}, {@code =0.21.0}</td><td>A comparator and a version of one to three numbers; missing numbers are 0, so {@code <0.22} means {@code <0.22.0}.</td></tr>
+<tr><td>{@code >=0.21.0, <0.22}</td><td>Comparators separated by commas; every one must hold.</td></tr>
+<tr><td>{@code ""}</td><td>An empty range admits every SDK version.</td></tr>
+</tbody>
+</table>
+<p>A bare version such as {@code "0.21.0"} is not a range and makes the manifest invalid, and so does a version with a
+pre-release or build suffix. The {@code version} of a {@code requires} entry uses the same syntax.</p>
+
+<h3>How Jasper checks</h3>
+<p>Jasper compares the range with its own SDK version twice:</p>
+<ul>
+<li><b>When a user installs the plugin.</b> <b>Install from Zip…</b> refuses a zip whose range excludes this Jasper's
+SDK: "<i>Name</i> <i>version</i> needs SDK <i>range</i>; this Jasper has SDK {@sdk.version}". Nothing is installed.</li>
+<li><b>At every launch.</b> A plugin whose range excludes the SDK, wherever it was found, does not load. Its status line
+in the log and its row in Settings › Plugins say Skipped, and the Plugin problems group posts "<i>Name</i> was not
+started" with the reason, "needs SDK <i>range</i>; this is SDK {@sdk.version}", and <b>Open Plugins</b>. Plugins that
+require it, other than optionally, are skipped too.</li>
+</ul>
+<p>The range is the author's word. When it admits this SDK, loading still refuses a plugin whose classes refer to SDK
+types or members this SDK no longer has: Jasper posts "<i>Name</i> could not be loaded", naming the class, the missing
+type or member and the SDK version to rebuild it for. A call to a method this SDK lacks fails when it runs, as a
+{@code LinkageError}, which Jasper contains and reports like any other failure of the plugin.</p>
+</section>

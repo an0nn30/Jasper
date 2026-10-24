@@ -12,17 +12,24 @@ import java.awt.Toolkit;
 import java.awt.Window;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * The boot splash's window (spec 10.11): undecorated, unfocusable and centred on the main screen, carrying the look's
- * window icons. It appears and closes at once, with no motion, and paints each step at once through the window's own
- * graphics, because the event thread is busy starting Jasper and would not get to a queued repaint. It is a plain AWT
- * window, not a Swing one, so opening it initializes no look and feel ahead of the application's. A window that cannot
- * be made is logged and the splash stays closed; start-up goes on. EDT.
+ * window icons. It appears and closes at once, and paints each step at once through the window's own
+ * graphics, because the event thread is busy starting Jasper and would not get to a queued repaint. Every paint is a copy
+ * from {@code SplashBuffer}, so a step changes only the step's line and the bar on screen. It is a plain AWT window, not
+ * a Swing one, so opening it initializes no look and feel ahead of the application's. A window that cannot be made is
+ * logged and the splash stays closed; start-up goes on. Window lifecycle and step updates are EDT-owned. The standard
+ * Meadow animation paints on a daemon while startup occupies the EDT; all buffer and live-window paint access is
+ * serialized by a private lock, and closing cancels the worker before disposing the window outside that lock.
  */
 public final class Splash {
     private static final System.Logger LOG = System.getLogger(Splash.class.getName());
+    private final Object paintLock = new Object();
     private final SplashPainter painter;
+    private final SplashAnimation animation;
+    private final SplashBuffer buffer;
     private final List<Image> icons;
     private Window window;
     private StartupSteps.Step step;
@@ -36,7 +43,19 @@ public final class Splash {
      *     splash on
      */
     public Splash(SplashPainter painter, List<Image> icons) {
+        this(painter, icons, true);
+    }
+
+    /**
+     * A splash honoring the startup animation preference.
+     * @param painter decoded artwork
+     * @param icons window and taskbar icons
+     * @param animations whether the user's app-wide preference permits motion
+     */
+    public Splash(SplashPainter painter, List<Image> icons, boolean animations) {
         this.painter = Objects.requireNonNull(painter, "painter");
+        buffer = new SplashBuffer(painter);
+        animation = new SplashAnimation(this::animate, painter.animated() && animations);
         this.icons = List.copyOf(icons);
     }
 
@@ -50,19 +69,24 @@ public final class Splash {
         step = Objects.requireNonNull(first, "first");
         try {
             window = new Window((Frame) null) {
-                @Override public void paint(Graphics g) { draw(g); }
-                // The whole window is painted each time, so nothing is cleared first.
-                @Override public void update(Graphics g) { draw(g); }
+                @Override public void paint(Graphics g) {
+                    synchronized (paintLock) {
+                        if (!closed) buffer.paint((Graphics2D) g, step);
+                    }
+                }
+                // A paint copies its whole area from the buffer, so nothing is cleared first.
+                @Override public void update(Graphics g) { paint(g); }
             };
             window.setFocusableWindowState(false);
             // The native window's first fill, before the splash paints, matches the splash: no light flash.
-            window.setBackground(SplashColors.TOP);
+            window.setBackground(painter.background());
             window.setIconImages(icons);
             window.setSize(SplashPainter.WIDTH, SplashPainter.HEIGHT);
             window.setLocation(centred(GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice()
                 .getDefaultConfiguration().getBounds()));
             window.setVisible(true);
-            paintNow();
+            synchronized (paintLock) { paintNow(g -> buffer.paint(g, step)); }
+            animation.start();
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "The splash could not be shown", failure);
             close();
@@ -75,28 +99,41 @@ public final class Splash {
      * @param next the step start-up reached
      */
     public void show(StartupSteps.Step next) {
-        step = Objects.requireNonNull(next, "next");
-        if (window != null) paintNow();
+        synchronized (paintLock) {
+            if (closed) return;
+            step = Objects.requireNonNull(next, "next");
+            if (window != null) paintNow(g -> buffer.show(g, step));
+        }
     }
 
     /** Closes the splash at once; idempotent. */
     public void close() {
-        closed = true;
-        if (window == null) return;
-        window.setVisible(false);
-        window.dispose();
-        window = null;
+        animation.close();
+        Window closing;
+        synchronized (paintLock) {
+            closed = true;
+            closing = window;
+            window = null;
+        }
+        // Never hold the painting lock across native window disposal.
+        if (closing != null) {
+            closing.setVisible(false);
+            closing.dispose();
+        }
     }
 
-    private void draw(Graphics g) {
-        StartupSteps.Step shown = step;
-        if (shown != null) painter.paint((Graphics2D) g, shown.text(), shown.fraction());
+    private void animate(int tick) {
+        synchronized (paintLock) {
+            if (closed || window == null) return;
+            painter.animationFrame(tick);
+            paintNow(g -> buffer.show(g, step));
+        }
     }
 
-    private void paintNow() {
+    private void paintNow(Consumer<Graphics2D> paint) {
         Graphics g = window.getGraphics();
         if (g == null) return;
-        try { draw(g); }
+        try { paint.accept((Graphics2D) g); }
         finally { g.dispose(); }
         Toolkit.getDefaultToolkit().sync();
     }

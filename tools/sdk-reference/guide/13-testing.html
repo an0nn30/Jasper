@@ -1,0 +1,178 @@
+<section class="guide" id="testing">
+<h2>Testing</h2>
+<p>The test kit, {@code jasper-sdk-testkit-{@sdk.version}.jar}, runs a plugin headless in a unit test. Its
+{@link FakePluginHost} is a single-threaded stand-in for Jasper's plugin runtime with the same rules: queued event
+delivery, topic ownership, services committed only after a successful start, rollback and a closed context after a
+failed one, capability checks and namespaced ids. The test scripts the workstation (windows, panes, settings, commands)
+and reads back what the plugin contributed as plain lines. The kit depends only on the SDK; put both jars on the test
+classpath, as the <a href="#quick-start">quick start</a>'s build does. See also <a href="../jasper-sdk-testkit/README.md">the test kit's README</a>.</p>
+
+<h3>A test</h3>
+<p>The plugin under test types a configured command into a pane from the pane's context menu, and prints it from a
+{@code jasper} subcommand:</p>
+<pre><code class="language-java">package dev.example.deploy;
+
+import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.plugin.PluginContext;
+import dev.jasper.sdk.settings.EditorHint;
+import dev.jasper.sdk.settings.Setting;
+import dev.jasper.sdk.settings.SettingKind;
+import dev.jasper.sdk.settings.SettingSpec;
+import dev.jasper.sdk.ui.ActionSpec;
+import java.util.concurrent.CompletableFuture;
+
+public final class DeployPlugin implements Plugin {
+    static final String TYPE = "dev.example.deploy.type";
+
+    @Override public void start(PluginContext context) {
+        Setting&lt;String&gt; command = context.settings().declare(SettingSpec.of("command",
+                SettingKind.text(text -&gt; !text.isBlank(), "Enter a command."), "make check")
+            .label("Check command").editor(EditorHint.technical()));
+        context.actions().register(ActionSpec.of(TYPE, "Type Deploy Check"),
+            invoked -&gt; invoked.pane().ifPresent(pane -&gt; pane.sendText(command.get())));
+        context.menus().terminalContext().add(TYPE);
+        context.commandLine().handle("deploy-check", call -&gt; {
+            call.out(command.get() + "\n");
+            return CompletableFuture.completedFuture(0);
+        });
+    }
+}</code></pre>
+<pre><code class="language-java">package dev.example.deploy;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import dev.jasper.sdk.Capabilities;
+import dev.jasper.sdk.PluginInfo;
+import dev.jasper.sdk.terminal.PaneInfo;
+import dev.jasper.sdk.terminal.SessionKind;
+import dev.jasper.sdk.terminal.SessionState;
+import dev.jasper.sdk.testing.FakePluginHost;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+class DeployPluginTest {
+    private static final String ID = "dev.example.deploy";
+    private static final PluginInfo INFO = new PluginInfo(ID, "Deploy", "1.0.0", Set.of(Capabilities.TERMINAL_INJECT));
+
+    /** Declares the manifest's subcommand, as Jasper would, then starts the plugin. */
+    private static void start(FakePluginHost host) {
+        host.declareSubcommand(ID, "deploy-check", "Print the deploy check command");
+        host.start(INFO, Set.of(), Set.of(), new DeployPlugin());
+    }
+
+    @Test void typesTheConfiguredCommandIntoThePane() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "build");
+            UUID pane = host.addTerminalPane(tab, new PaneInfo("zsh", Optional.empty(), Optional.empty(), 80, 24, true,
+                SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh"));
+            host.setSetting(ID, "command", "make deploy-check");
+            start(host);
+
+            assertThat(host.menu("context")).containsExactly("item:" + DeployPlugin.TYPE);
+            assertThat(host.invoke(DeployPlugin.TYPE, window, pane)).isTrue();
+            assertThat(host.sent(pane)).containsExactly("write:make deploy-check");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void reportsABlankCommandAndUsesTheDefault() {
+        try (var host = new FakePluginHost()) {
+            host.setSetting(ID, "command", " ");
+            start(host);
+
+            assertThat(host.settingsReports(ID)).containsExactly("command: Enter a command.");
+            var call = host.call("deploy-check", List.of(), Path.of("/work"));
+            assertThat(call.exit()).isCompletedWithValue(0);
+            assertThat(call.out()).isEqualTo("make check\n");
+        }
+    }
+}</code></pre>
+
+<h3>Threads</h3>
+<p>The thread that calls the host plays the UI thread. Nothing happens behind the test's back: published events wait
+until {@link FakePluginHost#flush()} delivers them (including those the deliveries publish), and background tasks wait
+until {@link FakePluginHost#runBackground()} runs them, one after another, on the calling thread. Run the plugin's
+{@code start}, and the test, on the Swing event dispatch thread instead when the plugin uses its {@link UiKit}: the kit's
+views ({@link FakeKit}, {@link FakeKitView}) require the real UI thread.</p>
+<pre><code class="language-java">@Test void buildsItsPanel() throws Exception {
+    SwingUtilities.invokeAndWait(() -&gt; {
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), new TargetsPlugin());
+            host.addTerminalWindow();
+            host.openPanel("dev.example.tool.targets");
+            assertThat(host.panelView("dev.example.tool.targets")).isPresent();
+            assertThat(host.failures()).isEmpty();
+        }
+    });
+}</code></pre>
+
+<h3>Starting and stopping</h3>
+<p>{@link FakePluginHost#start(PluginInfo,Set,Set,Plugin)} starts a plugin as Jasper would, with its identity and
+capabilities, the ids of its hard and optional requirements, and the instance. A plugin whose hard requirement is not
+active is not started; a {@code start} that throws is rolled back. Start providers before their consumers: each
+consumer receives the services of the providers it names, made by their factories. {@link FakePluginHost#stopAll()}
+stops every plugin in reverse order, and {@link FakePluginHost#close()} also delivers what is queued and deletes the
+temporary folder that holds the plugins' data directories ({@link FakePluginHost#FakePluginHost(Path)} uses a folder
+the test owns instead). {@link FakePluginHost#failures()} lists every contained failure (throwing starts, stops,
+handlers, factories and background tasks) as a line; assert it is empty.</p>
+
+<h3>What a test can drive and read</h3>
+<table>
+<thead><tr><th>Area</th><th>Script</th><th>Read</th></tr></thead>
+<tbody>
+<tr><td>Actions and chrome</td><td>{@link FakePluginHost#invoke(String,UUID,UUID)}</td><td>{@link FakePluginHost#actions()} ({@code id|title|enabled}), {@link FakePluginHost#actionSpec(String)}, {@link FakePluginHost#toolbar()}, {@link FakePluginHost#menu(String)} ({@code FILE} … {@code TRANSFER}, {@code context}, {@code top:<menu id>}), {@link FakePluginHost#status()}, {@link FakePluginHost#progress()}, {@link FakePluginHost#rail()}</td></tr>
+<tr><td>Tool windows and dialogs</td><td>{@link FakePluginHost#openPanel(String)} (in the main window), {@link FakePluginHost#closePanel(String)}, {@link FakePluginHost#requestClose(String)}, {@link FakePluginHost#requestQuit()}, {@link FakePluginHost#closeToolbarViews(UUID)}</td><td>{@link FakePluginHost#panels()}, {@link FakePluginHost#panelView(String)}, {@link FakePluginHost#panelHeader(String)}, {@link FakePluginHost#windows()}, {@link FakePluginHost#windowView(String,String)}, {@link FakePluginHost#dialogPresentation(String,String)}, {@link FakePluginHost#popoverViews(String)}, {@link FakePluginHost#contentTabs()}, {@link FakePluginHost#contentPresentation(ContentTab)}, {@link FakePluginHost#contentStatus(ContentTab)}, {@link FakePluginHost#contentCommands(ContentTab)}, {@link FakePluginHost#contentOwner(ContentTab)}, {@link FakePluginHost#contentComponent(ContentTab)}, {@link FakePluginHost#contentTab(String,String)}, {@link FakePluginHost#contentView(String,String)}, {@link FakePluginHost#windowContent(String,String)}, {@link FakePluginHost#dialogSwatch(String,String)}, {@link FakePluginHost#toolbarViews(UUID)}</td></tr>
+<tr><td>Views</td><td>{@link FakeKitView#emit(UiEvent)}, {@link FakeKitView#type(String,String)}, {@link FakeKitView#setSecret(String,char[])}, {@link FakeKit#contentFont(Font)} for the interface font custom content receives</td><td>{@link UiView#spec()}, {@link FakeKitView#focused()}, {@link FakeKitView#revealed()}</td></tr>
+<tr><td>Terminals</td><td>{@link FakePluginHost#addTerminalWindow()} (the first one added while no main window is open is the main window), {@link FakePluginHost#addTerminalTab(UUID,String)}, {@link FakePluginHost#addTerminalPane(UUID,PaneInfo)} (a terminal tab's one pane), {@link FakePluginHost#addContentTab(UUID,String)}, {@link FakePluginHost#moveTab(UUID,UUID)}, {@link FakePluginHost#closeTab(UUID)}, {@link FakePluginHost#holdPane(UUID)}, {@link FakePluginHost#activateTerminalWindow(UUID)}, {@link FakePluginHost#focusTerminalPane(UUID)}, {@link FakePluginHost#closeTerminalPane(UUID)}, {@link FakePluginHost#setPaneInfo(UUID,PaneInfo)}, {@link FakePluginHost#setSelection(UUID,String)}, {@link FakePluginHost#setForegroundJob(UUID,String)}, {@link FakePluginHost#setShellProfiles(List)}</td><td>{@link FakePluginHost#sent(UUID)} ({@code write:<text>}, {@code paste:<text>}), {@link FakePluginHost#openRequests()}, {@link FakePluginHost#terminalPanes()}, {@link FakePluginHost#windowTabs(UUID)}, {@link FakePluginHost#shellEnvironment(Map)}</td></tr>
+<tr><td>Terminal events</td><td>{@link FakePluginHost#commandStarted(UUID,String)}, {@link FakePluginHost#commandFinished(UUID,String,OptionalInt,Duration)}, {@link FakePluginHost#titleChanged(UUID,String)}, {@link FakePluginHost#cwdChanged(UUID,Path)}, {@link FakePluginHost#remoteCwdChanged(UUID,String,String)}, {@link FakePluginHost#sessionExited(UUID,OptionalInt)}, {@link FakePluginHost#bell(UUID)}, then {@link FakePluginHost#flush()}</td><td></td></tr>
+<tr><td>Restoring</td><td>{@link FakePluginHost#restoreTab(String,UUID,String,RestoreState)}</td><td>{@link FakePluginHost#restoreState(ContentTab)}, {@link FakePluginHost#restoreState(UUID)}, {@link FakePluginHost#declinedRestores()}</td></tr>
+<tr><td>Provided sessions</td><td>{@link FakePluginHost#cancelSession(UUID)}, {@link FakePluginHost#reconnectSession(UUID)}, {@link FakePluginHost#typeIntoSession(UUID,String)}, {@link FakePluginHost#pumpSessions()}</td><td>{@link FakePluginHost#sessionState(UUID)}, {@link FakePluginHost#sessionOutput(UUID)}</td></tr>
+<tr><td>Palette</td><td>{@link FakePluginHost#searchScope(String,String,UUID,UUID)}, {@link FakePluginHost#completeStep(String,String,String,UUID,UUID,Map)}, {@link FakePluginHost#executeInScope(String,String,String,UUID,UUID)}</td><td>{@link FakePluginHost#scopes()}, {@link FakePluginHost#scopePresentation(String)}, {@link FakePluginHost#scopesInAll()}, {@link FakePluginHost#scopesInRecents()}, {@link FakePluginHost#availableInScope(String,String,String,UUID,UUID)}, {@link FakePluginHost#stepInScope(String,String,String,UUID,UUID)}, {@link FakePluginHost#paletteOpens()}</td></tr>
+<tr><td>Settings</td><td>{@link FakePluginHost#setSetting(String,String,Object)} (a {@code String}, {@code Long}, {@code Double}, {@code Boolean} or list of strings, as TOML reads them; before the start it is the file the plugin starts with); a page of the plugin's own: {@link FakePluginHost#settingsPanel(String)}, {@link FakePluginHost#highlightSettingsPanel(String,String)}, {@link FakePluginHost#applySettingsPanel(String)}, {@link FakePluginHost#closeSettingsPanel(String)}; a look's default, before any plugin starts: {@link FakePluginHost#setKitDefault(String,String,Object)}</td><td>{@link FakePluginHost#declared(String)}, {@link FakePluginHost#savedSettings(String)}, {@link FakePluginHost#settingsReports(String)} ({@code key: message}), {@link FakePluginHost#settingsPanelView(String)}, {@link FakePluginHost#pendingSettings(String)}, {@link FakePluginHost#settingsPanelChanges(String)}, {@link FakePluginHost#lookDefaultProblems(String)}</td></tr>
+<tr><td>Notifications and activity</td><td>{@link FakeNotifications#runAction(String,String)}, {@link FakeNotifications#click(String)}</td><td>{@link FakePluginHost#notifications()}: {@link FakeNotifications#lines()} ({@code group|SEVERITY|title|content}, then the cause's class), {@link FakeNotifications#groups()}; {@link FakePluginHost#activityLog()}, {@link FakePluginHost#connectionLog()}</td></tr>
+<tr><td>Command line</td><td>{@link FakePluginHost#declareSubcommand(String,String,String)} before the start, then {@link FakePluginHost#call(String,List,Path)}</td><td>{@link FakeCommandCall#exit()}, {@link FakeCommandCall#out()}, {@link FakeCommandCall#err()}; {@link FakeCommandCall#cancel()} plays Ctrl+C</td></tr>
+<tr><td>Files</td><td>{@link FakePluginHost#queueFileChoice(List)} (what {@link Windows#choose(FileChoice)} returns), {@link FakePluginHost#queuePathSelection(List)} (the local {@code choose*} calls), {@link FakePluginHost#queueFileSelection(Optional)} ({@link WindowSurface#chooseFile(String,Optional)} and a settings row's Browse), {@link FakePluginHost#duringPathSelection(Runnable)}, {@link FakePluginHost#locateFile(String,UUID)}, {@link FakePluginHost#connectFileSource(String,String,UUID)}</td><td>{@link FakePluginHost#fileChoices()}, {@link FakePluginHost#fileSources()} ({@code id|heading}), {@link FakePluginHost#fileRoots(String)} ({@code id|label|connected})</td></tr>
+<tr><td>Desktop and appearance</td><td>{@link FakePluginHost#setPresentation(Presentation)} before any plugin starts, with {@link FakePresentations#STANDARD} (the default) or {@link FakePresentations#CLASSIC}, {@link FakePluginHost#publishApp(Topic,Object)}, {@link FakePluginHost#setVariant(Variant)}, {@link FakePluginHost#setSemanticColors(Map)}, {@link FakePluginHost#setWorkspace(Variant,WorkspacePalette,EditorPalette,SyntaxPalette)}, {@link FakePluginHost#setWorkspaceOpacity(double)}, {@link FakePluginHost#setEditorSchemes(List)}, {@link FakePluginHost#setTerminalTypography(TerminalTypography)}, {@link FakePluginHost#edit(Path,OptionalInt,Optional)}, {@link FakePluginHost#declareBundled(String)} before the start, {@link FakePluginHost#setCommandClient(Path)}</td><td>{@link FakePluginHost#clipboard()}: {@link FakeClipboard#copies()} ({@code copy|<plugin id>|<text>}, {@code secret|…}); {@link FakePluginHost#browsed()}, {@link FakePluginHost#openedInEditor()}, {@link FakePluginHost#editorPlugin()}, {@link FakePluginHost#active(String)}</td></tr>
+</tbody>
+</table>
+<p>{@code new FakeNotifications().group(id)} is a {@link NotificationGroup} for a class under test that takes one, without
+a host.</p>
+
+<h3>Where the fake differs from Jasper</h3>
+<ul>
+<li>Background tasks run one at a time when the test asks; in Jasper each runs at once on a virtual thread of its own,
+so tasks can overlap.</li>
+<li>The fake checks the calling thread only for the kit's views, which need the event dispatch thread, and for
+{@link Appearance}'s colours, palettes, workspace opacity and theme subscriptions, which need the thread that made the
+host or the event dispatch thread ({@link Appearance#variant()}, {@link Appearance#workspaceVariant()},
+{@link Appearance#presentation()} and {@link Appearance#terminalTypography()} answer any thread), and
+{@link Appearance#onTerminalTypographyChanged(Consumer)}, which needs the event dispatch thread. Calls Jasper refuses off
+the UI thread with {@code IllegalStateException} (registrations, subscribing, publishing services, handling subcommands,
+terminal queries, the clipboard) succeed in the fake from any thread.</li>
+<li>Services: the fake does not check that a service's interface is in one of the provider's exported packages, and an
+absent optional provider's classes are still on the test classpath, so the {@code NoClassDefFoundError} path cannot be
+tested with it.</li>
+<li>Settings live in memory; the fake writes no file. A value of the wrong TOML type rejects only that setting, where
+Jasper rejects the whole file; {@link FakePluginHost#settingsReports(String)} words integer, number, choice and list
+rejections with the kind's own message, where Jasper uses its own wording (see <a href="#settings">Settings</a>);
+{@code set} completes at once; and {@code number} values keep double precision. A look default the plugin cannot use
+is listed by {@link FakePluginHost#lookDefaultProblems(String)}, where Jasper logs it as a warning.</li>
+<li>Palette calls receive {@code maxResults} 5 and macOS glyphs, and
+{@link FakePluginHost#executeInScope(String,String,String,UUID,UUID)} skips the {@code available} check.</li>
+<li>{@link Platform#openInEditor(Path)} runs on the calling thread; {@link FileSource#connect(String,WindowOwner)} always
+receives a window; provided panes report 80 × 24; cancellation handlers run at once.</li>
+<li>An unavailable subcommand's message names the plugin's id rather than its name.</li>
+<li>{@link FakePluginHost#restoreTab(String,UUID,String,RestoreState)} puts the restored tab in a new tab at the end of
+the window's strip; Jasper places it where it was saved, in its tab and pane.</li>
+<li>{@link FakePluginHost#toolbarViews(UUID)} builds toolbar views for any open window, a child window too; Jasper builds
+them only in the main window.</li>
+<li>The fake has no active tool window: {@link Panels#toggle(String,WindowHandle)} and {@link PanelHost#show()} from a
+panel's own toggle action only toggle or show it, also under {@link FakePresentations#CLASSIC}, where Jasper activates
+a showing panel that is not the active tool window instead of hiding it.</li>
+</ul>
+</section>

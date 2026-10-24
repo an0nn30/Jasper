@@ -20,7 +20,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
      * How a title row without a workspace header looks; the kit's title metrics size each one.
      */
     public enum Style {
-        /** An auxiliary window's row: centred title, title actions at the right and a hairline below. */
+        /** An auxiliary window's row: centred title and a hairline below. */
         WINDOW,
         /** A dialog's band in the dialog surface, with no rule; its title and the controls centre lower, as a dialog's do. */
         DIALOG,
@@ -40,7 +40,9 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         }
     };
     private final PropertyChangeListener boundsChanged;
-    private JComponent header, accessory;
+    private JComponent header;
+    /** The control at the row's trailing end; null while it has none. */
+    private JComponent trailing;
     private java.util.List<JComponent> dragSurfaces = java.util.List.of();
     private MouseAdapter nativeDrag;
     private final PropertyChangeListener headerChanged = event -> {
@@ -122,16 +124,6 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         headerGeometryChanged();
     }
 
-    /** Auxiliary actions retain their kit borders and identity; the host still owns the centered title. */
-    public void setAccessory(JComponent value) {
-        if (closed || header != null || accessory != null) throw new IllegalStateException("Title accessory already installed");
-        accessory = java.util.Objects.requireNonNull(value); add(value);
-        value.addPropertyChangeListener(headerChanged);
-        headerGeometryChanged();
-    }
-    /** Action updates change layout within existing outer bounds. */
-    public void accessoryChanged() { if (!closed) headerGeometryChanged(); }
-
     private void headerGeometryChanged() {
         refreshNativeGeometry(); revalidate(); repaint(); minimumSizeChanged.run();
     }
@@ -173,6 +165,19 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
             graphics.setColor(ThemeZone.color(component, role));
             graphics.fillRect(x, y, side(), side());
         }
+    }
+
+    /**
+     * A control at the trailing end of a title row without a header, such as a child window's ⋮ (parent tabs spec 6):
+     * centred on the row, clear of the window's edge, while the title stays centred on the window. Once only.
+     *
+     * @param component the control
+     */
+    public void setTrailing(JComponent component) {
+        if (closed || header != null || trailing != null) return;
+        trailing = java.util.Objects.requireNonNull(component, "component");
+        add(component);
+        revalidate(); repaint();
     }
 
     /** How this title row looks; a workspace header keeps its own. */
@@ -243,15 +248,13 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         return dev.jasper.ui.swing.NativeStyles.installed().metric(role);
     }
 
-    private int accessoryHeight() { return accessory != null && accessory.isVisible() ? accessory.getPreferredSize().height : 0; }
-
     /** The row's own height: what it takes above the content. */
     private int titleHeight() {
         if (header != null) return Math.max(UIScale.scale(TITLE_HEIGHT), header.getPreferredSize().height);
         return switch (style) {
-            case WINDOW -> Math.max(metric(dev.jasper.ui.metrics.DesignMetrics.Role.WINDOW_TITLE_HEIGHT)
-                + metric(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE), accessoryHeight());
-            case DIALOG -> Math.max(metric(dev.jasper.ui.metrics.DesignMetrics.Role.DIALOG_TITLE_HEIGHT), accessoryHeight());
+            case WINDOW -> metric(dev.jasper.ui.metrics.DesignMetrics.Role.WINDOW_TITLE_HEIGHT)
+                + metric(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE);
+            case DIALOG -> metric(dev.jasper.ui.metrics.DesignMetrics.Role.DIALOG_TITLE_HEIGHT);
             case PROMPT -> metric(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_TITLE_HEIGHT);
             case INTEGRATED -> 0;
         };
@@ -277,7 +280,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     }
 
     @Override public Dimension getMinimumSize() {
-        if (header == null) return new Dimension(2 * Math.max(safeInset(), accessory != null && accessory.isVisible() ? accessory.getMinimumSize().width + Math.max(UIScale.scale(8), nativeRight) : nativeRight) + UIScale.scale(64), titleHeight());
+        if (header == null) return new Dimension(2 * Math.max(safeInset(), nativeRight) + UIScale.scale(64), titleHeight());
         Insets insets = header.getInsets();
         return new Dimension(safeInset() + Math.max(UIScale.scale(8), nativeRight)
             + header.getMinimumSize().width - insets.left - insets.right, titleHeight());
@@ -299,16 +302,17 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         }
         // Dialog titles remain centred independently of the window controls.
         int right = Math.max(UIScale.scale(8), nativeRight);
-        int actionWidth = accessory != null && accessory.isVisible()
-            ? Math.min(accessory.getPreferredSize().width, Math.max(0, getWidth() - safeInset() - right)) : 0;
         int center = titleCenter();
-        if (accessory != null) {
-            int height = Math.min(Math.max(1, accessory.getPreferredSize().height), getHeight());
-            accessory.setBounds(Math.max(0, getWidth() - right - actionWidth), Math.max(0, center - height / 2), actionWidth, height);
-        }
-        int inset = Math.max(Math.min(safeInset(), getWidth()), actionWidth + right);
+        int inset = Math.max(Math.min(safeInset(), getWidth()), right);
         int height = Math.min(title.getPreferredSize().height, getHeight());
         title.setBounds(inset, Math.max(0, Math.min(getHeight() - height, center - height / 2)), Math.max(0, getWidth() - 2 * inset), height);
+        // The trailing control fits within the title's inset, which is at least 120 px.
+        if (trailing != null) {
+            Dimension size = trailing.getPreferredSize();
+            int high = Math.min(size.height, getHeight());
+            trailing.setBounds(Math.max(0, getWidth() - right - size.width), Math.max(0, Math.min(getHeight() - high, center - high / 2)),
+                size.width, high);
+        }
     }
 
     public void setLight(boolean light) {
@@ -339,7 +343,6 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
             header.removePropertyChangeListener(headerChanged);
             for (JComponent surface : dragSurfaces) { surface.removeMouseListener(nativeDrag); surface.removeMouseMotionListener(nativeDrag); }
         }
-        if (accessory != null) accessory.removePropertyChangeListener(headerChanged);
         root.removePropertyChangeListener(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, boundsChanged);
         if (window != null) {
             window.removeComponentListener(frameBounds);

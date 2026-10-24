@@ -8,12 +8,13 @@ import java.util.Set;
 /**
  * What {@link dev.jasper.sdk.ui.Windows#choose(FileChoice)} asks for.
  *
- * @param owner         a live terminal window, a shown window of this plugin, or one of its content tabs
+ * @param owner         a live Jasper window or one of this plugin's content tabs
  * @param title         the dialog title
  * @param mode          open files, save to one file, or choose a folder
  * @param multiple      whether Open may select several files; only with {@link Mode#OPEN}
- * @param initial       where to open; empty opens where the owner's focused terminal is (a source's location when one
- *                      of {@code sources} recognises the pane, else the pane's local folder), else the home folder
+ * @param initial       where to open; empty opens at the focused terminal pane of the owner's window (a content tab's
+ *                      window, for a content tab): a source's location when one of {@code sources} recognises that
+ *                      pane, else the pane's local folder; else the home folder
  * @param suggestedName Save: the name filled in
  * @param sources       ids of the sources whose locations the caller handles; their roots are offered, others are not;
  *                      empty offers local places only

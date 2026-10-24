@@ -31,17 +31,6 @@ class RunWindowRolesTest {
         });
     }
 
-    /** Plan 8b: the home's insets, measured on the mocks, follow 5b's help-text role, equal in both catalogs. */
-    @Test void theHomeInsetsAreTheMocksSixAndFive() {
-        var names = Arrays.stream(DesignMetrics.Role.values()).map(Enum::name).toList();
-        int at = names.indexOf("RUN_WINDOW_HELP_TEXT_TOP");
-        assertThat(names.subList(at + 1, at + 3)).containsExactly("RUN_WINDOW_HOME_SIDE", "RUN_WINDOW_HOME_BOTTOM");
-        for (var catalog : java.util.List.of(DesignMetrics.DEFAULT, DesignMetrics.CLASSIC)) {
-            assertThat(catalog.value(DesignMetrics.Role.RUN_WINDOW_HOME_SIDE)).isEqualTo(6);
-            assertThat(catalog.value(DesignMetrics.Role.RUN_WINDOW_HOME_BOTTOM)).isEqualTo(5);
-        }
-    }
-
     @Test void theRunWindowTypeIsSemiboldHeadingsAndASmallDataFace() {
         assertThat(TypeScale.CLASSIC.size(Typography.Role.RUN_HEADING)).isEqualTo(11f);
         assertThat(TypeScale.CLASSIC.weight(Typography.Role.RUN_HEADING)).isEqualTo(600);

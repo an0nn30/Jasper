@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** One terminal window. Handles keep an id and no Swing object; two handles for the same window are equal. EDT only. */
+/** One Jasper window. Handles keep an id and no Swing object; two handles for the same window are equal. EDT only. */
 public interface WindowHandle extends WindowOwner {
     /**
      * The window's stable id.
@@ -15,16 +15,17 @@ public interface WindowHandle extends WindowOwner {
     UUID id();
 
     /**
-     * The window's tabs, in display order; empty once the window is closed.
+     * The window's tabs, terminal and content, each the item of one pane: tab by tab in strip order, then pane by pane;
+     * empty once the window is closed.
      *
      * @return the tabs
      */
     List<TabHandle> tabs();
 
     /**
-     * The selected tab.
+     * The active tab: the focused pane's item in the window's shown tab, terminal or content.
      *
-     * @return the tab, or empty once the window is closed
+     * @return the tab, or empty in an empty workspace and once the window is closed
      */
     Optional<TabHandle> activeTab();
 
@@ -41,6 +42,16 @@ public interface WindowHandle extends WindowOwner {
      * @return true while it is open
      */
     boolean isOpen();
+
+    /**
+     * Whether this is the main window, the one with Jasper's toolbar, tool windows and status bar, which stays open
+     * when its last tab closes; any other window is a child window, a title bar over its tabs, which closes with its
+     * last tab.
+     *
+     * @return true for the main window while it is open
+     * @since 0.20.0
+     */
+    boolean isMain();
 
     /** Raises the window. Ignored once it is closed. */
     void toFront();

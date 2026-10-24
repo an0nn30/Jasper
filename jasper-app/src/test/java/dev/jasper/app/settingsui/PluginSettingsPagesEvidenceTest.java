@@ -11,7 +11,6 @@ import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.pluginmanager.PluginManager;
 import dev.jasper.app.plugins.PluginRuntime;
-import dev.jasper.app.restart.ResidentControl;
 import dev.jasper.app.restart.RestartFlow;
 import dev.jasper.app.shortcuthelp.KeymapPage;
 import dev.jasper.app.terminals.TerminalRegistry;
@@ -70,9 +69,9 @@ class PluginSettingsPagesEvidenceTest {
                 // As JasperApplication wires it: plugin kit views follow the application's theme.
                 runtime[0].appearance(themes[0]::current, handler -> themes[0].subscribe((value, changed) -> handler.accept(value)));
                 runtime[0].start(Map.of(), true);
-                var restarts = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run, Duration.ofMillis(20), Duration.ofMillis(1));
-                manager[0] = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), restarts, () -> { }, ResidentControl.NONE,
-                    false, Runnable::run, path -> { }, path -> { }, uri -> { }));
+                var restarts = new RestartFlow(mode -> true);
+                manager[0] = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), restarts, () -> { },
+                    Runnable::run, path -> { }, path -> { }, uri -> { }));
             });
             var lines = new ArrayList<String>();
             for (String family : List.of("dark", "light", "dark-font20")) {
@@ -117,8 +116,8 @@ class PluginSettingsPagesEvidenceTest {
                 assertThat(rows.subList(0, 3)).extracting(line -> line.substring(line.indexOf(" card ") + 1)).containsOnly(rows.getFirst().substring(rows.getFirst().indexOf(" card ") + 1));
             }
         } finally {
-            if (runtime[0] != null) { var done = new CompletableFuture<List<CompletableFuture<?>>>(); SwingUtilities.invokeAndWait(() -> done.complete(runtime[0].stop()));
-                CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS); }
+            if (runtime[0] != null) { var pluginWorkers = dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime[0]); var done = new CompletableFuture<List<CompletableFuture<?>>>(); SwingUtilities.invokeAndWait(() -> done.complete(runtime[0].stop()));
+                CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS); pluginWorkers.await(); }
             SwingUtilities.invokeAndWait(() -> { windows.close(); if (themes[0] != null) themes[0].close();
                 javax.swing.UIManager.put("PasswordField.showCapsLock", priorCaps[0]); ThemeTestSupport.controller(true); });
             try (var paths = Files.walk(home)) { for (var path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path); }

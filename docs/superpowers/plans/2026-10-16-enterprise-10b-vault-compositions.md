@@ -1,5 +1,7 @@
 # Enterprise presentation 10b: the Credential Vault composition Implementation Plan
 
+> **Status: executed on 2026-10-18** (`6cd4d80cf..5c6808c56`, then the documentation commit); see `docs/STATUS.md`. Deviations from the plan's text: Execution notes R1 to R20; beyond them the tasks' host follow-ups to meet the 07 mocks (Task 3: the bar's menu button at the panel action size, its search a field tall, `DOCUMENT_RULE_GAP` between a classic document split's bar and body, a classic window form's footer band; Task 4: the table at its list column's header band on `surface.card`, a 20 px `surface.zebra` text footer, the classic rail tree's disclosure; Task 5: the manager detail grid (`DETAIL_GRID_INSET`, `DETAIL_GRID_TOP`, `ClassicGroupFace.GRID_EDGE`), classic `DETAIL_PADDING` and `DETAIL_SECTION_GAP` 12, `ICON_SWATCH`, and every Fields row's Copy through `CopyCards.plain`; Task 6: a sheet in a classic dialog's card starts at `FORM_TOP`, classic `SHEET_SECTION_GAP` 10, the group rules sampled at x 44 (the plan's x 34 crosses the render's rounded corners) with the first rule at 18, not 16 (R13 residual); Task 7: the classic compact prompt's `PROMPT_COMPACT_WIDTH` 400, `PROMPT_SIDES` and `PROMPT_TOP` 14, `PROMPT_COMPACT_INTRO_GAP` 12, `PROMPT_FIELD_HEIGHT` 22 and the footnote gap over a classic band); the Details band sampled at x 1085, not 1086 (R4); the Unlock tile measures 30 × 30 in the mock's crop, not 35; Task 10's gallery comparison finds every PNG unchanged and three component-tree dumps per theme renamed (`SecretFields$SecretControl$3` to `$2`); the classic Unlock hero is a `PROMPT_HEADER` stack (the plan says INLINE); the classic status row is a FOOTER stack with one Separator (the plan says INLINE with `status.rule.1` and `status.rule.2`; SDK 0.18 allows a Separator only in an INLINE or ACTIONS stack, and an INLINE row would squeeze its cells rather than elide the path, so the second rule is a recorded residual); the final review fixes (`Plan 10b: final review fixes`): a document bar's verbs in `text.primary` with `DOCUMENT_BAR_BUTTON_PADDING` and `DOCUMENT_BAR_RULE_GAP` 7, its menu's drawn ▼ and its shortcut caption in `text.placeholder`; the Fields grid's colon-free `text.secondary` labels, widest-label column and shared action lane (`DETAIL_GRID_TRAILING`, `DETAIL_ACTION_PADDING`, classic `DETAIL_ACTION_GAP` 4) and `DETAIL_ACTION_MIN_WIDTH` 86; the Type column's login method; key rows announcing their copies as paths; the footnote gap only with a footnote; the file chooser's host columns keeping their flat rail and pane; the remaining measured differences are residuals in `docs/STATUS.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** With Enterprise turned on, the Credential Vault composes the 07 Credential Vault mocks (spec 14.8): the classic
@@ -31,8 +33,9 @@ the same branch, and its rulings, harness and `Layout` lookup are used here by n
 and counts are fixtures; "Remember in Keychain" is out of scope, spec 18).
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-10`, branch
-`claude/enterprise-plugin-compositions`, after plan 10a's last commit. Run every command from the worktree root. Line
-numbers are from `deafed424` unless a plan is named; plans 3b to 10a move them. Every edit quotes the text it replaces
+`claude/enterprise-plugin-compositions`, after plan 10a's last commit (the branch is `main` at `f866788de`, every other
+plan merged). Run every command from the worktree root. Line numbers are from `f866788de` (refreshed on 2026-10-17, see
+"Execution notes (2026-10-17)"). Every edit quotes the text it replaces
 and the edit scripts stop with a message when that text is not found the stated number of times: re-find the quoted
 text, adjust the anchor and re-run; never edit around a missing anchor.
 
@@ -49,20 +52,22 @@ grep -c 'final PropertiesFace properties;' jasper-ui/src/main/java/dev/jasper/ui
 grep -c 'boolean flush()' jasper-ui/src/main/java/dev/jasper/ui/swing/PanelHeaders.java                    # plan 7 Task 10: 1
 grep -c 'Nodes.Hue swatch' jasper-sdk/src/main/java/dev/jasper/sdk/ui/DialogSpec.java                      # 3d: at least 1
 grep -c 'String footnote' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java                            # 3b Task 8: at least 1
-grep -c 'Optional<Nodes.Hue> dialogSwatch' jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakePluginHost.java  # 3d: 1
+grep -c 'dialogSwatch(String pluginId, String title)' jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakePluginHost.java  # 3d: 1
 ```
 
-Every command prints its line, files or count; if not, execute the missing plan first. Then read the STATUS entries of
-plans 6 and 7 (the **refresh step**): plan 6 draws OVERLAY and ATTACHED_SHEET dialogs in their window (spec 10.8: the
-header strip with the swatch and title, the footer on `surface.footer`) and plan 7 the flush header strip
-(`PanelHeaders.flush()`, `StripBorder`). This plan composes the content those draw and reuses plan 7's strip for the
-manager's pane headers (Task 1); where their APIs moved, re-anchor Tasks 1, 3 and 6 on them and record it in the banner.
+Every command prints its line, files or count; if not, execute the missing plan first. The **refresh step** (reading
+the STATUS entries of plans 4b, 5b, 6b, 7 and 10a and re-anchoring on them) was done on 2026-10-17: see "Execution notes
+(2026-10-17)" at the end, whose rulings bind where they differ from the task text. Plan 6b draws OVERLAY and
+ATTACHED_SHEET dialogs in their window (`ClassicDialog`: the header strip with `DialogSpec.swatch` and the title, the
+footer band, `KitView.hostTitled` and `dialogBand`) and plan 7 the flush header strip (`PanelHeaders.flush()`,
+`StripBorder`). This plan composes the content those draw and reuses plan 7's strip for the manager's pane headers.
 
 ## Global Constraints
 
 - Plan 10a's Global Constraints apply unchanged: the toolchain and `./gradlew` (never `--stop`), no GUI and no AOT training (`:jasper-ui:gallery` and the JUnit renders are headless), the worktree and one commit per task ending with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>`, no push or merge, composition at its owner (only `dev.jasper.vault.workstation` names `dev.jasper.enterprise.api`), every action reachable, mock matching, SDK 0.18.0 with no SDK type change, the migration ledger, doclint, the smallest documentation edits, source hygiene and the reserved word "hero".
-- Pixel rule: the default look stays byte-identical. Every Vault change is under `Layout.CLASSIC`; under `Layout.ROWS` each node the Vault builds is the one it builds today (the hue the editors pass resolves to `Hue.NONE`, the 4-argument `DialogSpec`'s value). In jasper-ui the default faces call today's code, the new roles' default values are unread (`DOCUMENT_BAR_SEARCH_WIDTH` 0, `SEPARATOR_HEIGHT`) or unchanged, and a document split's new fill applies only to a Split child, which no default view has (`git grep -n 'SplitKind.DOCUMENT'` at `deafed424`: the Editor's tab, the File Servers and Tunnels problem bodies and fixtures, none with a Split child). Tasks 1, 2 and 9 prove it with the gallery digests.
+- Pixel rule: the default look stays byte-identical. Every Vault change is under `Layout.CLASSIC`; under `Layout.ROWS` each node the Vault builds is the one it builds today (the hue the editors pass resolves to `Hue.NONE`, the 4-argument `DialogSpec`'s value). In jasper-ui the default faces call today's code, the new roles' default values are unread (`DOCUMENT_BAR_SEARCH_WIDTH` 0, `SEPARATOR_HEIGHT`) or unchanged, and a document split's new fill applies only to a Split child, which no default view has (`git grep -n 'SplitKind.DOCUMENT'` at `f866788de`: the Editor's tab and its gallery fixture, the File Servers and Tunnels problem bodies and the testkit fixture, none with a Split child). Tasks 1, 2 and 10 prove it with the gallery digests. Task 9's auxiliary frames change only under a look with classic menus (`ShellChrome.classicMenus`), never in the default look.
 - The Vault's secret hygiene is unchanged: a secret never enters a descriptor; the classic Details pane shows stored secrets through `Nodes.Secret` DETAIL nodes written with `UiView.replaceSecret`, as the rows composition does (`ManagerPanel.java:195-205`).
+- Every new candidate source gets its `docs/design/theme-engine/migration.csv` row in the commit that creates it (Execution notes R6): `ClassicManagerTest` and `ClassicVaultRenderTest` (Task 3), `ClassicEditorsTest` (Task 6), `ClassicUnlockTest` (Task 7) and the Vault's `CompositionParityTest` (Task 8). jasper-ui sources are outside the ledger's scan.
 
 ## Review Focus
 
@@ -85,7 +90,7 @@ manager's pane headers (Task 1); where their APIs moved, re-anchor Tasks 1, 3 an
 
 ## Verified facts
 
-At `deafed424` unless a plan is named.
+At `f866788de` (re-verified on 2026-10-17).
 
 1. `ManagerPanel` builds one WINDOW `Form` (`node()`, `ManagerPanel.java:348-356`) whose one section is the body: the
    locked card, the grants card or `entries()` (`:238-264`), a THREE_COLUMN `Split` of the categories `ItemList` (`KIND`,
@@ -95,51 +100,72 @@ At `deafed424` unless a plan is named.
    `COPY_PUBLIC`, the three `detail.*.copy` actions, `LOCK`, `UNLOCK`, `BACK`, `REVOKE`, `CLOSE`, `add.<TYPE>` and
    `add.generate` (`:128-164`); `render` writes the selected entry's secret with `view.replaceSecret(secretId(), secret)`
    (`:195-205`). `ManagerPanelTest.panel` builds it with the 11-argument constructor (`ManagerPanelTest.java:130-133`).
-2. A WINDOW form has exactly one section (`Nodes.java:578-579` in the SDK: "WINDOW requires one body section and no hero").
-3. `SplitViews`: a DOCUMENT split's fill is its first visible Custom or Empty child (`SplitViews.java:29-36`, `:101-105`);
-   it paints a `border.subtle` hairline at each boundary, inside the bar (`:42-64`); THREE_COLUMN widths are
-   `MANAGER_SIDEBAR_WIDTH`, `MANAGER_LIST_WIDTH` and the rest, scaled down only below sidebar + list + sidebar (`:83-99`),
-   192 and 272 in the default catalog (`compact-roles.tsv:235-236`). A manager column's panel (`Panels.Surface`,
-   `Panels.java:283-313`) fills its column and paints its trailing `border.subtle` edge for columns 0 and 1 (`:303`);
-   `ViewReconciler.applyColumns` assigns the columns before any control updates (`ViewReconciler.java:35`, `:185-198`).
-4. `Stacks.DocumentBarLayout` (`Stacks.java:731-797`): in an INLINE stack among a DOCUMENT split's bars the first visible
-   field or text fills (`barFields`, `:150`), other texts take at least `DOCUMENT_BAR_STATUS_WIDTH`, other children their
-   preferred width, padded by `DOCUMENT_BAR_VERTICAL_PADDING` (4) and `DOCUMENT_BAR_SIDE_PADDING` (6);
-   `ViewReconciler.applyDocumentBars` marks the bar's buttons as panel actions and its fields as panel searches
-   (`ViewReconciler.java:238-260`).
-5. `SecretFields.SecretControl` creates the reveal and copy `KitButton`s (`SecretFields.java:86-131`), mounts an INPUT
-   secret's reveal inside the field surface's east edge and a DISCREET_INPUT's in a slot there (`:102-107`), a DETAIL
-   secret's reveal and copy in a `GridLayout` row beside the value (`:189-217`), shows the discreet reveal only while
-   focused or filled (`revealVisibility`, `:316-320`), gives the reveal its glyph and texts (`refreshReveal`, `:322-339`)
-   and learns it is in a prompt form through `prompt(boolean)` (`:381-385`); `KitView.revealSecrets` reveals a secret and
-   its reveal group (`KitView.java:218`). `ControlRegistry.Control` exposes `view`, `node`, `component`, the final
-   `context()`, `interactive()` and `own(...)` to the package (`ControlRegistry.java:85-112`).
+2. A WINDOW form has exactly one section (`Nodes.java:611-612` in the SDK: "WINDOW requires one body section and no hero").
+3. `SplitViews`: a DOCUMENT split's fill is its first visible Custom or Empty child (`SplitViews.java:29-35`, `:101-105`);
+   it paints a `border.subtle` hairline at each boundary, inside the bar (`:42-64`, the colour at `:55`); THREE_COLUMN
+   widths are `MANAGER_SIDEBAR_WIDTH`, `MANAGER_LIST_WIDTH` and the rest, scaled down only below sidebar + list + sidebar
+   (`:83-99`), 192 and 272 in both catalogs today (`compact-roles.tsv:242-243`, `classic-roles.tsv:242-243`). A manager
+   column's panel (`Panels.Surface`, `Panels.java:323-350`) fills its column and paints its trailing `border.subtle` edge
+   for columns 0 and 1 (`:343`); `ViewReconciler.applyColumns` assigns the columns before any control updates
+   (`ViewReconciler.java:35`, `:194-207`, the panel's column at `:197`).
+4. `Stacks.DocumentBarLayout` (`Stacks.java:856-930`, `natural` at `:865-868`): in an INLINE stack among a DOCUMENT
+   split's bars the first visible field or text fills (`barFields` and `barTexts`, `:65`, set at `:208-211`), other texts
+   take at least `DOCUMENT_BAR_STATUS_WIDTH`, other children their preferred width, padded by
+   `DOCUMENT_BAR_VERTICAL_PADDING` (4) and `DOCUMENT_BAR_SIDE_PADDING` (6); `ViewReconciler.applyDocumentBars` marks the
+   bar's buttons as panel actions and its fields as panel searches (`ViewReconciler.java:247-260`).
+5. `SecretFields.SecretControl` creates the reveal and copy `KitButton`s (`SecretFields.java:86-134`), mounts an INPUT
+   secret's reveal inside the field surface's east edge and a DISCREET_INPUT's in a slot there (`:103-108`), a DETAIL
+   secret's reveal and copy in a `GridLayout` row beside the value (`:194-219`), shows the discreet reveal only while
+   focused or filled (`revealVisibility`, `:318-322`), gives the reveal its glyph and texts (`refreshReveal`, `:324-342`)
+   and learns it is in a prompt form through `prompt(boolean)` (`:383-387`); `KitView.revealSecrets` reveals a secret and
+   its reveal group (`KitView.java:219`). `ControlRegistry.Control` exposes `view`, `node`, `component`, the final
+   `context()`, `interactive()` and `own(...)` to the package (`ControlRegistry.java:94-131`). The secret's reveal and
+   copy are `KitButton.inner`, which 4b's classic button face keeps flat until hovered only while their kind is a ghost
+   (`ClassicButtonFace.flat`), so the classic face's SECONDARY kind draws them as standard buttons.
 6. 3b's `Separators.Rule` is `HAIRLINE` wide and `ICON_CONTROL` tall and paints `border.subtle` (3b Task 5 Step 3).
 7. `EditorForm.form()` builds a SHEET form of untitled cards and titled `Section`s from `group(...)`, an EXCLUSIVE choice
-   row unlabelled, and the entry's PROMPT icon and title as its hero (`EditorForm.java:205-231`); `EntryEditor.login`, `key`
+   row unlabelled (`section`, `:205-212`), and the entry's PROMPT icon and title as its hero (`EditorForm.java:214-231`); `EntryEditor.login`, `key`
    and `note` declare the rows, groups and identity hues BLUE, GREEN and AMBER (`EntryEditor.java:29-115`); `EntryPresenter.show`
    opens every editor as an ATTACHED_SHEET `DialogSpec` (`EntryPresenter.java:15-24`), called by `VaultManagerWindow.dialog`
    (`VaultManagerWindow.java:105-108`) from `add` and `edit` (`:110-135`).
 8. `PasswordPanel.unlock(kit, prompt)` (`PasswordPanel.java:54-58`) builds a PROMPT_COMPACT form whose hero is the lock
    tile, "Unlock Vault" and the intro, over one INPUT secret "Master password" (`:152-176`); `VaultPlugin.showUnlock` opens
-   it as an OVERLAY "Unlock Vault" when the manager is not open (`VaultPlugin.java:283-298`); the auto-lock is
+   it as an OVERLAY "Unlock Vault" when the manager is not open (`VaultPlugin.java:287-302`, the panel at `:294`); a locked
+   `dev.jasper.vault.open` asks for the unlock before it shows the manager (`openThen`, `:193-204`); the auto-lock is
    `settings.autoLock()`, 15 minutes by default (`VaultSettings.java:26`).
 9. `VaultManagerWindow.show` creates `new WindowSpec(ID, "Credential Vault", new Dimension(900, 555), true,
    WindowSpec.SizeBasis.CONTENT)` and sets the panel's title actions (`VaultManagerWindow.java:56-75`); `changed()` closes
    the editors when the vault is not unlocked (`:77-83`); `VaultPlugin.start` constructs it after reading the layout
-   (`VaultPlugin.java:135`, 10a Task 1).
-10. `StagedVaultHost` runs the staged Vault jar in the real host with headless windows (`StagedVaultHost.java:36-66`),
-    `createVault`, `invoke`, `surface`, `awaitSurface`, `kitView`, `invokeSave` (`:73-177`, `:218-230`); `HostedKitView.dispatch`
-    delivers an SDK event to the plugin as its kit does (`HostedKitView.java:33`).
-11. 3c's `TableRow` (8 components with `cellNodes` and `heading`) and `Nodes.Table(..., ScrollPolicy, Optional<Empty>,
-    String emptyText)`; SDK `TreeItem` has `count` (`TreeItem.java:10-24`) and no hue; `Column.sorted` shows the sort
-    indicator and a header click reports `UiEvent.Sorted(id, columnId)` (`Column.java:5-9`, `UiEvent.java:37`); a tree's
-    expansion reports `UiEvent.Expanded(id, itemId, expanded)` (`UiEvent.java:22`).
-12. The 07 mocks measure as "Mock measurements" below (re-measured on 2026-10-16 with the band script of plan 10a).
+   (`VaultPlugin.java:110` reads it into the field `layout`, `:140` constructs the window, 10a Task 1).
+10. `StagedVaultHost` runs the staged Vault jar in the real host with headless windows (`StagedVaultHost.java:36-71`),
+    `invoke`, `surface`, `awaitSurface`, `createVault`, `invokeSave`, `kitView` (`:78-180`, `:227-240`); `HostedKitView.dispatch`
+    delivers an SDK event to the plugin as its kit does (`HostedKitView.java:38`). Its plugin views take their theme from
+    the `WorkspaceAppearanceFixture` it is given; without one (`null`) the host's `HostedUi.kitThemes` falls back to the
+    bundled default theme (`HostedUi.java:352-357`), so an Enterprise render passes
+    `new WorkspaceAppearanceFixture(EnterpriseLook.resolved(false))`, as 10a's `PanelSurfaceFixture` does. Their kit is
+    the installed one (`PluginHost.java:100`, `FlatLafInstaller::installedKit`), which `ClassicCompositionRenderTest.under`
+    installs.
+11. 3c's `TableRow` (8 components with `cellNodes` and `heading`, `TableRow.java:29-30`; a cell node may be an INLINE
+    Stack of Icons and Texts) and `Nodes.Table(..., ScrollPolicy, Optional<Empty>, String emptyText)` (`Nodes.java:653`);
+    SDK `TreeItem` has `count` (`TreeItem.java:15`) and no hue; `Column.sorted` shows the sort indicator and a header
+    click reports `UiEvent.Sorted(id, columnId)` (`Column.java:11`, `UiEvent.java:37`); a tree's expansion reports
+    `UiEvent.Expanded(id, itemId, expanded)` (`UiEvent.java:22`).
+12. The 07 mocks measure as "Mock measurements" below (re-measured on 2026-10-16 with the band script of plan 10a; the
+    toolbar, Categories, Items, sheet and Unlock columns spot-checked again on 2026-10-17).
+13. `NativeShells.frame` gives every auxiliary frame the minimal File row (`menuBar`, `NativeShells.java:693-712`: New
+    Window, Close Window with ⌘W, Quit off macOS) and, under a classic look (`ShellChrome.classicMenus`), styles it as the
+    terminal windows' row (`ShellChrome.styleMenus`, `NativeShells.java:304-308`, `:323`); the Close Window item runs
+    `surface.closeCommand()` unless the window records shortcuts (`WindowInput.captureShortcut`). 6a ruling 31 recorded
+    the 07 mocks' missing menu row as a residual; 10a R18 handed it to this plan. Headless tests cannot create a `JFrame`;
+    `ShellChromeTest` tests the shells' values on a `JRootPane`.
+14. Plan 10a's `StrategyIsolationTest` and `VariantReadTest` are jasper-app tests (`dev.jasper.app.architecture`) that scan
+    the built jasper-ui jar: the reconciler (`ViewReconciler` and its nested classes) may not name `KitFaces` or any face
+    in its constant pool.
 
 ## Rulings
 
-"What — why — cost if wrong"; record them in `docs/STATUS.md` (Task 9) and the banner.
+"What — why — cost if wrong"; record them in `docs/STATUS.md` (Task 10) and the banner. Rulings 14 is the orchestrator's
+ruling of 2026-10-17; the Execution notes' rulings R1 to R20 refine these.
 
 1. **The reveal follows the `toggle` point (`RevealFace`): classic draws an input's reveal as a "Show" checkbox after the
    field, a prompt form's as "Show password" under the field, a discreet input's always, and a stored value's reveal and
@@ -186,6 +212,14 @@ At `deafed424` unless a plan is named.
     `#C4C7CC` where the mock draws full-height `#D3D6DA` (ΔE76 5.4); the status dot is round and 7 px, the kit's
     `StatusDot`; the Details pane's Show and Copy are the classic `BUTTON_HEIGHT` 24 where the mock draws 20; the Details column paints `surface.panel` (`Panels.Surface`), which reads `#F7F7F8` where the mock
     has `#ECEDEF` (ΔE76 3.6, inside the band tolerance) — cost if wrong: one more face rule each.
+14. **Under a classic look an auxiliary frame shows no in-window menu row; Close Window's key stays bound on the frame**
+    (the orchestrator's ruling of 2026-10-17 under the user's overnight authority, the mock winning on layout; it
+    supersedes 6a ruling 31 and closes 10a R18's hand-off) — the 07 Credential Vault mocks draw the native title directly
+    over the window's toolbar row; the Vault window's actions stay on its own controls (the toolbar row, Done) and keys
+    (⌘W, Ctrl+W elsewhere, closes it). A plugin cannot change the host's frame menus through SDK 0.18, so the change is
+    the host's, for every auxiliary frame (Task 9: `ShellChrome.frameMenuRow()`, `NativeShells.bindCloseWindow`), and spec
+    10.1 is amended — cost if wrong: New Window and (off macOS) Quit leave the auxiliary frames' row, reachable from any
+    terminal window's menus; restoring the row is one branch in `NativeShells.frame`.
 
 ## Mock measurements
 
@@ -206,8 +240,9 @@ column of the crop (`MockMatch.bands`), as in plan 10a. The manager crop is the 
 
 The sheet and overlay crops start under the dialog's 26 px header strip (plan 6), so they hold the form and its footer.
 The footer band (`surface.footer` under a `border.window` rule) is plan 6b's `Forms` band, which the host turns on with
-`KitView.dialogBand` for the dialogs it draws in their window; `ClassicVaultRenderTest.render` sets that flag and
-`hostTitled` as the host does, because the test's headless windows run no shell.
+`KitView.dialogBand` for the dialogs it draws in their window (`NativeShells.classicContent` and `CLASSIC_FLAGS`:
+`hostTitled`, `dialogBand`, `dialogCard` and a transparent holder); `ClassicVaultRenderTest.render` does the same,
+because the test's headless windows run no shell.
 
 | What | Value (logical px, ±1) |
 |---|---|
@@ -233,7 +268,10 @@ The footer band (`surface.footer` under a `border.window` rule) is plan 6b's `Fo
   `ui/ClassicManagerTest`, `ui/ClassicEditorsTest`, `ui/ClassicUnlockTest`, `ui/CompositionParityTest`.
 - jasper-app tests: `plugins/StagedVaultHost` (an Enterprise mode, `seedLogins`, `dispatchToManager`),
   `plugins/ClassicVaultRenderTest`.
-- Documents (Task 9): `docs/credential-vault.md`, `tools/visual/pairs.json`, `docs/STATUS.md`, this plan's banner.
+- jasper-app main (Task 9): `windows/ShellChrome` (`frameMenuRow()` replaces `styleMenus`), `windows/NativeShells` (`frame`,
+  `bindCloseWindow`); test `windows/ShellChromeTest`; `docs/app-architecture.md` and spec 10.1 with its header line.
+- Ledger (Tasks 3, 6, 7, 8): `docs/design/theme-engine/migration.csv`.
+- Documents (Task 10): `docs/credential-vault.md`, `tools/visual/pairs.json`, `docs/STATUS.md`, this plan's banner.
 
 ---
 
@@ -245,8 +283,8 @@ catalog carries the mock's manager widths and bar padding; a manager column's he
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/SeparatorFace.java`, `DefaultSeparatorFace.java`, `ClassicSeparatorFace.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Separators.java` (3b's `Rule`), `SplitViews.java:29-36,55,101-105`,
-  `Panels.java:303`, `PanelHeaders.java` (plan 7's `flush()`), `ViewReconciler.java:188`, `Stacks.java:740-743`,
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Separators.java:30-42` (3b's `Rule`), `SplitViews.java:29-35,55,101`,
+  `Panels.java:343`, `PanelHeaders.java:167-168` (plan 7's `flush()`), `ViewReconciler.java:197`, `Stacks.java:865-867`,
   `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (the enum and 4a's `classic()`),
   `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv`, `classic-roles.tsv`,
   `jasper-ui/src/test/resources/dev/jasper/ui/swing/face-pairs.tsv`
@@ -256,7 +294,8 @@ catalog carries the mock's manager widths and bar padding; a manager column's he
 - Consumes: 4b's `Face`, `KitFaces` (`controls.buttons()`: `RAISED`, `CLASSIC`; `colors.dialogSurface()`), `ThemePainting.role`
   and `painted`; 3b's `Separators.Rule`; plan 7's `PanelHeaders.HeaderControl.flush()`; 10a Task 3's `KitFaces.properties`.
 - Produces: package-private `interface SeparatorFace extends Face { Dimension size(KitContext); Color rule(KitContext);
-  boolean paneStrips(); }`; `final SeparatorFace KitFaces.separators`; `boolean PanelHeaders.HeaderControl.pane`;
+  boolean paneStrips(); }`; `final SeparatorFace KitFaces.separators`; `boolean PanelHeaders.HeaderControl.pane` (the
+  header heads a manager column; the reconciler sets it and names no face, Execution notes R2);
   `DesignMetrics.Role.DOCUMENT_BAR_SEARCH_WIDTH` (default 0, classic 200) and `SEPARATOR_HEIGHT` (18 in both); classic
   `MANAGER_SIDEBAR_WIDTH` 171, `MANAGER_LIST_WIDTH` 348, `DOCUMENT_BAR_VERTICAL_PADDING` 6. Task 3's toolbar row and
   status row, Task 4's columns and pane strips rely on these.
@@ -343,8 +382,8 @@ class ClassicSeparatorsTest {
                 assertThat(image.getRGB(400, bar.getHeight() - 1) & 0xFFFFFF).as("the bar's hairline").isEqualTo(window);
                 assertThat(image.getRGB(170, 300) & 0xFFFFFF).as("the rail's edge").isEqualTo(window);
                 var header = (PanelHeaders.HeaderControl) view.control("categories.header");
-                assertThat(header.pane).as("a manager column's header is a strip").isTrue();
-                assertThat(header.flush()).isTrue();
+                assertThat(header.pane).as("the header heads a manager column").isTrue();
+                assertThat(header.flush()).as("a manager column's header is a strip").isTrue();
                 KitFixtures.capture(context, view.spec(), 820, 400, "classic-manager-rules");
             } finally { KitViewTest.release(context); }
         });
@@ -355,7 +394,9 @@ class ClassicSeparatorsTest {
             var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
             try (var view = new KitView(context, new ViewSpec(pane("solo", "Sessions")), event -> { })) {
                 KitFixtures.render(view, 300, 200, 1);
-                assertThat(((PanelHeaders.HeaderControl) view.control("solo.header")).pane).isFalse();
+                var header = (PanelHeaders.HeaderControl) view.control("solo.header");
+                assertThat(header.pane).isFalse();
+                assertThat(header.flush()).isFalse();
             } finally { KitViewTest.release(context); }
         });
     }
@@ -373,7 +414,7 @@ class ClassicSeparatorsTest {
                 assertThat(KitViewTest.find(view, "rule", JComponent.class).getPreferredSize()).isEqualTo(new Dimension(
                     ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE), ThemePainting.metric(context, DesignMetrics.Role.ICON_CONTROL)));
                 assertThat(image.getRGB(400, bar.getHeight() - 1) & 0xFFFFFF).isEqualTo(rgb(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE)));
-                assertThat(((PanelHeaders.HeaderControl) view.control("categories.header")).pane).isFalse();
+                assertThat(((PanelHeaders.HeaderControl) view.control("categories.header")).flush()).as("no strip in the default kit").isFalse();
             } finally { KitViewTest.release(context); }
         });
     }
@@ -387,7 +428,7 @@ class ClassicSeparatorsTest {
 ```
 
 `KitViewTest.find`, `release`, `KitFixtures.render`, `capture`, `enterpriseLight()`, `enterprise()` and `light()` are the
-helpers 10a's `ClassicPropertiesTest` uses; `KitView.control(String)` is package-private (`KitView.java:344`).
+helpers 10a's `ClassicPropertiesTest` uses; `KitView.control(String)` is package-private (`KitView.java:432`).
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -527,17 +568,20 @@ edit(S + "Panels.java", [
 edit(S + "PanelHeaders.java", [
     ('''        /** Whether the host frames this header as a flush frame's strip (spec 10.7). */
         boolean flush() { return hostHeader.frame() != PanelHostHeader.Frame.STANDARD; }''',
-     '''        /** A manager column's header under a kit whose separators draw pane strips (plan 10b Rulings 2); set before each update. */
+     '''        /** Whether this header heads a manager column (plan 10b Rulings 2); the reconciler sets it before each update. */
         boolean pane;
 
-        /** Whether the host frames this header as a flush frame's strip (spec 10.7), or it heads a classic manager column. */
-        boolean flush() { return pane || hostHeader.frame() != PanelHostHeader.Frame.STANDARD; }''', 1)])
+        /**
+         * Whether the host frames this header as a flush frame's strip (spec 10.7), or it heads a manager column under a
+         * kit whose separators draw pane strips.
+         */
+        boolean flush() { return pane && context().faces().separators.paneStrips() || hostHeader.frame() != PanelHostHeader.Frame.STANDARD; }''', 1)])
 edit(S + "ViewReconciler.java", [
     ('''        if (control instanceof Panels.PanelControl panel) panel.column = column;\n''',
      '''        if (control instanceof Panels.PanelControl panel) panel.column = column;
-        // A manager column's header is a header strip under a kit whose separators say so (plan 10b Rulings 2).
+        // A manager column's header asks the kit whether it draws as a header strip (plan 10b Rulings 2).
         if (node instanceof Nodes.Panel panel && next.get(panel.header().id()) instanceof PanelHeaders.HeaderControl header)
-            header.pane = column >= 0 && view.context().faces().separators.paneStrips();\n''', 1)])
+            header.pane = column >= 0;\n''', 1)])
 edit(S + "Stacks.java", [
     ('''        int natural(Component child, Component fill) {
             int width = child.getPreferredSize().width;''',
@@ -549,12 +593,12 @@ edit(S + "Stacks.java", [
 M = "jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java"
 edit(M, [
     ('''DOCUMENT_BAR_LINE_GAP(4),''', '''DOCUMENT_BAR_LINE_GAP(4), DOCUMENT_BAR_SEARCH_WIDTH(0), SEPARATOR_HEIGHT(18),''', 1),
-    ('''        values.put(Role.THEME_PREVIEW_CAPTION_GAP, 8);\n''', '''        values.put(Role.THEME_PREVIEW_CAPTION_GAP, 8);
-        // The classic manager (plan 10b Rulings 4): the 07 Credential Vault mocks' columns, bar padding and search width.
+    ('''        int[] table = declared();\n''', '''        // Plan 10b: the classic manager (Rulings 4), the 07 Credential Vault mocks' columns, bar padding and search width.
         values.put(Role.MANAGER_SIDEBAR_WIDTH, 171);
         values.put(Role.MANAGER_LIST_WIDTH, 348);
         values.put(Role.DOCUMENT_BAR_VERTICAL_PADDING, 6);
-        values.put(Role.DOCUMENT_BAR_SEARCH_WIDTH, 200);\n''', 1)])
+        values.put(Role.DOCUMENT_BAR_SEARCH_WIDTH, 200);
+        int[] table = declared();\n''', 1)])
 R = "jasper-ui/src/test/resources/dev/jasper/ui/metrics/"
 edit(R + "compact-roles.tsv", [('''DOCUMENT_BAR_LINE_GAP\t4\n''', '''DOCUMENT_BAR_LINE_GAP\t4\nDOCUMENT_BAR_SEARCH_WIDTH\t0\nSEPARATOR_HEIGHT\t18\n''', 1)])
 edit(R + "classic-roles.tsv", [
@@ -565,20 +609,26 @@ edit(R + "classic-roles.tsv", [
 PY
 ```
 
-The `PanelHeaders` anchor is plan 7 Task 10's text; if plan 7's review renamed `flush()`, put `pane` into the method
-that decides the strip and record the name in the banner. `controls.buttons()` has the values `RAISED` and `CLASSIC`
-(4b); the `default` arm keeps the switch total if a later plan adds one. If `Separators.java` still imports
-`SemanticColor` only for the replaced line, the import stays harmless (no lint fails on it); remove it if the build's
-`-Xlint` says otherwise. If 4a's catalog test lists the classic delta by name (`ClassicCatalogTest`), add the four
-classic roles to its list with this ruling's reference.
+The `PanelHeaders` anchor is plan 7's `flush()` as it stands at `f866788de` (`PanelHeaders.java:167-168`). The reconciler
+sets only `pane`; the header control asks the face, because `StrategyIsolationTest` forbids the reconciler to name
+`KitFaces` or a face (Execution notes R2). `controls.buttons()` has the values `RAISED` and `CLASSIC` (4b); the `default`
+arm keeps the switch total if a later plan adds one. If `Separators.java` still imports `SemanticColor` or `DesignMetrics`
+only for the replaced lines, remove the unused import. `ClassicCatalogTest` reads `classic-roles.tsv` whole and lists no
+classic delta by name, so the TSV edits are its whole update.
 
 - [ ] **Step 4: Run the tests, freeze the pair and prove the gallery**
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.ClassicSeparatorsTest' --tests 'dev.jasper.ui.swing.SeparatorsTest' --tests 'dev.jasper.ui.swing.PanelHeaderStripTest' --tests 'dev.jasper.ui.swing.EditorKitTest' --tests 'dev.jasper.ui.swing.PanelSurfacesTest' --tests 'dev.jasper.ui.metrics.*' --tests 'dev.jasper.ui.swing.PaintSpecTest' --tests 'dev.jasper.ui.swing.StrategyIsolationTest' --tests 'dev.jasper.ui.swing.VariantReadTest' --continue`
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.ClassicSeparatorsTest' --tests 'dev.jasper.ui.swing.SeparatorsTest' --tests 'dev.jasper.ui.swing.PanelHeaderStripTest' --tests 'dev.jasper.ui.swing.EditorKitTest' --tests 'dev.jasper.ui.swing.PanelSurfacesTest' --tests 'dev.jasper.ui.metrics.*' --tests 'dev.jasper.ui.swing.PaintSpecTest' :jasper-app:test --tests 'dev.jasper.app.architecture.StrategyIsolationTest' --tests 'dev.jasper.app.architecture.VariantReadTest' --continue`
 Expected: PASS except `PaintSpecTest`, which FAILS listing the one `ClassicSeparatorFace` row missing from
 `face-pairs.tsv`. Add exactly that row, in the printed form, after the `ClassicPropertiesFace` rows (the face's place in
 `all()`), and run the same command: PASS. `ClassicSeparatorsTest` (4); 3b's `SeparatorsTest`, plan 7's
-`PanelHeaderStripTest`, the Editor's document bars and the panel surfaces unchanged.
+`PanelHeaderStripTest`, the Editor's document bars and the panel surfaces unchanged; the architecture scans (jasper-app
+tests over the built jasper-ui jar) find no face named by the reconciler.
+
+The classic separators and rules reach every Enterprise surface (SFTP's two toolbar separators, document-split
+hairlines and manager columns), so run the Enterprise mock suites once (Execution notes R3):
+`./gradlew :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicCompositionRenderTest' --tests 'dev.jasper.app.application.EnterpriseKitRenderTest' --tests 'dev.jasper.app.workspace.EnterpriseWorkstationMockTest' --continue`.
+Expected: PASS within their floors (SFTP's separators move toward the 01 mock's 16 px `#C4C7CC`, 10a D9).
 
 If the classic test's bar is not at least the field plus 12 tall, or the search does not end at the side padding, read
 `Stacks.DocumentBarLayout.layoutContainer` (it clips the last child at the trailing edge) before changing a value. Then:
@@ -630,7 +680,7 @@ standard buttons with text.
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/RevealFace.java`, `DefaultRevealFace.java`, `ClassicRevealFace.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/SecretFields.java:47-48,52,102-107,206-213,218,316-339,381-385`,
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/SecretFields.java:44,50-51,103-108,208-215,220,318-342,383-387`,
   `KitFaces.java`, `jasper-ui/src/test/resources/dev/jasper/ui/swing/face-pairs.tsv`
 - Test: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicRevealTest.java`
 
@@ -803,8 +853,8 @@ class ClassicRevealTest {
 }
 ```
 
-`KitView.update(ViewSpec)` and `replaceSecret(String, char[])` are public (`KitView.java:212`); a new secret id is a new
-control (the reconciler keys controls by id), so the second entry starts unrevealed.
+`KitView.update(ViewSpec)` and `replaceSecret(String, char[])` are public (`KitView.java:62`, `:213`); a new secret id is a
+new control (the reconciler keys controls by id), so the second entry starts unrevealed.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -1129,11 +1179,16 @@ both catalogs have; its buttons take the kit's `BUTTON_HEIGHT` (Rulings 13). No 
 
 - [ ] **Step 4: Run the tests, freeze the pair and prove the gallery**
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.ClassicRevealTest' --tests 'dev.jasper.ui.swing.SecretFieldsTest' --tests 'dev.jasper.ui.swing.KitViewTest' --tests 'dev.jasper.ui.swing.ClassicTogglesTest' --tests 'dev.jasper.ui.swing.PaintSpecTest' --tests 'dev.jasper.ui.swing.StrategyIsolationTest' --tests 'dev.jasper.ui.swing.VariantReadTest' --continue`
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.ClassicRevealTest' --tests 'dev.jasper.ui.swing.SecretFieldsTest' --tests 'dev.jasper.ui.swing.KitViewTest' --tests 'dev.jasper.ui.swing.ClassicTogglesTest' --tests 'dev.jasper.ui.swing.PaintSpecTest' :jasper-app:test --tests 'dev.jasper.app.architecture.StrategyIsolationTest' --tests 'dev.jasper.app.architecture.VariantReadTest' --continue`
 Expected: PASS except `PaintSpecTest`, which FAILS listing the one `ClassicRevealFace` row; add it after the
-`ClassicSeparatorFace` row and run again: PASS. (Run `--tests 'dev.jasper.ui.swing.*Secret*'` instead of
-`SecretFieldsTest` if the secret tests have another name.) Then repeat Task 1 Step 4's gallery digest commands against
+`ClassicSeparatorFace` row and run again: PASS. Then repeat Task 1 Step 4's gallery digest commands against
 `jasper-ui/build/plan10b-base`. Expected: `changed: none`.
+
+The classic reveal reaches every secret input under Enterprise (Add Host's and New File Server's passwords, the
+fixture forms of 6b's dialog comparison, the gallery's secrets in 5b's kit renders), so run once (Execution notes R3):
+`./gradlew :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicCompositionRenderTest' --tests 'dev.jasper.app.application.EnterpriseKitRenderTest' --tests 'dev.jasper.app.windows.EnterpriseDialogMockTest' --tests 'dev.jasper.app.windows.VaultSheetRenderTest' --continue`.
+Expected: PASS within their floors. A form that grows by the "Show" row (a prompt's "Show password" under its field)
+moves a dialog's height, not its strip or band; a floor or band that moves anyway is handled as R3 says.
 
 - [ ] **Step 5: Commit**
 
@@ -1167,15 +1222,15 @@ gains its Enterprise mode, and the render harness for the Vault starts here.
 **Files:**
 - Modify: `plugins/vault/src/main/java/dev/jasper/vault/ui/ManagerPanel.java:35-38,49,64-73,75,348-356` (and new methods
   before `close()`), `plugins/vault/src/main/java/dev/jasper/vault/ui/VaultManagerWindow.java:47-66`,
-  `plugins/vault/src/main/java/dev/jasper/vault/VaultPlugin.java:135`,
-  `jasper-app/src/test/java/dev/jasper/app/plugins/StagedVaultHost.java:45-66,178,258-266`
+  `plugins/vault/src/main/java/dev/jasper/vault/VaultPlugin.java:140`,
+  `jasper-app/src/test/java/dev/jasper/app/plugins/StagedVaultHost.java:47-71,184,274-275`
 - Create: `plugins/vault/src/test/java/dev/jasper/vault/ui/ClassicManagerTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicVaultRenderTest.java`
-- Modify: `docs/design/theme-engine/migration.csv` (only if the ledger's pattern matches a new test source; see Step 4)
+- Modify: `docs/design/theme-engine/migration.csv` (both new test sources match the ledger's pattern; Step 4)
 
 **Interfaces:**
 - Consumes: 10a Task 1's `Layout` and `VaultPlugin.layout`; 10a Task 2's `MockMatch`, `StagedEnterprise.start`,
-  `EnterpriseLook`; 10a Task 4's `ClassicCompositionRenderTest.under`; Task 1's separators, document fill and bar width;
+  `testsupport.EnterpriseLook` (10a R4), `WorkspaceAppearanceFixture`; 10a Task 4's `ClassicCompositionRenderTest.under`; Task 1's separators, document fill and bar width;
   3b's `Nodes.Separator`.
 - Produces: `ManagerPanel(UiKit, Layout, …11 callbacks…)` (the 11-argument constructor means `Layout.ROWS`),
   `Layout ManagerPanel.layout()`, `ManagerPanel.TOOLBAR` ("toolbar") and `LOCK_SHORTCUT`, the toolbar ids
@@ -1339,7 +1394,7 @@ package dev.jasper.app.plugins;
 import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.jasper.app.application.EnterpriseLook;
+import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockMatch;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.ui.theme.SemanticColor;
@@ -1366,9 +1421,12 @@ class ClassicVaultRenderTest {
     static final String STATUS = "0+1 #C4C7CC, 1+6 #E6E7EA, 7+1 #2655AE, 8+22 #2F65CA, 30+1 #2655AE, 31+6 #E6E7EA";
     @TempDir Path root;
 
-    /** The staged Vault in Enterprise mode, created (unbound) and unlocked, its manager open. */
+    /**
+     * The staged Vault in Enterprise mode, created (unbound) and unlocked, its manager open. Its views take the Enterprise
+     * Light theme through the appearance fixture (without one the host falls back to the bundled default theme).
+     */
     static StagedVaultHost vault(Path data) throws Exception {
-        var vault = new StagedVaultHost(data, false, null, true);
+        var vault = new StagedVaultHost(data, false, onEdtValue(() -> new WorkspaceAppearanceFixture(EnterpriseLook.resolved(false))), true);
         try { vault.createVault("synthetic-host-pass"); } catch (Throwable failure) { vault.close(); throw failure; }
         return vault;
     }
@@ -1376,16 +1434,18 @@ class ClassicVaultRenderTest {
     /**
      * The surface's kit view and everything below it in its holder, {@code width} by {@code height} logical pixels,
      * painted at 2x over {@code surface.dialog}: what the mock crops show under a title bar or a dialog's header strip.
-     * The headless windows run no shell, so a dialog's view first takes the flags the Enterprise host gives the dialogs it
-     * draws in their window (plan 6b's {@code NativeShells.inWindow}: {@code hostTitled} and {@code dialogBand}); the
-     * manager window's view keeps its own.
+     * The headless windows run no shell, so a dialog's holder and view first take what the Enterprise host gives the
+     * dialogs it draws in their window (plan 6b's {@code NativeShells.classicContent}: a transparent holder and
+     * {@code CLASSIC_FLAGS}, {@code hostTitled}, {@code dialogBand} and {@code dialogCard}); the manager window's view
+     * keeps its own.
      */
     static BufferedImage render(AuxiliarySurface surface, int width, int height) {
         return onEdtValue(() -> {
             var holder = surface.holder();
             if (surface.kind() != AuxiliarySurface.Kind.WINDOW) {
+                holder.setOpaque(false);
                 var content = StagedVaultHost.kitView(holder);
-                content.hostTitled(true); content.dialogBand(true);
+                content.hostTitled(true); content.dialogBand(true); content.dialogCard(true);
             }
             holder.setSize(width, height);
             for (int i = 0; i < 3; i++) SessionsSurfaceFixture.layout(holder);
@@ -1429,7 +1489,7 @@ class ClassicVaultRenderTest {
 Run: `./gradlew :jasper-plugin-vault:compileTestJava :jasper-app:compileTestJava --continue`
 Expected: FAIL to compile: "no suitable constructor found for ManagerPanel(FakeKit,Layout,…)", "cannot find symbol …
 TOOLBAR", "… LOCK_SHORTCUT", "… layout()", "no suitable constructor found for VaultManagerWindow(…,Layout)", "… seedLogins",
-"no suitable constructor found for StagedVaultHost(Path,boolean,<null>,boolean)".
+"no suitable constructor found for StagedVaultHost(Path,boolean,WorkspaceAppearanceFixture,boolean)".
 
 - [ ] **Step 3: Compose the classic frame and the host mode**
 
@@ -1448,7 +1508,7 @@ edit(U + "ManagerPanel.java", [
     ('''import dev.jasper.vault.service.UnlockPrompt;\n''', '''import dev.jasper.vault.service.UnlockPrompt;\nimport dev.jasper.vault.workstation.Layout;\n''', 1),
     ('''        ADD_GENERATE = "add.generate", UNLOCK_PREFIX = "unlock.";\n''', r'''        ADD_GENERATE = "add.generate", UNLOCK_PREFIX = "unlock.", TOOLBAR = "toolbar";
     /** The Lock Vault action's default binding as the platform writes it (plan 10b Rulings 8). */
-    static final String LOCK_SHORTCUT = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac") ? "⇧⌘L" : "Ctrl+Shift+L";
+    static final String LOCK_SHORTCUT = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac") ? "\u21E7\u2318L" : "Ctrl+Shift+L";
 ''', 1),
     ('''    private final UiView view, titleActions;\n''', '''    private final UiView view, titleActions;\n    private final Layout layout;\n''', 1),
     ('''    ManagerPanel(UiKit kit, Function<UUID, Optional<Object>> entry, Consumer<VaultManager.Type> onAdd,
@@ -1626,12 +1686,35 @@ PY
 ```
 
 `text(...)`, `icon(...)`, `hue(...)`, `password(...)` and `sentence(...)` are `ManagerPanel`'s existing helpers
-(`ManagerPanel.java:182-184,232-234,368`). The `⇧⌘L` escape stays a Java escape in the source (the raw
-string keeps the backslashes); `java.util.Locale` is already imported.
+(`ManagerPanel.java:182-184,232-234,368`). "⇧⌘L" is written as the Java escapes `\u21E7\u2318L` (the raw Python
+string keeps the backslashes, so the source holds the escape); `java.util.Locale` is already imported.
 
 - [ ] **Step 4: Run the tests and compare with the mock**
 
-Run: `./gradlew :jasper-plugin-vault:test --tests 'dev.jasper.vault.ui.*' --tests 'dev.jasper.vault.VaultPluginTest' :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicVaultRenderTest' --tests 'dev.jasper.app.plugins.VaultRenderEvidenceTest' --tests 'dev.jasper.app.plugins.ManagedVaultLoadingTest' --tests 'dev.jasper.app.plugins.ThemeMigrationCoverageTest' --continue`
+First add the two ledger rows (Execution notes R6), each checked against the set of first fields so a test column
+never counts as a row:
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+path = pathlib.Path("docs/design/theme-engine/migration.csv")
+text = path.read_text(encoding="utf-8")
+sources = {line.split(",", 1)[0] for line in text.splitlines()}
+rows = [
+    ("plugins/vault/src/test/java/dev/jasper/vault/ui/ClassicManagerTest.java", "dev.jasper.vault", "ClassicManagerTest", "New in Enterprise plan 10b Task 3 (spec 14.8)"),
+    ("jasper-app/src/test/java/dev/jasper/app/plugins/ClassicVaultRenderTest.java", "app.plugins", "ClassicVaultRenderTest", "New in Enterprise plan 10b Task 3 (spec 16.1.4)"),
+]
+added = 0
+for source, owner, surface, note in rows:
+    if source in sources: continue
+    text += f"{source},{owner},{surface},nonvisual-helper,none,none,{source},Test/fixture ownership; {note}\n"; added += 1
+path.write_text(text, encoding="utf-8")
+print("added", added)
+PY
+```
+
+Expected: `added 2`. Then run:
+`./gradlew :jasper-plugin-vault:test --tests 'dev.jasper.vault.ui.*' --tests 'dev.jasper.vault.VaultPluginTest' :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicVaultRenderTest' --tests 'dev.jasper.app.plugins.VaultRenderEvidenceTest' --tests 'dev.jasper.app.plugins.ManagedVaultLoadingTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
 Expected: PASS: `ClassicManagerTest` (2), the Vault's existing UI tests unchanged (they build the rows composition through
 the 6- and 11-argument constructors), `ClassicVaultRenderTest` (1), the default evidence renders.
 
@@ -1640,9 +1723,7 @@ If a band of `theManagerHasTheMocksToolbarAndStatusRows` differs, open `jasper-a
 (compare the GHOST buttons' and the field's heights with `BUTTON_HEIGHT` and `FIELD_HEIGHT`); a missing `#C4C7CC` rule
 is Task 1's hairline; a status row other than 36 is the WINDOW footer (plan 6's). Fix the composition or Task 1's
 classic value, never the expected bands, and run again until it passes; a difference that belongs to another plan's
-surface goes into the banner as a residual with its measured bands. If `ThemeMigrationCoverageTest` names a new test
-source, add its row to `docs/design/theme-engine/migration.csv` (eight fields, owner `dev.jasper.vault` for the plugin,
-`app.plugins` for jasper-app) and run it again.
+surface goes into the banner as a residual with its measured bands (Execution notes R3, R4).
 
 - [ ] **Step 5: Commit**
 
@@ -2049,7 +2130,7 @@ Add to `ClassicManagerTest` the import `dev.jasper.vault.model.Grant` and:
     }
 ```
 
-Add to `ClassicVaultRenderTest` the import `java.util.List` and:
+Add to `ClassicVaultRenderTest` the imports `java.util.List` and `dev.jasper.app.testsupport.MockCrops` and:
 
 ```java
     static final String DETAILS = "0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #ECEDEF, 102+1 #D3D6DA, 103+26 #FFFFFF, 129+1 #E6E8EB, 130+26 #FFFFFF, "
@@ -2066,7 +2147,7 @@ Add to `ClassicVaultRenderTest` the import `java.util.List` and:
                 var none = render(manager, NO_SELECTION.logicalWidth(), NO_SELECTION.logicalHeight());
                 MockMatch.save("light/vault-manager", NO_SELECTION.read(), none);
                 bands("the Details pane without a selection", none, 1600, 70, 1070, DETAILS_NONE);
-                assertThat(MockMatch.agreement(NO_SELECTION.read(), none)).as("edge agreement without a selection").isGreaterThanOrEqualTo(0.55);
+                MockCrops.fontsFloor("light/vault-manager edge agreement", MockMatch.agreement(NO_SELECTION.read(), none), 0.55);
                 vault.dispatchToManager(new UiEvent.Selected("rows", Set.of(ids.getFirst().toString())));
                 var selected = render(manager, SELECTED.logicalWidth(), SELECTED.logicalHeight());
                 MockMatch.save("light/vault-manager-selected", SELECTED.read(), selected);
@@ -2077,7 +2158,7 @@ Add to `ClassicVaultRenderTest` the import `java.util.List` and:
                 bands("the status row and Done", selected, 1600, 1068, 1142, STATUS);
                 for (String colour : List.of("#2F65CA", "#E1E3E6", "#F0F1F3", "#F7F8FA", "#E6E7EA", "#C4C7CC"))
                     assertThat(MockMatch.present(selected, Color.decode(colour))).as("shows " + colour).isTrue();
-                assertThat(MockMatch.agreement(SELECTED.read(), selected)).as("edge agreement").isGreaterThanOrEqualTo(0.55);
+                MockCrops.fontsFloor("light/vault-manager-selected edge agreement", MockMatch.agreement(SELECTED.read(), selected), 0.55);
                 assertThat(vault.problems).isEmpty();
             }
         });
@@ -2238,12 +2319,12 @@ labels the Authentication choice "Method" in the label column and reads "Private
 composition passes `Hue.NONE` and builds today's forms.
 
 **Files:**
-- Modify: `plugins/vault/src/main/java/dev/jasper/vault/ui/EditorForm.java:53-57,205-231`,
+- Modify: `plugins/vault/src/main/java/dev/jasper/vault/ui/EditorForm.java:56,205-231`,
   `plugins/vault/src/main/java/dev/jasper/vault/ui/EntryEditor.java:46,54,83,104`,
   `plugins/vault/src/main/java/dev/jasper/vault/ui/EntryPresenter.java:9-24,33-34`,
   `plugins/vault/src/main/java/dev/jasper/vault/ui/VaultManagerWindow.java:50,104-135`
 - Create: `plugins/vault/src/test/java/dev/jasper/vault/ui/ClassicEditorsTest.java`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicVaultRenderTest.java`
+- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicVaultRenderTest.java`, `docs/design/theme-engine/migration.csv`
 
 **Interfaces:**
 - Consumes: Task 2's classic reveal (the discreet password's "Show"); Task 3's `VaultManagerWindow` layout and
@@ -2381,13 +2462,19 @@ Add to `ClassicVaultRenderTest` the static import `dev.jasper.app.plugins.AppCon
             try (var vault = vault(root.resolve("sheets"))) {
                 vault.dispatchToManager(new UiEvent.Action("add.LOGIN"));
                 var login = vault.awaitSurface("Add Login");
-                ClassicCompositionRenderTest.check("light/vault-add-login", ADD_LOGIN, render(login, ADD_LOGIN.logicalWidth(), ADD_LOGIN.logicalHeight()),
+                var loginRender = render(login, ADD_LOGIN.logicalWidth(), ADD_LOGIN.logicalHeight());
+                ClassicCompositionRenderTest.check("light/vault-add-login", ADD_LOGIN, loginRender,
                     18, "0+206 #ECEDEF, 206+1 #C4C7CC, 207+40 #E6E7EA", 1, 0.55, "#C4C7CC", "#E6E7EA", "#FFFFFF");
+                bands("the Add Login groups", loginRender, 34, 0, ADD_LOGIN.height(), "0+16 #ECEDEF, 16+1 #C4C7CC, 17+80 #ECEDEF, "
+                    + "97+1 #C4C7CC, 98+18 #ECEDEF, 116+1 #C4C7CC, 117+76 #ECEDEF, 193+1 #C4C7CC, 194+12 #ECEDEF, 206+1 #C4C7CC, 207+40 #E6E7EA");
                 onEdt(login::requestClose);
                 vault.dispatchToManager(new UiEvent.Action("add.SSH_KEY"));
                 var key = vault.awaitSurface("Add SSH Key");
-                ClassicCompositionRenderTest.check("light/vault-add-ssh-key", ADD_SSH_KEY, render(key, ADD_SSH_KEY.logicalWidth(), ADD_SSH_KEY.logicalHeight()),
+                var keyRender = render(key, ADD_SSH_KEY.logicalWidth(), ADD_SSH_KEY.logicalHeight());
+                ClassicCompositionRenderTest.check("light/vault-add-ssh-key", ADD_SSH_KEY, keyRender,
                     18, "0+174 #ECEDEF, 174+1 #C4C7CC, 175+40 #E6E7EA", 1, 0.55, "#C4C7CC", "#E6E7EA", "#FFFFFF");
+                bands("the Add SSH Key group", keyRender, 34, 0, ADD_SSH_KEY.height(),
+                    "0+16 #ECEDEF, 16+1 #C4C7CC, 17+144 #ECEDEF, 161+1 #C4C7CC, 162+12 #ECEDEF, 174+1 #C4C7CC, 175+40 #E6E7EA");
                 onEdt(key::requestClose);
                 assertThat(vault.problems).isEmpty();
             }
@@ -2505,14 +2592,33 @@ title, the hero stays, and the presenter passes `Hue.NONE`, the 4-argument `Dial
 
 - [ ] **Step 4: Run the tests and compare with the mocks**
 
-Run: `./gradlew :jasper-plugin-vault:test --tests 'dev.jasper.vault.ui.*' :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicVaultRenderTest' --tests 'dev.jasper.app.plugins.VaultRenderEvidenceTest' --continue`
+Add the ledger row first (Execution notes R6):
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+path = pathlib.Path("docs/design/theme-engine/migration.csv")
+text = path.read_text(encoding="utf-8")
+source = "plugins/vault/src/test/java/dev/jasper/vault/ui/ClassicEditorsTest.java"
+if source in {line.split(",", 1)[0] for line in text.splitlines()}: raise SystemExit("already in the ledger")
+path.write_text(text + f"{source},dev.jasper.vault,ClassicEditorsTest,nonvisual-helper,none,none,{source},Test/fixture ownership; New in Enterprise plan 10b Task 6 (spec 14.8)\n", encoding="utf-8")
+PY
+```
+
+Run: `./gradlew :jasper-plugin-vault:test --tests 'dev.jasper.vault.ui.*' :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicVaultRenderTest' --tests 'dev.jasper.app.plugins.VaultRenderEvidenceTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
 Expected: PASS: `ClassicEditorsTest` (4), `EntryEditorTest` unchanged ("Password", "Private Key"), `ClassicVaultRenderTest`
-(4).
+(4), the ledger's coverage.
 
 A sheet band other than the mock's is the form's height: `206` (Add Login) is the two groups' rows (30 apart, the
-classic `SHEET_SECTION_GAP` 12 between groups, `FORM_TOP` 12); `174` (Add SSH Key) one group of four rows. A footer other
+classic `SHEET_SECTION_GAP` 12 between groups, `FORM_TOP` 10 since 10a D11); `174` (Add SSH Key) one group of four rows.
+The group rules down x 34 (the boxes' left edge, clear of their titles) are 10a's hand-off, re-measured on 2026-10-17
+(Execution notes R13): Add Login `0+16 #ECEDEF, 16+1 #C4C7CC, 17+80 #ECEDEF, 97+1 #C4C7CC, 98+18 #ECEDEF, 116+1 #C4C7CC,
+117+76 #ECEDEF, 193+1 #C4C7CC, 194+12 #ECEDEF, 206+1 #C4C7CC, 207+40 #E6E7EA`, Add SSH Key `0+16 #ECEDEF, 16+1 #C4C7CC,
+17+144 #ECEDEF, 161+1 #C4C7CC, 162+12 #ECEDEF, 174+1 #C4C7CC, 175+40 #E6E7EA`; the render's first rule above or below
+16 is `FORM_TOP` and the gap between the boxes `SHEET_SECTION_GAP`, both shared with 10a's native dialogs (R13 says how
+to resolve a disagreement). A footer other
 than 40 on `#E6E7EA` under a `#C4C7CC` rule is plan 6b's `Forms` band (`dialogBand`, `DIALOG_FOOTER_VERTICAL` and
-`FORM_SIDES`), which `render` turns on as `NativeShells.inWindow` does; a footer with no band means the flag did not reach
+`FORM_SIDES`), which `render` turns on as `NativeShells.classicContent` does; a footer with no band means the flag did not reach
 the view. If `render` finds the header strip inside the holder, it starts the crop below it (its `above`); if the footer
 is drawn outside the holder, render the surface plan 6 names and record it in the banner. Fix the composition or a classic value, never the expected bands, and record the
 measured edge agreement of both sheets.
@@ -2520,7 +2626,7 @@ measured edge agreement of both sheets.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add plugins/vault/src jasper-app/src/test
+git add plugins/vault/src jasper-app/src/test docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Vault compositions: the classic editor sheets
 
@@ -2546,9 +2652,9 @@ it, and the auto-lock as the footer's footnote; with auto-lock off there is none
 
 **Files:**
 - Modify: `plugins/vault/src/main/java/dev/jasper/vault/ui/PasswordPanel.java:36-58,152-176`,
-  `plugins/vault/src/main/java/dev/jasper/vault/VaultPlugin.java:290`
+  `plugins/vault/src/main/java/dev/jasper/vault/VaultPlugin.java:294`
 - Create: `plugins/vault/src/test/java/dev/jasper/vault/ui/ClassicUnlockTest.java`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicVaultRenderTest.java`
+- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicVaultRenderTest.java`, `docs/design/theme-engine/migration.csv`
 
 **Interfaces:**
 - Consumes: Task 2's prompt reveal ("Show password"); 3b's 11-argument `Nodes.Form` with `FormSubmission` and `footnote`;
@@ -2729,8 +2835,21 @@ The two-argument `unlock(kit, prompt)` is unchanged (ROWS, no footnote), so `Pas
 
 - [ ] **Step 4: Run the tests and compare with the mock**
 
-Run: `./gradlew :jasper-plugin-vault:test --tests 'dev.jasper.vault.ui.*' --tests 'dev.jasper.vault.VaultPluginTest' :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicVaultRenderTest' --tests 'dev.jasper.app.plugins.VaultRenderEvidenceTest' --continue`
-Expected: PASS: `ClassicUnlockTest` (3), `ClassicVaultRenderTest` (5).
+Add the ledger row first (Execution notes R6):
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+path = pathlib.Path("docs/design/theme-engine/migration.csv")
+text = path.read_text(encoding="utf-8")
+source = "plugins/vault/src/test/java/dev/jasper/vault/ui/ClassicUnlockTest.java"
+if source in {line.split(",", 1)[0] for line in text.splitlines()}: raise SystemExit("already in the ledger")
+path.write_text(text + f"{source},dev.jasper.vault,ClassicUnlockTest,nonvisual-helper,none,none,{source},Test/fixture ownership; New in Enterprise plan 10b Task 7 (spec 14.8)\n", encoding="utf-8")
+PY
+```
+
+Run: `./gradlew :jasper-plugin-vault:test --tests 'dev.jasper.vault.ui.*' --tests 'dev.jasper.vault.VaultPluginTest' :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicVaultRenderTest' --tests 'dev.jasper.app.plugins.VaultRenderEvidenceTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
+Expected: PASS: `ClassicUnlockTest` (3), `ClassicVaultRenderTest` (5), the ledger's coverage.
 
 The body is 114 tall in the mock: 20 above the tile, the 35 tile, the field row and "Show password" under it, then the
 form's bottom inset. A body of another height is the PROMPT_COMPACT form's insets (`FORM_TOP`, `FORM_SIDES`) or the
@@ -2742,7 +2861,7 @@ agreement.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add plugins/vault/src jasper-app/src/test
+git add plugins/vault/src jasper-app/src/test docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Vault compositions: the classic Unlock Vault
 
@@ -2768,6 +2887,7 @@ category filter narrow both alike (Rulings 13 of plan 10a: one parity test per m
 
 **Files:**
 - Create: `plugins/vault/src/test/java/dev/jasper/vault/ui/CompositionParityTest.java`
+- Modify: `docs/design/theme-engine/migration.csv`
 
 **Interfaces:**
 - Consumes: Tasks 3 to 5's classic manager and its ids; `KitViews.all`, `emit`, `press`.
@@ -2909,14 +3029,27 @@ does; both of a panel's views share its handler (`ManagerPanel.java:71-72`).
 
 - [ ] **Step 2: Run the tests**
 
-Run: `./gradlew :jasper-plugin-vault:test --tests 'dev.jasper.vault.ui.CompositionParityTest' --tests 'dev.jasper.vault.ui.ManagerPanelTest' --continue`
-Expected: PASS (2). A failing `assertParity` names the state and lists the action the classic view lacks: add its path
+Add the ledger row first (Execution notes R6):
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+path = pathlib.Path("docs/design/theme-engine/migration.csv")
+text = path.read_text(encoding="utf-8")
+source = "plugins/vault/src/test/java/dev/jasper/vault/ui/CompositionParityTest.java"
+if source in {line.split(",", 1)[0] for line in text.splitlines()}: raise SystemExit("already in the ledger")
+path.write_text(text + f"{source},dev.jasper.vault,CompositionParityTest,nonvisual-helper,none,none,{source},Test/fixture ownership; New in Enterprise plan 10b Task 8 (spec 14.7)\n", encoding="utf-8")
+PY
+```
+
+Run: `./gradlew :jasper-plugin-vault:test --tests 'dev.jasper.vault.ui.CompositionParityTest' --tests 'dev.jasper.vault.ui.ManagerPanelTest' :jasper-app:test --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
+Expected: PASS (2 parity tests, `ManagerPanelTest` unchanged, the ledger's coverage). A failing `assertParity` names the state and lists the action the classic view lacks: add its path
 to the classic composition (Tasks 3 to 5), never remove it from the rows one.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add plugins/vault/src/test
+git add plugins/vault/src/test docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Vault compositions: CompositionParityTest
 
@@ -2933,13 +3066,196 @@ EOF
 
 ---
 
-### Task 9: Documentation, the visual pairs, STATUS and the whole build
+### Task 9: Auxiliary frames without a menu row under a classic look
+
+Rulings 14 (the orchestrator's ruling of 2026-10-17): under a look whose terminal windows show the classic menu row in
+the window (`ShellChrome.classicMenus`: the Enterprise look), an auxiliary frame (the Credential Vault window, File
+Server's and every other plugin window) shows no menu row, as the 07 Credential Vault mocks draw it, and binds Close
+Window's key on its root pane. The default look keeps the minimal File row (or the unified title bar's menu) unchanged.
+A plugin cannot ask for this through SDK 0.18, so the host does it once for every auxiliary frame.
+
+**Files:**
+- Modify: `jasper-app/src/main/java/dev/jasper/app/windows/ShellChrome.java:7-8,13-14,18,52-55`,
+  `jasper-app/src/main/java/dev/jasper/app/windows/NativeShells.java:305-308,323,714`,
+  `jasper-app/src/main/java/dev/jasper/app/platform/ClassicMenuRow.java:29-30`,
+  `jasper-app/src/main/java/dev/jasper/app/workspace/WindowPairs.java:23`,
+  `jasper-app/src/test/java/dev/jasper/app/windows/ShellChromeTest.java:26-51`,
+  `docs/app-architecture.md:223-224`, `docs/sdk-architecture.md:380-381`,
+  `docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md` (its header and 10.1)
+
+**Interfaces:**
+- Consumes: `ShellChrome.classicMenus` (6a), `AuxiliarySurface.closeCommand()` and `onCloseCommand`,
+  `WindowInput.captureShortcut` and `SHORTCUT_RECORDER`.
+- Produces: package-private `boolean ShellChrome.frameMenuRow()` (replaces `styleMenus(JMenuBar)`, whose only callers
+  were `NativeShells.frame`'s two lines) and `static void NativeShells.bindCloseWindow(JRootPane, AuxiliarySurface)`.
+
+- [ ] **Step 1: Write the failing test**
+
+Replace `ShellChromeTest.aClassicLookGivesAFramesMenuRowTheTerminalWindowsRow` (its javadoc and body, `:26-51`) with:
+
+```java
+    /** Plan 10b Rulings 14 (spec 10.1 as amended): a classic look's auxiliary frames show no menu row and close with their key. */
+    @Test void aClassicLooksFramesHaveNoMenuRowAndCloseWithTheirKey() throws Exception {
+        assertThat(ShellChrome.of(new ShellLook(false, true, true), true).frameMenuRow()).as("a classic look on macOS").isFalse();
+        assertThat(ShellChrome.of(new ShellLook(false, true, true), false).frameMenuRow()).as("a classic look elsewhere").isFalse();
+        assertThat(ShellChrome.of(new ShellLook(false, false, false), true).frameMenuRow()).as("the default look").isTrue();
+        assertThat(ShellChrome.standard().frameMenuRow()).isTrue();
+        edt(() -> {
+            var surface = new AuxiliarySurface("dev.jasper.vault.manager", "Credential Vault", AuxiliarySurface.Kind.WINDOW, false,
+                new java.awt.Dimension(820, 571), null, null, ignored -> { throw new AssertionError("No native shell in tests"); });
+            var commands = new java.util.concurrent.atomic.AtomicInteger();
+            surface.onCloseCommand(() -> { commands.incrementAndGet(); return true; });
+            var root = new JRootPane();
+            NativeShells.bindCloseWindow(root, surface);
+            int menu = com.formdev.flatlaf.util.SystemInfo.isMacOS ? java.awt.event.InputEvent.META_DOWN_MASK : java.awt.event.InputEvent.CTRL_DOWN_MASK;
+            var key = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_W, menu);
+            var action = root.getActionMap().get(root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).get(key));
+            assertThat(action).as("Close Window's key is bound on the frame").isNotNull();
+            action.actionPerformed(new java.awt.event.ActionEvent(root, java.awt.event.ActionEvent.ACTION_PERFORMED, "close"));
+            assertThat(commands).as("it runs the window's Close Window command").hasValue(1);
+            root.putClientProperty(dev.jasper.app.platform.WindowInput.SHORTCUT_RECORDER,
+                new dev.jasper.app.platform.WindowInput.ShortcutRecorder(stroke -> stroke.equals(key)));
+            action.actionPerformed(new java.awt.event.ActionEvent(root, java.awt.event.ActionEvent.ACTION_PERFORMED, "close"));
+            assertThat(commands).as("a window recording shortcuts keeps the key").hasValue(1);
+            surface.close();
+        });
+    }
+```
+
+`AuxiliarySurface`'s constructor is package-private and the test is in its package; a surface that is never shown
+needs no shell. Headless tests cannot create the `JFrame` itself (Verified facts 13), so `frame`'s three lines are
+proved by review and the GUI check.
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `./gradlew :jasper-app:compileTestJava`
+Expected: FAIL to compile: "cannot find symbol … frameMenuRow()" and "… bindCloseWindow".
+
+- [ ] **Step 3: The frame without a menu row, its key, and the documents**
+
+```bash
+python3 -I - <<'PY'
+"""Plan 10b Task 9 step 3: a classic look's auxiliary frames show no menu row and bind Close Window's key."""
+import pathlib
+def edit(name, edits):
+    path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
+    for old, new, count in edits:
+        if text.count(old) != count: raise SystemExit(f"{name}: expected {count} of {old!r}, found {text.count(old)}")
+        text = text.replace(old, new)
+    path.write_text(text, encoding="utf-8")
+W = "jasper-app/src/main/java/dev/jasper/app/windows/"
+edit(W + "ShellChrome.java", [
+    ('''import dev.jasper.app.platform.ClassicMenuRow;\nimport javax.swing.JMenuBar;\n''', '', 1),
+    ('''whether a
+ * frame's own menu row is the classic one, and keeps''', '''whether an
+ * auxiliary frame shows a menu row of its own, and keeps''', 1),
+    ('''@param classicMenus whether a frame's menu row is the classic row of the look's terminal windows''',
+     '''@param classicMenus whether the look's terminal windows show the classic menu row; its auxiliary frames show none''', 1),
+    ('''    /** Styles {@code bar}, a frame's own menu row, as the look's terminal windows style theirs; the default look's stays as it is. */
+    void styleMenus(JMenuBar bar) {
+        if (classicMenus) ClassicMenuRow.style(bar);
+    }''',
+     '''    /**
+     * Whether an auxiliary frame shows its own menu row, the minimal File menu: the default look's frames do; a classic
+     * look's show none, as the 07 Credential Vault mocks draw them, and bind Close Window's key instead (spec 10.1).
+     */
+    boolean frameMenuRow() { return !classicMenus; }''', 1)])
+edit(W + "NativeShells.java", [
+    ('''            // Under in-window menus (spec 10.1) the minimal File menu is a row of this frame, so Close Window keeps its key;
+            // a classic look gives it its terminal windows' row.
+            JMenuBar menus = menuBar(surface);
+            if (bar != null) bar.setMenuBar(menus); else { frame.setJMenuBar(menus); shell.styleMenus(menus); }''',
+     '''            // The minimal File menu is a row of this frame (spec 10.1); a classic look's frames show no menu row, as the 07
+            // Credential Vault mocks draw them, and bind Close Window's key themselves (plan 10b Rulings 14).
+            JMenuBar menus = bar != null || shell.frameMenuRow() ? menuBar(surface) : null;
+            if (bar != null) bar.setMenuBar(menus);
+            else if (menus != null) frame.setJMenuBar(menus);
+            else bindCloseWindow(frame.getRootPane(), surface);''', 1),
+    ('''                if (bar != null) bar.setLight(!resolved.chrome().dark()); else shell.styleMenus(menus);''',
+     '''                if (bar != null) bar.setLight(!resolved.chrome().dark());''', 1),
+    ('''    /** Remembered bounds are ignored when no current display shows them, for example after unplugging a monitor. */''',
+     '''    /**
+     * Close Window's shortcut on {@code root}, for a frame without a menu row (a classic look's auxiliary frames, plan 10b
+     * Rulings 14): it runs the window's Close Window command unless the window is recording shortcuts, as the item does.
+     */
+    static void bindCloseWindow(JRootPane root, AuxiliarySurface surface) {
+        var key = KeyStroke.getKeyStroke(KeyEvent.VK_W, SystemInfo.isMacOS ? java.awt.event.InputEvent.META_DOWN_MASK : java.awt.event.InputEvent.CTRL_DOWN_MASK);
+        root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).put(key, "jasper.closeWindow");
+        root.getActionMap().put("jasper.closeWindow", new javax.swing.AbstractAction("Close Window") {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                if (!dev.jasper.app.platform.WindowInput.captureShortcut(root, key)) surface.closeCommand();
+            }
+        });
+    }
+
+    /** Remembered bounds are ignored when no current display shows them, for example after unplugging a monitor. */''', 1)])
+edit("jasper-app/src/main/java/dev/jasper/app/platform/ClassicMenuRow.java", [
+    (''' Terminal windows and the auxiliary frames of a classic look
+ * share it. EDT only.''', ''' A classic look's terminal
+ * windows show it. EDT only.''', 1)])
+edit("jasper-app/src/main/java/dev/jasper/app/workspace/WindowPairs.java", [
+    ('''({@code ClassicMenuRow} paints it; the row is shared with auxiliary frames)''', '''({@code ClassicMenuRow} paints it)''', 1)])
+edit("docs/app-architecture.md", [
+    ('''so each window's menus are a row in the window (an auxiliary frame's File row takes the
+classic row's look, `ClassicMenuRow`).''', '''so each terminal window's menus are a row in the window (an auxiliary frame shows none
+and binds Close Window's shortcut itself).''', 1)])
+edit("docs/sdk-architecture.md", [
+    ('''Cmd/Ctrl+W, for example by closing a tab. `NativeShells`' Close Window item calls
+`AuxiliarySurface.closeCommand()`, which asks the handlers newest first and otherwise closes like''',
+     '''Cmd/Ctrl+W, for example by closing a tab. `NativeShells`' Close Window item (or, in a classic look's
+frame, which has no menu row, its shortcut) calls `AuxiliarySurface.closeCommand()`, which asks the
+handlers newest first and otherwise closes like''', 1)])
+edit("docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md", [
+    ('''Amended on 2026-10-17 with plan 7's bottom-strip ruling, made under the same authority: 10.7 (the bottom strip is 24 px plus its rule).\n''',
+     '''Amended on 2026-10-17 with plan 7's bottom-strip ruling, made under the same authority: 10.7 (the bottom strip is 24 px plus its rule).
+Amended on 2026-10-17 with plan 10b's ruling: 10.1 (auxiliary windows carry no menu row under Enterprise).\n''', 1),
+    ('''- Under `menu_bar = "window"` the auxiliary frames keep their minimal File menu (`NativeShells.java:494-514`), now a row
+  in the window as it already is on Windows and Linux, so Close Window keeps ⌘W.''',
+     '''- Under `menu_bar = "window"` the auxiliary frames show no menu row, as the 07 Credential Vault mocks draw them; their
+  actions stay on their own controls, and each frame binds Close Window's ⌘W itself.''', 1)])
+PY
+git diff --stat
+```
+
+Expected: eight files changed (with Step 1's test) and no anchor message. `SystemInfo`, `KeyStroke`, `KeyEvent` and `JRootPane` are
+already imported in `NativeShells`; `JMenuBar` stays imported there (`menuBar` returns one). The spec's header line is
+the orchestrator's text; the 10.1 bullet is the smallest edit that makes it accurate (its stale `NativeShells` line
+reference goes with the sentence it belonged to).
+
+- [ ] **Step 4: Run the tests**
+
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.windows.*' --tests 'dev.jasper.app.application.PresentationReachTest' --tests 'dev.jasper.app.workspace.WindowChromeMenusTest' --tests 'dev.jasper.app.workspace.EnterpriseMenuRowMockTest' --continue`
+Expected: PASS: `ShellChromeTest` (3, the replaced test among them), the window and placement tests unchanged, the
+terminal windows' classic menu row unchanged (`ClassicMenuBar.style` still calls `ClassicMenuRow.style`).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add jasper-app/src docs/app-architecture.md docs/sdk-architecture.md docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md
+git commit -F - <<'EOF'
+Auxiliary frames: no menu row under the classic look
+
+Under a look whose terminal windows show the classic menu row, an
+auxiliary frame (the Credential Vault window and every plugin window)
+shows no menu row, as the 07 Credential Vault mocks draw it, and binds
+Close Window's key on its root pane; the default look keeps the File
+row. Spec 10.1 is amended with the orchestrator's ruling.
+
+🤖 Generated with Claude Code at The Home Depot
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+EOF
+```
+
+---
+
+### Task 10: Documentation, the visual pairs, STATUS and the whole build
 
 Spec 17's documents for this plan's part, the opt-in `tools/visual/pairs.json` entries for the Vault renders (spec
 16.1.4), the default-look proof, the full build with its counts, and the STATUS entry.
 
 **Files:**
-- Modify: `docs/credential-vault.md`, `docs/ui-architecture.md` (only where 4b lists the face pairs), `tools/visual/pairs.json`,
+- Modify: `docs/credential-vault.md`, `docs/ui-architecture.md:39`, `jasper-ui/README.md:40-42`, `tools/visual/pairs.json`,
   `docs/STATUS.md`, this plan's status banner (line 3)
 
 - [ ] **Step 1: The documents**
@@ -2952,9 +3268,12 @@ Read each document first and keep its voice; make the smallest accurate edits:
   Name/Username/Type/Modified table that sorts by its headers and counts what shows, and a Details pane whose stored
   values have **Show** and **Copy**, with the lock state, auto-lock and vault file in the status row beside **Done**; the
   add sheets carry their kind's colour, and Unlock Vault shows the auto-lock under its field.
-- `docs/ui-architecture.md`: if plan 4b's text lists the face pairs by control point, add `SeparatorFace` (buttons point:
-  separators, document-split hairlines, manager column edges and pane strips) and `RevealFace` (toggle point: a secret's
-  reveal and copy) to that list, one clause each; otherwise leave the file alone.
+- `docs/ui-architecture.md:39` names the one point that chooses two faces ("the table point chooses both the table and
+  the Properties faces"); extend that clause: "…and the Properties faces, the buttons point the separator face
+  (separators, document-split hairlines, manager column edges and pane strips) and the toggle point the reveal face (a
+  secret's reveal and copy)".
+- `jasper-ui/README.md:40-42` lists the faces `KitFaces` holds; add "separator, reveal," before "ordered list" (or at the
+  list's natural place), nothing more.
 
 - [ ] **Step 2: The visual pairs**
 
@@ -3005,7 +3324,7 @@ for theme in ("dark-1x", "light-1x"):
     bad += [f"{theme}/{name}" for name in sorted(set(base) | set(now)) if base.get(name) != now.get(name)]
 print("changed:", bad if bad else "none"); sys.exit(1 if bad else 0)
 PY
-git diff --stat HEAD~8 -- jasper-ui/src/test/resources | tail -3
+git diff --stat "$(git log --format=%H -1 --grep 'Plan 10b: refresh anchors for execution')" -- jasper-ui/src/test/resources | tail -3
 ```
 
 Expected: `changed: none`; the resources diff names only `compact-roles.tsv`, `classic-roles.tsv` and `face-pairs.tsv`
@@ -3035,7 +3354,7 @@ Record the line in the STATUS entry.
 Add a new entry at the top of `docs/STATUS.md`, above plan 10a's, in the style of the earlier entries:
 
 ```markdown
-**Enterprise presentation, plan 10b: the Credential Vault composition — 2026-10-16**
+**Enterprise presentation, plan 10b: the Credential Vault composition — <date>**
 (`claude/enterprise-plugin-compositions`, worktree `.claude/worktrees/enterprise-10`, `<first>..<last>`, then this
 documentation commit; [plan](superpowers/plans/2026-10-16-enterprise-10b-vault-compositions.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Under the Enterprise look the Vault
@@ -3044,26 +3363,30 @@ Delete, Copy Username, Copy Password, Lock Vault and its shortcut, the search) o
 sortable Name/Username/Type/Modified table with swatches and an "N of M items" footer, and a Details pane (swatch, name
 and method, a Fields group, the untitled Properties Modified and Used by, Edit… and Delete…), with the status row (lock
 state, auto-lock, vault file) beside Done; the add and edit sheets carry their kind's swatch, drop the prompt hero, title
-their groups and label the method; Unlock Vault puts the tile beside the intro and the auto-lock in its footnote.
+their groups and label the method; Unlock Vault puts the tile beside the intro and the auto-lock in its footnote. Under
+the classic look every auxiliary frame shows no menu row and binds Close Window's key on its root pane
+(`ShellChrome.frameMenuRow`, `NativeShells.bindCloseWindow`; the orchestrator's ruling, spec 10.1 amended).
 jasper-ui gains two face pairs: `SeparatorFace` (buttons point: 18 px `border.window` separators, document-split
 hairlines and manager column edges, pane header strips) and `RevealFace` (toggle point: Show, Show password, Show and
 Copy); a document split fills with a Split child; the bar's search width and the classic manager's widths and bar
 padding are catalog roles. `ClassicVaultRenderTest` renders the staged Vault under the shipped kit, Plex and theme
 against the five mock crops (bands, colours, edge agreement: <the measured agreements>); `CompositionParityTest` checks
-every rows gesture's classic path. Rulings (plan, "Rulings"): <one clause each, 1 to 13>. Residuals: <Rulings 13's, with
+every rows gesture's classic path. Rulings (plan, "Rulings"): <one clause each, 1 to 14>; Execution notes (2026-10-17)
+R1 to R20. Residuals: <Rulings 13's, with
 their measured values, the tile size of Task 7, and any floor a task lowered, with its cause>. For the user: decision 17's
 sentence case for "Private Key" and "Public Key" in the default look is not applied (Rulings 7). The default look is
 byte-identical (gallery digests unchanged; no default render changed). `./gradlew check --continue`: **<counts>**. GUI
 checks for the user: the Enterprise Vault manager against the Item selected and New menu mocks (sorting, the tree's
-collapse, Show and Copy, the toolbar's verbs while locked), Add Login, Add SSH Key and Unlock Vault. Not merged, not
-pushed.
+collapse, Show and Copy, the toolbar's verbs while locked), Add Login, Add SSH Key and Unlock Vault; under Enterprise, a
+plugin window without a menu row closing with ⌘W (and Ctrl+W on Windows and Linux), and the default look's File row
+unchanged. Not merged, not pushed.
 ```
 
 Replace the angle-bracketed parts with the facts of the run. Set this plan's status banner (a new line 3) to "**Status:
 executed on <date>** (`<first>..<last>`); see `docs/STATUS.md`." and list any deviation from the plan's text there.
 
 ```bash
-git add docs tools/visual/pairs.json
+git add docs jasper-ui/README.md tools/visual/pairs.json
 git commit -F - <<'EOF'
 Vault compositions: documentation, the visual pairs and status
 
@@ -3083,8 +3406,9 @@ EOF
 - Spec coverage (14.8 and row 10's Vault half): toolbar row with + New MenuButton and swatches (Task 3; swatches in the
   menu's hued glyphs and the table, Rulings 5), Categories tree with counts (Task 4), item table with footer (Task 4),
   Details pane with Fields group and Properties (Task 5), status row with Done (Task 3), ATTACHED_SHEET editors with
-  swatches (Task 6), Unlock Vault PROMPT overlay with its footnote (Task 7), CompositionParityTest (Task 8), documents,
-  pairs, STATUS and the full build (Task 9). Workstation consumption for the Vault is 10a Task 1.
+  swatches (Task 6), Unlock Vault PROMPT overlay with its footnote (Task 7), CompositionParityTest (Task 8), auxiliary
+  frames without a menu row (Task 9, Rulings 14), documents, pairs, STATUS and the full build (Task 10). Workstation
+  consumption for the Vault is 10a Task 1.
 - Review Focus: 1 → Task 3 `lockingDisablesTheToolbarAndClosesTheSheet`; 2 → Task 4
   `aSearchThatMatchesNothingKeepsTheHeadersAndCountsZero`; 3 → Task 4 `theSortSurvivesARefreshAndTheSelectionStays`;
   4 → Task 2 `aStoredValuesShowIsPerEntry` and Task 5 `theDetailsPaneFollowsTheSelection`; 5 → Task 7
@@ -3093,4 +3417,174 @@ EOF
   `RevealFace`/`KitFaces.reveal`/`SecretControl.box` (Task 2 → Tasks 5 to 7), `ManagerPanel.TOOLBAR`, `LOCK_SHORTCUT`,
   `ITEMS_FOOTER`, `COLUMN_*` (Tasks 3, 4 → 8), `StagedVaultHost(…, boolean enterprise)`, `seedLogins`, `dispatchToManager`
   and `ClassicVaultRenderTest.render`/`bands` (Task 3 → Tasks 4 to 7), `EditorForm.layout`, `swatch()` (Task 6),
-  `PasswordPanel.unlock(UiKit, UnlockPrompt, Layout, String)` (Task 7).
+  `PasswordPanel.unlock(UiKit, UnlockPrompt, Layout, String)` (Task 7), `ShellChrome.frameMenuRow()` and
+  `NativeShells.bindCloseWindow` (Task 9).
+
+## Execution notes (2026-10-17)
+
+Refreshed at `f866788de` (this branch is `main` there: every other plan is merged, 10a, 6b, 4b, 5b, 7, 8b, 9b and 11
+among them). Read first: the STATUS entries of plans 10a, 6b, 5b and 4b, 10a's Execution notes (R1 to R21, D1 to D22)
+and 6a ruling 31. Method (as 10a R1): every Create, Add-to, Replace and edit script of Tasks 1 to 9 was applied in order
+to an export of `f866788de`, and jasper-ui (main, testFixtures, test), the Vault (main, test) and jasper-app (main, test)
+were compiled with the JetBrains Runtime 25 `javac` against the worktree's built classes of the other modules; the
+ledger scripts were run on the export and its candidate scan repeated in Python; the compiled reconciler's constant
+pool was read with `javap`. Before the fixes below: one edit anchor missing (Task 1's `DesignMetrics.classic()`), two
+compile errors (Task 3's `EnterpriseLook` import), one architecture violation (Task 1's reconciler named `KitFaces`), five
+candidate sources without ledger rows and a staged Vault rendered in the default theme; after them every anchor is
+found its stated number of times, every module compiles with zero errors, the reconciler names no face, the ledger
+scan finds nothing missing and source hygiene is clean. No Gradle and no JUnit ran: assertions, bands, renders and
+floors are still to be proved by execution.
+
+### Pre-flight scan
+
+| Tasks | Shared file or interface | Finding | Ruling |
+|---|---|---|---|
+| 1 | `KitFaces`, `Separators`, `SplitViews`, `Panels`, `PanelHeaders`, `ViewReconciler`, `Stacks`, `DesignMetrics`, TSVs | `DesignMetrics.classic()` lost its `THEME_PREVIEW_CAPTION_GAP, 8` anchor (9b: 7); the reconciler edit names `KitFaces` and `SeparatorFace`, which `StrategyIsolationTest` forbids; the two architecture tests are jasper-app's, so `:jasper-ui:test --tests` for them finds nothing; other anchors and code compile | R2, R3, R18 |
+| 2 | `SecretFields`, `KitFaces`, `face-pairs.tsv` | Every anchor holds; `DefaultRevealFace` is `refreshReveal`, `revealVisibility` and the mounting code verbatim; same test-run defect as Task 1; the classic reveal reaches every Enterprise secret | R3 |
+| 3 | `ManagerPanel`, `VaultManagerWindow`, `VaultPlugin`, `StagedVaultHost`, ledger | `EnterpriseLook` is `testsupport`'s (10a R4); the staged Vault without an appearance renders in the bundled default theme; the render sets two of 6b's three in-window flags; "⇧⌘L" is raw in the script though the text says escape; two new candidate sources; Step 2's expected message names `<null>` | R5, R6, R7, R8 |
+| 4 | `ManagerPanel` (Task 3's `classicEntries()`), `ClassicManagerTest`, `ClassicVaultRenderTest` | Anchors on Task 3's text hold; manager-column insets predictably differ from the mock | R11 |
+| 5 | `ManagerPanel` (Task 4's `classicEntries()` end), tests | Anchors hold; the agreement asserts bypass `MockCrops.fontsFloor`; the New menu crop shows an open menu the render does not | R9, R10 |
+| 6 | `EditorForm`, `EntryEditor`, `EntryPresenter`, `VaultManagerWindow`, ledger | Anchors hold (the presenter's two `create` cases included); 10a hands over `FORM_TOP` / `MIXED_ROW_GAP` re-measurement; one new candidate source | R6, R13 |
+| 7 | `PasswordPanel`, `VaultPlugin`, ledger | Anchors hold; `VaultPlugin.showUnlock` moved to `:287-302`; one new candidate source | R6, R18 |
+| 8 | `CompositionParityTest` (Vault), ledger | Compiles against Tasks 3 to 5's ids and the 12-argument constructor; one new candidate source | R6 |
+| 9 (new) | `ShellChrome`, `NativeShells`, `ShellChromeTest`, `ClassicMenuRow`, `WindowPairs`, docs, spec 10.1 | The orchestrator's ruling; compiles; `styleMenus` loses its callers and goes | R14 |
+| 10 (was 9) | docs, `pairs.json`, STATUS, banner | `HEAD~8` counts eight task commits where there are now nine; the conditional face-list edit is decided (both docs list faces); `pairs.json` round-trips through `json.dumps(indent=2)` byte for byte | R15, R16 |
+| 1 and 2 | `KitFaces` (`separators` before `reveal`), `face-pairs.tsv`, `PaintSpecTest`, `all()` | Task 2 anchors on Task 1's `final SeparatorFace separators;`, `separators = switch` and `, separators,`: task order is binding; the two pair rows go after `ClassicPropertiesFace`'s in `all()` order | none |
+| 1 and 3 to 5 | classic separators, bar padding and search width, manager widths, pane strips | Task 3's toolbar and status bands and Task 4's columns rest on Task 1's values; `MANAGER_LIST_WIDTH` also sizes SIDEBAR_DETAIL lists | R11, R12 |
+| 1, 2 and 10a's suites | the classic catalog and faces every Enterprise surface uses | SFTP's separators, Add Host's and New File Server's passwords, 6b's fixture prompt, 5b's gallery secrets move | R3 |
+| 2 and 5 | DETAIL secret's Show and Copy | `ClassicRevealFace.detailActions` and `button(...)`; the reveal's SECONDARY kind is not flat in 4b's face though it stays `inner` | none |
+| 2 and 6 | DISCREET_INPUT "Show" | Add Login's password is discreet (`discreetInputs()`), and the classic face always shows its checkbox | none |
+| 2 and 7 | prompt "Show password" | `SecretControl.prompt(true)` moves the box row under the field; `classicNode` keeps `secret(password, …)` | none |
+| 3 and 4, 4 and 5 | `ManagerPanel` edit chain, `ClassicManagerTest` and `ClassicVaultRenderTest` additions | Task 4 replaces Task 3's `classicEntries()` verbatim, Task 5 anchors on Task 4's `detail()));` line and `/** The item table:`; Task 5's test uses Task 4's `date(...)`; render methods grow 1, 2, 3, 4, 5 | none |
+| 3 and 6 | `VaultManagerWindow` constructor | Task 3 assigns `this.layout` before the `new EntryPresenter(context)` Task 6 edits (javac flow check passes) | none |
+| 3 and 7 | `VaultPlugin` | Disjoint lines (`:140`, `:294`); both read the field `layout` from 10a | none |
+| 3, 6, 7, 8 | `migration.csv` appends | Each script checks the set of first fields and appends one row; order-independent | R6 |
+| 3 to 7 | `StagedVaultHost` Enterprise mode, `render`, `bands`, `check` | One appearance fixture and one flag set for every surface | R5, R7 |
+| 3 to 5 and 8 | classic ids and callbacks | Every rows action has a classic node: toolbar verbs, the menu's items, the table's activation, the Details' copies, `COPY_PUBLIC`, `UNLOCK`, `BACK` | none |
+| 6 and 10a | `FORM_TOP`, `SHEET_SECTION_GAP`, `MIXED_ROW_GAP` | Shared with Add Host's native dialog (10a D11) | R13 |
+| 3 and 9 | the Vault window's frame | Rulings 12's 820 × 571 content now meets the mock's window under its 29 px title bar with no menu row between | R14 |
+| 9 and 10 | docs and STATUS | Task 9 edits `app-architecture.md`, `sdk-architecture.md` and spec 10.1; Task 10's STATUS template names Task 9 | none |
+| 1, 2 and 10 | the gallery base | Captured once in Task 1 Step 1, compared in Tasks 1, 2 and 10 | none |
+
+### Rulings
+
+"What — why — cost if wrong". They bind where they differ from the task text above, which has been edited to agree.
+
+R1. **The refresh is a javac dry run** — what: the method above; why: the orchestrator forbids Gradle here and javac
+proves anchors, names, types and flow (10a R1's method); cost if wrong: an assertion or render fails at execution, which
+the TDD steps expect and fix in place.
+
+R2. **The reconciler names no face: it sets `HeaderControl.pane = column >= 0`, and `flush()` asks the separator face**
+— what: Task 1's `ViewReconciler` edit drops `view.context().faces().separators.paneStrips()`; `PanelHeaders.flush()`
+reads `pane && context().faces().separators.paneStrips() || …`; `ClassicSeparatorsTest` asserts `pane` true and
+`flush()` true under the classic kit, `flush()` false under the default kit and `pane` false for a dock panel; why: the
+plan's version puts `KitContext.faces:()Ldev/jasper/ui/swing/KitFaces;` and `SeparatorFace` into the reconciler's
+constant pool (read with `javap` from the dry run), which `StrategyIsolationTest` (spec 16.1.7) reports; cost if wrong:
+none (the same pixels).
+
+R3. **The architecture scans and the Enterprise suites run in jasper-app** — what: Tasks 1 and 2 run
+`dev.jasper.app.architecture.StrategyIsolationTest` and `VariantReadTest` under `:jasper-app:test`, and once each the
+Enterprise suites their classic faces reach (`ClassicCompositionRenderTest`, `EnterpriseKitRenderTest`,
+`EnterpriseWorkstationMockTest`; for Task 2 also `EnterpriseDialogMockTest` and `VaultSheetRenderTest`); a band or floor
+they move is fixed in the face, and only where the fix would contradict a 07 mock is the measured render value written
+into that test with its cause and recorded as a deviation (10a R11's precedent), never silently; why: under
+`:jasper-ui:test` the two scans are "No tests found", which fails the build, and 10a's STATUS asks for re-runs after
+classic changes; cost if wrong: a few minutes per run.
+
+R4. **A band that fails only on text ink may be re-sampled** — what: when a mismatch is runs of glyph ink inside a known
+text element (a header strip's title, a label), the sample column may move within the same element to a column where
+mock and render are both clear of text, re-measured on the mock with `MockMatch.bands` and recorded in the banner; why:
+Plex's 2× glyphs leave 2 px runs where the mock's antialiasing left 1 px runs that `bands` drops (Details at x 1086
+crosses "Details" in the strip); cost if wrong: one element is sampled a few pixels from the plan's column.
+
+R5. **The staged Vault renders in the Enterprise theme** — what: `ClassicVaultRenderTest.vault` passes
+`new WorkspaceAppearanceFixture(EnterpriseLook.resolved(false))` to `StagedVaultHost`, and imports
+`dev.jasper.app.testsupport.EnterpriseLook`; why: with a `null` appearance `HostedUi.kitThemes` falls back to the
+bundled default theme (Verified facts 10), so every band colour would be Slate Cobalt's; `application.EnterpriseLook`
+does not exist (10a R4); cost if wrong: none.
+
+R6. **Every new candidate source gets its ledger row in its own commit** — what: Tasks 3 (`ClassicManagerTest`,
+`ClassicVaultRenderTest`), 6 (`ClassicEditorsTest`), 7 (`ClassicUnlockTest`) and 8 (the Vault's `CompositionParityTest`)
+append `nonvisual-helper,none,none` rows ("Test/fixture ownership; New in Enterprise plan 10b Task N"), checked
+against the set of first fields (10a R10), run `ThemeMigrationCoverageTest` and add `migration.csv` to their commits;
+why: all five match the candidate pattern (checked on the dry run) and `sourceDiscoveryIncludesTestFixturesAndHelperFalsePositives`
+fails otherwise; the orchestrator's rule; jasper-ui is outside the scan; cost if wrong: none.
+
+R7. **`render` mirrors `NativeShells.classicContent`** — what: for a dialog surface it makes the holder transparent and
+sets `hostTitled`, `dialogBand` and `dialogCard` (6b's `CLASSIC_FLAGS`); why: the host draws every in-window classic
+dialog that way, and without `dialogCard` the form paints its own fill and frame inside the crop; cost if wrong: none.
+
+R8. **"⇧⌘L" is written as the Java escapes `⇧⌘L`** — what: the raw Python string now holds the escape, as the
+step's text always said; why: the script wrote the raw characters; both pass the hygiene check, the escape keeps the
+source ASCII; cost if wrong: none.
+
+R9. **Task 5's edge agreements go through `MockCrops.fontsFloor`** — what: as `ClassicCompositionRenderTest.check` (10a
+R15): asserted under the shipped IBM Plex, printed only where an installed Plex hides the plugin's files; on this machine
+Plex resolves, so mock matching under Plex is asserted for all five 07 mocks (Tasks 5, 6 and 7); cost if wrong: none.
+
+R10. **The New menu mock is matched with its menu closed** — what: `light/vault-manager` renders the manager with no
+popup (a `JPopupMenu` is not part of the holder and the menu's face is 4b's and 4c's); if its agreement falls under 0.55
+only because of the open menu's region, that pair's floor (test and `pairs.json`) is the measured value rounded down to
+two decimals, with the cause in the banner (10a D13's precedent); the bands at x 1600 lie clear of the menu; cost if
+wrong: the open menu's pixels go unchecked against this mock.
+
+R11. **Manager-column insets, if Task 4's first run shows them** — what: `Panels.refresh` (`Panels.java:73-76`) starts a
+rail, and a list column without a search row, at `COLUMN_RAIL_TOP` (8): the Items table would stand 8 below the toolbar
+rule where the mock's header band starts flush (`0+20 #F0F1F3`), and the Categories rows 8 below the strip where the
+mock has 4 (`60+4`); the preferred fix is classic `COLUMN_RAIL_TOP` 4 (under Enterprise only manager columns read it:
+the Vault's and the Licenses and Errors list columns, R12's reach) and top 0 for a manager column whose body is a `Table` (its header band is its top edge), in
+`Panels.refresh`; no default view has a `Table` body in a manager column (the Vault's rows composition, Licenses and
+Errors use item lists), so the gallery digests prove the default look; record it as a deviation; why: the mock wins on
+layout and the plan's triage already names `COLUMN_RAIL_TOP`; cost if wrong: one condition.
+
+R12. **The classic manager widths also reach SIDEBAR_DETAIL lists** — what: `MANAGER_LIST_WIDTH` 348 also sizes the list
+column of the Licenses and Errors windows under Enterprise (`SplitViews.java:94`); accepted and named in STATUS (reach)
+and the GUI checks; why: no mock covers those windows, and Rulings 4 sets the catalog value; cost if wrong: a role of its
+own for a SIDEBAR_DETAIL list.
+
+R13. **The 07 sheets re-measure `FORM_TOP` and `SHEET_SECTION_GAP`** (10a's hand-off) — what: Task 6 adds the group
+rules down x 34 (first rule 16 below the strip, Add Login's boxes 19 apart, measured on 2026-10-17); these roles are
+shared with 10a's native dialogs (D11: classic `FORM_TOP` 10, `MIXED_ROW_GAP` 8, measured on Add Host); a shared value
+changes only if `ClassicCompositionRenderTest` still passes; where the 07 sheets and 10a's dialogs need different values,
+10a's value stays, the x-34 expected band takes the render's measured value with the cause, and the difference is a
+residual (10a R11's precedent); why: one catalog serves both, and 10a's mocks were matched first; cost if wrong: 1 or
+2 px in the sheets.
+
+R14. **Auxiliary frames show no menu row under a classic look (the orchestrator's ruling, Rulings 14)** — what: new Task
+9: `ShellChrome.frameMenuRow()` (false while `classicMenus`) replaces `styleMenus`; `NativeShells.frame` installs the
+File row only for a unified title bar or `frameMenuRow()`, else `bindCloseWindow` puts ⌘W (Ctrl+W off macOS, the
+`SystemInfo` mask, headless-safe) on the root pane, running `closeCommand()` unless the window records shortcuts, as the
+item does; `ShellChromeTest` replaces its styling test with one on a `JRootPane`; `app-architecture.md`,
+`sdk-architecture.md`, `ClassicMenuRow`'s and `WindowPairs`' comments and spec 10.1 (one bullet, plus the header line
+"Amended on 2026-10-17 with plan 10b's ruling: 10.1 (auxiliary windows carry no menu row under Enterprise).") follow;
+the documentation task becomes Task 10; why: the mock wins on layout; SDK 0.18 gives a plugin no say over its frame's
+menus, so the host's `NativeShells.frame` is the one clean place, and the change covers every auxiliary frame, as 6a
+ruling 31's cost foresaw; headless tests cannot create a `JFrame`; spec 4.7's fallback under committed in-window menus
+also has `classicMenus` and drops the row too, which is accepted; cost if wrong: New Window and (off macOS) Quit are no
+longer in a plugin window, only in terminal windows' menus; one branch restores the row.
+
+R15. **Task 10's resource diff starts at this refresh commit** — what: `git diff --stat "$(git log --format=%H -1 --grep
+'Plan 10b: refresh anchors for execution')"`; why: `HEAD~8` assumed eight task commits; there are nine; cost if wrong:
+none.
+
+R16. **Task 10's face-list edits are named** — what: `docs/ui-architecture.md:39` and `jasper-ui/README.md:40-42` gain the
+separator and reveal faces, and the commit adds `jasper-ui/README.md`; why: both documents list `KitFaces`' faces, so the
+plan's conditional is decided; cost if wrong: none.
+
+R17. **"Before you start" reads `dialogSwatch(String pluginId, String title)`** — what: the grep pattern; why: the testkit
+declares the return type fully qualified, so `Optional<Nodes.Hue> dialogSwatch` counts 0; cost if wrong: none.
+
+R18. **Line numbers and anchors are `f866788de`'s** — what: Verified facts 1 to 14 and every task's "Files" lines
+(`DesignMetrics.classic()` now anchors on `int[] table = declared();`; `SecretFields` `:44`, `:50-51`, `:103-108`,
+`:208-215`, `:220`, `:318-342`, `:383-387`; `Panels.java:343`; `ViewReconciler.java:197`; `Stacks.java:865-867`;
+`KitView.java:62`, `:213`, `:432`; `VaultPlugin.java:140`, `:294`; `StagedVaultHost.java:47-71`, `:184`, `:274-275`;
+`EditorForm.java:56`, `:205-231`); the "Before you start" refresh step is done here; why: 10a, 6b, 7, 8b and 9b moved
+them; cost if wrong: none (every edit quotes its text).
+
+R19. **Only plan 10b executes; no rebase, merge or push** — what: Tasks 1 to 10 on this branch from `f866788de`, every
+command from the worktree root, never `./gradlew --stop`, no GUI and no AOT training; a timing-sensitive test that fails
+once is re-run alone before it counts as a failure; why: the orchestrator; cost if wrong: one extra run.
+
+R20. **"Remember in Keychain" is not built (spec 18)** — what: no checkbox or setting for it in Unlock Vault or elsewhere;
+the status row's "Unlocked · Keychain" is the configured device-secret provider (`VaultManagerWindow.Status.deviceSecret`,
+already shown by the rows composition); why: the orchestrator and spec 18 name it a fixture; cost if wrong: none.

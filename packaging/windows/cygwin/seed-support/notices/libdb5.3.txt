@@ -1,0 +1,418 @@
+Package source: x86_64/release/db/db-5.3.28-2-src.tar.xz
+License identifier: LicenseRef-Upstream-libdb5.3
+
+--- db-5.3.28-2.src/db.cygport ---
+inherit tcl
+
+NAME="db"
+VERSION=5.3.28
+RELEASE=2
+CATEGORY="Database"
+SUMMARY="Oracle Berkeley DB"
+DESCRIPTION="Oracle Berkeley DB is the industry-leading open source, embeddable
+database engine that provides developers with fast, reliable, local persistence
+with zero administration. Oracle Berkeley DB is a library that links directly
+into your application. Your application makes simple function calls, rather
+than sending messages to a remote server, eliminating the performance penalty
+of client-server architectures."
+HOMEPAGE="http://www.oracle.com/technology/products/berkeley-db"
+SRC_URI="http://download.oracle.com/berkeley-db/db-${VERSION%.${PV[4]}}.tar.gz"
+SRC_DIR="db-${VERSION%.${PV[4]}}"
+PATCH_URI+="
+	http://pkgs.fedoraproject.org/cgit/rpms/libdb.git/plain/007-mt19937db.c_license.patch
+	http://pkgs.fedoraproject.org/cgit/rpms/libdb.git/plain/db-5.3.21-memp_stat-upstream-fix.patch
+	http://pkgs.fedoraproject.org/cgit/rpms/libdb.git/plain/db-5.3.21-mutex_leak.patch
+	http://pkgs.fedoraproject.org/cgit/rpms/libdb.git/plain/db-5.3.28-lemon_hash.patch
+	http://pkgs.fedoraproject.org/cgit/rpms/libdb.git/plain/db-5.3.28-cwd-db_config.patch
+	http://pkgs.fedoraproject.org/cgit/rpms/libdb.git/plain/libdb-5.3.21-region-size-check.patch
+	db-configureac.patch
+	db-CYGWIN.patch
+	db-cygwinpath.patch
+	db-noundefined.patch
+	5.3-java.patch
+	5.3-tcl.patch
+	5.3-vpath.patch
+"
+
+PKG_NAMES="db libdb5.3 libdb-devel db-doc tcl-db" # java-db
+db_CONTENTS="--exclude=html usr/bin/db*.exe usr/share/doc/"
+libdb5_3_CONTENTS="--exclude=*java* usr/bin/*-5.3.dll"
+libdb_devel_CONTENTS="usr/include/ usr/lib/lib*"
+db_doc_CONTENTS="usr/share/doc/${NAME}/html/"
+java_db_CONTENTS="usr/bin/cygdb_java-*.dll ${JAVA_DIR#/}/db.jar"
+tcl_db_CONTENTS="${TCL_LIBDIR#/}/"
+
+DIFF_EXCLUDES="config.* configure db.jar install-sh ltmain.sh libtool.m4 lt*.m4"
+
+src_compile() {
+	local slot=${PV[1]}.${PV[2]}
+
+	check_prog_req libtoolize libtool
+
+	cd ${S}/lang/sql/sqlite
+	cygautoreconf
+
+	cd ${S}/dist
+
+	ac_macrodir=aclocal libtoolize --copy --force --install || error "berkdb: libtoolize failed"
+	./s_config || error "s_config failed"
+
+	cd ${B}
+	CFLAGS="$CFLAGS -DSQLITE_ENABLE_COLUMN_METADATA=1 -DSQLITE_DISABLE_DIRSYNC=1 -DSQLITE_ENABLE_FTS3=3 -DSQLITE_ENABLE_RTREE=1 -DSQLITE_SECURE_DELETE=1 -DSQLITE_ENABLE_UNLOCK_NOTIFY=1"
+	CYGCONF_SOURCE=${S}/dist \
+	cygconf \
+		--with-mutex=${ARCH_i686+x86}${ARCH_x86_64+x86_64}/gcc-assembly \
+		--enable-compat185 \
+		--enable-cxx \
+		--enable-dynamic \
+		--enable-sql \
+		--disable-java \
+		--enable-tcl \
+		--enable-test
+
+	cygmake libdb-${slot}.la
+	cygmake C_OBJS="libdb-${slot}.la"
+}
+
+src_test() {
+	cd ${B}
+	PATH=${B}/.libs:$PATH ${TCLSH} <<-_EOF
+	load [file join ${B}/.libs cygdb_tcl-${PV[1]}.${PV[2]}.dll]
+	source ${S}/test/tcl/test.tcl
+	log001
+	test001 btree
+	run_test test001
+	_EOF
+# Use this target for running standard tests (takes very long)
+# run_std
+# Use this target for running ALL tests (takes even longer)
+# run_all
+}
+
+src_install() {
+	local slot=${PV[1]}.${PV[2]}
+
+	cd ${B}
+	cyginstall docdir=/usr/share/doc/${NAME}/html emode=755 fmode=644
+
+	# replace unslotted libs with symlinks
+	rm -f ${D}/usr/lib/libdb{_cxx,_sql,}.a
+	dosym libdb-${slot}.dll.a /usr/lib/libdb.dll.a
+	dosym libdb_cxx-${slot}.dll.a /usr/lib/libdb_cxx.dll.a
+	dosym libdb_sql-${slot}.dll.a /usr/lib/libdb_sql.dll.a
+
+	# these implibs aren't needed
+	rm -f ${D}/usr/lib/libdb_java-${slot}.*
+	rm -f ${D}/usr/lib/libdb_tcl-${slot}.*
+
+	# relocate and install Tcl module
+	dodir ${TCL_LIBDIR}/db${slot}
+	mv ${D}/usr/lib/cygdb_tcl-${slot}.dll ${D}${TCL_LIBDIR}/db${slot}/
+	echo pkg_mkIndex ${D}${TCL_LIBDIR}/db${slot} cygdb_tcl-${slot}.dll | PATH=${D}/usr/bin:$PATH ${TCLSH}
+	sed -i -e "s#${D}##g" ${D}${TCL_LIBDIR}/db${slot}/pkgIndex.tcl
+}
+
+Source archive: x86_64/release/db/db-5.3.28-2-src.tar.xz
+
+--- db-5.3.28-2.src/db-5.3.28.tar.gz!/db-5.3.28/docs/license/license_db.html ---
+<!--$Id$-->
+<!--Copyright (c) 1997, 2013 Oracle and/or its affiliates.  All rights reserved.-->
+<!--See the file LICENSE for redistribution information.-->
+<html>
+<head>
+<title>Berkeley DB: Berkeley DB Product License</title>
+<meta name="description" content="Berkeley DB: An embedded database programmatic toolkit.">
+<meta name="keywords" content="embedded,database,programmatic,toolkit,btree,hash,hashing,transaction,transactions,locking,logging,access method,access methods,Java,C,C++">
+</head>
+<body bgcolor=white>
+<p align=center><b>Berkeley DB Product License</b></p>
+<p>The license that applies to this copy of the Berkeley DB software may be found
+in the "LICENSE" file included in each Berkeley DB distribution.</p>
+<p>For a license to use the Berkeley DB software under conditions other than
+those described in the "LICENSE" file, or to purchase support for this
+software, please send email to
+<a href="mailto:berkeleydb-info_us@oracle.com">berkeleydb-info_us@oracle.com</a>.</p>
+<p><font size=1>Copyright (c) 1996, 2013 Oracle and/or its affiliates.  All rights reserved.</font>
+</body>
+</html>
+
+
+--- db-5.3.28-2.src/db-5.3.28.tar.gz!/db-5.3.28/lang/sql/jdbc/license.terms ---
+This software is copyrighted by Christian Werner <chw@ch-werner.de> and others.
+The following terms apply to all files associated with the software
+unless explicitly disclaimed in individual files.
+
+The authors hereby grant permission to use, copy, modify, distribute,
+and license this software and its documentation for any purpose, provided
+that existing copyright notices are retained in all copies and that this
+notice is included verbatim in any distributions. No written agreement,
+license, or royalty fee is required for any of the authorized uses.
+Modifications to this software may be copyrighted by their authors
+and need not follow the licensing terms described here, provided that
+the new terms are clearly indicated on the first page of each file where
+they apply.
+
+IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY
+FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+ARISING OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY
+DERIVATIVES THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+MODIFICATIONS.
+
+
+--- db-5.3.28-2.src/db-5.3.28.tar.gz!/db-5.3.28/lang/sql/odbc/license.terms ---
+This software is copyrighted by Christian Werner <chw@ch-werner.de>
+and other authors. The following terms apply to all files associated
+with the software unless explicitly disclaimed in individual files.
+
+The authors hereby grant permission to use, copy, modify, distribute,
+and license this software and its documentation for any purpose, provided
+that existing copyright notices are retained in all copies and that this
+notice is included verbatim in any distributions. No written agreement,
+license, or royalty fee is required for any of the authorized uses.
+Modifications to this software may be copyrighted by their authors
+and need not follow the licensing terms described here, provided that
+the new terms are clearly indicated on the first page of each file where
+they apply.
+
+IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY
+FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+ARISING OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY
+DERIVATIVES THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+MODIFICATIONS.
+
+
+--- db-5.3.28-2.src/db-5.3.28.tar.gz!/db-5.3.28/lang/sql/odbc/debian/copyright ---
+This package was debianized by Sam Clegg <samo@debian.org> on
+Tue, 25 Jul 2006 11:43:45 +0100.
+
+It was downloaded from <http://www.ch-werner.de/sqliteodbc/>
+
+Upstream Author: Christian Werner <chw@ch-werner.de>
+
+Copyright: Copyright (c) 2001-2011 Christian Werner <chw@ch-werner.de>
+           OS/2 Port Copyright (c) 2004 Lorne R. Sunley <lsunley@mb.sympatico.ca>
+
+License:
+
+This software is copyrighted by Christian Werner <chw@ch-werner.de>
+and other authors. The following terms apply to all files associated
+with the software unless explicitly disclaimed in individual files.
+
+The authors hereby grant permission to use, copy, modify, distribute,
+and license this software and its documentation for any purpose, provided
+that existing copyright notices are retained in all copies and that this
+notice is included verbatim in any distributions. No written agreement,
+license, or royalty fee is required for any of the authorized uses.
+Modifications to this software may be copyrighted by their authors
+and need not follow the licensing terms described here, provided that
+the new terms are clearly indicated on the first page of each file where
+they apply.
+
+IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY
+FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+ARISING OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY
+DERIVATIVES THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+MODIFICATIONS.
+
+The Debian packaging is (C) 2006, Sam Clegg <samo@debian.org> and
+is licensed under the GPL-3, see `/usr/share/common-licenses/GPL-3'.
+
+
+--- db-5.3.28-2.src/db-5.3.28.tar.gz!/db-5.3.28/dist/vx_setup/LICENSE.TXT ---
+Copyright (c) 1996, 2013 Oracle and/or its affiliates.  All rights reserved.
+See the file LICENSE for redistribution information.
+
+
+--- db-5.3.28-2.src/db-5.3.28.tar.gz!/db-5.3.28/test/c/cutest/license.txt ---
+NOTE
+
+The license is based on the zlib/libpng license. For more details see
+http://www.opensource.org/licenses/zlib-license.html. The intent of the
+license is to: 
+
+- keep the license as simple as possible
+- encourage the use of CuTest in both free and commercial applications
+  and libraries
+- keep the source code together 
+- give credit to the CuTest contributors for their work
+
+If you ship CuTest in source form with your source distribution, the
+following license document must be included with it in unaltered form.
+If you find CuTest useful we would like to hear about it. 
+
+LICENSE
+
+Copyright (c) 2003 Asim Jalis
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not
+claim that you wrote the original software. If you use this software in
+a product, an acknowledgment in the product documentation would be
+appreciated but is not required.
+
+2. Altered source versions must be plainly marked as such, and must not
+be misrepresented as being the original software.
+
+3. This notice may not be removed or altered from any source
+distribution.
+
+
+--- db-5.3.28-2.src/db-5.3.28.tar.gz!/db-5.3.28/LICENSE ---
+/*-
+ * $Id$
+ */
+
+The following is the license that applies to this copy of the Berkeley DB
+software.  For a license to use the Berkeley DB software under conditions
+other than those described here, or to purchase support for this software,
+please contact Oracle at berkeleydb-info_us@oracle.com.
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+/*
+ * Copyright (c) 1990, 2013 Oracle and/or its affiliates.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Redistributions in any form must be accompanied by information on
+ *    how to obtain complete source code for the DB software and any
+ *    accompanying software that uses the DB software.  The source code
+ *    must either be included in the distribution or be available for no
+ *    more than the cost of distribution plus a nominal fee, and must be
+ *    freely redistributable under reasonable conditions.  For an
+ *    executable file, complete source code means the source code for all
+ *    modules it contains.  It does not include source code for modules or
+ *    files that typically accompany the major components of the operating
+ *    system on which the executable file runs.
+ *
+ * THIS SOFTWARE IS PROVIDED BY ORACLE ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR
+ * NON-INFRINGEMENT, ARE DISCLAIMED.  IN NO EVENT SHALL ORACLE BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * Copyright (c) 1990, 1993, 1994, 1995
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Copyright (c) 1995, 1996
+ *	The President and Fellows of Harvard University.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY HARVARD AND ITS CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL HARVARD OR ITS CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+/***
+ * ASM: a very small and fast Java bytecode manipulation framework
+ * Copyright (c) 2000-2005 INRIA, France Telecom
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holders nor the names of its
+ *    contributors may be used to endorse or promote products derived from
+ *    this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */

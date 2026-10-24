@@ -39,7 +39,8 @@ public sealed interface SettingKind<T> {
     static SettingKind<Integer> integer(int min, int max) { return new IntegerRange(min, max); }
 
     /**
-     * A finite number in a range.
+     * A finite number in a range. Jasper keeps the value, the default included, at float precision: 0.1 reads back as
+     * 0.10000000149011612.
      *
      * @param min the lowest allowed value
      * @param max the highest allowed value

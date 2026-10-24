@@ -226,16 +226,16 @@ public final class FakePluginContext implements PluginContext {
     /** Status bar items. */
     @Override public StatusBar statusBar() { return ui.statusBar(); }
 
-    /** Side panels. */
+    /** Tool windows. */
     @Override public Panels panels() { return ui.panels(); }
 
     /** Rail buttons. */
     @Override public Rail rail() { return ui.rail(); }
 
-    /** Plugin windows and dialogs. */
+    /** Plugin dialogs, overlays, content tabs and pickers. */
     @Override public Windows windows() { return ui.windows(); }
 
-    /** The host's variant, change notifications, and icons checked against the plugin's own class loader. */
+    /** The host's semantic colours, variants, presentation, workspace, editor and syntax palettes, opacity, saved terminal typography and change notifications. */
     @Override public Appearance appearance() {
         return new Appearance() {
             @Override public java.awt.Color color(dev.jasper.sdk.ui.SemanticColor role) { host.requireAppearanceThread(); return host.semanticColor(role); }
@@ -250,6 +250,9 @@ public final class FakePluginContext implements PluginContext {
             @Override public dev.jasper.sdk.ui.SyntaxPalette syntaxPalette() {
                 host.requireAppearanceThread(); return host.workspaceAppearance().syntax();
             }
+            @Override public java.util.List<dev.jasper.sdk.ui.EditorScheme> editorSchemes() {
+                host.requireAppearanceThread(); return host.editorSchemes();
+            }
             @Override public double workspaceOpacity(java.awt.Component component) {
                 host.requireAppearanceThread();
                 java.util.Objects.requireNonNull(component, "component");
@@ -262,6 +265,14 @@ public final class FakePluginContext implements PluginContext {
             @Override public Subscription onChanged(java.util.function.Consumer<Variant> handler) {
                 requireOpen();var subscription=host.subscribeAppearance(info.id(),handler);own(subscription);return subscription;
             }
+            @Override public dev.jasper.sdk.ui.TerminalTypography terminalTypography() {
+                return host.terminalTypography();
+            }
+            @Override public Subscription onTerminalTypographyChanged(Consumer<dev.jasper.sdk.ui.TerminalTypography> handler) {
+                requireOpen();
+                var subscription = host.subscribeTypography(info.id(), handler); own(subscription); return subscription;
+            }
+            @Override public dev.jasper.sdk.ui.Presentation presentation() { return host.presentation(); }
         };
     }
 }

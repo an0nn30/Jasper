@@ -33,14 +33,16 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
     }
 
     /**
-     * A small group of the plugin's own controls, one per window, such as a session choice with a Connect button. The
-     * factory runs when a window opens, and for each window already open from inside {@code add}, never for a window
+     * A small group of the plugin's own controls, one per window with a toolbar (the main window), such as a session
+     * choice with a Connect button. The factory runs when such a window opens, and for each one already open from
+     * inside {@code add}, never for a window
      * nobody sees, and the view closes with its window or with this registration. Its root is an INLINE
      * {@link Nodes.Stack} of LABEL {@link Nodes.Text}s, DROPDOWN, SEARCHABLE or PICKER {@link Nodes.Choice}s, at most one
-     * PRIMARY {@link Nodes.Button}, {@link Nodes.MenuButton}s and {@link Nodes.Separator}s. When it mounts the view the
-     * host refuses any other tree without an exception to the plugin: it records the refusal, naming the node, closes the
-     * view and that window shows none. {@link UiView#update} throws {@link IllegalArgumentException} naming the node and
-     * keeps the tree. A view never moves into the overflow menu: it hides while the toolbar is too narrow for it.
+     * PRIMARY {@link Nodes.Button} and any number of icon-only GHOST Buttons (a blank label with an icon and a tooltip,
+     * since 0.18.1), {@link Nodes.MenuButton}s and {@link Nodes.Separator}s. When it mounts the view the host refuses
+     * any other tree without an exception to the plugin: it records the refusal, naming the node, closes the view and
+     * that window shows none. {@link UiView#update} throws {@link IllegalArgumentException} naming the node and keeps the
+     * tree. A view never moves into the overflow menu: it hides while the toolbar is too narrow for it.
      *
      * @param factory builds one window's view
      * @since 0.18.0
@@ -69,7 +71,7 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
     static ToolbarItem menu(String icon, String title, List<String> actionIds) { return new Dropdown(icon, title, actionIds); }
 
     /**
-     * A group of the plugin's own controls, one per window.
+     * A group of the plugin's own controls in the main window's toolbar.
      *
      * @param factory builds one window's view
      * @return the item

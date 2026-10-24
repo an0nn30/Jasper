@@ -77,6 +77,7 @@ public final class TerminalView extends JComponent {
     private long observedAbsoluteRowEpoch;
     private volatile boolean exited;
     private float fontSize;
+    private float userScaleFactor = 1f;
     private float inactiveDim;
     private float backgroundOpacity = 1f;
     private Runnable onCloseRequest = () -> { };
@@ -99,8 +100,7 @@ public final class TerminalView extends JComponent {
         this.observedAbsoluteRowEpoch = access.absoluteRowEpoch();
         this.options = options;
         this.fontSize = options.fontSize();
-        this.fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures(),
-            options.lineHeight());
+        this.fonts = scaledFonts(options);
         this.palette = options.palette();
         this.painter = new TerminalPainter(fonts, palette);
         this.macOs = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac");
@@ -274,7 +274,10 @@ public final class TerminalView extends JComponent {
         contextMenuHandler = handler == null ? event -> { } : handler;
     }
 
-    /** Receives row-state invalidations on the Event Dispatch Thread. */
+    /**
+     * Receives {@code FindResult(0, 0, null)} on the Event Dispatch Thread when a reflow, a history reset or an
+     * alternate-screen switch drops the current find matches; null removes the listener.
+     */
     public void setFindResultListener(Consumer<FindResult> listener) {
         findResultListener = listener == null ? result -> { } : listener;
     }
@@ -310,8 +313,7 @@ public final class TerminalView extends JComponent {
         int previousWidth = fonts.cellWidth();
         int previousHeight = fonts.cellHeight();
         if (typographyChanged) {
-            fonts = new FontSet(next.fontFamily(), next.fontSize(), next.fallbackFonts(), next.ligatures(),
-                next.lineHeight());
+            fonts = scaledFonts(next);
         }
         if (options.optionAsMeta() != next.optionAsMeta()) {
             keyboard.setEncoder(new KeyEncoder(next.optionAsMeta(), macOs));
@@ -327,18 +329,46 @@ public final class TerminalView extends JComponent {
             painter = new TerminalPainter(fonts, palette);
         }
         if (typographyChanged) {
-            firePropertyChange("minimumSize", previousMinimum, getMinimumSize());
-            revalidate();
-            if ((previousWidth != fonts.cellWidth() || previousHeight != fonts.cellHeight())
-                && getWidth() > 0 && getHeight() > 0) {
-                resizeSessionToFit();
-            }
+            typographyChanged(previousMinimum, previousWidth, previousHeight);
         }
         reconcileBlink();
         repaint();
     }
 
-    /** The current terminal font size in points. */
+    private FontSet scaledFonts(TerminalOptions value) {
+        return new FontSet(value.fontFamily(), value.fontSize() * userScaleFactor, value.fallbackFonts(),
+            value.ligatures(), value.lineHeight());
+    }
+
+    private void typographyChanged(Dimension previousMinimum, int previousWidth, int previousHeight) {
+        firePropertyChange("minimumSize", previousMinimum, getMinimumSize());
+        revalidate();
+        if ((previousWidth != fonts.cellWidth() || previousHeight != fonts.cellHeight())
+            && getWidth() > 0 && getHeight() > 0) {
+            resizeSessionToFit();
+        }
+    }
+
+    /**
+     * Applies the host's user scale to terminal typography on the EDT, preserving the logical font size and options.
+     * The default is one. Java2D applies device scaling separately when painting.
+     *
+     * @param factor finite positive user scale
+     * @throws IllegalArgumentException if the factor is not finite and positive
+     */
+    public void setUserScaleFactor(float factor) {
+        if (!Float.isFinite(factor) || factor <= 0) throw new IllegalArgumentException("User scale must be finite and positive");
+        if (factor == userScaleFactor) return;
+        Dimension previousMinimum = getMinimumSize();
+        int previousWidth = fonts.cellWidth(), previousHeight = fonts.cellHeight();
+        userScaleFactor = factor;
+        fonts = scaledFonts(options);
+        painter = new TerminalPainter(fonts, palette);
+        typographyChanged(previousMinimum, previousWidth, previousHeight);
+        repaint();
+    }
+
+    /** The current logical terminal font size in points, before the host's user scale. */
     public float fontSize() {
         return fontSize;
     }
@@ -380,7 +410,7 @@ public final class TerminalView extends JComponent {
             options.copyOnSelect(), options.lineHeight(), options.bell()));
     }
 
-    /** Restores the Phase 1 default of 14 points. */
+    /** Sets the font size back to 14 points. */
     public void resetFontSize() {
         setFontSize(DEFAULT_FONT_SIZE);
     }

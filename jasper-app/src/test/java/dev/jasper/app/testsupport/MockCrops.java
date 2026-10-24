@@ -22,7 +22,7 @@ import javax.swing.JComponent;
  */
 public final class MockCrops {
     /** Where the dock tests write their renders, mock crops and differences. */
-    public static final Path OUT = MockProfile.ROOT.resolve("jasper-app/build/dock-renders");
+    public static final Path OUT = EnterpriseResources.ROOT.resolve("jasper-app/build/dock-renders");
     public static final String CONNECTED = "01 Workstation/Workstation - Connected (plugins in use).png";
     public static final String DISCONNECTED = "01 Workstation/Workstation - Disconnected.png";
     public static final String DARK = "08 Dark Mode/Workstation Dark - Connected (plugins in use).png";

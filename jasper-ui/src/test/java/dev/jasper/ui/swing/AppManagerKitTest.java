@@ -67,7 +67,7 @@ class AppManagerKitTest {
                 assertThat(detail.getWidth()).isEqualTo(900 - list.getWidth());
                 var rows = (InteractiveRows.RowsControl) view.control("rows");
                 assertThat(rows.column).as("a list column").isEqualTo(1);
-                assertThat(rows.rowHeight).as("one-line list rows take the rail row").isEqualTo(metric(DesignMetrics.Role.COLUMN_RAIL_ROW));
+                assertThat(rows.rowHeight).as("one-line list rows take the rail row").isEqualTo(Math.max(metric(DesignMetrics.Role.COLUMN_RAIL_ROW), FormsTest.contentHeight(context,DesignMetrics.Role.ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.LABEL)));
                 var first = KitViewTest.find(view, "a.title", JComponent.class);
                 assertThat(bounds(first, view).y).as("rows start at the rail's top inset without a search")
                     .isGreaterThanOrEqualTo(metric(DesignMetrics.Role.COLUMN_RAIL_TOP));
@@ -160,13 +160,13 @@ class AppManagerKitTest {
                 for (var view : List.of(rail, listing)) { view.setSize(260, 300); for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view); }
                 var places = (Trees.TreeControl) rail.control("places");
                 assertThat(places.column).isZero();
-                assertThat(places.heightAt(0)).as("a rail row").isEqualTo(metric(DesignMetrics.Role.COLUMN_RAIL_ROW));
+                assertThat(places.heightAt(0)).as("a rail row").isEqualTo(Math.max(metric(DesignMetrics.Role.COLUMN_RAIL_ROW), FormsTest.contentHeight(context,DesignMetrics.Role.ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.LABEL)));
                 assertThat(places.heightAt(1)).as("a branch is a section heading").isEqualTo(
                     ThemePainting.height(context, DesignMetrics.Role.SETTINGS_NAV_HEADING, dev.jasper.ui.metrics.Typography.Role.SECTION_LABEL));
                 assertThat(KitViewTest.find(rail, "@tree/places/section/expand", JComponent.class)).as("no disclosure on a rail heading").isNull();
                 var files = (Tables.TableControl) listing.control("files");
                 assertThat(files.column).isEqualTo(1);
-                assertThat(files.rowHeight).isEqualTo(metric(DesignMetrics.Role.COLUMN_RAIL_ROW));
+                assertThat(files.rowHeight).isEqualTo(Math.max(metric(DesignMetrics.Role.COLUMN_RAIL_ROW), FormsTest.contentHeight(context,DesignMetrics.Role.ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.LABEL)));
                 var scroll = KitViewTest.find(listing, "files", JScrollPane.class);
                 assertThat(scroll.getViewportBorder().getBorderInsets(scroll).top).as("rows below the rail's top inset").isEqualTo(metric(DesignMetrics.Role.COLUMN_RAIL_TOP));
                 var header = KitViewTest.find(listing, "@table/files/header/name", JComponent.class);

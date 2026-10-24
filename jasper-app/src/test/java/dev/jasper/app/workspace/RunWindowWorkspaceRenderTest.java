@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.KeyBindings;
@@ -11,7 +12,6 @@ import dev.jasper.app.palette.RunWindowRenderTest;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.presentation.PaletteLook;
-import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.presentation.Projections;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.EnterpriseResources;
@@ -29,7 +29,7 @@ import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 
-/** Spec 16.1.4: the Run window open in a whole Enterprise workspace, at its corner home, matching the 06 Run Dialog mock. */
+/** Spec 16.1.4: the Run window open in a whole Enterprise workspace, at its upper home, matching the 06 Run Dialog mock. */
 class RunWindowWorkspaceRenderTest {
     @Test void theRunWindowInAnEnterpriseWorkspaceMatchesItsMock() throws Exception {
         EnterpriseResources.assumePlexResolves();
@@ -39,8 +39,7 @@ class RunWindowWorkspaceRenderTest {
             MacTitleBar bar = null;
             try {
                 // The Enterprise workspace as the application builds it: the shipped kit's chrome, every landed group.
-                var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", ChromeRenderTest.HOST,
-                    Presentation.LANDED);
+                var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", ChromeRenderTest.LINUX);
                 var look = WindowLook.of(projections);
                 assertThat(look.chrome().palette()).as("the classic chrome's palette is the Run window").isEqualTo(PaletteLook.RUN_WINDOW);
                 var owner = DesktopTestSupport.track(new WindowContent(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), DesktopTestSupport.HOME,
@@ -69,10 +68,17 @@ class RunWindowWorkspaceRenderTest {
                 var overlay = (JComponent) window.getParent();
                 var work = owner.paletteWorkArea(overlay);
                 var context = themes.appearance().context(ThemeRoute.CHROME);
-                assertThat(window.getX()).as("at its corner home, the mocks' 6 right of the left stripe")
-                    .isEqualTo(work.x + context.metrics().value(DesignMetrics.Role.RUN_WINDOW_HOME_SIDE));
-                assertThat(window.getY() + window.getHeight()).as("and the mocks' 5 above the bottom strip")
-                    .isEqualTo(work.y + work.height - context.metrics().value(DesignMetrics.Role.RUN_WINDOW_HOME_BOTTOM));
+                // The user's 2026-10-18 direction (Rulings 19): centred across the workspace, a seventh down, ending at the middle
+                // while that stays in the dock work area, clamped into it by the margin.
+                var workspace = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), overlay);
+                int margin = context.metrics().value(DesignMetrics.Role.PALETTE_WINDOW_MARGIN), inset = Math.min(margin, work.height / 2);
+                int h = window.getHeight();
+                int top = Math.min(workspace.y + workspace.height / UpperHome.TOP_FRACTION, workspace.y + workspace.height / 2 - h);
+                assertThat(window.getX() + window.getWidth() / 2.0).as("centred across the workspace")
+                    .isCloseTo(workspace.x + workspace.width / 2.0, within(1.0));
+                assertThat(window.getY()).as("Rulings 19's rule").isEqualTo(Math.max(work.y + inset, Math.min(top, work.y + work.height - inset - h)));
+                // This window, 902 tall with Enterprise's 8 rows, is too short for the upper half (Rulings 19): it sits just under the toolbar row.
+                assertThat(window.getY()).as("just under the toolbar row").isEqualTo(work.y + Math.min(margin, work.height / 2));
                 var strip = owner.bottomStrip().orElseThrow();
                 assertThat(strip.isVisible()).as("the bottom strip shows its tool windows").isTrue();
                 var stripAt = SwingUtilities.convertRectangle(strip.getParent(), strip.getBounds(), root);
@@ -80,16 +86,7 @@ class RunWindowWorkspaceRenderTest {
                 var stripeAt = SwingUtilities.convertRectangle(stripe.getParent(), stripe.getBounds(), root);
                 var placed = SwingUtilities.convertRectangle(window.getParent(), window.getBounds(), root);
                 assertThat(stripeAt.width).as("the left stripe shows its tool windows").isPositive();
-                assertThat(placed.x - (stripeAt.x + stripeAt.width)).as("the mocks' 6 right of the left stripe")
-                    .isEqualTo(context.metrics().value(DesignMetrics.Role.RUN_WINDOW_HOME_SIDE));
-                assertThat(stripAt.y - (placed.y + placed.height)).as("the mocks' 5 above the bottom strip")
-                    .isEqualTo(context.metrics().value(DesignMetrics.Role.RUN_WINDOW_HOME_BOTTOM));
-                // Against the mock's frame at 2x (Verified facts 8: frame x 60-61, frame bottom y 1694-1695, strip rule y 1706-1707): the
-                // mock's 2 px window border is not drawn here, and plan 7's left stripe is 28 thick against the mock's 23 (DockMockTest).
-                assertThat(2 * placed.x).as("the frame's left edge, the mock's x 60 less its border plus the stripe's extra thickness")
-                    .isEqualTo(60 - 2 + 2 * (stripeAt.width - 23));
                 assertThat(2 * stripAt.y).as("the bottom strip's rule, the mock's y 1706").isEqualTo(1706);
-                assertThat(2 * (placed.y + placed.height)).as("the frame's bottom edge, the mock's y 1696").isEqualTo(1696);
                 var image = new BufferedImage(root.getWidth() * 2, root.getHeight() * 2, BufferedImage.TYPE_INT_ARGB);
                 var g = image.createGraphics();
                 try { g.scale(2, 2); root.paint(g); } finally { g.dispose(); }

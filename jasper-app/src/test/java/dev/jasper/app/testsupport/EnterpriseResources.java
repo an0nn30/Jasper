@@ -24,6 +24,8 @@ import java.util.Optional;
 public final class EnterpriseResources {
     /** The repository, from the test task's {@code jasper.repoRoot}. */
     public static final Path ROOT = Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
+    /** The preserved Enterprise mocks. */
+    public static final Path REFERENCE = ROOT.resolve("docs/design/enterprise/reference");
     /** The plugin's resources folder: the root of its jar. */
     public static final Path RESOURCES = ROOT.resolve("plugins/enterprise/src/main/resources");
 

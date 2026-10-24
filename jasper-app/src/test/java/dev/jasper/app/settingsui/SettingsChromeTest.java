@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 class SettingsChromeTest {
     /** The Enterprise look's projection (spec 9.1's table). */
     static final SettingsChrome CLASSIC = new SettingsChrome(false, true, false,
-        Set.of("window.native_decorations", "ui.animations.enabled"), "Use the default font size");
+        Set.of("window.native_decorations", "ui.animations.enabled", "window.rail_width"), true);
     static final Path FILE = Path.of("/fixture/config.toml");
 
     static AuxiliaryWindows windows() {
@@ -70,7 +70,8 @@ class SettingsChromeTest {
         var hooks = new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),
             () -> { }, () -> { }, uri -> { }, (parent, count) -> true, KitTestSupport::context);
         boolean mac = com.formdev.flatlaf.util.SystemInfo.isMacOS;
-        var standard = Projections.standard(new Projections.Host(mac, mac && com.formdev.flatlaf.util.SystemInfo.isMacFullWindowContentSupported));
+        var standard = Projections.standard(new Projections.Host(Projections.Platform.of(System.getProperty("os.name", "")),
+            mac && com.formdev.flatlaf.util.SystemInfo.isMacFullWindowContentSupported));
         assertThat(hooks.chrome()).isEqualTo(standard.settings());
         assertThat(hooks.composition()).isEqualTo(Composition.ROWS);
         assertThat(PageContext.standard()).isEqualTo(standard);

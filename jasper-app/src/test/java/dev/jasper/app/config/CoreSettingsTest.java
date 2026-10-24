@@ -76,7 +76,7 @@ class CoreSettingsTest {
         assertThat(snapshot.appearance()).isEqualTo(AppearanceMode.LIGHT);
         assertThat(snapshot.terminalScheme()).isEqualTo(TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow());
         assertThat(snapshot.darkTheme()).isEqualTo("ocean");
-        assertThat(snapshot.lightTheme()).isEqualTo("slate-cobalt");
+        assertThat(snapshot.lightTheme()).isEqualTo("jasper-meadow");
         assertThat(snapshot.terminal().env()).containsExactly(Map.entry("A", "1"));
         assertThat(snapshot.statusBarHeight()).isEqualTo(30);
         assertThat(snapshot.keybindings()).containsExactly(Map.entry("copy", "none"));

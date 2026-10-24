@@ -1,6 +1,3123 @@
 # Jasper — Status and Handoff
 
-**Linux Desktop colors — 2026-10-18.** Approved [plan](superpowers/plans/2026-10-17-jasper-linux-desktop-colors.md) execution started on `codex/linux-desktop-colors` in the attached worktree. Protocol, portal and GTK helpers pass focused Java/native tests on the authorized Ubuntu 26.04 VM; GTK also passes in private Ubuntu 24.04 userspace, with Ubuntu 22.04 baseline compilation and old-GTK rejection verified. Clarifications: missing modern libadwaita variables remain missing, and preview acquisition carries explicit source/appearance demand. Tasks 2–3 Java regressions were already covered by Task 1; native missing APIs and behavioral regressions supplied RED evidence. The pinned Ubuntu 26.04 CI container remains unexecuted; local native evidence uses the VM and older rootfs userspaces. Java supervision is implemented and independently reviewed: 35 focused tests pass across task/fix runs, with capped GTK capability retries and a live portal observer. Task 5 will document the already-approved appearance-to-platform dependency when its imports begin. No feature completion claimed.
+**Linux Desktop colors — 2026-10-24.** Continuing the approved [plan](superpowers/plans/2026-10-17-jasper-linux-desktop-colors.md) on `codex/linux-desktop-colors`, refreshed from main `22a611145`. Protocol, portal, GTK extraction and Java supervision are implemented and independently reviewed; palette mapping is in progress. Earlier native verification covers the Ubuntu 26.04 VM and private Ubuntu 24.04/22.04 userspaces. Verification after this refresh is pending.
+
+## Current state — 2026-10-22
+
+Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core is the workspace (windows, tabs, panes
+and tool windows), the terminal (with the bundled Cygwin environment's Cygwin Bash on Windows), the command palette,
+notifications, Settings, themes and looks; most features, the Editor and its Markdown preview among them, are bundled
+plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
+
+- **Branches.** `main` and `origin/main` are at `06746d3c2` (pushed 2026-10-22): `claude/workspace-tabs` (the
+  workspace tabs and the single instance: plans 1 to 5, 7a to 8c, 6a, 6b, 9a and 9b, and the side branches
+  `claude/html-disable-sweep`, `claude/priceless-curie-c36f2d` and `claude/hopeful-newton-94a051`), which merged
+  `origin/main` at `8c8776e7e` on 2026-10-21 and at `132dcac3e` on 2026-10-22, then `claude/staged-remote-sessions-flake`
+  (the merge entries below); the series' entries, which end "not merged" or "not pushed", were written before the push.
+  `origin/main` at `132dcac3e` is
+  `8c8776e7e`, the Editor font size shortcuts (`f77c41c94`) and the documentation commit that brings the guides up to
+  them; `origin/main` at `8c8776e7e` is `427321de4` and the two documentation commits that bring the guides up to it.
+  `origin/main` at `427321de4` adds, since the V1 documentation merge (`bee2c9f28`), the Rail and Status Bar Keymap
+  actions, the animated Meadow splash and the Shell Prompt application icon (both shared by Enterprise mode),
+  the Editor's own typography and Markdown preview (SDK 0.18.3, Editor 0.11.0, Remote 0.15.1), the bundled Cygwin on
+  Windows, Jasper Meadow as the default theme of both appearances in both looks, with a new Dark variant (`73c2b8f61`),
+  and the website without its demo fixtures and preview pages (`375615bbf`); the Cygwin entry below, which says "merged
+  into local `main`", was written before the push. `c6bb59fdd` has the V1 code fixes (`claude/v1-code-fixes`, the code
+  problems the V1 documentation audit found: the package description and Linux menu categories, setting descriptions,
+  Option key as Meta shown only on macOS, the Sample's Greetings… shortcut (Cmd+Option+Y; Ctrl+Alt+Shift+Y), the
+  Editor's F3 and Shift+F3 off macOS and one Close Tab in its tab menu, Vault's classic Lock Vault caption, the
+  `shellHistorySearchMeasurement` task's removal and the vimrc byte order mark written as a Java escape), Enterprise
+  plans 13 (stripe icons), 14 (IntelliJ Classic's title bar), 15a (the look query) and 15b (look polish), Jasper
+  Meadow's Light variant, the Windows user installation, Desk Buddy's shaded pixel sprites, the boot splash fix and
+  PR #1's CI, Windows and Linux fixes; entries below that end "merged to local `main`, not pushed" were written before
+  the push, and the Ubuntu Yaru, plan 10b, series and side-stripes entries, which end "Not merged", before their merge
+  (the side stripes as the rebased `e8ecfdcf2` to `faeec76f3`, which plan 15a's E15 leaves to confirm). The V1
+  documentation overhaul (`claude/v1-docs`, with `origin/main` at `c6bb59fdd` merged in) is merged into `main`; its entry below, which
+  ends "Not merged into `main`", was written before the merge. Since then `claude/v1-docs` has brought the guides up to
+  `427321de4`, then to `132dcac3e` (the Editor font size shortcuts) and then to `06746d3c2`. Unmerged into `main`:
+  `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
+- **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
+  one `:jasper-plugin-<dir>` for each directory under `plugins/`.
+- **SDK** `0.21.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.21.0, <0.22"`.
+- **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
+  either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
+  Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.
+  **Looks:** the default look, and the Enterprise look while its plugin is on (Settings › Plugins, then restart;
+  safe mode starts with the default look).
+- **Releases.** `v1.0.0` is tagged at `9d58fe73e` (2026-10-19, the merge of PR #1) and published on GitHub as the
+  prerelease Jasper 1.0.0; no entry below records that run.
+- **Last recorded checks.** `./gradlew check --continue` on `claude/staged-remote-sessions-flake` and on
+  `claude/workspace-tabs` after the third sync (both 2026-10-22): 12,823 tests, 0 failures, 0 errors, 29 skipped (25
+  platform skips and four opt-in Editor performance tests); no check is recorded for their merge, `06746d3c2`, which
+  conflicted in this file only. Earlier on the branch: 12,802 after plan 9b's final fix wave and its residual round
+  (2026-10-22) and 12,706 after plan 9a's (2026-10-21). `claude/editor-font-zoom` (`427321de4` with the Editor font size
+  shortcuts, 2026-10-21) had 11,893 tests, 0 failures, 0 errors, 29 skipped. These ran with Python 3.13
+  (`-Pjasper.python`), because `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14.
+  Hosted CI on PR #1 (2026-10-19): macOS, Ubuntu and every Linux packaging and install check passed, and so did the
+  single-worker Windows check; no later hosted CI run is recorded.
+
+Bundled plugins, all enabled by default except Enterprise:
+
+| Plugin | Id | Version | Exports | Provides |
+| --- | --- | --- | --- | --- |
+| Credential Vault | `dev.jasper.vault` | 0.7.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
+| Editor | `dev.jasper.editor` | 0.15.0 | `dev.jasper.editor.api` | Local and remote text files in panes, several views of one file, Markdown preview; `jasper editor` |
+| Enterprise | `dev.jasper.enterprise` | 0.3.0 | — | The Enterprise look and theme, as descriptor data |
+| File Server | `dev.jasper.fileserver` | 0.6.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
+| Project Index | `dev.jasper.indexer` | 0.3.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
+| Remote | `dev.jasper.remote` | 0.16.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
+| Sample | `dev.jasper.sample` | 0.5.0 | — | Exercises the plugin runtime; inert unless a `demo_*` setting is set |
+| Shell History | `dev.jasper.history` | 0.3.0 | — | Searching every shell's history from the palette |
+| Snippets | `dev.jasper.snippets` | 0.3.0 | `dev.jasper.snippets.api` | Saved commands in the palette |
+
+Open items, as the entries below record them:
+
+- **GUI checks.** No entry from 2026-10-13 on records its "GUI checks for the user" as done. The longest list is the
+  Enterprise look's, in the series entry (2026-10-18, spec 16.2); the side stripes entry and plans 13, 14, 15a and 15b
+  add their own, plan 14's starting with the classic title band in the packaged macOS app. The Editor's fonts and
+  Markdown preview list theirs in [Editor verification](editor-verification.md#fonts-and-markdown-preview), and the
+  Meadow splash, the Rail and Status Bar shortcuts (2026-10-20) and the Editor font size shortcuts (2026-10-21) await
+  theirs. The workspace tabs series awaits the checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only
+  tab, plans 7a to 8c, 6a, 6b, 9a and 9b; plan 2 had none), and so do its merge entries ("local main merged in",
+  2026-10-19, the second sync, 2026-10-21, and the side branches with the third sync, 2026-10-22). One AOT training run
+  should confirm the seeded `workspace.toml` (2026-10-21).
+- **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
+  one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
+  fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
+  classic title bar, the boot splash on Windows and Linux (2026-10-19), the Windows network-share checks (2026-10-14),
+  the Enterprise look's Windows and Linux checks (series entry) and Ubuntu Yaru's native appearance and window checks
+  (2026-10-17) need those machines. The bundled Cygwin's native x64 Windows acceptance and its interactive checks in
+  the app on both architectures (2026-10-20) are still to run and block release publication
+  ([verification](superpowers/plans/2026-10-20-jasper-cygwin-verification.md)).
+- **Theme converter.** `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails under Python 3.14 (2026-10-17,
+  and again on 2026-10-20); that test last changed on 2026-10-13.
+- **Website.** The Shell Prompt and Meadow website changes are not deployed: the Pages workflow runs only by hand and
+  has not been run (2026-10-20).
+- **Rulings awaited.** Plan 12's Rulings 17 (the focused header's guard) and its question on the Run window's row
+  count, plan 13's comparison of the iconed stripes with their icon slices cut out, and plan 9b's Ruling 14: one find
+  bar per Editor window, in its selected view, where IntelliJ and VS Code give each view its own.
+- **Deferred.** From plan 2's entry: `workspace.toml`'s writer has no depth cap while its reader drops a tab whose
+  splits nest deeper than 64; and a split to the left or up, then closing the new pane or dragging it back (plan 5),
+  does not give the sizes back exactly, so the pane that was split halves on each round trip.
+- **Test temp folders.** About 235,000 folders that tests leave in `java.io.tmpdir` on the dev Mac (`plugin-fixture*`,
+  `jasper-contract*`) slow sqlite-jdbc's native load; cleaning them up is left for a change of its own (2026-10-22).
+- **Enterprise residuals.** The differences from the mocks that the series entry and plans 13 to 15b list; the splash's
+  fixed colours and "Workstation…" step text for other branded looks; the external THD plugin's rebuild against SDK
+  0.21.0, from its `jasper-sdk-0.18.3` branch (plan 6b's entry); the default look's macOS menu bar, which still folds
+  against the window's width (plan 14).
+
+## Handoff log
+
+Newest first. Each entry describes its change as it stood when the entry was written.
+
+**Shared display scaling — 2026-10-24** (`codex/shared-display-scaling`; merged into `main` for Linux testing): terminal fonts,
+initial window geometry and pane padding follow FlatLaf's user scale while font settings and per-pane zoom stay in
+logical points (6–72, with rendered sizes allowed above 72). Scale changes refit the existing PTY and closing a pane
+releases its observer. Enterprise family-only UI font changes retain the desktop font size used for scale derivation.
+The [plan](superpowers/plans/2026-10-24-shared-display-scaling.md) left the precise control fix to investigation, a
+deviation from the complete-code planning convention. Independent task and whole-branch reviews found no issues;
+focused and fresh 1.25/1.5/2 scale checks passed. `./gradlew check --continue` with Python 3.13 passed: 12,847 tests,
+zero failures/errors, 29 skips. The first run found the corrected source-inventory omission for the two new app tests.
+Native GNOME Wayland and KDE acceptance remains pending. No GUI or AOT run.
+
+**Buddy translucent Linux rendering — 2026-10-24** (`codex/buddy-wayland-rendering`; Ubuntu fix verified by the user, approved for merge):
+all four Buddy windows compose complete frames in reusable device-resolution ARGB buffers, then replace native
+pixels in one clipped blit. This avoids X11 Swing's opaque backbuffer and the native background clear between
+frames. Headless pixel tests cover transparency, old-frame erasure, clipping, resize, disposal and 1×, 2× and
+1.25× scaling; `:jasper-buddy:test` passed (162 tests, zero failures, errors or skips). Full `check` passed with
+Python 3.12.14: **12,850 tests, zero failures/errors, 29 skipped**. Task and whole-branch reviews approved. The [plan](superpowers/plans/2026-10-24-buddy-wayland-rendering.md) records the implementation;
+its scope grew by one architecture-guide sentence. The user confirmed on Ubuntu GNOME Wayland that the black box
+and flickering are gone (2026-10-24). Dragging, repeated hide/show, menu/drawer and display scaling remain unrecorded.
+
+**Editor Color scheme setting — 2026-10-23** (`claude/editor-color-scheme`, worktree
+`.claude/worktrees/editor-color-scheme`, from local `main` at `f30067a2d`; not merged or pushed): the Editor's
+`color_scheme` (Settings › Tools › Editor › Colors) is `"workspace"` (the default: the shown UI theme's editor scheme,
+the behaviour before) or an installed theme's `<id>/dark` or `<id>/light` scheme, kept whatever the appearance; a saved
+scheme that is not installed is listed as not found and the workspace's applies. SDK 0.21.0 (unreleased) gains
+`EditorScheme` and `Appearance.editorSchemes()`; the app converts the `ThemeController`'s `ThemeLibrary` and announces
+a changed library as a workspace change; the testkit's `setEditorSchemes` and a contract test cover both runtimes. The
+Markdown preview keeps the workspace's colours. Plan: `docs/superpowers/plans/2026-10-23-editor-color-scheme.md`,
+executed in one session with a whole-branch review instead of per-task subagents. GUI check pending: pick a scheme of
+the other variant, flip the appearance, import and remove a theme while it is chosen.
+
+**Editor: Move Pane to Tab names every tab — 2026-10-23** (`claude/editor-tab-names`, rebased onto `main` at
+`f30067a2d`): the Editor's right-click Move Pane to Tab listed terminals' and other plugins' tabs as "Tab N",
+because a plugin reads other tabs' titles only with `terminal.observe` (plan 9a's security fix) and the Editor did not
+declare it. The user chose to have the Editor declare it, over Jasper drawing plugins' pane menus itself: the bundled
+Editor's `plugin.toml` now lists `terminal.observe`, so the menu names every tab as the Tab menu does. A bundled
+plugin is admitted without review, so no consent prompt appears; third-party plugins still see "Tab N" unless they
+declare it. The Editor's version is unchanged (0.16.0 on `main`). A new `EditorManifestTest` reads the shipped manifest
+(it failed before), and the Editor's test hosts declare what the manifest does. `./gradlew check --continue`: **12,828 tests, 0 failures,
+0 errors, 29 skipped**. GUI check for the user: in
+a window with a terminal tab and an Editor file in another tab, the Editor's right-click Move Pane to Tab lists the
+terminal's tab by its title.
+
+**Staged Remote fixture waits for its transfer store — 2026-10-22** (`claude/staged-remote-sessions-flake`, worktree
+`.claude/worktrees/staged-remote-flake`, from `claude/workspace-tabs` at `6f66a3603`; not merged or pushed):
+`StagedRemoteSessionsTest.editingSavedVaultReferenceWithoutOptionalVaultDoesNotLinkItsApi` failed now and then under a
+full `check` with "Plugin workers did not finish resource cleanup after stop". A thread dump taken while the fixture's
+`close` waited showed the Remote worker inside `TransferCoordinator.controlLoop`, opening the transfer store: sqlite-jdbc
+was extracting and `System.load`ing a fresh copy of its native library for the plugin's own class loader. A stop cannot
+interrupt that load. The test stops the plugin about half a second after starting it, so `close` waited on the load:
+1.4–2.8 s per run at a load average near 50, and past the 10-second bound near 100 (reproduced on the second run). The
+same load made `StagedTransferLifecycleTest` flaky (its entry below). `StagedRemoteHost` now waits, before it returns,
+for the transfer queue to answer a snapshot, which it does only once its store is open, so `close` no longer races the
+load; a new `StagedRemoteHostTest` pins it (it failed before the change). Test-only change. After it, 50 runs in a row
+passed at load averages of 20–120 with every worker wait at close 0 ms; the staged Remote suites (`StagedRemoteHostTest`,
+`StagedRemoteSessionsTest`, `StagedRemoteSftpTest`, `StagedRemoteTunnelsTest`, `RemoteRenderEvidenceTest`) pass. The
+load is slow partly because sqlite-jdbc lists all of `java.io.tmpdir`, which on the dev Mac holds about 235,000 entries,
+mostly `plugin-fixture*` (127,000) and `jasper-contract*` (97,000) folders that tests leave behind; cleaning those up is
+left for a change of its own. `./gradlew check --continue`: **12,823 tests, 0 failures, 0
+errors, 29 skipped**.
+**Workspace tabs: the side branches and origin/main merged in (the third sync) — 2026-10-22**
+(`claude/workspace-tabs`, `be2fe2670..6bc961c6f`, then this entry). Four `git merge --no-ff`, in this order; both
+sides' intent kept in every conflict:
+1. `claude/html-disable-sweep` (`0f52f9ef9`, cut at `ff322c478`, before plans 9a and 9b), merge `6f6bf04be`: this file
+   (the sweep's entry below plan 9a's) and `docs/design/theme-engine/migration.csv` (9a's and 9b's rows, then the
+   sweep's). `c8a0d95ca` then applies the sweep's rule to the menus 9a and 9b added: Move Tab Into's entries and the tab
+   menu's item commands (the Editor's Split File Right and Down among them) come from `PlainText.item`; the right-click
+   menu's Split list and Move Pane to Tab take `PlainText::item`, so their items have `html.disable` before their
+   Action; the Editor's `DocumentArea.menuItem` sets it before a command's title, so the text menu's Split File items
+   are plain text (`EditorViewsTest.theRightClickMenusSplitFileItemsArePlainText`). The Tab menu's Move Pane to Tab
+   and Move Tab Into entries and `DocumentArea.submenu` and `plainItem` already set it first and keep it.
+2. `origin/main` at `132dcac3e`, merge `fa15bd9eb`: `claude/priceless-curie-c36f2d` was cut from `main` there, not from
+   this branch, so main's Editor font size shortcuts (`f77c41c94`) and their documentation commit came in first, on
+   their own. Nine files conflicted. `HostedContentTest` keeps both sides' tests, main's font size test opening its
+   tabs with `tabs().open` and reading `currentTerminal()`. The Editor, workspace, keyboard shortcuts, maintenance and
+   plugin guides, the SDK guide page and the SDK reference keep this branch's wording with main's `font-bigger`,
+   `font-smaller` and `font-reset`; the Editor guide's tab menu lists the three font size commands, and each view of a
+   file has its own font size (`EditorViewsTest.increaseFontSizeInOneViewLeavesTheFilesOtherViews`, `6bc961c6f`). This
+   file keeps the branch's header with main's check and GUI check, and main's entry between the second sync's and plan
+   6b's.
+3. `claude/priceless-curie-c36f2d` (`7e59bdc42`), merge `6240ec810`: this file only.
+4. `claude/hopeful-newton-94a051` (`2be1e468d`, cut at `2b168a6af`), merge `6f66a3603`: this file only (the GUI checks
+   item and its entry). Plans 9a and 9b left `dev.jasper.app.persistence` as it was, and `StartupBenchTest` passes on
+   the seed unchanged.
+
+The entries dated 2026-10-21 are in commit-time order. `./gradlew check --continue` (Python 3.13): after merge 1 and
+`c8a0d95ca` 12,812 tests, after merges 2 and 3 12,819, each with 0 failures, 0 errors and 29 skipped; after merge 4,
+while another worktree's tests held the Mac at load averages of 90 to 170, 9 `jasper-app` failures, 8 of them "Plugin
+workers did not finish resource cleanup after stop" and one `SingleInstanceTest` timing assertion, none in code the
+merge touched; once the load fell, **12,823 tests, 0 failures, 0 errors, 29 skipped**. GUI checks for the user: the
+merged entries' own, and Increase Font Size in one view of a file leaving its other views as they were. Not merged
+into `main`, not pushed.
+
+**Workspace tabs, plan 9b: two views of one file — 2026-10-22** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `ab55ecde6..e6c33c193`, the documentation commit `c098fcbc5`, then the final
+review's fix wave, `ba3d5c783` to its documentation commit;
+[plan](superpowers/plans/2026-10-21-workspace-9b-two-views-of-a-file.md),
+[spec](superpowers/specs/2026-10-21-jasper-pane-flexibility-design.md), section 6). The Editor (0.15.0) shows one file
+in several views, each the item of a pane. **Split File Right** and **Split File Down** (the text's right-click menu,
+the tab's item commands, the palette as `dev.jasper.editor.split_file_right` and `_down`, Vim's `:action`; no default
+key) open another view beside the file's own, which they select first; **Open File Right…** and **Down…** of an open
+file (plan 9a's `openDocumentBeside`) open one beside the focused pane. A file's views share one Swing document
+(`VimTextArea.share`) and one undo history: the first view's `VimUndoManager` is the document's, which every view's
+text area gets back from `createUndoManager` (RSyntaxTextArea asks for it again in `discardAllEdits`), each view's
+registration with the document handing it each edit once, so it takes each edit once; each view brackets its own Vim
+steps, the one the user last typed in, clicked or focused edits now, and another view's open change ends where the next
+one edits (Vim's u_sync); an undo or redo moves only its own view's caret to the change, the others keeping caret,
+selection and place. An edit in one view leaves another view on the same text, not the same pixels: a
+`DocumentFilter` on the shared document (on only while it is shared) notes each other view's first shown line as a
+`Position` before every edit and puts it back after Swing's caret scroll, once per view per event, so lines added or
+removed above a view move it with its text, as Vim's `mark_adjust` moves another window's topline; a Vim view's cursor
+stays on its text in every mode outside the command line, and the window scrolls by the engine's `updateTopline` (Vim's
+`update_topline`, with `scrolloff`) the least that shows it (`VimEditor.keepPlace`); a view without Vim keeps its first
+line. A view that closes while others stay lets go of the document (`unshare`: an empty document and a history of its
+own, discarding nothing of the shared one) and takes its listeners off the session (`DocumentSession.removeListener`);
+Cancel in one view of a loading file leaves the read to the others; a split view starts at its source's caret, selection
+and scroll position. The session reads and replaces its text through `TextViews`, once for every view, each keeping its
+caret line. In `EditorWindow` a file's views are listed most recently active first (`recent`), a closing view leaving
+the others in that order: Open in Editor… and `Editor.open` of an open file select the first, prompts show over it, and
+only the file's last view asks about unsaved changes, a batch close asking once per file whose every view closes. Vim has
+one buffer per file and the views as its windows (`VimHost.Buffer.windows`, `Documents.quit` and `show`): `:q` closes its
+pane and gives `E37` only in a changed file's last view; the buffer's marks, the last Visual area and the change list are
+kept once per document (`Marks.Buffer`, a document property) for every view's editor, the jumplist, `''` and the place
+in the change list per view; the buffer-local options (`Options`' third level: `sw`, `et`, `ts`, `sts` and the other
+"Per file" options of the Editor guide) are the file's, `number`, `relativenumber` and `wrap` the pane's. Restoring, an
+open key comes back as another view, which reads nothing (`openRestored` returns nothing now; the restorer no longer
+declines "the file is open in another tab"). Remote and Project Index are unchanged: they see one document per key, read
+and saved once. Rulings (plan, "Rulings"; the amended ones as amended during execution): (1) one undo history per
+document, the first view's `VimUndoManager`, shared through `RTextArea.createUndoManager` and `setDocument`, taking each
+edit once; (2) the view that edits now is the one last typed in, clicked or focused, or whose Vim engine asked, and
+another view's open change ends where the next edits; (3), amended after Task 1a's review (a controller ruling): an
+undo or redo moves only its own view's caret, and an edit in another view leaves a view showing the same text, not the
+same pixels, as Vim's `mark_adjust` keeps another window's topline on its text and VS Code and IntelliJ keep another
+editor on its text; in a Vim view the cursor stays on its text in every mode outside the command line, and the window
+scrolls the least amount needed to show it, honouring `scrolloff`; in a view without Vim the first line stays; and these
+departures were added in the fix rounds and accepted: a whole-text replace (Revert or Reload) and its undo keep each view
+on its line number, an insert at a view's first-line start, and at offset 0, keeps that line on top (Vim shows the new
+line), an edit that takes away the first shown line shows the text after the deletion (Vim shows the line before it),
+and a Markdown view coming back from Preview shows the text it showed; (4) a closing view lets go of the document while
+others stay; (5) the session's text goes through `TextViews`, replaced once, each view keeping its caret line; (6) the
+language, tabs and soft wrap are the file's; (7) a file's views are listed most recently active first, an open of an
+open file selects the first, and a closing view keeps that order; (8) only a file's last view asks, and a batch asks
+once per file; (9) Split File Right and Down are Editor commands and actions with no default key, selecting their view
+first; (10) Open File Right… of an open file opens another view and reports it to Recent Files as Open in Editor… does,
+Split File and a restore report nothing; (11) a view's restore state is its file's key alone, and an open key restores
+as another view; (12), amended after Task 3's review (the user's rule: follow the industry standard, so Vim): one buffer
+per file, its views the windows, `:q` closing the pane and `E37` in a changed file's last view only; an uppercase mark
+set in another file selects the view it was set in, one set in another view of the same file acts in the current window
+(`getmark_buf_fnum`), and a mark whose view closes passes to the file's most recent other view; (13), amended likewise:
+Vim's buffer marks, the last Visual area and the change list belong to the file, the jumplist and `''` to each view; a
+new view starts at the change list's end and only the editing window's place in it moves (`changed_common`); a split
+view copies its source's jumplist, `''`, change-list place and window-local options (`win_init`); buffer-local options
+(`sw`, `et`, `ts`, `sts` and the others) are the file's and the window-local ones (`number`, `relativenumber`, `wrap`)
+the pane's, which **supersedes Ruling 13's clause that options stay global** for them; (14) one find bar, in the selected
+view, so no view's search leaks into another (the controller's reading of spec 6, which gives each view its own find
+bar: the find bar belongs to the window's selected view, as with files today, and per-view find bars, as in IntelliJ and
+VS Code, would change every tab's behaviour and are left for the user to decide); (15) the Editor API's plugins see one
+document per key, and `Editor.open` of an open key selects its view focused last; (16) Editor 0.15.0; (17) no `:split` or
+`:vsplit`; (18) `jasper editor --wait` returns once the file's last view has closed; (19) a split view starts at its
+source's caret, selection and scroll position; (20) Cancel in one view of a loading file closes that view alone, the
+read going on for the others.
+Spec issues: none. Deviations: (1) Task 1a's fix rounds (`4fec5fb25`, `a1ff84d6f`): Ruling 3 amended as above, with the
+added rules (the whole-text replace and its undo by line number, a stale viewport laid out before a put-back, the
+first-line insert); `share` enforces its preconditions and a closed view cannot be shared; one put-back per view per
+event (`View.queuedIn`, cleared when the latest put-back runs); the Markdown Preview keeps its place as a `Position`
+(`DocumentArea.SourcePlace`); the cursor rule applies in every Vim mode outside the command line, not only Normal mode.
+(2) Task 2's fix round (`fc9d4d147`): closing a view keeps the most-recent order (`remove` selects `recent`'s first, not
+the first opened); `EditorWindow.step(int)` and the no-argument `mayClose()` are gone; `tabsClosing`'s Javadoc and `openView`'s
+`getFirst()`. (3) Task 3's fix round (`a6b4ff402`): Rulings 12 and 13 amended as above; `Vim.GlobalMark.inFileOf`; the
+`Marks` constructor starts a view at the change list's end and `Buffer.changed` moves only the editing window's place
+(`VimTextArea.editsNow()`); file marks pass on in `EditorTab.shutdown` (`marksHeir`, `VimEditor.leaveMarksTo`), not in
+`EditorWindow.remove`, which runs after Vim closed; `VimEditor.splitFrom`, `Marks.splitFrom`, `Options.window()` and
+`windowFrom`; the Vim reference changed six rows (`ZQ` and `:q[uit]` in Task 3, `ZZ`, `:setl[ocal]`, `:wq` and `:x[it]`
+in the fix round), where the plan named two. (4) Task 4: `openRestored` passes `views(open).getFirst()` as the sharing
+view, as `openView` does after Task 2's fix, where the plan had a stream's `orElse(null)`. (5) Found during execution,
+fixed in `e6c33c193`: with Vim on in two views, an edit in one and then the other view's close threw a
+`NullPointerException` in `unshare`: `EditorTextView` took its lines from the view's own document and its token lists
+from the text area's current one, so a `setDocument` with stale geometry laid out the old lines against the new
+document; it reads the tokens from its own document now, as RSyntaxTextArea's `SyntaxView` does (seven cases, six of
+them RED with the exception). (6) Task 1b added one case beyond the plan (a second view's Vim groups), and the plan's
+Workspace counts are lower than what ran: the Editor's suite, 5,177 tests there, has 5,248, among them
+`VimUndoManagerTest` 41 (the plan's 8), `TextViewsTest` 30 (8), `EditorViewsTest` 22 (12) and `EditorWindowTest` 82 (79),
+the fix rounds', the crash fix's and the final fix wave's cases included. (7) Task 5 (the documentation commit
+`c098fcbc5`) also corrects `docs/vim-divergences.md`, where "Tabs are the buffers", "Uppercase marks across tabs" and
+"One typeahead per tab" were no longer true, and adds its "Another view's window after an edit" item; the options table
+of the Editor guide says "Per file" and "Per pane" where it said "Per tab". (8) The final review's fix wave
+(`ba3d5c783`, `d6e7ab0b6`, `ef0a315a1`, `d7a335e69`, then the documentation commit that updates this entry), with the
+controller's rulings: I1, several edits in one event (Replace All, Toggle Comment on several lines) took a view without
+Vim that was scrolled away from its caret to its caret, since its put-back ran before the later edits' caret scrolls:
+the put-back now goes through the event queue twice, after everything the event queued, still once per view per event;
+I2, Split File Right or Down with Vim on put the new view's cursor on another line, since the caret was copied and the
+viewport moved before the new pane's first layout and outside Vim: a Vim view now starts once its viewport has a size,
+as Vim's `:split` starts a window (the cursor on its source's, the source's first line on top, then `update_topline`;
+`EditorTab.startAt`, `VimEditor.startAt`), and while a put-back or a split's start waits, `ViewportSync.userScrolled`
+follows only a scroll the mouse makes (the parked guard), the Preview's restore going through Vim as a put-back does
+(`VimTextArea.keepPlace`); I3, a Markdown view in Preview lost its source's place on a reload or Revert to Saved (a
+one-view regression from `a1ff84d6f`): across a whole-text replace the place keeps its line number
+(`DocumentArea.replacing`, from `EditorTab.beginReplace`) and then follows the new text; M1, a wheel scroll, or a press
+on a scroll bar, of a view's pane while its put-back waits lets go of the place (`VimUndoManager.UserScroll`), which
+fixes the edge Task 5 noted (a queued wheel scroll overridden by a put-back); M2, a view that does not show once it has
+been displayable (a tab not shown, a source behind Preview) queues no put-back, so the put-back lays out none of its
+text while another view is typed in, and is put back once it shows, by the same rules (`EditorTextView.geometryBuilds()`
+counts the layouts for the test); a known cost stays: Swing's caret still lays out a hidden view whose caret an edit
+moves, one whose caret is below the edits, to scroll it into sight; M3, Open File Right… and Down… of an open file start
+the new view where the file's view active last is, as IntelliJ opens a file again at its last caret, through Vim's start
+with Vim on. Also in the wave: the Preview's place at the text's start follows the first-line rule; `Step.takesWhole`
+counts only inserts and removals; the marks heir is the file's view active last with Vim on, and its Javadoc cites
+Rulings 12; the class Javadoc and `docs/vim-divergences.md` widen the first-line departure from `mark_adjust` (lines
+added just above a window's first line: `O`, `:put!`, `o` on the line above, a split at column 0), the parked
+`w_topline` nuance being overturned; new cases pin the cursor rule while a command line is typed and in Insert mode,
+`g;` after an edit made from the middle of the change list, a view opened after a `:setlocal`, `:marks` for an uppercase
+mark of the same file, a two-window restore with the origin reset on the view path, a quiet read told from a loud one,
+and what a restored second view shows; the Editor guide says that closing asks only for a file's last view, how Open
+File Right… starts, and that a remote file's sign-in prompt shows over the window it was first opened in (a second view
+in another window shares the first view's sign-in owner, so a loud Retry asks there). The residual round after the fix
+wave's re-review (`e7960dc34`, then the documentation commit after it): a whole-text replace in another view (Select
+All, then paste) keeps a Vim view's cursor on its line number, as a reload does, and its window follows by Vim's rule,
+shown or hidden, where Swing's caret had taken the cursor to the end of the text; while a put-back or a split's start
+waits, Vim follows only the wheel or the mouse on a scroll bar (`ViewportSync.scrollingByHand`), so a click elsewhere, a
+tab's header say, that edits and lays a view out is not the user's scroll; a text area that shares a document drops the
+history it was made with (`VimUndoManager.abandon`), whose view listened to it for nothing; the marks heir has its test
+(a view before it in recent order whose Vim has stopped is passed over); and `docs/vim-divergences.md` says that
+`:marks` and `"%` show the file's location. Accepted with no change, as the reviews ruled: Task 1b's Minor 4 (one dirty
+check per view per edit), Task 4's Minor 4 (`openRestored`'s sentinel shape), the garbage-collection test of Task 1a,
+which assumes explicit GC (the build never disables it), and the other edge Task 5 noted: an edit no view's hook sees (a
+reload) holds no place for the view that edits now.
+
+`./gradlew check --continue` after the residual round: **12,802 tests, 0 failures, 0 errors, 29 skipped, BUILD
+SUCCESSFUL** (app 4,395, Editor 5,248, UI 943, terminal 460, testkit 244, Buddy 154, SDK 105, the other plugins 1,253)
+(excludes the external example, which `check` does not run); after the fix wave the example external plugin's
+`check pluginZip`, built against the SDK jars `check` wrote, passed, and the residual round changed no SDK. The fix
+wave's run had 12,796 tests (Editor 5,242); the run before it failed one app test, `StagedRemoteSessionsTest`'s
+`editingSavedVaultReferenceWithoutOptionalVaultDoesNotLinkItsApi` ("Plugin workers did not finish resource cleanup after
+stop"), which then passed three times on its own and in the next full run. The documentation commit `c098fcbc5` had
+12,777 tests (Editor 5,223).
+GUI checks for the user:
+- Split File Right from a file's right-click menu: the file shows in a new pane to the right; typing in either pane shows
+  in both at once, the ● marker on both; Cmd+Z (Ctrl+Z) in the other pane undoes it, that pane's caret going to the
+  change while the first pane's caret, selection and scroll position stay;
+- Split File Down from the middle of a long file with some text selected: the new view shows the same place and the
+  same selection; split a file at line 500: the new view starts at line 500;
+- from one view, add lines above another view's window, then delete lines above it, with Vim on and with Vim off: the
+  other view keeps showing its text, and a Vim cursor keeps its line;
+- Vim on: `ma` in one view, then `'a` in the other goes to the mark; an edit in either, then `'.` and `g;` in the
+  other, go to it;
+- in view A `:setlocal sw=2 et`, then `>>` in view B: B indents by two spaces;
+- Cancel in one view of a remote file that is still loading: that view closes, and the other shows the file once read;
+- scroll one view far from its caret with the wheel, then type near the top in the other view: the first view stays
+  where it was scrolled;
+- Vim on: Insert mode in one view, click the other view and type, press Esc in the first, then `u` in each: each undo
+  takes the newest edit, in time order;
+- a Markdown file: Preview in one view, Source in the other; typing in the source updates the preview;
+- close one view of a changed file: no question; close its last view: "Save changes to …?"; move one view to a new
+  window, change the file, close that window: no question; then Quit: one question naming the file once; with unsaved
+  edits in two views in two windows, Quit asks once;
+- Revert to Saved from one view while the other view's caret is near the end of a file the revert shortens;
+- Save As… from one view: both panes take the new name; quit and start: both views come back, each in its pane;
+- restart with two views of one file: both come back;
+- a remote file in two views (one in a child window): quit and start; both come back waiting, and showing either reads
+  the file once, quietly;
+- Open File Right… of a file that is already open: another view beside the focused pane; Open in Editor… of it then
+  selects the view you were in last;
+- Vim `:ls` in a view of a file with two views lists it once; `:q` there closes only that pane, and `:q` in its last
+  view of a changed file says `E37`;
+- Vim on in both views of a file: type in one, then close the other: no error;
+- Vim on, two views of a changed file: `:wq` in one saves the file and closes that pane; `:qa` in the other closes it;
+- Vim on: `mA` in a view of one file, then `'A` in a view of another file selects the view it was set in, on its line;
+- Replace All, or Toggle Comment on several lines, in one view while the other view is scrolled away from its caret:
+  the other view stays where it was scrolled;
+- Split File Down and Split File Right with Vim on and the cursor in the lower half of the window: the new view's
+  cursor is on the same line, in sight;
+- a Markdown file in Preview that changes on disk, or Revert to Saved after an edit while in Preview: back to Source, it
+  shows the line it showed;
+- Open File Right… of an open file: the new view starts where the view you were in last is (with Vim on, on its
+  cursor line);
+- two views of a 1 MB file, one in a tab that is not shown with its caret near the top: typing below that caret in the
+  shown view stays as quick as with one view, and selecting the other tab shows it on its text;
+- Vim on, two views of a file: Select All and paste in one; the other's cursor stays on its line number, in sight.
+
+Not merged, not pushed.
+
+**Workspace tabs, plan 9a: open beside, and moving panes and tabs into tabs — 2026-10-21** (`claude/workspace-tabs`,
+worktree `.claude/worktrees/workspace-tabs`, `b748fa26a..f7d5464b9`, the final review's fix wave ending in its
+documentation commit, then this residual round;
+[plan](superpowers/plans/2026-10-21-workspace-9a-open-beside-and-move-into-tabs.md),
+[spec](superpowers/specs/2026-10-21-jasper-pane-flexibility-design.md), sections 3 to 5 and 8). **Open beside:** the
+Editor (0.14.0) registers a second split item, Open File (`EditorPlugin.OPEN_FILE`), so every Split list gains Open File
+Right… and Open File Down…, and its File menu gains Open in Editor Pane… (`dev.jasper.editor.open_in_pane`) beside New
+Editor Pane; each shows the Editor's chooser for one file (`EditorWindow.openBeside`) and opens it in a new pane beside
+the focused pane (`openDocumentBeside`), a file that is open already showing its open pane (`selectOpen`, the branch
+plan 9b replaces), and cancelling opens nothing. The SDK (0.21.0, unreleased) says that a split item's actions ask first
+(`SplitItemSpec.asking()`, `asks`), and both runtimes end its entries and its actions' titles with an ellipsis
+(`SplitChoice.rightLabel()` and `downLabel()` word them for plugins' own lists). **Move Pane to Tab:** the Tab menu and
+a terminal's and an editor's right-click menus list the window's other tabs, numbered as Select Tab numbers them ("2
+zsh"), and move the focused pane to the right of the chosen tab's active pane, as a pane drag drops it
+(`WindowContent.moveToTab` over plan 8c's `movePane`); Move Pane to Tab 1 to 9 (`move_pane_to_tab_1`…) are unbound
+keymap actions; plugins build the submenu from `ContentTab.tabChoices()` (`TabChoice`) and `ContentTab.moveToTab(int)`,
+through the tab registry (`WorkspaceHost.tabChoices`, `moveToTab`), the testkit's fake and the contract pinning them on
+both runtimes. **Move Tab Into:** a tab's menu, and the Tab menu for the tab that shows, list the window's other tabs
+and move every pane of the tab to the right of the chosen tab's active pane as one nested split that keeps its
+arrangement and sizes (`Layout.insertBeside`, `ParentTabsView.moveInto`, `WindowContent.mergeTab`), held and announced
+once where it lands, a failure restoring both tabs; Move Tab Into Tab 1 to 9 (`move_tab_into_tab_1`…) are unbound keymap
+actions. **The tab drag** drops a tab beside a pane of any window's shown tab but its own (`TabDrag.Target.Into`), the
+landing showing the side, unless another window of Jasper's is on top there; across windows `WindowManager.moveTabInto`
+moves the items through the tab registry into the target tab, one `TAB_MOVED` each in the tab's order, then a full
+window it emptied closes (`WINDOW_CLOSED` after the last), and the main window it emptied renews its empty workspace's
+ids. **Spring-loading:** the entry resting on another tab's entry of any strip for 0.5 s, within 4 px, shows that tab at
+once (`TabDrag.spring`, a Swing `Timer` the tests fire themselves), and Esc, focus loss, a lost release or a release
+over no target bring back the tab that showed before. Rulings (plan, "Rulings"): (1) an asking split item ends its
+entries and its actions' titles with an ellipsis; (2) Open File's chooser takes one file, local or a file source's,
+starting in the folder of the Editor file active in the window; (3) Open in Editor Pane… is its own action; (4) a file
+that is open already shows its open pane; (5) the submenus' entries read "N title", every other tab listed, the first
+nine running Move Pane to Tab 1 to 9; (6) Move Pane to Tab moves the focused pane as a pane drag does; (7) what a drag
+may not move does not move; (8) `ContentTab.tabChoices()` and `moveToTab(int)`; (9) Move Tab Into follows Move Tab to
+New Window in a tab's menu; (10) `Layout.insertBeside` shares the pane's space by halves, a split of the side's
+orientation flattening into its parent; (11) names stay with their panes; (12) a merge within a window is held and
+undone on failure; (13) a merge across windows is one pass through the registry, with the event order above; (14)
+`Target.Into` over any shown tab's panes but the dragged tab's own; (15) spring-loading's delay, slop and seam; (16) the
+moved pane, or the moved tab's active item, takes the focus; (17) Editor 0.14.0; (18) nothing animates; (19) the SDK
+stays 0.21.0; (20), added after the automated security review of Task 4 (a controller ruling): `ContentTab.tabChoices()`
+follows `TabHandle.title()`'s rule: a choice carries its tab's title only when the plugin holds `terminal.observe`, or
+the tab's shown item is the plugin's own content; otherwise its title is empty and `TabChoice.label()` reads "Tab N"
+(the number still matches Select Tab N, so `moveToTab(N)` works); the first answer that carries other tabs' titles is
+audited once per plugin as a use of `terminal.observe`; the testkit's fake follows the same rule; Jasper's own menus
+(the Tab menu, a terminal's right-click menu) keep real titles. The Editor declares no `terminal.observe`, so its
+right-click Move Pane to Tab names its own tabs and lists every other tab as "Tab N". Cost if wrong: the Editor would
+have to declare the capability (its consent text changes), or a host-rendered pane menu would name every tab. (21), from
+the final review (a controller ruling): of Jasper's windows under the cursor the one that came to the front last takes
+or refuses a tab or a pane drag's drop, as native drag and drop goes on macOS and Windows and in VS Code, so Settings,
+About or a plugin's dialog that came to the front after the window under it gives the drag no target there (no strip
+drop, merge, pane drop, spring-loading or tear-out; the landing hides); the tab drag stamps each window as it comes to
+the front (`TabDrag.activated`), told by the window manager of its own windows and, through a `WINDOW_ACTIVATED`
+listener while they are open, of the others. Cost if wrong: one condition in `TabDrag.update`. (22) (a controller
+ruling): Move Tab Into is reachable from the keyboard, as every action of the series is bindable: the Tab menu's Move
+Tab Into, after Move Pane to Tab, moves the tab that shows, its first nine entries running Move Tab Into Tab 1 to 9,
+unbound, listed with Move Pane to Tab 1 to 9 under Panes. Cost if wrong: one submenu and nine keymap rows to remove.
+(23) (a controller ruling): a classic strip's "+" is no tab's entry, so resting the dragged entry on it springs nothing,
+a crowded strip's "+" over the tabs it clips included (`TabStrip.onNewTabButton`); a pane drag's new-tab places are
+unchanged. Cost if wrong: none. Spec issues: (1) spec 5's "a name you gave it goes; the target keeps its own name":
+Jasper names a tab after its active pane, and Rename Tab names that pane's terminal, so the merged tab is named after
+the moved tab's active pane while it has the focus; the controller ruled that names stay with their panes (Ruling 11)
+and amended spec 5, and the guides say what happens without claiming that the target keeps its name. Deviations: (1)
+Task 4's fix round (`cdb2fbff5`): Ruling 20; `OtherTab` gains the item its tab's active pane shows (`shown`) and
+`TabChoice` allows an empty title; the real `WorkspaceHost` wiring is tested (`MovePaneToTabTest`); a refused
+`moveToTab` leaves an unselected item inactive (the app contract's host lambda activates it only on a move); the
+contract pins a two-pane target (the pane lands right of the shown pane, not at the end), an emoji pair at the title's
+cap, an item waiting on its close decision (offered none and refused), and `TabRegistryTest` a restorer's held item; the
+Editor's entries and submenu are plain text (`html.disable`) and its menu follows tabs that open and close;
+`StandardMenu.TAB`'s Javadoc lists Move Pane to Tab. (2) Task 4: `PaneItems`'s class Javadoc was re-wrapped after the
+brief's edit (wording only). (3) Task 5's fix round (`423688d6b`): the window's tab strip re-slots its entries at once
+when a merge or a move changes their order (`WindowTabs.refresh`). Before, an entry that survived a merge between tabs
+that were not neighbours stayed where it was drawn while Select Tab, the Move lists, the tab list and the drop places
+followed the model; plan 8c's last-pane move into a tab that is not its neighbour was affected too. An open and a close
+keep their motion (plan 8a's veto), and `ClassicTabs`, which rebuilds its entries every time, needed nothing;
+`WorkspaceView.join` refuses a layout that places other items than the ones that arrived; `Layout.insertBeside` checks
+its arguments before the empty-layout message. (4) Task 5: the shown tab merging into a hidden one announces nothing, as
+plan 8c's rule has it (an item that stays the selected item gives the registry no selection, move or close); a hidden
+tab merging into the shown one announces the moved tab's active item once. (5) Task 7: two tests beyond the plan, from
+Task 6's review: a merge that fails after a spring leaves both tabs as they were, shows the dragged tab again and lets
+the failure propagate, and the landing of an Into target shows in the drag's own window after a spring; Task 7's fix
+round (`1a0f587b0`): the `springRest()` seam, tests that pin the slop and an entry boundary within it, and one hit-test
+(`entryUnder`) for spring-loading and a pane drag's hover. (6) Task 8: two sentences the new menu entry made stale are
+corrected (plugin authoring's content-tab commands and the Editor guide's tab right-click menu list Move Tab Into), and
+Ruling 20 is in plugin authoring, the SDK README, the guide page and the Editor guide. (7) The final review's fix wave
+(`b4152416c..f7d5464b9`): Rulings 21 to 23 (I1, M1 and M2); `EditorWindow.openBeside` refuses another placement before
+its chooser shows and `WindowManager.moveTabInto` refuses the main window's empty workspace, which has no pane to go
+beside; `WorkspaceActions.update` builds the Move lists once a pass; tests for the items left for it (below); the
+capability tables and audit lists of plugin authoring, the guide page and the plugins guide name
+`ContentTab.tabChoices()`, which degrades to "Tab N" without `terminal.observe` instead of refusing; and a residual
+round on top of `f7d5464b9`, ruled by the controller from the wave's concern: a window owned by the window under the
+cursor, as a plugin's modeless dialog is, counts as above it whatever the activation order, since macOS keeps an owned
+window above its owner (`TabDrag.Auxiliary.owners`). Accepted with no change, as the reviews ruled: Task 1's Minors 3
+and 4 (one `UiValuesTest` assertion tests only the action id's validation; the ellipsis wording sits in four places
+because the architecture forces it); Task 3's Minor 4 (style: fully qualified names, `PANE_MOVES`' place); Task 4's
+Minors 6 and 7 (a stale entry moves by number, inherent to the number API and shared by the host's menus; the title cap
+is copied across the module boundary) and that an own tab's placeholder text is blanked too (conservative); Task 5's
+Minor 2 (a redundant, defensive `reslot ||` where `WindowTabs.refresh` runs without motion); Task 6's Minors 5, 7 and 8
+(the move reads the pre-move target view, contrived; duplication; a report's warning breakdown). Left for the final
+review and done in its fix wave (deviation 7): Task 1's Minor 1 (a `SplitListsTest` helper's Javadoc); Task 2's Minors 1
+to 3 (the resolver-failure path of `withDocument` untested; focus asserted through the Editor's `selected()`, not the
+handle's `activeTab()`; `openBeside` shows the chooser before it validates the placement) and an app test for a split
+item opening into the main window's empty workspace; Task 3's Minors 2 and 3 (the Enterprise pin uses
+`containsSubsequence` and nothing opens the classic Window menu to see it filled; `update()` rebuilds the `OtherTab`
+list nine times, which a range check would avoid); Task 4's two test pins (`TabChoice(2, "").label()` in `UiValuesTest`;
+an own item hidden behind a foreign shown pane); Task 5's Minors 1 and 3 and a whole-tab merge with terminal items for
+`ActivePaneChanged` (pin the join guard's messages; a `WindowTabMotionTest` case for a non-neighbour merge with motion
+on); Task 6's Minors 1 to 4 (the main drag test cannot catch a missing final select or weights; the maximize test checks
+only a count; the selection after `WINDOW_CLOSED` is unasserted; `moveTabInto` throws for an empty workspace's pane
+instead of refusing) and its Minor 6 as a question, which Ruling 21 answers; Task 7's own notes (the slop assertion
+cannot tell resting from restarting, since only timing shows it; `entryUnder` repeats `onPanes`' loop over the entries'
+x-ranges), which its fix round resolved. `./gradlew check --continue` after the residual round: **12,706 tests, 0
+failures, 0 errors, 29 skipped, BUILD SUCCESSFUL** (app 4,395, Editor 5,152, UI 943, terminal 460, testkit 244, Buddy
+154, SDK 105, the other plugins 1,253) (excludes the external example, which `check` does not run); the example external
+plugin's `check pluginZip`, built against the SDK jars `check` wrote, passes.
+GUI checks for the user:
+- Tab › Split and a terminal's and an editor's right-click Split submenus list Open File Right… and Open File Down…;
+  each opens the file chooser for one file, and the file opens in a new pane to the right of or below the focused pane,
+  focused; Cancel opens nothing; a file that is open already shows its open pane;
+- File › Open in Editor Pane… sits after Split Right with Editor (New Editor Pane) and does what Open File Right does;
+  in the main window's empty workspace the file fills it as its one tab;
+- Tab › Move Pane to Tab and a terminal's and an editor's right-click Move Pane to Tab list the window's other tabs as
+  "2 zsh"; choosing one moves the focused pane to the right of that tab's active pane, which shows, and typing reaches
+  the moved pane; the submenu is disabled in a window of one tab; under the Enterprise look the Window menu shows it
+  too;
+- on macOS, with the menu in the screen menu bar, the Tab menu's Move Pane to Tab submenu fills when the menu opens
+  (listing the window's other tabs, not an empty or stale list), and follows a tab opened or closed since;
+- the Editor's right-click Move Pane to Tab names the tabs whose active pane shows an Editor file and lists every other
+  tab, terminals included, as "Tab 3" (the Editor reads no other tab's title); the Tab menu's submenu names them all;
+- Settings › Keymap lists Move Pane to Tab 1 to 9 and Move Tab Into Tab 1 to 9, unbound, and Split Right and Down with
+  Open File… and Open in Editor Pane…; binding Move Pane to Tab 2 shows the key on its entry and moves the pane, and
+  binding Move Tab Into Tab 2 moves the tab that shows;
+- a tab's right-click Move Tab Into, and Tab › Move Tab Into for the tab that shows (under the Enterprise look in the
+  Window menu), list the window's other tabs; choosing one puts all the tab's panes to the right of that tab's active
+  pane, keeping their arrangement and sizes, its entry gone and its active pane focused, every shell running; a tab
+  with a dialog open in a pane shows it disabled; the merged tab's entry is named after the focused pane;
+- dragging a tab's entry over a pane of another window shows the landing on the nearest side; releasing moves all its
+  panes there, the windows' shells still running; a child window's only tab dragged away (Enterprise, where its strip
+  shows) closes that window;
+- during a tab drag or a pane drag, a Settings or About window that came to the front after the window it floats over is
+  on top: over it the drag has no target, the landing hides, nothing springs and a release there moves nothing; bring
+  that window to the front first and its panes take the drop again; a plugin's modeless dialog stays on top of the
+  window that owns it even after that window comes to the front, and takes no drop either;
+- holding the dragged entry still over another tab's entry for half a second shows that tab at once, with no motion,
+  in the drag's own window and in another; a drop beside one of its panes merges the tab there; Esc, or a release over
+  a title bar, brings back the tab that showed before; moving on keeps the reorder marker as before;
+- pausing over another tab's entry while reordering springs that tab open; dropping the entry on the strip then
+  reorders it, as before, and the dragged tab shows again;
+- under the Enterprise look, with more tabs than the strip has room for, resting the dragged entry on the "+" shows none
+  of the tabs it covers.
+
+Not merged, not pushed.
+
+**Staged transfer test waits for its enqueue — 2026-10-21** (`claude/priceless-curie-c36f2d`, worktree
+`.claude/worktrees/priceless-curie-c36f2d`, from `main` at `132dcac3e`; not merged or pushed):
+`StagedTransferLifecycleTest` timed out now and then under a full `check` at `enqueued.get(5, SECONDS)`. The enqueue
+runs once the Remote coordinator's control loop has opened its SQLite queue, and each case's new plugin class loader
+makes its first connection extract and load sqlite-jdbc's native library, after listing all of `java.io.tmpdir`. That
+took 1.5–2 s on the idle dev Mac and 9–24 s under CPU load. Timestamps showed the command queued throughout and run
+within 7 ms of the queue opening: no ordering race in the host's drain or the transfer queue. The test now waits with
+`join()`, and the suite's 5-minute default timeout catches a hang; test-only change. Before it, 12 CPU burners failed
+3 of 3 runs; after it, 50 runs in a row passed under 10 burners (every case 5.1–22.2 s). Most of the idle cost is the
+listing: the dev Mac's user temp dir holds about 223,000 entries, mostly `plugin-fixture*` and `jasper-contract*`
+folders that `PluginJars.build` and `AppContractTest` leave behind on every run. Full headless `check` passed on macOS:
+11,893 tests, zero failures/errors, 29 skips; its first run's one failure, `EditorCommandsTest`'s 10-second wait for
+`/bin/sh` while the machine was loaded, passed on the rerun.
+
+**External text stays plain text — 2026-10-21** (`claude/html-disable-sweep`, from `claude/workspace-tabs` at
+`ff322c478`; not merged, not pushed). Swing builds a text's HTML view when a component's UI is installed (at
+construction) and when its text, font or foreground changes, and reads `html.disable` only then; a tooltip does not
+take the property from its component. A component given its text or its Action before the property, or a tooltip
+without it, showed a text starting with `<html>` as HTML. Fixed sites:
+- `jasper-ui`: `Buttons.KitButton` sets the property in its constructor (a segmented choice set its option label
+  first); `Composition.WrappedText` (a form row's caption) and `PreviewChoices.Tile` (an option's description) set it
+  on their tooltips.
+- `jasper-app` workspace: the new `PlainText` builds menus, items, check items, buttons and toggles empty, sets the
+  property, then the text or Action. It serves the toolbar's overflow items (`WindowToolbar.menuItem`), a contributed
+  dropdown's submenu and popup, contributed submenus, top-level menus and context items (`WindowChrome`), both tab
+  lists, the Find bar's recent searches, the status bar's content items, contributed items and progress buttons, the
+  rail's buttons and a tool window header's actions. `MenuBarItems.Item`, `ClassicToolbarButton` and
+  `WindowChrome.ReferenceButton` set the property before their Action, `PathBreadcrumbs` before a crumb's text.
+  Tooltips: those buttons, `StripeLabels.Label`, a tool window header's detail and the status bar's segments.
+- Window titles: on Windows and Linux FlatLaf's title pane shows a window's title (a child window's is its tab's,
+  which a program sets) in a label without the property. `platform.PlainTitlePane` sets it on each pane FlatLaf adds to
+  a workspace window, an auxiliary window or dialog, or the file chooser.
+
+Checked and unchanged: `WindowChrome.fillSplit`, `WindowContent.tabMenu` and the Editor's `DocumentArea.submenu` and
+`plainItem` (already in order); `DocumentArea.menuItem(Command)` (only the Editor's own titles); the other plugins (no
+Swing text of their own); the configuration file tooltip (an absolute path) and `LaunchFailure`'s lines (each starts
+with Jasper's text). The breadcrumb's label and the classic toolbar button's text were already rebuilt plain by the
+`setFont` after them. Tests: `ButtonsTest`, `PanelSurfacesTest` and `SettingsControlsTest` in `jasper-ui`,
+`PlainTextTest`, `PlainTitlePaneTest`, and a view check on the `WindowTabsTest` and `ClassicTabsTest` tab lists; each
+fails without its fix except `WindowTabsTest`'s, whose menu styling rebuilds the item. `./gradlew check`
+(Python 3.13): **12,615 tests, 0 failures, 0 errors, 29 skipped**; a first run under heavy machine load (load average 80)
+failed 42 tests, most waiting on plugin workers' cleanup, which all pass rerun, and `ThemeMigrationCoverageTest`,
+which wanted the new files in `docs/design/theme-engine/migration.csv`. GUI checks for the user: on Windows or Linux,
+a child window whose tab a program titles `<html><b>x</b>` shows the markup as text in its title bar; so do a
+contributed menu, a toolbar dropdown and a rail tooltip.
+
+**AOT training restores a seeded workspace.toml — 2026-10-21** (`claude/hopeful-newton-94a051`, off
+`claude/workspace-tabs` at `2b168a6af`; plan 6a's follow-up). The AOT training home now holds a `workspace.toml` with
+one main window (960 by 600 points at 100, 100) whose one tab holds one terminal item, so the training launch restores
+it as every start after the first does, and the cache holds the restore path's classes: `WorkspaceFile`'s reader,
+`WindowManager`'s and `WindowContent`'s restore, `WindowPlacement.restore`, and the `Layout` and `ParentTabs` read from
+the file. Placeholders stay untrained (the seed has no plugin item), and the training no longer takes the first
+start's path (`openNewMain`), whose terminal code the restore shares. The seed is the checked-in
+`jasper-app/src/main/resources/dev/jasper/app/benchmark/startup-workspace.toml` (`aotTrainingWorkspace` in
+`gradle/packaging-support.gradle`; `runAotTraining` copies it beside the training `config.toml`). `StartupBenchTest`
+checks that `WorkspaceFile.read` restores it as that snapshot with nothing kept aside and that its text is exactly what
+`WorkspaceFile.write` writes for it, so a format change fails the test until the seed is written again;
+`verifyPackagingSupport` checks that the training home holds it. The start-up benchmark re-seeds rather than deletes:
+`StartupRuns.seedWorkspace` copies the same file over the isolated home's `workspace.toml` before every launch,
+priming launches included, so every run restores the window the cache was trained on, whatever the run before saved
+as it quit (deleting it would measure the first start's path instead); `--real-home` leaves the user's file alone.
+`StartupBenchTest` pins this for cold and warm runs with a fake host that replaces the file as a quitting Jasper does.
+Guides: `packaging.md` (the training home, and where its window now appears), `benchmarks.md` and `app-maintenance.md`
+(the seed and its regeneration). `./gradlew check --continue`, run while other worktrees' builds held the 12-core
+Mac at load averages of 140 to 200: **12,609 tests, 39 failures, 0 errors, 29 skipped**, every other task passing. One
+failure was this change's: `ThemeMigrationCoverageTest`, because the new test's `new ArrayList` matched the consumer
+ledger's pattern; it now writes `new java.util.ArrayList`, as the file already did. The other 38, in `jasper-app` (the
+Settings mocks, the staged Remote surfaces, `StagedTransferLifecycleTest`, `WindowContentFirstTerminalTest` and
+others) and `jasper-plugin-remote` (`PublicationCrashTest`, `TransferStoreTest`, `AnchoredImportIntegrationTest`),
+touch nothing this change does; re-run by class, with the fixed test and the benchmark tests, all passed. No second
+full run. Not run, as briefed: AOT training (`trainAotCache`, `packageDist`, `-Pjasper.aot=true`), the GUI and any
+benchmark. For the user: run `./gradlew :jasper-app:trainAotCache` once (a
+window for a few seconds) to confirm that the restored start settles with its window shown, output painted and plugins
+bound, and that `verifyAotCache` accepts the cache. Not merged or pushed.
+
+**Workspace tabs: origin/main merged in (the second sync) — 2026-10-21** (`claude/workspace-tabs`, the merge of
+`origin/main` at `8c8776e7e` into `154aaf27b`, plan 6b's close; the merge base was the first sync's `f78bb0385`). Main
+brought Enterprise plans 15a and 15b (SDK 0.18.2's `Appearance.presentation()`, the look's defaults for plugin
+settings, a panel's own toggle action activating its tool window, the toolbar's Search Everywhere icon), the Editor's
+own typography and Markdown preview (SDK 0.18.3's saved terminal typography), the bundled Cygwin on Windows, Jasper
+Meadow as the default theme pair, the Meadow splash and the Shell Prompt icon, the Rail and Status Bar keymap actions,
+the V1 code fixes and the V1 documentation overhaul. 80 files conflicted; the merge commit names each one's resolution.
+The branch's windows, tabs, panes, tab registry, save and restore and SDK 0.21.0 API stay, and main's changes are
+ported into them: (1) the splash closes at the first visible paint of a window's frame (main's
+`TerminalWindow.afterFirstVisiblePaint`, now `WindowFrame.afterFirstVisiblePaint`, registered in
+`JasperApplication.frameOnScreen`), not when the window shows; (2) `toggle_rail` and `toggle_status_bar` are the
+View › Show/Hide items in the branch's `WindowCommands` and `WorkspaceActions`, enabled only in the main window and not
+in Zen; (3) a tab menu's command item runs the command of the content active when it is clicked (main's focus-safe
+commands) in the branch's `WindowContent.tabMenu`; (4) main's `activatingToggle` and the panel's own toggle action's
+`ACTIVATING_SHOW` join the branch's child-window routing; (5) main's Cygwin hook (`onManageCygwinPackages`) is wired on
+every `WindowContent`; (6) the Editor keeps the branch's restore, deferred Load, Split submenu and Move Pane to New Tab
+with main's Markdown surface, preview, typography and focus-safe content commands, and (after the fix wave below)
+publishes no Close Pane of its own, as main's fix of the shortcut the Editor showed but did not bind has it; (7) main's Javadoc pass on the SDK and its
+SDK reference guide pages are worded for the branch's API (no plugin windows, items in panes, split items, restorers).
+Main's new guides (`workspace.md`, `command-line.md`, `getting-started.md`, `plugins.md`, `terminal.md`, `editor.md`,
+`configuration.md`, `plugin-authoring.md` and the rest) keep main's structure and describe the branch's model: the main
+window and child windows, tabs of panes, the Split submenu and pane drags, `workspace.toml`, one Jasper per home (no
+`--standalone`), the Errors tab and the Vault manager as a dialog. Plan 6b's three hand-offs are done here:
+`docs/sdk-reference.html` regenerated, `EditorDocument.readQuietly` in `plugin-apis.md`, `SavedRemoteDocument` in
+`AGENTS.md`. Nothing of main's was left out except what plan 1 removed (`--standalone`, Launch Anyway, Quit It and
+Restart). Versions: SDK 0.21.0 (main's 0.18.2 and 0.18.3 additions included;
+every bundled range `sdk = ">=0.21.0, <0.22"`), Editor 0.13.0, Remote 0.16.0, sample 0.5.0, Enterprise 0.3.0 (main's,
+with the branch's range), Credential Vault 0.7.0 and File Server 0.6.0 (the same number on both sides, now holding
+both sides' changes; neither shipped). The first `./gradlew check --continue` after resolving: 12,600 tests, 7
+failures (main's new tests written for the pre-branch API, and `verifySdkReference` stale); after the fixes
+**12,600 tests, 0 failures, 0 errors, 29 skipped** (25 platform skips and four opt-in Editor performance tests), and
+the external example builds against the SDK jars. GUI checks for the user: the Meadow splash closes once the restored
+main window has painted; View › Show/Hide › Rail and Status Bar, and their bound keys, act in the main window and are
+disabled in a child window and in Zen; under Enterprise the toolbar's Search Everywhere icon sits before Settings… and
+the window's ⋮; a tool window's own toggle shortcut activates it under Enterprise, also from a child window; a
+Markdown file in a pane beside a terminal shows its preview, and Split Right with Editor beside it opens a new file; a
+restored Markdown file comes back in its saved view; the Editor's tab menu lists no Close Pane of its own and Cmd+W
+closes the pane; on Windows, Manage Cygwin packages… from a child window. The merge's fix wave (its code and docs
+reviews): a Markdown preview follows whether its pane shows, not the focus (`EditorWindow` keeps a hosted tab's preview
+active and `MarkdownController` suspends a view that does not show), so one beside a focused terminal keeps its images
+and one restored into a pane without the focus renders; the Editor no longer publishes Close Pane (main's rule; the
+host's Close Pane closes the pane, and Vim's `:action close-pane` still runs it); the guides, the SDK reference guide
+pages and the `jasper` usage text match the merged code; its re-review's residuals: Dismiss Cards run from a child
+window closes the main window's cards, a preview realized hidden (a restored tab that is not the shown one) waits until
+it shows, and Zen saves when toggled; `./gradlew check --continue`: **12,606 tests, 0 failures, 0 errors, 29 skipped**. Not merged into `main`, not pushed.
+
+**Editor font size shortcuts — 2026-10-21** (`claude/editor-font-zoom`, worktree `.claude/worktrees/editor-font-zoom`,
+from `main` at `427321de4`): Increase, Decrease and Reset Font Size (Cmd+=, Cmd+- and Cmd+0; Ctrl+Shift+=, - and 0)
+act on a selected Editor tab as they do on a terminal pane: one point at a time from 6 to 72 points, the tab's Markdown
+preview included, nothing saved; Reset returns it to the saved Editor size (the terminal's while the Editor follows
+it). A new saved size replaces the tab's own size; other font changes keep it. The workspace runs a plugin tab's
+content commands `font-bigger`, `font-smaller` and `font-reset` for the three actions (named in the SDK's
+`ContentTab`/`ContentCommand` Javadoc, the plugin guide and the regenerated SDK reference); the Editor publishes them
+without shortcuts, so the keymap's keys apply. The SDK stays 0.18.3 and the Editor 0.11.0. A small change agreed in
+chat, without a written spec or plan. Full headless `check` passed on macOS with Python 3.13: 11,893 tests, zero
+failures/errors, 29 skips. GUI check pending.
+
+**Workspace tabs, plan 6b: plugins' tabs come back — 2026-10-21** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `eefe0324e..b22836d14`, then this documentation commit and its final-review fix
+wave and a residual round; [plan](superpowers/plans/2026-10-18-workspace-6b-plugin-restorers.md),
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). SDK 0.21.0 (plan 6a's bump; no bump of this
+plan's own) gains `dev.jasper.sdk.RestoreState` (a restorer kind and at most 32 entries and 4,096 characters in all
+(keys and values); a larger state, or a key holding a lone surrogate, throws `IllegalArgumentException`),
+restore state on `ContentSpec` and `SessionSpec` (`withRestore`), `ContentTab.setRestore`, `Windows.restorer(kind,
+TabRestorer)` (a restorer returns empty, or why the tab cannot come back, which raises no incident) and
+`RestoreRequest`; the testkit gains `FakePluginHost.restoreState`, `restoreTab` (the restored tab takes the window being
+restored, placed, not shown; a session waits `NOT_STARTED` until shown) and `declinedRestores` (the reasons given when
+no tab came back; a restored item goes in a new tab of the window, unshown), and `PluginContractTest` checks restorers
+on the fake and on the application. In the application a tab carries its restore state (`Tab.restore()`,
+`layout.TabRestore`); `TabRegistry` keeps each plugin's restorers and, while one runs (one at a time), a slot whose
+saved id (while free) and window the next content tab that plugin opens takes, or the next session it opens in that
+window, unshown, before any placement or wait for the main window, so its `ContentTab.window()` names that window at
+once; the window being restored takes no other tab meanwhile (another content tab goes where an owner-less one goes,
+another session is refused). `WindowManager` saves a plugin's tab as `TabRecord.Content` of its window's `WindowRecord`
+while its plugin restores that kind (never Jasper's own tabs, going or coming), leaving out tabs, plugins' first and as
+closing them would, if the file would pass `WorkspaceFile.MAX_BYTES`; restoring, plan 6a's `WindowContent.restore` asks
+it for each record (`savedTabs`), so a plugin's item comes back in its saved tab and pane of the main window or a full
+window, or as a `Tab.Kind.PLACEHOLDER` item (`workspace.PlaceholderContent`) in its pane that says why from how its
+plugin stands (`PluginRuntime.standing`, given as `WindowManager.PluginState`: not installed, turned off, off in safe
+mode, waiting for review, could not start, or "… could not restore this tab: …" with Retry), asks again when it shows
+and on Retry (`Layout.replaceTab`: the rebuilt item takes the placeholder's pane), and acts in whatever window holds it;
+a placeholder is saved again as it was, and a full window holding only plugins' items comes back with them. The Editor
+(0.13.0) saves a document's key and reopens it through its reopeners (`openRestored`): a remote document waits until its
+tab is first active or Load, then reads with the Editor API's new `EditorDocument.readQuietly`, asking nothing. Remote
+(0.16.0) reopens remote documents before its hosts have loaded (`SavedRemoteDocument`) and saves an SSH tab's host and
+folder (a folder too long to save is left out); when the tab is first shown it reconnects, one tab after another per
+window, if the SSH agent signs it in, else (a Vault login, locked or not: the Vault may ask for a grant) shows Not
+connected with Reconnect, asking nothing; a quiet connect that fails says why, Cancel keeps a restored tab, and a
+missing host declines; a remote document's quiet read reads over an open connection or the agent. A restored tab's first
+connect and a restored document's quiet read answer a host-key question Cancel (`ConnectAttempt.quiet`,
+`EditChannels.submitQuietly`), so a host accepted Once comes back Not connected with Reconnect, which asks; picking a
+host whose restored tab still waits shows that tab (`restoredPanes`, plan 6a's `NOT_STARTED` hand-off). The sample's
+About (0.5.0) comes back; the Vault's manager, a dialog over the main window, does not, and the Vault keeps 0.7.0.
+`AppContractTest` now opens the main window and then a child for a tab placed in a new window while none is open (plan
+4b's hand-off), and the two other harness hand-offs (`FakeWorkspace.closeWindow` nulling `Panel.instance` with
+`AppContractTest`'s panel caches, and `AppContractTest`'s panel routing) closed without code: no harness can close a
+main window and no contract case toggles a panel; they belong to the plan that first adds such a case. Rulings (plan,
+"Rulings"): (1) a restore state is `RestoreState(kind, values)` in the SDK's root package: a kind of 1 to 64 letters,
+digits, dots, underscores or hyphens, at most 32 values and 4096 characters in all; (2) a session's tab carries restore
+state too, and is saved as `TabRecord.Content` under its plugin; (3) a plugin's tab is saved only while its plugin has a
+restorer for its kind, Jasper's own tabs never; (4) a restorer opens its tab as the plugin always does while the
+registry holds a slot, which gives the first tab it opens, or the first session in the window being restored, the saved
+id and that window, unshown, before any window is looked for; (5) a restorer returns empty or why the tab cannot come
+back, a returned reason is the placeholder's with no incident, and what it throws before it opens its tab is both; (6)
+(reworded by 32) a placeholder keeps the saved title and record, says why from how its plugin stands, asks again when it
+shows and on Retry, and offers Retry while its plugin runs; (7) how a plugin stands is `PluginRuntime.standing`, given
+to the window manager as `WindowManager.PluginState`; turning a plugin off takes effect at the next start, where its
+tabs are placeholders; (8) the Editor saves a document's key and reopens it through `Reopeners.resolve`: a local file at
+once, a remote one once its tab is active or on Load, quietly; an untitled buffer is not saved; (9) (restated by 43)
+Remote saves an SSH tab's host id, name and folder, and the restored tab connects when first shown only if the SSH agent
+signs in, else shows Not connected with Reconnect; (10) (superseded by 28) the Vault's manager is not a restored tab;
+(11) the sample's About comes back through the one method its action uses, its echo session does not; (12) (superseded
+by 18, itself by 37) the plugin version numbers; (13) a restored session that is not connected offers Reconnect, not
+Retry; (14) THD Sourcing Crypto rebuilds once, against 0.21.0, and needs nothing more; (15) (reworded by 34) the
+testkit's fake restores as Jasper does: the first tab or session takes the window being restored, a session waits
+`NOT_STARTED`, a declined reason is kept in `declinedRestores()`; (16) (restated by 46) a snapshot over
+`WorkspaceFile.MAX_BYTES` leaves out tabs until it fits, plugins' first and largest first, then terminals; (17) Remote's
+reopener answers before its hosts have loaded (`SavedRemoteDocument`); (18) (superseded by 37) Editor 0.12.0, Remote
+0.16.0 and sample 0.5.0; (19) (narrowed to the main window and full windows) a plugin's tab comes back in its saved tab
+and pane through `WindowContent.restore` and `ParentTabsView.restore`, its restorer seeing only the window; (20)
+(narrowed likewise) a content record whose restorer rebuilds nothing becomes a placeholder, so a full window holding
+only plugins' tabs comes back; (21) the size limit takes a tab out as closing it would (`WorkspaceFile.keeping`); (22) a
+saved record naming `jasper` is left out at restore, never a placeholder; (23) a restored tab names the window being
+restored at once, never the never-open window; (24) while a restorer runs its window takes only the saved tab: another
+content tab goes where an owner-less one goes, another session is refused; (25) `AppContractTest`'s `emptyWindow` opens
+the main window first when none is open, with a contract case on both runtimes; (26) `FakeWorkspace.closeWindow` nulling
+`Panel.instance` and `AppContractTest`'s panel routing close without code; (27) 6b's SDK additions stay in 0.21.0, with
+no bump of their own; (28) dialogs are not restored: the Vault's manager and a plugin's dialog close with their window;
+(29) (restated by 43 and 45) a restored SSH tab's first connect and a restored document's quiet read are quiet and run
+only when signing in asks nothing, a host-key question answered Cancel; (30) only a tab still open in the window being
+restored is the saved tab, and a state the SDK refuses runs no restorer; (31) (restated by 50) the Editor's decline says
+which: no running plugin opens that prefix, or its file can no longer be opened; (32) Retry puts the rebuilt item in the
+placeholder's pane, in its place, selected (`Layout.replaceTab`); (33) everything restores into the main window or a
+full window, and a placeholder moves to a full window like any item, with its Retry and Close; (34) the fake places a
+restored item in a new tab at the end of the window's strip, unshown; (35) a restored session's pane in the fake is held
+as `holdPane` holds a local one and connects when its tab is shown; (36) Remote's quiet host-key test asks the question
+directly while the connect waits on the fake's background executor; (37) Editor 0.13.0, Remote 0.16.0 and sample 0.5.0;
+the Vault and the other plugins keep their versions; (38) the Editor's restorer opens its document as New Editor Tab
+does, and the saved layout says where; (39) no `docs/sdk-reference.html` change here: the merge with main regenerates
+it; (40) a restored SSH tab joins Remote's attached panes when its session attaches, waiting in `restoredPanes` until
+then; (41) `activateHost` shows a restored tab of the host that still waits instead of opening a second; (42)
+`BundledSamplePluginTest`'s pinned sample version moves with the manifest; (43) only the SSH agent, or an open
+connection, signs in alone at restore, so a Vault login comes back Not connected and asks the Vault for nothing; (44)
+Cancel on a restored session's first connect keeps its pane, with Reconnect; (45) a quiet connect that fails keeps its
+reason, "Not connected: <why>", with Reconnect; (46) the size limit logs each item it leaves out once per process; (47)
+a local file deleted since its tab was saved comes back as the Editor's failed read, with Retry; (48) restorers ask
+nothing, which the Javadoc and the authoring guide say; (49) a placeholder's Retry and Close are focusable, and its
+tab's focus target is Retry while it shows, else Close; (50) a key with no prefix declines "no running plugin opens this
+document", a remote document reopened before the hosts load names "a remote host", and the guide's testkit paragraph
+names `restoreTab`, `restoreState` and `declinedRestores`; 10, 12 and 18 are superseded, 6, 15, 19 and 20 reworded, and
+9, 16, 29 and 31 restated by the review. Deviations: (1) Task 1, by a controller ruling from plan 6a's final review:
+`RestoreState` refuses a key holding a lone surrogate, which a save would turn into a duplicate key. Task 1's review: a
+restorer's item stays in the window being restored, so a move asked of it then is refused, and a placeholder is never
+registered under an id already open; an `Error` from a restorer closes the item it opened; the fake's `Terminals.split`
+and its declines follow the app; `TabRestorer` says it must not block. (2) Task 2's review: the size limit counts each
+item's UTF-8 share once (`WorkspaceFile.sizes`) and encodes once; Retry reads a failed rebuild's reason directly; a
+saved `jasper` record is logged when left out; a placeholder's reason wraps. (3) Task 3's review: a document's restore
+state never stops it opening or saving (a key over about 4,090 characters is simply not restored); a restored document
+is not recorded in Recent Files; a deferred document reads "loads when you select it". (4) Task 4's review: both
+harnesses keep a restored session's pane on its first Cancel, as Jasper does; an SSH tab whose restore state does not
+fit drops its folder, then its state, and still opens; a `hosts.toml` that cannot be read says so; a quiet attach
+failure says why; a host's running tab is shown before a restored one that waits; a document's quiet open checks again
+that signing in asks nothing. The fix rounds' accepted deviations: public `WorkspaceFile.sizes` and `Sizes`;
+`PlaceholderContent`'s wrapping `JTextArea`; the fake also closing on an `Error`; a contract case for the move refusal
+on both runtimes; `TerminalFixture.restoringSessions` wired to the slot; package-private test seams. (5) The
+final-review fix wave: a plugin's subcommand while no main window is open restores the windows first, then runs
+(`JasperApplication.commands`), so `jasper editor` for a file that was a saved tab selects that tab instead of leaving a
+placeholder beside a second tab; `TabRegistry.open` for the main window while none is open restores it before it looks
+for the (plugin, key), so an item that restore brought back is selected, not opened twice; an `Error` from a restorer
+other than a `LinkageError` (contained like an exception, so the tab it opened is kept) or a `VirtualMachineError` is
+that plugin's restore failure, as an exception is (`HostedUi` reports it, `TabRegistry.restore` closes the item it
+opened and gives its message as the reason), so its saved tab comes back as a placeholder and the rest of the windows as
+saved, and the fake follows, with a contract case on both runtimes; `TabRestorer` names every time a restorer runs (at a
+window's restore, on Retry, and inside a plugin's own call that opens a tab while no window is open) and what an `Error`
+does; a placeholder for a plugin that is turned off, off in safe mode (`PluginRuntime.Standing.Kind.SAFE_MODE`) or
+waiting for review says what brings it back, after a restart, since a change in Manage Plugins takes effect at the next
+start; the Editor's `openRestored` keeps the window the Editor was used from (`origin`); Remote's test-only
+`EditChannels` and `RemoteEditing` constructors are gone, their tests on the full ones; and the guides say a restore
+state's limits, a restorer's thread contract and an SSH tab's folder as they are. The residual round: a plugin's
+subcommand restores the windows first only when it will run (`PluginRuntime.runsSubcommand`: its plugin has registered
+the handler), so a call whose plugin is off answers "unavailable" and opens no window; a placeholder for a plugin marked
+for removal says `<name> is marked for removal in Manage Plugins.` (`PluginRuntime.Standing.Kind.MARKED_FOR_REMOVAL`),
+with no advice to turn it on, while one the user turned off stays "turned off"; `TabRegistry.restore` warns that a
+restorer's item did not close only when closing it failed; and the guides say that a `LinkageError` stays contained like
+an exception and keeps its tab, that a restorer may check that a local file exists, but reading it or using the network
+waits until the tab is shown, and that a restorer also runs on Retry. THD Sourcing Crypto
+(`~/projects/thd-sourcing-crypto-jasper-plugin`) starts from branch `jasper-sdk-0.18.3` at `941874e`, where 0.18 is done
+(`sdk = ">=0.18.0, <0.19"`, version 1.3.0): SDK 0.21.0 is the series' last bump and the one to rebuild it against, once,
+with the jars `sdkRelease` publishes; plan 4b's entry lists what 0.19 and 0.20 need (0.19: `CryptoFormTest.java:39-41`
+adds two panes to one tab, so `other` needs its own), and its `plugin.toml` and `PluginPackagingTest.java:49` take
+`sdk = ">=0.21.0, <0.22"` and `build.gradle.kts:8` and `README.md:28` name 0.21.0; 0.21 needs nothing more (it names
+`SessionState.RUNNING` in one fixture and switches over no `SessionState`, and it opens only a dialog, which is not
+saved). These files are main's, and the merge with main on 2026-10-21 brought them up to date: it regenerated
+`docs/sdk-reference.html` with this plan's SDK Javadoc, added `readQuietly` to `docs/plugin-apis.md`'s
+`EditorDocument`, and named `SavedRemoteDocument` in the `AGENTS.md` sentence on the Editor types Remote names.
+`./gradlew check`: **12,255 tests, 0 failures, 0 errors, 25 skipped** (excludes the external example, which `check` does
+not run). GUI checks for the user: with Jasper resident and no window open,
+`jasper editor <a file that was a saved tab>` gives one tab and no placeholder, and with the Editor turned off it
+answers that the Editor plugin is off and opens no window; two tabs in the main window, an Editor file in a pane of the
+hidden one beside a terminal (Split Right with Editor), a Remote SSH tab (one host through the agent, one with a
+password in the Vault, locked), and, with the sample on, its About moved to a full window (Move Tab to New Window); an
+Editor tab in a full window; quit and start: each comes back in its window, tab and pane, the agent's SSH tab connects
+when shown, the other says Not connected with Reconnect, and the hidden tab's remote file loads only when that tab
+shows; the Vault's manager, if it was open, stays closed; under the Enterprise look the tab strip shows as before; turn
+the sample off in Manage Plugins, restart: its About is a placeholder without Retry in its full window, and Close closes
+that window; turn Remote off with a remote file open in the Editor, restart: that tab is a placeholder with Retry
+("Editor could not restore this tab: no running plugin opens remote: documents."), and turning Remote on again and
+restarting brings it back; a remote file open in the Editor comes back without asking for anything, loads when its tab
+is clicked if an open connection or the agent signs in, and otherwise says so with Retry; with residency and the Vault
+unlocked, close the main window and reopen it from the Dock: the Vault-signed SSH tab comes back Not connected with
+Reconnect and no grant prompt; press Cancel while a restored SSH tab connects: the tab stays with Reconnect; tab to a
+placeholder's Retry and Close with the keyboard; two SSH tabs restored side by side in one window both connect; with a
+restored SSH tab still hidden, pick its host in Remote's Sessions: that tab shows instead of a new one; an Editor tab
+whose file was deleted comes back as the Editor's failed read, with Retry; drag a placeholder's pane into another tab
+and press Retry there: the file comes back in that pane; connect an SSH host whose key you accept Once, quit and start:
+its tab comes back Not connected with Reconnect, asking nothing, and Reconnect asks about the key; start in safe mode
+with a user plugin's tab saved: its placeholder says the plugin is off in safe mode. Not merged, not pushed.
+
+**Workspace tabs, plan 6a: saving and restoring the workspace — 2026-10-21** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `e51f2d14c..3f273675e` on the parent-tabs model, then `77d7b3033..987b30f63`,
+this documentation commit and its final-review fix wave; [plan](superpowers/plans/2026-10-18-workspace-6a-save-restore.md),
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). Jasper saves its windows to
+`<home>/workspace.toml` (`workspace.WorkspaceStore` over plan 2's `WorkspaceFile`): one second after the first change (a
+timer that does not slide), at once when a window closes, and before closing every window (closing the main window,
+Quit, going to the background), after which saving waits until the windows come back; writes run in order on virtual
+threads, each after the one before however it ended, a write the writer refuses logged as a failed one, and shutdown
+waits for them; a snapshot that fails, an `Error` too, costs only that save. The file says window, tab, pane and item
+(spec 12): each window's place, `shown_tab` and tabs in strip order (`[[windows.tabs]]`), each tab's `active_pane`,
+`maximized` and nodes, each pane naming its one item, then the window's items (`[[windows.items]]`); `version` stays 1.
+`WindowManager.snapshot()` keeps each window's `JasperWindow.Placement`, its tabs and a `TabRecord.Terminal` per local
+terminal (rename, last local directory, profile); other items are taken out as closing them would
+(`WorkspaceFile.keeping`): a tab left with none goes, a full window left with none is left out, Jasper's own Errors tab
+among them. `WindowManager.ensureMain` restores: the main window, then its full windows, each before its frame exists,
+the main window in front; tab, pane and item ids come back as saved; a request's directory opens in a new tab after the
+restored ones; with nothing saved, an unreadable file or a main window that cannot be restored, a new main window opens;
+a restore that throws once the main window shows, an `Error` too, costs only what failed, the saved windows kept aside
+(Rulings 43). Saved windows that do not all come back (an unreadable file, a dropped window, tab or item entry, a window
+that cannot be restored) are kept as `workspace.toml.bad` with the notice "Jasper could not restore your windows",
+posted one EDT turn after the file was read, so it shows as a card on every first opening, a settled resident Jasper's
+Dock reopen included (Rulings 44). A main window that shows no terminal (a maximized pane counts alone) marks the first
+paint with its own. A restored terminal waits (`TerminalPane.restored()`) until its tab is the one its window shows when
+an EDT turn ends (a gesture that passes over tabs, such as Move to Main Window, starts none of them; a request's new tab
+leaves the restored ones waiting), and reports `NOT_STARTED`, in the testkit's fake too (`FakePluginHost.holdPane`,
+local panes only, checked on both runtimes); a directory that is gone starts the shell where a new shell starts.
+`UiState`'s `[main_window]` is gone (no migration), and plan 5's keep-on-screen helpers are `WindowPlacement.fitted` and
+`displayFor`. The SDK is 0.21.0, a breaking boundary: `SessionState.NOT_STARTED`; every bundled manifest, the external
+example and every guide range declare `sdk = ">=0.21.0, <0.22"`. Rulings (plan, "Rulings"): (1) 6a is windows and
+terminal tabs, the store and SDK 0.21.0, and 6b plugins' tabs; (2) one SDK bump, to 0.21.0, 6b's additions `@since
+0.21.0`; (3) `NOT_STARTED` is the first constant of `SessionState` and of `PaneSnapshot.State`; (4) a restored terminal
+starts once its tab shows (narrowed by 37); (5) a restored pane whose directory is gone starts where a new shell starts,
+no WSL share probed; (6) a terminal tab saves its rename, inheritable local directory and profile, a program's tab as a
+shell, a provided session's not in 6a; (7) every window keeps the place its frame reports, and `[main_window]` goes with
+no migration; (8) a layout change, a rename, a terminal's new local directory, a window opening or closing and a new
+place are worth saving; (9) the save timer starts at the first change and never slides, the snapshot is taken on the
+EDT, an equal one is not written, writes run in order on virtual threads; (10) closing every window saves first and
+holds saving until they are restored, whatever that save does; (11) a restore in the same process uses the snapshot it
+saved last, not the file; (12) `ensureMain` is the one restore point, a request's directory opening in a new tab after
+the restored ones; (13) saved windows that do not all come back are kept as `workspace.toml.bad` with a notice; (14) the
+snapshot takes out each tab that cannot come back as closing it would; (15) no snapshot while no main window is open or
+while it opens; (16) a restored full window's timing line says `restore`; (17) a main window that shows no terminal
+marks the first paint with its own; (18) the rehearsal never touches the store; (19) shutdown waits for the last write;
+(20) a full window that cannot be restored is logged and left out, a main window that cannot opens fresh in place and is
+never discarded; (21) a restored window's place reaches its frame through `JasperWindow.placement`, never
+`Opening.bounds`; (22) a snapshot that throws costs only that save, and every write runs after the one before however it
+ended; (23) the testkit's fake holds a pane as Jasper holds a restored tab (`FakePluginHost.holdPane`); (24) the
+keep-on-screen helpers sit beside `WindowPlacement`, which fits a restored window with `fitted`; (25) the first file
+shape (roles, parent tabs, pane windows), replaced by 32; (26) a bad entry drops alone, and so does one repeating an
+earlier entry's ids; (27) tab, pane and item ids come back as saved, a window's id is new at every opening; (28) every
+layout change, moves between windows included, reaches `workspaceChanged`, where the save is asked for; (29) a pane
+window comes back as one, moot now that pane windows are gone; (30) a restored workspace takes the window's theme and
+glass, and its tabs take their places at once; (31) the start of the shown restored tabs waits for the end of the EDT
+turn and is asked for once per turn, so a gesture that passes over tabs starts none of them; (32) `workspace.toml` says
+window, tab, pane and item, `version` staying 1; (33) a write the writer refuses is logged as a failed one; (34)
+`save()` takes over a scheduled save only once it has windows to write; (35) an `Error` from the snapshot costs that
+save alone; (36) the store's tests record its log, and `layoutChanged()` stays right after the model takes a change;
+(37) a restored terminal starts once its tab is the one its window shows when an EDT turn ends, every pane of that tab;
+(38) every window restores by one route: `ensureMain` reads the store, restores the main window, then each full window;
+(39) Task 5's review fix round is a task of its own (Task 6); (40) the earlier tasks' Minors the ledger gave the final
+fix wave stay with it; (41) a request's new tab that a restored main window fails to open is logged and costs only
+itself; (42) the first-paint check reads the main window once its opening's EDT turn ends; (43) a restore catches
+`RuntimeException | Error` once the main window shows and in the main window's own restore, and keeps the saved windows
+aside, so a deterministic failure costs only what failed and never repeats at each start (Rulings 20, 35, 41; Task 8's
+review); (44) the set-aside notice posts one EDT turn after the restore read the file, so it shows as a card on every
+first opening, a settled resident Jasper's Dock reopen included (Rulings 13; Task 9's review); superseded or reworded
+for tabs and panes: Rulings 4, 14, 17, 25 to 31 and Spec issues 4; Spec issues 5 to 7 (the main window's empty tab keeps
+one empty pane, saved with `item = ""`; the file says the spec's words; a request's new tab covers the restored tab that
+showed, which waits). Deviations: (1) Task 8's review: a full window whose restore fails once its items are mounted is
+discarded unshown, not closed as one that opened (its emptying waits for its frame); one pane whose start fails leaves
+its tab's other panes starting; a restored window is sized as a new window is (the empty window's stand-in size goes);
+`keepAside` guards both set-asides; Rulings 43. (2) Task 9's review: the set-aside notice posts one EDT turn later
+(Rulings 44); the store takes a writer (`JasperApplication.workspaceWriter`) so tests pin that Quit waits for its save
+and that the store writes the Jasper home's `workspace.toml`. (3) 6b's text cites a few line numbers and a test count
+that moved; its anchors are unaffected. (4) The final-review fix wave: one log recorder in `testsupport` (`LogRecorder`)
+ends the store's and the codec's stderr warnings in the store and restore tests, and the tests assert the warnings (a
+write that fails or that the writer refuses says "Could not save the workspace to <file>"); a hold with a scheduled save
+and nothing to save, a pane with no `item` key and the `.bad` bytes of a file in the old words are pinned;
+`WindowFrame.discard` loses its dead `placement = null`; the Javadoc of `WindowShell` and `WorkspaceStore` and a few
+test names and messages say what the code does; the authoring guide and `TabHandle.isOpen` say that a tab Jasper closed
+with its windows comes back under the same id when they are restored, so a plugin drops a handle on `TAB_CLOSED`; and
+`configuration.md`'s hand-edit sentence is corrected (once Jasper has opened a window it restores from what it last
+saved, not from the file). Closed with no change, as the review ruled: Task 1's re-review item 2, Task 4's Minors 5 to
+7, the size half of Task 7's Minor 4 (6b's `WindowManager.fitted` keeps every write under the reader's limit), Task 8's
+Minors 5 to 7 (the focus half of 7 is a GUI check below) and Task 9's Minor 3; Task 1's re-review item 1 moves to 6b.
+Left for plan 6b: plugins' items (restore state, restorers, placeholders) within SDK 0.21.0, restored with their saved
+ids straight into their windows and tabs, never through `TabRegistry.open`, and never saving Jasper's own items
+(`TabRegistry.APP_OWNER`); `ContentTab.window()` names a never-open window for an item that waits for the main window,
+which now waits through every full window's restore; Remote's restored `NOT_STARTED` panes; `AppContractTest`'s
+`emptyWindow` and panel routing and `FakeWorkspace.closeWindow` nulling `Panel.instance`; the guides' "what each pane
+holds" sentences are completed by 6b's Task 6, since until then only terminals come back; `RestoreState` refuses a key
+holding a lone surrogate; a plugin's item in a file this build did not write is dropped without a `.bad` copy until 6b's
+placeholders; THD Sourcing Crypto rebuilt after 6b, against 0.21.0. So 6a merges only together with 6b. Follow-up: AOT
+training trains only the fresh path (its home is deleted each time), so the restore classes are untrained; seeding the
+training home with a one-tab `workspace.toml`, and deleting it between `StartupRuns` benchmark runs, is left for the
+start-up work. The rehearsal never reaching the store is pinned by the code's structure (it never calls
+`WindowManager`); headless, `warmUp` rehearses nothing. `./gradlew check --continue`: **12,162 tests, 0 failures, 0
+errors, 25 skipped, BUILD SUCCESSFUL** (app 4,173, Editor 4,920, UI 930, terminal 460, testkit 213, Buddy 151, SDK 95,
+the other plugins 1,220) (excludes the external example, which `check` does not run). GUI checks for the user: with two
+tabs in the main window (one split), a full window of two tabs, quit and start again: every window comes back where it
+was, the tab each showed shown, with its panes, their sizes and the active one, the tab strip as before in each look
+(Enterprise always shows it), and only the shown tab's shells start; a hidden tab's shells start when it shows; a
+renamed tab keeps its name; maximize a window, quit, start: it comes back maximized; unplug a display between runs:
+every window lands on the remaining one; close a full window, quit, start: it stays closed; close every tab of the main
+window, quit, start: the empty workspace comes back; corrupt `workspace.toml`, start: one tab and the notice, the file
+kept as `workspace.toml.bad`; with residency, close the main window and reopen from the Dock: the same windows; corrupt
+`workspace.toml` before the login-item process starts (a Jasper quit to the background restores from its own last save
+and shows no notice), then reopen from the Dock: the notice shows as a card; after a restore, the keyboard focus is in
+the active pane of the main window's shown tab, and typing reaches the shell once it starts; under Enterprise, a
+restored terminal tab not yet shown has the idle dot on its strip entry (a shell that ended has the same; its entry
+tells assistive technology of no running session) until it is first shown, when the dot turns to running, and the status
+bar names only the shown tab's active pane. Not merged, not pushed.
+
+**Workspace tabs, plan 8c: moving panes — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `107b7eb55..5ec032b5b`, then the documentation commit and its final-review fix wave;
+[plan](superpowers/plans/2026-10-20-workspace-8c-moving-panes.md),
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). Holding Cmd+Option (Ctrl+Alt on Linux and
+Windows) and dragging inside a pane moves it, the iTerm way: the tab drag (`TabDrag`) carries a pane too. A window's
+`paneClicks` hands it the modifier press on an item of its shown tab, consumed, and the drag's gesture listener consumes
+that press's drags and release, so no item hears any of them, whatever ends the drag; `TerminalView` leaves a consumed
+mouse event alone, so a terminal neither reports nor selects, and a text view's text drag sits out the gesture. A pane
+drops beside another pane of any window's shown tab, on the side whose edge is nearest (`WorkspaceDropResolver`, now
+`Area(group, bounds)` and `Drop(group, side)`; `Drop.Strip` and `Drop.Centre` are gone), the landing showing that half;
+over the middle half of a tab's entry it shows that tab at once, and the tabs a drag showed show again when it ends
+elsewhere; on a new-tab place (`TabStrip.newTabPlace`: an entry's outer quarter in either look, the classic tabs' "+"
+and the room after them) it becomes a new tab there, at once; the main window's empty workspace takes one anywhere over
+it. Within its window a move is a layout change (`ParentTabsView.moveBeside`, `moveToNewTab(Tab, int)`), with no
+`TAB_MOVED`; between its tabs it is announced once, where it lands, in one terminal-registry change, and a pane that
+fails to land goes back (`WindowContent.held`, `WorkspaceView.restore`), Move Pane to New Tab's included; into another
+window it goes through `WindowManager.movePane` and `movePaneToNewTab` and the tab registry, one `TAB_MOVED`, the
+session kept, a full window it empties closing after the move. Outside every window nothing happens; a pinned item's
+drag never starts. Rulings (plan, "Rulings"): (1) the modifier is exactly Cmd+Option (either Option key) or Ctrl+Alt,
+with the left button; (2) a pane's gesture is the drag's from its press to its release, a new left press ending one
+whose release went elsewhere, and the terminal view leaves a consumed event alone; (3) an entry's outer quarters are
+new-tab places in either look, and the classic tabs' "+" and the room after them the strip's end; (4) hovering an
+entry's middle half shows its tab at once, its item focused only in the drag's own window; (5) the tabs a drag showed
+show again when it ends, but in the drop's window; (6) a pane drops on the nearest side, with no centre; (7) where it
+already is means its own pane and its own tab's entry's middle half; (8) in its own window a tab's only pane takes no
+new tab at any place; (9) Move Pane to New Tab, a command, keeps the strip's open motion, and a tab a pane drop makes
+lands at once; (10) the main window's empty workspace takes a pane anywhere over it; (11) a pinned item's drag never
+starts; (12) moves within a window skip the registry, moves between windows go through the window manager and the
+registry; (13) the resolver keeps the pane drag's shape; (14) a modifier press makes its pane the active one; (15) no
+action is added; (16) a text view's text drag sits out the gesture; (17) a pane moving between tabs of its window is
+announced once, where it lands, and goes back if its landing fails. Spec issues: (1) the equal tabs have no empty end
+and no "+"; ruled by the controller: an entry's outer quarters are new-tab places in either look. Deviations: (1)
+amendment 1, from plan 8b's final review (I2, left for this plan): plan 8b's Move Pane to New Tab announced its old
+tab's next pane on the way; Task 2 holds it with the pane drops, so its case comes before Task 3; Tasks 1-3 ran their
+text verbatim. (2) The final-review fix wave: the Esc keystroke that ends a drag is swallowed whole, its typed ESC and
+its release too, so Ctrl+Alt+Esc sends a terminal nothing, and a window losing the focus ends
+the swallow; a pane press is the left button's own (`getButton`, as
+`SwingUtilities` already reads a press on JBR 25), so a second button's press mid-drag ends the drag and starts none; a
+modifier press focuses its pane; a drop that does nothing or fails shows the earlier tab again; each restore of a failed
+move runs on its own; the classic strip has no dead zones (a divider is the place between its tabs, and the row below
+them theirs); the new pins (Esc's whole keystroke, a second button mid-drag, the window's keymap through `paneClicks`,
+Cmd+Option+Ctrl and Ctrl+Alt+Meta, an item being closed, a move into another window raising it and focusing the item,
+focus loss and a lost release mid-hover, a failed move to another window, odd and narrow entries, a full window's only
+pane into a new tab, one `TAB_MOVED` for the empty workspace, `atOnce` after a throw). Known: a Cmd+Option-click
+(Ctrl+Alt-click on Linux and Windows) starts the pane gesture, so it no longer opens a link or reaches a program that
+reads the mouse, and Cmd-click, Ctrl-click and Alt-drag keep their meanings; on Windows only the left Alt counts, since
+Java reports the right one as AltGraph; a move to another window that fails lands its item in a new tab of its old
+window (the registry's recovery), and nothing closes; a Cmd+Option-click (Ctrl+Alt-click) whose keys are let go before
+the button reaches the item as a plain click, which can select a row, sort a column or toggle a fold. `./gradlew check
+--continue`: **12,125 tests, 0 failures, 0 errors, 25 skipped, BUILD SUCCESSFUL** (app 4,136, Editor 4,920, UI 930,
+terminal 460, testkit 213, Buddy 151, SDK 95, the other plugins 1,220).
+GUI checks for the user:
+- Cmd+Option-drag (Ctrl+Alt on Linux and Windows) a terminal pane onto another pane of its tab, then of another window:
+  it splits beside that pane on the side nearest the cursor, the landing showing where, and the shell keeps running;
+- the same drag in a terminal running tmux or vim with the mouse on, where mid-drag you release Cmd+Option (Ctrl+Alt)
+  first, then press Esc, before the release: nothing reaches the program and no selection starts; without the modifier
+  a drag selects or reaches the program as before;
+- on Linux and Windows, Esc pressed with Ctrl+Alt still held ends the drag and sends nothing to vim;
+- a right press mid-drag ends the drag;
+- an editor pane with a selection: a Cmd+Option-drag over the selection moves the pane and never drags the text; a
+  plain drag still selects or drags the text; with `vim = true`, in Visual mode, a Cmd+Option-drag over the selection
+  moves the pane and never moves the text;
+- Cmd and either Option key drag a pane on macOS; on Windows the left Alt key with Ctrl does, and AltGr does not;
+- hovering the middle of a tab's entry shows that tab at once and dropping on one of its panes moves the pane there;
+  releasing Cmd+Option (Ctrl+Alt) first, then pressing Esc, or a release over a title bar, brings back the tab that
+  showed before, in the drag's window and in another window;
+- dragging a pane over another tab of its own window keeps the drag running (the pressed view hides while the hovered
+  tab shows) until the drop;
+- a drop on any entry's outer quarter, in either look, or on the "+" or the room after the tabs under Enterprise, makes
+  a new tab at that place, with no slide, the bar marking it first; a tab's only pane does nothing there in its own
+  window; Move Pane to New Tab still opens its tab with the strip's motion;
+- after Move Pane to New Tab, or a drop beside a pane of another tab, typing at once goes to the moved pane, and the
+  pane its old tab shows next never takes the focus on the way;
+- a full window's last pane dragged into the main window closes the full window; the main window's last pane dragged
+  away leaves its empty workspace, which takes a pane dropped anywhere over it;
+- outside every window nothing happens and no window opens; on Linux, a desktop that takes Ctrl+Alt-drag for itself
+  leaves Jasper no gesture.
+
+Not merged, not pushed.
+
+**Workspace tabs, plan 8b: split with a choice — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `ee3cd8989..62287a388`, then the documentation commit and its final-review fix wave;
+[plan](superpowers/plans/2026-10-20-workspace-8b-split-with.md),
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). A new pane can hold a terminal, an editor or a
+plugin's view. The SDK (0.21.0, unreleased) renames `TabPlacement.ACTIVE_GROUP` to `NEW_TAB` and gains split items:
+`Windows.splitItem(SplitItemSpec, opener)` lists a plugin's view in every Split list and registers its Split Right with
+and Split Down with actions, which bind like any action and call the opener with the window and `SPLIT_RIGHT` or
+`SPLIT_DOWN`; `Windows.splitChoices()`, `ContentTab.split` (the terminal's needs `terminal.open`), `moveToNewTab` and
+`mayMoveToNewTab` let a plugin build the same entries into its own menu. The testkit's fake and the app's contract
+fixture hold a window's tabs of panes and show them through `windowTabs`, and the contract pins the placements, the
+split items and the pane commands on both runtimes. The app keeps split items in `Contributions` (`SplitItem`); the Tab
+menu and a terminal's context menu show one Split submenu (Terminal Right, Terminal Down, then each item's Right and
+Down, the bundled plugins' first, with no icons). Move Pane to New Tab (`move_pane_to_new_tab`, Option+Cmd+T,
+Ctrl+Alt+Shift+T elsewhere) gives the focused pane a tab of its own right after its tab, from the Tab menu, the context
+menus and the palette. The Editor (0.12.0) has New Editor Tab
+(`dev.jasper.editor.new_editor_tab`, was New Editor File) and a split item whose actions are Split Right with Editor (New
+Editor Pane, in the File menu after New Editor Tab) and Split Down with Editor; Revert to Saved
+(`dev.jasper.editor.revert`) and Reload vimrc (`dev.jasper.editor.reload_vimrc`) are actions too; every file it opens
+from outside opens in a new tab; its right-click menu lists Revert to Saved and ends with Split and Move Pane to New Tab;
+its Cmd+W command is Close Pane. Rulings (plan, "Rulings"): (1) `NEW_TAB`, with no `KitCompatibility` entry; (2) the
+fakes take the two levels; (3) split items and their actions' ids and titles; (4)
+plugins reach the Split lists through `splitChoices` and `ContentTab.split`; (5) the lists put the bundled plugins'
+items first; (6) one Split submenu everywhere, replacing Split Right and Split Down in the menus; (7) the toolbar's
+Split button stays; (8) the palette lists every entry as its action; (9) Move Pane to New Tab and what stays; (10) the
+menus' order; (11) `ContentTab.moveToNewTab` and `mayMoveToNewTab`; (12) the Editor's commands; (13) New Editor Pane is
+Split Right with Editor; (14) every Editor open uses `NEW_TAB`; (15) the Editor's Close Pane and its guide's keys; (16)
+only the Editor's version moves; (17) split items live in `Contributions`; (18) a content tab reaches its window through
+the registry; (19) a terminal beside a content tab needs `terminal.open`; (20) Revert to Saved and Reload vimrc are Editor
+actions; (21) the Editor's File menu offers New Editor Tab and Split Right with Editor; (22) the Split submenus show no
+icons. Spec issues: none. Deviations: (1) Task 1's review: `FakePluginHost.windowTabs` is empty for a window that is not
+open, as `ContractHarness.windowTabs` says, pinned on both runtimes. (2) Task 2: `WindowChromeHintTest` binds New Tab to
+`cmd+alt+y`, since Move Pane to New Tab takes ⌥⌘T, and `ShortcutEditorIntegrationTest` searches "new_tab tabs", which
+Move Pane to New Tab's row also matched. (3) Task 4's review: `ContentTab.split(SplitChoice.TERMINAL, …)` checks
+`terminal.open` before anything else, a closed tab's too; `HostedUi.terminalOpen` is a `Function<String, Runnable>` that
+refuses until `HostedContext` sets it, and its audit runs only once a window opened the terminal
+(`TabRegistry.splitTerminal` says whether one did); a tab waiting on a close decision splits nothing
+(`TabRegistry.splittable`, the part of `movable` a split shares; a pinned tab still splits); the fake's `split` is quiet
+once its plugin stops; the testkit's open requests record `beside|<tab>|<RIGHT or DOWN>`. (4) Task 6: the Editor's
+right-click Split submenu is built through `DocumentArea.submenu` and `plainItem`, since the plugin presentation check
+refuses Swing controls elsewhere; the check's `DocumentArea` exception gains `JMenu`, with one fixture each way. Its
+review: `html.disable` goes in before the text in those factories, `WindowChrome.fillSplit` and `WindowContent.tabMenu`,
+since Swing reads it only on a later text change, so a plugin's `"<html>"` label is plain text (other app sites with
+the old order are left for a separate sweep); Revert to Saved and Reload vimrc from the palette or a key act on the file
+of the window they run in; Vim's `:q` and `ZQ` read "close the pane" (the Vim reference regenerated); `TabMenuTest`
+pins `tabMenu`'s order, though `NativeStyles.menuTree` already cleared the view; the sdk-architecture and
+plugin-authoring lines say "vendor-popup JMenuItem and JMenu"; `RunWindowFixtures` keeps "New Editor File", which is
+the mock's data. (5) The final-review fix wave: the Editor passes other plugins' resolvers its window, not its tab, and
+the SDK says why; a stale Editor Split entry does nothing; the fake removes a split item by identity and refuses splits
+per tab; `WorkspaceHost.splitTerminal` reports whether it split; the new pins (a split item's palette words, a stopped
+plugin's split choices, one audit line through a real `HostedContext`, the Split lists' keys after a rebind and the Tab
+menu's Split first, Move Pane to New Tab for a plugin's item and in the empty workspace). Known: the Editor's Split
+submenu shows no shortcuts, since the SDK gives a plugin no way to read a binding. Left for plan 8c: the pane drag, and
+one announcement per cross-tab pane move (8c's amended Tasks 2 and 3 hold the window's announcements while a pane moves
+between tabs). Merge with main: run `./gradlew sdkReference` and commit `docs/sdk-reference.html` (the branch's SDK is
+0.21.0); `Windows.java`'s `popover` Javadoc conflicts, and main's form, which has no mid-line `@return`, is the one to
+take; check main's guides for anchors of members this series renamed, such as `TabPlacement.ACTIVE_GROUP`.
+`./gradlew check --continue`: **12,070 tests, 0 failures, 25 skipped, BUILD SUCCESSFUL** (SDK 95, testkit 213, app
+4,082, Editor 4,920, terminal 459, UI 930, Buddy 151, the other plugins 1,220); the example external plugin's
+`check pluginZip` passes.
+GUI checks for the user:
+- the Tab menu's Split submenu and a terminal's right-click Split submenu: Terminal Right (Cmd+D) and Terminal Down
+  (Cmd+Shift+D) with their keys, then Editor Right and Editor Down, none with an icon; each opens its pane beside the
+  focused one;
+- a terminal's right-click Split ▸ Terminal Right or Editor Right on the unfocused pane of a split tab opens beside that
+  pane;
+- under the Enterprise look the Window menu, which holds the Tab menu's items, shows the same Split submenu;
+- in the packaged Jasper.app on macOS (the screen menu bar), after the Editor is disabled in Settings › Plugins and
+  Jasper restarted, Tab ▸ Split lists no Editor entries; after it is enabled and Jasper restarted again, they return,
+  with no duplicate or missing Split; rebinding Split Right in Settings › Keymap updates the glyph in the reopened
+  submenu;
+- an editor's right-click menu: Split opens a terminal or an editor beside that editor, also when another pane had the
+  focus; Move Pane to New Tab is disabled while the editor is its tab's only pane; Revert to Saved asks before
+  discarding edits;
+- Option+Cmd+T (Ctrl+Alt+Shift+T on Linux and Windows) moves the focused pane into a tab right after its own, every
+  shell running, and typing then reaches the moved pane; a maximized pane's old tab shows the rest;
+- after Option+Cmd+T, a vim or tmux in the pane left behind gets no focus-in or focus-out report;
+- New Editor Tab, Split Right with Editor and Split Down with Editor from the palette; typing "new editor pane" finds
+  Split Right and Split Down with Editor;
+- a Cmd-click on a file, `jasper editor FILE`, Open in Editor… and Recent Files each open a new tab, also while an
+  editor pane of a split tab has the focus, and while the main window shows its empty workspace the file fills it, as
+  the window's one tab, with no empty tab beside it (Review Focus 5);
+- the File menu reads Open in Editor…, New Editor Tab, Split Right with Editor, New Editor Window;
+- Settings › Keymap lists Move Pane to New Tab with its keys and the Editor's five new actions (New Editor Tab, Split
+  Right and Split Down with Editor, Revert to Saved, Reload vimrc) unbound, and binding one works.
+
+Not merged, not pushed.
+
+**Workspace tabs, plan 8a: tabs hold panes — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `c1540b4e9..a49e33f69`, then the documentation commit and its final-review fix wave;
+[plan](superpowers/plans/2026-10-20-workspace-8a-tabs-hold-panes.md),
+[spec](superpowers/specs/2026-10-20-jasper-tabs-and-panes-design.md)). Jasper has two levels: a window holds tabs, and a
+tab holds panes split in any direction, each holding one item (a terminal, an editor file or a plugin's view). The code
+keeps its names: a `ParentTab` is a tab, a `Group` a pane holding at most one tab, the contributions' `Tab` an item.
+Each window has one strip, the parent-tab bar (`ParentTabBar`, which takes in `StripSource`), shown from two tabs under
+the equal tabs and always under Enterprise (`WorkspaceChrome.showsTabStrip`); no pane has a strip, and the equal tabs
+open and close with the motion the pane strips had, an entry keeping its place while its tab shows another pane and a
+dragged or moved tab landing at once. Whatever opens without a pane opens as a new tab (`WindowContent.attach`; New Tab,
+`newTab(Path)`, the registry's `NEW_TAB` placement, which the SDK's `TabPlacement.ACTIVE_GROUP` maps to, its moves and
+Move to Main Window), the main window's empty workspace taking it in its place. Pane windows (`Origin`, `PaneLayout`,
+`WindowLayout`, the `pane` role of `workspace.toml`), Pop Out Tab, Pop Out Pane, Bring Back, New Tab in Pane and the
+item drag are gone; the tab drag and Move Tab to New Window (`WindowManager.moveTabToNewWindow`, from two tabs) stay,
+and `ContentTab.moveToNewWindow()` opens a full window holding the item in a tab of its own. The keys follow the spec's
+table: Close Pane ⌘W / Ctrl+Shift+W, Close Tab ⌥⌘W / Ctrl+Alt+Shift+W, Next and Previous Tab ⌘⇧] ⌘⇧[ / Ctrl+PageDown
+Ctrl+PageUp, Select Tab 1-9 ⌘1-9 / Ctrl+1-9, Ctrl+Tab free. While a tab holds two or more panes every pane but the
+active one dims by `terminal.dim_inactive_panes` (a terminal through today's rule, unchanged, any other item under
+`GroupView.dim`'s overlay), and an inactive window dims every terminal, as before. The controller's rulings of
+2026-10-20, which spec 5 records since `2d7233474`, kept the strip's motion and the inactive window's dimming. The
+user's decision of 2026-10-20 (the spec's decision 3: Enterprise always shows the strip, one tab too) supersedes the
+"Enterprise: one row of tabs" entry below, which is history and is not edited. Rulings (plan, "Rulings"): (1) the code
+names stay, their Javadoc saying tab, pane and item; (2) a group holds at most one tab, and a saved group listing two is
+a bad entry, its parent tab dropped alone; (3) whatever opens without a pane opens as a new tab, the main window's empty
+workspace taking it in its place; (4) the SDK's names stay and its Javadoc follows the app, the testkit and the contract
+cases keeping their model for plan 8b; (5) pane windows go whole; (6) `ContentTab.moveToNewWindow()` opens a full window
+holding the item, and Move Tab to New Window, like the tear-out, needs two tabs in its window; (7) the ⋮ menu lists Move
+Tab to New Window in every window and Move to Main Window in a full window, each enabled while its action is; (8) a
+strip entry's menu reads Rename Tab, Move Tab to New Window, Close Tab, then the shown item's commands, Move to Main
+Window staying in the ⋮ and the context menu; (9) `ParentTabBar` takes in `StripSource`; (10) the strip shows from two
+tabs under the equal tabs and always under the classic tabs; (11) the classic strip's "+" is New Tab and the equal tabs
+have none; (12) a pane dims while its tab holds two or more panes and it is not the active one, by
+`terminal.dim_inactive_panes`; (13) an inactive window keeps dimming its terminals, as today, with the focused-pane dim
+on top; (14) the defaults of spec 10, Ctrl+Tab and Ctrl+Shift+Tab free; (15) Close Pane closes the focused pane's item
+after its guard, Close Tab the shown tab as one gesture after its guards; (16) Next and Previous Tab run before the
+focus owner's own bindings; (17) the File, Tab and context menus read as spec 10 names them; (18) the item drag goes
+whole; (19) plan 7c's hidden-strip band and empty-workspace landing stand; (20) the window's strip keeps the open and
+close motion where the look has it, an entry kept by its tab, a move, a reorder and a drag landing at once; (21) a left
+press on a pane's item makes its pane the active one, a view that takes no focus too. Spec issues, both ruled by the
+controller as the plan reads them: (1) spec 6 reads two ways on a window's only tab and Move Tab to New Window, and Move
+Tab to New Window needs two tabs in its window; (2) spec 15 puts a dimming setting out of scope, and
+`terminal.dim_inactive_panes` stays as the amount. Deviations: (1) Task 1: two `TabDragTest` pins for a press whose item
+closes, or whose entry shows another pane, before the threshold; each also asserts the drag label never showed a title,
+since the review's assertions alone passed with the guard removed. (2) Task 2: `MoveTabsTest` pins that a tab moved to a
+new window, or back to the main window, takes the focus there (the deleted `BringBackTest` held the only such pin);
+`WorkspaceFileReadTest` reads a legacy `role = "pane"` window and drops it alone. (3) Task 3:
+`ClassicTabsTest.thePlusAndTheCloseActLikeButtons` keeps its strip after the "+" (which now opens a tab). (4) Task 4:
+`ClassicTabsTest` expects the window strip's "Close Tab"; a controller-ruled pin,
+`TabDragTest.aPressOnAnEntrysCloseStartsNoTabDrag`; and `WindowContent.selectTab` selects an item in a hidden tab before
+its tab shows, so no other item of that tab turns active on the way (no stray `onActive` or SDK `TAB_SELECTED`), pinned
+by `WorkspaceTabsTest` and `ParentTabsViewTest.selectingAnItemOfAHiddenTabPublishesOneTabSelectedForIt`. (5)
+final-review fix wave: `paneClicks` finds the pane by the press's location, so a press on a view's bare area activates
+its pane; listener registration after `addHost`; pins for Move Tab to New Window from a full window, Close Pane and
+Close Tab at the edges, a split tab arriving settled, and `paneClicks`'s right press, other window and listener
+baseline. Known: `ClassicTabs.refresh` rebuilds every entry when a split tab's active pane changes (a hover or tooltip
+flicker in Enterprise); `WindowTabs` re-keys instead. Left for plans 8b and 8c: the SDK's `TabPlacement.ACTIVE_GROUP`
+and the testkit's one-level model (8b), ⌥⌘T and Ctrl+Alt+Shift+T free for Move Pane to New Tab (8b), and the tab drag's
+machinery with `WorkspaceDropResolver`'s areas, drops and edges for the pane drag (8c). Plan 6a's re-plan follows plans
+8a-8c. `./gradlew check --continue`: **12,032 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user:
+- Cmd+T opens a tab in the window's strip, in both looks, the Enterprise look with Enterprise enabled (Settings ›
+  Plugins, then restart); the standard look shows the strip from two tabs, Enterprise always, its "+" opening a tab; no
+  pane shows a strip, and a split tab shows one entry;
+- in the standard look a third tab opens and a tab closes with the strip's quick eased settle; a split, a click into
+  another pane and closing a pane leave the entries in place; with Enable animations off nothing moves;
+- a tab of two panes: the inactive pane dims and the focused one is clear; a click into the other pane, Cmd+Option+arrow
+  and a tab switch move the dim at once; an Editor file as the inactive pane (open a file, then Cmd+D) dims too, and a
+  click on it makes its pane the active one; a tab of one pane is clear; a window in the background dims its terminals,
+  as before;
+- a click on the blank background of a plugin view in an inactive pane makes that pane active, and Cmd+W then closes it;
+- Cmd+W closes the focused pane (an Editor file with unsaved edits asks first) and the tab with its last pane;
+  Cmd+Option+W closes the whole tab after its guards; Cmd+Shift+] / [ and Cmd+1-9 switch tabs; on Linux and Windows
+  Ctrl+PageDown and Ctrl+PageUp do, and Ctrl+Tab reaches the terminal (try `cat -v`);
+- the ⋮ menu with two tabs: Move Tab to New Window opens a full window holding the tab with its panes, every shell
+  running; with one tab it is disabled; a full window's Move to Main Window joins its tabs to the main window's strip,
+  and a strip entry's menu has no Move to Main Window;
+- a tab dragged along the strip, onto another window's strip, onto the top band of a window with one tab, over the main
+  window's empty workspace and out of every window, landing at once with no slide; dragged over a pane it lands nothing,
+  and a press on a pane starts no drag;
+- an Editor file opened from Open File… and a `jasper` CLI request open as new tabs, the main window's empty workspace
+  taking the first.
+
+Not merged, not pushed.
+
+**Enterprise: one row of tabs — 2026-10-20** (`claude/workspace-tabs`, worktree `.claude/worktrees/workspace-tabs`, on
+`0463d5d1c`; [spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md), section 7). The user, testing the branch:
+"There is a bug in Enterprise mode where the tabs stack instead of go side by side": an Enterprise window with one parent
+tab and one tab showed the same tab twice, the parent-tab bar as the top row and the pane's classic strip under it. Asked
+how Enterprise should show its tabs, the user chose: "One row in Enterprise. Enterprise never shows a separate
+parent-tab row; each pane's strip is the only tab row, and parent tabs are reached through the Tab menu and Cmd+1 to 9."
+Asked about Cmd+T, the user chose "New parent tab": Cmd+T and the toolbar's New Session still open a parent tab, the row
+then showing only that parent tab's tabs, and Cmd+1 to 9 switch back. This supersedes the parent tabs spec's section 7
+("Enterprise: it always shows") and plan 7a's Rulings 17, so the 7a, 7b and 7c entries below that say Enterprise always
+shows the bar are history; they are not edited. What changed: `WorkspaceChrome.showsParentTabBar` returns false for
+the classic tabs (the equal tabs still show it from two parent tabs), so under Enterprise every window's `ParentTabBar`
+stays hidden, takes no row and starts no drag, and `showsStrip` is as it was (every pane's strip shows). Tests:
+`ParentTabBarTest` replaces its Enterprise "always shows the bar" test with one pinning no bar at one and three parent
+tabs, New Tab opening a parent tab whose tab the pane's strip shows alone, Select Parent Tab 1 showing the first again,
+and the bar's `newTabName()` and `closeName()` read from its source, and turns the empty-main-workspace test to no bar
+with New Tab filling it; `EnterpriseWorkstationMockTest.theTabsAreTheMocks` reads the strip at the toolbar's rule again
+(`25 + TOOLBAR + 1`, as before plan 7a) and asserts the first tab sits there; `PopOutTest` has no bar in a full window
+either; `TabDragTest` replaces "Enterprise's bar drags its parent tabs" with the bar never showing, so no press starts a
+drag; `TabDragWindowsTest` moves a full window's only parent tab through `WindowManager.moveParentTab`, since no look
+shows a bar over it to drag from (the window still closes after `TAB_MOVED`). `./gradlew check --continue`: **12,059
+tests, 0 failures, 0 errors, 25 skipped** (`jasper-app` 4,087 with 19 skipped). GUI checks for the user:
+- an Enterprise window with one parent tab and with two shows one row of tabs, the pane's strip, under the toolbar;
+- Cmd+T under Enterprise opens a parent tab: the row shows only its tab, and Cmd+1 shows the first parent tab's tabs
+  again; the Tab menu's Select Parent Tab items do the same.
+
+Not merged, not pushed.
+
+**Workspace tabs, plan 7c: dragging parent tabs — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `c789f0ec7`, `16a458a03` and `537db9b06` (plan 7b's final fix wave lies between the
+first two), then this documentation commit, then its final fix wave ("Parent tab drag: final review fixes");
+[plan](superpowers/plans/2026-10-19-workspace-7c-parent-tab-drag.md),
+[spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md)). A parent tab drags as a tab does: a press on its
+bar entry (`ParentTabBar.pressed`) hands plan 5's `TabDrag` the whole parent tab (`pressed(ParentTabBar, Tab,
+MouseEvent)`, `Target.Bar`). Along its bar a release puts it at the strip rule's place (`WorkspaceDropResolver.place`,
+the public `marker`; `ParentTabs.move`, `ParentTabsView.reorder`, `WindowContent.reorderParentTab`) and the entries
+take their new places at once. On another main or full window's bar it moves there whole through
+`WindowManager.moveParentTab`, a window showing no bar taking it over the band at its top; outside every window it
+becomes a full window through `popOutParentTab(…, bounds, cursor)`, except a full window's only parent tab. A parent
+tab holding a pinned tab moves along its own bar only, and panes and pane windows take none. A tab released outside
+every window pops out into a pane window with its origin (`popOutTab(tab, bounds, cursor)`); the drag reaches the
+window manager through its window (`WindowContent.manager()`, `TabDrag(Supplier)`), and
+`moveToNewWindow(Tab, Rectangle, Point)` is gone. Plan 7a's two hand-offs are tested: both windows' pane strips after
+a move between them, and a torn-out pane window showing no strip and no bar. Rulings (plan, "Rulings"): (1) a parent
+tab drags with the one tab drag and ends it when the tab its entry shows closes, leaves or gives way; (2) along its bar
+the strip rule gives its place, its own place showing no landing; (3) nothing moves until the release, then the
+entries take their places at once and no `TAB_MOVED` is reported; (4) onto another main or full window's bar it moves
+whole through `moveParentTab`, one `TAB_MOVED` per tab; (5) a window whose bar hides takes it over the band at its top,
+at the end of its bar; (6) outside every window it becomes a full window on the cursor's display; (7) a full window's
+only parent tab has no tear-out target, yet another window's bar takes it; (8) a parent tab holding a pinned or closing
+tab takes its own bar only; (9) a parent tab drops on bars alone; (10) a tab released outside every window pops out
+into a pane window with its origin, and plan 7b's Rulings 19 ends; (11) a tab dropped on a bar drops nothing; (12) the
+drag reaches the window manager through its window, a window no manager opened moving nothing out. Spec issues: none.
+Deviations: Tasks 1 and 2 none, no pre-flight anchor needed refreshing; Task 3 removed
+`PopOutTest.plan5sTearOutOpensAFullWindow`, which pinned 7b's Rulings 19 that this plan ends (the pane-window tear-out
+is pinned in `TabDragWindowsTest` and `WindowManagerTest`), made the drop ignore the managers' results (the drag has already ended, and
+the managers refuse again on their own), and gave a window with no manager no parent-tab tear-out. The final fix wave
+lets the main window's empty workspace take a parent tab anywhere over it, in its place, all of it the landing, where
+Rulings 5 gave it the band at its top (a tab already lands anywhere on it, and with no panes there spec 13 does not
+apply); gives a tab being closed targets in its own window only, as a pinned tab (`TabRegistry.movable`, as for a
+parent tab); and makes the public `WorkspaceDropResolver.marker` refuse a place outside 0 to its entries. Comments that
+still say "a torn-out tab's window (plan 5)" (`WindowFrame`, `WindowShell`, `WindowManager`) remain true. Left for
+plans 6a and 6b: `WindowManager.moveToNewWindow` is gone in every form (plan 7b removed the one-argument form, this
+plan the three-argument one), so the 6b re-plan pops a tab out with `popOutTab`; plan 5's hand-off stands
+(`Opening.bounds` and `WindowShell.place` are a tear-out's workspace bounds, for pane and full windows alike).
+`./gradlew check --continue` after the final fix wave: **12,059 tests, 0 failures, 0 errors, 25 skipped**
+(`jasper-app` 4,087 with 19 skipped). GUI checks for the user:
+- a parent tab dragged along its bar, in both looks: the landing bar, then the entries in their new places at once,
+  with no slide;
+- a parent tab dropped on another window's bar between its entries, and on the top of a standard window with one
+  parent tab (the band highlights, then the bar shows with both), every shell running (a `top` stays current);
+- the hidden-bar band's discoverability: whether the top of a standard window with one parent tab reads as a place to
+  drop;
+- a parent tab dragged along the top of the main window's empty workspace (all its tabs closed): it takes the empty
+  workspace's place, and no bar shows;
+- a parent tab dropped in the middle of an empty main window: the whole workspace highlights, and it lands there;
+- a parent tab released outside every window: a full window under the cursor, on that display, its workspace the
+  parent tab's size (under Enterprise its bar sits above the workspace);
+- where an Enterprise full window lands when torn out;
+- under Enterprise, a full window's only parent tab: outside every window nothing happens; onto the main window's bar
+  it moves and its window closes;
+- a tab torn out into a pane window: under the cursor at its old pane's size, its origin where the tab was, no strip
+  in the standard look, and Bring Back returning it beside its pane;
+- a modal prompt in a tab: its parent tab moves along its own bar only;
+- a parent tab dragged over a pane window, a pane or a pane's strip: no landing, and nothing on release;
+- dragging across displays and in full screen.
+
+Not merged, not pushed.
+
+**Workspace tabs, plan 7b: Pop Out, Bring Back and the window menu — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `e80f2c322..66be37837` (plan 6b's re-planned document lies between), then this
+documentation commit, then its final fix wave ("Pane windows: final review fixes", after plan 7c's first commit);
+[plan](superpowers/plans/2026-10-19-workspace-7b-pop-out.md),
+[spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md)). Tabs, panes and parent tabs leave their window and
+pane windows come back. The model gains `layout.Origin` (parent tab, pane, side, share), `Layout.origin` and
+`Layout.graft`, and `PaneLayout` carries its origin. A pane window is a child window whose `WindowContent` the window
+manager gives an origin while it is empty (`paneWindow`): one layout, no parent-tab bar in either look, New Tab stacking
+in its pane, and `windowLayout()` a `PaneLayout`. `WindowManager` gains `popOutTab`, `popOutPane`, `popOutParentTab`,
+`moveParentTab`, `bringBack` and `moveToMainWindow`. Every move goes through the tab registry one tab at a time (one
+`TAB_MOVED` each, sessions untouched): `WindowContent.receive` lands the tabs in the chosen parent tab, then
+`WorkspaceView.rearrange` gives it the planned layout. Bring Back follows the origin's parent tab into whichever window
+holds it, falls back to that parent tab's active pane and then the main window's, ends a maximize, and fills an empty
+main workspace. A window whose only parent tab moves whole to another window takes a new id for its empty workspace
+(`ParentTabsView.renew`). Pop Out Pane, Pop Out Parent Tab, Bring Back and Move to Main Window are disabled while a tab
+they would move is pinned or being closed (`mayBringBack`, `mayMoveToMainWindow`). Commands `pop_out_tab`,
+`pop_out_pane`, `pop_out_parent_tab`, `bring_back` and `move_to_main_window`, no keys, replace `move_tab_to_new_window`
+and `move_tab_to_main_window`; the registry's `moveToNewWindow` (and so `ContentTab.moveToNewWindow()`) pops a tab out;
+plan 5's tear-out still opens a full window. Each window's ⋮ (`WindowMenuButton`; the classic row's icon button) opens
+its window menu. A toolbar pins it (`WindowToolbar.pin`), and the overflow, now `IconRegistry`'s horizontal ellipsis
+`more`, sits before it. The menu has Pop Out Pane and Pop Out Parent Tab in the main window, plus Move to Main Window in
+a full window, Bring Back and Pop Out Pane in a pane window; a full window's Pop Out Parent Tab and a pane window's Pop
+Out Pane appear only while it has two parent tabs or two panes. A tab's menu, a terminal's context menu and the
+parent-tab bar's menu offer the same commands for what they were opened on.
+Rulings (plan, "Rulings"): (1) `Origin(parentTab, pane, side, share)` in `layout` and `PaneLayout(Layout, Origin)`, the
+window being the one holding the parent tab when Bring Back runs; (2) `Layout.origin` records the group across a pane's
+edge within the sibling its space goes to, the side it is on and its share of the two weights (a layout's only group
+records itself, on the right, at half); (3) Pop Out Tab's origin is its pane's when the tab is the pane's only one, else
+that pane, the right side and a half; (4) what pops out of a pane window keeps that window's origin; (5) Bring Back goes
+to the origin's parent tab in whichever main or full window holds it, beside the origin pane or else its active pane,
+and with no such window beside the main window's active pane, always on the recorded side and share, ending a maximize
+and selecting, focusing and raising the pane window's active tab; (6) every move between windows goes through the tab
+registry one tab at a time, `receive` landing the tabs and `rearrange` laying them out; (7) a pane, a parent tab or a pane
+window moves whole or not at all, so nothing moves while any of its tabs is pinned or being closed (`TabRegistry.movable`)
+and the commands are disabled wherever they are offered; (8) a child window's only tab, only pane and (full window) only
+parent tab stay, while the main window's may all pop out; (9) a pane window is a child window whose content has an origin
+(`WindowRole` stays `MAIN` or `CHILD`, no parent-tab bar, Close Parent Tab disabled); (10) a parent tab keeps its id and
+layout when it moves, and a window whose only parent tab leaves takes a new id for its empty workspace; (11) Pop Out Tab
+and Pop Out Pane open the pane window at the pane's place and size on its display, Pop Out Parent Tab where the platform
+puts a window; (12) Move to Main Window joins the parent tabs after the main window's active one in their order, the
+empty workspace giving way to the first, the shown one showing; (13) the five commands have no keys, the Keymap lists
+them by what they act on and the menu bar does not take them; (14) the window menu's entries by kind (main window: Pop
+Out Pane, Pop Out Parent Tab; full window: those two while it has two parent tabs, Move to Main Window; pane window: Bring
+Back, then Pop Out Pane while it has two panes), an entry the spec makes conditional left out and the others disabled
+while their action is; (15) a tab's menu, a terminal's context menu, the parent-tab bar's menu and the palette offer the
+same commands for what they were opened on; (16) the main window's ⋮ is named `windowMenu`, "View Options", pinned after
+Settings (Settings… under Enterprise), shows no label and hides with the toolbar; (17) a child window's ⋮ sits at the
+trailing end of its title row in each platform's title and shows under Compact too; (18) the SDK does not change
+(`moveToMainWindow()` keeps its meaning); (19) plan 5's tear-out stays a full child window until plan 7c; (20) the
+Enterprise mock and classic header tests measure "Settings…" and the search field 30 px left of the mocks, the standard
+toolbar's tests count one more button, and `WindowToolbarTest` reads the horizontal ellipsis and a pinned control after
+it; (21) new files take ledger rows `nonvisual-helper,none,none`. Spec issues: 1 (the origin records the parent tab, not
+the window) and 2 (the ⋮ moves "Settings…" and the search field 30 px left of the Workstation mocks) were decided by the
+controller, for the user to confirm; 3 (the overflow shows a horizontal ellipsis and sits before the ⋮, so two ⋮ never
+sit side by side) was ruled by the controller. The plan says a window id "never decides where the panes go"; it would in
+one case: a pane popped out of a full window whose parent tab then closes comes back to the main window, not to the full
+window that is still open.
+Deviations: 7b's `openParentTab(Tab, ParentTabId, int)` was refreshed before execution to keep 7a's
+executed theme and glass and its bar-order insert; the origin names a pane, so a pane whose sibling was a subtree comes
+back beside one group of it (documented and pinned), and `Layout.origin` clamps its share into [0.01, 0.99]; the plan's
+`OptionalAssert.doesNotContain` does not exist, so `TabDragWindowsTest` uses `.isPresent().get().isNotEqualTo(pane)`;
+`WindowManager.leaving` uses `registry.movable`, so no window opens for a tab being closed; one
+`ParentTabsView.workspace(id)` gives every new workspace, a renewed one too, the window's theme and glass; a window's
+`landing` is restored rather than nulled; `holderOf` skips closing windows; a whole parent tab keeps its maximize when it
+moves; `rearrange` keeps held tabs the plan lacks and does nothing when the plan names none of the workspace's tabs;
+`WindowMenuButton` calls `setText(null)` (`JButton(Icon)` leaves ""); `WindowPanelsTest` hides the toolbar, because the
+pinned ⋮ widens the main window's minimum by about 56 px (the centred header's minimum is twice its wider side); Pop Out
+Tab's enablement adds `registry.movable(tab)` (`mayPopOutTab(Tab)`) on every surface, and the `may*` checks are false
+without a manager; the final fix wave keeps every id in one window when a move of several tabs leaves one behind (a
+listener pins it, or its move fails): `receive` then skips `rearrange`, and `moveParentTab` gives the part that arrived a
+new id (`ParentTabsView.reid`), while Pop Out Pane's tabs stay split across the two windows; and `bringBack`,
+`moveToMainWindow`, `popOutPane` and `moveParentTab` report what arrived, empty or false when nothing did. Left for plan
+7c:
+- a drag onto another window's bar is `WindowManager.moveParentTab(from, id, to, index)`;
+- a parent tab dragged outside every window is `popOutParentTab(window, id, bounds, cursor)`;
+- an item torn out to a pane window is `popOutTab(tab, bounds, cursor)`, in place of `moveToNewWindow(Tab, Rectangle,
+  Point)`.
+
+For plans 6a and 6b: `windowLayout()` is a `PaneLayout` with its `Origin` for a pane window, and a restored pane
+window becomes one through `WindowContent.paneWindow(Origin)` while it is empty, as `WindowManager.openChild` does.
+`./gradlew check --continue` after the final fix wave:
+**BUILD SUCCESSFUL, 12,039 tests, 0 failures, 0 errors, 25 skipped (app 4,067 with 19 skipped, terminal 459 with 5, ui 930, buddy 151, sdk 94, sdk-testkit 205, editor 4,913, enterprise 3, fileserver 285, history 41, indexer 99, remote 544, sample 14, snippets 13, vault 221 with 1)**. GUI checks for the user:
+- the ⋮ at the end of the main window's toolbar, in the standard look (after Settings) and under Enterprise (after
+  Settings…), and its menu;
+- on a narrow standard window, the overflow's horizontal ellipsis ("More actions") just before the ⋮ (Spec issues 3);
+- the main window's minimum width with the ⋮ (about 56 px wider than before);
+- a child window's ⋮ at the end of its title row: macOS's unified bar, macOS under Enterprise's band, the Windows title
+  pane (the title in the glue) in both looks, and the row under the system title bar in Compact and on Linux;
+- Pop Out Tab and Pop Out Pane opening a pane window over the pane's place, on its display, with the focus in the tab;
+- Bring Back of a pane window split further, landing nested beside its pane with the recorded share, its active tab
+  focused;
+- Bring Back after the origin parent tab popped out to a full window, after it closed, and into an empty main window;
+- Pop Out Parent Tab and Move to Main Window keeping every shell running (a `top` stays current);
+- the strip's tab menu, a terminal's context menu (on a pane showing no strip) and the parent-tab bar's menu acting on
+  the tab they were opened on;
+- a modal prompt in a tab blocking its pane's or parent tab's move;
+- an Enterprise child window in macOS full screen: the band hides, so it has no ⋮, and Bring Back stays in a terminal's
+  context menu and the palette;
+- a long native title in the band, which can run under the ⋮;
+- under Enterprise, a child window's ⋮ is the classic icon button the main window's row ends with.
+
+Not merged, not pushed.
+
+**Workspace tabs, plan 7a: parent tabs — 2026-10-20** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `8e129ff34..05521e053` (the Vault dialog commits, Remote 0.15.0 and plans 7b and
+7c's documents lie between), then this documentation commit, then its final fix wave ("Parent tabs: final review fixes");
+[plan](superpowers/plans/2026-10-19-workspace-7a-parent-tabs.md),
+[spec](superpowers/specs/2026-10-19-jasper-parent-tabs-design.md)). A window holds parent tabs, each an unnamed set of
+panes (the split grid of plans 3 to 5), and shows one at a time. The model joins `layout` (`ParentTabId`, `ParentTab`,
+`ParentTabs` with its order of use, the sealed `WindowLayout` over `ParentTabs` and `PaneLayout`); `workspace.
+ParentTabsView` takes the terminal column's place in every window with a `WorkspaceView` per parent tab, the hidden ones
+kept in the tree, invisible, so a switch restarts nothing; `WindowContent.workspace()` is the shown parent tab's, its
+tabs are every parent tab's, and `windowLayout()` gives the model. New Tab (⌘T / Ctrl+Shift+T) opens a parent tab at the
+end of the bar, or fills the main window's empty workspace; `newTab`, plugins' `ACTIVE_GROUP` tabs, the registry's
+placements and single-instance requests open in the shown parent tab's active pane; New Terminal Window and New Editor
+Window open full windows. A parent tab closes with its last tab and the one used before it shows. The parent-tab bar
+(`ParentTabBar`, the look's strip over a `StripSource`) sits above the workspace, shows each parent tab as its active tab,
+never moves, and shows from two parent tabs under the equal tabs and always under the classic tabs. A pane shows its
+strip by its own count (superseding `128a0ac89`'s window count). Commands: `new_tab_in_pane`, `close_pane`,
+`close_parent_tab`, `maximize_pane`, `focus_pane_*`, `next_parent_tab`, `previous_parent_tab`, `select_parent_tab_1`-`9`
+(the `*_group` ids removed); `next_tab` and `previous_tab` move within the active pane on Ctrl+Tab. Rulings (plan,
+"Rulings"): (1) the model lives in `layout`; (2) a closing shown parent tab hands over to the one used most recently
+before it, then the never-shown ones after it in the bar, then before, nearest first; (3) New Tab puts its parent tab at
+the end of the bar; (4) one `WorkspaceView` per parent tab inside `ParentTabsView`, the hidden ones kept in the tree;
+(5) `workspace()` is the shown parent tab's, while `tabs()`, `tabCount()`, `terminalTabs()` and the SDK's
+`WindowHandle.tabs()` cover every parent tab in bar order; (6) a parent tab joins holding its first tab and leaves with
+its last, and only a window's only parent tab may be empty; (7) `newTab`, `openTab`, `Terminals.openTab`, placements and
+requests open in the shown parent tab's active pane, and only New Tab makes a parent tab; (8) a group id names its
+parent tab, so a tab placed beside a hidden parent tab's group lands there; (9) no tab moves between parent tabs of one
+window, so parent-tab changes report no `TAB_MOVED`; (10) a person's switch focuses the shown parent tab's active tab,
+and a close hands the focus on only when it was in the parent tabs or nowhere a person sees; (11) a pane shows its strip
+by its own tab count; (12) labels say Pane and Parent Tab while the code keeps `Group` and `Tab`; (13) the defaults of
+`ActionId` (⌘1-9 / Ctrl+1-9 select parent tabs, Select Tab 1-9 have none, Ctrl+Tab and Ctrl+Shift+Tab run on every
+platform); (14) Next and Previous Parent Tab run from the window's key dispatcher before the focus owner's own bindings;
+(15) the File and Tab menus' new order, Select Tab 1-9 only in the palette and the Keymap; (16) the bar shows each
+parent tab as its active tab, with "+" New Tab and a × and menu that close a parent tab with its tabs' guards; (17) the
+bar is the parent-tabs view's top row; (18) the mock test reads the pane's strip under the bar; (19) the bar is named
+`parentTabBar` and stays the view's last child; (20) new files take ledger rows `nonvisual-helper,none,none`; (21) a
+split beside a hidden parent tab's terminal opens there and does not show it. Spec issues: 1 (spec 8's Alt+1-9 for
+Select Parent Tab 1-9 is taken by Remote's tool-window toggles and is readline's digit argument) was decided by the
+controller, for the user to confirm: Ctrl+1-9 moved from Select Tab to Select Parent Tab off macOS; Alt+1-9 would first
+need Remote's three toggles moved (a Remote change and version bump). Deviations:
+`ParentTabs.java` got a ledger row, because `new ArrayList` matches `CANDIDATE`; a new parent tab takes the window's
+theme and glass, which the plan omitted; `ParentTabsView` keeps its views in bar order (`add(view, index)`); a strip in
+a hidden parent tab runs no motion (`WindowTabs.shown()`); pins were added for Rulings 3, 10 and 21; `MockUiTest`
+measures the content height relative to its own value; `WindowTabsTest` overrides `select_tab_1`; strip tab tooltips
+carry no shortcut by default; `StripSource.closeName()` was added, so the bar's × is "Close Parent Tab"; `ParentTabBarTest`'s
+search assertion names the first view's strip; tests pin a whole parent tab's close and no motion in the bar. Left for
+plan 7b: `PaneLayout`'s origin and the pane windows that hold it, and Pop Out Parent Tab and Move to Main Window in
+`WindowContent.parentTabMenu`; for plan 7c: a drag from `ParentTabBar.pressed` (the bar's entries start none), with moves
+between parent tabs of one window still refused by the registry; for plans 6a and 6b: `WindowContent.windowLayout()` is
+what a window saves, and `workspaceChanged(WorkspaceView, boolean)` runs on every layout and parent-tab change; for plan
+6a (SDK 0.21.0): the SDK Javadoc still describes one workspace (`WindowHandle.tabs()` "in workspace order (group by group,
+…)" at `WindowHandle.java:18`; "the active group of the owner's window" in `TabPlacement.java:10` and `Windows.java:19`;
+"the window's active group" in `Terminals.openTab`), to be reworded as "parent tab by parent tab in bar order, then group
+by group" and "the active pane of the shown parent tab"; for plans 7b and 7c: `ParentTabs` refuses a one-step move of a
+parent tab's last tab into another parent tab of the same window, so callers remove, then replace.
+`./gradlew check --continue`: **BUILD SUCCESSFUL, 11,948 tests, 0 failures, 0 errors, 25 skipped (app 3,976 with 19 skipped, terminal 459 with 5, ui 930, buddy 151, sdk 94, sdk-testkit 205, editor 4,913, enterprise 3, fileserver 285, history 41, indexer 99, remote 544, sample 14, snippets 13, vault 221 with 1)**. GUI checks for the user: in the standard
+look one parent tab shows no bar, ⌘T (Ctrl+Shift+T) and the toolbar's New tab show it at once above the panes, each
+opening a parent tab, and each entry is its parent tab's active tab's title; clicking an entry, ⌘1-9 / Ctrl+1-9 and
+⌘⇧[ ⌘⇧] / Ctrl+PageUp Ctrl+PageDown switch parent tabs with every shell still running (a `top` in a hidden parent tab is
+current when it shows) and the focus on the shown parent tab's tab, also with the focus in the Editor or a tool window's
+table; switching to a parent tab whose right pane is active keeps that pane active (AWT's focus hand-off on hide must not
+leave another pane active); ⌃⇥ ⌃⇧⇥ (Ctrl+Tab, Ctrl+Shift+Tab) move within the active pane; a parent tab's last tab
+closing (Cmd+W, its shell exiting, the bar's ×, Close Parent Tab) shows the one used before it, and closing to one
+parent tab hides the bar; a bar entry's × and middle-click close every tab of that parent tab: terminal tabs without a
+prompt; a plugin tab's close guard (an Editor file with unsaved changes) asks once first, and a refusal closes nothing;
+under the Enterprise look the bar always shows above the pane strips, its "+" (New Tab) and the toolbar's New Session
+open a parent tab (a bar entry), a pane strip's "+" (New Tab in Pane) stacks in its pane, and the main window's empty
+workspace shows a bar with "+" alone;
+a pane holding one tab shows no strip in the standard look, in a split too; the File menu's Close Pane and Close Parent
+Tab, the Tab menu's new order and the Keymap's Panes category; Remote's Alt+1/2/3 still toggle its tool windows on
+Windows and Linux; a `jasper` request and a plugin's tab open in the shown parent tab; New Terminal Window and New Editor
+Window open windows that take parent tabs; a tab dragged within the shown parent tab and into another window lands as
+before. Not merged, not pushed.
+
+**Credential Vault: the manager is a dialog over the main window again — 2026-10-20** (`claude/workspace-tabs`,
+`144ff89f1` on `bba5c472e`, then its review fix). The user decided on 2026-10-19: "Make the Vault manager a separate dialog window that floats above
+the main window. That needs no SDK change." This replaces plan 4b's tab form of the manager (`VaultManagerTab`,
+`82a4ddcbf`). `VaultManagerDialog` opens one modeless plugin dialog titled "Credential Vault", owned by the main window
+(`WindowHandle.isMain()`) whichever window asked; it is never a tab. Opening it raises the main window first
+(`WindowHandle.toFront`, which restores it when minimized), then shows or raises the manager; while the vault is locked
+it shows the inline unlock prompt, and a consumer's unlock raises only the manager. Done and Escape close it again, which closes its sheets and cancels a live unlock prompt; ROWS keeps Lock and Add in its first
+row and CLASSIC its toolbar. A `PluginDialog` is no `WindowOwner`, so its add, edit, password and generator sheets hang
+from an anchor on its Done button; the passive Unlock asks over the main window. It is not restored on relaunch, and the
+Vault stays at 0.7.0. App rule, with no SDK API change: a modeless plugin dialog whose content is a WINDOW form becomes
+window-sized at its first show (`HostedUi`, `AuxiliarySurface.windowSized`): the user can resize it, `DialogFit` never
+re-packs it, it remembers its bounds in `ui-state.toml` under `<plugin id>|<title>` (window keys are now TOML-quoted,
+so a title fits; the key is cut to 255 characters, never inside a surrogate pair), and with none remembered it opens at its content's preferred size but at least 900 × 555, or 820 × 571
+under the classic mapping (`NativeShells.windowContent`), the manager window's sizes before plan 4b. Modal plugin
+dialogs and attached sheets are unchanged; `DialogSpec.Presentation.CENTERED`'s Javadoc names the exception. Host rule
+from the review: every plugin dialog now closes with its Jasper window, as overlays already did, so no surface outlives
+the native dialog its window took with it (Remote's modeless SFTP and Transfer dialogs too). The
+classic render is main's dialog render again (`ClassicVaultRenderTest`, every pin unchanged); `StagedVaultHost`, the
+app's Vault tests and Remote's import test went back to the pre-4b dialog lookups. `./gradlew check` passes:
+3936 app tests (eight new across the change and its review fix), 221 Vault tests (four new), 544 Remote
+tests, 205 testkit tests and 94 SDK tests, 0 failures (19 app, 5 terminal and 1 Vault test skipped). For the user to confirm: (1) while an Add or Edit sheet is open, document modality through the manager also
+blocks the main window (before plan 4b the manager was a window of its own); (2) the sheets are owned by the anchor on
+the manager's Done button, so a change that hid or moved Done would close an open sheet. GUI check for the user: the
+manager opens as a dialog over the main window at about 900 × 555 (820 × 571 under Enterprise) and can be resized;
+after you resize and move it, closing and reopening it (and relaunching Jasper) brings those bounds back; Open Vault
+again raises the one dialog; Add, Edit, Change Master Password and Generate SSH Key sheets hang from the manager; under
+Enterprise it matches the 07 mock again (dialog ground, Done); the main window is blocked while a sheet is open; Open
+Vault from a child window while the main window is minimized restores the main window with the manager over it; and the
+manager closes with the main window.
+Not merged, not pushed.
+
+**Meadow theme pair — 2026-10-20**: Normal and Enterprise first-run defaults use Jasper Meadow in both appearances. Dark pairs moonlit blue-green surfaces with sage accents and ivory text across the UI, terminal and Editor; Light colours are unchanged. Saved picks take precedence. Implemented as a bounded theme update with an in-chat approved design and independent review.
+
+**Bundled Cygwin implementation complete — 2026-10-20** (merged into local `main`): The approved [design](superpowers/specs/2026-10-20-jasper-bundled-cygwin-design.md) and [plan](superpowers/plans/2026-10-20-jasper-bundled-cygwin.md) now include the locked 114-package seed, corresponding sources/notices, production PTY relay, Cygwin Bash discovery, Manage Cygwin packages, and persistent provisioning through both Windows install routes. Default Gradle acquisition/install uses Java and bundled artifacts without PowerShell or separately installed tooling. Disconnected Windows ARM64 acceptance passes real MSI install/add-package/repair/upgrade/uninstall and actual Gradle install/update/uninstall/reinstall; all 8,275 Cygwin root entries survive the Gradle lifecycle unchanged. Native validation fixed WiX/source path limits, MSI empty-root process inspection and read-only launcher cleanup. Independent review and the full merged headless check pass: 11,878 tests, zero failures/errors and 29 skips. Native x64 Windows and interactive-app acceptance remain outstanding and block release publication. [Verification evidence](superpowers/plans/2026-10-20-jasper-cygwin-verification.md).
+
+**Shell Prompt icon and Meadow website — 2026-10-20**: The approved moss shell/terminal artwork replaces package and runtime icons on all three platforms, including the native macOS catalog. The website header, footer and favicon match. Enterprise shares the Shell Prompt platform icon and animated Meadow splash with normal mode. The icon generator uses the tracked raster master, retains platform framing and exports native containers plus a manifest. The local merge also includes the animated Meadow splash and visible-workspace handoff, Meadow website scenery, welcome section and shared tab transitions. Full headless check and macOS package verification pass (11,633 tests, zero failures/errors, 25 existing skips). Pages remains manual-only; deployment has not been run.
+
+**Local Meadow splash — 2026-10-20** (`codex/meadow-splash-preview`): Standard windowed launches show
+Jasper in a pixel meadow with the Meadow palette, build version and actual startup steps. A daemon animates
+blink/wave frames while startup occupies the EDT; painting is serialized and the first visible workspace paint (or startup failure) cancels
+animation before closing the window. The saved app-wide animation preference is honored. Custom branded looks
+retain their own splash, and background/headless/safe-mode launches stay silent. Sprite resources are packaged
+from the companion's approved source artwork. The browser study remains local and outside the public site bundle.
+Independent review passed after correcting the animation preference; native desktop testing remains with the user.
+
+**Rail and Status Bar shortcuts — 2026-10-20** (`claude/rail-status-keys`): View › Show/Hide › Rail and Status Bar
+are Keymap actions `toggle_rail` and `toggle_status_bar` (keymap spec rows 57 and 59): Global, unbound by default and
+disabled in Zen like their menu items. They replace the palette-only `view.rail` and `view.status_bar` commands; the
+menu items and palette entries use the actions. Full headless `check` passed on macOS after the rebase onto
+`origin/main` at `bee2c9f28`: 11,630 Java tests, zero failures/errors, 25 expected skips. GUI check pending.
+
+**Jasper pixel sprites — 2026-10-20**: The app uses the approved shaded pixel artwork: 20 frames at 84 × 96, nearest-neighbor sampling, and a 105 × 120 default display. Animation timing and reduced-motion behavior are unchanged. The editable master, atlas, exporter and maintenance documentation match the runtime strip. Full headless `check` passed: 11,621 Java tests, zero failures/errors and 25 existing platform skips; the exporter verified all 20 frames against the runtime strip.
+
+**Windows user install from IntelliJ — 2026-10-20** (`codex/windows-user-install`):
+`installWindowsUser` builds a separate standard-JBR app image and installs it in
+`%APPDATA%\JasperApp` with a Start Menu shortcut; `uninstallWindowsUser` removes the
+owned installation, shortcut and matching login entry, preserving user data.
+The user approved omitting custom VM options, native startup recovery and the native CLI.
+The install graph excludes native compilation, installer generation and AOT training.
+Full parallel headless `check` passed on merged main on macOS: 11,618 Java tests, zero failures/errors,
+25 expected skips, plus native, architecture and 71 theme tests. Used `-Pjasper.python`
+with installed Python 3.13: the unchanged deeply nested JSON theme test fails on 3.14.
+Install dry-run and independent review passed; graph verification uses resolved task
+data to avoid cross-project state locks during parallel checks.
+Windows lifecycle tests cover updates, rollback, ownership, junctions and data preservation;
+native Windows execution and desktop/daemon acceptance remain pending. No GUI launched.
+Follow-up: Windows script policy blocked the PowerShell install step. The same tasks
+now use a Java helper with direct JNA Windows APIs for shortcuts, process checks and
+the matching login entry. Both compile only this small helper; uninstall builds no
+application artifacts. Portable filesystem/rollback tests run on every host, with
+native shortcut, registry and junction checks added on Windows.
+Full parallel headless `check`, 26 portable installer checks, install dry-run and
+independent review passed for the Java replacement. Native Windows execution remains pending.
+
+**Jasper Meadow Light — 2026-10-20**: The default light theme uses warm cream surfaces and moss #52643F accents for buttons, selections and focus. Existing saved theme choices, Enterprise defaults and the Slate Cobalt dark default are retained. Select Light appearance and Jasper Meadow Light in Settings to try it with an existing profile. After merging the current remote main, full headless `check` passed: 11,618 Java tests, zero failures/errors, 25 existing platform skips, plus theme-tool, native and architecture checks.
+
+**Enterprise presentation, plan 15b: look polish at the user's direction — 2026-10-20** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, after plan 15a; [plan](superpowers/plans/2026-10-19-enterprise-15b-look-polish.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
+Commits `41847317f..807169d15` (the anchor refresh, then Tasks 1 to 5), then this documentation commit and the final review fixes; plan 15's spec
+amendment line gains 5.2, 5.3, 10.3, 10.7, 11.6 and 16.2, and 5.1, 5.9, 9.1 and 16.1 are edited again. The user asked on
+2026-10-19: "in entperise I want to replace that text box command pallete in the toolbar with just search icon like in
+IntelliJ classic", and approved plan 15 ("... activation, classic icons everywhere, the search icon, versions, docs and
+the Sample plugin", quoted in full in plan 15a's entry below). What they became. **Activation:** a `Panels.toggle` or
+`PanelHost.show()` made synchronously inside the handler of the panel's own declared toggle action
+(`PanelSpec.withToggleActionId`) is sent as `PanelRequest.Op.ACTIVATING_TOGGLE` or the new `ACTIVATING_SHOW`, which
+`WindowContributions` maps to toggle or show, then activate; under flush frames (Enterprise) the tool window takes the
+focused tint and the keyboard, and under standard frames nothing activates. A hide, a deferred call, another action's
+call and a panel without a declared toggle stay plain. An activating toggle of a shown tool window that is not the
+active one activates it, and only the active one hides, as IntelliJ's ActivateToolWindowAction (final review). This answers plan 12's question (the user: yes): View › Tool
+Windows and ⌘⌥1 to ⌘⌥3 activate Sessions, SFTP, Tunnels, Transfers and File Servers, and Transfers' action, which only
+shows, activates on every press without a Remote change. No SDK or testkit value changes; the javadoc of
+`Panels.toggle`, `PanelHost.show` and `PanelSpec` says it (since 0.18.2). **Classic icons:** under `[chrome] icons =
+"classic"` the six classic names (`add`, `split`, `zoom`, `settings`, `window.add`, `search`) draw IntelliJ's classic
+art in the app-drawn `ToolWindowHeader` actions, a borrowed kit header's host actions, the panel's own header controls
+and the buttons of toolbar views, through `KitView.classicChromeIcons(boolean)`, `IconRegistry.classicChromeIcon`,
+`AppIcons.classicChromeIcon` and `ToolWindowArea` taking the window's `ChromeArtwork`; `BuiltInArtwork.CLASSIC_NAMES`
+lets the host ask without decoding the classic SVGs. Every other name, a document bar's buttons and every panel or
+window body keep their catalog art. **`toolbar_search`:** the eleventh chrome point, `[chrome] toolbar_search = "field"
+| "icon"`, is `field` in both bases and `icon` in Enterprise's kit; `icon` needs `palette = "run_window"` and a native
+or classic title bar, else the kit is refused with one message naming the key. `WorkspaceLook.Search` (read only by
+`WorkspaceChrome`) and `PluginLook.Search` carry it, and SDK 0.18.2's `Presentation.toolbarSearch` now reports `ICON`
+under Enterprise; `FakePresentations.CLASSIC` takes `ICON`. **The button:** `ClassicHeader(true)` puts an icon-only
+"Search Everywhere" button with the classic magnifier (a 22 px square, priority 100) first in the trailing group, 8 px
+before Settings…, in place of the field; it runs COMMAND_PALETTE as the field does, its tooltip is "Search Everywhere"
+plus the palette's shortcut in parentheses, it stays icon-only under `icons_and_labels`, goes with the row under
+`hidden` (⇧⌘P still opens the Run window) and stays beside Settings… in a narrow window. **`LookIdentityTest`:** no
+class in the app or jasper-ui jar, and no `dev/jasper/` class of a staged plugin other than Enterprise, holds
+"enterprise" in its constant pool, so a look stays data. No version moves: SDK 0.18.2, Enterprise 0.3.0, no plugin code
+or manifest changes. Rulings (plan, "Rulings"): (1) a toggle or show inside the panel's own declared toggle action
+activates, anything else stays plain; (2) activation needs no SDK or testkit change; (3) the classic set reaches
+tool-window headers and toolbar views, not bodies; (4) classic art for the six names only, through a `KitView` flag and
+`AppIcons.classicChromeIcon`; (5) the key is `toolbar_search`, values `field` and `icon`; (6) `icon` needs the Run
+window and a native or classic title bar; (7) the button is icon-only, named "Search Everywhere" with the shortcut,
+first in the trailing group, and runs COMMAND_PALETTE; (8) the covering array holds `toolbar_search` at `field`; (9) no
+version moves; (10) the identity guard scans constant pools, Enterprise's own classes and bundled libraries excepted;
+(11) `FakePresentations.CLASSIC` moves to `ICON`; (12) plan 15a's baseline is reused; (13) one spec header line for plan
+15. Execution rulings (plan, "Execution notes") X1 to X23, among them: X1 the window-level activation tests sit in
+`WindowPanelsTest`; X2 an activating toggle also needs `PanelEntry.namedToggle()`; X3 "in the panel header" is `panel &&
+!documentBar`; X4 `CLASSIC_NAMES` lives outside `ClassicHolder`; X7 `ClassicHeader` declares both constructors; X8
+`ProjectionsTest`'s Enterprise plugin looks take `Search.ICON`; X9 `EnterpriseMenuRowMockTest.Mounted` captures the
+button's bounds; X12 and X13 spec 5.3, 9.1 and 10.7 are corrected, not just extended. Deviations from the Enterprise
+mocks, as the user's 2026-10-19 direction: the toolbar's field is the icon, so `EnterpriseWorkstationMockTest` drops the
+field's assertions (mock x 2116-2715, y 122-165) for the button's (a 44 mock px square at the field's top, 16 mock px
+before Settings…; the Settings… crop is unchanged), and the pairs `chrome-toolbar-light` (0.581, now 0.427) and
+`chrome-toolbar-dark` (0.577, now 0.423) pass at their unchanged 0.30 floors with a note, the light one no longer
+listing `#FFFFFF`, the field's `surface.input`. Under classic artwork a header's `+` is IntelliJ's classic `add`,
+authored (#6E6E6E in Light), in the strip's 10 px glyph box beside ⋯ and − in the strip's ink (#404040 in Light), where
+the mocks set a glyph in the strip's ink: since the final review `DockFixture` builds its area with
+`ChromeArtwork.CLASSIC`, as Enterprise windows do, and `DockMockTest.compareHeader` expects that art's own ink for the
+`add` of File Servers, Sessions and Tunnels (the glyph centre and extent checks pass unchanged); the 16 dock header pairs
+pass their unchanged floors, each within 0.002 of before (`dock-light-kit-servers-header` 0.986 to 0.985,
+`dock-light-kit-sessions-header` 0.982 to 0.981, `dock-light-disconnected-kit-sessions-header` 0.982 to 0.981,
+`dock-light-disconnected-kit-tunnels-header` 0.996 to 0.995, `dock-dark-kit-servers-header` 0.986 to 0.985,
+`dock-dark-kit-sessions-header` 0.984 to 0.982, `dock-dark-kit-tunnels-header` 0.988 to 0.986,
+`dock-vault-kit-servers-header` 0.993 to 0.992, `dock-vault-kit-sessions-header` 0.983 to 0.982,
+`dock-vault-kit-tunnels-header` 0.997 to 0.995; the other six the same). `./gradlew check
+--continue`: **11,597 tests, 0 failures, 0 errors, 25 skipped** (plan 15a: 11,569 and 25); `check_pairs.py` passes 101
+of 101 gated pairs with the same verdicts as the baseline (`plan15-baseline`, from `f78bb0385`), and every agreement is
+the same except the two toolbar lines and `enterprise-settings-13` (0.723, 0.722 since plan 15a), and since the final
+review the dock header lines above; the headless gallery
+is byte-identical to the baseline's (Slate Cobalt Dark and Light, 161 files each) and so are the 11 default-look
+jasper-app renders. No test needed a re-run. The final review fixes add three tests
+(`KitClassicChromeIconsTest`, `WindowPanelsTest`, `HostedUiTest`), counted above. Later: the splash's fixed colours and "Workstation…" step text for other
+branded looks; the external THD plugin's port to SDK 0.18. GUI checks for the user, in this order: (1) under Enterprise
+Light and Dark, the toolbar's magnifier before the wrench, against IntelliJ Classic's: its hover, the tooltip "Search
+Everywhere (⇧⌘P)", a click opens the Run window, ⇧⌘P still does, Icons & Labels keeps it icon-only, and a narrow window
+keeps it beside the wrench; (2) View › Tool Windows › Sessions, SFTP, Tunnels, Transfers and File Servers, and ⌘⌥1 to
+⌘⌥3: each opens its tool window with the focused header tint, and typing goes there; for Sessions, SFTP, Tunnels and
+File Servers a second press hides it and hands the keyboard back to the terminal, a press while the terminal has the
+keyboard activates an open tool window instead of hiding it, while Transfers' action only shows, so
+a second View › Transfers or ⌘⌥3 keeps it open and activates it again; (3) Sessions', Tunnels' and File Servers'
+header `+` in IntelliJ's classic art: authored, in the strip's 10 px glyph box beside ⋯ and − in the strip's ink; judge
+its size and ink against IntelliJ Classic; (4) Remote's session view's Run button unchanged; (5) the
+default look: the title field, the rails, the headers and the shortcuts as before (a toggle shortcut opens without the
+tint). Merged to local main, not pushed.
+
+**Workspace tabs: local main merged in (Enterprise plans 12 to 14) — 2026-10-19** (`claude/workspace-tabs`, the merge
+`23436efc3` of local main `f78bb0385`, then the fixes `5e709850c` and `94c91e6d2` and "Merge fixes: a child window's
+activating toggle activates, its Windows title dims"). The merge had 22 conflicts; the merge commit lists the resolutions.
+Ports of main into the branch's replacements, for the user to confirm: (1) a child window takes the classic title: on
+macOS `WindowContent.mountChild` gives it `MacTitleBand`, the vibrant appearance and `TitleInset`, and unfolds the screen
+menus; on Windows it gets a 28 px FlatLaf title pane in the toolbar's colour that publishes `TitleInset` and dims while
+the window is inactive (FlatLaf paints the title in one colour, so `mountChild` repicks `WindowPairs.TITLE` or
+`INACTIVE_TITLE` from `setActive`); (2) a child window's `ACTIVATING_TOGGLE` routes to the main window as
+`Op.ACTIVATING_SHOW`, which shows the panel and makes it the active tool window under flush frames, as IntelliJ's
+detached editor does (a routed toggle never hides, and a plugin's `TOGGLE` stays non-activating). SDK 0.20.0 includes
+main's 0.18.1 additions, and Enterprise is 0.2.0. Remote is 0.15.0: the v1.0.0 tag already shipped a Remote 0.14.0 (main's icon-only GHOST
+buttons, on SDK 0.18.1), and this one also carries the branch's SDK 0.20. The fixes also close the SDK
+README's parenthesis and correct `ShellLook`'s Javadoc (the main window's menu row; every window frame's classic title).
+`./gradlew check` passes: 3921 app tests, 4913 Editor, 930 UI, 544 Remote, 459 terminal, 285 File Server, 221 Vault,
+205 testkit, 151 Buddy, 99 Indexer, 94 SDK, 41 History, 14 sample, 13 Snippets and 3 Enterprise tests, 0 failures
+(19 app, 5 terminal and 1 Vault test skipped). GUI checks for the user: a child window under Enterprise on macOS shows the
+band, the traffic lights, the screen menus and Compact; a child window under Enterprise on Windows shows the 28 px title
+pane with overlays below it, and its title and caption buttons dim when the window is inactive; View > a tool window from a child window
+activates it in the main window. Not merged, not pushed.
+
+**Editor: a New Editor Window toolbar button — 2026-10-19** (`claude/workspace-tabs`, one commit on `914bfc272`). The user
+asked on 2026-10-19: "I also want a toolbar button in this mode and Enterprise mode where I can open a new Editor File
+window too." The Editor places `ToolbarItem.action("dev.jasper.editor.new_window")` after its File menu items; the
+action carries the Editor's `file` glyph (so it differs from New Terminal Window's), its title is the
+tip, and clicking it runs the action the File menu runs. Both looks' headers already draw a contributed button, so
+the standard look shows the glyph with its label and the Enterprise classic row shows the label-first button (the glyph
+when the toolbar is icons only); the Editor stays at 0.11.0. Files: `EditorPlugin`, `EditorPluginTest` (one new test),
+`EditorToolbarButtonTest` (new: the staged Editor in the real host, both looks), `BundledSamplePluginTest` (the
+bundled toolbar now holds three entries), `docs/editor.md` and the `ThemeMigrationCoverageTest` ledger row.
+`:jasper-plugin-editor:check` and `:jasper-app:check` pass: 4913 Editor tests, 3807 app tests (one new), 0 failures,
+19 skipped. GUI check for the user: the New Editor Window button shows in the standard look and in the Enterprise
+look, and clicking it opens a new editor window with one untitled document. Not merged, not pushed.
+
+**Workspace tabs: a window's only tab shows no strip — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, one commit on `4a3bbd01a`, between plans 5 and 6a;
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md), amended). The user asked on 2026-10-19: "in
+normal mode (not enterprise mode), if there is only one tab in the main window (or in a mini window created by a new
+Terminal window or editor window or plugin window), then I do not want to show the tab bar. this is only in normal
+mode." Under the standard look's equal tabs a window holding exactly one tab (the main window or any child window: New
+Terminal Window, New Editor Window, a plugin's new window, a tear-out, Move Tab to New Window) shows no tab strip, and its
+group's card area fills the group; a split holds at least two tabs, so each of its groups shows its strip; the Enterprise
+look's classic tabs always show. `WorkspaceChrome.showsStrip(count)` decides, and `WorkspaceView.render`, which every
+layout change runs, hands the answer to each `GroupView.display`, which hides the strip before it takes its tabs and
+shows it after: the strip follows the count in the same EDT turn, at once and settled (a hidden `WindowTabs` takes its
+tabs without motion). A hidden strip reports an empty rectangle and no tab places to `WorkspaceView.dropAreas`, so a tab
+dropped near a one-tab window's top splits that edge or joins the group; that window's own tab has no strip to start a
+drag from. Files: `GroupView`, `WorkspaceView`, `WorkspaceChrome`, `WindowTabs`, `TabStrip`; tests in
+`WorkspaceViewTest`, `WindowRolesTest`, `WorkspaceDropTest`, `WindowTabsTest`, `ClassicTabsTest`, `TabDragWindowsTest`
+(its child window holds two tabs; the tests that drag a window's only tab give it the classic tabs), `WindowTabMotionTest`,
+`TabHeightTest`, `MockUiTest`, `GraphiteChromeTest` and `ChromeRenderTest`; spec section 1 decision 4 and section 10,
+`README.md`, `docs/configuration.md` and `docs/app-maintenance.md`. `:jasper-app:check` passes: 3806 app tests
+(four new), 0 failures, 19 skipped. GUI check for the user:
+in the standard look one tab shows no strip, and a second tab (New Tab, a split, a tab moved in) shows it at once, with
+both tabs in place; closing back to one tab hides it at once; under the Enterprise look the strip always shows. Not
+merged, not pushed.
+
+**Workspace tabs, plan 5: tear-out and drag-back — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `e2294085b..49f5b7a84` (Tasks 1 to 4, after the plan refresh), then the
+documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-18-workspace-5-tear-out.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). One tab drag (`workspace.TabDrag`, the window
+manager's, shared by every window it opens) replaces the strips' release-to-reorder: a left press on a tab of either
+strip face that moves past the kit's `TAB_REORDER_THRESHOLD` (5 px) drags it on plain mouse events in screen
+coordinates, with its label in a small undecorated window beside the cursor (`TabDragLabel`) and the landing on the
+target window's `DockDropOverlay`. `dock.WorkspaceDropResolver` (pure; `dock` may now name the layout's group ids and
+sides) maps the cursor to a drop: a place in a strip, a group's centre, a group's outer quarter on a side (the empty
+main workspace is all centre), and picks the most recently active window under the cursor; on macOS a window in full
+screen on the display of the drag's own window, other than that window, takes no drop. Within a window `WorkspaceView.drop` reorders,
+moves or splits; into
+another window the tab registry moves the tab (TAB_MOVED, both maximizes end, an emptied child window closes after it)
+and the drop places it, an edge drop beside the target group directly (`TabRegistry.move(Tab, UUID, GroupId, Side)`);
+outside every window the tab tears out into a new child window whose workspace is its old group's size with the tab
+under the cursor, its frame grown by its own title bar (`WindowFrame` measures it) and kept on the display under the
+cursor (none for a child window's only tab, which can still move into another window, or for a pinned tab, which moves
+within its window only). A release over a
+window's dock, chrome or title bar or over another window of Jasper's (Settings, About), a drop that would change
+nothing, Esc, a lost release, the source window losing the focus (a modal dialog, another application) and the dragged
+tab closing or leaving its window or group do nothing. Sessions and content are never touched. `GroupView.reorder` is
+gone. Rulings (plan, "Rulings"): (1) `WorkspaceDropResolver` lives in `dock` beside `DockDropResolver`, and `dock` gains
+one allowed edge, to `layout`, for `GroupId` and `Side`; (2) over a strip the drop is the place before the first other
+tab whose middle is not left of the cursor, over a card area a side's outer quarter (the nearer side by share in a
+corner) or the centre, a strip has no edge zones, the empty main workspace is all centre and a divider is no zone; (3)
+the drag starts past `TAB_REORDER_THRESHOLD`, and `DOCK_DRAG_THRESHOLD` stays the dock's; (4) a centre drop highlights
+the whole group, an edge drop its half on that side, a strip drop a `TAB_INDICATOR`-wide bar, and the overlay draws no
+ghost; (5) a drop that would change nothing (the tab's own place, its own group's centre, an edge of the group it is
+alone in) shows no landing and does nothing; (6) the label is an undecorated, never focusable, always-on-top `JWindow` 8
+scaled px right of and below the cursor's tip, made when a drag starts and disposed when it ends, and never in a
+headless JVM; (7) a drag ends without a drop on Esc, a plain move or a press anywhere (a lost release), its source
+window losing the focus or closing, the dragged tab closing or leaving its window or group, and a release over no
+target, and the Esc dispatcher and the listener register before the label shows; (8) within a window a drop is a layout
+operation of plans 2 and 3a; (9) a window's frame is its native window's bounds, Jasper's other showing windows take no
+drop and shield no main or child window, and another application's window is invisible to Java, so a release over one
+tears out; (10) the window manager owns one `TabDrag` and gives it to every window it opens, and a window no manager
+opened keeps its own, which tears nothing out; (11) a drop on another window goes through the tab registry, an edge drop
+with `move(Tab, UUID, GroupId, Side)` and a strip or centre drop with `move(Tab, UUID)` and then the window's workspace
+places the tab, in one EDT turn; (12) a tear-out opens the child window through `moveToNewWindow(Tab, Rectangle)` with
+its workspace bounds, which its frame grows by the chrome it measures and keeps on the display; (13) a child window's
+only tab and a pinned tab have no tear-out target; (14) `GroupView.reorder` and the strips' release-to-reorder go
+outright, four tests reorder through `WorkspaceView.reorder` and `WindowTabsTest`'s drag test drags; (15) new files take
+ledger rows `nonvisual-helper,none,none`; (16) the user guide for tabs is `README.md`'s tabs paragraph, and
+`docs/keyboard-shortcuts.md`, which has no section on tabs, does not change; (17) a pinned tab is offered targets in its
+own window only; (18) on macOS a window other than the drag's own whose frame is exactly its display's bounds is in full
+screen and takes no drop, a rule that is macOS's alone. Deviations: (a) before Task 1 the plan was replayed on
+`094729d08` (28 blocks, 3 failing before the refresh, 0 after, with every proposed ruling) and refreshed in `e2294085b`,
+with rulings F1 to F9: F1 a tear-out names the new window's workspace and `WindowFrame.placeWorkspace` grows it by the
+chrome it measures in the packed frame (the title bar is inside the frame on every default), F2 no split-from group is
+kept and the left/up round-trip halving is deferred (below), F3 the tear-out test asserts no `TabOpened` or `TabClosed`,
+F4 Task 4 Steps 3 and 4 cover 4b's placement and `moveToNewWindow(tab, bounds)` hand-offs, F5 plan 3a's declined #6 is
+not needed and the plugin tear-out test asserts `view.isVisible()` twice, F6 `AppContractTest` and `FakeWorkspace` go to
+plan 6 (below), F7 executors used the pre-flight's absolute counts, F8 an in-window modal overlay opening mid-drag does
+not end the drag, as `DockDrag` behaves, F9 five anchors and seven text fixes are applied, and the File structure names
+`WindowFrame` and `WindowShell` under Task 4; (b) Task 3, controller ruling after review 1: `WorkspaceView.apply`
+refocuses when the active group changes under the workspace's `holdsFocus` rule, not `drop` at its end, so a tab dropped
+into another group keeps the focus once (a test counts `focusTarget` calls, and `RecordingFocusManager` gains
+`own(Component)`), `GroupView.pressed` cancels a dock drag whose release was lost, and the exit-path tests assert the
+Esc dispatcher and the AWT listener are gone (`f01f025cf`); (c) Task 4, controller ruling after review 1:
+`TabDrag.displayFor` chooses a tear-out's display, the default screen only when it finds none, in place of the display
+holding the workspace's top-left corner (then the one the workspace overlaps most; since the final review, (d), the one
+under the cursor), so a tear-out near a monitor's edge opens where the cursor is, with its test and two more (a drop
+into another window's inactive group, a refused or failed registry move) and a comment on `WindowContent`'s own drag
+(`49f5b7a84`); (d) final review: a tear-out opens on the display under the cursor, which `TabDrag.Target.TearOut`,
+`WindowManager.moveToNewWindow(Tab, Rectangle, Point)`, `Opening.cursor` and `WindowShell.place` (now a
+`BiConsumer<Rectangle, Point>`) carry to `WindowFrame.placeWorkspace` and `TabDrag.displayFor(Point, List)` picks, so a
+display left of or above another keeps a release near its edge; on macOS only a window in full screen on the display of
+the drag's own window takes no drop (`TabDrag.dropFrame`'s `onSourceDisplay`), as each display shows a Space of its own;
+the drag label shows at most 40 characters of a title, the last an ellipsis (`TabDragLabel.TITLE_LIMIT`); tests for the
+drag's own window closing mid-drag, the target window closing under the landing and a drop into another window's empty
+main workspace; a drag starts on the left button only; and Javadoc and documentation corrections (`WindowManager`,
+`DockDropOverlay`, `WindowContent`, `README.md`, `docs/app-maintenance.md`). Left for plan 6: saving a child window's
+bounds, which a tear-out now chooses,
+and the layout after every drag, through the debounced save; from plan 4b, `AppContractTest`'s `emptyWindow` (it makes
+the main window when none is open) and panel routing (it bypasses `panelRoute`) before the first contract case that
+needs either, and `FakeWorkspace.closeWindow` closing and nulling `Panel.instance`, with `AppContractTest` clearing its
+panel caches, once a fake main window can close; and, as `Opening.bounds` and `WindowShell.place` now mean a tear-out's
+workspace bounds, restoring child windows' saved frame bounds through a frame-bounds path (`WindowPlacement`, as
+`restoreLayout` does for the main window), with the keep-on-screen helpers (`TabDrag.fitted`, the display choice) moved
+beside `WindowPlacement` first so that the main and child windows restore by one algorithm. Deferred: plan 2's Rulings 8
+limit, now reachable by a drag: when a group has a sibling before it in a split of the same orientation, a tab dropped
+on its left or upper edge and dragged back gives the new group's space to that sibling, so the group that was split
+halves on each round trip. `./gradlew check --continue`: **11,757 tests, 0 failures, 0 errors, 25 skipped** (from the
+XML in `*/build/test-results/test/`; `jasper-app` 3,802, `jasper-sdk` 94, `jasper-sdk-testkit` 204,
+`jasper-plugin-editor` 4,912, `WorkspaceDropResolverTest` 10, `WorkspaceDropTest` 8, `TabDragTest` 16,
+`TabDragWindowsTest` 22, `TabRegistryTest` 34, `WindowManagerTest` 33; the build passed on its first run,
+`StagedTransferLifecycleTest` included). GUI checks for the user: a tab dragged along its strip, onto another group's
+tabs and middle, and onto each outer quarter of a group, in both tab faces (equal tabs and the Enterprise look's classic
+tabs), with the landing shown and no motion, and a tab dropped into another group takes the focus (no flash of a
+neighbouring tab); a tab dragged into another Jasper window's strip, middle and edge, and a child window's last tab
+dragged into the main window (the child closes cleanly, the shell keeps running); a tab released on the desktop opens a
+child window under the cursor whose workspace is the size of its old group, the tab under the cursor and the title bar
+above it (the unified macOS bar, FlatLaf's title pane on Windows and Linux, and the system's: `placeWorkspace` sizes it
+for each), also on a second display, near a display's edge (the window opens on the display under the cursor, moved onto
+it), on a display left of another and on one above another, and across displays with different scales; a child window's
+only tab released on the desktop stays; releases over the dock, the toolbar, a title bar and the Settings window change
+nothing, and a release over the Settings window where it sits over a main window's workspace is noted as it behaves
+(Ruling 9: Settings shields no window, so the tab drops into the workspace beneath it); Esc, Cmd+Tab (Alt+Tab) to
+another application and a modal dialog (a plugin's) during a drag end it with no label left on screen; overlapping
+windows take the drop in the most recently active one; on macOS, a Jasper window in full screen takes no drop from a
+window on the desktop of the same display, one in full screen on a second display takes drops, a drag within a window in
+full screen shows its label without switching Spaces, and a window on another Space (not in full screen),
+which Java cannot tell apart, is noted as it
+behaves; on Windows and Linux, the label window stays above other windows and takes no focus, including under a
+focus-follows-mouse window manager on Linux (the label must not take focus as the pointer crosses it). Not merged, not
+pushed.
+
+**Workspace tabs, plan 4b: plugin windows become tabs — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `da79cae7c..4576cbecf` (Tasks 1 to 7, after the plan refresh), then the
+documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-18-workspace-4b-plugin-windows.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). The SDK is 0.20.0, a breaking boundary: every
+bundled manifest, the external example and every guide range declare `sdk = ">=0.20.0, <0.21"`; the Vault is 0.7.0, the
+sample 0.4.0, the Editor 0.11.0, Remote 0.14.0 and File Server 0.6.0, and every cross-plugin range still holds.
+`WindowHandle.isMain()` tells the main window from a child window; `Windows.openTab(spec, owner, view, placement)` takes
+a `TabPlacement` (`ACTIVE_GROUP`, the three-argument form; `SPLIT_RIGHT` and `SPLIT_DOWN`, a new group beside the active
+one; `NEW_WINDOW`, straight into a child window opened for the tab, the owner's window untouched, reported as
+`WINDOW_OPENED` then `TAB_OPENED`); `ContentTab.moveToNewWindow()`, `moveToMainWindow()` and `window()` replace
+`move(boolean)` and `isSeparate()`. `Windows.create`, `PluginWindow`, `WindowSpec`, `ShortcutContext.window` and
+`KeyContext.WINDOW` are gone, and `KitCompatibility` refuses them as 0.20's; so is the auxiliary windows' title-action,
+content-size and close-command chain that only plugin windows used (Close Window calls `requestClose()`). A content tab
+carries no window chrome: the Vault manager is a content tab (`VaultManagerTab`; the ROWS actions are its body's first
+row) without Done, the sample's About is a tab that owns its Details sheet, and the Errors window is `ErrorsTab`, an
+app-owned content tab (`TabRegistry.APP_OWNER`, `jasper`, key `errors`) in the main window whose view paints from the
+workspace route and has no Done. Panels, the toolbar and the status bar are the main window's in the SDK's words; a
+child window's panel toggle shows the one panel in the main window in the fake as in the application, the testkit's and
+the contract harness's panel methods take no window, Remote and File Servers keep one panel's state, and Remote's
+Sessions panel follows only its own window's row. The Editor has New Editor Window (`dev.jasper.editor.new_window`, no
+key). App side: `WindowEntry.main`, `WorkspaceHost.attachBeside(tab, group, side)` (any group), `TabRegistry.Placement`,
+`TabRegistry.Windows.emptyWindow`, `guardsAllowQuit`. The testkit's `FakeWorkspace` and the app's `TerminalFixture` keep
+a window's tabs in groups (most recently used first), make the first window opened while none is main the main window,
+which outlives its last tab, and close a child window with its last tab after the move reports `TAB_MOVED`;
+`FakePluginHost.contentTab` and `contentView` find a content tab by title; `PluginContractTest` checks placements, the
+moves, the main window's rule and the one panel on both runtimes. Rulings (plan, "Rulings"): (1) the SDK is 0.20.0 and
+every range follows, and the five plugins whose behaviour changed bump to the next minor; (2) `WindowHandle.isMain()` is
+abstract, since a default could only lie; (3) `TabPlacement` is `ACTIVE_GROUP`, `SPLIT_RIGHT`, `SPLIT_DOWN` and
+`NEW_WINDOW`, the four-argument `openTab` is the abstract one and the three-argument form a default; (4) a split opens a
+new group beside the owner window's active group, and `attachBeside` attaches beside any group, which plan 5's drop
+uses; (5) `NEW_WINDOW` attaches to a child window opened empty, a window that fails to show the tab closes again, and an
+open key is selected where it is; (6) `moveToNewWindow()` leaves a child window's only tab, a closed tab, one with a
+modal prompt open and one being closed where they are, and `moveToMainWindow()` leaves a tab the main window holds; (7)
+the fakes model the application's main window, groups and child windows, and `TerminalFixture` gains `addMainWindow()`;
+(8) the Vault manager is a content tab in the window that asked, key `manager`; (9) the sample's About is a tab whose
+Details sheet the tab owns, `installPanelAndAboutTab`; (10) the testkit finds a content tab by title; (11) tests whose
+subject was a plugin window go, and a test of behaviour that stays is rewritten for its new owner; (12) Quit and restart
+ask the content tabs' guards and the quit guards, and an open auxiliary window keeps a non-resident process alive
+(`auxiliaryOpen`); (13) the auxiliary windows' title-action, content-size and close-command chain goes, with
+`MacTitleBar`'s accessory, `KitView.titleStrip` and `SurfaceMount`'s `title`; (14) panels live in the main window as one
+instance, in the fake too; (15) the SDK says the toolbar and the status bar are the main window's, and the harness still
+builds a toolbar view for whichever window it names; (16) the Errors window becomes an app-owned tab opened by Show
+more…, Notifications: Show Errors and a system notification's click; (17) New Editor Window opens an untitled document
+with `NEW_WINDOW`; (18) the guides describe 0.20 in a new "Main and child windows" section of `jasper-sdk/README.md`,
+two older STATUS links follow renamed headings, and the stale-text check joins wrapped lines; (19) THD Sourcing Crypto
+stays skipped; (20) a content tab carries no window chrome, and Escape closes none of the three; (21) Jasper's own tabs
+share `TabRegistry.APP_OWNER`, which plan 6 never saves. Deviations: (a) the classic Vault manager departs from
+Enterprise's 07 Credential Vault mocks, which draw it as a window with Done over a dialog band: `ClassicVaultRenderTest`
+pins it to the render (the manager tab's footer is the status row alone, 7 px shorter, so its top moved from logical 534
+to 541; re-pinned, old → new: the status row's rows 1068..1142 → 1082..1142; the columns' bottom 1070 → 1084; `STATUS`
+`0+1 #C4C7CC, 1+6 #E6E7EA, 7+1 #2655AE, 8+22 #2F65CA, 30+1 #2655AE, 31+6 #E6E7EA` → `0+1 #E8E8E9, 1+29 #F7F7F8`;
+`CATEGORIES`' last runs `86+448 #F7F7F8, 534+1 #C4C7CC` → `86+455 #F7F7F8, 541+1 #E8E8E9`; `ITEMS`' last runs `65+413
+#FFFFFF, 478+1 #DDE0E4, 479+20 #F7F8FA, 499+1 #C4C7CC` → `65+420 #FFFFFF, 485+1 #E4E5E8, 486+20 #F7F8FA, 506+1 #E8E8E9`;
+`DETAILS_NONE` `0+24 #E1E3E6, 24+1 #C4C7CC, 25+474 #ECEDEF, 499+1 #C4C7CC` → `0+24 #E1E3E6, 24+1 #C4C7CC, 25+481
+#F7F7F8, 506+1 #E8E8E9`; `DETAILS` `0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #ECEDEF, 102+1 #D3D6DA, 103+26 #FFFFFF, 129+1
+#E6E8EB, 130+26 #FFFFFF, 156+1 #D3D6DA, 157+8 #ECEDEF, 165+1 #C4C7CC, 166+61 #ECEDEF, 227+1 #B4B8BF, 228+22
+#FEFEFE~#EEF0F2, 250+1 #B4B8BF, 251+248 #ECEDEF, 499+1 #C4C7CC` → `0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #F7F7F8, 102+1
+#D3D6DA, 103+26 #FFFFFF, 129+1 #E4E5E8, 130+26 #FFFFFF, 156+1 #D3D6DA, 157+8 #F7F7F8, 165+1 #C4C7CC, 166+60 #F7F7F8,
+226+1 #B4B8BF, 227+22 #FEFEFE~#F6F6F6, 249+1 #B4B8BF, 250+256 #F7F7F8, 506+1 #E8E8E9`; the `fontsFloor` agreements
+(0.598, 0.752) stay above 0.55); (b) Task 3, controller ruling Q1: the ROWS split's id is `rows.layout`, since `rows` is
+`ManagerPanel.ROWS`, the entry list's id, and `ViewSpec` refuses a duplicate; (c) Task 3, controller ruling Q2: as a
+content tab on the workspace route the Details pane takes the workspace ground `#F7F7F8` instead of the 07 mock's
+`#ECEDEF` (the window panel's), consistent with every other content tab, so `DETAILS` and `DETAILS_NONE` are re-pinned
+whole, and the shift is more than the ground: in `DETAILS` the field moved one device pixel (`166+61` → `166+60`, so
+227, 228 and 250 → 226, 227 and 249), the rule at 129 `#E6E8EB` → `#E4E5E8` and `ITEMS`' rule `#DDE0E4` → `#E4E5E8`
+follow the ground, and the field's gradient ends `#F6F6F6` where it ended `#EEF0F2`; (d) before Task 1 the plan was
+replayed on 4a's final code `499d47901` (61 blocks, 18 failing before the refresh, 0 after, with every proposed ruling;
+20 anchors refreshed) and refreshed in `da79cae7c`, with rulings F1 to F21: F1 the plugin bumps (Ruling 1), F2
+`PluginStateStoreOptInTest` and `PresentationSelectionTest` move to 0.20, F3 Task 4 drops the deleted `PluginWindow` and
+`WindowSpec` ledger rows, F4 Task 4's commit adds `jasper-ui` and `docs`, F5 `toBackground`'s "plugin windows" comment
+is reworded, F6 (blocking) Task 2 uses the rebased `FakeWorkspace`, `FakeContent` and `TerminalFixture`, keeping 3b's
+M1, M2 and M6, its `IllegalArgumentException` ruling and 4a's F3 refresh, with split calls `openTerminal(…, group)` and
+the `FakeTerminalsTest` move case ported, F7 `TabRegistry.Windows` keeps a four-argument constructor, F8 a `NEW_WINDOW`
+rollback keeps the attach failure first (`Tab.keep` around `movedOut`) and `emptyWindow` requires the child's host (one
+`TabRegistryTest` case), F9 `mainOpened` looks the main host up per waiting tab and re-queues one whose host is gone (a
+test), F10 a waiting tab loses its placement and can wait with no window, which `open`'s Javadoc says, F11 a refused
+move restores `tab.active` (a test) and `closingAll`'s Javadoc names the main window too, F12 the fake's toggle from a
+child window shows the panel (4a's TOGGLE to SHOW; test, Javadoc and guide follow), F13 `closeTab(UUID)` in
+`FakePluginHost` and `ContractHarness`, F14 `TerminalFixture.moveTab` leaves `registry.atomically` and the contract pins
+the move order with topics, F15 the placement case records topic and event (`WINDOW_OPENED` before `TAB_OPENED`) and
+3b's open and split case records topics, F16 `AnchorContractTest`'s body-replacement test stays on a dialog (7 to 8
+cases), F17 Task 8 renames the `terminalWindows`, `terminalOwner` and `terminalWindow` identifiers and eight test names,
+F18 plan 4a's entry (j) is rewrapped, F19 `README.md`'s toolbar and status clause is corrected, F20 executors used the
+pre-flight's absolute counts (`PluginContractTest` 110 after Task 2 and 108 after Task 4, `TabRegistryTest` 33,
+`AnchorContractTest` 8, `WindowManagerTest` 33), F21 the window manager, `JasperWindow` and `EmptyWorkspace` were
+checked and need no edit; (e) Task 4, controller ruling (option A): `AuxiliaryWindows.dialog(String, boolean,
+JComponent)` skips its showing check when `GraphicsEnvironment.isHeadless()`, as `HostedAnchor.isOpen` does, since a
+content tab's view never shows headless and every anchored dialog was refused (one production line, headless only), with
+a shared fixture change (`HostedAnchorContractTest` builds a `TerminalFixture` main window and passes `HostedTerminals`
+to `HostedUi`); `KitMountingTest` drops `owner.close()`, which no longer compiles, `ClassicPlacementTest`'s window case
+is ported to the Licenses window, since its fixture was the removed Vault manager window, and twelve now-unused imports
+go; (f) Task 5: `StagedRemoteHost.sessionsState`'s new local is `sessionsField`, since the brief's `sessions` shadowed
+the method's parameter and did not compile, and seven now-unused imports go; (g) Task 6: the `errorsTab` field's comment
+in `JasperApplication` says its tab opens in the main window; (h) Task 8, controller ruling: wording the brief's
+patterns miss is fixed, so `ShortcutCatalog`'s `auxiliary.close` context reads "Help windows",
+`MacTitleBar.Style.WINDOW` no longer names title actions, `FileServersPanel`, `HostsPanel`, `TunnelsPanel`,
+`TransfersPanel`, `TransferUi` and `RemotePlugin` no longer call their panel one per window, `Panels.toggle`'s Javadoc
+and the guide say a child window's request shows the panel and brings the main window to the front, `ErrorsView`'s two
+comments name the tab, `DesignMetrics`' comment names the Errors tab, and this plan's banner replaces Task 3's
+"executing" line; the banner's "nothing else moved" was wrong, and (c) corrects it; (i) final review: a child window's
+panel request goes through `Panels.toggle` every time, which raises the main window, where `SftpUi`, `TunnelsUi`,
+`TransfersPanels` and `FileServerPlugin` had called a built panel's `show()`, which changed it behind the child window,
+and the fake's toggle from a child window records `front|<main window>` in `openRequests()`; SFTP's host chooser and a
+Browse's follow-up belong to the explorer's window, the main one, so a requester that closes mid-connect no longer
+leaves the explorer on "Connecting…"; the Vault manager's passive Unlock asks over `tab.window()`;
+`AuxiliaryWindows.modalOverlay(String, JComponent)` shares `dialog`'s headless guard; `Tab.inMainWindow()` is gone, its
+tests reading `isMain`; `WorkspaceContentRouteTest` proves its two dropped window cases on a dialog; the SDK Javadoc
+names `ContentTab.window()`'s window that is not open, the four-argument `openTab`'s `IllegalStateException` while the
+main window closes or Jasper quits, and `WindowSurface`'s dialogs without a menu bar or saved bounds, and `HostedUi`'s
+surface comment names overlays; the sample's and the guide's sheet comment says a modal sheet keeps its tab where it is;
+`EditorWindowTest`'s close test is renamed; and Task 8's six stale phrases follow the main window
+(`PanelHost.setHeader`, the Toolbar and Status Bar choices, the badge's `ToolStripe` and toolbar views, the Vault
+manager's close button, the Editor's Cmd+W, the guide's panel heading and header callbacks). THD Sourcing Crypto
+(`~/projects/thd-sourcing-crypto-jasper-plugin`, branch `jasper-sdk-0.17.1` at `3740e4e`, not yet rebuilt for 0.18)
+stays skipped: plan 6 bumps the SDK again (restorers), so rebuild it once, after the series' last SDK bump, against the
+jars `sdkRelease` then publishes. That rebuild carries every change since 0.17.1: its `plugin.toml` (`sdk = ">=0.16.1,
+<0.18"`) and `PluginPackagingTest.java:49` move to the final range, and `build.gradle.kts:8` and `README.md:28` name the
+final version; 0.18's rename applies (`CryptoForm.java:112` and `CryptoFormTest.java:61` read `ChoiceKind.SEGMENTED`,
+now `EXCLUSIVE`); 0.19's one pane per terminal tab applies (`CryptoFormTest.java:39-41` adds two panes to one tab: give
+`other` its own tab, `host.addTerminalPane(host.addTerminalTab(window, "zsh"), zsh())`, after which focusing `other`
+selects its tab); 0.20 needs nothing more (its dialog is owned by the action's window, and its tests read
+`FakePluginHost.windows()` and `windowView`, which list dialogs, in one main window, and open no panel). Left for plan
+5: tear-out and drag-back (a child window opened at a screen point and sized like the source group, through 4a's
+`moveToNewWindow(Tab, Rectangle)` and `windowsByActivation`, and a drop beside any group through
+`WorkspaceHost.attachBeside(tab, group, side)`), and, once a fake main window can close, `FakeWorkspace.closeWindow`
+closing and nulling the panel instance as `WindowContributions` does, with `AppContractTest` clearing its panel caches
+(unobservable today). Left for plan 6: `ContentSpec` restore state, `Windows.restorer` and the Editor's restorer, the
+next SDK bump, and restoring the Vault manager's tab; Jasper's own tabs (`TabRegistry.APP_OWNER`, the Errors tab) are
+never saved, so plan 6 can skip them by owner. `./gradlew check --continue`: **11,700 tests, 0 failures, 0 errors, 25
+skipped** (from the XML in `*/build/test-results/test/`; `jasper-app` 3,745, `jasper-sdk` 94, `jasper-sdk-testkit` 204,
+`jasper-plugin-editor` 4,912, `PluginContractTest` 108 on each runtime, `AnchorContractTest` 8 on each,
+`WindowManagerTest` 33, `TabRegistryTest` 33, `KitCompatibilityTest` 15, `JasperApplicationWindowsTest` 7,
+`ErrorsTabTest` 5, `ErrorsViewTest` 16, `ClassicVaultRenderTest` 5, `EditorPluginTest` 20; the build passed on its first
+run, `StagedTransferLifecycleTest` included). GUI checks for the user: the Vault manager opens as a Credential Vault tab
+in the window that asked (Cmd+Shift+\ twice opens one tab) with no Done, Escape leaves it open and the tab's close
+button closes it, its editors attach to that window, and Lock Vault with an editor open clears it; under the ROWS layout
+the manager's first row holds Lock and Add above the columns; under the Enterprise look, the manager tab beside the 07
+Credential Vault mock (the recorded deviation: no Done, no dialog band under the status row), and its Details pane's
+ground (`#F7F7F8`, the workspace's) against the mock's; Move Tab to New Window on the manager keeps its state; the
+sample's About tab (with the sample enabled) and its Details sheet; Show more… on an error notification opens the Errors
+tab in the main window, from a child window too, with no Done; New Editor Window from the File menu and the palette
+opens an untitled document in a child window and leaves the window it came from as it was; a tool window shortcut,
+SFTP's Open SFTP here and a tunnel's panel from a child window show the panel in the main window; Open SFTP here twice
+from a child window: the main window comes to the front each time; Open SFTP here from a child window with no SSH pane
+shows its host chooser (owned by the main window) in front of the raised main window, not behind it; Settings, About and
+Licenses close with Close Window and Cmd/Ctrl+W; Cmd+Q with an unsaved editor
+tab in a child window asks once. Not merged, not pushed.
+
+**Workspace tabs, plan 4a: the main window and child windows — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `bd735c724..82a55495d` (Tasks 1 to 6 and their fix rounds, after the plan refresh),
+then the documentation commit and the final review's fixes;
+[plan](superpowers/plans/2026-10-18-workspace-4a-windows.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). Jasper has one main window and any number of
+child windows, all made, tracked and closed by the application's `workspace.WindowManager`: `MainWindow` is made only in
+`ensureMain`, and only when none is open (`verifyApplicationArchitecture` checks its constructor's one call site);
+`ChildWindow`s close with their last tab; closing the main window asks every window's tabs' guards and closes the child
+windows first; every outside request (handoff, `jasper`, reopen, open-file, a notification's click, a plugin's tab, the
+menu bar item) restores the main window first, which until plan 6 opens a new one; a plugin's tab asked for while the
+main window is composed opens there once it is up, and a closing main window is never taken for an absent one.
+`verifyApplicationArchitecture` and `JasperApplicationWindowsTest` pin `MainWindow`, `WindowManager` and `WindowFrame`
+to their one place each. A child window is a `WindowContent` in the CHILD role: a title bar (the active tab's title; on
+macOS the main window's menus in the screen menu bar, none under a look with in-window menus) over its workspace, in the
+main window's centre surface and glass, with the same keymap and palette, no dock, stripes, status bar, notification
+layer or Buddy; its tool window toggles open in the main window, and coming back to it shows the cards that waited. A
+child window a move empties closes after the move has reported itself: `TAB_MOVED`, then `WINDOW_CLOSED` (the SDK's
+Javadoc, README, fakes and contract test follow, the reverse of plan 3b's order). For plan 5: `Opening.bounds`,
+`moveToNewWindow(Tab, Rectangle)` with `WindowShell.place`, `windowsByActivation()`; for plan 6: `Hooks.closing` and
+`closingAll`, and, since while `closeAll` runs the main window's closed hook runs after `manager.closed(main)` with
+`closingAll` still true, `ensureMain` gives a hook there no main window. The main window's last tab leaves
+`EmptyWorkspace` (New Terminal Tab, Open File). `WindowFrame` (formerly `TerminalWindow`) is the one `JFrame`;
+`WindowShell` its functions, so `WindowManagerTest` and `JasperApplicationWindowsTest` run the lifecycle headlessly.
+`new_window` is gone everywhere; `new_terminal_window` (⌘N / Ctrl+Shift+N), `close_window` (⇧⌘W / none),
+`move_tab_to_new_window` and `move_tab_to_main_window` (no keys; the tab menu and the palette) are new; the menu bar
+item offers New Terminal Window; an auxiliary frame's File menu holds Close Window and, off macOS, Quit. `TabRegistry`'s
+factory, detached hosts and `move(Tab, boolean)` are gone (`TabRegistry.Windows` from the window manager); the SDK's
+`ContentTab.move(boolean)`/`isSeparate()` mean Move to New Window / Move to Main Window / "not in the main window" until
+plan 4b. An operating-system notification's click raises the window that holds its pane now (plan 3a's hand-off). The
+application's comments and user-facing text, Remote's messages and the user guides say "Jasper window" (taking over plan
+3b's leftovers, its Rulings 11). Rulings (plan, "Rulings"): (1) a child window is a `WindowContent` in the CHILD role
+with the main window's actions, menus, keymap, palette and tab registry and only its workspace mounted; (2)
+`WindowManager`, the sealed `JasperWindow`, `WindowShell` and `WindowFrame` live in `workspace`, a headless core with
+`WindowFrame` the one `JFrame`; (3) one main window per process, structurally: `MainWindow`'s one call site is
+`ensureMain`, `WindowManager`'s the application's constructor, `WindowFrame`'s `frameOnScreen` and `rehearsalWindow`;
+(4) until plan 6, restoring opens a fresh main window with one terminal tab (or in a request's first directory) and no
+child window, and `ensureMain(String, Path)` is plan 6's one method; (5) every request with no main window restores it
+first (handoff, `jasper`, reopen, open-file, a notification click, a plugin's tab, New Terminal Window, the menu bar
+item's Open Jasper, New Terminal Window and Settings…), and its Quit does not; (6) the main window alone keeps the dock
+layout, Zen, its bounds, the notification card layer and panel and the Buddy's visibility, and a child window gets an
+in-memory `UiState`; (7) a child window's title bar is the unified macOS bar in its WINDOW style or the system's, titled
+with the active tab, and on macOS its menus are in the screen menu bar only while the look keeps that on; (8) in a child
+window Toolbar, Status Bar, Rail and Zen are disabled and a panel request goes to the main window, which comes forward
+for SHOW and TOGGLE; (9) New Terminal Window opens a child window with a terminal tab in `WindowContent.directory()`
+after restoring the main window; (10) Move Tab to New Window is enabled for a selected tab in the main window and for a
+child window with another tab, a refused or failed move closes the empty window, and Move Tab to Main Window closes the
+child window it empties; (11) the tab menu reads Rename Tab, the move, then the close items and the content's commands,
+the moves stay out of the menu bar, and the toolbar's button becomes New Terminal Window; (12) Close Window (⇧⌘W on
+macOS, no key elsewhere) closes the focused window as its title bar does, a child window after its tabs' guards and the
+main window after every window's, with its child windows; (13) the registry's factory, detached hosts, `activated` and
+`move(Tab, boolean)` go for `TabRegistry.Windows`, and until plan 4b `ContentTab.move(true)`, `move(false)` and
+`isSeparate()` mean Move to New Window, Move to Main Window and "not in the main window"; (14) an operating-system
+notification's click raises the window holding its pane now, else its target, and the Notifications panel shows in the
+main window; (15) closing the main window asks every window's tabs' guards, then closes the child windows and the main
+window, and Quit and the background keep today's guards; (16) the warm-up rehearsal builds its own content and
+`WindowFrame`, never a `MainWindow`, so the manager never hears of it; (17) the benchmark's window is the main window
+and its cycles open and close a child window; (18) a child window opens at the configured grid's size, an empty one
+sizes its workspace to it, and only the main window restores saved bounds; (19) `JasperApplication.frames` is a
+package-private test seam, and `JasperApplicationWindowsTest` runs the application's windows with stand-in shells; (20)
+`open` with the main window open raises the main window, not a child window used last; (21) new files take ledger rows
+`nonvisual-helper,none,none` and the renamed `TerminalWindow` keeps its row under `WindowFrame`; (22) "Jasper window"
+replaces "terminal window" in the application's, the plugins' and the guides' words, and the main window is named where
+only it has the thing; (23) a move reports itself before the window it emptied closes (`TAB_MOVED`, then
+`WINDOW_CLOSED`) through `TabRegistry.Windows.movedOut`, so a failed attach can go back, and the SDK's Javadoc, README,
+fakes and contract follow; (24) a plugin's tab asked for while the main window is composed opens there once it is up;
+(25) `ensureMain` never takes a closing main window for an absent one; (26) a child window's workspace sits in the main
+window's `ToolWindowArea` centre surface, so it is glass as the main window's is; (27) coming back to any window shows
+the notification cards that waited, in the main window; (28) `WindowManager.Hooks` has `closing` and `closingAll` for
+plan 6, no-ops until then; (29) `Opening.bounds`, `moveToNewWindow(Tab, Rectangle)` and `windowsByActivation()` are plan
+5's. Deviations: (a) until plan 6, restoring opens a fresh main window and no child window (spec 6.4's last row; spec 18
+puts restoring in plan 6); (b) before Task 1 the plan was replayed on 3b's final code `55e6de176` (41 blocks, 7 failing
+before the refresh, 0 after) and refreshed in `bd735c724`: five anchors were re-found (Task 1 Step 3's constructor tail,
+Task 3 Step 1's `TerminalContentTest` name, Task 4 Step 1's `WorkspaceHost` count, Task 6 Step 3's dropped pair, one
+"Before you start" line) and F7's two ports of 3a's fix-round tests were applied (`TabRegistryTest`'s
+`registry.detached` probes, `WorkspaceViewTest`'s `WorkspaceHost` arity); (c) F1: Task 1 keeps `detached = empty || role
+== CHILD`, 3a's meaning, until Task 4 removes the field; (d) F2: `JasperApplicationWindowsTest` counts tabs through
+`terminalTabs()`, since `tabCount()` is package-private; (e) F3: `FakeWorkspace.move` calls `refreshActive()` once the
+source lets the tab go, so the fake reports the application's order (no active pane, `TabMoved`, the tab selected,
+`WindowClosed`), `FakeTerminalsTest` follows, and a `WindowManagerTest` probe on real windows pins it (it passed as
+read, settling 3b's "one place off"); (f) F4: executors used the pre-flight's absolute counts, which Task 2's fix round
+moved to `WindowManagerTest` 23, 25 and 27 after Tasks 2, 4 and 5 (the plan's counts were off); (g) F5: `WindowFrame`
+clears the content's fixed 900 by 650 size for an empty child window, so it opens at the grid size (Rulings 18); (h) F6:
+a frame that fails to build reaches `windowClosed` (`Hooks.closed`'s contract), and for
+`JasperApplicationBackgroundTest` and `JasperApplicationResidencyTest` their counts (41, 16) are unchanged; (i) F8: Task
+1's failed-build catch closes `themeRegistration` (3a's hand-off) with `addSuppressed`, since `Tab.keep` is
+package-private in `contributions`, and, from its review, `windowCommands` too; (j) F9: `transfer` keeps the error when
+`old.detach` throws, still attaches to the next window and rethrows, recovery keeps failures with `Tab.keep`, and a move
+whose every attach fails stays as 3b's
+F8 (one `TabRegistryTest` case); (k) F10: `aChildWindowClosesWhenItsLastTabCloses` ends with `TabClosed`,
+`WindowClosed`, `ActivePaneChanged(empty)` (3a's hand-off); (l) F11: `TabMoveTest` gains the routing case
+(`lastInWindow`, `onError`, `onEmpty` reach the target) and `TabRegistryTest` the pending, closed and unknown-window
+case (the pinned and already-there cases were pinned at the base); (m) F12: a take-back naming a closed window is
+absorbed by Rulings 23 as written; (n) F14: `ResidentTray`'s class Javadoc "New Window" is reworded; (o) F15: `main` is
+26 commits ahead (a trial merge conflicts in 16 files), and 4a executed on the branch as it is, so merging `main`
+re-runs the replay; (p) Task 1's review fixes (`d3d9c70fd`): `WorkspaceView.applyTheme` restyles a hidden empty state,
+the empty state's captions follow `setBindings` (a test), and the `role()` and `WindowRole.MAIN` Javadoc is corrected;
+(q) Task 2's review fixes (`99522bb50`): `closeAll` closes every window and rethrows the first failure after the main
+window closes, the later ones suppressed; the architecture rule lost its `MainWindow` self-exemption;
+`JasperWindow.close`, `discard` and `moveToNewWindow` keep the first failure with `addSuppressed`; `requireEdt` guards
+`Contributions.panelRoute`, `JasperWindow.requestClose` and activation; a closing-all flag makes `openChild` refuse, so
+no child window outlives the main window; (r) Task 3, controller ruling: `quitNow` runs `closeAll` in a try/finally that
+always requests shutdown, and `toBackground` does the same for `auxiliary.close()` and `updateDock()`, because
+`closeAll` rethrows by design and Quit must end the process; one `JasperApplicationWindowsTest` case pins Quit, with no
+`toBackground` test (the fixture has no plugin window); (s) Task 3's review fixes (`3e477a85b`): `frameOnScreen`
+discards its frame when a later call fails, `toBackground` keeps `closeAll`'s failure first, `open` treats a closing
+main window as absent, `rehearsalWindow` closes a half-built content, and a test pins Rulings 20; (t) Task 4:
+`JasperApplicationBackgroundTest.aContentTabThatRefusesToCloseKeepsEverythingOpen` passes its host's id as the tab's
+owner, since the removed fallback had put owner-less tabs in the first host, and `isSeparate()` is true for a tab with
+no window (Rulings 13); (u) Task 4's review fixes (`743935685`): `transfer` runs `movedOut` and `select` isolated after
+the move, keeps the move's failure first and selects only an arrived tab (a four-case `TabRegistryTest`), and the F3
+probe records every event with its window's name; (v) Task 5: `ShortcutEditorIntegrationTest` queries the shortcut
+editor by the id `new_tab`, since its label search "New tab" now finds "Move Tab to New Window" first; (w) Task 6:
+`ClassicMenuRow`'s class Javadoc is reworded too (its "terminal" and "windows" split across a line, which the brief's
+grep missed), and no plugin version is bumped, since plan 4b's pre-flight bumps each changed plugin to the next minor
+from its version at execution (Editor 0.10.0, File Server 0.5.0, Remote 0.13.0, Vault 0.6.0 now); (x) Task 7, controller
+ruling: four of Task 6's wording minors are folded in, so `NotificationsFeature.activated`'s and
+`JasperApplication.presence`'s comments say the main window holds the cards, `WindowContent.mount`'s Javadoc says "a
+window frame's root", and `docs/keyboard-shortcuts.md` says the Editor's keys are its tabs' commands, not registered
+actions; (y) final review: tabs asked for while the main window is composed wait in the registry's list, in order, until
+`ensureMain` says the main window opened (`TabRegistry.mainOpened`: each attaches, the last is selected, one that fails
+is removed and logged) or failed (`mainFailed`: each is removed, its failure suppressed under the main window's), with
+nothing re-posted and no second composition, and a plugin's tab with no main window hears "The main window is closing
+or Jasper is quitting"; a panel toggle from a child window shows the panel; `WindowFrame`'s constructor closes its title
+bar and glass and disposes the frame when it fails (no test: a `JFrame` cannot be built headless); the empty workspace
+is a workspace zone; the architecture rule counts each explicit `new` of a pinned type, since javap prints a class's own
+constructor calls unqualified and the old rule, self-exemption or not, let a factory inside `MainWindow` pass; Move to
+Main Window has one path, `TabRegistry.moveToMainWindow` (`WindowManager.moveToMainWindow` is gone, its tests ported);
+a failed new-window move decides on `inWindow`, and a change listener that refuses a moving tab's new owner leaves the
+tab in its window; `ensureMain` opens nothing while every window closes; and the documentation and comment corrections
+(the plugin moves, a child window closing with its last tab, the main window's header, Zen, toolbar views and status
+items, the screen menu bar, `transfer`'s catch name and Javadoc, `ResidentTray`'s Javadoc). Left for plan 4b: plugin
+windows as tabs (`Windows.create`, `PluginWindow`, `WindowSpec`, `ShortcutContext.Kind.WINDOW`, `KeyContext.WINDOW`; the
+Vault manager and the sample About), the Errors window as a tab, `TabPlacement`, the `ContentTab` move API, panels in
+the main window only in the SDK, `WindowHandle.isMain()`, and
+`WindowContent`'s comment on `KeyContext.WINDOW`'s case; from the pre-flight (F13), each needing the SDK's main window
+or `TabPlacement`: `KitCompatibility`'s 0.20 entries, `closeTab(UUID)` in `FakePluginHost` and `ContractHarness`,
+owner-less content placement pinned in the contract (`AppContractTest`'s main window is the last window added,
+`FakeUi`'s the first open one), exact event order in the contract with each event's topic and `TerminalFixture.moveTab`
+out of `registry.atomically`, the fakes' last-tab rule through `isMain()`, and a group model for `TabPlacement` in both
+fakes. `./gradlew check --continue`: **11,695 tests, 0 failures, 0 errors, 25 skipped** (from the XML in
+`*/build/test-results/test/`; `jasper-app` 3,745, `jasper-sdk` 94, `jasper-sdk-testkit` 206, `PluginContractTest` 107 on
+each runtime, `WindowManagerTest` 32, `TabRegistryTest` 29, `TabMoveTest` 8, `JasperApplicationWindowsTest` 7,
+`WindowRolesTest` 10, `JasperApplicationBackgroundTest` 41, `JasperApplicationResidencyTest` 16; the build passed on its
+first run, `StagedTransferLifecycleTest` included). GUI checks for the user: Cmd+N opens a child window in the current
+terminal's folder with a title bar and no toolbar, status bar or tool windows; on macOS a child window's unified bar has
+a centred title and a focused child window shows the same menus as the main window in the screen menu bar (none at all
+under the Enterprise look, whose menus sit in the window, where its shortcuts still work: spec 6.3 as amended); a child
+window in Compact view mode; an empty child window (a moved tab's) opens at the grid size; Shift+Cmd+W, the Close Window
+item of the real frames' File menus, and the title bar close a child window (an unsaved editor asks) and the main window
+with its child windows, and the glass closes after the content; the auxiliary frames' File menu holds Close Window and,
+off macOS, Quit; the main window restores its saved bounds; keyboard focus is in the empty main workspace after its last
+tab closes, so Cmd+T opens a tab; the main window's last tab leaves New Terminal Tab and Open File; Move to New Window
+and Move to Main Window from a tab's menu keep a running command running; a tool window shortcut in a child window opens
+the tool window in the main window and leaves focus in it; Cmd+Q while resident closes every window and keeps Jasper in
+the background; the menu bar item's New Terminal Window with no window open restores the main window first; a
+translucent workspace in a child window looks as the main window's; the empty main workspace under a workspace theme
+that differs from the chrome; a notification card posted while a child window is in front shows in the main window when
+a window comes forward. Not merged, not pushed.
+
+**Workspace tabs, plan 3b: the SDK's tab and pane break — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `b6687d9df..5c27d93d8` (Tasks 1 to 4, after the plan refresh), then the
+documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-18-workspace-3b-sdk-tabs.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). The SDK is 0.19.0, a breaking boundary: every
+in-repo manifest, the example external plugin and every guide range declare `sdk = ">=0.19.0, <0.20"`, plugin versions
+are unchanged, and the SDK's and the testkit's Javadoc, the exception messages both runtimes throw at plugins and the
+guides say "Jasper window". `TabHandle` covers every tab: `kind()` (`TERMINAL`, `CONTENT`) and `terminal()` replace
+`panes()` and `activePane()`; `WindowHandle.tabs()` lists every tab in workspace order and `activeTab()` is the active
+group's selected tab of either kind; `Terminals.split` opens a terminal tab in a new group beside the pane's group and
+`openTab` one in the active group. `TAB_OPENED`, `TAB_CLOSED` and `TAB_SELECTED` cover content tabs, and `TAB_MOVED`
+(`TabMoved(tabId, fromWindowId, toWindowId)`) reports a move between windows in place of a close and an open; a moved
+terminal tab reports no `PANE_OPENED` or `PANE_CLOSED` and its pane keeps its id, a window the move empties reports
+`WINDOW_CLOSED`, and one opened for it `WINDOW_OPENED`, before the `TAB_MOVED`, and a window that fails to show an
+arrival takes it back (the move back, or a close). `StandardMenu.PANE` and `MenuTarget.Slot.PANE` are gone: the Tab menu
+reads Split Right, Split Down, Focus Group, the prompts, a rule and the tab commands. `ExitPolicy.CLOSE_PANE` is
+`ExitPolicy.CLOSE`. Close Others and Close Group ask plugin guards with `batch` false, as `Windows.onTabsClosing`
+defines it (true for a window or quit). App side: `TabEntry(id, windowId, kind, terminal, title, select)`, `WindowEntry`
+and `WindowTerminals` list every tab, `TerminalEvent.TabMoved`, `Tab.movingFrom()`, `WindowTerminals.tabWithdrawn`;
+`KitCompatibility` refuses the four removed members as 0.19's. The testkit and the app's contract fixture hold one pane
+per terminal tab, split into a tab of their own, list a plugin's content as a `CONTENT` tab of its window and close a
+window with its last tab; `FakePluginHost.addContentTab` and `moveTab` and `ContractHarness.addContentTab` and `moveTab`
+are new, and `PluginContractTest` checks content tabs, moves and `ExitPolicy.CLOSE` on both runtimes. Remote reads
+`TabHandle::terminal`; File Server's tests give a second pane its own tab. Rulings (plan, "Rulings"): (1) SDK 0.19.0 is
+a breaking boundary, every in-repo range is `>=0.19.0, <0.20` and plugin versions stay; (2) `TabHandle.Kind` is a nested
+enum, `kind()` is fixed for a tab's life and needs neither a capability nor the UI thread, `terminal()` needs no
+capability and `title()` keeps `terminal.observe` for every tab; (3) `TAB_MOVED` carries `TabMoved(tabId, fromWindowId,
+toWindowId)`, groups stay out of the SDK and a move within a window reports only the selection it changes; (4)
+`TAB_OPENED`, `TAB_CLOSED` and `TAB_SELECTED` cover every tab and `TAB_SELECTED` reports the window's active tab; (5)
+the window a tab arrives in reports the move after the old window let it go (`Tab.moving` becomes `Tab.movingFrom()`,
+`moving()` keeps its meaning), and a window that announced an arrival and fails to show the tab takes it back; (6) a
+moved terminal tab reports no `PANE_OPENED` or `PANE_CLOSED` and keeps its pane's id, and a window the move empties
+reports `WINDOW_CLOSED` and one opened for it `WINDOW_OPENED` before the `TAB_MOVED`, on both runtimes; (7)
+`StandardMenu.PANE` and `MenuTarget.Slot.PANE` fold into Tab; (8) `ExitPolicy.CLOSE_PANE` becomes `ExitPolicy.CLOSE` and
+the `terminal.on_exit` values stay; (9) the testkit and the contract fixture model the application: one pane per
+terminal tab, a split is a terminal tab, focusing a pane selects its tab, a plugin's content is a `CONTENT` tab and the
+last tab of any kind takes its window; (10) `KitCompatibility` lists the four removed members under "0.19"; (11) "Jasper
+window" replaces "terminal window" in everything a plugin reads, and the application's comments and user-facing text are
+plan 4's; (12) Remote needs no `TAB_MOVED` subscription, since a moved tab arrives selected; (13) the app's
+`TabEntry.Kind` is `TabHandle.Kind`'s app-native twin; (14) a content tab's registry title is its presentation title;
+(15) in `AppContractTest` every window is a `WorkspaceHost`. Deviations: (a) before Task 1 the plan was replayed on 3a's
+final code `9a60e08d0` (39 blocks, 0 failures) and refreshed in `b6687d9df`: six edit anchors (Task 3 Step 4's
+`WindowContent` edit now quotes 3a's executed `attach` and `detach`; Task 5's Enterprise owner sentence) and four
+"Before you start" lines were re-found on 3a's final text, and every other anchor matched; (b) F1: both
+`WindowTerminals.entry` replacements (Tasks 2, 3) keep 3a's D2 guard, a closed `TerminalContent` reports no pane,
+because `WindowTerminalsTest` pins the order it gives; (c) F2: the take-back of an announced arrival (`announced`,
+`tabArrived`, `tabWithdrawn`) replaces 3a's `tabClosed(published)` in place, after `tabHost.detach` and before
+`workspace.remove`, keeping 3a's tested order; `WorkspaceTabsTest.aFailedAttachClosesWhatItAnnounced` holds; (d) F3:
+3a's hand-off for `TerminalFixture` and `HostedTerminalsTest:219` is Task 2's as written, with no plan edit; (e) F5 and
+F6, an addition to the plan text made at pre-flight (Task 4 Step 4b): "Split pane" reads "Split" (`WindowChrome`,
+`WindowChromeTest`), jasper-ui's `StateFixtures` "Close Pane" and "Panes" read "Close Tab" and "Tabs",
+`ConfigurationControllerTest`'s `...ZoomedHiddenPanes` test is renamed, `TabHost`'s "cannot fail" comment is reworded
+and `TerminalTabTest` is renamed `TerminalContentTest` (23 path cells and one class cell of `migration.csv`); "In a
+terminal pane" stays, since a terminal tab still has one pane; (f) F7: executors and reviewers used the absolute counts
+of the pre-flight table, because the plan states deltas (`TabRegistryTest` 22, `TabMenuTest` 8 and `PluginContractTest`
+102 at the start); (g) F9: `AppContractTest.moveTab` does not refuse a plugin's own content tab as `FakePluginHost` does
+(Rulings 9), because no contract case exercises it; (h) F10: the plan's instruction for the Editor's exposure stands,
+and Task 3's reviewer ran `:jasper-plugin-editor:test` (it passes with no Editor change); (i) Task 1:
+`PluginStateStoreOptInTest` and `PresentationSelectionTest` moved to 0.19 (their pinned host SDK and in-memory ranges,
+and `e.sdk`'s too-new range to `>=0.20.0`), because they resolve plugins that `LookFixtures` writes at 0.19, so the
+brief's "keep 0.18" was wrong; `DescriptorParserTest` keeps 0.18; (j) Task 2: an unused `List` import is removed from
+`WindowTerminals`; (k) Task 3, controller ruling: `TerminalFixture.addPane` throws `IllegalArgumentException` for a
+content tab, as `FakeWorkspace` does; (l) final review: `TabMoveTest` and `WindowTerminalsTest` pin exactly one
+`TabMoved` per move, the move there and back, and one `TabClosed` for an open its window failed to show;
+`FakeWorkspace`, `FakeTerminals` and `TerminalFixture` announce a tab that `openTab` or a split opens, add its pane,
+then select it, as the application does, which a `PluginContractTest` case pins on both runtimes; `FakeWorkspace`
+reports the active pane right after the `WINDOW_CLOSED` of a window it closes; the fake's content tabs are active while
+their tab is their window's selected tab, as `WindowContent.update` sets them; `TabHandle.title()`'s and
+`FakePluginHost.closeToolbarViews`'s Javadoc are corrected; and a reworded `TabHost` comment is rewrapped. THD Sourcing
+Crypto (`~/projects/thd-sourcing-crypto-jasper-plugin`, branch
+`jasper-sdk-0.17.1` at `3740e4e`, not yet rebuilt for 0.18) stays skipped. Plan 4 removes `Windows.create`,
+`PluginWindow` and `WindowSpec` (spec 14) and bumps the SDK again, so rebuild it once, after the series' last SDK bump,
+against the jars `sdkRelease` then publishes; that rebuild includes 0.19's changes: its `plugin.toml` (`sdk = ">=0.16.1,
+<0.18"`) and `PluginPackagingTest.java:49` move to the final range, and `build.gradle.kts:8` and `README.md:28` name the
+final version; 0.18's rename still applies (`CryptoForm.java:112` and `CryptoFormTest.java:61` read
+`ChoiceKind.SEGMENTED`, now `EXCLUSIVE`); `CryptoFormTest.java:39-41` adds two panes to one tab, which the testkit
+refuses from 0.19: give `other` its own tab (`host.addTerminalPane(host.addTerminalTab(window, "zsh"), zsh())`), after
+which focusing `other` selects its tab. Its main code (`CryptoPlugin.java:30`, `:37`: `StandardMenu.TOOLS`,
+`Terminals.activePane()`) needs nothing for 0.19. Left for plan 4: `WindowHandle.isMain()`, `TabPlacement`, the
+`ContentTab` move API, `WINDOW_*` from child windows, panels in the main window only; the fakes' rule that the last tab
+takes its window with it, which the main window will not follow; `FakeWorkspace` and `TerminalFixture` keep each
+window's tabs in insertion order and add a split's or `openTab`'s tab at the end, while the application puts a split's
+group beside the target's group and `WindowHandle.tabs()` promises group-by-group order, so `TabPlacement` needs a group
+model in both fakes; and the application's user-facing "terminal window" (the shortcut help's `GLOBAL` row, Remote's
+connect and sign-in messages, the user guides; Rulings 11). Left for plan 4 as well, from the reviews: a failed move
+whose every recovery fails (every window's attach throws, F8) leaves no `TabClosed`, and plan 4 owns transfer's recovery
+and its test; the take-back can name a window already reported closed; a throwing `old.detach` during a move publishes
+nothing while `tab.window()` names the next window; and owner-less content lands in the last-added host in
+`AppContractTest` but in the first open window in `FakeUi`, so plan 4's `TabPlacement` moves it to the main window and
+pins it in the contract. `./gradlew check --continue`: **11,635 tests, 0 failures, 0 errors, 25 skipped** (from the XML
+in `*/build/test-results/test/`; `jasper-app` 3,685, `jasper-sdk` 94, `jasper-sdk-testkit` 206, `PluginContractTest` 107
+on each runtime, `TabRegistryTest` 23, `TabMoveTest` 7, `WindowTerminalsTest` 3, `KitCompatibilityTest` 14,
+`TabMenuTest` 8, `TerminalContentTest` 9; Remote's `StagedTransferLifecycleTest` is load-sensitive, timing out once
+under a full run in Task 4 and passing alone and on rerun, and it passed here). GUI checks for the user: the Tab menu in
+the standard bar and the classic Window menu (no Pane menu); a Remote SSH split opens in a new group; Remote's Split
+with Same Host disabled while an Editor tab is active and enabled again on an SSH tab; Open in Separate Window on an
+Editor tab and back (the separate window closes with its last tab). Not merged, not pushed.
+
+**Workspace tabs, plan 3a: the tab registry and the workspace view — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `f623a24bc..ea571cec8` (Tasks 1 to 6 and their fix rounds), then the documentation
+commits and the final review's fixes; [plan](superpowers/plans/2026-10-17-workspace-3a-tab-registry.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). Every tab of every window is a
+`contributions.Tab` in the application's `TabRegistry`, which absorbs `ContentRegistry`, `ContentEntry` and
+`ContentHost` and keeps the per-plugin close guards and batched approval; a tab holds a `TabContent`, either
+`workspace.TerminalContent` (one terminal pane and its `TabState`) or a plugin's `HostedContent`. Each window renders
+plan 2's `Layout` in a `WorkspaceView`: `SplitContainer`s with draggable dividers (a tenth of the split on each side,
+weights written to the layout on release) over `GroupView`s, each an always-visible `TabStrip` (the equal or the classic
+tabs, shown active for the active group of the active window) over its selected tab, reporting its strip and card
+rectangles for plan 5. Focus going into a tab (a pane, or a plugin's view through a window-level focus listener) makes
+it the active tab without moving focus again. `TabHost` wires a terminal tab to its window and again after
+`TabRegistry.move(Tab, UUID)`, which keeps its session and ends a maximize on both sides (`Tab.moving()`); a tab that
+moves or is reordered takes its place in a strip without motion. Cmd+D and Cmd+Shift+D open a terminal tab in a new
+group to the right or below, in a running active terminal's directory with its profile, otherwise (beside a plugin's
+view or an ended shell) where a new tab starts with the default profile; `close_tab` (⌘W / Ctrl+Shift+W) absorbs
+`close_pane`; `close_group` (⌥⌘W / Ctrl+Alt+Shift+W) is new; `maximize_group` and `focus_group_*` replace `zoom_pane`
+and `focus_pane_*`; Next, Previous and Select Tab act in the active group; `terminal.dim_inactive_panes` dims terminal
+tabs outside the active group. The tab menu reads Rename Tab, Open in Separate Window or Move to Main Window, Close Tab,
+Close Others, Close Group, then the content's commands. `TerminalTab`, `SplitTree`, `TerminalDeck`,
+`terminals.SplitAxis` and jasper-ui's `DesignMetrics.Role.TAB_REVEAL_INSET` are gone; the terminal registry splits into
+new groups (`PaneEntry.split` takes `layout.Side`). Rulings (plan, "Rulings"): (1) the registry lives in `contributions`
+(`TabRegistry`, `Tab`, `TabContent`, `HostedContent`, `WorkspaceHost`) with an edge to `layout`, and
+`workspace.TerminalContent` is the second `TabContent`; (2) placeholder content is plan 6's, `Tab.Kind` is `TERMINAL`
+and `HOSTED`; (3) a window starts on a registry of its own and joins the application's, with its tabs, when
+`connectContributions` hosts content (`TabRegistry.adopt`), and the warm-up rehearsal never joins; (4) terminal tabs
+have no close guard and close at once, hosted tabs keep per-plugin approval, `inWindow` lists every tab for the
+window-close approval and `hosted()` the plugin tabs Quit asks; (5) `TabRegistry.add(TabId, Kind, TabContent, UUID)`
+registers a tab its window places itself, and `open` and `move` attach through `WorkspaceHost.attach` to the active
+group; (6) a strip drives one group (`WorkspaceChrome.tabs(GroupView)`) and shows active while its window and group are;
+(7) strips always show: the equal tabs lose their one-tab hiding and reveal, and `TAB_REVEAL_INSET` goes with its two
+frozen catalog rows; (8) a terminal tab is active while it is its window's active tab and the window is, so dimming
+covers every terminal tab outside the active group; (9) a divider drag moves the boundary between its neighbours, each
+keeping a tenth of the split, writes the weights on release and cannot be moved by a theme change; (10) the view
+rebuilds its splits only when the shape changes, otherwise it pushes weights and moves tab components, and the active
+tab takes focus when it or the shape changed; (11) Split Right and Down are enabled whenever the window can open a tab,
+beside a running terminal the new tab starts in its directory with its profile, otherwise with the default profile; (12)
+New Tab, Next, Previous and Select Tab act in the active group and reordering keeps the selection; (13) the tab menu
+reads Rename Tab, Open in Separate Window or Move to Main Window, Close Tab, Close Others, Close Group, then the
+content's commands; (14) Close Others and Close Group ask the hosted tabs' guards as one batch and a refusal closes
+nothing; (15) the Pane menu keeps its slot until plan 3b; (16) Maximize Group needs two or more groups and its palette
+titles read Maximize Group and Restore Group; (17) a moved tab keeps its content and session, announced as `TabClosed`
+then `TabOpened`, and each window ends its maximize; (18) the activity's "go to" selects through the registry
+(`Tab.select()`) and follows a moved tab; (19) the terminal registry keeps `TabEntry`'s pane list for terminal tabs, and
+`PaneEntry.split` takes `Side`; (20) `TabState` stays the terminal tab's naming state, owned by `TerminalContent` with
+`renamed()`; (21) the move test runs `IdleTerminalSession`; (22) the benchmark alternates Split Right and Down on the
+active group; (23) a group view reports its strip's and card area's rectangles; (24) new files take ledger rows
+`nonvisual-helper,none,none`; (25) the keymap page's Panes category becomes Groups, the toolbar button reads "Maximize
+group" and the old names stay as palette keywords; (26) focus going into a tab makes it the active tab without moving
+focus again; (27) the equal tabs move only for a tab that opens or closes, never for one that moves or reorders; (28) a
+terminal tab whose attach fails is closed again; (29) `WorkspaceView.model()`, `moveTab`, `resizeSplit` and
+`GroupView.display` avoid AWT's method names; (30) what the rewrite leaves without a caller goes. Deviations from the
+plan text made while executing it, each ruled by the controller: (a) Task 2:
+`SplitContainerTest.aDividerDragMovesItsBoundaryAndReportsTheWeightsOnRelease` releases at the divider-relative `2, 50`,
+and Task 3's `WorkspaceViewTest.aDividerDragWritesTheLayoutsWeights` at `2`, because AWT delivers a release relative to
+the divider where it now is (the verbatim release was a second move); (b) Task 2's review round changed
+`SplitContainer`: a press and release, or a drag back to its start, reports no weights (the plan's exact comparison
+reported about 60% of non-dyadic weights), and a boundary clamps to `[min(least, start[i]), pair - min(least,
+start[i+1])]` instead of a plain tenth, so a press never snaps one and a divider whose pair is under a fifth stays
+draggable (it can grow a narrow side, never shrink one further; two adjacent columns both under a tenth cannot trade
+space directly, they widen through their other dividers); `SplitContainerTest` has 10 tests, not 7; (c) Task 3 Step 6
+also ports `TerminalTabTest`'s `reorderTab(0, 1)` to `workspace().activeGroupView().reorder(...)`, since Task 3 deletes
+`reorderTab` and Task 5 replaces the file; (d) Task 3's
+`WindowPanelsTest.theStripesAndSidePanelsReachTheToolbarAndTheBottomSpansStripeToStripe` takes `deck` as the selected
+tab's component after the `tabStrip()` to `workspace()` port, because the workspace now holds the strip (assertions
+unchanged), and `WindowTabs.capped` and `WindowContent.tabTitle` keep the Java escapes of the ellipsis and the bullet
+where the plan text carries the characters; (e) Task 3's fix round: `Tab.dispose` isolates its listeners (the first
+failure is rethrown, later ones suppressed) and always disposes its content, `TabRegistry.remove` always detaches, the
+`addHost` unregister removes every tab before it forgets the host, and `WindowContent.close` guards its registry leave,
+so a throwing listener never leaks a session or a window; five tests (`WorkspaceViewTest` has 10, not 8); (f) Task 4's
+`TabRegistryTest` insertion anchor was re-found, since the fix round had changed the end of the class; (g) Task 5, D1:
+`workspaceChanged` tells the palette only when the selected tab changed, as the old deck did, because the plan's Task 3
+code and Task 5 test contradicted each other (the palette stays open across a maximize); (h) Task 5, D2: a closed
+`TerminalContent` reports no pane to the terminal registry, so `ActivePaneChanged(empty)` precedes `WindowClosed` as
+before when `WindowContent.close` closes a window; when a window's last tab closes, `WindowClosed` now comes before
+`ActivePaneChanged(empty)`;
+(i) Task 5 closes again what a failed attach announced: the pane is wired before it is announced, the terminal
+registry hears `PaneOpened` before the activity's OPENED, and a failure ends in `PaneClosed`, `TabClosed` and a CLOSED
+for every OPENED, with `WorkspaceTabsTest.aFailedAttachClosesWhatItAnnounced` (11 tests, not 10); (j) Task 5's
+mechanical test ports beyond the brief: `WorkspaceViewTest.shellOf` reads `.pane().session()`, `WindowCommandsTest`
+expects the split commands while a pane is pending (Rulings 11), `ConfigurationControllerTest` counts four tabs, not
+three (a split is a tab); (k) `ContentRegistryTest` has 10 cases, not 11, so `TabRegistryTest` has 13 after Task 1, 15
+after Task 3 and 16 after Task 4 (the plan says 14, 16 and 17), and 19 as built (the fix round's three tests); Task 1
+touched 22 test files, not 21; `LayoutGeometryTest`'s class Javadoc loses only "today's" and keeps its citations of the
+deleted `SplitTreeTest`; `Layout.unmaximize`'s Javadoc keeps "plans 4 and 5 call it"; (l) Task 7 also rewords
+`docs/app-architecture.md` and `docs/app-maintenance.md`, which named the removed `WindowContent.configurePane`, to
+`TabHost.configure`, and leaves `TAB_REVEAL_INSET` in the dated history of `docs/STATUS.md`,
+`docs/design/theme-engine/temporary-paths.md` and `docs/design/theme-engine/migration.csv`;
+(m) final review: `TabRegistry.requestClose` removes every approved tab whatever another's removal throws (through the
+new `TabRegistry.removeAll`), always ends its pending close and completes its result, and logs a failure as a warning,
+since a rethrow would end in a future nobody reads; `Tab.keep`, and with it `open`'s rollback, never suppresses a
+failure under itself; a layout change gives the active tab focus only while the palette's card does not hold the
+window's input and the permanent focus owner was in the workspace, nowhere, or not showing (a closed terminal, or the
+palette that just closed to run a command), so focus in the open palette, the Run window or a tool window stays there;
+Focus Group takes focus from wherever it is; a close guard that throws, even an `Error`, refuses its close, and
+`requestClose` runs on the Event Dispatch Thread only;
+Close Others and Close Group of terminal tabs alone close at once, without the registry's approval; every tab's
+`Tab.active()` follows its window's active tab, terminal tabs included; a group outside the active one shows no Select
+Tab shortcut; a window stops hearing the focus manager first when it closes, and when its first tab fails in its
+constructor; the `WorkspaceHost.detach`, `WindowContent.detach`, `connectContributions` and `closeTabs` Javadoc and
+`docs/windows-startup-verification.md`'s Ctrl+Enter row are corrected; ten tests (`TabRegistryTest` 22, `TabMenuTest` 8,
+`WorkspaceTabsTest` 14, `WorkspaceViewTest` 11). Every other anchor and all
+other code and test text were applied as written. Left for plan 3b (the SDK break): `TabEntry` gains a kind and loses
+its pane list, `WindowEntry` lists every tab, `TabHandle.kind()`/`terminal()` replace `panes()`/`activePane()`,
+`WindowHandle.tabs()` lists every tab, TAB events cover every content and gain `TAB_MOVED`, `StandardMenu.PANE` and
+`MenuTarget.Slot.PANE` fold into Tab; the test-side fake still splits within a tab: `TerminalFixture` adds a split's
+pane to the same tab, and `HostedTerminalsTest` (its split assertion at `:219`) and
+`PluginContractTest.openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane` assert `split.tab().id()` is the old
+tab, so `AppContractTest` never exercises the new split behaviour. Left for plan 4: an operating-system notification's
+click raises the window its command finished in, captured when `JasperApplication` composed that window, before the
+activity's "go to" follows a moved tab; resolve that window at click time once tabs move between windows. `./gradlew
+check --continue`: **11,609 tests, 0 failures, 0 errors, 25 skipped** (from the XML in `*/build/test-results/test/`,
+`jasper-app`'s from a `:jasper-app:test` rerun: one `StagedTransferLifecycleTest` case timed out in the full run and
+passes alone; `jasper-app` 3,672, `SplitContainerTest` 10, `WorkspaceViewTest` 11, `TabRegistryTest` 22,
+`TabMoveTest` 6, `WorkspaceTabsTest` 14, `TabMenuTest` 8, `KeymapDefaultsTest` 4). GUI checks for the user: each group's
+strip in the equal and the classic tabs and its active state across windows; clicking into another group's terminal or
+plugin view (it becomes active, Cmd+W closes it); Cmd+D, Cmd+Shift+D (also beside a plugin view), dragging a divider and
+a theme change with splits; Maximize Group and Focus Group; dimming; the tab menu, and Close Group over a modified
+Editor tab (one prompt); a translucent workspace with groups; Open in Separate Window; focus staying in the open
+palette, the Run window or a tool window while a background group closes (a shell exiting with `on_exit = close`),
+and Focus Group and Maximize Group run from the palette still moving focus to the group. Not merged, not pushed.
+
+**V1 documentation overhaul — 2026-10-19** (`claude/v1-docs`, worktree `.claude/worktrees/v1-docs`, from `main` at
+`faeec76f3`). The current guides describe Jasper as a pluggable DevOps workstation, its core and its bundled plugins,
+as the code stands, with each claim checked against the code: plan numbers, phase framing, review chatter and the SDK's
+version-by-version sections are gone from them, their still-true content folded into the topic it belongs to, and the
+current SDK version is the only one they name (older versions appear only where Jasper refuses plugins built for
+them). The root [README](../README.md) is rewritten, and the
+[documentation index](README.md) groups the guides by reader: Using Jasper, Plugins, Theming, Building plugins, and
+Building Jasper and contributing, then the project records. New guides under `docs/`: `getting-started.md`,
+`workspace.md`, `terminal.md`, `command-line.md`, `plugins.md`, `plugin-apis.md`, `history-and-snippets.md`,
+`enterprise.md`, `creating-themes.md` and `looks.md`; also `jasper-sdk-testkit/README.md` and
+`docs/examples/external-plugin/README.md`. `keyboard-shortcuts.md` is rewritten as the reference of every default
+shortcut. `docs/sdk-reference.html` is the generated SDK reference: `tools/sdk-reference/SdkReference.java` renders the
+guide pages in `tools/sdk-reference/guide/` and the Javadoc of the SDK, the testkit and the bundled plugins' exported APIs;
+`./gradlew sdkReference` (`gradle/sdk-reference.gradle.kts`) rewrites it and `verifySdkReference`, in
+`:jasper-sdk:check`, fails when it is stale. The SDK and testkit changes are Javadoc only. `AppDocumentationTest`
+now also link-checks every Markdown file under `docs/` and the terminal, UI, testkit, `jasper` command, launcher and
+mock-tool READMEs. `config.example.toml` changes only comments. `AGENTS.md` gains the documentation map, the generated
+pages and the build checks it did not name, and drops its phase framing. Dated records keep their text: only link
+targets that renamed headings broke were changed, links to checklists and evidence the guides no longer carry point at
+`ef03625b4`, STATUS's former top-level Open acceptance work section now stands in the historical notes as "Open
+acceptance work — 2026-09-21", whose headings drop a level, the 2026-10-10 "Current state" heading reads "Theme engine
+status — 2026-10-10", and the STATUS entries then on the branch write shortcuts in words (Cmd+Shift+P / Ctrl+Shift+P)
+instead of glyphs; entries merged in from `main` later keep their authors' text.
+Outside the SDK and the exported plugin APIs, five Javadoc comments in jasper-terminal's supported API change
+(`TerminalOptions.Builder.lineHeight`, `SessionLaunchOptions.Builder.localPathMapper`, `TerminalSession.exitFuture`,
+`TerminalView.setFindResultListener` and `TerminalView.resetFontSize`), and `packaging/README.txt`, the text shipped in
+the packages, is rewritten. Apart from those, `AppDocumentationTest` and the build scripts' wiring for the reference and
+the link check, code comments and strings are unchanged. `./gradlew check` passed before `origin/main` was merged in (11,437
+tests, 0 failures, 0 errors, 25 skipped); the branch is pushed for review, and each time `origin/main` was merged in
+the guides were brought up to it, last to `34aa868fe` (Enterprise plans 13 to 15b, SDK 0.18.2) on 2026-10-20. Not
+merged into `main`.
+
+**Enterprise presentation, plan 15a: the look query at the user's direction — 2026-10-19** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, from `main` at `f78bb0385`; [plan](superpowers/plans/2026-10-19-enterprise-15a-look-query.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
+Commits `2ad889b0b..23796aaa9`, then this documentation commit and the final review fixes; spec 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1,
+4.6, 4.7, 5.1, 5.8, 5.9, 8.4, 8.7, 9.1, 14.1 to 14.3, 15, 16.1, 17, 18 and 19.1 amended, and the plugin SDK design gains
+a banner line. The user asked: "Lets make sure that the changes we made were in the enterprise kit, and are exposed via
+plugin code and all plugins are up to date with these changes so that future plugins can also leverage look-specific
+settings when Enterprise is enabled." After the audit they approved: "Go ahead with plan 15 as proposed: SDK look query
+(and remove the Enterprise API), kit defaults for plugin settings, activation, classic icons everywhere, the search
+icon, versions, docs and the Sample plugin." This plan is the first of two; plan 15b
+(`2026-10-19-enterprise-15b-look-polish.md`) runs next on this branch. SDK 0.18.2 adds `Appearance.presentation()`,
+which returns `dev.jasper.sdk.ui.Presentation`, a JDK-only record of the look Jasper runs with: `classic` (the classic
+base), `icons` (`NEW_UI`, `CLASSIC`), `toolWindows` (`RAILS`, `STRIPES`), `titleBar` (`UNIFIED`, `NATIVE`, `CLASSIC`,
+resolved for the platform), `menus` (`SCREEN_MENU_BAR`, `TITLE_BAR`, `WINDOW`), `toolbarSearch` (`FIELD` for every look
+until 15b), `uiFace` and `dataFace`, `bodySize` and the look's default `toolbarHeight`; it is IntelliJ's
+`ExperimentalUI.isNewUI()` plus `JBUI.CurrentTheme`, fixed for the run, the same for every plugin and safe from any
+thread. The host builds it once in `dev.jasper.app.plugins.HostedPresentation` from the new `PluginLook` projection
+(`classic`, `classicIcons`, `stripes`, `titleBar`, `menus`, `search`; read only by `HostedPresentation`), the installed
+`Kit` and the look's `DefaultSource`, handed over by `PluginRuntime.presentation(Kit, PluginLook, DefaultSource)`; the
+fallback (spec 4.7) reports the default look's chrome with the defaults read at start. The Enterprise API is removed
+outright: `dev.jasper.enterprise.api.Workstation`, its export, the optional requirements, the compile-only dependencies,
+the `workstationPackages` gate rule and the three `FakeEnterprise` copies are gone; Enterprise 0.3.0 has no exports and
+its `start` does nothing. Remote 0.15.0, Vault 0.7.0 and File Server 0.6.0 choose `Layout.CLASSIC` from
+`Layout.of(context.appearance().presentation())` in `start`, so any classic look drives their classic compositions;
+they, Sample 0.4.0 and Enterprise declare `sdk = ">=0.18.2, <0.19"` (Editor, History, Indexer and Snippets are
+unchanged). A kit's `[defaults."<plugin id>"]` table holds raw TOML values keyed as that plugin's settings file writes
+its keys; `DefaultSource` carries them, and `DeclaredSettings` reads each with the declared setting's own kind and uses
+it as the default, so the precedence is user-saved, then the kit's, then the plugin's own, and Reset to Default returns
+to the kit's (staging the plugin's own default under a kit default saves an explicit value). A value the kind rejects
+and a key the plugin never declares are logged at WARNING once (`PluginHost.lookDefaultProblem`) and ignored, and the
+plugin starts. Enterprise's kit sets `[defaults."dev.jasper.editor"] font_family = "IBM Plex Mono"`, its bundled data
+face. The Sample's panel starts in the bottom strip under labelled stripes and on the left otherwise
+(`example:pluginlook` in the authoring guide), and its `demo_step_millis` demonstrates a kit default under test. The
+testkit mirrors it all: `FakePluginHost.setPresentation`, `FakePresentations.STANDARD` and `CLASSIC`, `setKitDefault`
+and `lookDefaultProblems`, with shared contract cases on both hosts. Rulings (plan, "Rulings"): (1) two plans, 15a and
+15b; (2) the type is `dev.jasper.sdk.ui.Presentation`, reached as `Appearance.presentation()`; (3) the method is
+abstract; (4) the design's ten facts; (5) values a user can change are reported as the look's, fixed for the run, with
+no change notification; (6) `menus` is the look's placement in the Normal view with the platform's default decorations;
+(7) the fallback reports the default look's chrome with the defaults read at start; (8) a new projection `PluginLook`,
+read only by `HostedPresentation`; (9) `toolbarSearch` ships now and reads `FIELD` until 15b; (10) `Layout.CLASSIC`
+exactly when `classic()`; (11) the `workstation` packages keep their names; (12) Enterprise keeps an `EnterprisePlugin`
+whose `start` does nothing; (13) Enterprise is 0.3.0 once for plan 15; (14) the consumers and Enterprise declare
+`>=0.18.2`, and the Editor is not bumped; (15) the `[defaults."<plugin id>"]` format, with raw values checked by the
+declared kind; (16) a rejected value or an undeclared key is logged once and the plugin starts; (17) Reset returns to
+the kit's default; (18) Enterprise's kit sets only the Editor's `font_family`; (19) the Sample shows the query and a kit
+default with no new setting; (20) the external Hello example gets only its `jasperSdkVersion` default, `0.18.2`; (21)
+the `FakeKit.BUILT_INS` parity test reads the private field reflectively; (22) `FakePresentations` replaces the
+`FakeEnterprise` copies; (23) migration rows follow added and deleted files; (24) the two stale STATUS lines are
+corrected; (25) the docs are split by the plans' points; (26) `PluginRuntime.presentation` takes the kit, the look and
+the defaults, with no one-argument overload; (27) one spec header line for plan 15. Execution rulings (plan, "Execution
+notes"): E1 the app's default presentation is per platform (`SCREEN_MENU_BAR` on macOS) while
+`FakePresentations.STANDARD` is the Windows and Linux one; E2 one "started" flag in `FakePluginHost`; E3 the SDK
+README's version sentence names 0.18.2; E4 the staged fixtures set the host's presentation before the consumer starts
+and keep today's Vault compositions; E5 `KitParser.name` quotes non-bare segments; E6 Task 4 keeps
+`plugin-architecture.gradle.kts:51`, drops `EnterprisePluginTest`'s unused constants and corrects its migration row; E7
+Task 9 finds its guide anchors by text; E8 migration rows copy their neighbours' owners; E9 `sdkRelease --rerun` for
+stale jars; E10 a changed Enterprise render is recorded, never a lowered floor; E11 the `LayoutTest` javadoc; E12 Task
+6's logger, import and harness details; E13 the guide's `pluginlook` text after the `pluginpanels` notes; E14 every
+interface plan 15b relies on kept as written; E15 only the two STATUS lines of Rulings 24 are corrected; and
+`HostedPresentation.standard()` reads the default presentation (`Presentation.standard`), since only the listed classes
+may read `Kit.DEFAULT` (`StaticDefaultTest`). No Enterprise
+Settings render moved in Task 2. One Enterprise render changed, at the user's 2026-10-19 direction: Settings › Editor
+(`enterprise-settings/light/13.png`) shows the Font row's kit default, "IBM Plex Mono", where it showed "JetBrains Mono"
+(pair `enterprise-settings-13` 0.723, now 0.722). `./gradlew check --continue`: **11,569 tests, 0 failures, 0 errors, 25
+skipped**; `check_pairs.py` passes 101 of 101 gated pairs with the same verdicts as the Task 1 baseline (`f78bb0385`),
+and every agreement is the same except that line and `composition-light-vault-manager` (0.730, now 0.729), whose status
+bar prints the vault file's path under a fresh JUnit temporary directory on every run; the headless gallery is
+byte-identical to the baseline's (Slate Cobalt Dark and Light, 161 files each) and so are the 11 default-look jasper-app
+renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and settings images,
+`DefaultDockPixelsTest`'s `default-dark` and `default-light`). No test needed a re-run. Left for plan 15b: activation by
+a panel's own toggle action, classic icons in tool-window headers and toolbar views, the toolbar search icon
+(`[chrome] toolbar_search`, which `toolbarSearch` will report) and the identity guard, with their docs. Later: the
+splash's fixed colours and "Workstation…" step text for other branded looks; the external THD plugin's port to SDK 0.18.
+The side-stripes entry below also ends "Not merged, not pushed.", but its commits are not ancestors of `f78bb0385` (the
+series was rebased), so it is left for the user to confirm (E15). GUI checks for the user, in this order: (1) under
+Enterprise, the Editor opens files in IBM Plex Mono, and Settings › Editor shows "IBM Plex Mono" with Reset to Default
+hidden; choosing another font shows Reset, and Reset returns to IBM Plex Mono; (2) with Enterprise off, the Editor keeps
+its own default font; (3) under Enterprise, Remote's Sessions on the right, Transfers in the bottom strip, File Servers'
+table and the Vault manager's classic layout, as before; (4) with Enterprise off, all three show their rows; (5) with
+`demo_ui = true`, the Sample panel starts in the bottom strip under Enterprise and on the left without it; (6) Settings
+› Plugins shows Enterprise 0.3.0, Remote 0.15.0, Vault 0.7.0, File Server 0.6.0 and Sample 0.4.0. The final review's
+fixes add `PresentationReachTest.theApplicationHandsTheLooksPluginDefaultsToThePlugins` (the application hands the look's
+plugin defaults to a started plugin) and `PluginSettingsPageTest.stagingThePluginsOwnDefaultUnderAKitDefaultSavesItAndResetReturnsToTheKits`,
+so the suite holds 11,569 tests (only the touched classes were re-run); a `[defaults]` table named without a dot now
+also says to quote a dotted setting key, and a rejected look default's report no longer ends "configuration was not
+applied". Merged to local main, not pushed.
+
+**Enterprise presentation, plan 14: IntelliJ Classic's title bar at the user's direction — 2026-10-19** (`claude/enterprise-title-bar`, worktree `.claude/worktrees/enterprise-14`, from `main` at `3a36993ba`; [plan](superpowers/plans/2026-10-19-enterprise-14-title-bar.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
+Commits `200367316..98dedc443`, then this documentation commit; spec 1 (decision 8), 3 (principles 5 and 8), 4.7, 4.8, 5.1
+to 5.3, 5.9, 9.1, 10.1 to 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1 amended, and the app architecture guide
+corrected. The user asked: "Next, on MacOS and Windows only - the enterprise theme uses a custom title bar that looks
+like the IntelliJ title bar, using the same color as the toolbar so it looks cohesive. Mac also moves the menu bar to
+the global mac menu bar area instead of using built-in, and on windows the title bar contains the file menu bar like in
+the normal variant of the app." After review they added that only the toolbar height and the macOS lights must match
+IntelliJ ("the content will be different because the apps are different"), then approved the design.
+`[chrome] title_bar` gains a third value, `"classic"`, which the Enterprise kit names; `Projections.Host` carries the
+platform (`Projections.Platform`: MAC, WINDOWS, or LINUX for any other system, from `os.name`). On macOS and Windows a
+classic title commits the default look's desktop flags, so a failed start falls back to exactly the default look; on
+Linux it gives exactly `native`'s projections. On macOS `MacTitleBand` (platform) gives the terminal window's root pane
+`apple.awt.fullWindowContent` and `apple.awt.transparentTitleBar` and a 28 pt band in the toolbar's colour (the header's
+`surface.app`, never a title-bar zone) above the toolbar row, where AppKit draws the traffic lights and the frame's
+title; the appearance is `NSAppearanceNameVibrantLight` or `NSAppearanceNameVibrantDark` by the theme; full screen
+removes the band and leaving restores it; a double-click zooms, minimises or does nothing as `AppleActionOnDoubleClick`
+says (`MacTitleDoubleClick`); the menus are in the screen menu bar, with About Jasper and Settings… in the application
+menu, and auxiliary frames keep their system title bars and show the minimal File menu there. On Windows FlatLaf's 28 px
+title pane, in the toolbar's colour, embeds the classic menus and then `ClassicWindowTitle`, the frame's title
+left-aligned 22 px after them in `text.secondary` and dimmed to `text.tertiary` while the window is inactive, over the
+classic menu row's 1 px `border.divider` rule; `CollapsingMenuBar` folds the menus into "…" and then ☰ before the title
+shrinks below 60 px, and `window.native_decorations = true` and Compact give the system title bar and the in-window menu
+row. Linux is unchanged. `TitleInset` (platform), published only by the band, the Windows classic decoration and, under
+the classic title on Windows, the FlatLaf title panes of auxiliary frames and dialogs, keeps classic in-window dialogs
+and overlays below the title and announces each change (`TitleInset.CHANGED`). The
+Enterprise toolbar is 28 px (`window.toolbar_height`), IntelliJ's, on every platform. No SDK, plugin or Enterprise
+version changes. Rulings (plan, "Rulings"): (1) one plan of eight tasks; (2) a third `title_bar` value, `classic`,
+rather than a per-host meaning of `native`; (3) `Projections.Platform` read from `os.name` without AWT, every other
+system counting as Linux; (4) the classic base keeps `native` and only the Enterprise kit names `classic`; (5) each of
+the six title-dependent projections is decided and tested, Linux's equal to `native`'s, and the three-argument
+`ShellLook` and `WindowLook` constructors mean no classic title; (6) `ClassicMenuBar` stays, with the menus where the
+platform puts them; (7) the macOS band is IntelliJ Classic's full-window-content mechanism, not `MacTitleBar` or JBR's
+`CustomTitleBar`; (8) the band's window takes the vibrant appearances by the theme's darkness; (9) full screen is
+FlatLaf's republished buttons bounds with width 0; (10) the band handles a double-click itself from
+`AppleActionOnDoubleClick`; (11) dragging the band is left to AppKit; (12) macOS auxiliary windows keep their system
+title bars and show the minimal File menu; (13) the Windows title is Jasper's `ClassicWindowTitle` inside the menu bar,
+not FlatLaf's label, in a 28 px bar; (14) its colours are `text.secondary` under the text guard and `text.tertiary`
+under the indicator guard; (15) the Windows rule is the classic menu row's own `border.divider`; (16) Windows auxiliary
+frames and dialogs take FlatLaf's title panes without a menu row; (17) `window.native_decorations = true` on Windows
+gives Linux's frame with no title inset; (18) Compact under a classic title keeps the system title bar without the band;
+(19) `TitleInset` is a root client property only the band, the Windows decoration and the Windows auxiliary title panes
+publish; (20) the toolbar is 28 px
+as the kit's default, a saved value still overriding it; (21) the mock tests render under a Linux host and shift for the
+28 px row; (22) `ChromeRenderTest` gains `enterprise-mac` and `enterprise-windows`, `enterprise` moving to the Linux
+host; (23) no version bump; (24) the workspace-tabs reconciliation below. The execution rulings E1 to E13 and the Task 7
+record are in the plan's "Execution notes". Deviation from the approved design: W1's `centerTitleIfMenuBarEmbedded` is
+replaced by `ClassicWindowTitle` (Rulings 13) because the key is process-wide and FlatLaf's title does not dim.
+Deviations from the Enterprise mocks, at the user's 2026-10-19 direction: macOS and Windows no longer show the mocks'
+native title bar or in-window menu row (the mocks stay true on Linux, where the mock tests render); the toolbar is
+28 px, so `EnterpriseWorkstationMockTest`'s toolbar run, ink tops, search field top and tab rows move by the 12 device
+px (6 px at 1x) the mocks' 34 px row is taller, its rows' column stopping 12 rows sooner so the Dark tab run ends at the
+same row of the strip, `ClassicHeaderTest`'s header is 29 px (28 and the rule) with the first button at y 2 and the
+field at y 3, and the two toolbar pairs crop the mock's middle 56 device rows against the render's 56-row toolbar row
+(`chrome-toolbar-light` 0.581, `chrome-toolbar-dark` 0.577; the 0.30 floor unchanged). Deviations from the plan's text:
+the execution rulings E1 to E13 (anchors corrected in place, two more `ChromeSpec` comments, imports,
+`ChromeRenderTest.HOST` from `os.name`, fixed scratchpad paths for the Task 8 proof, the mock tests' copied list and
+shorter ink regions, the guide's paragraph kept whole, the spec's wrapped phrases, and the relayed traffic-light request
+met by the recorded checkpoint) and the Task 7 record (the Dark tab run's shorter column, the 56-row toolbar crops);
+Task 8 appends its record to the existing "Execution notes" instead of adding the section again, and writes the spec's
+header amendment as one line, as plans 12 and 13 did. `./gradlew check --continue`: **11,541 tests, 0 failures, 0
+errors, 25 skipped**; `check_pairs.py` passes 101 of 101 gated pairs with the same verdicts as `3a36993ba`, only the two
+`chrome-toolbar-*` lines changed; the headless gallery is byte-identical to `3a36993ba`'s (Slate Cobalt Dark and Light,
+161 files each) and so are the 11 default-look jasper-app renders (`ChromeRenderTest`'s default, complement and fallback
+chrome, palette and settings images, `DefaultDockPixelsTest`'s `default-dark` and `default-light`);
+`CustomTitleBarTest`, `MacTitleBarTest` and `DefaultDockPixelsTest` are unedited. The lights checkpoint (done before
+execution, with the user's yes): started from Jasper's app launcher, the band's mechanism draws IntelliJ's lights
+(centres 23 pt apart, about 14 pt across) and a leading title at about 84 pt; started through JBR's `bin/java`
+(`:jasper-app:run`), macOS draws its legacy controls and centres the title. **Before checking:** your
+`~/.config/jasper/config.toml` saves `window.toolbar_height = 34` (and `window.toolbar = "icons_and_labels"`), which
+override the look's defaults; delete those lines, or Reset them in Settings, to see the 28 px toolbar. GUI checks for
+the user, in this order: (1) macOS, Enterprise Light: in the packaged app (`./gradlew :jasper-app:packageApp`, then open
+`jasper-app/build/packaging/image/Jasper.app`; a `:jasper-app:run` window shows macOS's legacy controls by design), the
+traffic lights and the title against IntelliJ's screenshot (12.webp): centres 23 pt apart, about 14.7 pt across, the
+title leading-aligned after the lights; whether macOS leading-aligns or centres the title (if centred, a follow-up
+paints it); dragging the window by the band; a double-click in it with System Settings › Desktop & Dock's double-click
+action at Zoom, Minimize and Do Nothing; (2) the band's colour against the toolbar, with no seam, in Enterprise Light
+and Dark and under another theme; (3) the screen menu bar: the application menu's About Jasper, Settings… and Quit;
+File, Edit, View, Session, Transfer, Tools, Window and Help; no stray "…" or ☰ menu; ⌘Q once; (4) full screen and back:
+the band leaves and returns, and the lights and title follow; (5) auxiliary windows (Settings, About, Licenses, Errors,
+the Vault manager, a plugin window): their system title bars, the screen menu bar's File menu while one is focused, ⌘W
+closing it; (6) classic in-window dialogs and the Vault's sheets below the band; (7) Windows: the menus in the title bar
+after the icon; the title left after them, dimming when another window is active; the rule under the bar; a narrow
+window folding to "…" and ☰; maximise and restore; dragging and double-clicking empty title-bar space and the title;
+in-window dialogs below the bar, and the Vault manager's and Settings' sheets below their own title bars;
+`window.native_decorations = true` giving the system title bar and the menu row;
+Compact; (8) Linux: unchanged apart from the 28 px toolbar. Reconciliation: the unmerged `claude/workspace-tabs` series
+rules that a child window has no menu bar under Enterprise; whichever of it and this plan merges second reconciles them,
+and on macOS a child window then needs the screen menu bar's menus. Final review fixes ("Plan 14: final review fixes";
+the plan's "Final review record"): Windows auxiliary windows under the classic title publish their title pane's inset,
+so classic sheets hang below it; the Windows title shares the menus' baseline; the macOS classic menu bar never folds
+against the window's width, as AppKit lays out the screen menu bar; the chrome covering array gains two `classic` rows,
+rendered as macOS and Windows, and its strength check counts `title_bar`'s three values; the double-click reader closes
+its process streams. They add 5 tests; the windows, workspace, platform, presentation and documentation test packages
+(1,158 tests) and `javadoc` pass, the 11 default-look jasper-app renders still equal the baseline, and `check` was
+not rerun after them. Follow-up: the
+default look's macOS menu bar (in the unified bar) still folds against the window's width, a risk older than this plan.
+Merged to local `main` (`f78bb0385`), not pushed.
+
+**Enterprise presentation, plan 13: stripe icons at the user's direction — 2026-10-19** (`claude/enterprise-stripe-icons`, worktree `.claude/worktrees/enterprise-13`, from `main` at `2c065f8cd`; [plan](superpowers/plans/2026-10-19-enterprise-13-stripe-icons.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
+Commits `eca2feca8..2606d5633`, then this documentation commit; spec 5.2, 10.7, 16.1 and 19.1 amended. After trying
+plan 12 the user asked: "Now I want the sidebar strip to have icons like the classic intelliJ does for plugins and
+whatnot too you can use those classic IntelliJ icons we vendored in." Every labelled stripe button (both side stripes
+and the bottom strip) now starts, in reading order, with its tool window's or rail action's icon, as IntelliJ's classic
+`StripeButton`: 13 px (`STRIPE_ICON`), upright, centred across, `STRIPE_LABEL_PADDING` from the label's start, then a
+4 px gap (`STRIPE_ICON_GAP`) and the text, the same in every state. Under `[chrome] icons = "classic"` (Enterprise) the
+icon is the user's Set A, the classic counterpart of the panel's declared icon: `network` draws `webToolWindow`,
+`folder` `toolWindowProject`, `tunnel` `toolWindowModuleDependencies`, `download` `toolWindowAnalyzeDataflow`, `server`
+`toolWindowServer` and `bell` `notifications`; any other name, a plugin's own path included (the Sample's flask), draws
+its monochrome glyph in the label's ink; an identity name such as `more.vertical` keeps its authored art. Under
+`new_ui` a label draws what the icon rails draw, at 13 px (a built-in name's New UI chrome artwork, a plugin path's
+own glyph), and a window without an icon reads text only. A dragged label keeps its icon and its length, and the
+drag's ghost is that stripe icon. jasper-ui vendors 12 more unmodified SVGs (those six, light and dark) from
+JetBrains/intellij-community at
+`8062c061ff33`, hash-checked rows under `classic/toolwindows/` in `assets-classic.tsv` (26 rows), behind a stripe-only
+lazy table (`IconRegistry.stripeIcon`); every file keeps its JetBrains copyright comment except `toolWindowServer.svg`
+and `toolWindowServer_dark.svg`, which upstream ships without one (stated in `BuiltInArtworkTest`, `icons/SOURCE.md`
+and `ATTRIBUTION.txt`). The stripe numbers and Event Log's count pill stay; no SDK, plugin or Enterprise version
+changes. Rulings (plan, "Rulings"): (1) one plan of seven tasks; (2) the 12 files are appended to `assets-classic.tsv`
+under `classic/toolwindows/` and fetched by the existing script; (3) `toolWindowServer` keeps no comment, the one stated
+exception; (4) a separate lazy stripe table reached only through `IconRegistry.stripeIcon`, empty for a name without a
+file, the classic chrome set unchanged; (5) keyed by icon name, so a third-party panel naming one of the six gets that
+file; (6) the resolver is `AppIcons.stripeIcon` in `dev.jasper.app.platform`; (7) the fallback glyph's ink is the
+label's own painted ink, with no new `PaintPair`; (8) an identity name without stripe art draws its authored catalog
+art; (9) any other sized `Icon` is drawn as given, centred and scaled down into the box; (10) labelled stripes under
+`new_ui` draw what the rails draw, at 13 px; (11) the metrics `STRIPE_ICON` 13 and `STRIPE_ICON_GAP` 4, equal in both
+catalogs, are read only by `StripeLabels`; (12) a side stripe is the larger of its line and `STRIPE_ICON`, plus its two
+edges and its rule, thick, icons or not (still 23 under IBM Plex); (13) the icon box starts `STRIPE_LABEL_PADDING` from
+the reading start and is centred with integer division (4 across a side stripe, 5 down the bottom strip), without
+IntelliJ's 1.1 stretch; (14) the same untinted icon in every state; (15) rail actions lead with their icon too
+(`Command.ICON`, else `command`); (16) `DockStripe.beginDrag` receives the panel's icon and the ghost is
+`StripeSet.ghost(icon)`, the rails' unchanged; (17) the mock checks compare the cut render, below; (18) spec 9.1, 12.1
+and 12.2 are unchanged; (19) the label ink, the stripe surface and the default look's rails, ghost and drag are
+unchanged. The execution rulings R1 to R17 are in the plan's "Execution notes". Deviations from the Enterprise mocks, at
+the user's 2026-10-19 direction: the stripes' labels carry icons, so each is 17 px longer than the mocks'; `DockMockTest`
+renders the shipped icons, asserts each label's whole icon slice (the icon, its gap and the margins beside it, 17 px,
+34 at 2x) as its tile with IntelliJ's classic file, and compares the mocks with the slices cut out, which is
+pixel-identical to the text-only label, so every run expectation,
+tolerance and floor and the `FONTS` lines equal plan 12's. **For the user to confirm:** this cut is a change of method
+relative to the approved design ("update honestly to the iconed stripes"), beside the 17 px longer labels. The nine
+gated stripe pairs (`dock-{light,dark,vault}-{left-stripe,right-stripe,bottom-strip}`) read `-text-render.png`, with a
+note, and nine ungated `-iconed` pairs show the real iconed `-render.png` beside the mock crop widened by the slices,
+for `compare_all.py`; no other pair's crop or floor changed. Deviations from the plan's text: Task 7 also re-wraps spec 16.1 item 4,
+whose line the added test names pushed past 120 columns; the plan's "322 files each" for the gallery is 161 per theme,
+322 in all, as earlier entries count them. `./gradlew check --continue`: **11,503 tests, 0 failures, 0 errors, 25
+skipped**; `check_pairs.py` passes 101 of 101 gated pairs, the 25 dock pairs' output equal to plan 12's; the headless
+gallery is byte-identical to `2c065f8cd`'s (Slate Cobalt Dark and Light, 322 files) and so are the 11 default-look
+jasper-app renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and settings images,
+`DefaultDockPixelsTest`'s `default-dark` and `default-light`). GUI checks for the user: under Enterprise Light and Dark,
+each stripe label's icon against the user's screenshot of IntelliJ's Classic UI stripe: Sessions' globe, SFTP's folder,
+Tunnels' chain link, File Servers' server rack, Event Log's bell, Transfers' arrows, and the Sample panel's flask and
+"About Sample" in the label's colour; closed, hovered and open labels; switching Light and Dark with the stripes
+showing; dragging a label within a stripe, to the other stripe and between a side stripe and the bottom strip (the
+label keeps its icon, the gap fits it, the ghost is the icon); Event Log's count pill after its bell; a short window
+cutting off labels; the About page's IntelliJ icons entry; the default look's rails unchanged. Merged with local `main`'s
+splash fix (`64ead2e34`) and then to local `main`, not pushed: `./gradlew check --continue` on the merged tree gives
+**11,514 tests, 0 failures, 0 errors, 25 skipped**. Its first run timed out once in `StagedTransferLifecycleTest` and
+failed a `@TempDir` clean-up in `StartupStepsApplicationTest`; both passed three runs alone and the second full run.
+
+**The boot splash no longer flashes on Windows and Linux — 2026-10-19** (`claude/splash-no-flash`, worktree
+`.claude/worktrees/splash-flash`, from `main` at `2c065f8cd`; merged to local `main`, not pushed). Each start-up step repainted the
+whole branded splash straight onto its window, the gradient first, and Windows and X11 show a window's pixels as they
+are drawn, so between steps the art, icon, name, version and bar vanished to the bare gradient; macOS presents a paint at
+once. Under Xvfb in the Linux container, 408 of 789 screen captures taken during 599 steps showed the area above the
+step line changed (up to 185,125 of its 247,680 pixels); after the fix, 0 of 596 (XRender) and 0 of 571 (X11). The new
+`SplashBuffer` draws the splash off screen at the window's device scale, and every paint, the system's included, is one
+copy from it; a step draws again and copies only the step's line (from a pixel below the icon to the bar's rule) and
+the bar. Each area it draws starts from the window's own first fill, so a redraw at a fractional scale matches the whole
+splash; `SplashPainter` is unchanged. `SplashBufferTest` records every pixel a paint writes: at 1, 1.07, 1.25, 1.5,
+1.75 and 2x a step writes nothing above its line, no pixel changes twice, and the result is the whole splash on the new
+step; a step that only moves the fill writes only the bar, and an expose writes only its clip.
+`./gradlew check --continue`: **11,486 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: on Windows (100 % and 150 %) and Linux (X11 and a
+Wayland session, scale 1 and 2), with Enterprise on, a cold start's splash keeps its art, icon, name, version and
+copyright steady at every step while only the step text and the bar change, with no blank or dark frame, and a window
+dragged over it and away leaves it whole; on macOS it looks as before.
+
+**CI runtime optimization — 2026-10-19** (PR #1): CI runs independent Gradle projects with
+`--parallel`, two workers on Unix and one on Windows; each project's tests remain sequential. Root verifiers consume
+root-owned runtime dependencies, and plugin staging consumes producer task outputs. Full local
+`check`, forcing all 15 Java test tasks to execute with warm build artifacts, fell from 8m48s
+serial to 4m45s parallel (46%). All 11,437 tests were retained, with zero failures/errors and the
+same 25 platform skips; one new regression prevents Windows Git Bash probing root UNC paths.
+Architecture/license checks and independent review passed. Hosted checks on the final head gate merge.
+Ubuntu improved from 13m47s to 9m26s. Windows with two workers hit subprocess/startup/cleanup
+deadlines that passed serially; the single-worker hosted Windows check subsequently passed in 18m01s.
+Synchronized main at `2c065f8cd`, retaining its Enterprise theme assertions alongside portable
+font checks; full local `check` passed (11,486 tests, zero failures/errors, 25 existing skips).
+
+**macOS/Windows CI follow-up — 2026-10-19** (`codex/ubuntu-rendering-tests`, PR #1): Startup
+fixtures await application shutdown before temporary-home cleanup. Windows fixes cover native
+linker artifacts and const-correct C fixtures, portable filesystem fixtures, FTP completion waits,
+font-aware rendering assertions and stable gallery scale. Remote shell tests now run through Git
+Bash on Windows; worktree/home comparison canonicalizes both paths. Plugin fixtures await actual
+worker termination before deleting data. Runtime shutdown retains plugin classloaders until worker
+cleanup completes, preserving the bounded stop grace. Shell fixtures use finite-file stdin and captures.
+Full local `check` passed (11,432 tests, zero failures/errors); GitHub macOS, Ubuntu and all Linux
+packaging/install checks passed. Focused checks cover the subsequent Windows fixture corrections;
+PR #1 is gated on all hosted checks. No new test skips.
+
+**Workspace tabs, plan 2: the layout model and its encoding — 2026-10-18** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `255264a42..a2dbb4472` (Tasks 1 to 5 and their fix rounds), the documentation commit
+`5d2cd4ed1` and the final-review fixes; [plan](superpowers/plans/2026-10-17-workspace-2-layout-model.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). Pure and unwired: no visible change. New
+JDK-only package `dev.jasper.app.layout` (nothing from `java.awt`, enforced by `verifyApplicationArchitecture`):
+`TabId` and `GroupId` (UUID records), and `Layout` over a tree of n-ary weighted `Split`s (same-orientation nesting
+flattened, weights normalized) and tab `Group`s, with `open`, `select`, `activate`, `split`, `move`, `moveToNewGroup`,
+`remove`, `resize`, `toggleMaximize`, `neighbour` (today's `SplitTree.navigate` rule) and `bounds()` over the unit
+square (for `neighbour`), `unmaximize`, and orders of use that pick the focused group and the selected tab after a
+removal. `persistence.WorkspaceFile` writes spec 8's `workspace.toml` atomically (`AppDirs.workspaceState()`) and reads
+it back without throwing: bad tab and window entries dropped alone (the original file then copied to `workspace.toml.bad`
+and reported as `Loaded.Restore.keptAside`), keys falling back alone, an unreadable file (or one over 256 KiB) set aside
+under that name (`Loaded.Fresh`). Rulings (plan, "Rulings"): (1) `Group.selected` is an
+`Optional`, empty only for the empty workspace's group; (2) `Layout` is a final class with spec 7.1's public
+constructor and keeps the groups' order of use outside `equals` and the file; (3) `resize` addresses a split by its
+path, and a split's id in the file is the name-based UUID of `"jasper.split:"` plus that path; (4) weights within 1e-9
+of summing to 1 are kept bit for bit, others divided by their sum, no minimum weight; (5) a maximized group is the
+active group, closing a tab keeps the maximize while the group survives and two groups remain, a split or a move
+between groups clears it; (6) `select` also activates the tab's group; (7) closing a group's selected tab selects its
+most recently shown tab, the orders of use private and seeded in `JTabbedPane`'s order; (8) a removed group's weight
+goes to the sibling before it, so Cmd+D then closing the new tab restores the sizes exactly; (9) `move` counts the
+target without the moved tab, and `split` and `moveToNewGroup` need a target group with tabs; (10) `neighbour` is a
+query returning `Optional<GroupId>` over the whole tree's geometry, maximize ignored; (11) `TabId` and `GroupId` parse
+only the canonical 36-character form; (12) the codec is the stateless `persistence.WorkspaceFile` with nested values,
+reusing `UiState.Bounds` (`UiState.bounds` and `number` became package-private); (13) `read` never throws, not even on
+a `StackOverflowError` from tomlj's parser, and `write` throws `IOException`; (14) bad tab entries are dropped through
+`Layout.remove`, bad window entries drop that window, a tree deeper than 64 is a bad window, and other keys fall back
+alone; (15) the cap is `ui-state.toml`'s 256 KiB; (16) restore-state keys are bare when they match `[A-Za-z0-9_-]+`,
+quoted otherwise, every string through `UiState.quote`; (17) `WindowRecord.bounds` is an `Optional`; (18) `Snapshot`
+puts the main window first and refuses a group or tab in two windows; (19) a group's place in the unit square is
+`Region`, not `Bounds`; (20) for plan 6: `WindowRecord` needs a record for every tab of its layout, so before saving it
+takes out, with `Layout.remove`, every tab it cannot restore and leaves out a child window holding only such tabs. The
+plan's one spec issue (the maximize when a tab closes) is resolved: the spec was amended with the plan (`39162f79d`) to
+match Rulings 5. Deviations from the plan text made while executing it: Task 1 added tests that can fail for two
+rulings (`LayoutValuesTest`: weights 0.7, 0.2 and 0.1, whose sum is 0.9999999999999999, are kept bit for bit and a
+`Split` rebuilt from its own children equals it; two non-canonical 36-character ids, `+0000001-0000-4000-8000-00000000000a`
+and `00000001-0-0-0-000000000000000000001`, which `UUID.fromString` accepts, are rejected by `TabId.parse` and
+`GroupId.parse`); Task 2 added two assertions to
+`LayoutOperationsTest.theMaximizeFollowsTheActiveGroupClearsOnMovesAndSurvivesClosedTabs` (in the three-group layout,
+closing the maximized group's last tab clears the maximize and activates the first group of the order of use); Task 5
+added `WorkspaceFileReadTest.windowsWhoseRootSplitsShareAnIdAreReadApart` (a main and a child window whose root splits
+share one id are read back as written; the reader keys nodes per window), so `WorkspaceFileReadTest` has 17 tests, not
+16; the probe for the plan's open question (fact 15) showed that tomlj 1.1.1 does overflow its stack on 250,000 nested
+`[` under the 256 KiB cap, so `aNestingThatOverflowsTheParserIsSetAside` does exercise the `StackOverflowError` branch
+(it failed with that error when the branch was removed); this commit adds one-line Javadoc comments to the enum
+constants of `layout.Orientation`, `layout.Side` and `WorkspaceFile.Role` (doclint's "no comment" warnings). The plan's
+other code and test text was applied as written, no anchor needed re-finding in Tasks 1 to 6. `SplitTree` stays until
+plan 3 and `UiState`'s `[main_window]` until plan 6. `./gradlew check --continue`: BUILD SUCCESSFUL, **11,548 tests,
+0 failures, 0 errors, 25 skipped** (from the XML in `*/build/test-results/test/`; `LayoutValuesTest` 6,
+`LayoutTest` 6, `LayoutOperationsTest` 15, `LayoutGeometryTest` 16, `WorkspaceFileTest` 4, `WorkspaceFileReadTest` 17,
+`AppDirsTest` 11). No GUI checks (nothing visible changed). Not merged, not pushed.
+
+Final-review fixes: `Loaded.Restore` gained `Optional<Path> keptAside`. When `read` dropped any window, any tab entry or a
+tab a group lists without one, it copies the original file to `workspace.toml.bad` (replacing an older copy) and reports
+the copy; a failed copy is logged and reports nothing. The reader checks the main window's entry before any child's, so a
+hand-edited child that reuses the main window's group or tab ids is the window dropped. Tests: a dropped child window and a
+dropped tab each keep the original aside, a clean file keeps nothing, a failed copy reports nothing, a child listed first
+is the one dropped, and a child sharing a group id with the main window is dropped alone (`WorkspaceFileReadTest` has 23
+tests). `./gradlew :jasper-app:check` afterwards: BUILD SUCCESSFUL, 3,617 tests, 0 failures, 0 errors, 19 skipped.
+
+**Deferred** (plan 2): (a) the writer has no depth cap while the reader drops a window nested deeper than 64, so a main
+window that deep sets the whole file aside on the next start; (b) Rulings 8's limit: a LEFT or UP split and then closing
+the new tab does not restore the sizes exactly, and under plan 5's drag (drop on a group's left edge, drag back) the group
+halves each round trip; (c) plan 6a's text builds `Loaded.Restore` with one argument and must read `keptAside` for the
+notice that a file was kept aside.
+
+**Workspace tabs, plan 1: the single instance — 2026-10-18** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, every commit after `91f3cd66a` (the anchor refresh before Task 1) up to the branch
+tip: Tasks 1 to 11, the documentation commit, the spec amendment `4f9f8d629` and the final-review fixes;
+[plan](superpowers/plans/2026-10-17-workspace-1-single-instance.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). One Jasper process per home: a launch takes
+`<home>/daemon/instance.lock` (`residency.InstanceLock`, `FileChannel.tryLock`, held for the life of the process; the
+owner's process id is in `daemon/instance.pid`) before AWT, or hands its request to the owner and exits
+(`bootstrap.SingleInstance`; spec 5.2's table is `LaunchAction`). The owner binds the handoff endpoint and the command
+socket at once (`bootstrap.Instance`) and holds early requests (`EarlyRequests`) until `compose` hands it the
+application; until then a handoff is answered on receipt, afterwards only once the EDT has taken it (within 1 s), and a
+quitting owner takes none; a `jasper` call is answered when it has run. Handoff protocol 2 (`LaunchRequest`): RAISE or
+OPEN_PATHS, the launch's working directory, its paths and the start-up flags it ignored; replies OK, TOKEN, UPDATED,
+PROTOCOL. A launch retries an owner that does not answer for 10 s (taking the lock if the owner has gone), then says
+"Jasper is already running but not responding. Quit it (process N) and try again." and exits 1 (`LaunchFailure`), never
+starting a second instance. An owner answering UPDATED whose own jar changed restarts into the new build when no window
+is open (the replacement opens the launch's paths), otherwise posts "Jasper was updated" with Restart; ignored start-up
+flags get "Jasper is already running: quit it first to start with …". Restart (Plugins page, VM options, updates, the
+look's Try Again) spawns the replacement with `--replacing <pid>`, which waits up to 30 s for the lock, or hands off once
+that process has gone. A start that fails after the claim closes its endpoints and exits. `JasperApplication.open(List<Path>,
+String)` routes RAISE, OPEN_PATHS, `jasper <path>…`, the macOS open-file event (`Desktop.setOpenFileHandler`) and the
+reopen event through today's windows (`OpenPlan`); a file from outside opens in a plugin's editor or is revealed, never
+edited by the desktop; a cold start's first window takes its first directory (`openFirstWindow`); plan 4 retargets
+these to the main window. Command-line paths are positional `AppArguments`; the macOS plist gains
+`CFBundleDocumentTypes` (text, source code and folders at Alternate), which `verifyPackage` checks. Removed:
+`--standalone`, the private `commands-<pid>` sockets, `daemon/lock` and `<socket>.lock`, the handoff endpoint's
+`token.pid`, the liveness probes, RETIRE and the STALE release, `RestartFlow`'s probe/retire/standalone states,
+`RestartMode.STANDALONE`, `ResidentControl`, `endpointReleased`, the Plugins page's notice line (it was hidden in every
+state the 8b and 9b comparisons render; `SettingsPagesMockTest.pluginsMatchesItsMock` and the `settings-plugins` pair
+are unchanged: the 9b comparison printed `settings-plugins: best_offset_render_px dx=10 dy=13 edge_agreement=0.287`
+before and after). Rulings (plan, "Rulings"): (1) the lock lives in `residency`; (2) an I/O failure taking it ends
+the launch with an error; (3) the 10 s retry retries the lock too; (4) early requests run once the application is
+composed; (5) the not-responding error goes to stderr, the log and a system-look dialog and names the pid in
+`instance.pid`; (6) UPDATED acts only when the owner's own jar changed; (7) both notices are INFO in `jasper.general`;
+(8) restart keeps its order and always adds `--replacing`; (9) `RestartFlow` keeps two states and the Plugins page's
+notice line goes; (10) a non-option argument is a path; (11) Jasper, not the client, tells a path from a subcommand, a
+declared subcommand winning, and a call that starts with a path lists the missing ones; (12) OPEN_PATHS opens in the
+last active window or a new one; (13) a cold start's first window takes the first directory and is still timed cold;
+(14) the owner binds over whatever is at the socket path; (15) a home whose socket path is too long runs unreachable and
+says so; (16) child JVMs run `java.home/bin/java` on two code sources; (17) a request over 1 MiB ends the launch with
+exit 2; (18) the document types are Text (Editor) and Folder (Viewer); (19) `start` takes the home, so no test takes
+the real lock; (20) a non-resident `--background` launch exits from `startDesktop` unless it already holds a request,
+which it then carries out as an ordinary start; (21) raise and path calls answer once they have run; (22) a ready owner
+answers a handoff once its EDT took it, within 1 s; (23) a quitting owner takes no handoff; (24) a failed start keeps
+the lock until its process exits; (25) the lock is never opened twice in one process; (26) a file from outside is
+revealed, never desktop-edited, without a plugin's editor; (27) a replacement whose predecessor has gone hands off. The
+spec was amended while the plan was written (`c6d11f711`: no `LSMultipleInstancesProhibited`; `a92166bb2`: the EDT
+take and the quitting owner) and again after its execution (`4f9f8d629`, sections 5.2 to 5.4): Rulings 26 (a file from
+outside is revealed where the spec said "as Cmd-click does", edit-or-reveal), 6 (UPDATED restarts only when the owner's
+own jar changed, where the spec restarted for any differing build) and 27 (a replacement whose predecessor has gone
+hands off, where the spec's row only waited and then errored) are now spec text, with one limitation: a second process
+that receives files by Apple event (`open -n -a Jasper FILE`, or another copy of Jasper.app chosen in Open With) claims
+the home before AWT and never sees the event, so it hands off a RAISE and its files are not opened. Deviations from the
+plan text made while executing it: `InstanceLock.close()`
+is synchronized on the class like `tryAcquire` (Task 1; its 300-round close/ask stress test is bounded, `InstanceLockTest`
+has 8 tests, not 6); `JasperApplication` gained the private helpers `activeWindow()` (shared by `open` and
+`raiseTerminal`) and `newWindowTrigger()` (shared by `newWindow` and `openFirstWindow`) (Task 4); three imports
+`ResidentIndicatorTest` no longer used were removed (Task 5); `SingleInstanceTest.ready(...)` declares `throws Exception`
+and `Instance`'s Javadoc does not claim production never closes the lock (Task 6), whose replacement-wait test
+(`aReplacementWhosePredecessorNeverQuitsWaitsForItAndNamesIt`, a different pid planted so only the wait can name the live
+process) and `SingleInstanceProcessTest.theReplacementWaitsForTheLock` (a 1.5 s hand-off budget) are stronger than the
+plan's, and a new test proves a request the event thread reaches too late is withdrawn
+(`aRequestTheEventThreadReachesAfterTheLaunchGaveUpIsWithdrawnAndNeverCarriedOut`, `SingleInstanceTest` 16 tests, not 15);
+`ApplicationBootstrapTest`'s rollback test throws from the `Consumer<Startup>` form and asserts the home's lock is free
+afterwards, with a new `aFailedPrePassReleasesTheHome`, and a `--background` launch that is not resident but carries out
+a request now shows its Dock presence before its first window (`JasperApplication.dockFollowsWindows()` also holds for a
+process whose `DockPresence` began hidden; two tests in `JasperApplicationBackgroundTest`) (Task 7); a hand-off socket
+test pins that an owner leaves only its socket and token in the folder (`anOwnerLeavesOnlyItsSocketAndItsTokenInTheFolder`,
+`HandoffSocketTest` 19 tests, not 18) (Task 8); `verifyPackage` runs against `jasper-app/build/packaging/image`, not the
+plan's `build/jpackage/image` (Task 10). The stale "private launch" Javadoc (`JasperApplication`, `PluginRuntime`) and the
+`updateDock` and `DockPresence` Javadoc that still said only a resident process follows its windows were corrected in the
+documentation commit. The whole-branch review's fixes: `EarlyRequests` logs an `Error` from a request and carries on (a
+held request that threw one used to end the drain and strand every later handoff and `jasper` call, which hung);
+`Instance.dispatch` fails a call whose dispatcher threw one; a raise or path call fails with "Jasper is quitting; run the
+command again" on a quitting owner (it exited 0 having done nothing) and fails instead of waiting when `open` throws an
+`Error`, which still reaches the event thread's handler (`JasperApplication.onEventThread`); the README and
+`docs/sdk-architecture.md` no longer say the plugin catalog notices another Jasper process's changes; and `InstanceLock`'s
+Javadoc and `docs/app-maintenance.md` say that on POSIX nothing in the owner's process may open `daemon/instance.lock`,
+because any open and close of it drops the owner's lock (eight tests added: `:jasper-app:check` ran 3546 tests, 0
+failures, 19 skipped). `./gradlew check --continue`, before these fixes: **11475 tests, 0 failures,
+0 errors, 25 skipped** (jasper-app 3538 (19 skipped), jasper-ui 920, jasper-terminal 459 (5 skipped), jasper-buddy 151, jasper-sdk 90, jasper-sdk-testkit 197, plugins 6120 (1 skipped)). Before the first launch of this build, quit any older resident Jasper
+completely (its menu bar item's Quit Jasper Completely): it holds no instance lock and is unreachable from the new
+build, so it would keep running beside it (a one-time transition, Ruling 14). A home on a filesystem without working
+file locks (some NFS or SMB mounts) cannot start: the launch reports that it could not lock its home folder (Ruling 2).
+GUI checks for the user: a second launch from Finder, Spotlight, `open -n -a Jasper` and `Jasper.exe notes.txt` (one
+process, the window comes forward); `open -n -a Jasper FILE` while Jasper runs (macOS delivers the Apple event to the
+second process, which claims the home before AWT and never sees it, so it hands off a RAISE and the file is not opened);
+`jasper --safe-mode` while Jasper runs (the notice); Open With and Dock drops of a text file and a folder, with Jasper running and quit;
+`jasper notes.txt src` from a shell; a stopped owner (`kill -STOP`) gives the not-responding dialog after 10 s; Quit and
+an immediate relaunch end with one process; Restart Now and the VM options restart; a packaged `--background` launch
+that holds a request (a second launch handed it one while it started hidden, with residency off) shows its Dock icon
+with its window. Not merged, not pushed.
+
+**Ubuntu CI fixes — 2026-10-18** (`codex/ubuntu-rendering-tests`): Reproduced the 12 rendering
+failures on Ubuntu 24.04 ARM64/JBR 25. Font fallback now reaches logical families when physical
+fonts lack symbols/CJK; CI installs DejaVu and Noto CJK. Settings mock fixtures explicitly select
+their depicted capabilities; exact paint checks sample opaque glyph interiors and menu sizing uses
+the actual shortcut font. Full Linux validation also exposed an SSH shutdown race: host-key
+rejection reasons now survive MINA session cleanup, with deterministic regressions. Full `check`
+passed on Ubuntu and macOS: 11,430 tests each, zero failures/errors (53/25 existing platform skips).
+The Ubuntu external SDK plugin check/ZIP build also passed (one additional test). No skips or
+layout tolerances added; actionlint, source hygiene and independent review passed.
+
+**Windows installer build — 2026-10-18** (`codex/fix-windows-launcher-build`). MSVC's export
+library and `.exp` file now go to the object directory instead of jpackage's launcher resources;
+`buildLauncher` previously rejected `jpackageapplauncher.exp` as missing Jasper's hook.
+`packaging/windows/Build-Installer.ps1` passed on Windows ARM64, including image and MSI
+verification, producing `Jasper-1.0.0-windows-aarch64-setup.exe`. Launcher core: 152 checks,
+zero failures; watcher tests passed. Broader `check --continue` failed in command-client core
+compilation (MSVC const qualifiers), Editor, File Server, Indexer, Remote and UI tests; app test
+compilation failed during overlapping builds and passed on the standalone installer rerun.
+Merged into `main`; no installer run.
+
+**Enterprise presentation, plan 12: IntelliJ classic at the user's direction — 2026-10-18**
+(`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`;
+[plan](superpowers/plans/2026-10-18-enterprise-12-intellij-classic.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Commits `ef5a90cc9..e96129c86`, then
+the documentation commits `01f6611c3` and `ae2356289`, then the final review's fixes; spec 1 (decisions 4 and 14), 4.1,
+5.1, 5.2, 5.8, 6.4, 7.6, 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 10.8, 11.5, 14.4, 16.1, 17 and 19.1 amended. After trying Enterprise the user asked for IntelliJ's classic look in five places. (1)
+**Classic icons.** jasper-ui vendors 14 unmodified SVGs from JetBrains/intellij-community at tag idea/2026.2.3
+(`8062c061ff33`), checked against `assets-classic.tsv`; a new `[chrome] icons = "new_ui" | "classic"` point (Enterprise:
+`classic`) marks each window's header and status bar, and the About page's entry is now "IntelliJ Platform icons (New UI
+and Classic)" with an `ATTRIBUTION.txt` notice. The classic header draws them: under `icons` (Enterprise's new
+`window.toolbar` default, a fifth look-default key) 22 px icon buttons whose tooltips are their labels, Split marking
+its menu with a corner ▼; under `icons_and_labels` the icon, then the label. (2) **Remote's session view** is IntelliJ's
+run-configuration combo (the classic buttons face draws a rich DROPDOWN in a toolbar strip as `ComboBoxButton`: 24 px,
+the `application` icon, the name capped at 240 with an ellipsis, IntelliJ's arrow) and an icon-only GHOST `run` button,
+tooltip "Connect", in place of "Session:" and Connect; SDK 0.18.1 admits icon-only GHOST buttons in toolbar views and
+adds the authored `run` and `application` icons (Remote 0.14.0 requires it; Enterprise 0.2.0). (3) **The focused
+header.** Under flush frames any mouse press inside a tool window, and opening it from its stripe or a View toggle the
+host declares (`PanelRequest.Op.ACTIVATING_TOGGLE`), activates it and moves the keyboard into it, to its first keyed
+control other than a button, else its first button, else the frame; a press in the terminal hands the tint back and
+dragging a divider keeps it. Every bundled tool window except Event Log declares its own toggle action, which calls
+`PanelRegistry.toggle`, so for those only the stripe and a press activate: View › Sessions, SFTP, Tunnels, Transfers
+and File Servers and the stripe-number shortcuts open them without the tint. Light's focused header paints exactly #DFE2E9. (4) **The theme.**
+`enterprise.json` is now `convert_port`'s output from `tools/themes/enterprise/port.json` and IntelliJ's "IntelliJ
+Light" and New UI "Dark" theme files and editor schemes, pinned by a golden test, with an About entry "IntelliJ Platform
+themes (the Enterprise theme)"; accents #2675BF and `Blue5` #366ACE, Light's `surface.header.active` the user's #DFE2E9,
+Dark's its recipe, **#2C3340**; the `dark-terminal` scheme is gone. Every Enterprise test reads its colours from the
+shipped theme's roles, and `check_pairs.py` looks for a pair's colours in the render only. (5) **The Run window** opens
+at `UpperHome`: centred across the window, its top a seventh down, moved up to end at the middle while the work area
+allows, clamped into the work area (`RUN_WINDOW_HOME_SIDE`/`_BOTTOM` removed; the saved
+`[palette.run_window] left/bottom` keys are unchanged). Rulings (plan, "Rulings"): (1) one plan of twelve tasks; (2) 14
+unmodified files under `icons/classic/`, one without a `_dark` sibling serving both variants; (3) the classic chrome set
+is `add`, `split`, `zoom`, `settings`, `window.add` and `search`, any other name falling back to New UI; (4) `run` and
+`application` are authored catalog names in both looks, with vector fallbacks; (5) one About entry for both icon sets;
+(6) `[chrome] icons` projects onto `WorkspaceLook.Icons`, read only by `WorkspaceChrome`, and the default look's rails
+keep New UI; (7) classic header buttons as above, tooltips the labels; (8) `window.toolbar` joins the defaults allowlist
+and Enterprise defaults it to `icons`; (9) any number of icon-only GHOST buttons in a toolbar view, a labelled GHOST
+still refused; (10) the toolbar combo is IntelliJ's `ComboBoxButton`, only for a rich DROPDOWN in a toolbar strip under
+classic buttons; (11) an icon-only GHOST button in a toolbar strip draws a 16 px glyph in a `BUTTON_HEIGHT` square; (12)
+Remote's classic view: no label, the `application` face, a GHOST `run` Connect; (13) the port reads the vendored
+`f7377708` inputs, which convert identically at `8062c061ff33`; (14) an override key is filled only from an exact
+IntelliJ key, then port.json's overrides; (15) the accents keep white labels under the TEXT guard, superseding plan 5b's
+#3C74D6; (16) two schemes, `light` and `dark`, author "JetBrains, ported by Jasper"; (17) `FOCUSED_HEADER`'s guard is
+kept for every value; (18) activation follows IntelliJ, a plugin's own `PanelRegistry.toggle` never activating; (19)
+`UpperHome` replaces `CornerHome`; (20) colours are checked in the render only, `pairs.json` re-themed by role.
+**Awaiting the user's ruling:** Rulings 17 keeps `FOCUSED_HEADER`'s `Guard.beyond(1)` for every value, a deviation from
+approved design D (an authored `surface.header.active` override painting unguarded), because design D would remove the
+focused tint from the six Catppuccin and Ubuntu Yaru variants whose authored active header equals their header; #DFE2E9
+is 5.9 L* from Light's header and paints exactly either way. **A question for the user:** should ⌘1 to ⌘3 and the View items
+activate the bundled windows, as IntelliJ's ⌘1 does (the host would treat a panel's own declared toggle action as
+activating)? **A question for the user:** with Enterprise's 8 visible
+rows the Run window is about 427 px tall, so it is entirely in the upper half only in windows about 1000 px tall or
+more, and in shorter ones it sits just under the toolbar and crosses the middle (Rulings 19); should Enterprise show
+fewer rows? Task 9's changes that follow the theme (Step 7, file and one line each): `RunWindowPresentationTest`,
+Enterprise Light's muted texts gain the shortcut and value pairs and the mono value reads its guarded pair;
+`ClassicCompositionRenderTest`, mock probes start on the mock's own colour, Dark's faint rule and column header, and its
+zebra rows, read as one band each, "Vault locked" reads the guarded `status.warning` and New Tunnel's target edge
+`hue.green`; `ClassicVaultRenderTest`, the Categories column is `surface.sidebar` and the Details pane is read in two
+parts around its rule; `RunWindowRenderTest`, the disabled Forward glyph's composite (share 0.277, measured #AFAFAF),
+the heading count and the keycap edge come from painted pairs; `SettingsChromeMockTest`, floors 0.97/0.96/0.98 become
+0.92/0.96/0.91 (measured sidebar 0.950, footer 0.942) and the Display arrow reads `text.placeholder`;
+`SettingsPagesMockTest`, the "6 groups" count reads its guarded pair, the Copy keycap edge its composite and the Plugins
+search strip `surface.sidebar`; `DockMockTest`, `HEADER_FLOOR` 0.94 becomes 0.87 (measured 0.907) and `STRIPE_FLOOR`
+0.92 becomes 0.85 (measured 0.882); `EnterpriseChromeTargetsTest`, the tab indicator is IntelliJ's
+`EditorTabs.underlineColor` (#4083C9, #3574F0) and the scrim the converter's (0x40, 0x8C);
+`EnterpriseWorkstationMockTest`, Dark's tab strip and its rule (#1E1F22) read as one run; `PaintedContrastTest`, the
+BLUE-square fixture gives Enterprise Light a blue equal to its accent; `pairs.json`, `classic-notifications-groups`'s
+floor 0.80 becomes 0.75 (0.923 before, 0.788 after). Step 8's hand removals from `pairs.json` (79 values in 42 pairs,
+each with a note): #2F65CA (old Light `accent`, `selection.bg`, `tab.indicator`, `hue.blue`) mapped to #4083C9 (28
+pairs), #042C99 (26) and #2675BF (`chrome-tabs-light`); #2A2C30 (Dark `border.window`) to #1E1F22 (`chrome-toolbar-dark`
+and the four `dock-dark-kit-*-header` pairs); #2E3135 (Dark `surface.card` and its kin) to #1E1F22, #393B40 and #FFFFFF
+(`enterprise-dark-fileservers`; the last two also `chrome-tabs-dark`); #3D74D6 (Dark `selection.bg`) to #2E436E
+(`enterprise-dark-sftp`, `chrome-tabs-dark`) and (Dark `accent`) to #366ACE (`chrome-tabs-dark`); #3A3D42
+(`surface.panel.raised`, `surface.tabstrip`) to #323437 (`chrome-tabs-dark`); #50545B (`surface.control.selected`,
+`border.field.raised`, `border.menu`) to #1E1F22 and #43454A (`dock-dark-left-stripe`, `dock-dark-right-stripe`);
+#FFFFFF (Light `surface.card` and its kin) to #C4C4C4 (`chrome-tabs-light`); #2E9E4F (`status.success`, `hue.green`) to
+#34B171 (`classic-new-tunnel`); #C4C7CC (Light `border.window`) to #D1D1D1 (`chrome-dialog-add-login-footer`); and three
+mock literals no theme role held: #2D984D (`classic-new-file-server-ftp`), #E8EEFA (`classic-file-servers`) and #8E949C
+(`chrome-dialog-unlock-strip`). Step 8 also re-maps the mock literal #E6E7EA to the new `surface.footer` #EBEBEB
+by a ΔE 1.5 near match in 29 entries, which the plan's exact-role script does not do. Task 8 records the session toolbar pairs' agreement under IntelliJ's combo (0.962 to
+0.666 Light, 0.826 to 0.653 Dark, floor 0.50). Deviations from the plan's text: the spec's amendment line also names
+5.1, which Task 12 amends, and 9.1 and 17, which the review found stale (9.1's projection tables gain
+`WorkspaceLook.icons` and give `PaletteLook.home` as `UPPER`; 17 says five keys), and 19.1's order runs 1 to 12; Task 12
+fences the STATUS template in the plan's Step 6, whose inline links failed `AppDocumentationTest`;
+`docs/command-palette.md` also drops "or below it" from the Run window's re-attach rule, which `UpperHome` no longer
+has; `docs/sdk-icons.md` also says that panels, prompts and tiles draw a monochrome glyph of the same name, since
+`IconRegistry.select` gives the authored artwork to ordinary themed contexts only; Task 4's
+`EnterpriseWorkstationMockTest.theToolbarRowIsTheMocks` also moves ink 0's top expectation up 4 px (`rise`, the add
+icon's ink tops out above the "+") and reads the render's Settings… crop from ΔE 12 instead of 25 (its disabled icon);
+Task 9 Step 8's #E6E7EA near match above; the final review's fixes: an activating toggle that replaces a window no
+longer hands focus back to the terminal first, an activated frame's keyboard skips a toolbar row of buttons, a frame
+is focusable only while it holds the keyboard (never a Tab stop), and spec 6.4, 10.8 and 16.1 are amended; otherwise
+none beyond the plan's Rulings. `./gradlew check --continue` after the final review's fixes: **11,475 tests, 0 failures, 0 errors, 25 skipped**; `check_pairs.py` passes 101
+of 101 gated pairs; the headless gallery is byte-identical to `faeec76f3`'s (Slate Cobalt Dark and Light, 322 files) and
+so are the 11 default-look jasper-app renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and
+settings images, `DefaultDockPixelsTest`'s `default-dark` and `default-light`). GUI checks for the user: under
+Enterprise, the toolbar's classic icons in Light and Dark, with their tooltips and Split's menu; View › Toolbar's Icons
+& Labels; the session combo against IntelliJ's, with a long host name and with no saved sessions; Run's hover and
+disabled states, and connecting by Run; clicking blank space, a header strip and a stripe label in each tool window (the
+tint, and typing goes there), dragging a divider (the tint stays), then clicking the terminal; switching between Event
+Log and Transfers from their stripe labels after clicking into one (the tint stays and typing goes to the new one); the Light focused header
+against the user's screenshot (#DFE2E9); Enterprise Light and Dark as a whole against IntelliJ Light and New UI Dark;
+the Run window opening centred in the upper part in a tall window (about 1200 px or more), ending at the middle in a
+window about 1000 to 1200 px tall and just under the toolbar, crossing the middle, in a shorter one, then dragged away
+and back; the About page's IntelliJ entries. Merged to local `main` (`f78bb0385`), not pushed.
+
+**Enterprise presentation: side stripes at the user's direction — 2026-10-18** (`claude/enterprise-stripes`, worktree
+`.claude/worktrees/enterprise-stripes`, from `main` at `4ed94fb78`: `095e220b9`, `4b55dbfb7`, then this documentation
+commit, then the review's fixes; spec 3, 9.1, 10.7, 12.1 and 12.2 amended). After trying Enterprise the user asked for side stripes that fit their labels,
+centred and not resizable, and for the second group at the stripe's bottom, as IntelliJ. A labelled side stripe is its
+label's line (the face's fractional ascent and descent), the rail's two edges and its rule thick: 23 under IBM Plex, the
+mocks' 22 + 1; a larger interface font still thickens it; `window.rail_width` no longer applies to the labelled stripes
+or the bottom strip's lead, and Settings hides the Panel rail width under a look with `tool_windows = "stripes"`
+(`SettingsChrome.hiddenKeys`). Side labels and their pills are centred across the stripe, the text by its capitals (plan
+7's Rulings 21 reverted; the line stands 3 px further in than the mocks'). The second group (Left Bottom, Right Bottom) is laid out in order
+ending `RAIL_GAP` above the stripe's bottom end, or straight after the top group on a stripe too short for both, as
+IntelliJ's `Stripe` places its split group, so its first label stands at the group's top; the left stripe's rail
+actions follow the top group, or the second group on a stripe too short for both; during a drag the groups' drop bounds meet midway between them, the gap opens before or
+after a label where the drop lands, and the lifted label's length and an empty group's drop space stay at the group's
+end, the stripe's bottom. `DockMockTest` renders each side stripe as tall as its two labels and `RAIL_GAP` at both ends
+(166 and 138; the six side-stripe pairs' crops 332 and 276 tall at 2x, with a note), where the mocks' labels compare in
+place, compares the glyphs against the mock moved across to the centred line (agreement 0.933 to 0.947 for 0.92), and
+asserts File Servers and Tunnels at their stripes' bottom ends in the whole dock, a user-directed deviation from the 01
+and 08 mocks, as is the 05 Settings Window mock's Panel rail width, now hidden (`enterprise-settings-02`, with a note); the whole dock and the bottom strip now meet the mocks' places with no extra stripe thickness. All 25 dock
+pairs pass `check_pairs.py` (all 101 pairs: 101 PASS, 0 FAIL); the default look is byte-identical (`DefaultDockPixelsTest`, the headless gallery's 322
+files, dark and light against `4ed94fb78`). `./gradlew check`: **11,437 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the stripes' width and centred
+labels, drag and drop onto both groups of both stripes, and the Window page without Panel rail width under Enterprise.
+Not merged, not pushed.
+
+**CI and prerelease workflows — 2026-10-18** (`codex/release-workflows-main`): Tests run on PRs and
+pushes to `main`, retaining documentation/path filters and cancelling superseded PR runs.
+The manual [Release workflow](../.github/workflows/release.yml) accepts an existing `vX.Y.Z`
+tag, builds its commit on five native runners, and publishes Windows x64/ARM64 ZIPs and EXEs,
+Linux x64/ARM64 DEB/RPM packages and a macOS ARM64 DMG, plus SDK jars and SHA-256 checksums,
+as a prerelease. Release packaging excludes the three native test suites already run by CI;
+package verification remains enabled. Actionlint, embedded-script fixture checks and the Gradle
+packaging dry run passed; independent review found no actionable issues. Hosted builds and
+publication await the first manual run. No local GUI/AOT execution.
+
+**Enterprise presentation: the series — 2026-10-18** (`claude/enterprise-final`, worktree
+`.claude/worktrees/enterprise-final`, rebased from `5d5e5fcf3`, where plans 1 to 11 are merged, onto `main`'s `11e40192c`
+(plan 10b on the Ubuntu Yaru commits);
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md), plans `2026-10-1*-enterprise-*.md` in
+`superpowers/plans/`). The series is complete; each plan's entry below keeps its rulings and measurements. What it
+delivered: (1) the kit seam, a `Kit` naming metrics, type scale, faces and FlatLaf keys, with `Kit.DEFAULT` today's look;
+(2) the theme engine's 23 derived roles, overridable ones and paint-time guards; (3) SDK 0.18 in five plans: 3a the
+renames, 3b the controls (Notice, Properties, Separator, TABS, read-only fields, swatches, footnotes), 3c the table
+vocabulary, 3d the chrome (Session and Transfer menus, toolbar views, scope hues and nouns, dialog swatches) and 3e
+spec 13's default-look changes; (4) the classic look in three: 4a the frozen classic catalog, 4b the form faces and 4c the
+data faces with the full kit matrix and the first mock comparison; (5) presentation providers in two: 5a the declarative
+kit file, the election and the start-up fallback, 5b the bundled Enterprise plugin with IBM Plex and the Enterprise
+theme in Light and Dark; (6) the window in two: 6a the shell (in-window classic menu row, native title, still motion),
+6b the content (toolbar row, classic tabs, ruled status cells, "▶ Run…" and in-window classic dialogs); (7) dock chrome:
+labelled stripes, the bottom strip, flush frames and header strips, and a dock layout per look; (8) the Run window in
+two: 8a its view and 8b its modeless place at the dock's bottom-left corner; (9) Settings in two: 9a the classic dialog
+chrome and row menus, 9b the classic page compositions; (10) plugin compositions in two: 10a Remote's Workstation,
+Tunnels, SFTP and Transfers and File Server's panel, 10b the Credential Vault manager, sheets and Unlock Vault; (11)
+branding: the look's icons and the Boot Splash with its start-up steps. This branch adds the open Run item's header tint
+(`6f0dced51`) and aligns the spec with the rulings made during execution (`4f5d880c0`). The series review's fixes remove plan 5a's
+landing gate (`Presentation.Landed`), derive the font row's copy from `SettingsChrome.kitFontSize`, make
+`KitFixtures.enterpriseLight()` the shipped theme's Light variant (with `enterpriseDark()`, so the Enterprise gallery
+renders Dark too), route the mock helpers' ΔE through `MockComparison`, bump the bundled plugins whose SDK range or
+behaviour the series changed (Remote 0.13.0, File Server 0.5.0, Vault 0.6.0, Editor 0.10.0, Snippets, History, Indexer
+and Sample 0.3.0), and correct the guides. To turn Enterprise on: Settings ›
+Plugins, enable Enterprise (bundled, off by default), restart; turning it off and restarting brings Slate Cobalt back,
+and safe mode starts without it. `./gradlew check --continue` (this branch, rebased): **11,426 tests, 0 failures, 0
+errors, 25 skipped**; `check_pairs.py`: 101 of 101 gated pairs pass; the default gallery (Dark and Light, 322 files) is
+byte-identical to `11e40192c`'s.
+Residuals against the mocks (logical px unless stated; plan that recorded each): the secondary ink `#3A3D42` that no SDK
+text role paints, so the box titles (4b), SFTP breadcrumbs (10a), Vault status cells (`text.tertiary` `#5C6370`) and
+Unlock's intro (`#1E1F22` at (59, 24) for (55, 18)) paint other inks (10b); `DESCRIPTION` and `SUPPORTING` at 11 px
+where the New File Server and New Tunnel mocks draw 12, New Tunnel's floor 0.53 at 0.535 (4a, 10a); the classic label
+column, Add Login's 94 under the 100 px floor (4b) and the sheets' fields at 142 for 121 (10b); unfocused native table
+and tree selections keep the terminal-selection wildcard (4a, 4c); Add Host's side column shows four buttons for the
+mock's two (4c); classic tabs 1 px and the status bar 2 px taller than the mocks (6b Rulings 7 and 8); Add SSH Key's
+swatch `#2C8B48` for `#2E9E4F`, ΔE 9.7 (6b R39); the header action glyphs in one 10 px box, at 2x "+" 14 for 12, the
+import arrow 12 to 13 for 14, the ellipsis 16 for 19, the minus 14 to 16 for 12 (7); the Light open stripe tile
+`#D7D9DC` for `#CFD4DC`, 8 apart (7); the side stripes 28 thick for the mocks' 23 (7, measured in 8b); Transfer's menu
+title ink 3 px wider in Light and 2 in Dark, the Run window's help text top 84 for 85 (5b); the Run window's muted inks
+TEXT-guarded (`#717680`, `#686D75`, `#E3EAF9` for `#7A808A`, `#7A808A`, `#DCE5F7`), its disabled checkbox on
+`surface.tableHeader` for white, its empty line guarded against the dialog surface (8a); Settings' history buttons draw
+chevrons for the mocks' arrows and the crumb's page title stands at 226 for 225 (9a); `SETTINGS_DESCRIPTION_HEIGHT` 47
+for 47.5, the checkbox label gap and description offset, Keymap recording's Cancel and Set 3 and 1 px narrower, the
+Plugins folder tabs' baseline rule, Shell's "Empty" placement, File Server's port description wrapping one word later,
+and the fixture differences (Keymap counts, the Enterprise plugin in Plugins, Shell's Custom profile, Shell History's
+list, Project Index's empty state at 0.930 over its 0.92 floor) (9b); the Disconnected mock's striped second host
+(`#F7F8FA`) renders `#FFFFFF`, the Tunnels row 22 for 24, the Session combo about 212 wide at 2x for 219, Transfers' place
+after Event Log unchecked (10a Rulings 14); the Sessions tree's separators at 148 and 248 for 166 and 293 with
+right-aligned Host and Port, the Tunnels cell positions, the SFTP row, table and chooser details, Add Host's 106 px keys
+box, "No keys" line, placeholders and disabled buttons, the HTTP tag's ink `#2F65CA` for `#2655AE`, the File Servers
+status dot, ink and Address alignment, the keys table's 22 px empty body and 7 px title inset, and inks no check sees
+(New File Server's "Authorized keys" label and empty key lines `#5C6370`, the combo's address unmuted, SFTP's Modified
+values `#1E1F22`, the selected tree row's idle dot) (10a D3 to D22); the Vault status row's one 18 px `#C4C7CC` cell rule
+for the mock's two full-height `#D3D6DA` (SDK 0.19), its round 7 px dot, the Details' Show and Copy 24 tall for 20, the
+Details column `#F7F7F8` for `#ECEDEF` (ΔE76 3.6), the sheets' first group rule 18 below the strip for 16, plain kind
+glyphs in the tree and hued ones in + New where the mocks draw swatches (SDK 0.19), the toolbar's 14 px "+" setting New
+and its ▼ 1.5 right and the shortcut 2.5 right, the Fields values at 619 for 614.5, a selected row's Name swatch lost in
+the selection where the mock outlines it, the tree's texts at 50 and 58 for 39 and 53, Unlock's field at 126 for 117,
+and Cancel and Save 58 and 54 wide for 69 (10b). Face residuals with no mock behind them: a disabled classic dropdown
+faded twice, a disabled button on a selected row faded as one layer, a classic checkbox row 1 px left of the labels in
+SETTINGS and MIXED cards (4b), and the classic radio's focus halo clipped by 2 px (4b, 4c).
+GUI checks for the user (spec 16.2), Enterprise on unless stated. Window chrome: Light and Dark against the
+Workstation and Dark Mode mocks; the macOS in-window menu bar, native title and About in Help; menus folding into "…",
+then ☰; the toolbar row giving way as the window narrows; many tabs; a configuration warning cell; Compact keeping the
+menu row; nothing moving with animations on; turning Enterprise off brings Slate Cobalt back without a warning; with IBM
+Plex installed, the look's Warning names the hidden files; in the default look, the menu bar's Session and Transfer menus
+(no SSH menu; Transfer reads Share Folder…, New File Server…, —, Open SFTP here, Transfers), the Vault status item
+locking and unlocking, the palette's three recent rows. Dock: stripe drag and drop including the bottom strip; the
+stripes' numbers after a Keymap change; the focused header strip (Catppuccin included); the header action glyphs;
+Enterprise Dark's dock against the Dark Mode mock; the default slots on a fresh Enterprise start; Transfers and Cmd+Option+3. Run
+window: open it with Cmd+Shift+P, "▶ Run…" (shown active while open) and Search everywhere; drag it, drop it near its home and
+below it (it re-attaches) and elsewhere (it stays, and a new window opens it there); double-click its title; a clicked
+pane takes the keys while it stays; its title row or help text gives the keys back; tab switches and other applications
+leave it open; Escape, ×, Cancel and running a row close it; Browse… opens a file and it stays. Settings: the native
+"Settings" title, the strip, the triangles; a right-click on a modified row, a Notifications row and a plugin page's
+setting row; the Keymap's recording band and Find by Shortcut; the Plugins page's checkboxes and ⋯; Add Variable… and
+its sheet with variables in the table; in the default look, Command Palette, Terminal and System Settings' first
+headings and Project Index's ordered lists. Plugin compositions: the Workstation window (the toolbar view's combo and
+Connect, the Sessions tree's star and Properties, the Tunnels and File Servers tables' activation and context menus, the
+SFTP row); Add Host; New File Server (in the default look too: TFTP's read-only login, FTP's Warning notice, Choose…
+setting the folder); the Vault manager against the Item selected and New menu mocks (sorting, the tree's collapse, Show
+and Copy, the toolbar's verbs while locked), Add Login, Add SSH Key and Unlock Vault; the Licenses and Errors windows'
+list width; a plugin window without a menu row closing with Cmd+W, and the default look's File row unchanged. Dialogs:
+Unlock Vault over a terminal window and Add Login over the Vault window (Escape, a second dialog over the first, the
+window closing under them, full screen, either requested over a minimised window opening natively; an in-window classic
+dialog blocks only its window, a known residual); the file chooser (Browse…, File › Open File…, which opens the file in
+the default editor and nothing on Cancel), Create Vault, About Jasper and Remote's "Items already exist". Splash and
+icon: on a cold start the splash appears centred, unfocused and crisp, with no light flash, the art, icon, version line,
+steps and bar, and closes as the first window shows; a start failing after it opened leaves none; none with
+`--background`, `--no-window` or `--safe-mode`, nor in the default look; the Dock icon is Enterprise's in packaged and
+development builds, also when a `--background` resident opens its first window and after Quit then reopen. Windows and
+Linux: the NATIVE title and what the caption shows under Enterprise Dark (6a Rulings 32: `DWMWA_USE_IMMERSIVE_DARK_MODE`
+or not); Settings without the title-bar and animations rows; the window icons are Enterprise's; Ctrl+W closes a plugin
+window without a menu row. Not merged, not pushed.
+
+**Enterprise presentation, plan 10b: the Credential Vault composition — 2026-10-18**
+(`claude/enterprise-plugin-compositions`, worktree `.claude/worktrees/enterprise-10`, `6cd4d80cf..5c6808c56`, then this
+documentation commit; [plan](superpowers/plans/2026-10-16-enterprise-10b-vault-compositions.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Under the Enterprise look the Vault
+manager is the 07 mocks' classic window (820 × 571, no title actions): a toolbar row (New with the add menu, Edit…,
+Delete, Copy Username, Copy Password, Lock Vault and its shortcut, the search) over a Categories tree with counts, a
+sortable Name/Username/Type/Modified table with swatches and an "N of M items" footer, and a Details pane (swatch, name
+and method, a Fields group, the untitled Properties Modified and Used by, Edit… and Delete…), with the status row (lock
+state, auto-lock, vault file) beside Done; the add and edit sheets carry their kind's swatch, drop the prompt hero, title
+their groups and label the method; Unlock Vault puts the tile beside the intro and the auto-lock in its footnote. Under
+the classic look every auxiliary frame shows no menu row and binds Close Window's key on its root pane
+(`ShellChrome.frameMenuRow`, `NativeShells.bindCloseWindow`; the orchestrator's ruling, spec 10.1 amended).
+jasper-ui gains two face pairs: `SeparatorFace` (buttons point: 18 px `border.window` separators, document-split
+hairlines and manager column edges, pane header strips) and `RevealFace` (toggle point: Show, Show password, Show and
+Copy); a document split fills with a Split child; the bar's search width and the classic manager's widths and bar
+padding are catalog roles. `ClassicVaultRenderTest` renders the staged Vault under the shipped kit, Plex and theme
+against the five mock crops (bands, colours, edge agreement: the manager 0.732 with nothing selected, 0.849 with a login
+selected; Add Login 0.787; Add SSH Key 0.734; Unlock Vault 0.633; every floor 0.55); `tools/visual/pairs.json` gains the
+five `composition-light-vault-*` pairs, which `check_pairs.py` passes; `CompositionParityTest` checks every rows
+gesture's classic path. Rulings (plan, "Rulings"): (1) the reveal follows the `toggle` point (a "Show" checkbox after an
+input, "Show password" under a prompt's field, a discreet input's always, "Show" and "Copy" buttons on a stored value);
+(2) the rules follow the `buttons` point (18 px `border.window` separators, hairlines and column edges); (3) the classic
+manager is one WINDOW section, a document split of the toolbar row over the three columns, which a document split now
+fills with its first Split child, and the window has no title actions; (4) the classic manager catalog: sidebar 171,
+list 348, a 34 px bar with a 200 px search (the Editor's document bars and the File Servers' and Tunnels' broken-file
+notes take the same values); (5) swatches
+where SDK 0.18 carries them (the Name cells, the Details heading, the editors), plain kind glyphs in the tree and hued
+glyphs in the + New menu (a residual for SDK 0.19); (6) "Used by" lists the plugins granted the entry by their ids' last
+segment, else "Not used"; (7) "Private key" and "Public key" in sentence case under CLASSIC only; (8) the Lock Vault
+caption is the action's default binding as the platform writes it; (9) the tree shows counts and All Items stays
+expanded unless collapsed; (10) the classic editors drop the prompt hero, title their groups "Login", "Authentication",
+"SSH Key" and "Secure Note" and label the choice "Method"; (11) Unlock Vault: the tile beside the intro, "Master
+password" in the label column, "Show password", the footnote "Auto-locks after <n> min idle", none when auto-lock is
+off; (12) the manager window is 820 × 571 (content); (13) the residuals below; (14) under a classic look an auxiliary
+frame shows no menu row and Close Window's key stays bound (supersedes 6a ruling 31). Execution notes (2026-10-17) R1 to
+R20. Execution deviations (plan banner): to meet the mocks the host also gives a document bar's menu button the panel
+action size and its search a field's height, puts a classic document split's rule between bar and body
+(`DOCUMENT_RULE_GAP`) and a classic window form's footer band on `surface.footer`; starts a classic manager rail 4 under
+its strip (`COLUMN_RAIL_TOP`, R11) and a list column's table at its header band on `surface.card`, with a 20 px
+`surface.zebra` text footer; draws a manager detail's titled group (its FORM card of label and value rows) as a grid
+(`DETAIL_GRID_INSET`, `DETAIL_GRID_TOP`, `ClassicGroupFace.GRID_EDGE`), with classic `DETAIL_PADDING` and
+`DETAIL_SECTION_GAP` 12 and `ICON_SWATCH` 10 (12 in the default catalog); starts a sheet in a classic dialog's card at
+`FORM_TOP` with classic `SHEET_SECTION_GAP` 10; and takes the mock's compact prompt (`PROMPT_COMPACT_WIDTH` 400,
+`PROMPT_SIDES` and `PROMPT_TOP` 14, `PROMPT_COMPACT_INTRO_GAP` 12, `PROMPT_FIELD_HEIGHT` 22); every Fields row has its
+Copy (`CopyCards.plain` for the non-secret ones, announcing a key row's copy as the key's path); the Unlock hero is a
+`PROMPT_HEADER` stack and the status row a FOOTER stack (the plan says INLINE for both). Final review fixes: a document
+bar's flat verbs take `text.primary` (disabled `text.secondary` at half), `DOCUMENT_BAR_BUTTON_PADDING` 7 and
+`DOCUMENT_BAR_RULE_GAP` 7 beside its rules, its menu a drawn ▼ one icon gap after the label, and a caption right after a
+button (Lock Vault's shortcut) follows it without a gap in `text.placeholder`; the Fields grid's labels drop the colon in
+`text.secondary`, its label column is the widest label, its rows' actions share one lane (`DETAIL_GRID_TRAILING` 4,
+`DETAIL_ACTION_PADDING` 6, classic `DETAIL_ACTION_GAP` 4) so the mask keeps 12 dots, and a manager detail's row of text
+buttons is at least `DETAIL_ACTION_MIN_WIDTH` 86 wide; the Type column shows a login's method ("Password"), as the Item
+selected mock's cells do, and the kind for keys and notes; a prompt over a classic band keeps the footnote gap only with
+a footnote; the file chooser's Places and listing, host columns (`KitView.managerColumn`), keep their flat rail and pane.
+Residuals: Rulings 13's (the status row draws one cell rule, 18 px `#C4C7CC` where the mock draws full-height
+`#D3D6DA`, and not the mock's second before the path: SDK 0.18 lets a Separator stand only in an INLINE or ACTIONS stack,
+and an INLINE row would squeeze its cells rather than elide the path, a residual for SDK 0.19; its cells paint
+`text.tertiary` `#5C6370` where the mock has `#3A3D42`, which no SDK text role paints; the round 7 px status dot; the Details' Show and
+Copy at `BUTTON_HEIGHT` 24 where the mock draws 20; the Details column `#F7F7F8` where the mock has `#ECEDEF`, ΔE76 3.6;
+the dialog header strips and frames are plan 6's); the sheets' first group rule stands 18 below the header strip where
+the 07 sheets draw 16 (10a's `FORM_TOP` 10 stays, R13); the Unlock tile is 30 × 30 at (14, 14), as the mock's crop
+measures. Final review residuals (logical px, render vs mock): the toolbar's + glyph is the 14 px control icon where the
+mock's is smaller, so New and its ▼ stand 1.5 right, and the shortcut 2.5 right in a heavier ⇧ (owner 4b's button face);
+the Fields values start at 619 vs 614.5 (`COLUMN_GAP` 12); a selected row's Name swatch vanishes into the selection
+where the mock outlines it in white (owner 4c's table face); in the tree All Items' text stands at 50 vs 39 and the
+kinds' at 58 vs 53 (owner 4c's tree face); Unlock's intro paints `#1E1F22` at (59, 24) where the mock has `#3A3D42` at
+(55, 18), which no SDK text role paints, and its field starts at 126 vs 117 (owner 6b's prompt face); the sheets' fields
+start at 142 vs 121 (classic `FORM_LABEL_WIDTH`, R13's precedent keeps 10a's value); the dialogs' Cancel and Save are 58
+and 54 wide where the mock draws both 69 (owners 4b and 6b). No floor was lowered. The classic `MANAGER_LIST_WIDTH` 348 also sizes the Licenses and Errors windows' list
+column under Enterprise (R12); the classic `COLUMN_RAIL_TOP` 4 also starts the Enterprise file chooser's Places and
+listing 4 under their headers (8 before); the classic `PROMPT_SIDES`, `PROMPT_TOP` 14 and `PROMPT_FIELD_HEIGHT` 22 reach
+every Enterprise prompt (Create Vault, About Jasper, Remote's "Items already exist" and any in-window prompt), and
+`PROMPT_COMPACT_WIDTH` 400 every compact one; a DOCUMENT bar's menu buttons take the panel action size, as its buttons
+already do, under every kit (no bundled default-look bar has one). For the user: decision 17's sentence case for
+"Private Key" and "Public Key" in the default look is not applied (Rulings 7); the classic Type column shows a login's
+method where no ruling covers it (the final review's reading of the Item selected mock). The default look is byte-identical (gallery PNG digests unchanged; only three
+component-tree dumps per theme name the anonymous `SecretFields$SecretControl$2` where they named `$3`, since one
+anonymous class moved into `DefaultRevealFace`; no default render changed; the final review fixes' roles and face methods
+are unused by the default faces, and the gallery was not re-run for them). `./gradlew check --continue` after the final
+review fixes: **11,422 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the Enterprise Vault manager against the Item
+selected and New menu mocks (sorting, the tree's collapse, Show and Copy, the toolbar's verbs while locked), Add Login,
+Add SSH Key and Unlock Vault; under Enterprise, a plugin window without a menu row closing with Cmd+W (and Ctrl+W on
+Windows and Linux), and the default look's File row unchanged; the Licenses and Errors windows' list width under
+Enterprise; under Enterprise, the file chooser (Browse…, File › Open File…), Create Vault, About Jasper and Remote's
+"Items already exist". Not merged, not pushed.
 
 **Ubuntu Yaru theme — 2026-10-17** (`codex/ubuntu-yaru-theme`). Built-in `ubuntu-yaru` Light and Dark, adapted
 from Yaru `26.04.5.1ubuntu`: neutral GTK surfaces, orange actions and focus, matching terminal and editor palettes.
@@ -22,7 +3139,7 @@ published, ROWS otherwise, including when Enterprise is not installed); `verifyP
 `dev.jasper.enterprise.api` to those packages. Under the Enterprise look Remote contributes the "Session: [combo]
 [Connect]" toolbar view, the Sessions panel is a Name/Host/Port tree over Properties, Tunnels a Type/Local/Remote/Via
 table, SFTP's tools read Hidden files and Upload over a Modified column (disconnected: Choose Session… over "Not
-Connected"), Transfers a bottom panel shown by ⌘⌥3, and the panels start Sessions and Tunnels right, SFTP and File
+Connected"), Transfers a bottom panel shown by Cmd+Option+3, and the panels start Sessions and Tunnels right, SFTP and File
 Servers left; File Server's panel is a Folder/Address/Status table over Properties and New File Server lists keys as a
 table; Add Host's keys read "No keys". Classic Properties (jasper-ui) follow the table point: the Workstation grid when
 titled, label-colon lines when untitled. `ClassicCompositionRenderTest` renders every surface from the staged plugins
@@ -71,7 +3188,7 @@ re-measures `FORM_TOP` and `MIXED_ROW_GAP` against the 07 in-window sheets. The 
 `./gradlew check --continue` (after the final review's fixes): **11,308 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the
 Enterprise Workstation window against the Workstation and Dark Mode mocks (the toolbar view's combo and Connect, the
 Sessions tree's star and Properties, the Tunnels and File Servers tables' activation and context menus, the SFTP row,
-the Transfers panel and ⌘⌥3, the default slots on a fresh Enterprise start), Add Host and New File Server. Not merged,
+the Transfers panel and Cmd+Option+3, the default slots on a fresh Enterprise start), Add Host and New File Server. Not merged,
 not pushed. Merged with main (plans 8b and 9b) as `567ac7b2e` (textual conflicts only in STATUS.md and
 migration.csv; no classic value changed on both sides, so the role enum and both role tables keep 8b's
 `RUN_WINDOW_HOME_SIDE`, `RUN_WINDOW_HOME_BOTTOM` and `RUN_WINDOW_BUTTON_PADDING` and 9b's Keymap, keycap and list roles
@@ -243,9 +3360,9 @@ palette scopes specifications carry spec 19.2's banners. Deviations: (a) Task 2:
 before, and the headless gallery's files for Slate Cobalt Dark and Light (322) are byte-identical to the base. `./gradlew check --continue` after the final review fixes: **11,265 tests, 0 failures, 0 errors, 25 skipped**
 (the base's 11,240, this plan's 20 and the final review's 5). A
 selected result's title and tag take the text-aware face (Plex has no ⌘): the Enterprise print's selected row reads ⌘T.
-Open for the orchestrator: the 06 mocks paint the active "▶ Run…" status cell #D9DFEA, the code spec 10.6's
-`surface.control.selected` (#D7D9DC in Enterprise Light). GUI checks for the user (spec 16.2): with Enterprise on, open the Run
-window with ⇧⌘P, "▶ Run…" and Search everywhere; drag it by its title, drop it near its home and below it (it
+Under ruled cells the open Run window's "▶ Run…" paints `surface.header.active` (the 06 mocks' #D9DFEA; Dark #3D4658), not
+spec 10.6's `surface.control.selected`, which slash segments keep (orchestrator ruling, mock wins; `WindowPairs.ACTIVE_RUN`). GUI checks for the user (spec 16.2): with Enterprise on, open the Run
+window with Cmd+Shift+P, "▶ Run…" and Search everywhere; drag it by its title, drop it near its home and below it (it
 re-attaches) and elsewhere (it stays, and a new window opens it there); double-click its title; click a terminal pane
 and type (the pane takes the keys, the window stays); click the Run window's title row or help text and type (the keys go to
 the Open field); switch tabs and focus another application (it stays); Escape in
@@ -357,6 +3474,9 @@ derived role moved); `EnterpriseFirstWindowTest` asserts Event Log at Bottom Lef
 stripe pairs' tile colours are the shipped theme's; all 75 `check_pairs.py` pairs pass (the 25 dock pairs 0.982 to
 1.000) and the default look is byte-identical (gallery, 322 files, and `DefaultDockPixelsTest`); merged counts, with
 the side labels at the outer edge (`97abf5932`), **11,240 tests, 0 failures, 0 errors, 25 skipped**.
+Changed on 2026-10-18 at the user's direction (the side-stripes entry at the top): the side stripes fit their labels,
+centred, whatever `window.rail_width`, and the second group stands at the stripe's bottom end, so Rulings 4's side
+thickness, Rulings 7 (the rail actions now follow the top group) and Rulings 21 no longer hold.
 
 **Enterprise presentation, plan 9a: the Settings chrome — 2026-10-17** (`claude/enterprise-settings`, worktree
 `.claude/worktrees/enterprise-9`, `87e894a99..82633dd6c`, then this documentation commit;
@@ -478,6 +3598,15 @@ are the Enterprise icon from the splash on; in a packaged Enterprise build, the 
 a `--background` resident opens its first window and after Quit then reopen; no splash with `--background` (the resident's later windows still carry the icon), `--no-window` or
 `--safe-mode`; a start that fails after the splash opened leaves no splash behind; the default look shows no splash and
 Jasper's icon. Not merged, not pushed.
+
+2026-10-19 splash flicker fix: each step is completed in an offscreen image at the window graphics' actual X/Y
+scale and copied once, retaining fractional HiDPI resolution, origin and clipping. Merging with local `main` on
+2026-10-20 kept the boot splash's `SplashBuffer` (the boot-splash entry above), which also draws off screen at the device
+scale and copies only the step's line and the bar; `SplashPainter.frame` went, and `SplashFrameTest` now checks
+`SplashBuffer` on an offset, clipped target at the same seven scales. All 23 splash tests pass;
+independent review found no actionable issues. Serial `./gradlew check --continue`: Java XML **11,454 tests, 0 failures, 0 errors, 26 skipped**;
+only the previously documented `checkThemeTool.test_deeply_nested_input_is_a_message` assertion fails.
+Native Windows/Linux startup acceptance remains user-run.
 
 **Enterprise presentation, plan 5b: the Enterprise plugin — 2026-10-17** (`claude/enterprise-provider`, worktree
 `.claude/worktrees/enterprise-5`, `4b373d85b..45616955d`, then this documentation commit and the final review's fixes;
@@ -739,7 +3868,7 @@ every `finally { themes.close(); EnterpriseLook.restoreDefault(); }`. At the mer
 with plan 5b, `EnterpriseLook` takes the shipped kit, faces and theme, `enterprise-fixture.json` goes, and
 `EnterpriseMenuRowMockTest` runs again under Plex. `./gradlew check --continue` after the final review fixes: **10,809 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user (spec 16.2), which wait for plan 5b's Enterprise
 or run now under a development plugin whose kit says `title_bar = "native"`, `menu_bar = "window"`, `motion = "none"`
-(`--plugin-dir`): the macOS in-window menu bar and native title (⌘W in a plugin window, its classic File row, About in
+(`--plugin-dir`): the macOS in-window menu bar and native title (Cmd+W in a plugin window, its classic File row, About in
 Help), Windows and Linux NATIVE and what the Windows caption shows under a dark theme (Rulings 32), Compact keeping the
 menu row, nothing moving with animations on. Not pushed.
 Merged with main (plans 4b and 8a) as `bff0edae2`: the `Role` enum, `compact-roles.tsv` and `classic-roles.tsv` take
@@ -1409,7 +4538,7 @@ first failed in the app: the folder loads off the EDT, so the list was hidden wh
 focused Refresh (ring shown, cause ACTIVATION). The dialog's traversal policy now has no initial component, and the
 chooser focuses the list when it appears (the search field for an empty or unreadable folder) unless the user
 focused something meanwhile; GUI check pending. Hidden items (user's ask, both browsers): the chooser's tools row
-has a **Show hidden items** toggle (the saved choice Cmd/Ctrl+Shift+. already toggled); the SFTP browser (and the Copy
+has a **Show hidden items** toggle (the saved choice Cmd+Shift+. / Ctrl+Shift+. already toggled); the SFTP browser (and the Copy
 to host picker) gains the choice, off by default, remembered as `sftp_show_hidden` in Remote's `panel-state.toml`,
 filtered in `DirectoryCache` so pages and counts stay right. New kit glyph `hidden`; SDK 0.17.1 (the testkit mirrors
 it). Then the active-tab line (user's ask): new format roles `tab.indicator` (focused window) and
@@ -1516,7 +4645,7 @@ when the command is installed; a dangling `jasper` link counts as Jasper's own o
 `Resources/bin/jasper` or `lib/bin/jasper`, any other asking first; `jasper editor` also completes when a tab closes
 while its file is still loading; from the final review, the cold start on Linux runs from the home folder without the caller's `GIT_*` variables and on Windows with the user's default environment, the client refuses a request over 1 MiB (exit 2), a plugin that stops ends its calls in flight (exit 1), and connections that end before the first call never make a `--no-window` Jasper quit. Known limits: a relative `JASPER_HOME` resolves against the home folder in a cold start; a shell that outlives its Jasper's `commands-<pid>` socket (tmux) waits on that dead socket. `./gradlew check --continue`: **9,928 tests, 0 failures, 0 errors, 12 skipped**; after merging `main`:
 **10,108 tests, 0 failures, 0 errors, 12 skipped**. No GUI launched. GUI checks for the user: in a dev run's
-shell, `jasper-app/build/cli/bin/jasper editor --wait notes.txt` and Ctrl-C; on the packaged macOS app, Install (the
+shell, `jasper-app/build/cli/bin/jasper editor --wait notes.txt` and Ctrl+C; on the packaged macOS app, Install (the
 administrator prompt), then from iTerm `jasper editor --wait notes.txt`, `git config --global core.editor "jasper editor
 --wait"` and `git commit`, with Jasper resident, not resident and not running, `jasper` alone, and `jasper --help`; on
 Windows, Install, a new terminal, and `jasper editor --wait` bringing Jasper to the front; on Windows and Linux,
@@ -1679,7 +4808,7 @@ Rebased onto `main` (f8bd2c41) and merged to local `main` (not pushed). `./gradl
 **9,795 tests**, whose only failure was the `SftpChooseSessionTest` flake that `main`'s c6523372 then fixed; after
 rebasing onto that fix, `:jasper-plugin-remote:check` passes (0 failures, 8 skipped overall). An independent review found one Important issue (the
 last panel restored in Zen was saved as hidden until the next dock change), fixed with a regression test, and doc nits,
-fixed. No GUI launched. GUI checks for the user: in Zen, Cmd+Alt+1 and View › Tool Windows show a panel with no rail
+fixed. No GUI launched. GUI checks for the user: in Zen, Cmd+Option+1 / Alt+1 and View › Tool Windows show a panel with no rail
 (frame corners and insets as with View › Rail hidden); a divider drag in Zen; leaving Zen restores the earlier layout;
 quitting and relaunching in Zen; the new commands from the palette; Add and Connect in the Add Host form; one rail
 hidden (the borderless, square side), the placeholder over the terminal's edge while dragging to an empty side, and a
@@ -1687,8 +4816,9 @@ drop there showing the rail. Not pushed.
 
 **Enter's verb in the palette hint bar — 2026-10-13** (`claude/palette-enter-hint`, worktree
 `.claude/worktrees/palette-enter-hint`; bounded change, design approved in chat, no spec or plan). In a scope with two or
-three verbs the hint bar now lists every verb with its key, Enter's first ("Copy password ⏎ · Copy username ⌘⏎ · Open
-in Vault ⇧⏎"), so the Vault's password copy shows a key; a click on Enter's link runs the first verb. Single-verb scopes
+three verbs the hint bar now lists every verb with its key, Enter's first ("Copy password Enter · Copy username
+Cmd+Enter · Open in Vault Shift+Enter" on macOS, Ctrl+Enter elsewhere, the keys drawn as symbols on macOS), so the
+Vault's password copy shows a key; a click on Enter's link runs the first verb. Single-verb scopes
 (Commands) still show only the row's detail. This replaces the search-everywhere spec's secondary-verbs-only hint bar
 (user decision). A test pins that the longest bundled set (Files: Open, Copy path, Open terminal here) stays on one line
 at the 560 px anchored minimum on macOS and elsewhere. `./gradlew check --continue`: **9,776 tests, 0 failures, 0 errors, 8 skipped**. No GUI launched.
@@ -1851,7 +4981,7 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
 
 **Task9b and fix1 independently approved through `f4b9d4ee`.** Scoped re-review found I1/I2/I3/M1 addressed and no new findings. Physical recorder/popup/focus/appearance and all source/pixel acceptance remain open. The older9b handoff below is historical implementation evidence, superseded for review status by this approval.
 
-**Historical Task9b fix round1 handoff (now independently approved through f4b9d4ee; native/pixel acceptance pending).** Ordinary Keymap recording passes bare Tab/Shift-Tab and owned auxiliary-button Space to Swing while search/literal modes preserve all-key capture. Popup presses retain independent physical ownership through dismissal/selection tails and clear on owner teardown. Tree-detail updates preflight registered artwork throughout the full descriptor, including lazy rows/menus, before touching retained controls. The focused same-ID rejection regression preserves the original action, component, document, selection and focus, then accepts a valid update. M1 adds only the missing artwork parameter documentation. Exact causal tests, failed headless harness attempts, frozen gate/capture evidence and final outcome are recorded in scratch `.superpowers/sdd/2026-10-04-theme-engine-3-surface-refactor/task-9b-fix1-report.md`. The traversal fixture uses AWT container-order enumeration with Swing eligibility and supplies OS focus transfer; it is not native LayoutFocusTraversalPolicy/keyboard proof. Independent scoped re-review is approved; all native/pixel acceptance remains open. EarlyTask10 ordering and all carried visual debt remain unchanged; no SDK/API expansion, GUI, AOT, push or merge.
+**Historical Task9b fix round1 handoff (now independently approved through f4b9d4ee; native/pixel acceptance pending).** Ordinary Keymap recording passes bare Tab/Shift+Tab and owned auxiliary-button Space to Swing while search/literal modes preserve all-key capture. Popup presses retain independent physical ownership through dismissal/selection tails and clear on owner teardown. Tree-detail updates preflight registered artwork throughout the full descriptor, including lazy rows/menus, before touching retained controls. The focused same-ID rejection regression preserves the original action, component, document, selection and focus, then accepts a valid update. M1 adds only the missing artwork parameter documentation. Exact causal tests, failed headless harness attempts, frozen gate/capture evidence and final outcome are recorded in scratch `.superpowers/sdd/2026-10-04-theme-engine-3-surface-refactor/task-9b-fix1-report.md`. The traversal fixture uses AWT container-order enumeration with Swing eligibility and supplies OS focus transfer; it is not native LayoutFocusTraversalPolicy/keyboard proof. Independent scoped re-review is approved; all native/pixel acceptance remains open. EarlyTask10 ordering and all carried visual debt remain unchanged; no SDK/API expansion, GUI, AOT, push or merge.
 
 **Historical Task9b implementation handoff (review superseded by approved fix1; native/pixel acceptance pending).** Task9a and fix1 are independently approved through `6409ace0`. Actual Keymap now owns one inline tree detail, shared keycaps/input-like recorder, embedded search Record and native read-only input, while retaining staged Apply, conflict consent and physical-event ownership. Actual Plugins rows/identity header, Settings Tools navigation and notification owner headings receive declared immutable SVG/PNG through one safe engine decoder. Runtime prepares shared values on its management worker; failed decorative art falls back generically. Shared identity geometry, receiving sampling, constrained keycaps/actions and split separator preserve owner state and raw/custom artwork contracts. The exact contracts, evidence and retained source differences are recorded in the Settings amendment, calibration ledger and scratch `task-9b-report.md`; final gate outcomes live in that report. No native or pixel acceptance is claimed. After independent9b approval, the bounded original-art foundation portion of existing Task10 runs **before9c/6–8**, including the carried declared identity-hue contract; remaining Task10 integration and Task11 typography/native work stay open. No Task10 catalog, routing or manifest-key change is included here. Zero pages accepted; locked-desktop physical recorder/popup/focus/appearance checks remain controller-owned.
 
@@ -1880,7 +5010,7 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
 - **Plan3 Task2b implementation independently approved through `02eb78e4`; visual completion remains open (2026-10-10).** Grouped Add Host uses the real Vault-owned DEFAULT28 picker, preserves single-clear versus managed-key append intent and ordered UUID selection, and reflects actual validation/persistence busy/error. Shared Form submission policy preserves older defaults while allowing primary appearance with Enter opt-out; TECHNICAL fields and MONO_CAPTION carry technical typography. Retained Form traversal after close is fixed, with actual staged Login/path-key Cancel and completed Import Close containment regressions. Independent review found no new actionable code defects and confirmed824 affected tests, zero failures/errors/skips. V1 keeps the measured heading/card/list/settings geometry and picker artwork corrections open; native ink and fresh teardown/keyboard verification remain required. A signed isolated Host-a bundle at this commit passed headless package verification with AOT disabled; native launch is pending because the Mac is locked. Task3 may proceed using the reviewed contracts and must recheck affected form families when shared geometry changes. No page is accepted.
 - **Task2a status supersedes historical bullets below:** cf8e163c fix1 independently approved; I1–I4 addressed. Controller observed all four Login/path-key Save/Cancel transitions return to the same query and captured all six compact states. Native Cancel warnings and completed Import Close blank shell exposed the additional shared closed-focus-policy defect addressed in Task2b; fresh native verification remains required. Native/headless query/footer ink divergence and transient enlarged footer truncation remain explicit investigation items, without a font-policy workaround.
 
-## Current state — 2026-10-10
+### Theme engine status — 2026-10-10
 
 - **Theme engine Plan2 independently approved through `0b367eee`; Plan3 Task1 implementation approved through `83d2435c`.** Original migration review findings are closed. Task1's I1 annotation projection, I2 strength spacing, I3 enlarged warning and inherited C1 font scaling fixes passed scoped independent re-review with no new breakage. UI446/app31/SDK64/testkit135/Vault160 pass, zero failures/errors, one existing Keychain skip. These are scoped counts; last full migration gate was9,658 tests, zero failures/errors, six skips.
 - **Fixed-head native E checks passed.** Actual Create default800×896 and system20 1200×1350 show the full warning; same-size Serif refresh and physical keyboard focus/drafts survive font changes/reset. Actual standalone Unlock760×568 and wrong-password760×648 preserve visible error, clear/focus/readiness and successful recovery. Synthetic Vault header confirms unbound; config restored and isolated QA quit. Full original frames/AX/hashes/equal-scale ICC overlays remain in Plan3 SDD native E evidence. **No page is pixel-accepted:** font ink/baseline, palette/disabled-opacity and native chrome residuals remain, alongside all other pages. Fixture cleanup warning M1 remains Task11 hygiene.
@@ -2639,7 +5769,7 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
   verifyUiDistribution confirm the application engine jar and isolate all seven plugin runtimes.
   Task 14 initial headless repository verification and audit completed before review: fresh `./gradlew check --rerun-tasks` passed in **5m 6s**, **99/99 tasks executed**.
   Across **681 XML files**: **9,043 tests, 9,037 passed, 0 failures, 0 errors, 6 skipped**; per-module
-  counts in [UI maintenance](ui-maintenance.md). All five architecture gates and UI/SDK doclint passed.
+  counts in [UI maintenance at `ef03625b4`](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/ui-maintenance.md#combined-final-review-fix-verification). All five architecture gates and UI/SDK doclint passed.
   All 26 module/SDK nodes have real renderer/exhaustive host branches; eight events and 14 node enum
   vocabularies match. The two unreachable unsupported-renderer defaults are removed, making creation
   and validation compile-time exhaustive. The [exact temporary-path ledger](design/theme-engine/temporary-paths.md)
@@ -2725,7 +5855,7 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
   `git ls-files` (with `core.fsmonitor=false`, never in a home-folder work tree) or a folder walk skipping excluded
   names, capped at 200,000 files, saved under the plugin's data directory and refreshed when a pane re-enters the
   project or a command finishes there (5-minute throttle, 3 s debounce). The palette's **Files** scope (Go to File,
-  ⌘P / Ctrl+Alt+Shift+P) ranks exact, prefix, initials, substring and path matches with the current project first and
+  Cmd+P / Ctrl+Alt+Shift+P) ranks exact, prefix, initials, substring and path matches with the current project first and
   opens files in the Editor, copies paths or opens a terminal there. File › Index Folder… and the Settings page add
   folders by hand. Deviations from the spec: `data/projects.toml` instead of JSON (no JSON library is bundled); user
   guide [`docs/project-index.md`](project-index.md) instead of a plugin README; Linux/Windows Go to File is
@@ -2882,6 +6012,13 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
   `./gradlew check --continue` on main passed **8,771 tests, 0 failures, 0 errors, 6 existing skips**.
   Previews are preserved in the main checkout under `jasper-app/build/flat-tabs-preview/`.
   The managed worktree is archived after verification. No push performed.
+
+- **Editor fonts and Markdown preview** (2026-10-20; `codex/editor-markdown-preview`): written spec approved.
+  Local main `34aa868fe` merged as `c74465f5d`; the [implementation plan](superpowers/plans/2026-10-20-editor-fonts-markdown-preview.md)
+  is approved for subagent-driven implementation and per-task review; all 13 tasks implemented and independently reviewed; whole-branch review and scoped re-review passed through `59e790a6c`. Thirteen tasks cover SDK typography, independent/followed
+  fonts and source geometry, current semantic-icon toolbar, native Markdown rendering, provider-relative resources,
+  mode persistence, focus/search/navigation and linked scrolling. Refresh replaces the removed icon enums with
+  semantic names and targets SDK 0.18.3, Editor 0.11.0 and Remote 0.15.1. Headless baseline passed using Python 3.13 for the theme-tool test. Task 3 uses a uniform configured-font line box, preserves the stock gutter, and adapts physical Vim geometry; its review fixed syntax invalidation, bidi caret mapping and repeated layout costs. Task 13 measures full-limit, dense and multiple-preview fixtures and fixes native break/attribute scans, repeated preferred-size invalidation and unsliced anchor rebuilding. Warm maps now rebuild in about 1 ms for giant/dense paragraphs; exact cold source layout still takes about 1.28/2.12 s and can recur after invalidation. The vendor Java tokenizer can delay worker cancellation about 27 s. See [verification evidence and pending native acceptance](editor-verification.md#fonts-and-markdown-preview); maximum-size responsiveness is not claimed. Before review fixes, full `check` passed with Python 3.13: **11,843 tests, zero failures/errors, 29 skips** (25 existing plus four opt-in performance tests, separately passed), and `sdkRelease` passed. After final fixes, **5,115 Editor tests, zero failures/errors, four opt-in skips**, all three architecture gates, and rebuilt `packageApp`/`verifyPackage` passed. Review fixes cover scroll intent across geometry retries, Find ownership across tab/pane changes, keyboard traversal out of Preview and stale-content labeling. Merged into local main as `048b58680`; independent conflict-resolution review passed. Full merged-tree `check` passed with Python 3.13: **11,866 tests, zero failures/errors, 29 skips**, all 150 tasks executed. Native acceptance remains pending. No GUI, AOT training or push.
 
 - **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
   second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.
@@ -3837,7 +6974,7 @@ launched, no AOT training. GUI checks for the user: move and resize a window, Cm
 
 - **Notifications plan 2: incidents and the Errors window, merged to local `main` (`c02673cd`); awaiting the user's
   GUI checks** (2026-10-02 to 2026-10-03; plan
-  `docs/superpowers/plans/2026-10-02-notifications-2-incidents.md`, [guide](notifications.md#the-errors-window)):
+  `docs/superpowers/plans/2026-10-02-notifications-2-incidents.md`, [guide](notifications.md#the-errors-tab)):
   uncaught exceptions on any thread, contained plugin failures, failed shell launches and failing notification
   actions are in-memory incidents (at most 100, coalesced by source, class and root-cause frames, traces taken on the
   catching thread and capped at 256 KiB). Each is announced by one ERROR notification in `jasper.errors`,
@@ -3901,7 +7038,7 @@ launched, no AOT training. GUI checks for the user: move and resize a window, Cm
   **7,930/0/0/6**, all architecture gates and 1,637-source hygiene pass; authored diff whitespace clean.
   Deferred minor: CoreSettings theme help still mentions runtime theme plugins; update with Plan 5 Import UI.
   No second review or desktop visual acceptance. User-only acceptance checklist:
-  [themes](themes.md#native-acceptance-for-this-upgrade-user-run). **Next: Plan 5**, the Themes page, staged preview,
+  [themes](design/theme-engine/acceptance.md). **Next: Plan 5**, the Themes page, staged preview,
   Import/Duplicate/Open/Remove UI and live file reload on the completed APIs.
 
 - **Hidden-rail terminal framing** (2026-10-01, user visually accepted): the terminal/tab column
@@ -3922,7 +7059,7 @@ s
   the final whole-branch review's five findings are fixed in `863ca6b9` and independently approved.
   All seven plugins audited: Remote/File Server/Vault/Editor
   custom renderers and rules use mounted-owner palettes; Vim error/bell styles remain plugin-owned; syntax and
-  configured yank colors stay unchanged. [Authoring audit](plugin-authoring.md#supported-custom-content) records
+  configured yank colors stay unchanged. [Authoring audit](plugin-ui.md) records
   precedence, exemptions, cleanup and progress text limitations (all three audited bundled bars draw no text).
   Recorded deviations: narrow public `setUI` stack detection plus silent UIResource default semantics; source-owned
   hierarchy observation of excluded associated headers/editors; failed mount/registry rollback and live unmounted
@@ -4041,7 +7178,7 @@ s
   tunnel on the same session holds is refused locally (MINA cancels by port on any failed request); palette verbs
   re-resolve the tunnel by id; `BundledSamplePluginTest` and `RemoteShortcutConfigTest` expectations count the new
   panel, toggle and status item; Remote is 0.10.0 because main already shipped 0.9.0. Follow-ups: Toggle Tunnels is
-  unbound (⌥⌘4 / Alt+4 would continue the approved panel series; needs the user's approval); the Tunnels panel's row
+  unbound (Cmd+Option+4 / Alt+4 would continue the approved panel series; needs the user's approval); the Tunnels panel's row
   operations are list keys, not yet Keymap panel actions like the Sessions panel's; half-close through a remote tunnel
   is untested against OpenSSH, and MINA's client cannot carry a target-first half-close (later client-to-target bytes
   are lost); stopping a remote tunnel while its port request is still in flight and restarting it at once on the same
@@ -4051,7 +7188,7 @@ s
   `./gradlew check` green after merging main (File Server FS-2): app 1471/0/1 (also after `:jasper-app:test --rerun`),
   terminal 391/0/4, Editor 4782/0/0, Remote 382/0/0, Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0,
   Sample 12/0/0, File Server 158/0/0, SDK 39/0/0, testkit 79/0/0 (7,669 tests in all, 0 failures, 6 skipped). GUI
-  checks pending with the user (`docs/remote.md`, Native acceptance for tunnels). Merged to local main 2026-10-01 (not
+  checks pending with the user ([`docs/remote.md` at `ef03625b4`](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/remote.md#tunnels), Native acceptance for tunnels). Merged to local main 2026-10-01 (not
   pushed).
 - **File Server FS-2: FTP/FTPS and TLS** (branch `claude/file-server-fs2`, plan
   `docs/superpowers/plans/2026-09-30-file-server-fs2.md`): File Server 0.2.0 serves FTP with explicit FTPS (Apache
@@ -4087,19 +7224,19 @@ s
   actions carry a context (Global, Terminal, a plugin's tabs, a panel, a window). The most specific applicable action
   takes a key; a key with no applicable action reaches the focused component (the shell, in a terminal pane), and so
   does a disabled action's key outside terminal panes. Built-ins have explicit macOS and Linux/Windows defaults; plugin
-  cmd+shift defaults get Alt outside macOS. Settings › Keymap has a Where column. Menu items show their shortcuts, but
+  `cmd+shift` defaults get Alt outside macOS. Settings › Keymap has a Where column. Menu items show their shortcuts, but
   only the root input map takes keys, so a key it declines never fires a menu item (Linux Ctrl+Shift+V in a text field
   no longer pastes into the shell). Linux Ctrl+Tab / Ctrl+Shift+Tab switch tabs before focus traversal can take them,
   from a text area, a table or a field too.
   SDK 0.11.0 (with File Server's `network.listen` and `Windows.onQuitting`): `ShortcutContext`, `ActionSpec.withContext` / `withDefaultBindings`, `FakePluginHost.actionSpec`;
   bundled plugins declare `sdk = ">=0.11.0, <0.12"`; Remote 0.9.0, Vault 0.4.0. **Moved defaults** (macOS / Linux and
-  Windows): Command Palette ⇧⌘P / Ctrl+Shift+P (was ⌘K / Ctrl+K); Clear Scrollback ⌘K, terminal only (was ⇧⌘K);
-  Close Pane ⌘W / Ctrl+Shift+W, closing the tab with its last pane (was ⇧⌘W / Ctrl+Alt+Shift+W); Close Tab ⌥⌘W /
-  Ctrl+Alt+Shift+W (was ⌘W / Ctrl+Shift+W); Rename Tab ⌘I / Ctrl+Shift+I (was F2); Reload Config unbound (was ⇧⌘R /
+  Windows): Command Palette Cmd+Shift+P / Ctrl+Shift+P (was Cmd+K / Ctrl+K); Clear Scrollback Cmd+K, terminal only (was Cmd+Shift+K);
+  Close Pane Cmd+W / Ctrl+Shift+W, closing the tab with its last pane (was Cmd+Shift+W / Ctrl+Alt+Shift+W); Close Tab Cmd+Option+W /
+  Ctrl+Alt+Shift+W (was Cmd+W / Ctrl+Shift+W); Rename Tab Cmd+I / Ctrl+Shift+I (was F2); Reload Config unbound (was Cmd+Shift+R /
   Ctrl+Alt+Shift+R); Linux Next/Previous Tab Ctrl+Tab / Ctrl+Shift+Tab (was Ctrl+Shift+] / [); Linux Quit
-  Ctrl+Alt+Shift+Q (was Ctrl+Shift+Q); SSH Sessions ⌥⌘1 / Alt+1 (was ⇧⌘S / Ctrl+Shift+S); new: SFTP ⌥⌘2 / Alt+2,
-  Transfers ⌥⌘3 / Alt+3, Open SFTP Here ⇧⌘O / Ctrl+Alt+Shift+O, Lock Vault ⇧⌘L / Ctrl+Alt+Shift+L; Open Vault
-  ⌘\ / Ctrl+Shift+\ (was F8). Deviations
+  Ctrl+Alt+Shift+Q (was Ctrl+Shift+Q); SSH Sessions Cmd+Option+1 / Alt+1 (was Cmd+Shift+S / Ctrl+Shift+S); new: SFTP Cmd+Option+2 / Alt+2,
+  Transfers Cmd+Option+3 / Alt+3, Open SFTP Here Cmd+Shift+O / Ctrl+Alt+Shift+O, Lock Vault Cmd+Shift+L / Ctrl+Alt+Shift+L; Open Vault
+  Cmd+\ / Ctrl+Shift+\ (was F8). Deviations
   (plan banner): the SDK type is `ShortcutContext` (`ActionContext` was taken); Find/Copy/Paste stay Global until K3;
   palette hiding of owned-context actions, the testkit's context invocation and DEFAULT_DROPPED, and the Keymap's
   "overrides … here" wait for K3/K4; the docs sweep is K4 (it also owns the stale F8 mentions left in
@@ -4107,16 +7244,16 @@ s
   Vault's own no-vault notice no longer names F8); menu items show accelerators but never fire them from the keyboard
   (Deviation 6); in a terminal pane a disabled action's key does nothing instead of reaching the shell, because X11 and
   Windows would deliver it as a control character, such as ^C from Ctrl+Shift+C with no selection (Deviation 9).
-  **Upgrade note:** a user `[keybindings]` entry on a stroke that is now another action's default (⌘K, ⌘I, ⇧⌘P, ⌘W,
-  ⌥⌘W, Ctrl+Tab, Ctrl+Alt+Shift+Q, …) collides, and the loader falls back to the default keybindings, as for any
+  **Upgrade note:** a user `[keybindings]` entry on a stroke that is now another action's default (Cmd+K, Cmd+I, Cmd+Shift+P, Cmd+W,
+  Cmd+Option+W, Ctrl+Tab, Ctrl+Alt+Shift+Q, …) collides, and the loader falls back to the default keybindings, as for any
   collision.
   `./gradlew check` green after merging main: app 1471/0/1, terminal 391/0/4, Editor 4782/0/0, Remote 297/0/0,
   Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0, File Server 114/0/0, SDK 39/0/0,
   testkit 79/0/0. Merged into local main 2026-09-30 (not pushed). GUI checks pending with
-  the user: ⇧⌘P / Ctrl+Shift+P opens the palette; ⌘K clears in a terminal and does nothing in the SSH Sessions panel's
-  search; ⌘W closes a split pane, then the tab; on Linux Ctrl+K and F2 reach the shell, Ctrl+Tab switches tabs from a
+  the user: Cmd+Shift+P / Ctrl+Shift+P opens the palette; Cmd+K clears in a terminal and does nothing in the SSH Sessions panel's
+  search; Cmd+W closes a split pane, then the tab; on Linux Ctrl+K and F2 reach the shell, Ctrl+Tab switches tabs from a
   terminal, an Editor tab or a panel field, Ctrl+Shift+C with no selection in a terminal does nothing, and
-  Ctrl+Shift+V in a panel field pastes into the field only; ⌥⌘1 / Alt+1 toggles SSH Sessions; the Keymap shows the
+  Ctrl+Shift+V in a panel field pastes into the field only; Cmd+Option+1 / Alt+1 toggles SSH Sessions; the Keymap shows the
   Where column; menus still show each shortcut, a click still runs the item, and every menu shortcut still works from
   a terminal.
 - **File Server FS-1: foundation and HTTP** (branch `claude/file-server-fs1`, spec
@@ -4235,13 +7372,13 @@ s
   (`dev.jasper.remote.chooser.RemoteHosts`, `files.source`): each host is a root with a connected dot, clicking it
   resolves the logins (Vault prompts as usual) and browses over SFTP with links followed, and an SSH pane is located on
   its host at the shell's folder (or the login's home). Editor 0.6.0 adds `LocationResolver` /
-  `Editor.locationDocuments`; Open in Editor… (Cmd/Ctrl+O) now always shows Jasper's chooser, offering sources with a
+  `Editor.locationDocuments`; Open in Editor… (Cmd+O / Ctrl+Shift+O) now always shows Jasper's chooser, offering sources with a
   resolver and opening their files through it, starting in the active document's folder (local or remote) or where the
   focused pane is. Remote's resolver builds `RemoteDocument`s. Removed: `RemoteFilePicker`, `RemoteOpening`, File ›
   Open Remote File… and `SftpPanel.pickMode`. SDK 0.10.1: `FileLocation.Sourced.HOME`. `./gradlew check` green:
   app 1348/0/1, terminal 391/0/4, Editor 4781/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0,
-  Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0. Not merged. GUI checks pending with the user: Cmd/Ctrl+O in an SSH pane opens on that host at the shell's
-  folder; clicking a disconnected host connects (Vault prompt, Cancel, Retry); opening a remote file; Cmd/Ctrl+O from a
+  Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0. Not merged. GUI checks pending with the user: Cmd+O / Ctrl+Shift+O in an SSH pane opens on that host at the shell's
+  folder; clicking a disconnected host connects (Vault prompt, Cancel, Retry); opening a remote file; Cmd+O / Ctrl+Shift+O from a
   remote Editor tab starts in its folder; pinning a remote folder.
 - **File chooser plan B1: SDK file sources** (branch `claude/file-chooser-b1`, plan
   `docs/superpowers/plans/2026-09-30-file-chooser-b1.md`): SDK 0.10.0 adds `dev.jasper.sdk.files` (`FileSources`,
@@ -4257,28 +7394,28 @@ s
   `docs/superpowers/specs/2026-09-30-file-chooser-design.md`, plan `docs/superpowers/plans/2026-09-30-file-chooser-a.md`,
   executed inline 2026-09-30): every native file picker (`FileDialog`, `JFileChooser`) is replaced by Jasper's
   Explorer-style chooser (`dev.jasper.app.files`): navigation pane (Terminal folder, home, Desktop, Downloads, Pinned,
-  Recent), back/forward/up, breadcrumb path bar with typed paths (Cmd/Ctrl+L), search filter, sortable list, preview
-  pane toggle, dotfile toggle (Cmd/Ctrl+Shift+.), typed paths in the name field, Save with replace confirmation and
+  Recent), back/forward/up, breadcrumb path bar with typed paths (Cmd+L / Ctrl+L), search filter, sortable list, preview
+  pane toggle, dotfile toggle (Cmd+Shift+. / Ctrl+Shift+.), typed paths in the name field, Save with replace confirmation and
   New folder. Choosers start at the owner's focused-pane folder when the caller gives none; Open in Editor… no longer
   overrides that in a terminal pane. No SDK change (moved to plan B; deviations listed in the plan). `./gradlew check`
   green: app 1338/0/1, terminal 391/0/4, Editor 4778/0/0, Remote 306/0/0, Vault 139/0/1, Buddy 163/0/0, History
   41/0/0, Snippets 11/0/0, Sample 12/0/0, SDK 31/0/0, testkit 69/0/0. Not merged. GUI checks pending with the user:
-  Cmd/Ctrl+O from a local pane opens at its folder quickly (target about 100 ms); Save As in the Editor; Settings file
+  Cmd+O / Ctrl+Shift+O from a local pane opens at its folder quickly (target about 100 ms); Save As in the Editor; Settings file
   pickers; Install Plugin (.zip only); SFTP upload/download folder pickers; dark and light themes; long paths in the
-  path bar. Cmd/Ctrl+O in an SSH pane still shows the old remote picker until plan B.
-- **Opening remote files from Cmd/Ctrl+O and File › Open Remote File…** (branch `claude/remote-open-file`, spec
+  path bar. Cmd+O / Ctrl+Shift+O in an SSH pane still shows the old remote picker until plan B.
+- **Opening remote files from Cmd+O / Ctrl+Shift+O and File › Open Remote File…** (branch `claude/remote-open-file`, spec
   `docs/superpowers/specs/2026-09-29-remote-open-file-design.md`, plan
   `docs/superpowers/plans/2026-09-29-remote-open-file.md`, executed inline 2026-09-29): Open in Editor… asks openers
-  before the local chooser (Editor 0.5.0: `OpenRequest`, `Editor.opener`); the Editor tab's hardcoded Cmd/Ctrl+O is
+  before the local chooser (Editor 0.5.0: `OpenRequest`, `Editor.opener`); the Editor tab's hardcoded Cmd+O / Ctrl+O is
   gone, so the Keymap's binding for Open in Editor… applies in terminal panes and Editor tabs. Remote 0.7.0 answers
   for connected SSH panes and remote Editor tabs with a modal Open Remote File picker (host dropdown, navigation,
   multi-select, up to 20 files, links followed), also on File and SSH › Open Remote File… (no default shortcut); the
   SFTP panel's open-in-Editor logic moved to `EditorOpening`, shared with the picker. `./gradlew check` green: app
   1294/0/1, terminal 391/0/4, Editor 4776/0/0, Remote 299/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0,
   Snippets 11/0/0, Sample 12/0/0, SDK 31/0/0, testkit 69/0/0 (tests/failures/skipped). Not merged. GUI checks pending
-  with the user: Cmd/Ctrl+O in an SSH pane, a remote Editor tab and a local pane; rebinding Open in Editor… in the
+  with the user: Cmd+O / Ctrl+Shift+O in an SSH pane, a remote Editor tab and a local pane; rebinding Open in Editor… in the
   Keymap moves all three; File › Open Remote File… with and without an SSH pane focused; on Linux/Windows, the
-  Keymap's cmd+o is Ctrl+Shift+O, which now applies in Editor tabs too (their old in-tab key was Ctrl+O). Superseded by the file chooser (plan B2): the picker and Open Remote File… are gone.
+  Keymap's `cmd+o` is Ctrl+Shift+O, which now applies in Editor tabs too (their old in-tab key was Ctrl+O). Superseded by the file chooser (plan B2): the picker and Open Remote File… are gone.
 - **IntelliJ parent themes and schemes** (branch `claude/intellij-parent-themes`, bounded change approved in chat
   2026-09-29, no spec): every theme and editor scheme IntelliJ bundles at the pinned intellij-community commit is
   vendored under `themes/intellij/` (New UI `expUI/`, `islands/`, `Light.xml`), so plugin themes built on
@@ -4450,7 +7587,7 @@ s
   none) and as `WSL` rows in `>ssh`. `./gradlew check --continue` on Windows: 3479 tests, 234
   skipped, 8 failed, all on the known list in `docs/windows-startup-verification.md` (app 1187/141 skipped/2 failed,
   terminal 391/19/0, Editor 1172/13/0, Remote 278/54/6, Vault 139/7/0, Buddy 163/0/0, History 40/0/0, SDK 27/0/0,
-  SDK testkit 60/0/0, Sample 11/0/0, Snippets 11/0/0); hygiene scan clean. Native WSL acceptance (docs/remote.md items 11 to 15, also in
+  SDK testkit 60/0/0, Sample 11/0/0, Snippets 11/0/0); hygiene scan clean. Native WSL acceptance (items 11 to 15 of [docs/remote.md at `ef03625b4`](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/remote.md#native-acceptance), also in
   `docs/windows-startup-verification.md`) and the macOS/Linux check pending with the user. Deviations from the
   plan: none in code. Plan A's names matched the plan's assumptions (`ShellProfile.Kind`, `ShellProfileCatalog`,
   `OpenSpec.Local(Optional<Path>, Optional<String>)`, `JasperApplication.shellProfiles`); `knownProfile` compares
@@ -4681,7 +7818,7 @@ s
   `docs/superpowers/specs/2026-09-27-jasper-editor-vim-design.md`, 2026-09-27): a headless Vim engine in
   `dev.jasper.editor.vim` on every tab's `VimTextArea`: Normal, Insert and Replace modes, counts, motions, text
   objects, operators, registers (with `"+` and `"*`), undo in Vim's steps, and `.`. The handler rule gives Vim only
-  the keys it defines; ⌘ keys stay with the Editor. The Vim bar shows the mode, pending keys and messages. The
+  the keys it defines; Cmd keys stay with the Editor. The Vim bar shows the mode, pending keys and messages. The
   `vim` setting, the Vim status item and Toggle Vim Mode switch it (the toggle writes the settings file).
   - Fidelity: 469 corpus cases in `plugins/editor/src/test/resources/vim/corpus`, recorded from Vim 9.1 by
     `./gradlew :jasper-plugin-editor:recordVimCorpus` (not part of `check`) and replayed by `VimCorpusTest`; every
@@ -5323,7 +8460,7 @@ s
   - **Not done:** visual acceptance of Light and Dark (user-run), merge and push.
 - **Search Everywhere palette** (branch `claude/theme-engine`, plan
   `docs/superpowers/plans/2026-09-25-jasper-search-everywhere.md`):
-  - **Tabs:** All first (Cmd/Ctrl+K), then one tab per scope.
+  - **Tabs:** All first (Cmd+K / Ctrl+K), then one tab per scope.
   - **All tab:** groups each participating scope's matches, capped per scope, with a "More in…"
     row. SDK 0.8.0 adds `ScopeSpec.withInAll`; Vault opts out.
   - **Rows:** one line, with a hint bar showing the other verbs. Tab and Shift+Tab switch tabs.
@@ -5379,7 +8516,7 @@ s
   longer adds its own View items (SFTP panel, SSH Hosts), which duplicated those toggles. SDK 0.8.1
   adds `PanelSpec.toggleActionId`: a panel may name one of its plugin's already registered actions as
   its toggle, and the app then lists that action in Tools and registers no `<panel id>.toggle`.
-  Remote names its renamed actions (Toggle SSH hosts, with ⇧⌘S, and Toggle SFTP), so each panel has
+  Remote names its renamed actions (Toggle SSH hosts, with Cmd+Shift+S, and Toggle SFTP), so each panel has
   one palette entry and Tools shows the shortcuts; Remote requires `>=0.8.1`.
 - **Rail width:** `window.rail_width` is 28–64 logical pixels, default 28, clamped the same way.
   Rail buttons stay square at width − 6, separators at width − 14. View → Rail width… and the
@@ -5500,7 +8637,7 @@ The approved keyboard shortcut reference is integrated into local `main` through
 `/Users/dustin/.codex/worktrees/keyboard-shortcuts/moray`.
 **Help → Keyboard Shortcuts…** opens one reusable window with grouped app/plugin rows,
 text and exact-key capture search, effective overridden bindings, conflict explanations,
-contextual keys and live updates. [Guide and native acceptance](keyboard-shortcuts.md).
+contextual keys and live updates. [Guide and native acceptance](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/keyboard-shortcuts.md#maintenance-and-verification) (at `ef03625b4`).
 No SDK changes. Third-party private UI listeners are not discoverable, and OS-reserved
 shortcuts remain OS-controlled.
 
@@ -5765,7 +8902,7 @@ Implemented in the native worktree `/Users/dustin/.codex/worktrees/remote-7a/mor
 `codex/remote-7a`, now merged into local `main` (not pushed). The [7a plan](superpowers/plans/2026-09-22-jasper-remote-plan-7a-ssh.md)
 implements the approved [Remote design](superpowers/specs/2026-09-22-jasper-remote-design.md): saved hosts,
 config import, host-key trust, Vault/agent authentication, shared sessions, ProxyJump, hosts panel,
-editor, palette, actions and status. [Guide and native acceptance](remote.md). Tunnels (7b) and SFTP (7c) follow.
+editor, palette, actions and status. [Guide and native acceptance](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/remote.md#native-acceptance) (at `ef03625b4`). Tunnels (7b) and SFTP (7c) follow.
 
 Native inline execution, one commit per task, followed by one independent review and a tested fix commit.
 `./gradlew check :jasper-app:installDist` passed: **1,604 tests, 1,601 passed, three expected skips,
@@ -6033,7 +9170,7 @@ fills and blue default buttons. Editors align actions right and attach/release t
 button with the form lifetime. The terminal toolbar keeps its independent geometry. The dark
 secondary button text is slightly lighter (#A7AEBB instead of #A0A7B4), preserving Jasper's existing
 4.5:1 contrast guard; disabled text keeps its tested defaults. No JetBrains platform dependency,
-SDK change, credential-type addition or vault format change. [Authoring guidance](plugin-authoring.md#consistent-buttons-flexible-layouts).
+SDK change, credential-type addition or vault format change. [Authoring guidance](plugin-ui.md).
 
 `./gradlew check :jasper-app:installDist -q` passed: **1,546 tests, 1,543 passed, three expected
 skips, no failures/errors**. Independent review found two P2 issues (visible security status and
@@ -6063,7 +9200,7 @@ The resumed handoff held an uncommitted draft with only palette/status tasks. Th
 [6b plan](superpowers/plans/2026-09-22-jasper-vault-plan-6b-ui.md) now covers the palette,
 self-clearing clipboard, padlock/rail, persisted manager operations, account/key/note editors,
 master-password change, singleton manager, grant revocation and key generation with an optional
-login account. [User guide and native acceptance](credential-vault.md).
+login account. [User guide and native acceptance](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/credential-vault.md#native-acceptance) (at `ef03625b4`).
 
 **Resolved user decision:** the user chose passphrase encryption on 2026-09-22. The generator
 now accepts and confirms an optional passphrase. Nonempty values encrypt every supported algorithm
@@ -6181,7 +9318,7 @@ the service is present (`requires … optional = true`, the Vault/SSH shape). Th
 and every wiring arm (3,473 lines); `CommandsScope` moved into `palette`, `CommandHistory` into
 `commands`, `PaletteContext` lost `trivialCommands` and `PaletteTarget` lost `shellName`.
 `ConfigLoader` reports `[palette.scopes.history]` as moved. See
-[command palette](command-palette.md), [configuration](configuration.md#shell-history) and
+[command palette](command-palette.md), [configuration](history-and-snippets.md) and
 [plugin authoring](plugin-authoring.md#palette-scopes).
 
 Scope decisions, as recorded at the top of the plan:
@@ -6450,7 +9587,7 @@ visibility and window bounds remembered in `ui-state.toml`. The SDK is 0.3.0. Ne
 and types: `dev.jasper.app.windows` (`AuxiliarySurface`, `AuxiliaryWindows`, `NativeShells`),
 `workspace.WorkspaceRegions` and `workspace.WindowRail`, `persistence.UiState`, and panels and
 rail actions in the `contributions` model. See
-[SDK architecture](sdk-architecture.md#panels-the-rail-and-plugin-windows).
+[SDK architecture](sdk-architecture.md#panels-the-rail-and-plugin-dialogs).
 
 Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks`
 passed with **1,277 tests: 1,275 passed, two expected environment skips, no failures or
@@ -6560,19 +9697,6 @@ the app endpoint-lock/accepted-launch shutdown defects were fixed with regressio
 tests. The two terminal documentation follow-ups (option reconstruction sites and
 plan completion markers) are addressed by the [documentation audit](documentation-audit.md). App review
 left no deferred minors.
-
-## Open acceptance work
-
-- User-run desktop behavior: window placement, physical keyboard/clipboard,
-  fonts/IME, Buddy native windows, shell exits and residency.
-- Windows native packaging and desktop acceptance.
-- Fresh native throughput/RSS measurements on the refactored code; the dated
-  [readiness measurements](terminal-readiness.md) apply only to their recorded revisions.
-- The two-week daily-use trial has not started.
-
-Use the [packaging checklist](packaging.md#native-acceptance-checklist) and
-[benchmark protocol](benchmarks.md). Agents must not launch native windows or
-benchmarks without the user's applicable authorization.
 
 ## Historical implementation notes
 
@@ -6841,7 +9965,7 @@ completion ordering, per-pane identity, pre-threshold titles, dismissal and long
 Unicode titles. `./gradlew check`: app 674 (673 passed, one fish skip), terminal
 320 (319 passed, one existing font skip): **994 total, 992 passed, two skipped,
 zero failures/errors**. Source hygiene and diff checks pass. Native GUI remains
-user-run. [Title behavior and tmux settings](configuration.md#automatic-tab-and-notification-titles).
+user-run. [Title behavior and tmux settings](terminal.md#titles).
 
 **Buddy notification reference correction (2026-09-17):** On
 `claude/command-notifications` in `.claude/worktrees/practical-shamir-1252c5`, the
@@ -7065,8 +10189,8 @@ fish skip; jasper-terminal 316 tests, 315 passed and one existing font skip.
 Total 839 tests, 837 passed, two skipped, zero failures/errors; after merging
 `main`, which had brought in the palette input-row anchor and its three tests,
 842 tests, 840 passed, two skipped, zero failures. [Configuration
-guide](configuration.md#shell-history), [palette
-guide](command-palette.md#shell-history), [design
+guide](history-and-snippets.md), [palette
+guide](history-and-snippets.md#searching-history), [design
 spec](superpowers/specs/2026-09-16-jasper-history-ranking-design.md),
 [plan](superpowers/plans/2026-09-16-jasper-history-ranking.md). Still user-run:
 the History palette inside tmux on the real desktop, confirming a just-run
@@ -7252,7 +10376,7 @@ placeholder for the process — and Shift+Enter is "Edit file" (creates
 From History, Shift+Enter is "Save as snippet…": a one-field name step prefilled
 with the command's first word and argument, appending to the store and, on
 success, reopening Snippets with the new row selected; a duplicate name or a
-write failure keeps the step open with an error message. Cmd+J/Ctrl+Shift+J
+write failure keeps the step open with an error message. Cmd+J / Ctrl+Shift+J
 always opens Snippets (a prior override collides with the new `snippets_palette`
 default exactly as `history_palette` does). Deviations from the plan text,
 recorded in the plan and spec status banners: scopes expose steps through
@@ -7274,7 +10398,7 @@ Task 6 extended the [headless render matrix](design/command-palette/README.md)
 with three new states — the Snippets list, the `Deploy` fill-in step and the
 History save-name step — rendered from a six-snippet fixture file (two of them
 with placeholders) written into a temporary directory, all inspected in dark and
-light. [Guide](command-palette.md#snippets),
+light. [Guide](history-and-snippets.md#using-snippets),
 [design spec](superpowers/specs/2026-09-15-jasper-snippets-design.md),
 [plan](superpowers/plans/2026-09-15-jasper-snippets.md). Fresh
 `./gradlew check --rerun-tasks`: jasper-app 464 tests passed; jasper-terminal 303
@@ -7296,7 +10420,7 @@ many").
 hard cap every scope returns: `PaletteContext` carries it to `CommandsScope` (through a
 `CommandSearch.find` limit) and `ShellHistoryScope` (which no longer holds fifty rows and
 scrolls twelve), the card sizes to exactly that many rows, and `PaletteScope.preferredRows()`
-is gone. Cmd/Ctrl+1–5 still number the first five. Tests cover parsing, the range, both
+is gone. Cmd+1–5 / Ctrl+1–5 still number the first five. Tests cover parsing, the range, both
 scopes and the live change on an open palette. History renders regenerated.
 
 **Palette scopes and shell history (2026-09-15):** On `claude/palette-scopes` in
@@ -7306,8 +10430,8 @@ scope-based: one `PaletteScope` contract with two implementations, `CommandsScop
 `ShellHistoryScope` (substring search over an application-wide `ShellHistoryIndex`
 fed by zsh/bash/fish/nushell/PowerShell history files and OSC 133 B/C live
 capture; nushell is looked up under `$XDG_CONFIG_HOME` or `~/.config` and, on macOS,
-also under `~/Library/Application Support/nushell`). Cmd+K/Ctrl+K
-always opens Commands, Cmd+R/Ctrl+Shift+R always opens History (a prior user override
+also under `~/Library/Application Support/nushell`). Cmd+K / Ctrl+K
+always opens Commands, Cmd+R / Ctrl+Shift+R always opens History (a prior user override
 already bound to that shortcut now collides with the `history_palette` default and reverts
 all keybinding overrides to defaults until the user sets `history_palette = "none"` or
 rebinds it); a scope's own shortcut dismisses it while already active, even from the
@@ -7366,7 +10490,7 @@ bracketed paste enabled. No GUI, merge or push.
 
 **Palette placement follow-up (2026-09-13):** Moved the card upward at the user's request: its center targets one-third of the way down the terminal area, retaining horizontal centering and small-window clearance clamps. The updated position assertion failed before the change; all 15 palette integration tests pass afterward. Regenerated the 24-image theme/state matrix and separate 2× UI-scale artifact; representative normal/narrow renders were inspected. This is a focused follow-up to the full verification below; native GUI checks remain user-run.
 
-**Command palette implementation (2026-09-12):** Complete and independently reviewed on `codex/command-palette-design` in `.worktrees/command-palette`, branched from main `1db31b1`; the main checkout remains unchanged. Cmd/Ctrl+K opens the centered themed palette, Cmd/Ctrl+1–5 runs numbered results, and three shared recents persist across restarts. Commands register through window-owned Swing actions without a plugin framework. All six task gates and final whole-branch/scoped review are complete through runtime fix `28a7ff0`. Final review corrected selected-result visibility after query/reorder changes in short scrolled cards; two actual-viewport regressions reproduced the defect before the fix. Fresh `./gradlew check --rerun-tasks` executed all eight tasks: 661 tests, 660 passed, one existing font skip, zero failures/errors. Actual purple/classic/light renders and separate 2× UI scaling were inspected; matching-only medians were 18.3–93.9 µs over 1,000 indexed commands. Branch-wide diff checks and source hygiene passed after temporary-report cleanup. [Guide and extension example](command-palette.md), [visuals, measurements and review record](design/command-palette/README.md), [plan](superpowers/plans/2026-09-12-jasper-command-palette.md), [native acceptance checklist](superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md). Native focus, IME, accessibility, Windows desktop and real restart acceptance remain user-run. No GUI, packaging, merge or push.
+**Command palette implementation (2026-09-12):** Complete and independently reviewed on `codex/command-palette-design` in `.worktrees/command-palette`, branched from main `1db31b1`; the main checkout remains unchanged. Cmd+K / Ctrl+K opens the centered themed palette, Cmd+1–5 / Ctrl+1–5 runs numbered results, and three shared recents persist across restarts. Commands register through window-owned Swing actions without a plugin framework. All six task gates and final whole-branch/scoped review are complete through runtime fix `28a7ff0`. Final review corrected selected-result visibility after query/reorder changes in short scrolled cards; two actual-viewport regressions reproduced the defect before the fix. Fresh `./gradlew check --rerun-tasks` executed all eight tasks: 661 tests, 660 passed, one existing font skip, zero failures/errors. Actual purple/classic/light renders and separate 2× UI scaling were inspected; matching-only medians were 18.3–93.9 µs over 1,000 indexed commands. Branch-wide diff checks and source hygiene passed after temporary-report cleanup. [Guide and extension example](command-palette.md), [visuals, measurements and review record](design/command-palette/README.md), [plan](superpowers/plans/2026-09-12-jasper-command-palette.md), [native acceptance checklist](superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md). Native focus, IME, accessibility, Windows desktop and real restart acceptance remain user-run. No GUI, packaging, merge or push.
 
 **Default purple theme (2026-09-12):** `jasper-dark-purple` now supplies the default app chrome and terminal colors, including the dark half of Follow System. Explicit `jasper-dark` remains classic; `jasper-light` is unchanged. Custom files keep their existing fixed classic palette inheritance. Source defaults, generated config template, root example and documentation are updated. `./gradlew check` executed both modules: 585 tests, 584 passed and one existing font skip. Actual purple/classic/light Swing + ANSI previews were rendered headlessly and inspected; independent review found no actionable issues. The Mac app/DMG was rebuilt and package verification passed with the official Eclipse icon. The user has approved merging the completed icon/theme work into `main` and publishing it to `origin`. No live settings, GUI or installation changes were performed. Historical palette/render folder `design/jasper-dark-purple/` is not present in this checkout.
 
@@ -7394,7 +10518,20 @@ The following dated milestone notes describe earlier verification; the readiness
 
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-jasper-phase-1-terminal-design.md) for binding product requirements. Normal GUI acceptance is user-run. The user explicitly authorized controlled readiness benchmarks; game/VM prerequisites were checked before every run.
 
-## Plan 4c implementation — custom themes and system appearance
+### Open acceptance work — 2026-09-21
+
+- User-run desktop behavior: window placement, physical keyboard/clipboard,
+  fonts/IME, Buddy native windows, shell exits and residency.
+- Windows native packaging and desktop acceptance.
+- Fresh native throughput/RSS measurements on the refactored code; the dated
+  [readiness measurements](terminal-readiness.md) apply only to their recorded revisions.
+- The two-week daily-use trial has not started.
+
+Use the [packaging checklist](packaging.md#native-acceptance-checklist) and
+[benchmark protocol](benchmarks.md). Agents must not launch native windows or
+benchmarks without the user's applicable authorization.
+
+### Plan 4c implementation — custom themes and system appearance
 
 Implemented on `codex/plan-4c-themes` and integrated locally on main after user approval. The completed feature worktree and branch are being cleaned up after successful merged verification. All four task reviews passed; whole-branch review findings were resolved in `3c3af48`, and scoped re-review approved with no new findings. See [design](superpowers/specs/2026-09-12-jasper-plan-4c-themes-design.md), [implementation plan](superpowers/plans/2026-09-12-jasper-plan-4c-themes.md), [configuration](configuration.md), [headless comparison](design/plan-4c-themes/comparison.md) and [native checklist](superpowers/plans/2026-09-12-jasper-plan-4c-manual-check.md). The main checkout was clean at integration; the updated example is now available at the repository root.
 
@@ -7404,7 +10541,7 @@ Task 4 deviations: remember latest OS reading outside the committed reducer so f
 
 Fresh `./gradlew check --rerun-tasks` passed with all eight tasks executed: 502 tests, 501 passed, one known `FontSetTest.fallsBackWhenPrimaryCannotDisplay()` skip, zero failures/errors. Both modules passed source hygiene (152 Java files) and `git diff --check` passed. Native detector/GUI/physical screens/benchmark remain unrun; all native checklist items are unchecked. Logging/launcher cleanup and packaging remain pending. Final review correction `3c3af48` makes explicit Reload retry unchanged desired theme state through the existing delivery guards, makes service-test timestamps deterministic, and adds the combined malformed-main-config/theme-poll regression. Both actual OS and saved-config failure paths recover through the real Reload action. Root final verification ran all eight tasks in 13 seconds: 506 tests, 505 passed, one known font skip, zero failures/errors; scoped re-review approved all three findings. No review findings remain open.
 
-## 1. Goal and delivery phases
+### 1. Goal and delivery phases
 
 Jasper is a Java Swing terminal workstation with a MobaXterm-style layout, built to replace `~/projects/conch` as the daily terminal. Product phases: terminal → SSH session management → credential vault → SFTP → tunnels → plugins and editor. Reuse tested non-UI Java from `~/projects/termlab-bundle` in later phases. Do not redesign the terminal foundation before the Phase 1 switch-over test.
 
@@ -7428,7 +10565,7 @@ Plan 3.5 was developed on `codex/plan-3-5-chrome-themes` and merged locally. Tha
 
 Previous milestone: [Plan 3.5 — macOS chrome, themes and toolbar](superpowers/plans/2026-09-11-jasper-plan-3-5-chrome-and-themes.md). The user has tried Plan 3 during development and reports that it looks good overall; this is qualitative feedback, not a claim that every native checklist item or benchmark was completed.
 
-## 2. Implemented behavior
+### 2. Implemented behavior
 
 The existing terminal retains ligatures, fallback fonts, wide characters, colors, cursor modes, Option input, mouse reporting, scrollback, selection, clipboard, bracketed paste, prompt jumps, OSC integration and clickable links.
 
@@ -7462,7 +10599,7 @@ The screenshot revision now supplies:
 - A 30px status bar that shares the terminal background, live shell/path/grid metadata and running dot; the current 4px terminal padding supersedes the old 24px mock geometry, and the app default/reset font size remains 16.
 - Measured dark surface and visible ANSI accent colors, with equivalent light geometry. Actual headless previews: [dark](design/mock-ui-dark.png), [light](design/mock-ui-light.png). Reproduce with `./gradlew :jasper-app:mockUiPreview`.
 
-## 3. Fixes included during Plan 3
+### 3. Fixes included during Plan 3
 
 - `openingLink` capture clears on new press and focus loss; a missed release cannot swallow a later gesture.
 - Alternate-screen transitions invalidate selections, matches, pending find and viewport row references.
@@ -7478,7 +10615,7 @@ The screenshot revision now supplies:
 - Global shortcuts are installed on the root pane, with native text-field editing retained.
 - F13–F24 override parsing uses Java's separate high-function-key range; actual F13/F24 strokes are regression-tested.
 
-## 4. Verification still required
+### 4. Verification still required
 
 1. User-run [compact tab/motion checklist](superpowers/plans/2026-09-11-jasper-tab-motion-manual-check.md), then [screenshot UI checklist](superpowers/plans/2026-09-11-jasper-mock-ui-manual-check.md): native controls, title-tab hit testing, dragging/double-click, fullscreen, scaling and exact visual comparison in real windows. The earlier Plan 3.5 appearance checklist is superseded by this reference. Also retain the [Plan 3 acceptance checklist](superpowers/plans/2026-09-11-jasper-plan-3-manual-check.md): native windows/menu/Quit, split/zoom/focus/dividers, tab gestures, find, clipboard, links, mouse reporting, directory inheritance and chrome readability. Headless tests do not establish these native visual results.
 2. Packaged readiness benchmarking is recorded in the [measurement report](benchmarks/2026-09-12-terminal-readiness.md). Final runtime `8d84e7d` passed three full throughput runs at 36.91–37.28 MB/s. The 35 MB/s floor passes; 45 MB/s target remains unmet. These controlled fixtures do not replace normal native acceptance.
@@ -7487,7 +10624,7 @@ The screenshot revision now supplies:
 
 Known skip: `FontSetTest.fallsBackWhenPrimaryCannotDisplay` skips on this Mac because its probe finds no differentiating glyph. Nerd Font-specific fallback tests run with a suitable installed font and skip on systems lacking it.
 
-## 5. Remaining terminal hardening
+### 5. Remaining terminal hardening
 
 The integrated readiness work resolves the carried-over gesture ownership, bounded logical-line traversal, idle frame/blink work, pure mouse-report snapshots, visible search scanning, EDT browser dispatch, multi-notch wheel and selection integrity findings. See the [handoff](terminal-readiness.md) for evidence. Remaining limitations:
 
@@ -7498,7 +10635,7 @@ The integrated readiness work resolves the carried-over gesture ownership, bound
 
 Readiness added astral/edge/overlapping search, bounded wrapped continuation, button ownership and multi-notch regressions. Retained coverage opportunities include large-history indicator geometry, empty-scrollback viewport, copy-on-select, alternate-screen wheel/arrows, paste-to-live, Shift+PageDown and match colors. Add behavioral regressions when working in these areas, not tests that mirror source constants.
 
-## 6. Native acceptance and remaining Plan 4 work
+### 6. Native acceptance and remaining Plan 4 work
 
 The screenshot revision supersedes Plan 3.5 geometry and artwork. User visual/native acceptance remains open; the user approved integration and starting Plan 4. The integrated UI baseline runs from `/Users/dustin/projects/moray` with `./gradlew :jasper-app:run`. That checkout now includes Plan 4a live reload and Plan 4b full terminal configuration. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
 
@@ -7506,20 +10643,20 @@ Plans 4a–4d supply saved settings, full terminal configuration, custom themes/
 
 Remaining opportunities: logical-pixel font-cell rounding, cosmetic ShellIntegrationFilter hold-limit prefix counting, and deeper retention/dependency/font-cache profiling if real usage warrants it. No speculative heap or backend change is part of this slice. Three-platform CI passed; normal native acceptance remains necessary before the two-week trial.
 
-## 7. Decisions and implementation deviations
+### 7. Decisions and implementation deviations
 
 - Keep JediTerm, own renderer, two one-way modules, no emulator abstraction/plugin API.
 - Option+Left/Right remains ESC[1;3D / ESC[1;3C, not ESC b / ESC f.
 - OSC8 schemes remain http/https/ftp/mailto; detected text may include file URLs. Refused OSC8 targets do not fall through to text detection.
-- macOS Command-click links takes precedence over program mouse reports; Shift provides local mouse behavior; horizontal Shift-wheel on macOS is ignored.
+- macOS Cmd-click links takes precedence over program mouse reports; Shift provides local mouse behavior; horizontal Shift-wheel on macOS is ignored.
 - The user's approved Phase 1 direction and Plan 3 go-ahead were used for execution; a supplemental written design records concrete app contracts.
-- On Linux/Windows, cmd already means Ctrl+Shift. Defaults explicitly written cmd+shift add Alt to avoid collisions; user overrides parse literally and collisions are errors. macOS defaults are unchanged.
+- On Linux/Windows, `cmd` already means Ctrl+Shift. Defaults explicitly written `cmd+shift` add Alt to avoid collisions; user overrides parse literally and collisions are errors. macOS defaults are unchanged.
 - Settings/reload and saved configuration were deferred from Plan 3 to Plan 4a and are now implemented. Plan 3.5 supplied coordinated built-in themes and macOS title-bar work; automatic system appearance remains a later Plan 4 deliverable.
 - Four direct multi-pane carryovers were included; the remaining hardening list above is follow-up scope.
 - Native acceptance is user-run per newly merged AGENTS.md. No agent GUI launch or benchmark followed discovery of that rule.
 - The user selected the local `~/projects/tabler-icons` repository. Seven outline assets and full MIT license are bundled; SOURCE.txt records the source commit and theme-color adaptation.
 
-## 8. Workflow and historical Plan 3 verification
+### 8. Workflow and historical Plan 3 verification
 
 Superpowers spec/plan → task implementer with TDD → separate task review → scoped fix/re-review → final branch review. Reviewed commits: models `a75d5fa`; terminal hooks `56b251d`; lifecycle fixes `73f105c`; desktop `acfc79f`; desktop review fixes `6fac903`/`dcc0b00`; final minor fixes `dda35e2`. Task reviews and final whole-branch review approved. Final fixes synchronize appearance menu state and make the forced-close test wait for installed signal traps. A mutation check confirmed that removing force fallback makes the latter test fail; production cleanup was restored before verification.
 
@@ -7527,19 +10664,19 @@ Root final verification on `dda35e2`: all 8 Gradle tasks executed successfully i
 
 Plan 3 was merged locally and its feature worktree/branch removed after merged checks passed (277 tests, zero failures/errors, one expected skip). Plan 3.5 is now integrated on main; continue native acceptance from `/Users/dustin/projects/moray`, retaining the daily-use gate.
 
-## 9. Execution rulings preserved from the completed Plan 3 ledger
+### 9. Execution rulings preserved from the completed Plan 3 ledger
 
 These are historical Plan 3 scope decisions. The user's subsequent Plan 3.5 amendment above changes the sequencing of built-in theme work.
 
 - The existing approved Phase 1 design plus the user's Plan 3 go-ahead authorizes execution; use a supplemental execution design instead of restarting approval — avoids repeating settled layout decisions — costs rework if the detailed choices differ from user intent.
-- Non-mac defaults containing explicit cmd+shift add Alt because cmd already means Ctrl+Shift — prevents duplicate destructive shortcuts — costs non-mac shortcut familiarity; macOS unchanged.
+- Non-mac defaults containing explicit `cmd+shift` add Alt because `cmd` already means Ctrl+Shift — prevents duplicate destructive shortcuts — costs non-mac shortcut familiarity; macOS unchanged.
 - Settings/reload remain visibly disabled and status says Built-in defaults until Plan 4 — no configuration subsystem in Plan 3 — costs waiting for settings until the next planned milestone.
 - Light/dark chrome is selectable in Plan 3; automatic system appearance remains Plan 4 with config — keeps scope aligned — costs manual appearance selection temporarily.
 - Fold four immediate STATUS carryovers into Task 2 (lost link gesture, alternate-buffer invalidation, prompt pruning, child termination), retain remaining performance/selection findings for follow-up — these directly affect reliable multiple panes — costs additional Task 2 work and later hardening before Phase 1 acceptance.
 - GUI smoke and final benchmark are user-run under newly added AGENTS.md — respects desktop-operation restriction — costs leaving visual/performance acceptance pending after headless completion.
 - Keep disabled Settings/Reload tooltips user-facing, without internal Plan 4 numbers — developer instructions exclude implementation details from product flows and implementation already explains unavailable config — costs losing an internal milestone reference in tooltips, which remains in docs. Corrected ambiguous plan phrase before re-review.
 
-## 10. Plan 3.5 execution rulings
+### 10. Plan 3.5 execution rulings
 
 - The user's go-ahead authorizes implementation of the requested title/theme direction with reviewable initial colors — avoids repeated approval of the already requested milestone — costs visual rework if the initial palette differs from intent.
 - Start with slim custom title surface and separate tabs unless the pending optional layout answer changes it — limits geometry changes before toolbar discussion — costs a later layout revision if tabs should be integrated.
@@ -7554,7 +10691,7 @@ Root final verification on `f487631`: `./gradlew check --rerun-tasks` ran all ei
 
 The user selected local integration. The completed feature worktree and branch are cleaned up after merged verification succeeds. No GUI or benchmark was launched and no remote is configured. Native title-bar/appearance checks and the terminal daily-use gate remain open.
 
-## 11. Screenshot revision execution rulings
+### 11. Screenshot revision execution rulings
 
 - Treat the supplied mock and explicit exact-match instruction as the approved visual design, superseding earlier colored-toolbar and separate-title decisions — avoids asking approval for the mock the user just selected — costs rework for any mistaken measurements.
 - Interpret the144dpi screenshot as2x and convert its monitor ICC colors to sRGB for Swing values — aligns logical sizes and displayed colors — costs refinement if the mock's intended logical scale differs.
@@ -7563,7 +10700,7 @@ The user selected local integration. The completed feature worktree and branch a
 
 Both task reviews and the final whole-branch review (`182b9fb..be39bbf`) approved without actionable findings. The screenshot-only production/test commit was `63a3325`; the follow-up below changes it. Fresh root verification and independent reviewer XML checks confirm 308 total tests, 307 passed, one known skip. This plan’s scratch workspace is removed after review; the committed plan, comparison report, previews and this handoff retain the evidence and rulings. The feature worktree remains available for user inspection and integration approval.
 
-## 12. Compact tab follow-up
+### 12. Compact tab follow-up
 
 Task 1 (`0c4ab43`) approved without findings: shared live native/Swing height, current-window numeric control, real platform shortcut/override dispatch, 80 app tests. Task 2 (`e46eaae`) implements 180ms entry/underline motion; nine deterministic real-strip tests cover intermediate/final rendered positions, retargeting, metadata continuity, overflow/resize/removal and idle/lifecycle cleanup. Fresh root full verification is recorded at the top. The updated previews show settled 38px geometry; the original 54px mock remains a historical reference. Persistence remains Plan 4.
 
@@ -7573,19 +10710,19 @@ Task 1 (`0c4ab43`) approved without findings: shared live native/Swing height, c
 
 Final whole-branch review (`182b9fb..7449ac4`) found one integration issue: the active title’s preferred width changed tab-strip allocation and prematurely settled animation. The single fix wave `20764b3` preserves motion when allocation changes leave tab coordinates valid, and adds three real MacTitleBar/JRootPane regressions. Scoped review (`7449ac4..20764b3`) marked it addressed with no new findings. Twelve motion tests now pass; root fresh final verification is 328 total, 327 passed, one known skip. Native smoothness, controls and physical keyboard-layout acceptance remain user-run. The plan scratch workspace is removed after review; committed reports, plan, source and this handoff preserve the result. At that milestone the feature remained in `.worktrees/mock-ui`; section 14 records its subsequent integration and removal.
 
-## 13. Reverse close animation
+### 13. Reverse close animation
 
 User-requested bounded follow-up `0f4cd74` reverses the existing motion for visible tab closure. The tab and shell leave the live model immediately; a disabled departing entry contracts while following tabs fill its space and the underline targets the new selection. Closing during entry uses its current width; consecutive closes have independent deadlines. Completed, hidden, reordered, cramped/overflow and disposed departing visuals are removed. Final-tab closure is not delayed.
 
 Four new real MacTitleBar/JRootPane regressions cover active/inactive closes, closing during entry, consecutive deadlines and cleanup. Initial three regressions failed against the prior behavior; the empty-owner timer regression also failed before its fix. Final covering tests:27 passed. Fresh full `./gradlew check --rerun-tasks`:332 total,331 passed, one known font skip; all eight tasks executed, no warnings. Source hygiene and diff checks pass. Independent review of `600c378..0f4cd74` approved without actionable findings; native reverse-motion acceptance remains user-run. This bounded extension updates the existing spec without a new subsystem or plan.
 
-## 14. Approved integration and Plan 4 start
+### 14. Approved integration and Plan 4 start
 
 The user explicitly approved merging all current UI work into main and beginning Plan 4 with saved settings and live reload. Main received the complete UI branch at `1bd8b49`. Fresh merged verification passed 332 tests (331 passed, one known font skip), and the completed mock-ui worktree/branch were removed. Plan 4a then started in the isolated `.worktrees/plan-4` worktree. Native UI/benchmark/daily-use acceptance remains open and is not implied by merge approval.
 
 Plan 4a covers existing live controls only: tab height, toolbar/status, font size, built-in theme and shortcut overrides. Runtime View choices remain temporary; saved defaults are in the user-edited file. Additional terminal options, custom themes, system appearance and packaging follow in separate runnable slices. TomlJ 1.1.1 is selected for precise TOML source positions.
 
-## 15. Plan 4a implementation and execution rulings
+### 15. Plan 4a implementation and execution rulings
 
 Parser/paths/CLI: `8c6fa0e`. File service/template: `e25b4c8`. Live application integration: `a18de61`. Review fixes: `9c0ae64` (all modifiers in rendered toolbar hints and removal of obsolete configuration tooltip). Task reviews are complete with no open findings. Full check after fixes executed all eight Gradle tasks: app 158 passed; terminal 235 passed and one known skip. Source hygiene and diff checks passed. No terminal-module changes were needed.
 
@@ -7602,7 +10739,7 @@ Final whole-branch review (`1bd8b49..b23ee71`) found one P2 test portability iss
 
 Merged-result verification on `05a94d4`: `./gradlew check --rerun-tasks` passed in 11 seconds, all eight tasks executed; XML confirms 394 tests, 393 passed and one known skip, zero failures/errors. The completed feature worktree is no longer the development entry point; use the main checkout.
 
-## Plan 4b recorded decisions
+### Plan 4b recorded decisions
 
 - Ruling: Treat the user's go-ahead as approval of the full Plan4b scope just presented, continuing the established spec-driven workflow without repeating approval — explicit scope and live/new-pane semantics were accepted — costs rework if detailed choices differ from intent.
 - Ruling: Extend the existing terminal options API with backward-compatible constructors and applyOptions rather than replacing views — preserves sessions and existing callers — costs maintaining compatibility overloads.
@@ -7611,7 +10748,7 @@ Merged-result verification on `05a94d4`: `./gradlew check --rerun-tasks` passed 
 - Ruling: Coalesce attached-view bells; visual defaults to a150ms15%-foreground flash, sound is explicit, and stale attachment callbacks are rejected — implements the spec bell choice without late sound/flashes or unbounded queued events — costs tuning visual strength/duration after native use and ignoring bells while detached.
 - Ruling: Anchor array validation diagnostics to the containing key’s exact position instead of TomlJ’s misleading element start — TomlJ includes preceding whitespace/comments in array-element locations, and existing diagnostics identify fields — costs locating the invalid element within the named list rather than pointing directly to its token.
 
-## Plan 4c execution rulings
+### Plan 4c execution rulings
 
 Ruling: Exclude the detector dependency’s transitive net.java.dev.jna group while retaining existing pty4j-provided JNA and JNA-platform 5.14.0 — detector metadata requested an unpublished jpms variant during Gradle test resolution; this avoids replacing the established runtime — costs revisiting the exclusion if native dependency requirements change. Implementer must include runtime dependency evidence.
 
@@ -7620,11 +10757,11 @@ Ruling: Keep the latest OS appearance reading separately from the committed effe
 Ruling: Explicit Reload publishes one accepted state through the existing revision/close guard even when its value is unchanged, while polling and Settings still suppress unchanged values — equal-state suppression prevented the promised failed-theme retry — costs one deliberate UI reapplication per user reload and avoids a second unguarded completion path.
 
 
-## Packaging verification notes
+### Packaging verification notes
 
 Task 1 was independently approved with no required fixes. Task 2 added RED/GREEN environment regressions; full `./gradlew check` passed with 508 tests, 507 passed and one known font skip. Final forced `./gradlew check :jasper-app:packageDist --rerun-tasks` passed all 13 tasks in 44 seconds: 508 tests, 507 passed, one known font skip, zero failures/errors; package and DMG checks passed. Whole-branch review fixes in `de4ec8c` were approved by scoped re-review with no open findings. [Verification, artifact checksum and execution decisions](superpowers/plans/2026-09-12-jasper-plan-4d-verification.md). One intermediate forced run observed a concurrent RIS snapshot NPE in `TerminalLiveOptionsTest` in unchanged terminal source/tests; targeted and subsequent full runs passed. The readiness branch reproduced and fixed this reset-lock race with a deterministic concurrent-reset regression, distinct from the known font skip. No claim of Windows or desktop runtime acceptance is made.
 
-## Authorized publication and Windows CI test portability
+### Authorized publication and Windows CI test portability
 
 The readiness branch was pushed after explicit user approval. Initial CI passed macOS/Linux but failed three Windows app tests. Test-only `a5f4dc1` uses the platform line separator for the exact logging fallback assertion and adds method-level Windows exclusions for two existing `/bin/sh` fixtures. Production code, package and measured runtime remain unchanged. Focused 15/15 and local full 575 passed/one known skip; `c793925` additionally fixes an off-EDT test resize race without weakening its grid/connector assertions; focused8/full575pass1skip and the confirming three-platform run passed. Details and the controller-review substitution caused by the agent service's thread limit are recorded in the [readiness handoff](terminal-readiness.md#publication-and-ci-follow-up).
 
@@ -7745,7 +10882,7 @@ Independent review and rollback re-review are complete. No GUI launch or push.
 Theme-engine Plan 1 final fix evidence (2026-10-04): stabilized headless `./gradlew check` passed
 9,063 tests (9,057 passed; zero failures/errors; six existing environment skips). Six regenerated
 gallery runs contain 49 fixtures each / 636 files total; details and exact per-module totals are in
-[UI maintenance](ui-maintenance.md) and [calibration](design/theme-engine/calibration.md).
+[UI maintenance at `ef03625b4`](https://github.com/an0nn30/Jasper/blob/ef03625b477f399f046b80c9709911987114d761/docs/ui-maintenance.md#combined-final-review-fix-verification) and [calibration](design/theme-engine/calibration.md).
 Task 14 verification and independent review are complete; one known Minor expression-parity gap
 is assigned to Plan 2 Task 2 before imported-theme visual acceptance. User/native acceptance remains
 pending; Plan 2 execution started 2026-10-05 and Plan 3 remains unexecuted. See the [review handoff](design/theme-engine/verification.md).

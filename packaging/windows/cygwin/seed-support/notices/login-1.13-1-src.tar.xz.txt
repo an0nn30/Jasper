@@ -1,0 +1,2495 @@
+Package source: x86_64/release/login/login-1.13-1-src.tar.xz
+License identifier: LicenseRef-Upstream-login
+
+--- login-1.13-1.src/login.cygport ---
+NAME="login"
+VERSION=1.13
+RELEASE=1
+CATEGORY="Base"
+SUMMARY="Sign on to a system"
+HOMEPAGE="http://cygwin.com/"
+
+GIT_URI="git://cygwin.com/git/cygwin-apps/login.git"
+GIT_TAG="v${PV//\./_}"
+inherit git
+
+src_compile() {
+	lndirs
+	cd ${B}
+	cygmake CC=${CC} CFLAGS="${CFLAGS}"
+}
+
+Source archive: x86_64/release/login/login-1.13-1-src.tar.xz
+
+--- login-1.13-1.src/login-1.13.tar.bz2!/login/Makefile ---
+#
+# Copyright (c) 1988 Regents of the University of California.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms are permitted
+# provided that the above copyright notice and this paragraph are
+# duplicated in all such forms and that any documentation, advertising
+# materials, and other materials related to such redistribution and
+# use acknowledge that the software was developed by the University
+# of California, Berkeley.  The name of the University may not be
+# used to endorse or promote products derived from this software
+# without specific prior written permission.  THIS SOFTWARE IS PROVIDED
+# ``AS IS'' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
+# WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND
+# FITNESS FOR A PARTICULAR PURPOSE.
+#
+# @(#)Makefile	5.1 (Berkeley) 10/18/88
+#
+CC=gcc
+CFLAGS=	-O
+SRCS=	login.c winpriv.c winsec.c lastlog.c
+OBJS=	login.$(O) winpriv.$(O) winsec.$(O) lastlog.$(O)
+
+LOGIN_OBJS = login.$(O) winpriv.$(O) winsec.$(O)
+TEST_WINSEC_OBJS = test_winsec.$(O) winsec.$(O)
+
+MAN=	login.1
+prefix=/usr
+docdir=/usr/share/doc/login
+mandir=/usr/share/man
+DESTDIR=
+EXEEXT=.exe
+O=o
+
+all: login$(EXEEXT) lastlog$(EXEEXT) test_winsec$(EXEEXT)
+
+login$(EXEEXT): $(LOGIN_OBJS)
+	$(CC) -o $@ $(CFLAGS) $^ -lnetapi32
+
+lastlog$(EXEEXT): lastlog.$(O)
+	$(CC) -o $@ $(CFLAGS) $^
+
+test_winsec$(EXEEXT): $(TEST_WINSEC_OBJS)
+	$(CC) -o $@ $(CFLAGS) $^ -lnetapi32
+
+clean:
+	rm -f $(OBJS) test_winsec.$(O) core 
+	rm -f login$(EXEEXT).stackdump login$(EXEEXT)
+	rm -f lastlog$(EXEEXT).stackdump lastlog$(EXEEXT)
+	rm -f test_winsec$(EXEEXT) test_winsec$(EXEEXT).stackdump
+
+cleandir: clean
+	rm -f $(MAN) tags .depend
+
+depend: $(SRCS)
+	mkdep -p $(CFLAGS) $(SRCS)
+
+install: login$(EXEEXT)
+	-mkdir -p $(DESTDIR)$(prefix)/bin $(DESTDIR)$(docdir) $(DESTDIR)$(mandir)/man1 $(DESTDIR)$(mandir)/man8
+	install -m 4755 login$(EXEEXT) $(DESTDIR)$(prefix)/bin/login$(EXEEXT)
+	install -m 0755 lastlog$(EXEEXT) $(DESTDIR)$(prefix)/bin/lastlog$(EXEEXT)
+	install -m 644 login.README $(DESTDIR)$(docdir)/login.README
+	install -m 644 login.1 $(DESTDIR)$(mandir)/man1/login.1
+	install -m 644 lastlog.8 $(DESTDIR)$(mandir)/man8/lastlog.8
+
+lint: $(SRCS)
+	lint $(CFLAGS) $(SRCS)
+
+tags: $(SRCS)
+	ctags $(SRCS)
+
+
+
+--- login-1.13-1.src/login-1.13.tar.bz2!/login/lastlog.c ---
+/*
+ * Copyright (c) 1989 - 1994, Julianne Frances Haugh
+ * Copyright (c) 1996 - 2000, Marek Michałkiewicz
+ * Copyright (c) 2000 - 2006, Tomasz Kłoczko
+ * Copyright (c) 2007 - 2011, Nicolas François
+ * Copyright (c) 2014 Red Hat, Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the copyright holders or contributors may not be used to
+ *    endorse or promote products derived from this software without
+ *    specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#elif defined(__CYGWIN__)
+#define HAVE_STRFTIME
+#define HAVE_LL_HOST
+#endif
+
+//#ident "$Id$"
+
+#include <getopt.h>
+#include <lastlog.h>
+#include <pwd.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+#include <assert.h>
+#if 0
+#include "defines.h"
+#include "prototypes.h"
+/*@-exitarg@*/
+#include "exitcodes.h"
+#else
+#include <ctype.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#define DAY (24L*3600L)
+#define _(x) x
+#define memzero(ptr, size) memset((void *)(ptr), 0, (size))
+#endif
+
+/*
+ * Needed for MkLinux DR1/2/2.1 - J.
+ */
+#ifndef LASTLOG_FILE
+#define LASTLOG_FILE "/var/log/lastlog"
+#endif
+
+static
+int getulong (const char *numstr, /*@out@*/unsigned long int *result)
+{
+	long long int val;
+	char *endptr;
+
+	errno = 0;
+	val = strtoll (numstr, &endptr, 0);
+	if (    ('\0' == *numstr)
+	     || ('\0' != *endptr)
+	     || (ERANGE == errno)
+	     /*@+ignoresigns@*/
+	     || (val != (unsigned long int)val)
+	     /*@=ignoresigns@*/
+	   ) {
+		return 0;
+	}
+
+	*result = (unsigned long int)val;
+	return 1;
+}
+
+static
+int getrange (char *range,
+              unsigned long *min, bool *has_min,
+              unsigned long *max, bool *has_max)
+{
+	char *endptr;
+	unsigned long n;
+
+	if (NULL == range) {
+		return 0;
+	}
+
+	if ('-' == range[0]) {
+		if (!isdigit(range[1])) {
+			/* invalid */
+			return 0;
+		}
+		errno = 0;
+		n = strtoul (&range[1], &endptr, 10);
+		if (('\0' != *endptr) || (ERANGE == errno)) {
+			/* invalid */
+			return 0;
+		}
+		/* -<long> */
+		*has_min = false;
+		*has_max = true;
+		*max = n;
+	} else {
+		errno = 0;
+		n = strtoul (range, &endptr, 10);
+		if (ERANGE == errno) {
+			/* invalid */
+			return 0;
+		}
+		switch (*endptr) {
+			case '\0':
+				/* <long> */
+				*has_min = true;
+				*has_max = true;
+				*min = n;
+				*max = n;
+				break;
+			case '-':
+				endptr++;
+				if ('\0' == *endptr) {
+					/* <long>- */
+					*has_min = true;
+					*has_max = false;
+					*min = n;
+				} else if (!isdigit (*endptr)) {
+					/* invalid */
+					return 0;
+				} else {
+					*has_min = true;
+					*min = n;
+					errno = 0;
+					n = strtoul (endptr, &endptr, 10);
+					if (   ('\0' != *endptr)
+					    || (ERANGE == errno)) {
+						/* invalid */
+						return 0;
+					}
+					/* <long>-<long> */
+					*has_max = true;
+					*max = n;
+				}
+				break;
+			default:
+				return 0;
+		}
+	}
+
+	return 1;
+}
+
+
+/*
+ * Global variables
+ */
+const char *Prog;		/* Program name */
+static FILE *lastlogfile;	/* lastlog file stream */
+static unsigned long umin;	/* if uflg and has_umin, only display users with uid >= umin */
+static bool has_umin = false;
+static unsigned long umax;	/* if uflg and has_umax, only display users with uid <= umax */
+static bool has_umax = false;
+static time_t seconds;		/* that number of days in seconds */
+static time_t inverse_seconds;	/* that number of days in seconds */
+static struct stat statbuf;	/* fstat buffer for file size */
+
+
+static bool uflg = false;	/* print only an user of range of users */
+static bool tflg = false;	/* print is restricted to most recent days */
+static bool bflg = false;	/* print excludes most recent days */
+
+#define	NOW	(time ((time_t *) 0))
+
+static __attribute__((__noreturn__))
+void usage (int status)
+{
+	FILE *usageout = (EXIT_SUCCESS != status) ? stderr : stdout;
+	(void) fprintf (usageout,
+	                _("Usage: %s [options]\n"
+	                  "\n"
+	                  "Options:\n"),
+	                Prog);
+	(void) fputs (_("  -b, --before DAYS             print only lastlog records older than DAYS\n"), usageout);
+	(void) fputs (_("  -h, --help                    display this help message and exit\n"), usageout);
+#ifndef __CYGWIN__
+	(void) fputs (_("  -R, --root CHROOT_DIR         directory to chroot into\n"), usageout);
+#endif
+	(void) fputs (_("  -t, --time DAYS               print only lastlog records more recent than DAYS\n"), usageout);
+	(void) fputs (_("  -u, --user LOGIN              print lastlog record of the specified LOGIN\n"), usageout);
+	(void) fputs ("\n", usageout);
+	exit (status);
+}
+
+static void print_one (/*@null@*/const struct passwd *pw)
+{
+	static bool once = false;
+	char *cp;
+	struct tm *tm;
+	time_t ll_time;
+	off_t offset;
+	struct lastlog ll;
+
+#ifdef HAVE_STRFTIME
+	char ptime[80];
+#endif
+
+	if (NULL == pw) {
+		return;
+	}
+
+
+	offset = (off_t) pw->pw_uid * sizeof (ll);
+	if (offset + sizeof (ll) <= statbuf.st_size) {
+		/* fseeko errors are not really relevant for us. */
+		int err = fseeko (lastlogfile, offset, SEEK_SET);
+		assert (0 == err);
+		/* lastlog is a sparse file. Even if no entries were
+		 * entered for this user, which should be able to get the
+		 * empty entry in this case.
+		 */
+		if (fread ((char *) &ll, sizeof (ll), 1, lastlogfile) != 1) {
+			fprintf (stderr,
+			         _("%s: Failed to get the entry for UID %lu\n"),
+			         Prog, (unsigned long int)pw->pw_uid);
+			exit (EXIT_FAILURE);
+		}
+	} else {
+		/* Outsize of the lastlog file.
+		 * Behave as if there were a missing entry (same behavior
+		 * as if we were reading an non existing entry in the
+		 * sparse lastlog file).
+		 */
+		memzero (&ll, sizeof (ll));
+	}
+
+	/* Filter out entries that do not match with the -t or -b options */
+	if (tflg && ((NOW - ll.ll_time) > seconds)) {
+		return;
+	}
+
+	if (bflg && ((NOW - ll.ll_time) < inverse_seconds)) {
+		return;
+	}
+
+	/* Print the header only once */
+	if (!once) {
+#ifdef HAVE_LL_HOST
+		puts (_("Username         Port     From             Latest"));
+#else
+		puts (_("Username                Port     Latest"));
+#endif
+		once = true;
+	}
+
+	ll_time = ll.ll_time;
+	tm = localtime (&ll_time);
+#ifdef HAVE_STRFTIME
+	strftime (ptime, sizeof (ptime), "%a %b %e %H:%M:%S %z %Y", tm);
+	cp = ptime;
+#else
+	cp = asctime (tm);
+	cp[24] = '\0';
+#endif
+
+	if (ll.ll_time == (time_t) 0) {
+		cp = _("**Never logged in**\0");
+	}
+
+#ifdef HAVE_LL_HOST
+	printf ("%-16s %-8.8s %-16.16s %s\n",
+	        pw->pw_name, ll.ll_line, ll.ll_host, cp);
+#else
+	printf ("%-16s\t%-8.8s %s\n",
+	        pw->pw_name, ll.ll_line, cp);
+#endif
+}
+
+static void print (void)
+{
+	const struct passwd *pwent;
+	if (uflg && has_umin && has_umax && (umin == umax)) {
+		print_one (getpwuid ((uid_t)umin));
+	} else {
+		setpwent ();
+		while ( (pwent = getpwent ()) != NULL ) {
+			if (   uflg
+			    && (   (has_umin && (pwent->pw_uid < (uid_t)umin))
+			        || (has_umax && (pwent->pw_uid > (uid_t)umax)))) {
+				continue;
+			}
+			print_one (pwent);
+		}
+		endpwent ();
+	}
+}
+
+int main (int argc, char **argv)
+{
+	/*
+	 * Get the program name. The program name is used as a prefix to
+	 * most error messages.
+	 */
+	Prog = program_invocation_short_name;
+
+#ifdef HAVE_GETTEXT
+	(void) setlocale (LC_ALL, "");
+	(void) bindtextdomain (PACKAGE, LOCALEDIR);
+	(void) textdomain (PACKAGE);
+#endif
+
+#ifndef __CYGWIN__
+	process_root_flag ("-R", argc, argv);
+#endif
+
+	{
+		int c;
+		static struct option const longopts[] = {
+			{"before", required_argument, NULL, 'b'},
+			{"help",   no_argument,       NULL, 'h'},
+#ifndef __CYGWIN__
+			{"root",   required_argument, NULL, 'R'},
+#endif
+			{"time",   required_argument, NULL, 't'},
+			{"user",   required_argument, NULL, 'u'},
+			{NULL, 0, NULL, '\0'}
+		};
+
+		while ((c = getopt_long (argc, argv, "b:hR:t:u:", longopts,
+		                         NULL)) != -1) {
+			switch (c) {
+			case 'b':
+			{
+				unsigned long inverse_days;
+				if (getulong (optarg, &inverse_days) == 0) {
+					fprintf (stderr,
+					         _("%s: invalid numeric argument '%s'\n"),
+					         Prog, optarg);
+					exit (EXIT_FAILURE);
+				}
+				inverse_seconds = (time_t) inverse_days * DAY;
+				bflg = true;
+				break;
+			}
+			case 'h':
+				usage (EXIT_SUCCESS);
+				/*@notreached@*/break;
+			case 'R': /* no-op, handled in process_root_flag () */
+				break;
+			case 't':
+			{
+				unsigned long days;
+				if (getulong (optarg, &days) == 0) {
+					fprintf (stderr,
+					         _("%s: invalid numeric argument '%s'\n"),
+					         Prog, optarg);
+					exit (EXIT_FAILURE);
+				}
+				seconds = (time_t) days * DAY;
+				tflg = true;
+				break;
+			}
+			case 'u':
+			{
+				const struct passwd *pwent;
+				/*
+				 * The user can be:
+				 *  - a login name
+				 *  - numerical
+				 *  - a numerical login ID
+				 *  - a range (-x, x-, x-y)
+				 */
+				uflg = true;
+				/* local, no need for xgetpwnam */
+				pwent = getpwnam (optarg);
+				if (NULL != pwent) {
+					umin = (unsigned long) pwent->pw_uid;
+					has_umin = true;
+					umax = umin;
+					has_umax = true;
+				} else {
+					if (getrange (optarg,
+					              &umin, &has_umin,
+					              &umax, &has_umax) == 0) {
+						fprintf (stderr,
+						         _("%s: Unknown user or range: %s\n"),
+						         Prog, optarg);
+						exit (EXIT_FAILURE);
+					}
+				}
+				break;
+			}
+			default:
+				usage (EXIT_FAILURE);
+				/*@notreached@*/break;
+			}
+		}
+		if (argc > optind) {
+			fprintf (stderr,
+			         _("%s: unexpected argument: %s\n"),
+			         Prog, argv[optind]);
+			usage (EXIT_FAILURE);
+		}
+	}
+
+	lastlogfile = fopen (LASTLOG_FILE, "r");
+	if (NULL == lastlogfile) {
+		perror (LASTLOG_FILE);
+		exit (EXIT_FAILURE);
+	}
+
+	/* Get the lastlog size */
+	if (fstat (fileno (lastlogfile), &statbuf) != 0) {
+		fprintf (stderr,
+		         _("%s: Cannot get the size of %s: %s\n"),
+		         Prog, LASTLOG_FILE, strerror (errno));
+		exit (EXIT_FAILURE);
+	}
+
+	print ();
+
+	(void) fclose (lastlogfile);
+
+	return EXIT_SUCCESS;
+}
+
+
+--- login-1.13-1.src/login-1.13.tar.bz2!/login/login.1 ---
+.\" Copyright 1999, 2000 SuSE GmbH Nuernberg, Germany
+.\" Author: Thorsten Kukuk <kukuk@suse.de>
+.\" May be distributed under the GNU General Public License
+.TH LOGIN 1 "17 May 2000" "Cygwin Login 1.2" "Cygwin Manual"
+.SH NAME
+login \- sign on
+.SH SYNOPSIS
+.BR "login [ " name " ]"
+.br
+.B "login \-p"
+.br
+.BR "login \-h " hostname
+.br
+.BR "login \-f " name
+.SH DESCRIPTION
+.B login
+is used when signing onto a system.
+If an argument is not given,
+.B login
+prompts for the username.
+
+If the file
+.I /etc/nologin
+exists, the content of the file is written to stdout and nobody
+is permitted to log into the system.
+
+Random administrative things, such as setting the UID and GID of the
+tty are performed.  The TERM environment variable is preserved, if it
+exists (other environment variables are preserved if the
+.B \-p
+option is used).  Then the HOME, PATH, SHELL, MAIL, and LOGNAME
+environment variables are set.  PATH is not changed from the
+system PATH if it's found. Otherwise PATH defaults to
+.I /usr/local/bin:/bin:/usr/bin.
+
+Authentication is done via SAM database.
+The user's shell is then started. If no shell is specified for the
+user in
+.BR /etc/passwd ,
+then
+.B /bin/sh
+is used.  If there is no directory specified in
+.IR /etc/passwd ,
+then
+.I /
+is used (the home directory is checked for the
+.I .hushlogin
+file described above).
+.SH OPTIONS
+.TP
+.B \-p
+Used by
+.BR getty (8)
+to tell
+.B login
+not to destroy the environment. This is disabled in the Cygwin version.
+.TP
+.B \-f
+Used to skip a second login authentication.  This specifically does
+.B not
+work for root.
+.TP
+.B \-h
+Used by other servers (i.e.,
+.BR telnetd (8))
+to pass the name of the remote host to
+.B login
+so that it may be placed in utmp and wtmp.
+
+.SH FILES
+.nf
+.I /var/run/utmp
+.I /var/log/wtmp
+.I /var/log/lastlog
+.I /etc/passwd
+.fi
+.SH "SEE ALSO"
+.BR passwd (1),
+.BR passwd (5),
+.BR environ (7),
+.BR telnetd (8).
+.SH BUGS
+
+Perhaps.
+
+.SH AUTHOR
+Derived from BSD login 5.32.1.1 (1/28/89) and ported to Cygwin
+by Sergey Okhapkin (sos@prospect.com.ru)
+.br
+Added new features: Corinna Vinschen <vinschen@cygnus.com>
+
+
+--- login-1.13-1.src/login-1.13.tar.bz2!/login/login.c ---
+/*
+ * Copyright (c) 1980, 1987, 1988 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms are permitted
+ * provided that the above copyright notice and this paragraph are
+ * duplicated in all such forms and that any documentation,
+ * advertising materials, and other materials related to such
+ * distribution and use acknowledge that the software was developed
+ * by the University of California, Berkeley.  The name of the
+ * University may not be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ */
+
+#ifndef lint
+char copyright[] =
+  "@(#) Copyright (c) 1980, 1987, 1988 The Regents of the University of California.\n\
+ All rights reserved.\n";
+#endif /* not lint */
+
+#ifndef lint
+static char sccsid[] __attribute__ ((used)) =
+  "@(#)login.c	5.32.1.1 (Berkeley) 1/28/89, 1.10 (Cygwin) 2009-04-20";
+#endif /* not lint */
+
+/*
+ * login [ name ]
+ * login -h hostname	(for telnetd, etc.)
+ * login -f name	(for pre-authenticated login: datakit, xterm, etc.)
+ */
+
+#include <unistd.h>
+#include <sys/param.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <sys/file.h>
+#include <sys/ioctl.h>
+#include <sys/termios.h>
+
+#include <utmp.h>
+#include <signal.h>
+#include <lastlog.h>
+#include <errno.h>
+#include <syslog.h>
+#include <grp.h>
+#include <pwd.h>
+#include <setjmp.h>
+#include <stdio.h>
+#include <strings.h>
+
+#define	TTYGRPNAME	"tty"	/* name of group to own ttys */
+
+#define	MOTDFILE	"/etc/motd"
+#define	MAILDIR		"/usr/spool/mail"
+#define	NOLOGIN		"/etc/nologin"
+#define	HUSHLOGIN	".hushlogin"
+#ifdef __CYGWIN__
+#define	LASTLOG		"/var/log/lastlog"
+#else
+#define	LASTLOG		"/usr/adm/lastlog"
+#endif
+#define	BSHELL		"/bin/sh"
+
+#ifdef __CYGWIN__
+#include <windows.h>
+#include <sys/cygwin.h>
+#endif
+
+#ifdef __CYGWIN__
+static int isROOT_UID (uid_t uid);
+#else
+#define isROOT_UID(uid) ((int) ((uid) == 0))
+#endif
+
+static void getloginname ();
+static void timedout ();
+static void motd ();
+static void sigint ();
+static void checknologin ();
+static void dolastlog (int quiet);
+static void badlogin (char *name);
+static void sleepexit (int eval);
+
+/*
+ * This bounds the time given to login.  Not a define so it can
+ * be patched on machines where it's too small.
+ */
+int timeout = 300;
+
+struct passwd userpwd;
+char pwbuf[16384];
+struct passwd *pwd;
+int failures;
+char term[64], *hostname, *username, *tty;
+
+int
+main (int argc, char **argv)
+{
+#ifndef __CYGWIN__	/* Avoid warnings. */
+  extern int errno, optind;
+  extern char *optarg, **environ;
+  struct group *gr;
+  int ioctlval;
+#endif
+  register int ch;
+  register char *p;
+  int ask, fflag, hflag, pflag, cnt;
+  int quietlog, passwd_req;
+#ifdef __CYGWIN__
+  gid_t priv_gid;
+  uid_t priv_uid;
+#endif
+#ifndef __CYGWIN__	/* Avoid warnings. */
+  char *salt, *envinit[1];
+#endif
+  char *domain, *ttyn, *pp;
+  char tbuf[MAXPATHLEN + 2];
+  char *ttyname (), *crypt (), *getpass ();
+  time_t time ();
+  off_t lseek ();
+
+  (void) signal (SIGALRM, timedout);
+  (void) alarm ((u_int) timeout);
+  (void) signal (SIGQUIT, SIG_IGN);
+  (void) signal (SIGINT, SIG_IGN);
+
+  /*
+   * -p is used by getty to tell login not to destroy the environment
+   * -f is used to skip a second login authentication 
+   * -h is used by other servers to pass the name of the remote
+   *    host to login so that it may be placed in utmp and wtmp
+   */
+  (void) gethostname (tbuf, sizeof (tbuf));
+  domain = index (tbuf, '.');
+
+  fflag = hflag = pflag = 0;
+  passwd_req = 1;
+  while ((ch = getopt (argc, argv, "fh:p")) != EOF)
+    switch (ch)
+      {
+      case 'f':
+	fflag = 1;
+	break;
+      case 'h':
+#ifndef __CYGWIN__
+	if (!isROOT_UID (getuid ()))
+	  {
+	    fprintf (stderr, "login: -h for super-user only.\n");
+	    exit (1);
+	  }
+#endif
+	hflag = 1;
+	if (domain && (p = index (optarg, '.')) &&
+	    strcasecmp (p, domain) == 0)
+	  *p = 0;
+	hostname = optarg;
+	break;
+      case 'p':
+	pflag = 1;
+	break;
+      case '?':
+      default:
+	fprintf (stderr, "usage: login [-fp] [username]\n");
+	exit (1);
+      }
+  argc -= optind;
+  argv += optind;
+  if (*argv)
+    {
+      username = *argv;
+      ask = 0;
+    }
+  else
+    ask = 1;
+
+  for (cnt = getdtablesize (); cnt > 2; cnt--)
+    close (cnt);
+
+  ttyn = ttyname (0);
+  if (ttyn == NULL || *ttyn == '\0')
+    ttyn = "/dev/tty??";
+  if ((tty = rindex (ttyn, '/')))
+    ++tty;
+  else
+    tty = ttyn;
+
+  openlog ("login", LOG_ODELAY, LOG_AUTH);
+
+  for (cnt = 0;; ask = 1)
+    {
+#ifndef __CYGWIN__
+      ioctlval = 0;
+      (void) ioctl (0, TIOCSETD, &ioctlval);
+#endif
+      if (ask)
+	{
+	  fflag = 0;
+	  getloginname ();
+	}
+      /*
+       * Note if trying multiple user names;
+       * log failures for previous user name,
+       * but don't bother logging one failure
+       * for nonexistent name (mistyped username).
+       */
+      if (failures && strcmp (tbuf, username))
+	{
+	  if (failures > (pwd ? 0 : 1))
+	    badlogin (tbuf);
+	  failures = 0;
+	}
+      (void) strcpy (tbuf, username);
+#ifdef __CYGWIN__
+      getpwnam_r (username, &userpwd, pwbuf, sizeof(pwbuf), &pwd);
+#else
+      if (pwd = getpwnam (username))
+	salt = pwd->pw_passwd;
+      else
+	salt = "xx";
+#endif
+      /* if user not super-user, check for disabled logins */
+      if (pwd == NULL || !isROOT_UID (pwd->pw_uid))
+	checknologin ();
+
+      /*
+       * Disallow automatic login to root; if not invoked by
+       * root, disallow if the uid's differ.
+       */
+      if (fflag && pwd)
+	{
+	  int uid = getuid ();
+
+	  passwd_req = isROOT_UID (pwd->pw_uid) ||
+	    ((!isROOT_UID (uid)) && (uid != pwd->pw_uid));
+	}
+
+      /*
+       * If no pre-authentication and a password exists
+       * for this user, prompt for one and verify it.
+       */
+      if (!passwd_req || (pwd && !*pwd->pw_passwd))
+	break;
+
+      pp = getpass ("Password:");
+#ifdef __CYGWIN__
+	{
+	  HANDLE hToken = cygwin_logon_user (pwd, pp);
+	  if (hToken != INVALID_HANDLE_VALUE)
+	    {
+	      cygwin_set_impersonation_token (hToken);
+	      break;
+	    }
+	}
+#else
+	{
+	  p = crypt (pp, salt);
+	  if (pwd && !strcmp (p, pwd->pw_passwd))
+	    break;
+	}
+#endif
+      (void) bzero (pp, strlen (pp));
+
+      printf ("Login incorrect\n");
+      failures++;
+      /* we allow 10 tries, but after 3 we start backing off */
+      if (++cnt > 3)
+	{
+	  if (cnt >= 10)
+	    {
+	      badlogin (username);
+#ifndef __CYGWIN__
+	      (void) ioctl (0, TIOCHPCL, (struct sgttyb *) NULL);
+#endif
+	      sleepexit (1);
+	    }
+	  sleep ((u_int) ((cnt - 3) * 5));
+	}
+    }
+  chown (ttyn, pwd->pw_uid, pwd->pw_gid);
+  chmod (ttyn, 0600);
+
+  /* committed to login -- turn off timeout */
+  (void) alarm ((u_int) 0);
+  /*
+   * If valid so far and root is logging in, see if root logins on
+   * this terminal are permitted.
+   */
+#ifdef __CYGWIN__
+  /* Unfortunately we have to make sure that the user is already
+     the right one to chmod to its home dir on Windows. */
+  priv_gid = getegid ();
+  priv_uid = geteuid ();
+  setegid (pwd->pw_gid);
+  if (seteuid (pwd->pw_uid))
+    {
+      printf ("Switching to user %s failed!\n", username);
+      sleep (1);
+      exit (0);
+    }
+#endif
+  if (chdir (pwd->pw_dir) < 0)
+    {
+      printf ("No directory %s!\n", pwd->pw_dir);
+      if (chdir ("/"))
+	exit (0);
+      pwd->pw_dir = "/";
+      printf ("Logging in with home = \"/\".\n");
+    }
+  /* nothing else left to fail -- really log in */
+#ifdef __CYGWIN__
+  /* But we have to revert to the privileged user to access utmp. */
+  setegid (priv_gid);
+  seteuid (priv_uid);
+#endif
+  {
+    struct utmp utmp;
+
+    bzero ((char *) &utmp, sizeof (utmp));
+    (void) time (&utmp.ut_time);
+    strncpy (utmp.ut_name, username, sizeof (utmp.ut_name));
+    if (hostname)
+      strncpy (utmp.ut_host, hostname, sizeof (utmp.ut_host));
+    strncpy (utmp.ut_line, tty, sizeof (utmp.ut_line));
+#ifdef __CYGWIN__
+    /* Cygwin has the Linux fields in utmp as well. */
+    {
+      int len = strlen (tty) - sizeof (utmp.ut_id);
+      if (len > 0)
+	tty += len;
+      strncpy (utmp.ut_id, tty, sizeof (utmp.ut_id));
+      if (len > 0)
+	tty -= len;
+      utmp.ut_pid = getpid ();
+    }
+#endif
+    utmp.ut_type = USER_PROCESS;
+    login (&utmp);
+  }
+  quietlog = access (HUSHLOGIN, F_OK) == 0;
+  dolastlog (quietlog);
+
+  setgid (pwd->pw_gid);
+  setuid (pwd->pw_uid);
+
+#if 0
+  if (!hflag)
+    {				/* XXX */
+      static struct winsize win = { 0, 0 /*, 0, 0 */  };
+
+      (void) ioctl (0, TIOCSWINSZ, &win);
+    }
+#endif
+
+#ifndef __CYGWIN__
+  initgroups (username, pwd->pw_gid);
+#endif
+
+  if (*pwd->pw_shell == '\0')
+    pwd->pw_shell = BSHELL;
+
+  /* destroy environment unless user has requested preservation */
+#ifndef __CYGWIN__
+  if (!pflag)
+    environ = envinit;
+#endif
+  (void) setenv ("HOME", pwd->pw_dir, 1);
+  (void) setenv ("SHELL", pwd->pw_shell, 1);
+#ifndef __CYGWIN__
+  (void) setenv ("TERM", term, 0);
+#endif
+  (void) setenv ("USER", pwd->pw_name, 1);
+  (void) setenv ("PATH", "/usr/ucb:/bin:/usr/bin:", 0);
+
+  if (tty[sizeof ("tty") - 1] == 'd')
+    syslog (LOG_INFO, "DIALUP %s, %s", tty, pwd->pw_name);
+  if (isROOT_UID (pwd->pw_uid))
+    {
+      if (hostname)
+	syslog (LOG_NOTICE, "ROOT LOGIN ON %s FROM %s", tty, hostname);
+      else
+	syslog (LOG_NOTICE, "ROOT LOGIN ON %s", tty);
+    }
+
+  if (!quietlog)
+    {
+      struct stat st;
+
+      motd ();
+      (void) sprintf (tbuf, "%s/%s", MAILDIR, pwd->pw_name);
+      if (stat (tbuf, &st) == 0 && st.st_size != 0)
+	printf ("You have %smail.\n",
+		(st.st_mtime > st.st_atime) ? "new " : "");
+    }
+
+  (void) signal (SIGALRM, SIG_DFL);
+  (void) signal (SIGQUIT, SIG_DFL);
+  (void) signal (SIGINT, SIG_DFL);
+  (void) signal (SIGTSTP, SIG_IGN);
+
+  tbuf[0] = '-';
+  strcpy (tbuf + 1, (p = rindex (pwd->pw_shell, '/')) ?
+	  p + 1 : pwd->pw_shell);
+  execlp (pwd->pw_shell, tbuf, NULL);
+  fprintf (stderr, "login: no shell: ");
+  perror (pwd->pw_shell);
+  exit (0);
+}
+
+static void
+getloginname ()
+{
+  register int ch;
+  register char *p;
+  static char nbuf[UT_NAMESIZE + 1];
+
+  for (;;)
+    {
+      printf ("login: ");
+      for (p = nbuf; (ch = getchar ()) != '\n';)
+	{
+	  if (ch == EOF)
+	    {
+	      badlogin (username);
+	      exit (0);
+	    }
+	  if (p < nbuf + UT_NAMESIZE)
+	    *p++ = ch;
+	}
+      if (p > nbuf)
+	{
+	  if (nbuf[0] == '-')
+	    fprintf (stderr, "login names may not start with '-'.\n");
+	  else
+	    {
+	      *p = '\0';
+	      username = nbuf;
+	      break;
+	    }
+	}
+    }
+}
+
+static void
+timedout ()
+{
+  fprintf (stderr, "Login timed out after %d seconds\n", timeout);
+  exit (0);
+}
+
+jmp_buf motdinterrupt;
+
+static void
+motd ()
+{
+  register int fd, nchars;
+  void (*oldint) ();
+  char tbuf[8192];
+
+  if ((fd = open (MOTDFILE, O_RDONLY, 0)) < 0)
+    return;
+  oldint = signal (SIGINT, sigint);
+  if (setjmp (motdinterrupt) == 0)
+    while ((nchars = read (fd, tbuf, sizeof (tbuf))) > 0)
+      (void) write (fileno (stdout), tbuf, nchars);
+  (void) signal (SIGINT, oldint);
+  (void) close (fd);
+}
+
+static void
+sigint ()
+{
+  longjmp (motdinterrupt, 1);
+}
+
+static void
+checknologin ()
+{
+  register int fd, nchars;
+  char tbuf[8192];
+
+  if ((fd = open (NOLOGIN, O_RDONLY, 0)) >= 0)
+    {
+      while ((nchars = read (fd, tbuf, sizeof (tbuf))) > 0)
+	(void) write (fileno (stdout), tbuf, nchars);
+      sleepexit (0);
+    }
+}
+
+static void
+dolastlog (int quiet)
+{
+  struct lastlog ll;
+  int fd;
+
+  if ((fd = open (LASTLOG, O_RDWR, 0)) >= 0)
+    {
+      (void) lseek (fd, (off_t) pwd->pw_uid * sizeof (ll), L_SET);
+      if (!quiet)
+	{
+	  if (read (fd, (char *) &ll, sizeof (ll)) == sizeof (ll) &&
+	      ll.ll_time != 0)
+	    {
+	      printf ("Last login: %.*s ",
+		      24 - 5, (char *) ctime (&ll.ll_time));
+	      if (*ll.ll_host != '\0')
+		printf ("from %.*s\n", (int) sizeof (ll.ll_host), ll.ll_host);
+	      else
+		printf ("on %.*s\n", (int) sizeof (ll.ll_line), ll.ll_line);
+	    }
+	  (void) lseek (fd, (off_t) pwd->pw_uid * sizeof (ll), L_SET);
+	}
+      bzero ((char *) &ll, sizeof (ll));
+      (void) time (&ll.ll_time);
+      strncpy (ll.ll_line, tty, sizeof (ll.ll_line));
+      if (hostname)
+	strncpy (ll.ll_host, hostname, sizeof (ll.ll_host));
+      (void) write (fd, (char *) &ll, sizeof (ll));
+      (void) close (fd);
+    }
+}
+
+static void
+badlogin (char *name)
+{
+  if (failures == 0)
+    return;
+  if (hostname)
+    syslog (LOG_NOTICE, "%d LOGIN FAILURE%s FROM %s, %s",
+	    failures, failures > 1 ? "S" : "", hostname, name);
+  else
+    syslog (LOG_NOTICE, "%d LOGIN FAILURE%s ON %s, %s",
+	    failures, failures > 1 ? "S" : "", tty, name);
+}
+
+static void
+sleepexit (int eval)
+{
+  sleep ((u_int) 5);
+  exit (eval);
+}
+
+#ifdef __CYGWIN__
+
+extern int uidIsLocalSystem (uid_t uid);
+extern int uidIsMemberOfLocalAdministrators (uid_t uid);
+extern int testUserRightsByUID (uid_t uid, const char **strRightsToTest,
+				ULONG intRightsToTestCount);
+
+static int
+isROOT_UID (uid_t uid)
+{
+  static const char *REQUIRED_PRIVS[] = {
+    "SeAssignPrimaryTokenPrivilege",
+    "SeTcbPrivilege"
+  };
+  static const ULONG NUM_REQUIRED_PRIV = 2;
+
+  OSVERSIONINFOEX osvi;
+  struct passwd *pw;
+
+  ZeroMemory (&osvi, sizeof (OSVERSIONINFOEX));
+  osvi.dwOSVersionInfoSize = sizeof (OSVERSIONINFOEX);
+  if (!GetVersionEx ((OSVERSIONINFO *) & osvi))
+    return 0;			/* not a root id */
+
+  if (osvi.dwMajorVersion == 5)
+    {
+      /* Windows Server 2003 R2, Windows Server 2003, or Windows XP. */
+      if (osvi.dwMinorVersion < 2)
+	{
+	  /* XP: check for LocalSystem */
+	  if (uidIsLocalSystem (uid) == 0)
+	    return 1;		/* yes, LocalSystem! */
+
+	  /* otherwise, need to check capabilities */
+	}
+    }
+
+  /* check capabilities */
+  pw = getpwuid (uid);
+
+  /* not in /etc/passwd. say it is not root. */
+  if (!pw)
+    return 0;
+
+  /* check for membership in BUILTIN\Administrators */
+  if (uidIsMemberOfLocalAdministrators (uid) != 0)
+    return 0;
+
+  /* returns non-zero if the account DOES have all specified privileges */
+  return testUserRightsByUID (uid, REQUIRED_PRIVS, NUM_REQUIRED_PRIV);
+}
+#endif
+
+
+--- login-1.13-1.src/login-1.13.tar.bz2!/login/winpriv.c ---
+/***************************************************************************
+* winpriv.c -- adapted from editrights/main.c. Original
+* copyright notice and license text follows.
+*
+* ==========================================================================
+* editrights version 1.01: a cygwin application to edit user
+*                          rights on a windows NT system
+* 
+* Copyright (c) 2003, Chris Rodgers <editrights-at-bulk.rodgers.org.uk>
+* All rights reserved.
+* 
+* Redistribution and use in source and binary forms, with or
+* without modification, are permitted provided that the following
+* conditions are met:
+* 
+* Redistributions of source code must retain the above copyright notice,
+* this list of conditions and the following disclaimer.
+* 
+* Redistributions in binary form must reproduce the above copyright
+* notice, this list of conditions and the following disclaimer in the
+* documentation and/or other materials provided with the distribution.
+* 
+* The name of Chris Rodgers may not be used to endorse or promote
+* products derived from this software without specific prior written
+* permission.
+* 
+* THIS SOFTWARE IS PROVIDED BY CHRIS RODGERS "AS IS" AND ANY EXPRESS
+* OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+* ARE DISCLAIMED. IN NO EVENT SHALL CHRIS RODGERS BE LIABLE FOR ANY
+* DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+* DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+* GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+* INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+* IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+* OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+* IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+* ==========================================================================
+*
+****************************************************************************/
+
+/* Copyright (C) 2007 Jari Aalto; Licenced under GPL v2 or later */
+
+#include <unistd.h>
+#include <pwd.h>
+#include <sys/cygwin.h>
+#include <syslog.h>
+#include <wchar.h>
+#include <windows.h>
+#include <wininet.h>
+#include <lmcons.h>
+#include <ntsecapi.h>
+#include <ntstatus.h>
+
+/* Macros */
+#define NTCHECKERROR(StatusWanted,LogLevel,Function,API,retval) if(retval!=StatusWanted) { \
+		syslog(LogLevel,"Error in " Function " (" API " returned 0x%x)",retval); \
+                NTCHECKERROR_FAILED = 1; }
+
+/* Prototypes */
+PSID getSID (LSA_HANDLE hLSA, const char *strUser);
+PLSA_UNICODE_STRING makeLSAStringA (PLSA_UNICODE_STRING strLSA,
+				    const char *strIn, size_t len);
+LSA_HANDLE openPolicy (const char *strMachine, ACCESS_MASK access);
+int testUserRights (LSA_HANDLE hLSA, const char *strUser,
+		    const char **strRightsToTest, ULONG intRightsToTestCount);
+int testUserRightsByUID (uid_t uid, const char **strRightsToTest,
+			 ULONG intRightsToTestCount);
+
+/* like testUserRights, returns 0 if uid does NOT have all of the required privileged,
+   and returns non-zero if it DOES. */
+int
+testUserRightsByUID (uid_t uid, const char **strRightsToTest,
+		     ULONG intRightsToTestCount)
+{
+  int retVal = 0;
+  LSA_HANDLE hLSA;
+  struct passwd *pw;
+  char strUser[UNLEN + 1];
+  char *domain = (char *) alloca (INTERNET_MAX_HOST_NAME_LENGTH + 1);
+
+  pw = getpwuid (uid);
+  if (!pw)
+    return retVal;
+  cygwin_internal (CW_EXTRACT_DOMAIN_AND_USER, pw, domain, strUser);
+
+  hLSA = openPolicy (NULL, POLICY_ALL_ACCESS);	/* always this machine */
+  if (hLSA)
+    {
+      retVal =
+	testUserRights (hLSA, strUser, strRightsToTest, intRightsToTestCount);
+      LsaClose (hLSA);
+    }
+  return retVal;
+}
+
+/* Set an LSA_UNICODE_STRING based on an ascii string. *
+ * strLSA->Buffer must point to allocated storage of   *
+ * size (len+1) * sizeof(WCHAR).                       */
+PLSA_UNICODE_STRING
+makeLSAStringA (PLSA_UNICODE_STRING strLSA, const char *strIn, size_t len)
+{
+  if (!strIn)			/* Fed NULL pointer */
+    {
+      strLSA->Buffer[0] = 0;	/* unicode NULL char */
+      strLSA->Length = 0;
+      strLSA->MaximumLength = 0;
+    }
+  else
+    {
+      mbstate_t mbst = { 0 };	/* multibyte char initial state. */
+      mbsrtowcs (strLSA->Buffer, &strIn, len, &mbst);
+      strLSA->Buffer[len] = 0;	/* NULL terminate. */
+      strLSA->Length = wcslen (strLSA->Buffer) * sizeof (WCHAR);
+      strLSA->MaximumLength = strLSA->Length + sizeof (WCHAR);
+    }
+  return strLSA;
+}
+
+/* Open a connection to the Local Security Authority *
+ * Policy object on the specified system.            */
+LSA_HANDLE
+openPolicy (const char *strMachine, ACCESS_MASK access)
+{
+  LSA_OBJECT_ATTRIBUTES objattr;
+  LSA_HANDLE hLSA;
+  NTSTATUS status;
+  LSA_UNICODE_STRING machine;
+  int c;
+  int NTCHECKERROR_FAILED __attribute__ ((__unused__)) = 0;
+
+  c = strMachine ? strlen (strMachine) : 0;
+  machine.Buffer = (PWSTR) alloca ((c + 1) * 2);	/* Keep within this function so we *
+							 * can use alloca(...)             */
+  makeLSAStringA (&machine, strMachine, c);
+
+  objattr.Length = sizeof (objattr);	/* Reserved structure */
+  objattr.RootDirectory = NULL;
+  objattr.ObjectName = NULL;
+  objattr.Attributes = 0;
+  objattr.SecurityDescriptor = NULL;
+  objattr.SecurityQualityOfService = NULL;
+
+  status = LsaOpenPolicy (machine.Length ? &machine : NULL,	/* If no machine, use localhost. */
+			  &objattr, access, &hLSA);
+  NTCHECKERROR (STATUS_SUCCESS, LOG_WARNING, "openPolicy", "LsaOpenPolicy",
+		status) return hLSA;
+}
+
+int
+testUserRights (LSA_HANDLE hLSA, const char *strUser,
+		const char **strRightsToTest, ULONG intRightsToTestCount)
+{
+  /* Test if the user has the specified rights. Returns zero if they don't all match, non-zero if they do all match. */
+  PLSA_UNICODE_STRING UserRights;
+  ULONG CountOfRights;
+  NTSTATUS status;
+  int c, d;
+  int intMatched = 0;
+  int NTCHECKERROR_FAILED = 0;
+
+  PSID Sid = getSID (hLSA, strUser);
+  if (!Sid)
+    {
+      return 0;
+    }
+
+  status = LsaEnumerateAccountRights (hLSA, Sid, &UserRights, &CountOfRights);
+
+  LocalFree (Sid);
+
+  NTCHECKERROR (STATUS_SUCCESS
+		&& status != STATUS_OBJECT_NAME_NOT_FOUND, LOG_WARNING,
+		"testUserRights", "LsaEnumerateAccountRights", status);
+  if (NTCHECKERROR_FAILED)
+    {
+      return 0;
+    }
+
+  for (c = 0; c < CountOfRights; c++)
+    {
+      const wchar_t *src = UserRights[c].Buffer;
+      size_t len = wcslen (src);
+      mbstate_t mbst = { 0 };	/* multibyte char initial state. */
+      char *rightname = alloca (len + 1);	/* allocate 1 byte per character + 1 byte for null terminator. */
+      rightname[wcsrtombs (rightname, &src, len, &mbst)] = '\0';
+      for (d = 0; d < intRightsToTestCount; d++)
+	{
+	  if (!strcasecmp (rightname, strRightsToTest[d]))
+	    intMatched++;
+	}
+    }
+  return (intMatched == intRightsToTestCount);
+}
+
+/* Warning: The caller must call LocalFree() on the returned PSID */
+PSID
+getSID (LSA_HANDLE hLSA, const char *strUser)
+{
+  LSA_UNICODE_STRING lsastrUser;
+  PLSA_REFERENCED_DOMAIN_LIST referencedDomains;
+  PLSA_TRANSLATED_SID sids;
+  int c;
+  ULONG cSubAuth, NewSidLength;
+  PSID NewSid = NULL;
+  NTSTATUS status;
+  int NTCHECKERROR_FAILED = 0;
+
+  c = strUser ? strlen (strUser) : 0;
+  lsastrUser.Buffer = (PWSTR) alloca ((c + 1) * 2);	/* Keep within this function so we *
+							 * can use alloca()                */
+  makeLSAStringA (&lsastrUser, strUser, c);
+
+  status = LsaLookupNames (hLSA, 1, &lsastrUser, &referencedDomains, &sids);
+  NTCHECKERROR (STATUS_SUCCESS, LOG_WARNING, "getSID", "LsaLookupNames",
+		status);
+  if (NTCHECKERROR_FAILED)
+    {
+      if (referencedDomains)
+	{
+	  LsaFreeMemory (referencedDomains);
+	}
+      if (sids)
+	{
+	  LsaFreeMemory (sids);
+	}
+      return NULL;
+    }
+
+  cSubAuth =
+    *GetSidSubAuthorityCount (referencedDomains->Domains[sids->DomainIndex].
+			      Sid);
+  NewSidLength = GetSidLengthRequired ((UCHAR) (cSubAuth + 1));
+  NewSid = (PSID) LocalAlloc (0, NewSidLength);
+  CopySid (NewSidLength, NewSid,
+	   referencedDomains->Domains[sids->DomainIndex].Sid);
+  *GetSidSubAuthorityCount (NewSid) = (UCHAR) cSubAuth + 1;
+  *GetSidSubAuthority (NewSid, cSubAuth) = sids->RelativeId;
+
+  LsaFreeMemory (referencedDomains);
+  LsaFreeMemory (sids);
+
+  return NewSid;
+}
+
+
+--- login-1.13-1.src/login-1.13.tar.bz2!/login/winsec.c ---
+/* winsec - provides functions for analyzing user and group SIDs
+ *
+ * Copyright (c) 2008, Charles S. Wilson
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+#include <syslog.h>
+#include <unistd.h>
+#include <pwd.h>
+#include <sys/cygwin.h>
+#include <windows.h>
+#include <dsgetdc.h>
+#include <lm.h>
+#include <wininet.h>
+
+/**************************************************************************
+ * private function prototypes
+ **************************************************************************/
+/**
+ * converts unicode string wcs to (multibyte?) in mbs,
+ * using current codepage.
+ **/
+static void uni2ansi (LPWSTR wcs, char *mbs, int size);
+
+/**
+ * helper method for getUserSIDForUID
+ * returns negative on error
+ *
+ * 0 on success
+ *   bufptr is populated with the requested user info
+ *   uni_servername is populated with the associated server,
+ *      if applicable (or null)
+ *   it is the caller's responsibility to free both:
+ *      NetApiBufferFree((PVOID)bufptr);
+ *      HeapFree(GetProcessHeap(), 0, (LPVOID)uni_servername)
+ *
+ * 1 if account name corresponding to uid matches *any*
+ *   element in the skipNames list, which is a null-terminated
+ *      argv-style array of *local* user names.  In this case,
+ *      the index of the matched name is stored in *matchedName,
+ *      and the UserInfo buffer is NOT populated.
+ *
+ * NB: name comparison is performed in a case-insensitive manner
+ * NB: To match the LocalSystem account, include both
+ *     "LocalSystem" and "SYSTEM" in skipNames).
+ */
+static int getUserInfoForUID (uid_t uid,
+			      const char **skipNames,
+			      DWORD level,
+			      LPBYTE * bufptr,
+			      LPWSTR * uni_servername, int *matchedName);
+
+/**
+ * helper method for currentUserIsMemberOfGroupSID
+ * returns negative on error
+ * zero if the ptg object contains a SID that matches groupSID
+ * positive otherwise
+ */
+static int currentProcessTokenGroupsContainsGroupSID (PSID groupSID,
+						      PTOKEN_GROUPS ptg,
+						      PSID
+						      localAdminGroupSID);
+
+/**************************************************************************
+ * public function prototypes
+ **************************************************************************/
+
+/* returns pointer to appropriate function on success, NULL otherwise */
+FARPROC getProcAddress (LPCTSTR lpModuleName, LPCSTR lpProcName);
+
+/**
+ * each of the following return:
+ * negative if error
+ * 0 if true
+ * 1 if false
+ **/
+int currentUserIsLocalSystem ();
+int currentUserIsMemberOfLocalAdministrators ();
+int uidIsLocalSystem (uid_t uid);
+int uidIsMemberOfLocalAdministrators (uid_t uid);
+
+/**
+ * Obtain the SID for the specified uid
+ * returns 0 on success, nonzero otherwise
+ * caller must free userSid using
+ *    HeapFree(GetCurrentHeap(), 0, userSid),
+ *    not FreeSid(userSid)
+ **/
+int getUserSIDForUID (uid_t uid, PSID * userSID);
+
+/**
+ * test the specified uid_t's corresponds to the specified user sid
+ * returns negative on error
+ * zero if the specified uid_t matches the specified user sid
+ * positive otherwise
+ **/
+int uidMatchesAccountSID (uid_t uid,
+			  BYTE nsubauthoritycount,
+			  DWORD dwsubauthority0,
+			  DWORD dwsubauthority1,
+			  DWORD dwsubauthority2,
+			  DWORD dwsubauthority3,
+			  DWORD dwsubauthority4,
+			  DWORD dwsubauthority5,
+			  DWORD dwsubauthority6, DWORD dwsubauthority7);
+
+/**
+ * !!!! NOT YET IMPLEMENTED !!!!
+ * test whether the specified uid_t is a member of the specified group
+ * returns negative on error
+ * zero if the specified uid_t is a member of the specified group
+ * positive otherwise
+ */
+int uidIsMemberOfGroupSID (uid_t uid,
+			   BYTE nsubauthoritycount,
+			   DWORD dwsubauthority0,
+			   DWORD dwsubauthority1,
+			   DWORD dwsubauthority2,
+			   DWORD dwsubauthority3,
+			   DWORD dwsubauthority4,
+			   DWORD dwsubauthority5,
+			   DWORD dwsubauthority6, DWORD dwsubauthority7);
+
+/**
+ * test whether the current user corresponds to the specified user sid
+ * returns negative on error
+ * zero if current account matches the specified SID
+ * positive otherwise
+ **/
+int currentUserMatchesAccountSID (BYTE nSubAuthorityCount,
+				  DWORD dwSubAuthority0,
+				  DWORD dwSubAuthority1,
+				  DWORD dwSubAuthority2,
+				  DWORD dwSubAuthority3,
+				  DWORD dwSubAuthority4,
+				  DWORD dwSubAuthority5,
+				  DWORD dwSubAuthority6,
+				  DWORD dwSubAuthority7);
+
+/**
+ * test whether the current user is a member of the specified group
+ * returns negative on error
+ * zero if current account is a member of the specified group
+ * positive otherwise
+ */
+int currentUserIsMemberOfGroupSID (BYTE nSubAuthorityCount,
+				   DWORD dwSubAuthority0,
+				   DWORD dwSubAuthority1,
+				   DWORD dwSubAuthority2,
+				   DWORD dwSubAuthority3,
+				   DWORD dwSubAuthority4,
+				   DWORD dwSubAuthority5,
+				   DWORD dwSubAuthority6,
+				   DWORD dwSubAuthority7);
+
+
+/**************************************************************************
+ * uni2ansi
+ **************************************************************************/
+static void
+uni2ansi (LPWSTR wcs, char *mbs, int size)
+{
+  if (wcs)
+    WideCharToMultiByte (CP_ACP, 0, wcs, -1, mbs, size, NULL, NULL);
+  else
+    *mbs = '\0';
+}
+
+/**************************************************************************
+ * currentUserIsLocalSystem
+ *   returns 0 if yes
+ **************************************************************************/
+int
+currentUserIsLocalSystem ()
+{
+  return currentUserMatchesAccountSID (1,
+				       SECURITY_LOCAL_SYSTEM_RID,
+				       0, 0, 0, 0, 0, 0, 0);
+}
+
+/**************************************************************************
+ * currentUserIsMemberOfLocalAdministrators
+ *   returns 0 if yes
+ **************************************************************************/
+int
+currentUserIsMemberOfLocalAdministrators ()
+{
+  return currentUserIsMemberOfGroupSID (2,
+					SECURITY_BUILTIN_DOMAIN_RID,
+					DOMAIN_ALIAS_RID_ADMINS,
+					0, 0, 0, 0, 0, 0);
+}
+
+/**************************************************************************
+ * uidIsLocalSystem
+ *   returns 0 if yes
+ **************************************************************************/
+int
+uidIsLocalSystem (uid_t uid)
+{
+  return uidMatchesAccountSID (uid,
+			       1,
+			       SECURITY_LOCAL_SYSTEM_RID,
+			       0, 0, 0, 0, 0, 0, 0);
+}
+
+/**************************************************************************
+ * uidIsMemberOfLocalAdministrators
+ *   returns 0 if yes
+ **************************************************************************/
+int
+uidIsMemberOfLocalAdministrators (uid_t uid)
+{
+/* The following implementation would be nice, but 
+   uidIsMemberOfGroupSID is not yet implemented. so
+   instead, we use an alternate procedure...
+
+  return uidIsMemberOfGroupSID(
+      uid,
+      2,
+      SECURITY_BUILTIN_DOMAIN_RID,
+      DOMAIN_ALIAS_RID_ADMINS,
+      0, 0, 0, 0, 0, 0);
+*/
+  LPUSER_INFO_3 ui = NULL;
+  int rv = -1;
+  int rc;
+  LPWSTR uni_servername = NULL;
+  int matchedName;
+
+  static const char *skipNames[] = {
+    "LocalSystem",
+    "SYSTEM",
+    NULL
+  };
+
+  rc = getUserInfoForUID (uid,
+			  skipNames,
+			  3, (LPBYTE *) (&ui), &uni_servername, &matchedName);
+
+  if (rc < 0)
+    {
+      goto cleanup_uidIsMemberOfLocalAdministrators;
+    }
+  if (rc == 1)
+    {
+      rv = 1;
+      goto cleanup_uidIsMemberOfLocalAdministrators;
+    }
+  if (rc != 0)
+    {
+      syslog (LOG_ERR, "unknown error from getUserInfoForUID");
+      goto cleanup_uidIsMemberOfLocalAdministrators;
+    }
+
+  rv = 1;
+  if (ui->usri3_priv & USER_PRIV_ADMIN)
+    {
+      rv = 0;
+    }
+
+cleanup_uidIsMemberOfLocalAdministrators:
+  if (ui)
+    NetApiBufferFree ((PVOID) ui);
+  if (uni_servername)
+    HeapFree (GetProcessHeap (), 0, (LPVOID) uni_servername);
+  return rv;
+}
+
+/**************************************************************************
+ * currentUserMatchesAccountSID
+ *   returns 0 if current user matches specified SID
+ **************************************************************************/
+int
+currentUserMatchesAccountSID (BYTE nSubAuthorityCount,
+			      DWORD dwSubAuthority0,
+			      DWORD dwSubAuthority1,
+			      DWORD dwSubAuthority2,
+			      DWORD dwSubAuthority3,
+			      DWORD dwSubAuthority4,
+			      DWORD dwSubAuthority5,
+			      DWORD dwSubAuthority6, DWORD dwSubAuthority7)
+{
+  SID_IDENTIFIER_AUTHORITY nt_auth = SECURITY_NT_AUTHORITY;
+  PSID requestedSID = NULL;
+  PSID userSID = NULL;
+  HANDLE hToken = NULL;
+  DWORD dwLength = 0;
+  PTOKEN_USER ptu = NULL;
+  int rv = -1;
+
+  if (!AllocateAndInitializeSid (&nt_auth,
+				       nSubAuthorityCount,
+				       dwSubAuthority0,
+				       dwSubAuthority1,
+				       dwSubAuthority2,
+				       dwSubAuthority3,
+				       dwSubAuthority4,
+				       dwSubAuthority5,
+				       dwSubAuthority6,
+				       dwSubAuthority7, &requestedSID))
+    {
+      syslog (LOG_ERR, "failed to create requested sid, error = %lu",
+	      GetLastError ());
+      return rv;
+    }
+
+  if (!OpenProcessToken (GetCurrentProcess (), TOKEN_READ, &hToken))
+    {
+      syslog (LOG_ERR, "failed to obtain process token, error = %lu",
+	      GetLastError ());
+      goto cleanup_currentUserMatchesAccountSID;
+    }
+
+  /* first we get the required size */
+  if (!GetTokenInformation
+      (hToken, TokenUser, (LPVOID) ptu, 0, &dwLength))
+    {
+      if (GetLastError () != ERROR_INSUFFICIENT_BUFFER)
+	{
+	  syslog (LOG_ERR, "failed to obtain token information, error = %lu",
+		  GetLastError ());
+	  goto cleanup_currentUserMatchesAccountSID;
+	}
+      ptu = (PTOKEN_USER) LocalAlloc (LMEM_FIXED, dwLength);
+      if (ptu == NULL)
+	{
+	  syslog (LOG_ERR,
+		  "failed to allocate memory for token information, error = %lu",
+		  GetLastError ());
+	  goto cleanup_currentUserMatchesAccountSID;
+	}
+    }
+  /* now populate with the actual token information */
+  if (!GetTokenInformation
+      (hToken, TokenUser, (LPVOID) ptu, dwLength, &dwLength))
+    {
+      syslog (LOG_ERR, "failed to obtain token information, error = %lu",
+	      GetLastError ());
+      goto cleanup_currentUserMatchesAccountSID;
+    }
+
+  userSID = ptu->User.Sid;
+  if (userSID == NULL)
+    {
+      syslog (LOG_ERR, "failed to obtain user SID, error = %lu",
+	      GetLastError ());
+      goto cleanup_currentUserMatchesAccountSID;
+    }
+
+  /* EqualSid returns 0 if not equal. We return 0 if equal. */
+  rv = (EqualSid (userSID, requestedSID) == 0);
+
+cleanup_currentUserMatchesAccountSID:
+  if (requestedSID)
+    FreeSid (requestedSID);
+  if (ptu)
+    LocalFree (ptu);
+  return rv;
+}
+
+/**************************************************************************
+ * currentUserIsMemberOfGroupSID
+ *   returns 0 if current user is a member of the specified group
+ **************************************************************************/
+int
+currentUserIsMemberOfGroupSID (BYTE nSubAuthorityCount,
+			       DWORD dwSubAuthority0,
+			       DWORD dwSubAuthority1,
+			       DWORD dwSubAuthority2,
+			       DWORD dwSubAuthority3,
+			       DWORD dwSubAuthority4,
+			       DWORD dwSubAuthority5,
+			       DWORD dwSubAuthority6, DWORD dwSubAuthority7)
+{
+  SID_IDENTIFIER_AUTHORITY nt_auth = SECURITY_NT_AUTHORITY;
+  PSID requestedSID = NULL;
+  PSID localAdministratorsSID = NULL;
+  HANDLE hToken;
+  DWORD dwLength = 0;
+  PTOKEN_GROUPS ptg = NULL;
+  int rv = -1;
+
+  if (!AllocateAndInitializeSid (&nt_auth,
+				       nSubAuthorityCount,
+				       dwSubAuthority0,
+				       dwSubAuthority1,
+				       dwSubAuthority2,
+				       dwSubAuthority3,
+				       dwSubAuthority4,
+				       dwSubAuthority5,
+				       dwSubAuthority6,
+				       dwSubAuthority7, &requestedSID))
+    {
+      syslog (LOG_ERR, "failed to create requested sid, error = %lu",
+	      GetLastError ());
+      return rv;
+    }
+
+  /* need this to deal with Vista issues */
+  if (!AllocateAndInitializeSid (&nt_auth,
+				       2,
+				       SECURITY_BUILTIN_DOMAIN_RID,
+				       DOMAIN_ALIAS_RID_ADMINS,
+				       0, 0, 0, 0, 0, 0,
+				       &localAdministratorsSID))
+    {
+      syslog (LOG_ERR,
+	      "failed to create local administrators group sid, error = %lu",
+	      GetLastError ());
+      goto cleanup_currentUserIsMemberOfGroupSID;
+    }
+
+
+  if (!OpenProcessToken (GetCurrentProcess (), TOKEN_READ, &hToken))
+    {
+      syslog (LOG_ERR, "failed to obtain process token, error = %lu",
+	      GetLastError ());
+      goto cleanup_currentUserIsMemberOfGroupSID;
+    }
+
+  /* first we get the required size */
+  if (!GetTokenInformation
+      (hToken, TokenGroups, (LPVOID) ptg, 0, &dwLength))
+    {
+      if (GetLastError () != ERROR_INSUFFICIENT_BUFFER)
+	{
+	  syslog (LOG_ERR, "failed to obtain token information, error = %lu",
+		  GetLastError ());
+	  goto cleanup_currentUserIsMemberOfGroupSID;
+	}
+      ptg = (PTOKEN_GROUPS) LocalAlloc (LMEM_FIXED, dwLength);
+      if (ptg == NULL)
+	{
+	  syslog (LOG_ERR,
+		  "failed to allocate memory for token information, error = %lu",
+		  GetLastError ());
+	  goto cleanup_currentUserIsMemberOfGroupSID;
+	}
+    }
+  /* now populate with the actual token information */
+  if (!GetTokenInformation
+      (hToken, TokenGroups, (LPVOID) ptg, dwLength, &dwLength))
+    {
+      syslog (LOG_ERR, "failed to obtain token information, error = %lu",
+	      GetLastError ());
+      goto cleanup_currentUserIsMemberOfGroupSID;
+    }
+
+  rv =
+    currentProcessTokenGroupsContainsGroupSID (requestedSID, ptg,
+					       localAdministratorsSID);
+
+cleanup_currentUserIsMemberOfGroupSID:
+  if (ptg)
+    LocalFree (ptg);
+  if (localAdministratorsSID)
+    FreeSid (localAdministratorsSID);
+  if (requestedSID)
+    FreeSid (requestedSID);
+  return rv;
+}
+
+/**************************************************************************
+ * uidMatchesAccountSID
+ *   returns 0 if the user with the specified uid matches the specified SID
+ **************************************************************************/
+int
+uidMatchesAccountSID (uid_t uid,
+		      BYTE nSubAuthorityCount,
+		      DWORD dwSubAuthority0,
+		      DWORD dwSubAuthority1,
+		      DWORD dwSubAuthority2,
+		      DWORD dwSubAuthority3,
+		      DWORD dwSubAuthority4,
+		      DWORD dwSubAuthority5,
+		      DWORD dwSubAuthority6, DWORD dwSubAuthority7)
+{
+  SID_IDENTIFIER_AUTHORITY nt_auth = SECURITY_NT_AUTHORITY;
+  PSID requestedSID = NULL;
+  PSID userSID = NULL;
+  int rv = -1;
+
+  if (!AllocateAndInitializeSid (&nt_auth,
+				       nSubAuthorityCount,
+				       dwSubAuthority0,
+				       dwSubAuthority1,
+				       dwSubAuthority2,
+				       dwSubAuthority3,
+				       dwSubAuthority4,
+				       dwSubAuthority5,
+				       dwSubAuthority6,
+				       dwSubAuthority7, &requestedSID))
+    {
+      syslog (LOG_ERR, "failed to create requested sid, error = %lu",
+	      GetLastError ());
+      return rv;
+    }
+
+  if (getUserSIDForUID (uid, &userSID))
+    {
+      syslog (LOG_ERR, "could not obtain SID for uid %d", uid);
+      goto cleanup_uidMatchesAccountSID;
+    }
+
+  /* EqualSid returns 0 if not equal. We return 0 if equal. */
+  rv = (EqualSid (userSID, requestedSID) == 0);
+
+cleanup_uidMatchesAccountSID:
+  if (userSID)
+    HeapFree (GetProcessHeap (), 0, (LPVOID) userSID);
+  if (requestedSID)
+    FreeSid (requestedSID);
+  return rv;
+}
+
+/**************************************************************************
+ * uidIsMemberOfGroupSID
+ *   returns 0 if the user with the specified uid is a member of the
+ *   specified group
+ **************************************************************************/
+int
+uidIsMemberOfGroupSID (uid_t uid,
+		       BYTE nSubAuthorityCount,
+		       DWORD dwSubAuthority0,
+		       DWORD dwSubAuthority1,
+		       DWORD dwSubAuthority2,
+		       DWORD dwSubAuthority3,
+		       DWORD dwSubAuthority4,
+		       DWORD dwSubAuthority5,
+		       DWORD dwSubAuthority6, DWORD dwSubAuthority7)
+{
+  SID_IDENTIFIER_AUTHORITY nt_auth = SECURITY_NT_AUTHORITY;
+  PSID requestedSID = NULL;
+  PSID userSID = NULL;
+  int rv = -1;
+
+  if (!AllocateAndInitializeSid (&nt_auth,
+				       nSubAuthorityCount,
+				       dwSubAuthority0,
+				       dwSubAuthority1,
+				       dwSubAuthority2,
+				       dwSubAuthority3,
+				       dwSubAuthority4,
+				       dwSubAuthority5,
+				       dwSubAuthority6,
+				       dwSubAuthority7, &requestedSID))
+    {
+      syslog (LOG_ERR, "failed to create requested sid, error = %lu",
+	      GetLastError ());
+      return rv;
+    }
+
+  if (getUserSIDForUID (uid, &userSID))
+    {
+      syslog (LOG_ERR, "could not obtain SID for uid %d", uid);
+      goto cleanup_uidIsMemberOfGroupSID;
+    }
+
+  /* not yet implemented */
+  rv = 1;
+
+cleanup_uidIsMemberOfGroupSID:
+  if (userSID)
+    HeapFree (GetProcessHeap (), 0, (LPVOID) userSID);
+  if (requestedSID)
+    FreeSid (requestedSID);
+  return rv;
+}
+
+/**************************************************************************
+ * currentProcessTokenGroupsContainsGroupSID
+ *   returns 0 if the ptg contains a SID that matches groupSID
+ **************************************************************************/
+static int
+currentProcessTokenGroupsContainsGroupSID (PSID groupSID,
+					   PTOKEN_GROUPS ptg,
+					   PSID localAdminGroupSID)
+{
+  if (groupSID && ptg && localAdminGroupSID)
+    {
+      int rv = 1;
+      int i;
+
+      // Loop through the group SIDs looking for the requested SID.
+      for (i = 0; i < ptg->GroupCount; i++)
+	{
+	  if (EqualSid (groupSID, ptg->Groups[i].Sid))
+	    {
+	      /* note: when requestedSid is the Administrators group,
+	       *       there is a wrinkle on Vista. The SID may be
+	       *       present, but in one of a few different states.
+	       * (1) enabled. This is the normal case on NT/2k/XP
+	       *     it also indicates an administrative user whose
+	       *     privileges are currently elevated via UAC.
+	       *     ptg->Groups[i].Attributes & SE_GROUP_ENABLED
+	       * (2) deny-only. This is a Vista user who is a member
+	       *     of the Administrators group, but whose privileges
+	       *     are currently not elevated.
+	       *     ptg->Groups[i].Attributes & SE_GROUP_USE_FOR_DENY_ONLY
+	       * (3) disabled: not really a member of the administrators
+	       *     group.
+	       */
+	      if (EqualSid (groupSID, localAdminGroupSID))
+		{
+		  /* handle Vista issues */
+		  if ((ptg->Groups[i].Attributes & SE_GROUP_ENABLED) ||
+		      (ptg->Groups[i].
+		       Attributes & SE_GROUP_USE_FOR_DENY_ONLY))
+		    {
+		      /* yes, we have valid (but possibly unelevated) membership */
+		      rv = 0;
+		      break;
+		    }
+		  else
+		    {
+		      /* no, we are not really a member of local administrators */
+		      /* stop looking, rv is already = 1 */
+		      break;
+		    }
+		}
+	      else
+		{
+		  rv = 0;
+		  break;
+		}
+	    }			/* EqualSid */
+	}			/* while */
+      return rv;
+    }				/* all parameters are non-null */
+  return -1;
+}
+
+/**************************************************************************
+ * getUserSIDForUID
+ *   returns 0 on success, nonzero otherwise
+ *   caller must free userSID using HeapFree(GetCurrentHeap(), 0, userSid)
+ **************************************************************************/
+int
+getUserSIDForUID (uid_t uid, PSID * userSID)
+{
+  DWORD dwLength = 0;
+  LPUSER_INFO_3 ui = NULL;
+  int rv = -1;
+  int rc;
+  LPWSTR uni_servername = NULL;
+  int matchedName;
+  char servername[256];
+
+  static const char *skipNames[] = {
+    "LocalSystem",
+    "SYSTEM",
+    NULL
+  };
+
+  rc = getUserInfoForUID (uid,
+			  skipNames,
+			  3, (LPBYTE *) (&ui), &uni_servername, &matchedName);
+  if (rc < 0)
+    {
+      goto error_getUserSIDForUID;
+    }
+  if (rc == 1)
+    {
+      PSID tmpSID = NULL;
+      SID_IDENTIFIER_AUTHORITY nt_auth = SECURITY_NT_AUTHORITY;
+
+      /* unfortunately, NetUserGetInfo fails for LocalSystem. So, as a
+         special case, check for that and create the SID manually.
+         Not sure what other accounts fail.  Probably LocalService
+         and NetworkService, among others. */
+      if ((matchedName == 0) ||	/* "LocalSystem" */
+	  (matchedName == 1))	/* "SYSTEM" */
+	{
+	  if (!AllocateAndInitializeSid (&nt_auth,
+					       1,
+					       SECURITY_LOCAL_SYSTEM_RID,
+					       0, 0, 0, 0, 0, 0, 0, &tmpSID))
+	    {
+	      syslog (LOG_ERR,
+		      "failed to create user sid (LocalSystem), error = %lu",
+		      GetLastError ());
+	      goto error_getUserSIDForUID;
+	    }
+	}
+      else
+	{
+	  syslog (LOG_ERR,
+		  "internal: don't know how to create standard SID for %s",
+		  skipNames[matchedName]);
+	  goto error_getUserSIDForUID;
+	}
+      /* Because SIDs created via AllocateAndInitializeSid are freed using
+         FreeSid, but we explicitly declare our SIDs must be freed using
+         HeapFree, we have to make a copy */
+      dwLength = GetLengthSid (tmpSID);
+      *userSID =
+	(PSID) HeapAlloc (GetProcessHeap (), HEAP_ZERO_MEMORY, dwLength);
+      if (*userSID == NULL)
+	{
+	  syslog (LOG_ERR, "unable to allocate memory for user sid");
+	  goto error_getUserSIDForUID;
+	}
+      if (!CopySid (dwLength, *userSID, tmpSID))
+	{
+	  syslog (LOG_ERR, "unable to copy user sid");
+	  goto error_getUserSIDForUID;
+	}
+      FreeSid (tmpSID);
+
+      /* success! */
+      rv = 0;
+      goto cleanup_getUserSIDForUID;
+    }
+  if (rc != 0)
+    {
+      syslog (LOG_ERR, "unknown error from getUserInfoForUID");
+      goto error_getUserSIDForUID;
+    }
+
+  if (uni_servername)
+    uni2ansi (uni_servername, servername, sizeof (servername));
+
+  /* a local block for scoped variables */
+  {
+    char ansi_username[100];
+    char ansi_domainname[100];
+    DWORD ansi_domainname_len = 100;
+    char psid_buffer[SECURITY_MAX_SID_SIZE];
+    PSID psid = (PSID) psid_buffer;
+    DWORD sid_len = SECURITY_MAX_SID_SIZE;
+    SID_NAME_USE acc_type;
+
+    uni2ansi (ui->usri3_name, ansi_username, sizeof (ansi_username));
+
+    if (!LookupAccountName (uni_servername ? servername : NULL,
+				  ansi_username,
+				  psid, &sid_len,
+				  ansi_domainname, &ansi_domainname_len,
+				  &acc_type))
+      {
+	if (uni_servername)
+	  {
+	    syslog (LOG_ERR,
+		    "unable to obtain user sid for %s on domain controller %s\n",
+		    ansi_username, servername);
+	  }
+	else
+	  {
+	    syslog (LOG_ERR,
+		    "unable to obtain user sid for %s on localhost\n",
+		    ansi_username);
+	  }
+	goto error_getUserSIDForUID;
+      }
+    else if (acc_type == SidTypeDomain)
+      {
+	char ansi_extended_username[356];
+	strcpy (ansi_extended_username, ansi_domainname);
+	strcat (ansi_extended_username, "\\");
+	strcat (ansi_extended_username, ansi_username);
+	sid_len = SECURITY_MAX_SID_SIZE;
+	ansi_domainname_len = 100;
+	if (!LookupAccountName (uni_servername ? servername : NULL,
+				      ansi_extended_username,
+				      psid, &sid_len,
+				      ansi_domainname, &ansi_domainname_len,
+				      &acc_type))
+	  {
+	    if (uni_servername)
+	      {
+		syslog (LOG_ERR,
+			"unable to obtain user sid for %s on domain controller %s\n",
+			ansi_extended_username, servername);
+	      }
+	    else
+	      {
+		syslog (LOG_ERR,
+			"unable to obtain user sid for %s on localhost\n",
+			ansi_extended_username);
+	      }
+	    goto error_getUserSIDForUID;
+	  }
+      }
+    /* we got the SID! now, make a dynamically allocated copy
+       of it before we leave this block */
+    dwLength = GetLengthSid (psid);
+    *userSID =
+      (PSID) HeapAlloc (GetProcessHeap (), HEAP_ZERO_MEMORY, dwLength);
+    if (*userSID == NULL)
+      {
+	syslog (LOG_ERR, "unable to allocate memory for user sid");
+	goto error_getUserSIDForUID;
+      }
+    if (!CopySid (dwLength, *userSID, psid))
+      {
+	syslog (LOG_ERR, "unable to copy user sid");
+	goto error_getUserSIDForUID;
+      }
+  }				/* lexical block */
+
+  rv = 0;
+  goto cleanup_getUserSIDForUID;
+
+error_getUserSIDForUID:
+  if (*userSID)
+    {
+      HeapFree (GetProcessHeap (), 0, (LPVOID) (*userSID));
+      *userSID = NULL;
+    }
+
+cleanup_getUserSIDForUID:
+  if (ui)
+    NetApiBufferFree ((PVOID) ui);
+  if (uni_servername)
+    HeapFree (GetProcessHeap (), 0, (LPVOID) uni_servername);
+  return rv;
+}
+
+
+/**
+ * helper method for getUserSIDForUID
+ * returns negative on error
+ *
+ * 0 on success
+ *   bufptr is populated with the requested user info
+ *   uni_servername is populated with the associated server,
+ *      if applicable (or null)
+ *   it is the caller's responsibility to free both:
+ *      NetApiBufferFree((PVOID)bufptr);
+ *      HeapFree(GetProcessHeap(), 0, (LPVOID)uni_servername)
+ *
+ * 1 if account name corresponding to uid matches *any*
+ *   element in the skipNames list, which is a null-terminated
+ *      argv-style array of *local* user names.  In this case,
+ *      the index of the matched name is stored in *matchedName,
+ *      and the UserInfo buffer is NOT populated.
+ *
+ * NB: name comparison is performed in a case-insensitive manner
+ * NB: To match the LocalSystem account, include both
+ *     "LocalSystem" and "SYSTEM" in skipNames).
+ */
+/**************************************************************************
+ * getUserInfoForUID
+ *   returns 0 on success, -1 on error
+ *   returns 1 if short-circuit by name
+ *   caller must free:
+ *      NetApiBufferFree((PVOID)bufptr);
+ *      HeapFree(GetProcessHeap(), 0, (LPVOID)uni_servername)
+ **************************************************************************/
+static int
+getUserInfoForUID (uid_t uid,
+		   const char **skipNames,
+		   DWORD level,
+		   LPBYTE * bufptr, LPWSTR * uni_servername, int *matchedName)
+{
+  int rv = -1;
+  struct passwd *pw;
+  char name[UNLEN + 1];
+  WCHAR uni_name[2 * (UNLEN + 1)];
+  char domain[INTERNET_MAX_HOST_NAME_LENGTH + 1];
+  char servername[256];
+
+  if (!uni_servername)
+    {
+      syslog (LOG_ERR, "called with null parameter: uni_servername");
+      return rv;
+    }
+  if (!bufptr)
+    {
+      syslog (LOG_ERR, "called with null parameter: bufptr");
+      return rv;
+    }
+  *uni_servername = NULL;
+  *bufptr = NULL;
+
+  pw = getpwuid (uid);
+  if (!pw)
+    {
+      syslog (LOG_ERR, "unable to obtain passwd struct for uid %d", uid);
+      goto error_getUserInfoForUID;
+    }
+  cygwin_internal (CW_EXTRACT_DOMAIN_AND_USER, pw, domain, name);
+
+  /* check for name match */
+  if (skipNames && *skipNames && matchedName)
+    {
+      int foundMatch = 0;
+      const char **p = skipNames;
+      int c = 0;
+      size_t namelen = strlen (name);
+      while (*p && !foundMatch)
+	{
+	  if (strncasecmp (name, *p, namelen) == 0)
+	    {
+	      foundMatch = 1;
+	      break;
+	    }
+	  p++;
+	  c++;
+	}
+      if (foundMatch)
+	{
+	  *matchedName = c;
+	  rv = 1;
+	  return rv;
+	}
+      /* not found, so reset matchedName */
+      *matchedName = -1;
+    }
+
+  MultiByteToWideChar (CP_ACP, 0, name, -1, uni_name, 2 * (UNLEN + 1));
+
+  /* create a block we can break out of */
+  do
+    {
+      int rc, len;
+      LPWSTR tmp_uni_servername = NULL;
+      PDOMAIN_CONTROLLER_INFOW pdci = NULL;
+	{
+	  rc = DsGetDcNameW (NULL, NULL, NULL, NULL, 0, &pdci);
+	  if (rc != ERROR_SUCCESS)
+	    {
+	      /* not a member of a domain */
+	      break;
+	    }
+	  tmp_uni_servername = pdci->DomainControllerName;
+	}
+
+      /* save the value of servername */
+      len = lstrlenW (tmp_uni_servername);
+      if (len)
+	{
+	  *uni_servername =
+	    (LPWSTR) HeapAlloc (GetProcessHeap (), 0,
+				(len + 1) * sizeof (WCHAR));
+	  if (*uni_servername)
+	    lstrcpyW (*uni_servername, tmp_uni_servername);
+	}
+
+      /* clean up */
+      NetApiBufferFree (pdci ? (PVOID) pdci : (PVOID)
+			      tmp_uni_servername);
+    }
+  while (0);
+
+  if (*uni_servername)
+    uni2ansi (*uni_servername, servername, sizeof (servername));
+
+  /* now, look for user that corresponds to uid (e.g. uni_name) */
+  if (NetUserGetInfo
+      (*uni_servername, (LPWSTR) & uni_name, level, bufptr) != NERR_Success)
+    {
+      if (*uni_servername)
+	{
+	  /* if we had a domain, then try again locally. if we didn't have a
+	     domain, then the initial call WAS local */
+	  if (NetUserGetInfo
+	      (NULL, (LPWSTR) & uni_name, level, bufptr) != NERR_Success)
+	    {
+	      syslog (LOG_ERR,
+		      "unable to obtain user info for %s [tried domain controller %s and localhost]\n",
+		      name, servername);
+	      goto error_getUserInfoForUID;
+	    }
+	  /* else ok */
+	}
+      else
+	{
+	  syslog (LOG_ERR, "unable to obtain user info for %s on localhost\n",
+		  name);
+	  goto error_getUserInfoForUID;
+	}
+    }
+  if (*bufptr == NULL)
+    {
+      syslog (LOG_ERR, "unable to obtain user info for %s\n", name);
+      goto error_getUserInfoForUID;
+    }
+  rv = 0;
+  return rv;
+
+error_getUserInfoForUID:
+  if (*bufptr)
+    {
+      NetApiBufferFree ((PVOID) (*bufptr));
+      *bufptr = NULL;
+    }
+  if (*uni_servername)
+    {
+      HeapFree (GetProcessHeap (), 0, (LPVOID) (*uni_servername));
+      *uni_servername = NULL;
+    }
+  return rv;
+}

@@ -386,11 +386,40 @@ public final class PluginRuntime {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         clipboard = Objects.requireNonNull(value);
     }
-    private dev.jasper.ui.kit.Kit kit;
-    /** Supplies the presentation's kit, which plugins' views are made with, before plugin startup (spec 4.9). */
-    public void presentation(dev.jasper.ui.kit.Kit kit) {
+    private final HostedTypography typography = new HostedTypography();
+
+    /** Publishes saved terminal typography before plugin startup or on configuration changes. UI thread only.
+     * @param value the saved typography
+     */
+    public void terminalTypography(dev.jasper.sdk.ui.TerminalTypography value) { typography.publish(value); }
+
+    /** Converts the application's saved font configuration at the SDK boundary. UI thread only.
+     * @param font saved font settings
+     */
+    public void terminalTypography(dev.jasper.app.config.FontConfig font) {
+        terminalTypography(HostedTypography.from(Objects.requireNonNull(font, "font")));
+    }
+
+    /** The presentation given before plugin startup: its kit, what plugins learn of its look, and its defaults. */
+    private record Given(dev.jasper.ui.kit.Kit kit, dev.jasper.app.presentation.PluginLook look, dev.jasper.app.config.DefaultSource defaults) { }
+    private Given given;
+    /**
+     * Supplies the presentation before plugin startup: the kit plugins' views are made with (spec 4.9), and the look and
+     * defaults every plugin's appearance reports (plan 15a).
+     *
+     * @param kit the kit the look installed
+     * @param look what plugins learn of the look
+     * @param defaults the look's defaults
+     */
+    public void presentation(dev.jasper.ui.kit.Kit kit, dev.jasper.app.presentation.PluginLook look, dev.jasper.app.config.DefaultSource defaults) {
         if (host != null) throw new IllegalStateException("Plugins have already started");
-        this.kit = Objects.requireNonNull(kit);
+        given = new Given(Objects.requireNonNull(kit, "kit"), Objects.requireNonNull(look, "look"), Objects.requireNonNull(defaults, "defaults"));
+    }
+    private java.util.function.Supplier<dev.jasper.app.appearance.ThemeLibrary> themes = dev.jasper.app.appearance.ThemeLibrary::bundledOnly;
+    /** Supplies the installed themes, read on the UI thread, before plugin startup: plugins list their editor schemes. */
+    public void themes(java.util.function.Supplier<dev.jasper.app.appearance.ThemeLibrary> library) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        themes = Objects.requireNonNull(library);
     }
     /** Supplies the live application motion policy before plugin startup. */
     public void animations(java.util.function.BooleanSupplier enabled) {
@@ -424,6 +453,8 @@ public final class PluginRuntime {
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<Problem> startupProblems = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
+    private final CompletableFuture<Void> resourcesClosed = new CompletableFuture<>();
+    private boolean stopped;
     private final PluginSettingsFiles settingsFiles;
     private java.util.concurrent.ScheduledExecutorService settingsPoller;
     private volatile Map<String, PluginCandidate> launched = Map.of();
@@ -442,8 +473,8 @@ public final class PluginRuntime {
      * @param notifier receives plugin activities for Buddy
      * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
-     * @param windows builds plugin windows and dialogs
-     * @param terminals the application-wide directory of terminal windows, tabs and panes
+     * @param windows builds plugin dialogs and overlays
+     * @param terminals the application-wide directory of Jasper windows, tabs and panes
      */
     public PluginRuntime(Options options, ActivityNotifier notifier, SettingsReports reports,
                          Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals) {
@@ -458,8 +489,8 @@ public final class PluginRuntime {
      * @param notifier receives plugin activities for Buddy
      * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
-     * @param windows builds plugin windows and dialogs
-     * @param terminals the application-wide directory of terminal windows, tabs and panes
+     * @param windows builds plugin dialogs and overlays
+     * @param terminals the application-wide directory of Jasper windows, tabs and panes
      * @param notifications where plugins' notifications and plugin problems go
      * @param editor opens a file in the user's editor, off the UI thread; may throw
      */
@@ -476,8 +507,8 @@ public final class PluginRuntime {
      * @param notifier receives plugin activities for Buddy
      * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
-     * @param windows builds plugin windows and dialogs
-     * @param terminals the application-wide directory of terminal windows, tabs and panes
+     * @param windows builds plugin dialogs and overlays
+     * @param terminals the application-wide directory of Jasper windows, tabs and panes
      * @param notifications where plugins' notifications and plugin problems go
      * @param editor opens a file in the user's editor, off the UI thread; may throw
      * @param profiles the detected shell profiles
@@ -558,10 +589,35 @@ public final class PluginRuntime {
 
     private java.nio.file.Path subcommandList;
 
-    /** Where {@code jasper --help} reads the subcommands; before {@link #start}, and never for a private launch. */
+    /** Where {@code jasper --help} reads the subcommands; before {@link #start}. */
     public void subcommandList(java.nio.file.Path file) {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         subcommandList = file;
+    }
+
+    /**
+     * Whether a plugin declares {@code name} as a {@code jasper} subcommand, whether or not it runs; false before the
+     * plugins start. Any thread.
+     *
+     * @param name the first argument of a call
+     * @return true when the call is a plugin's
+     */
+    public boolean declaresSubcommand(String name) {
+        PluginHost current = host;
+        return current != null && current.commands.declares(name);
+    }
+
+    /**
+     * Whether a call to subcommand {@code name} would run in its plugin now, which has registered its handler, rather than
+     * answer that the plugin is off. Any thread: it is the registry's answer at that moment, and the plugin can stop before
+     * the call gets there. False before the plugins start.
+     *
+     * @param name the first argument of a call
+     * @return true when a running plugin has a handler for it
+     */
+    public boolean runsSubcommand(String name) {
+        PluginHost current = host;
+        return current != null && current.commands.answers(name);
     }
 
     /** Runs {@code jasper <subcommand>} calls in the plugins that answer them. */
@@ -590,7 +646,7 @@ public final class PluginRuntime {
 
     /**
      * Opens a file for editing, on a worker thread: the editor a plugin provides ({@code Platform.editor}), asked on the
-     * UI thread with the active terminal window, then {@code desktop} on this thread when no plugin provides one, it
+     * UI thread with the active Jasper window, then {@code desktop} on this thread when no plugin provides one, it
      * declines or throws, or it does not answer within 30 seconds. Before the plugins start, {@code desktop} alone. Once
      * they run, an interrupted worker, such as one Jasper's quit interrupts, opens nothing and keeps its interrupt.
      *
@@ -608,7 +664,7 @@ public final class PluginRuntime {
      *
      * @param file the file
      * @param line the 1-based line, or empty for the file's start
-     * @param window the terminal window the click came from, or empty for none
+     * @param window the Jasper window the click came from, or empty for none
      * @param desktop the desktop's opener, such as {@code ConfigEditor::open}, or {@code ConfigEditor::editOrReveal} for a
      *        file a program named; its failure propagates
      * @throws IllegalStateException on the UI thread
@@ -680,9 +736,15 @@ public final class PluginRuntime {
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
-            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass));
+            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass), typography);
         created.animations = animations;
-        if (kit != null) { var chosen = kit; created.kit = () -> chosen; }
+        created.themes = themes;
+        if (given != null) {
+            var chosen = given;
+            created.kit = chosen::kit;
+            created.presentation = HostedPresentation.of(chosen.look(), chosen.kit(), chosen.defaults());
+            created.defaults = chosen.defaults();
+        }
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;
         created.commandClient = commandClient;
@@ -786,6 +848,58 @@ public final class PluginRuntime {
             new AppEvents.ThemeChanged(dark ? Variant.DARK : Variant.LIGHT));
     }
 
+    /**
+     * How a discovered plugin stands at this launch (workspace tabs spec 13): its name, and whether it runs or why not.
+     *
+     * @param name its display name
+     * @param kind whether it runs, or why not
+     */
+    public record Standing(String name, Kind kind) {
+        /** Whether it runs, or why not; earlier is better, so a copy that runs wins over one that lost. */
+        public enum Kind {
+            /** It started at this launch. */
+            RUNNING,
+            /** It waits for the user's review of its capabilities. */
+            NEEDS_CONSENT,
+            /** The user turned it off. */
+            TURNED_OFF,
+            /** The user marked it for removal at the next launch. */
+            MARKED_FOR_REMOVAL,
+            /** Safe mode keeps it off at this launch. */
+            SAFE_MODE,
+            /** It was skipped or failed to load or start. */
+            FAILED
+        }
+
+        /** Requires both values. */
+        public Standing { Objects.requireNonNull(name, "name"); Objects.requireNonNull(kind, "kind"); }
+    }
+
+    /**
+     * How the plugin with {@code id} stands at this launch. UI thread.
+     *
+     * @param id the plugin
+     * @return its name and standing; empty when no plugin with that id was discovered
+     */
+    public Optional<Standing> standing(String id) {
+        Standing found = null;
+        for (PluginStatus status : statuses) {
+            if (!status.id().equals(id)) continue;
+            Standing.Kind kind = switch (status.state()) {
+                case ACTIVE -> Standing.Kind.RUNNING;
+                case NEEDS_CONSENT -> Standing.Kind.NEEDS_CONSENT;
+                case DISABLED -> switch (status.reason()) {
+                    case PluginStatus.SAFE_MODE, PluginStatus.SAFE_MODE_LOOK -> Standing.Kind.SAFE_MODE;
+                    case PluginStatus.MARKED_FOR_REMOVAL -> Standing.Kind.MARKED_FOR_REMOVAL;
+                    default -> Standing.Kind.TURNED_OFF;
+                };
+                case SKIPPED, FAILED -> Standing.Kind.FAILED;
+            };
+            if (found == null || kind.ordinal() < found.kind().ordinal()) found = new Standing(status.name(), kind);
+        }
+        return Optional.ofNullable(found);
+    }
+
     /** Discovered plugin display names, without performing file I/O. */
     public Map<String, String> pluginNames() {
         var names = new java.util.LinkedHashMap<String, String>();
@@ -838,26 +952,33 @@ public final class PluginRuntime {
     }
 
     /**
-     * Stops plugins in reverse order. The futures complete when background work has drained and the
-     * classloaders are closed; the caller bounds the wait.
+     * Stops plugins in reverse order. The futures bound the background work grace before interruption.
+     * Classloaders close once workers actually terminate, so their cleanup can still load classes.
      *
      * @return asynchronous remainders of the shutdown
      */
     public List<CompletableFuture<?>> stop() {
+        if (stopped) return List.of();
+        stopped = true;
         synchronized(artworkLock){artworkStopped=true;artworkEpoch++;pluginIcons=Map.of();}
         if (settingsPoller != null) settingsPoller.shutdownNow();
         PluginHost current = host;
-        if (current == null) return List.of();
+        if (current == null) { resourcesClosed.complete(null); return List.of(); }
         if (adminWorker != null) adminWorker.shutdown();
         List<CompletableFuture<?>> pending = new ArrayList<>(current.stop());
         List<PluginClassLoader> closing = List.copyOf(loaders);
         loaders.clear();
-        pending.add(CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).whenComplete((done, failure) -> {
+        var adminTerminated = adminWorker == null ? CompletableFuture.completedFuture(null)
+            : HostedContext.terminated(adminWorker, "admin");
+        CompletableFuture.allOf(current.workersTerminated(), adminTerminated,
+            CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new))).whenComplete((done, failure) -> {
+            if (failure != null) { resourcesClosed.completeExceptionally(failure); return; }
             for (PluginClassLoader loader : closing) {
                 try { loader.close(); }
                 catch (IOException ignored) { LOG.log(System.Logger.Level.DEBUG, "Could not close " + loader.getName()); }
             }
-        }));
+            resourcesClosed.complete(null);
+        });
         return pending;
     }
 
@@ -1090,7 +1211,7 @@ public final class PluginRuntime {
         if (status.superseded()) return false;
         return switch (status.state()) {
             case NEEDS_CONSENT, SKIPPED, FAILED -> true;
-            case DISABLED -> status.reason().equals("safe mode");
+            case DISABLED -> status.reason().equals(PluginStatus.SAFE_MODE);
             case ACTIVE -> false;
         };
     }

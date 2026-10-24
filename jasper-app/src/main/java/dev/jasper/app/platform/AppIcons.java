@@ -1,5 +1,6 @@
 package dev.jasper.app.platform;
 
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.metrics.DesignMetrics;
 
@@ -91,6 +92,128 @@ public final class AppIcons {
         }
     }
 
+    /**
+     * The icon a labelled tool window stripe's button draws for a panel's or rail action's {@code icon} (spec 10.7), a
+     * {@code logicalSize} square whose art and ink are read at paint time from the receiving component. A header
+     * strip's glyph is first unwrapped to its source. Under {@link ChromeArtwork#CLASSIC} a named icon draws IntelliJ's
+     * classic tool-window file where {@link dev.jasper.ui.icons.IconRegistry#stripeIcon} has one, authored and untinted;
+     * a plugin's path, and any other name, draws its monochrome glyph in the ink {@code ink} gives for the receiving
+     * component. Under {@link ChromeArtwork#NEW_UI} it draws what the icon rails draw: a named icon's chrome artwork, or
+     * a plugin's ordinary glyph. Any other icon is drawn as given, centred in the square and scaled down uniformly when
+     * larger. Empty for no icon: a null icon, or one whose width or height is not positive.
+     */
+    public static java.util.Optional<Icon> stripeIcon(Icon icon, ChromeArtwork artwork, int logicalSize,
+                                                      java.util.function.Function<Component, Color> ink) {
+        Objects.requireNonNull(artwork, "artwork");
+        Objects.requireNonNull(ink, "ink");
+        Icon source = icon instanceof StripGlyph strip ? strip.source() : icon;
+        if (source == null || source.getIconWidth() <= 0 || source.getIconHeight() <= 0) return java.util.Optional.empty();
+        if (source instanceof PresentationIcon presentation && presentation.pathData() != null)
+            return java.util.Optional.of(new PluginStripeIcon(presentation, artwork, logicalSize, ink));
+        java.util.Optional<String> name = source instanceof PresentationIcon presentation
+            ? java.util.Optional.of(presentation.name()) : kitName(source);
+        if (name.isPresent()) {
+            var tint = source instanceof PresentationIcon ? SemanticColor.TEXT_SECONDARY : SemanticColor.TEXT_PRIMARY;
+            return java.util.Optional.of(new NamedStripeIcon(name.get(), tint, artwork, logicalSize, ink));
+        }
+        return java.util.Optional.of(new GivenStripeIcon(source, logicalSize));
+    }
+
+    /**
+     * IntelliJ's classic chrome art in place of {@code icon} (plan 15b), for a tool window header's action under
+     * {@link ChromeArtwork#CLASSIC}: present for a built-in {@link PresentationIcon}, or a {@link #named},
+     * {@link #semantic} or {@link #icon} glyph (a header strip's glyph is first unwrapped to its source), whose name is
+     * one of {@link dev.jasper.ui.icons.IconRegistry#classicChromeNames()}. The icon has {@code icon}'s size and paints
+     * the classic art in the receiving component's theme, prepared on its first paint at that device size. Any other
+     * icon, a plugin's path included, gives empty.
+     *
+     * @param icon the icon the header would show
+     * @return the classic art at the same size, or empty
+     */
+    public static java.util.Optional<Icon> classicChromeIcon(Icon icon) {
+        Icon source = icon instanceof StripGlyph strip ? strip.source() : icon;
+        java.util.Optional<String> name = source instanceof PresentationIcon presentation
+            ? (presentation.pathData() == null ? java.util.Optional.of(presentation.name()) : java.util.Optional.empty()) : kitName(source);
+        return name.filter(dev.jasper.ui.icons.IconRegistry.classicChromeNames()::contains)
+            .map(value -> new ClassicChromeIcon(value, icon));
+    }
+
+    /** Classic chrome art prepared per name and device size, on first paint. */
+    private static final Map<PreparationKey, dev.jasper.ui.icons.IconRegistry.PreparedIcon> CLASSIC_CHROME = new ConcurrentHashMap<>();
+
+    /** A classic chrome name drawn at {@code sized}'s size in the receiving component's theme. */
+    private record ClassicChromeIcon(String name, Icon sized) implements Icon {
+        @Override public int getIconWidth() { return sized.getIconWidth(); }
+        @Override public int getIconHeight() { return sized.getIconHeight(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            int device = getIconWidth();
+            var prepared = CLASSIC_CHROME.computeIfAbsent(new PreparationKey(name, device),
+                key -> NAMED.classicChromeIcon(key.name(), key.size()).orElseThrow());
+            prepared.icon(ThemeZone.theme(component), SemanticColor.TEXT_PRIMARY).paintIcon(component, graphics, x, y);
+        }
+    }
+
+    /** One stripe preparation: the chrome artwork, the icon name and the device size it was prepared at. */
+    private record StripeKey(ChromeArtwork artwork, String name, int size) { }
+    /**
+     * Prepared stripe art, built on first paint: under CLASSIC the tool-window file (empty for a name without one),
+     * under NEW_UI the chrome icon. Only a CLASSIC stripe's paint reads the stripe table.
+     */
+    private static final Map<StripeKey, java.util.Optional<dev.jasper.ui.icons.IconRegistry.PreparedIcon>> STRIPES =
+        new ConcurrentHashMap<>();
+
+    /** A built-in or semantic icon name on a labelled stripe; {@code tint} is its rail tint under New UI. */
+    private record NamedStripeIcon(String name, SemanticColor tint, ChromeArtwork artwork, int size,
+                                   java.util.function.Function<Component, Color> ink) implements Icon {
+        @Override public int getIconWidth() { return UIScale.scale(size); }
+        @Override public int getIconHeight() { return getIconWidth(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            int device = getIconWidth();
+            var theme = ThemeZone.theme(component);
+            var prepared = STRIPES.computeIfAbsent(new StripeKey(artwork, name, device), key -> switch (key.artwork()) {
+                case CLASSIC -> NAMED.stripeIcon(key.name(), key.size());
+                case NEW_UI -> java.util.Optional.of(NAMED.chromeIcon(key.name(), key.size()));
+            });
+            Icon art = prepared.isPresent()
+                ? prepared.get().icon(theme, artwork == ChromeArtwork.CLASSIC ? SemanticColor.TEXT_PRIMARY : tint)
+                : NAMED.panel(name, theme.semantic(), ink.apply(component), device);
+            art.paintIcon(component, graphics, x, y);
+        }
+    }
+
+    /** A plugin's own path on a labelled stripe: its glyph in the label ink, or its ordinary glyph under New UI. */
+    private record PluginStripeIcon(PresentationIcon source, ChromeArtwork artwork, int size,
+                                    java.util.function.Function<Component, Color> ink) implements Icon {
+        @Override public int getIconWidth() { return UIScale.scale(size); }
+        @Override public int getIconHeight() { return getIconWidth(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            int device = getIconWidth();
+            var theme = ThemeZone.theme(component);
+            Icon art = artwork == ChromeArtwork.CLASSIC ? source.glyph(theme.semantic(), ink.apply(component), device)
+                : source.ordinary(theme, device);
+            art.paintIcon(component, graphics, x, y);
+        }
+    }
+
+    /** Any other icon on a labelled stripe, drawn as given: centred in the square, scaled down uniformly when larger. */
+    private record GivenStripeIcon(Icon source, int size) implements Icon {
+        @Override public int getIconWidth() { return UIScale.scale(size); }
+        @Override public int getIconHeight() { return getIconWidth(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            int box = getIconWidth();
+            int width = source.getIconWidth(), height = source.getIconHeight();
+            double scale = Math.min(1.0, (double) box / Math.max(width, height));
+            int left = (box - (int) Math.round(width * scale)) / 2, top = (box - (int) Math.round(height * scale)) / 2;
+            var g = (Graphics2D) graphics.create();
+            try {
+                g.clipRect(x, y, box, box);
+                g.translate(x + left, y + top);
+                if (scale < 1.0) g.scale(scale, scale);
+                source.paintIcon(component, g, 0, 0);
+            } finally { g.dispose(); }
+        }
+    }
+
     /** Native macOS tray template artwork; not a standard-control icon catalog. */
     static java.net.URL trayArtwork() {
         return Objects.requireNonNull(AppIcons.class.getClassLoader().getResource(BASE + "terminal/toolwindow/terminal.svg"));
@@ -112,34 +235,73 @@ public final class AppIcons {
         return icon;
     }
 
-    /** Client property marking a native chrome receiver: icons painted inside it use the chrome's original artwork. */
+    /**
+     * Client property marking a native chrome receiver with its {@link ChromeArtwork}: icons painted inside it use that
+     * chrome artwork.
+     */
     private static final String CHROME_RECEIVER = "Jasper.chromeArtwork";
 
     /**
      * Marks {@code component} as one of the workspace chrome's receiving contexts (title bar header, tool window
-     * stripes, status bar): named glyphs painted inside it use {@link dev.jasper.ui.icons.IconRegistry#chromeIcon}'s
-     * original desktop artwork. Icon values, sizes and identities are unchanged; everything outside keeps ordinary artwork.
+     * stripes, status bar) for the New UI originals: the same as {@code chromeReceiver(component, ChromeArtwork.NEW_UI)}.
      */
-    public static void chromeReceiver(javax.swing.JComponent component) { component.putClientProperty(CHROME_RECEIVER, Boolean.TRUE); }
+    public static void chromeReceiver(javax.swing.JComponent component) { chromeReceiver(component, ChromeArtwork.NEW_UI); }
 
-    static boolean inChrome(Component component) {
+    /**
+     * Marks {@code component} as one of the workspace chrome's receiving contexts, drawing {@code artwork}: named glyphs
+     * painted inside it use {@link dev.jasper.ui.icons.IconRegistry#chromeIcon(String, int, ChromeArtwork)}'s desktop
+     * artwork for that set. Icon values, sizes and identities are unchanged; everything outside keeps ordinary artwork.
+     * A later mark replaces an earlier one.
+     */
+    public static void chromeReceiver(javax.swing.JComponent component, ChromeArtwork artwork) {
+        component.putClientProperty(CHROME_RECEIVER, Objects.requireNonNull(artwork, "artwork"));
+    }
+
+    /**
+     * The chrome artwork of the nearest receiver holding {@code component} (itself included), or empty outside every
+     * receiver.
+     */
+    public static java.util.Optional<ChromeArtwork> chromeArtwork(Component component) {
         for (Component c = component; c != null; c = c.getParent())
-            if (c instanceof javax.swing.JComponent j && j.getClientProperty(CHROME_RECEIVER) == Boolean.TRUE) return true;
-        return false;
+            if (c instanceof javax.swing.JComponent j && j.getClientProperty(CHROME_RECEIVER) instanceof ChromeArtwork artwork)
+                return java.util.Optional.of(artwork);
+        return java.util.Optional.empty();
     }
 
     private record PreparationKey(String name, int size) { }
     private record NativeSnapshot(int size, dev.jasper.ui.icons.IconRegistry.PreparedIcon artwork,
                                   dev.jasper.ui.icons.IconRegistry.PreparedIcon chrome) { }
-    /** One process-lifetime preparation owner, shared with builtin PresentationIcons. No receiving theme is cached. */
+    /** A classic chrome icon prepared for one snapshot's size. */
+    private record ClassicSnapshot(int size, dev.jasper.ui.icons.IconRegistry.PreparedIcon icon) { }
+    /**
+     * One process-lifetime preparation owner, shared with builtin PresentationIcons. No receiving theme is cached. The
+     * classic chrome icon is built only the first time it paints inside a {@link ChromeArtwork#CLASSIC} receiver, so a
+     * default-look start never prepares it.
+     */
     static final class NativePreparation {
         final String name; final int baseSize;
         volatile NativeSnapshot snapshot;
+        private volatile ClassicSnapshot classic;
         NativePreparation(String name,int size) { this.name=name;this.baseSize=size;prepare(); }
-        void prepare() { int size=UIScale.scale(baseSize);snapshot=new NativeSnapshot(size,NAMED.themedIcon(name,size),NAMED.chromeIcon(name,size)); }
+        void prepare() {
+            int size=UIScale.scale(baseSize);
+            snapshot=new NativeSnapshot(size,NAMED.themedIcon(name,size),NAMED.chromeIcon(name,size));
+            if(classic!=null && classic.size()!=size)classic=null;
+        }
         int size(){return snapshot.size();}
         void paint(Component c,Graphics g,int x,int y,SemanticColor tint) {
-            var current=snapshot;(inChrome(c)?current.chrome():current.artwork()).icon(ThemeZone.theme(c),tint).paintIcon(c,g,x,y);
+            var current=snapshot;
+            var prepared=switch(chromeArtwork(c).orElse(null)) {
+                case null -> current.artwork();
+                case NEW_UI -> current.chrome();
+                case CLASSIC -> classic(current.size());
+            };
+            prepared.icon(ThemeZone.theme(c),tint).paintIcon(c,g,x,y);
+        }
+        private dev.jasper.ui.icons.IconRegistry.PreparedIcon classic(int size) {
+            var built=classic;
+            if(built==null || built.size()!=size)classic=built=new ClassicSnapshot(size,NAMED.chromeIcon(name,size,ChromeArtwork.CLASSIC));
+            return built.icon();
         }
     }
     private static final Map<PreparationKey,NativePreparation> PREPARED = new java.util.HashMap<>();

@@ -13,7 +13,10 @@ import java.util.concurrent.CountDownLatch;
 public final class IdleTerminalSession {
     private IdleTerminalSession() { }
 
-    public static TerminalSession start() {
+    public static TerminalSession start() { return start(OutputStream.nullOutputStream()); }
+
+    /** As {@link #start()}; what is written to the session reaches {@code received}. */
+    public static TerminalSession start(OutputStream received) {
         var stopped = new CountDownLatch(1);
         var exited = new CompletableFuture<Integer>();
         var output = new InputStream() {
@@ -26,7 +29,7 @@ public final class IdleTerminalSession {
             }
             @Override public void close() { stopped.countDown(); }
         };
-        return TerminalSession.attach(new AttachedConnection(output, OutputStream.nullOutputStream(),
+        return TerminalSession.attach(new AttachedConnection(output, received,
             (columns, rows) -> { }, exited, () -> { output.close(); exited.complete(0); }),
             new GridSize(80, 24), 100);
     }

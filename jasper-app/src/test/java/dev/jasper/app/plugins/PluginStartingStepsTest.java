@@ -36,7 +36,9 @@ class PluginStartingStepsTest {
         });
         assertThat(named).as("named before loading, although it then fails to load: it has no classes").containsExactly("Example Tool");
         var pending = new AtomicReference<List<CompletableFuture<?>>>();
+        var pluginWorkers = PluginShutdownTestSupport.capture(runtime.get());
         SwingUtilities.invokeAndWait(() -> pending.set(runtime.get().stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get();
+        pluginWorkers.await();
     }
 }

@@ -14,4 +14,15 @@ class KeyNamesTest {
             .isEqualTo("Ctrl+Shift+]");
         assertThat(KeyNames.stroke(KeyEvent.VK_O, 0).getModifiers() & KeyNames.MENU).isEqualTo(KeyNames.MENU);
     }
+
+    @Test void findAgainIsCmdGOnMacOsAndF3Elsewhere() {
+        assertThat(KeyNames.findAgain(false, true)).isEqualTo(KeyStroke.getKeyStroke(KeyEvent.VK_G, InputEvent.META_DOWN_MASK));
+        assertThat(KeyNames.findAgain(true, true))
+            .isEqualTo(KeyStroke.getKeyStroke(KeyEvent.VK_G, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        // Ctrl+Shift+G is the window's Find Next on Linux and Windows, so the Editor's Find Previous must not take it.
+        assertThat(KeyNames.findAgain(false, false)).isEqualTo(KeyStroke.getKeyStroke(KeyEvent.VK_F3, 0));
+        assertThat(KeyNames.findAgain(true, false)).isEqualTo(KeyStroke.getKeyStroke(KeyEvent.VK_F3, InputEvent.SHIFT_DOWN_MASK));
+        assertThat(KeyNames.describe(KeyNames.findAgain(true, false), false)).isEqualTo("Shift+F3");
+        assertThat(KeyNames.describe(KeyNames.findAgain(true, true), true)).isEqualTo("⇧⌘G");
+    }
 }

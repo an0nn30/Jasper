@@ -13,24 +13,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The approved defaults (spec 2026-09-30-keymap-defaults-design.md, Defaults) for the built-in actions plan K1
- * covers; the comment on each row is the spec's row number. Find, Find Next, Find Previous, Copy and Paste stay Global
- * until plan K3.
+ * covers; the comment on each row is the spec's row number, or the spec that set it since. Find, Find Next, Find
+ * Previous, Copy and Paste stay Global until plan K3.
  */
 class KeymapDefaultsTest {
     private record Row(String id, KeyContext context, String macOs, String other) { }
 
     private static final List<Row> ROWS = List.of(
-        new Row("new_window", KeyContext.GLOBAL, "cmd+n", "ctrl+shift+n"),                     // 1
+        new Row("new_terminal_window", KeyContext.GLOBAL, "cmd+n", "ctrl+shift+n"),            // 1, workspace tabs spec 11
+        new Row("close_window", KeyContext.GLOBAL, "cmd+shift+w", "none"),                    // workspace tabs spec 11
+        new Row("move_tab_to_new_window", KeyContext.GLOBAL, "none", "none"),                 // tabs and panes spec 10
+        new Row("move_to_main_window", KeyContext.GLOBAL, "none", "none"),
         new Row("quit", KeyContext.GLOBAL, "cmd+q", "ctrl+alt+shift+q"),                       // 3
         new Row("open_settings", KeyContext.GLOBAL, "cmd+,", "ctrl+shift+,"),                  // 4
         new Row("open_file", KeyContext.GLOBAL, "none", "none"),  // Enterprise spec 13: File › Open File…, unbound
+        new Row("manage_cygwin_packages", KeyContext.GLOBAL, "none", "none"),
         new Row("reload_config", KeyContext.GLOBAL, "none", "none"),                           // 5
         new Row("command_palette", KeyContext.GLOBAL, "cmd+shift+p", "ctrl+shift+p"),          // 14
-        new Row("new_tab", KeyContext.GLOBAL, "cmd+t", "ctrl+shift+t"),                        // 22
-        new Row("close_tab", KeyContext.GLOBAL, "alt+cmd+w", "ctrl+alt+shift+w"),              // 23
-        new Row("next_tab", KeyContext.GLOBAL, "cmd+shift+]", "ctrl+tab"),                     // 24
-        new Row("previous_tab", KeyContext.GLOBAL, "cmd+shift+[", "ctrl+shift+tab"),           // 25
-        new Row("select_tab_1", KeyContext.GLOBAL, "cmd+1", "ctrl+1"),                         // 26
+        new Row("new_tab", KeyContext.GLOBAL, "cmd+t", "ctrl+shift+t"),                        // 22; tabs and panes spec 10
+        new Row("close_pane", KeyContext.GLOBAL, "cmd+w", "ctrl+shift+w"),                     // 23; tabs and panes spec 10
+        new Row("close_tab", KeyContext.GLOBAL, "alt+cmd+w", "ctrl+alt+shift+w"),              // tabs and panes spec 10
+        new Row("next_tab", KeyContext.GLOBAL, "cmd+shift+]", "ctrl+pagedown"),                // 24; tabs and panes spec 10
+        new Row("previous_tab", KeyContext.GLOBAL, "cmd+shift+[", "ctrl+pageup"),              // 25
+        new Row("select_tab_1", KeyContext.GLOBAL, "cmd+1", "ctrl+1"),                         // 26; workspace plan 7a Spec issues 1
         new Row("select_tab_2", KeyContext.GLOBAL, "cmd+2", "ctrl+2"),
         new Row("select_tab_3", KeyContext.GLOBAL, "cmd+3", "ctrl+3"),
         new Row("select_tab_4", KeyContext.GLOBAL, "cmd+4", "ctrl+4"),
@@ -42,10 +47,30 @@ class KeymapDefaultsTest {
         new Row("rename_tab", KeyContext.GLOBAL, "cmd+i", "ctrl+shift+i"),                     // 28
         new Row("split_right", KeyContext.GLOBAL, "cmd+d", "ctrl+shift+d"),                    // 32
         new Row("split_down", KeyContext.GLOBAL, "cmd+shift+d", "ctrl+alt+shift+d"),           // 33
-        new Row("close_pane", KeyContext.GLOBAL, "cmd+w", "ctrl+shift+w"),                     // 34
-        new Row("zoom_pane", KeyContext.GLOBAL, "cmd+shift+enter", "ctrl+alt+shift+enter"),    // 35
+        new Row("maximize_pane", KeyContext.GLOBAL, "cmd+shift+enter", "ctrl+alt+shift+enter"), // 35, parent tabs spec 8
+        new Row("move_pane_to_new_tab", KeyContext.GLOBAL, "alt+cmd+t", "ctrl+alt+shift+t"),  // tabs and panes spec 9 and 10
+        new Row("move_pane_to_tab_1", KeyContext.GLOBAL, "none", "none"),                      // pane flexibility spec 4
+        new Row("move_pane_to_tab_2", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_3", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_4", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_5", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_6", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_7", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_8", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_pane_to_tab_9", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_1", KeyContext.GLOBAL, "none", "none"),                     // pane flexibility spec 5
+        new Row("move_tab_into_tab_2", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_3", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_4", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_5", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_6", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_7", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_8", KeyContext.GLOBAL, "none", "none"),
+        new Row("move_tab_into_tab_9", KeyContext.GLOBAL, "none", "none"),
         new Row("toggle_zen_mode", KeyContext.GLOBAL, "none", "none"),                       // Zen follow-up
-        new Row("focus_pane_left", KeyContext.GLOBAL, "cmd+alt+left", "ctrl+alt+shift+left"),  // 36
+        new Row("toggle_rail", KeyContext.GLOBAL, "none", "none"),                           // 57
+        new Row("toggle_status_bar", KeyContext.GLOBAL, "none", "none"),                     // 59
+        new Row("focus_pane_left", KeyContext.GLOBAL, "cmd+alt+left", "ctrl+alt+shift+left"),  // 36, parent tabs spec 8
         new Row("focus_pane_right", KeyContext.GLOBAL, "cmd+alt+right", "ctrl+alt+shift+right"),
         new Row("focus_pane_up", KeyContext.GLOBAL, "cmd+alt+up", "ctrl+alt+shift+up"),
         new Row("focus_pane_down", KeyContext.GLOBAL, "cmd+alt+down", "ctrl+alt+shift+down"),
@@ -85,6 +110,7 @@ class KeymapDefaultsTest {
         }
     }
 
+    /** Every macOS default uses Cmd, and none takes one of macOS's own keys. */
     @Test void macDefaultsUseCmdAndLeaveMacOsItsKeys() {
         Set<KeyStroke> system = new HashSet<>();
         for (String key : List.of("cmd+h", "alt+cmd+h", "cmd+space", "alt+cmd+d", "ctrl+cmd+d", "ctrl+cmd+q",
@@ -96,15 +122,30 @@ class KeymapDefaultsTest {
         });
     }
 
+    /** Off macOS a default is Ctrl+Shift, Ctrl and a digit, or Ctrl+PageUp and PageDown, as GNOME Terminal's tabs. */
     @Test void linuxDefaultsLeaveTheShellItsKeys() {
         int mask = InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK | InputEvent.META_DOWN_MASK;
         for (ActionId action : ActionId.values()) KeyBindings.parse(action.defaultBinding(false), false).ifPresent(stroke -> {
             int modifiers = stroke.getModifiers() & mask, key = stroke.getKeyCode();
             boolean ctrlShift = (modifiers & InputEvent.CTRL_DOWN_MASK) != 0 && (modifiers & InputEvent.SHIFT_DOWN_MASK) != 0;
             boolean ctrlDigit = modifiers == InputEvent.CTRL_DOWN_MASK && key >= KeyEvent.VK_1 && key <= KeyEvent.VK_9;
-            boolean ctrlTab = key == KeyEvent.VK_TAB && (modifiers & ~InputEvent.SHIFT_DOWN_MASK) == InputEvent.CTRL_DOWN_MASK;
-            assertThat(ctrlShift || ctrlDigit || ctrlTab).as("%s: %s", action, KeyBindings.format(stroke, false)).isTrue();
+            boolean ctrlPage = modifiers == InputEvent.CTRL_DOWN_MASK && (key == KeyEvent.VK_PAGE_UP || key == KeyEvent.VK_PAGE_DOWN);
+            assertThat(ctrlShift || ctrlDigit || ctrlPage).as("%s: %s", action, KeyBindings.format(stroke, false)).isTrue();
             assertThat(modifiers & InputEvent.META_DOWN_MASK).as("%s avoids the Super key", action).isZero();
         });
+    }
+
+    /**
+     * Workspace plan 7a Spec issues 1: the tool windows keep their digits, Alt+1 to 9 off macOS (IntelliJ's; Remote's SSH
+     * hosts, SFTP and Transfers) and Cmd+Alt+1 to 9 on macOS; no built-in default takes one.
+     */
+    @Test void noBuiltInDefaultTakesTheToolWindowsDigits() {
+        for (boolean mac : new boolean[]{true, false}) {
+            int toolWindows = mac ? InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK : InputEvent.ALT_DOWN_MASK;
+            KeyBindings bindings = KeyBindings.defaults(mac);
+            for (int key = KeyEvent.VK_1; key <= KeyEvent.VK_9; key++)
+                assertThat(bindings.actionFor(KeyStroke.getKeyStroke(key, toolWindows)))
+                    .as("digit %d on %s", key - KeyEvent.VK_0, mac ? "macOS" : "Linux").isEmpty();
+        }
     }
 }

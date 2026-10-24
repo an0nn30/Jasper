@@ -45,7 +45,7 @@ class ShortcutContextDispatchTest {
             assertThat(owner.dispatchShortcut(mac("cmd+alt+j"), pane)).isTrue();
             assertThat(owner.dispatchShortcut(mac("cmd+alt+j"), panelField)).isTrue();
             var editor = new JPanel(); var inside = new JTextArea(); editor.add(inside);
-            model.content().open("dev.x", "a", "A", owner.id(), editor);
+            model.tabs().open("dev.x", "a", "A", owner.id(), editor);
             assertThat(owner.dispatchShortcut(mac("cmd+alt+j"), inside)).isTrue();
             assertThat(owner.dispatchShortcut(mac("cmd+alt+j"), owner)).isTrue();
             assertThat(ran).containsExactly("global", "panel", "content", "global");
@@ -102,28 +102,27 @@ class ShortcutContextDispatchTest {
             var owner = content(launcher(new ArrayDeque<>()), true);
             var root = new BindingRoot(); root.setContentPane(owner); owner.installRootBindings(root);
             assertThat(root.activate(mac("cmd+t"))).as("New Tab").isTrue();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.tabCount()).isEqualTo(2);
             assertThat(root.activate(mac("cmd+9"))).as("no ninth tab: the key passes").isFalse();
             assertThat(root.activate(mac("cmd+k"))).as("Clear Scrollback applies only in a terminal pane").isFalse();
         });
     }
 
-    @Test void closePaneClosesTheFocusedPaneThenTheTabWithItsLastPane() throws Exception {
-        // A split needs a running shell, so the launcher's queued work runs between the steps, as in TerminalTabTest.
+    @Test void cmdWClosesTheActiveTabAndAGroupGoesWithItsLastTab() throws Exception {
+        // The launcher's queued work runs between the steps, so the split inherits from a running shell, as in TerminalContentTest.
         Queue<Runnable> pending = new ArrayDeque<>();
         WindowContent[] owner = new WindowContent[1];
-        TerminalTab[] tab = new TerminalTab[1];
         edt(() -> { owner[0] = content(idleLauncher(pending), true); owner[0].newTab(HOME); });
         while (!pending.isEmpty()) pending.remove().run();
-        edt(() -> { tab[0] = owner[0].currentTab(); tab[0].split(SplitTree.Axis.RIGHT); });
+        edt(() -> owner[0].invoke(ActionId.SPLIT_RIGHT));
         while (!pending.isEmpty()) pending.remove().run();
         edt(() -> {
-            assertThat(tab[0].panes()).hasSize(2);
+            assertThat(owner[0].workspace().model().groups()).hasSize(2);
             assertThat(owner[0].dispatchShortcut(mac("cmd+w"), owner[0].currentPane())).isTrue();
-            assertThat(tab[0].panes()).hasSize(1);
-            assertThat(owner[0].tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner[0].workspace().model().groups()).as("the split's group goes with its tab").hasSize(1);
+            assertThat(owner[0].tabCount()).isEqualTo(2);
             assertThat(owner[0].dispatchShortcut(mac("cmd+w"), owner[0].currentPane())).isTrue();
-            assertThat(owner[0].tabStrip().getTabCount()).isEqualTo(1);
+            assertThat(owner[0].tabCount()).isEqualTo(1);
         });
     }
 
@@ -174,13 +173,13 @@ class ShortcutContextDispatchTest {
                         assertThat(fired).as("Edit > Paste did not paste into the shell").isEmpty();
                         assertThat(taken).as("a text field's paste stays with the field").isFalse();
                     }
-                    int tabs = owner.tabStrip().getTabCount();
+                    int tabs = owner.tabCount();
                     assertThat(press(field, owner.bindings().strokeFor(ActionId.NEW_TAB).orElseThrow())).isTrue();
-                    assertThat(owner.tabStrip().getTabCount()).as("New Tab runs exactly once").isEqualTo(tabs + 1);
+                    assertThat(owner.tabCount()).as("New Tab runs exactly once").isEqualTo(tabs + 1);
                     assertThat(fired).as("no menu item fired from the keyboard").isEmpty();
                     assertThat(menuItem(owner, ActionId.CLEAR_SCROLLBACK).getAccelerator()).as("still shown").isEqualTo(clear);
                     menuItem(owner, ActionId.NEW_TAB).doClick(0);
-                    assertThat(owner.tabStrip().getTabCount()).as("a click still runs the item").isEqualTo(tabs + 2);
+                    assertThat(owner.tabCount()).as("a click still runs the item").isEqualTo(tabs + 2);
                 } finally {
                     frame.removeNotify();
                     KeyboardFocusManager.setCurrentKeyboardFocusManager(previous);

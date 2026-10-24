@@ -20,12 +20,14 @@ class HostedAnchorTest {
     @Test void mountedCapabilitySurvivesValueUpdatesButDiesOnDisableAndCannotRevive() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var windows=AppContractTest.headlessWindows();
-            var ui=new HostedUi("test.picker",new dev.jasper.app.contributions.Contributions(),new Containment(() -> true),Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},windows,null);
+            // A workspace for the view's content tab, where it may grant anchors.
+            var model=new dev.jasper.app.contributions.Contributions();
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(java.util.UUID.randomUUID(),tab -> {},tab -> {},tab -> {},() -> {}));
+            var ui=new HostedUi("test.picker",model,new Containment(() -> true),Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},windows,null);
             var kit=new HostedKit("test.picker",() -> true,ui::kitThemes,null,new Containment(() -> true));ui.kit(kit);
             var view=kit.create(picker(ControlState.READY),e -> {});
             assertThatThrownBy(() -> view.anchor("pick")).isInstanceOf(IllegalArgumentException.class);
-            var window=ui.windows().create(new WindowSpec("test.picker.owner","Owner",new java.awt.Dimension(300,200),false));
-            window.setContent(view);window.show();
+            var window=ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("owner","Owner"),null,view);
             var anchor=view.anchor("pick");var closes=new AtomicInteger();anchor.onClosed(closes::incrementAndGet);
             view.update(picker(ControlState.READY));assertThat(anchor.isOpen()).isTrue();
             var child=ui.windows().dialog(new DialogSpec("Child",anchor,true));child.show();

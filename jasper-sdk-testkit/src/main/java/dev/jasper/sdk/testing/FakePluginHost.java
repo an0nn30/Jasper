@@ -51,7 +51,9 @@ import dev.jasper.sdk.palette.PaletteVerb;
  * A single-threaded plugin runtime for tests. It follows the same rules as the application: queued
  * ordered delivery, topic ownership, coalesced activity progress, services committed on a successful
  * start, rollback and a closed context on failure. Appearance palettes and workspace
- * subscriptions accept the creating test thread or the real Swing EDT, rejecting background workers.
+ * subscriptions accept the creating test thread or the real Swing EDT, rejecting background workers. Kit views are the
+ * exception: {@link FakeKit} and {@link FakeKitView} need the real Swing event dispatch thread, so run a test of a
+ * plugin that builds views inside {@code SwingUtilities.invokeAndWait}.
  */
 public final class FakePluginHost implements AutoCloseable {
     private static final String APP = "jasper";
@@ -77,6 +79,10 @@ public final class FakePluginHost implements AutoCloseable {
     /** A {@code [[subcommands]]} declaration. */
     record Declared(String pluginId, String name, String summary) { }
     final Map<String, Declared> subcommands = new LinkedHashMap<>();
+    /** A plugin's split item, as {@code Windows.splitItem} registered it. */
+    record SplitItem(String pluginId, dev.jasper.sdk.ui.SplitItemSpec spec) { }
+    /** Every plugin's split items, in registration order. */
+    final List<SplitItem> splitItems = new CopyOnWriteArrayList<>();
     final Map<String, FakeCommandLine.Registered> subcommandHandlers = new LinkedHashMap<>();
     /** A subcommand call a handler took and has not completed. */
     private record RunningCall(FakePluginContext context, String name, FakeCommandCall call) { }
@@ -90,8 +96,13 @@ public final class FakePluginHost implements AutoCloseable {
     final FakeNotifications notifications = new FakeNotifications(this);
         private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
+    /** Why restorers declined, in order. */
+    private final List<String> declines = new CopyOnWriteArrayList<>();
     final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<String, List<String>> settingsReports = new java.util.concurrent.ConcurrentHashMap<>();
+    /** The look's defaults for plugins' settings, by plugin id and then dotted key, as a kit's tables give them. */
+    private final Map<String, Map<String, Object>> kitDefaults = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, List<String>> lookDefaultProblems = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<UUID, FakeUi.FakeWindow> overlays = new HashMap<>();
     private Path dataRoot;
     private final boolean ownsRoot;
@@ -162,6 +173,35 @@ public final class FakePluginHost implements AutoCloseable {
         publishWorkspace(next, requestedOpacity);
     }
 
+    private volatile List<dev.jasper.sdk.ui.EditorScheme> editorSchemes = List.of();
+    private List<dev.jasper.sdk.ui.EditorScheme> requestedSchemes = List.of();
+    List<dev.jasper.sdk.ui.EditorScheme> editorSchemes() { return editorSchemes; }
+
+    /** Queues the installed editor schemes {@code Appearance.editorSchemes} lists, which start empty. The next
+     * {@link #flush()} publishes them and, when they differ from the current ones, announces a workspace change, as
+     * importing or removing a theme does.
+     * @param schemes the schemes, each id once
+     * @throws IllegalArgumentException when two schemes share an id
+     * @since 0.21.0
+     */
+    public void setEditorSchemes(List<dev.jasper.sdk.ui.EditorScheme> schemes) {
+        requireAppearanceThread();
+        var copy = List.copyOf(schemes);
+        if (copy.stream().map(dev.jasper.sdk.ui.EditorScheme::id).distinct().count() != copy.size())
+            throw new IllegalArgumentException("Editor scheme ids must be unique");
+        if (requestedSchemes.equals(copy)) return;
+        requestedSchemes = copy;
+        events.add(() -> {
+            editorSchemes = copy;
+            for (var entry : workspaceHandlers) {
+                if (!entry.closed().get()) {
+                    try { entry.handler().accept(appearance.variant()); }
+                    catch (RuntimeException | LinkageError failure) { recordFailure(entry.pluginId() + " workspace appearance: " + failure); }
+                }
+            }
+        });
+    }
+
     /** Sets the opacity every component reports through {@code Appearance.workspaceOpacity} and announces it as a
      * workspace change on the next {@link #flush()} (no announcement when unchanged). Like the other workspace values,
      * components report the last flushed opacity until then.
@@ -193,7 +233,63 @@ public final class FakePluginHost implements AutoCloseable {
         });
     }
 
+    private volatile dev.jasper.sdk.ui.TerminalTypography terminalTypography = new dev.jasper.sdk.ui.TerminalTypography(
+        "Cousine Nerd Font Mono", 12, List.of("Symbols Nerd Font Mono", "Apple Color Emoji"), true, 1);
+    private final List<Entry> typographyHandlers = new CopyOnWriteArrayList<>();
+
+    /** Queues saved terminal typography for publication on the next {@link #flush()}, as a saved change to Jasper's
+     * terminal font settings would. Until then every plugin reads Jasper's defaults: Cousine Nerd Font Mono at 12
+     * points, falling back to Symbols Nerd Font Mono and Apple Color Emoji, with ligatures and a line height of 1.
+     * The flush updates the getter first and then runs the handlers on the EDT; a value equal to the current one
+     * notifies nobody, and a handler that throws is recorded in {@link #failures()} without stopping the others.
+     * @param value the saved terminal typography
+     * @throws IllegalStateException off the thread that made this host and the EDT
+     * @since 0.18.3
+     */
+    public void setTerminalTypography(dev.jasper.sdk.ui.TerminalTypography value) {
+        requireAppearanceThread();
+        Objects.requireNonNull(value, "typography");
+        events.add(() -> {
+            Runnable publish = () -> {
+                if (terminalTypography.equals(value)) return;
+                terminalTypography = value;
+                for (var entry : List.copyOf(typographyHandlers)) {
+                    if (!entry.closed().get()) {
+                        try { entry.handler().accept(value); }
+                        catch (RuntimeException | LinkageError failure) {
+                            recordFailure(entry.pluginId() + " terminal typography: " + failure);
+                        }
+                    }
+                }
+            };
+            if (javax.swing.SwingUtilities.isEventDispatchThread()) publish.run();
+            else {
+                try { javax.swing.SwingUtilities.invokeAndWait(publish); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+                catch (java.lang.reflect.InvocationTargetException failure) {
+                    if (failure.getCause() instanceof Error error) throw error;
+                    if (failure.getCause() instanceof RuntimeException runtime) throw runtime;
+                    throw new IllegalStateException(failure.getCause());
+                }
+            }
+        });
+    }
+
+    dev.jasper.sdk.ui.TerminalTypography terminalTypography() { return terminalTypography; }
+
+    Subscription subscribeTypography(String pluginId, Consumer<dev.jasper.sdk.ui.TerminalTypography> handler) {
+        if (!javax.swing.SwingUtilities.isEventDispatchThread())
+            throw new IllegalStateException("Terminal typography registration requires the UI thread");
+        Objects.requireNonNull(handler, "handler");
+        var entry = new Entry(pluginId, value -> handler.accept((dev.jasper.sdk.ui.TerminalTypography) value), new AtomicBoolean());
+        typographyHandlers.add(entry);
+        return () -> { entry.closed().set(true); typographyHandlers.remove(entry); };
+    }
+
     private volatile Variant variant = Variant.DARK;
+    private volatile dev.jasper.sdk.ui.Presentation presentation = FakePresentations.STANDARD;
+    /** Set by the first {@link #start} and never cleared, even when every plugin has stopped since. */
+    private boolean started;
 
     /** A host whose plugins' data directories live in a temporary directory this host deletes on close. */
     public FakePluginHost() { this.ownsRoot = true; }
@@ -218,6 +314,7 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public FakePluginContext start(PluginInfo info, Set<String> requires, Set<String> optional, Plugin plugin) {
         if (contexts.containsKey(info.id())) throw new IllegalArgumentException("Already started: " + info.id());
+        started = true;
         var all = new java.util.HashSet<>(requires);
         all.addAll(optional);
         var context = new FakePluginContext(this, info, Set.copyOf(all), Objects.requireNonNull(plugin));
@@ -248,6 +345,70 @@ public final class FakePluginHost implements AutoCloseable {
         }
         return context;
     }
+
+    /**
+     * Sets the presentation every plugin's appearance reports, as the application chooses its look before plugins start.
+     *
+     * @param presentation the look this host runs with
+     * @throws IllegalStateException once any plugin has started, even if it has stopped since
+     * @since 0.18.2
+     */
+    public void setPresentation(dev.jasper.sdk.ui.Presentation presentation) {
+        Objects.requireNonNull(presentation, "presentation");
+        if (started) throw new IllegalStateException("Plugins have already started");
+        this.presentation = presentation;
+    }
+
+    /**
+     * Gives a plugin's setting a look default, as a kit's {@code [defaults."<plugin id>"]} table does in the
+     * application: when the plugin declares the key, a value its kind accepts replaces the declared default, and a
+     * saved value still wins. A value the kind rejects, and a key the plugin never declares, leave the plugin's own
+     * default and are reported in {@link #lookDefaultProblems(String)}.
+     *
+     * @param pluginId the plugin
+     * @param key the dotted setting key
+     * @param rawValue a String, Long, Double, Boolean or List of String, as TOML reads them
+     * @throws IllegalStateException once any plugin has started, even if it has stopped since
+     * @since 0.18.2
+     */
+    public void setKitDefault(String pluginId, String key, Object rawValue) {
+        Objects.requireNonNull(pluginId, "pluginId");
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(rawValue, "rawValue");
+        if (!(rawValue instanceof String || rawValue instanceof Long || rawValue instanceof Double || rawValue instanceof Boolean
+                || rawValue instanceof List<?> items && items.stream().allMatch(String.class::isInstance)))
+            throw new IllegalArgumentException("Not a raw TOML value: " + rawValue);
+        if (started) throw new IllegalStateException("Plugins have already started");
+        kitDefaults.computeIfAbsent(pluginId, id -> new java.util.LinkedHashMap<>())
+            .put(key, rawValue instanceof List<?> items ? List.copyOf(items) : rawValue);
+    }
+
+    /**
+     * The look defaults a plugin could not use, in the order reported. A rejected value reads
+     * {@code <plugin id>: the look's default for <key> is not used: <reason>}, and a key the plugin never declares
+     * {@code <plugin id>: the look gives a default for <key>, which the plugin does not declare}; the reason's wording
+     * may differ from the application's.
+     *
+     * @param pluginId the plugin
+     * @return the problems, empty when there are none
+     * @since 0.18.2
+     */
+    public List<String> lookDefaultProblems(String pluginId) { return List.copyOf(lookDefaultProblems.getOrDefault(pluginId, List.of())); }
+
+    /** One plugin's look defaults by dotted key; empty when the look gives none. */
+    Map<String, Object> kitDefaults(String pluginId) { return kitDefaults.getOrDefault(pluginId, Map.of()); }
+
+    void lookDefaultProblem(String pluginId, String message) {
+        lookDefaultProblems.computeIfAbsent(pluginId, id -> new CopyOnWriteArrayList<>()).add(pluginId + ": " + message);
+    }
+
+    /**
+     * The presentation every plugin's appearance reports; safe from any thread.
+     *
+     * @return the presentation set, or {@link FakePresentations#STANDARD}
+     * @since 0.18.2
+     */
+    public dev.jasper.sdk.ui.Presentation presentation() { return presentation; }
 
     /**
      * Whether the plugin started and has not stopped.
@@ -337,7 +498,10 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Builds a plugin's own settings page as Settings would, over a host whose rows are labelled placeholders.
+     * Builds a plugin's own settings page as Settings would. {@code SettingsPanelHost.row} gives the standard rows
+     * Jasper builds (ids {@code settings:<key>}, {@code settings:<key>:reset}, ...), which {@link #settingsPanelView}
+     * can drive; an event one of those rows handles, emitted on that view, then calls the page's
+     * {@code SettingsPanel.pendingChanged()}.
      *
      * @param pluginId the plugin
      * @return the page's component; empty when the plugin gave no page or is not running
@@ -353,7 +517,12 @@ public final class FakePluginHost implements AutoCloseable {
             try {
             var owned=java.util.Objects.requireNonNull(panel.create(rows),"Settings view");
             var view=context.kit().requireOwned(owned);view.mount(rows);rows.view=view;view.hostSpec=rows::descriptor;
-            view.hostEvents=rows::event;
+            view.hostEvents = event -> {
+                if (rows.closed) return false;
+                boolean handled = rows.event(event);
+                if (handled) panel.pendingChanged();
+                return handled;
+            };
             rows.component=view.component;return rows.component;
             }catch(Throwable failure){recordFailure("Settings callback failed");rows.component=new javax.swing.JLabel("This page could not be shown.");return rows.component;}
         });
@@ -451,6 +620,10 @@ public final class FakePluginHost implements AutoCloseable {
         }
     }
 
+    /**
+     * Stops every active plugin in reverse start order, delivers every queued event, and deletes the temporary data
+     * directory when this host made it ({@link #FakePluginHost()}); a data root the caller gave is kept.
+     */
     @Override public void close() {
         stopAll();
         flush();
@@ -549,12 +722,14 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * UI thread: the toolbar views a terminal window shows, in toolbar order. The window builds each registered
+     * UI thread: the toolbar views a Jasper window shows, in toolbar order. The window builds each registered
      * {@code ToolbarItem.View} once, the first time this is asked for it, as a window builds its views when it opens; a
      * view whose factory threw or whose tree the toolbar does not admit is left out and recorded in {@link #failures()}.
-     * A window that is not open, or whose views {@link #closeToolbarViews closed}, shows none and asks no factory.
+     * A window that is not open, or whose views {@link #closeToolbarViews closed}, shows none and asks no factory. Jasper
+     * builds toolbar views only in the main window, the only window with a toolbar; the fake builds them for any open
+     * window, a child window too.
      *
-     * @param windowId a terminal window
+     * @param windowId a Jasper window
      * @return the live views
      * @since 0.18.0
      */
@@ -566,10 +741,10 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * UI thread: closes a window's toolbar views, as the window does when it closes; a fake window does when its last
-     * pane closes.
+     * UI thread: closes a window's toolbar views, as the window does when it closes; a fake child window does when its
+     * last tab closes or moves to another window; the main window stays open.
      *
-     * @param windowId a terminal window
+     * @param windowId a Jasper window
      * @since 0.18.0
      */
     public void closeToolbarViews(UUID windowId) {
@@ -583,7 +758,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * One menu target's contributed entries.
      *
-     * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code TOOLS}, {@code SESSION},
+     * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code TAB}, {@code TOOLS}, {@code SESSION},
      *     {@code TRANSFER}, {@code context} or {@code top:<menuId>}
      * @return {@code item:id}, {@code ---} and {@code submenu:title} lines, children indented, sections separated by {@code ===}
      */
@@ -959,55 +1134,60 @@ public final class FakePluginHost implements AutoCloseable {
         return lines;
     }
 
-    /** Returns the currently published header of an open panel instance.
+    /**
+     * Returns the header the open panel last published.
+     *
      * @param panelId panel identifier
-     * @param windowId owning window
-     * @return header metadata, or an empty header if no instance exists
+     * @return header metadata, or an empty header if the panel is not open
      */
-    public dev.jasper.sdk.ui.PanelHeader panelHeader(String panelId, UUID windowId) {
+    public dev.jasper.sdk.ui.PanelHeader panelHeader(String panelId) {
         for (var context : contexts.values()) for (var panel : context.ui.panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            var instance = panel.instances.get(windowId);
-            if (instance != null) return instance.header;
+            if (panel.instance != null) return panel.instance.header;
         }
         return dev.jasper.sdk.ui.PanelHeader.EMPTY;
     }
 
     /**
-     * Discards an open panel instance as its window would when the window closes: its header clears, retained header
-     * callbacks become inert and its close handlers run. Nothing happens when no such instance is open.
+     * Discards the open panel as the main window would when it closes: its header clears, retained header callbacks
+     * become inert and its close handlers run. Nothing happens when the panel is not open.
      *
      * @param panelId panel identifier
-     * @param windowId owning window
      */
-    public void closePanel(String panelId, UUID windowId) {
+    public void closePanel(String panelId) {
         for (var context : contexts.values()) for (var panel : context.ui.panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            var instance = panel.instances.remove(windowId);
+            var instance = panel.instance;
+            panel.instance = null;
             if (instance != null) instance.close();
         }
     }
 
     /**
-     * Invokes a panel's factory as a window showing it would. A factory failure is recorded.
+     * Invokes a panel's factory as the main window showing it would, or shows the panel built there: panels live in the
+     * main window. A factory failure is recorded.
      *
      * @param panelId the panel to build
-     * @param windowId the window the panel host reports
-     * @return the component, or null when there is no such panel or its factory failed
+     * @return the component, or null when no main window is open, there is no such panel or its factory failed
      */
-    public javax.swing.JComponent openPanel(String panelId, UUID windowId) {
+    public javax.swing.JComponent openPanel(String panelId) {
         for (FakePluginContext context : contexts.values()) {
-            javax.swing.JComponent built = context.ui.openPanel(panelId, windowId);
+            javax.swing.JComponent built = context.ui.openPanel(panelId);
             if (built != null) return built;
         }
         return null;
     }
 
-    /** The mounted owned view of an opened panel, when its content is a kit view. */
-    public java.util.Optional<FakeKitView> panelView(String panelId, UUID windowId) {
+    /**
+     * The mounted owned view of the open panel, when its content is a kit view.
+     *
+     * @param panelId panel identifier
+     * @return the view, or empty when the panel is not open
+     */
+    public java.util.Optional<FakeKitView> panelView(String panelId) {
         for (var context : contexts.values()) for (var panel : context.ui.panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            var instance = panel.instances.get(windowId);
+            var instance = panel.instance;
             if (instance == null || instance.done) return java.util.Optional.empty();
             return context.kit().views().stream().filter(view -> view.component == instance.content).findFirst();
         }
@@ -1067,9 +1247,9 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Inspects the actual Swing content of an open plugin surface for headless form tests.
-     * @param pluginId surface owner
-     * @param title exact surface title
+     * Inspects the actual Swing content of an open plugin dialog for headless form tests.
+     * @param pluginId dialog owner
+     * @param title exact dialog title
      * @return content while open, empty after close or if absent
      */
     public java.util.Optional<javax.swing.JComponent> windowContent(String pluginId, String title) {
@@ -1080,11 +1260,11 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * The owned view mounted on an open plugin window or dialog, for driving {@code UiView} content in headless tests
+     * The owned view mounted on an open plugin dialog, for driving {@code UiView} content in headless tests
      * (secrets through {@link FakeKitView#setSecret}, intents through {@link FakeKitView#emit}). Call it on the UI thread.
-     * @param pluginId surface owner
-     * @param title exact surface title
-     * @return the mounted view while the surface is open, empty after close, for raw content or if absent
+     * @param pluginId dialog owner
+     * @param title exact dialog title
+     * @return the mounted view while the dialog is open, empty after close, for raw content or if absent
      */
     public java.util.Optional<FakeKitView> windowView(String pluginId, String title) {
         FakePluginContext context = contexts.get(pluginId);
@@ -1097,7 +1277,7 @@ public final class FakePluginHost implements AutoCloseable {
      * How an open plugin dialog is presented, as its {@code DialogSpec} asked. Call it on the UI thread.
      * @param pluginId dialog owner
      * @param title exact dialog title
-     * @return the presentation while the dialog is open; empty for windows, overlays, closed or absent dialogs
+     * @return the presentation while the dialog is open; empty for overlays and closed or absent dialogs
      * @since 0.15.4
      */
     public java.util.Optional<dev.jasper.sdk.ui.DialogSpec.Presentation> dialogPresentation(String pluginId, String title) {
@@ -1112,8 +1292,8 @@ public final class FakePluginHost implements AutoCloseable {
      * UI thread.
      * @param pluginId dialog owner
      * @param title exact dialog title
-     * @return the swatch while the dialog (any presentation, {@code OVERLAY} dialogs included) is open; empty for plugin
-     *     windows, {@code Windows.overlay} surfaces and closed or absent dialogs
+     * @return the swatch while the dialog (any presentation, {@code OVERLAY} dialogs included) is open; empty for
+     *     {@code Windows.overlay} surfaces and closed or absent dialogs
      * @since 0.18.0
      */
     public java.util.Optional<dev.jasper.sdk.ui.Nodes.Hue> dialogSwatch(String pluginId, String title) {
@@ -1124,9 +1304,11 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /** Shown producer-owned popover views, in creation order, for deterministic input/lifetime tests.
-     * @param pluginId content producer @return live mounted views */
+     * @param pluginId content producer
+     * @return live mounted views
+     */
     public List<FakeKitView> popoverViews(String pluginId){var context=contexts.get(pluginId);if(context==null)return List.of();return context.ui.popovers.stream().filter(p->p.shown&&!p.closed&&p.content!=null).map(p->p.content).toList();}
-    /** The currently shown plugin windows. */
+    /** The open plugin dialogs and overlays as {@code id|title|shown}, in creation order; the id is {@code dialog} or {@code overlay}. */
     public List<String> windows() {
         List<String> lines = new ArrayList<>();
         for (FakePluginContext context : contexts.values())
@@ -1135,10 +1317,10 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Closes the first open window with this id as the user would, consulting its closing guards.
+     * Closes the first open dialog or overlay with this id as the user would, consulting its closing guards.
      *
-     * @param windowId the window id, or {@code dialog}
-     * @return false when a guard vetoed the close or there is no such window
+     * @param windowId {@code dialog} or {@code overlay}
+     * @return false when a guard vetoed the close, for an overlay, which the user cannot close, or when there is none
      */
     public boolean requestClose(String windowId) {
         for (FakePluginContext context : contexts.values())
@@ -1147,21 +1329,7 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Runs the Close Window command of the first open window with this id, as File → Close Window or Cmd/Ctrl+W
-     * would: its close-command handlers newest first, then, when none handled it, its closing guards.
-     *
-     * @param windowId the window id
-     * @return true when the window closed; false when a handler handled the command, a guard vetoed or there is no such window
-     * @since 0.8.4
-     */
-    public boolean closeCommand(String windowId) {
-        for (FakePluginContext context : contexts.values())
-            for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows)) if (window.id.equals(windowId)) return window.closeCommand();
-        return false;
-    }
-
-    /**
-     * Asks the closing guards of every open plugin window, then every quit guard, as quitting or restarting Jasper
+     * Asks every plugin's content tabs' closing guard, then every quit guard, as quitting or restarting Jasper
      * does, and closes nothing. Dialogs and overlays are not asked. A quit guard whose future is still pending counts
      * as a refusal here: the fake does not pump events.
      *
@@ -1170,9 +1338,6 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public boolean requestQuit() {
         for (FakePluginContext context : contexts.values()) if (!context.ui.closeContent(List.copyOf(context.ui.contents), false).getNow(false)) return false;
-        for (FakePluginContext context : contexts.values())
-            for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows))
-                if (!window.id.equals("dialog") && !window.id.equals("overlay") && !window.mayClose()) return false;
         for (FakePluginContext context : contexts.values())
             for (var guard : List.copyOf(context.ui.quitGuards)) {
                 java.util.concurrent.CompletableFuture<Boolean> decision;
@@ -1185,7 +1350,8 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Adds a terminal window. Windows, tabs and panes announce themselves on the terminal topics like the
+     * Adds a Jasper window: the main window when none is open, which stays open when its last tab leaves, else a child
+     * window, which closes with its last tab. Windows, tabs and panes announce themselves on the terminal topics like the
      * application's, delivered by {@link #flush()}.
      *
      * @return the new window's id
@@ -1193,7 +1359,8 @@ public final class FakePluginHost implements AutoCloseable {
     public UUID addTerminalWindow() { return workspace.addWindow().id; }
 
     /**
-     * Adds and selects a tab.
+     * Adds and selects a terminal tab, in a new tab of its own at the end of the window's strip;
+     * {@link #addTerminalPane} gives it its one pane.
      *
      * @param windowId an open window
      * @param title the tab's title
@@ -1204,7 +1371,7 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Adds a pane; a tab's first pane is its focused pane.
+     * Adds a terminal tab's pane. A terminal tab holds one pane, so a second throws {@code IllegalStateException}.
      *
      * @param tabId an open tab
      * @param info what the pane reports
@@ -1222,17 +1389,79 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public void activateTerminalWindow(UUID windowId) { workspace.window(windowId).ifPresent(workspace::activate); }
     /**
-     * The user focused a pane, which also selects its tab.
+     * The user focused a pane, which selects its tab.
      *
      * @param paneId the pane
      */
     public void focusTerminalPane(UUID paneId) { workspace.pane(paneId).ifPresent(workspace::focus); }
     /**
-     * Closes a pane; the last pane takes its tab with it, and the last tab its window.
+     * Closes a pane with its tab; a child window's last tab takes the window with it.
      *
      * @param paneId the pane
      */
     public void closeTerminalPane(UUID paneId) { workspace.pane(paneId).ifPresent(workspace::close); }
+
+    /**
+     * Adds and selects a content tab, as the application or another plugin shows a document or a tool view: a tab with no
+     * terminal pane, which {@code TabHandle.kind()} reports as {@code CONTENT}, in a new tab of its own at the end of the
+     * window's strip.
+     *
+     * @param windowId an open window
+     * @param title the tab's title
+     * @return the new tab's id
+     * @since 0.19.0
+     */
+    public UUID addContentTab(UUID windowId, String title) {
+        return workspace.addTab(workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No such window: " + windowId)),
+            dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT, Objects.requireNonNull(title, "title")).id;
+    }
+
+    /**
+     * A window's tabs as its strip shows them, each tab's items pane by pane: the ids
+     * {@code TabHandle.id()} reports.
+     *
+     * @param windowId a window
+     * @return the tabs in strip order, each a list of item ids; empty for a window that is not open
+     * @since 0.21.0
+     */
+    public List<List<UUID>> windowTabs(UUID windowId) {
+        return workspace.window(windowId).map(workspace::tabsOf).orElse(List.of());
+    }
+
+    /**
+     * Moves a tab the test added to a new tab at the end of another open window's strip, where it is selected, as
+     * dragging it there does: a terminal tab's pane keeps its id and session with no {@code PANE_OPENED} or
+     * {@code PANE_CLOSED}, the move is announced on {@code TAB_MOVED}, and a child window left with no tab closes after
+     * it. A plugin moves its own content tab with {@code ContentTab.moveToNewWindow} or {@code moveToMainWindow}.
+     *
+     * @param tabId an open tab the test added
+     * @param windowId another open window
+     * @since 0.19.0
+     */
+    public void moveTab(UUID tabId, UUID windowId) {
+        var tab = workspace.tab(tabId).orElseThrow(() -> new IllegalArgumentException("No such tab: " + tabId));
+        var window = workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No such window: " + windowId));
+        for (FakePluginContext context : contexts.values())
+            if (context.ui.contents.stream().anyMatch(content -> content.tab == tab))
+                throw new IllegalArgumentException("A plugin moves its own content tab with ContentTab.moveToNewWindow or moveToMainWindow");
+        workspace.move(tab, window);
+    }
+
+    /**
+     * Closes a tab the test added, of either kind, as its close button does: a terminal tab's pane closes with it, and a
+     * child window's last tab takes the window with it. A plugin closes its own content tab with {@code ContentTab.close}
+     * or {@code requestClose}.
+     *
+     * @param tabId an open tab the test added
+     * @since 0.20.0
+     */
+    public void closeTab(UUID tabId) {
+        var tab = workspace.tab(tabId).orElseThrow(() -> new IllegalArgumentException("No such tab: " + tabId));
+        for (FakePluginContext context : contexts.values())
+            if (context.ui.contents.stream().anyMatch(content -> content.tab == tab))
+                throw new IllegalArgumentException("A plugin closes its own content tab with ContentTab.close");
+        workspace.close(tab);
+    }
     /**
      * Replaces what a pane reports, without an event.
      *
@@ -1240,6 +1469,27 @@ public final class FakePluginHost implements AutoCloseable {
      * @param info the new snapshot
      */
     public void setPaneInfo(UUID paneId, dev.jasper.sdk.terminal.PaneInfo info) { workspace.pane(paneId).ifPresent(pane -> pane.info = Objects.requireNonNull(info, "info")); }
+    /**
+     * Holds a local pane as Jasper holds a restored terminal tab it has not shown yet: it reports
+     * {@code SessionState.NOT_STARTED} with no grid (0 columns, 0 rows, no shell integration) and drops what plugins send
+     * it, and it starts on its tab's next selection or focus ({@link #focusTerminalPane}, or its {@code TabHandle.select()}),
+     * after the selection is reported, with the snapshot it had when it was held. Only a local pane can be held; a pane
+     * that shows a provided session is refused.
+     *
+     * @param paneId the pane
+     * @throws IllegalArgumentException if the pane shows a provided session
+     * @since 0.21.0
+     */
+    public void holdPane(UUID paneId) {
+        workspace.pane(paneId).ifPresent(pane -> {
+            if (pane.session != null)
+                throw new IllegalArgumentException("Only a local pane can be held: pane " + paneId + " shows a provided session");
+            if (pane.held != null) return;
+            pane.held = pane.info;
+            pane.info = FakeTerminals.notStarted(pane.info);
+        });
+    }
+
     /**
      * Sets the text selected in a pane.
      *
@@ -1268,7 +1518,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * What plugins asked to open or raise, in order.
      *
-     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program) or {@code front|<window id>}
+     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program), {@code session-tab|<window id>|<session title>}, {@code session-split|<pane id>|<RIGHT or DOWN>|<session title>}, {@code beside|<content tab id>|<RIGHT or DOWN>} (a content tab's Terminal Right or Terminal Down) or {@code front|<window id>} (a window's {@code toFront()}, or the main window that a child window's panel toggle raises)
      */
     public List<String> openRequests() { return List.copyOf(workspace.openRequests); }
 
@@ -1370,12 +1620,15 @@ public final class FakePluginHost implements AutoCloseable {
      * A provided session's state.
      *
      * @param paneId the pane
-     * @return {@code CONNECTING|<status>}, {@code RUNNING|}, {@code EXITED|<how it ended>}, {@code LOCAL|} for a pane that is not a provided session, or {@code CLOSED|} for a pane that is gone
+     * @return {@code NOT_STARTED|<status>} for a restored session whose tab has not shown, {@code CONNECTING|<status>},
+     *     {@code RUNNING|}, {@code EXITED|<how it ended>}, {@code LOCAL|} for a pane that is not a provided session, or {@code CLOSED|} for a pane that is gone
      */
     public String sessionState(UUID paneId) { return workspace.sessions.state(workspace.anyPane(paneId).orElse(null)); }
 
     /**
-     * The user pressed Cancel. A pane that never showed a session closes; otherwise it returns to the disconnected state.
+     * The user pressed Cancel. A pane that never showed a session closes, unless Jasper restored it with its tab; otherwise
+     * it returns to the disconnected state and publishes {@code SESSION_STATE_CHANGED} with {@code EXITED}, as a failed
+     * attempt does here. Jasper publishes {@code EXITED} only when an attached session ends.
      *
      * @param paneId the pane
      */
@@ -1469,7 +1722,7 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param sourceId a registered source
      * @param rootId   one of its roots
-     * @param windowId the terminal window the chooser belongs to
+     * @param windowId the Jasper window the chooser belongs to
      * @return the browser; the caller closes it
      * @since 0.10.0
      */
@@ -1537,12 +1790,15 @@ public final class FakePluginHost implements AutoCloseable {
                 + String.join(",", spec.verbs().stream().map(verb -> verb.role().name()).toList());
         }
 
-        /** The ids of registered scopes the palette's All tab searches, in registration order. */
+        /** The ids of registered scopes a query with no scope chosen searches (in All), in registration order. */
         public List<String> scopesInAll() {
             return scopes.values().stream().filter(registered -> registered.spec().inAll()).map(registered -> registered.spec().id()).toList();
         }
 
-        /** The ids of registered scopes the palette may offer before anything is typed, in registration order (since 0.9.2). */
+        /**
+         * The ids of registered scopes whose spec sets {@code inRecents}, in registration order (since 0.9.2). The
+         * application offers a scope's rows before anything is typed only when it is in All too.
+         */
         public List<String> scopesInRecents() {
             return scopes.values().stream().filter(registered -> registered.spec().inRecents()).map(registered -> registered.spec().id()).toList();
         }
@@ -1569,7 +1825,10 @@ public final class FakePluginHost implements AutoCloseable {
                 .orElseThrow(() -> new IllegalArgumentException("No such verb: " + verbId));
         }
 
-        /** Searches a scope as the palette would, as {@code rowId|title|enabled} lines; later row lookups use this answer. */
+        /**
+         * Searches a scope as the palette would, as {@code rowId|title|enabled} lines; later row lookups use this
+         * answer. Every palette call this host makes passes {@code maxResults} 5 and {@code macOs} true.
+         */
         public List<String> searchScope(String scopeId, String query, UUID windowId, UUID paneIdOrNull) {
             var registered = scope(scopeId);
             PaletteResults results = registered.scope().search(query, query(registered, windowId, paneIdOrNull));
@@ -1636,22 +1895,181 @@ public final class FakePluginHost implements AutoCloseable {
      * @return the fake clipboard
      */
     public FakeClipboard clipboard() { return clipboard; }
-    /** @return hosted content in registration order, for contract assertions */
+    /**
+     * The open content tabs plugins opened with {@code Windows.openTab}, plugin by plugin in start order and each
+     * plugin's in opening order; a closed tab drops out.
+     *
+     * @return hosted content in registration order, for contract assertions
+     */
     public List<dev.jasper.sdk.ui.ContentTab> contentTabs() {
         return contexts.values().stream().flatMap(c -> c.ui.contents.stream()).map(c -> (dev.jasper.sdk.ui.ContentTab)c).toList();
     }
-    /** @param tab handle from this host
+    /**
+     * The component a content tab shows: its kit view's component, the same instance after the tab moves to another
+     * window.
+     *
+     * @param tab handle from this host
      * @return the actual hosted component */
     public javax.swing.JComponent contentComponent(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).component; }
-    /** @param tab handle from this host
+    /**
+     * What a content tab's header shows: the presentation the plugin last set with {@code setPresentation}, or until
+     * then one titled after its {@code ContentSpec}.
+     *
+     * @param tab handle from this host
      * @return recorded presentation */
     public dev.jasper.sdk.ui.ContentPresentation contentPresentation(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).presentation; }
-    /** @param tab handle from this host
+    /**
+     * The Jasper window a content tab is in: the window it opened in, or the one a move took it to. An owner
+     * that was a content tab resolves to that tab's window, and no owner or a closed window to the main window, or to a
+     * new main window when none is open.
+     *
+     * @param tab handle from this host
      * @return originating owner */
     public dev.jasper.sdk.WindowOwner contentOwner(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).owner; }
-    /** @param tab hosted content handle
+    /**
+     * The status items a content tab last published with {@code setStatus}; empty until it publishes any.
+     *
+     * @param tab hosted content handle
      * @return published status descriptors */
     public List<dev.jasper.sdk.ui.ContentStatus> contentStatus(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).status; }
+
+    /**
+     * A plugin's open content tab, found by its title, as a plugin's manager or document opens it. Call it on the UI
+     * thread.
+     *
+     * @param pluginId the tab's owner
+     * @param title the tab's exact presentation title
+     * @return the tab while it is open; empty after close or if absent
+     * @since 0.20.0
+     */
+    public java.util.Optional<dev.jasper.sdk.ui.ContentTab> contentTab(String pluginId, String title) {
+        FakePluginContext context = contexts.get(pluginId);
+        if (context == null) return java.util.Optional.empty();
+        return context.ui.contents.stream().filter(content -> !content.closed && content.presentation.title().equals(title))
+            .map(content -> (dev.jasper.sdk.ui.ContentTab) content).findFirst();
+    }
+
+    /**
+     * The owned view a plugin's open content tab shows, found by its title, for driving {@code UiView} content in headless
+     * tests as {@link #windowView} does for dialogs. Call it on the UI thread.
+     *
+     * @param pluginId the tab's owner
+     * @param title the tab's exact presentation title
+     * @return the view while the tab is open; empty after close, for raw content or if absent
+     * @since 0.20.0
+     */
+    public java.util.Optional<FakeKitView> contentView(String pluginId, String title) {
+        return contentTab(pluginId, title).map(tab -> ((FakeContent) tab).view);
+    }
+
+    /**
+     * The restore state a tab gives: a plugin's content tab's, or the one a plugin's provided
+     * session carries. Call it on the UI thread.
+     *
+     * @param tabId a tab of the scripted workspace
+     * @return its restore state; empty when the tab does not come back
+     * @since 0.21.0
+     */
+    public java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(UUID tabId) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeContent content : context.ui.contents) if (content.tab.id.equals(tabId)) return content.restore;
+        return workspace.tab(tabId).map(tab -> tab.pane).map(pane -> pane.session).flatMap(session -> session.spec.restore());
+    }
+
+    /**
+     * The restore state a plugin's content tab gives. Call it on the UI thread.
+     *
+     * @param tab a content tab from this host
+     * @return its restore state; empty when the tab does not come back
+     * @since 0.21.0
+     */
+    public java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent) tab).restore; }
+
+    /**
+     * Restores one saved tab as Jasper does when it restores its windows: the plugin's restorer for
+     * {@code state}'s kind runs, and the first content tab it opens, whatever window or placement it named, or the first
+     * provided session it opens in window {@code windowId}, is the saved tab, in that window, where it stays while the
+     * restorer runs: a move asked of it does nothing. A content tab is placed there, not shown: it is
+     * neither selected nor active until the test shows it. A session's tab waits as Jasper's does, {@code NOT_STARTED} with
+     * no connection attempt, until its tab is shown ({@link #focusTerminalPane} or its {@code TabHandle.select()}). Jasper
+     * places the tab where it was saved, in its tab and pane; this fake puts it in a new tab at the end of the window's
+     * strip. Call it on the UI thread.
+     *
+     * @param pluginId the plugin that saved the tab
+     * @param windowId the window being restored
+     * @param title the tab's saved title
+     * @param state its saved restore state
+     * @return the tab the restorer opened, content or terminal, while it is open in that window, whatever the restorer then
+     *     returned or threw, except another {@link Error}; empty when the plugin is not running or has no restorer for the
+     *     kind, or its restorer opened nothing: it declined (recorded in {@link #declinedRestores()}), threw an exception
+     *     or a {@link LinkageError} (recorded in {@link #failures()}, as Jasper contains them) or returned empty, where
+     *     Jasper shows a placeholder; empty too when it threw another {@link Error}, the plugin's restore failure, which
+     *     closes the tab it opened and is recorded in {@link #failures()}
+     * @throws VirtualMachineError one the restorer threw, as Jasper lets it through, once the tab it opened has closed
+     * @since 0.21.0
+     */
+    public java.util.Optional<UUID> restoreTab(String pluginId, UUID windowId, String title, dev.jasper.sdk.RestoreState state) {
+        FakeWorkspace.Window window = workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No window " + windowId));
+        FakePluginContext context = contexts.get(pluginId);
+        if (context == null || context.state != FakePluginContext.State.ACTIVE) return java.util.Optional.empty();
+        dev.jasper.sdk.ui.TabRestorer restorer = context.ui.restorers.get(state.kind());
+        if (restorer == null || workspace.slot != null) return java.util.Optional.empty();
+        var slot = new FakeWorkspace.Slot(window, context);
+        workspace.slot = slot;
+        java.util.Optional<String> declined;
+        try {
+            declined = restorer.restore(new dev.jasper.sdk.ui.RestoreRequest(context.terminals.windowHandle(windowId), title, state));
+        } catch (Exception | LinkageError failure) {
+            // Contained as Jasper's containment holds it: a checked exception too, which another JVM language may throw.
+            failures.add(pluginId + " restorer " + state.kind() + ": " + failure);
+            return java.util.Optional.ofNullable(slot.taken).filter(tab -> tab.open && tab.window == window).map(tab -> tab.id);
+        } catch (VirtualMachineError fatal) {
+            // What Jasper lets through takes the tab the restorer opened with it.
+            workspace.slot = null;
+            if (slot.taken != null) {
+                try { closeRestored(slot.taken); } catch (RuntimeException | Error closing) { fatal.addSuppressed(closing); }
+            }
+            throw fatal;
+        } catch (Error failure) {
+            // Another Error is the plugin's restore failure, as Jasper contains it: the tab it opened closes, and the rest of
+            // the windows restore (workspace plan 6b's final review, M1).
+            failures.add(pluginId + " restorer " + state.kind() + ": " + failure);
+            workspace.slot = null;
+            if (slot.taken != null) {
+                try { closeRestored(slot.taken); } catch (RuntimeException | Error closing) { failures.add(pluginId + " restorer close: " + closing); }
+            }
+            return java.util.Optional.empty();
+        } finally {
+            workspace.slot = null;
+        }
+        // As Jasper's: only a tab still open in the window being restored is the saved tab, and a reason counts without one.
+        java.util.Optional<UUID> restored = java.util.Optional.ofNullable(slot.taken).filter(tab -> tab.open && tab.window == window).map(tab -> tab.id);
+        if (restored.isEmpty() && declined != null && declined.isPresent()) declines.add(pluginId + " " + state.kind() + ": " + declined.get());
+        return restored;
+    }
+
+    /** Closes a tab a restorer opened, a content tab through its handle. */
+    private void closeRestored(FakeWorkspace.Tab tab) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeContent content : List.copyOf(context.ui.contents)) if (content.tab == tab) { content.close(); return; }
+        workspace.close(tab);
+    }
+
+    /**
+     * Why restorers declined to restore a tab, in order, each only when no tab came back, as Jasper drops the reason of a
+     * restorer that opened its tab: an expected outcome a placeholder shows, which is no failure.
+     *
+     * @return lines of the form {@code <plugin id> <kind>: <reason>}
+     * @since 0.21.0
+     */
+    public List<String> declinedRestores() { return List.copyOf(declines); }
+
+    /**
+     * The commands a content tab last published with {@code setCommands}; empty until it publishes any.
+     *
+     * @param tab hosted content handle
+     * @return published command descriptors */
+    public List<dev.jasper.sdk.ui.ContentCommand> contentCommands(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).commands; }
 
     /** A {@code Terminals.environment} contributor and the plugin that registered it. */
     record ShellContributor(FakePluginContext context, Function<Map<String, String>, Map<String, String>> contributor) { }
@@ -1710,11 +2128,11 @@ public final class FakePluginHost implements AutoCloseable {
     /** The editor a plugin provides ({@code Platform.editor}) and the plugin that registered it. */
     record ProvidedEditor(FakePluginContext context, dev.jasper.sdk.ui.FileEditor editor) { }
     private volatile ProvidedEditor providedEditor;
-    private final Set<String> bundledPlugins = ConcurrentHashMap.newKeySet();
+    final Set<String> bundledPlugins = ConcurrentHashMap.newKeySet();
 
     /**
      * Marks a plugin as one that ships with Jasper, before it starts: its {@code Platform.editor} registration replaces
-     * a non-bundled plugin's, as the application's bundled plugins' do.
+     * a non-bundled plugin's, and its split items come first in the Split lists, as the application's bundled plugins' do.
      *
      * @param pluginId the plugin
      * @since 0.17.1
@@ -1755,7 +2173,7 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param file the file
      * @param line the line to show, or empty
-     * @param windowId the terminal window the open came from, or empty
+     * @param windowId the Jasper window the open came from, or empty
      * @return what the editor answered; false when no plugin provides one, or it threw, which {@link #failures()} records
      * @since 0.17.1
      */

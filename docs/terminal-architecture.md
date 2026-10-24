@@ -1,8 +1,8 @@
 # Terminal architecture
 
-Start at the [module README](../jasper-terminal/README.md) for installation and
-compiled embedding examples. This guide describes the current implementation;
-historical plans are decision records, not prerequisites for maintenance.
+Start at the [module README](../jasper-terminal/README.md) for installation, the supported API and
+compiled embedding examples. This guide describes the current implementation; the dated plans under
+`docs/superpowers/` are decision records, not prerequisites for maintenance.
 
 ## Dependency direction
 
@@ -31,19 +31,22 @@ flowchart TD
     Session --> Access
     Session --> Engine[internal.emulation]
     Session --> Process[internal.process]
+    Session --> Shell[internal.shell]
+    Session --> Transport[internal.transport]
     Session --> Config
     Access --> Engine
     Access --> Process
-    Access --> Shell[internal.shell]
+    Access --> Shell
+    Access --> Transport
     Access --> Text
     Access --> Paint
     Access --> Search
     Engine --> Process
     Engine --> Shell
+    Engine --> Transport
     Engine --> Text
     Engine --> Paint
     Engine --> Config
-    Shell --> Text
     Paint --> Text
     Paint --> Config
     Paint --> Fonts
@@ -52,21 +55,26 @@ flowchart TD
 
 Arrows show package collaboration, including signatures and construction. No
 internal package calls back through a session or view facade: callback values
-carry notifications upward. JediTerm `PtyConnector` and `ShellIntegrationConnector`
-are package-private in `internal.emulation`; native ownership lives in
-`internal.process.PtyChild`. There is no emulator backend interface.
+carry notifications upward. The JediTerm connectors `PtyConnector`, `AttachedConnector`
+and `ShellIntegrationConnector` are package-private in `internal.emulation`; native ownership
+lives in `internal.process.PtyChild` and an attached connection's in
+`internal.transport.AttachedTransport`. There is no emulator backend interface.
 
 ## Owners and patterns
 
 | Owner | Responsibility and lifetime |
 | --- | --- |
-| `TerminalSession` | Facade for process lifetime, listeners, metadata and input; closed by the pane owner |
-| `PtySessionFactory` | Factory wiring child → engine → queries/tracker → facade before starting the reader |
-| `PtyChild`, `ForegroundJobResolver` | Native I/O, bounded shutdown and process metadata; one per session |
+| `TerminalSession` | Facade for process or connection lifetime, listeners, metadata and input; closed by the pane owner |
+| `PtySessionFactory` | Wires child or transport → engine → queries/tracker → facade before starting the reader; closes the child or connection when wiring fails |
+| `PtyChild`, `ForegroundJobResolver` | Native I/O, bounded shutdown and process metadata; one per local session |
+| `AttachedTransport`, `AttachedConnector` | An attached connection's writer thread, bounded outbound queue, drain window and single close; its JediTerm adapter |
 | `JediTermEngine` | Reader, emulator/display, protocol input, locked reset and vendor translation |
 | `BufferQueries`, `JediCellReader` | Locked buffer reads and vendor-free row capture; no Swing state |
 | `AbsoluteRowState` | Discard count and prompt rows coordinated with buffer mutations; volatile/atomic and copied publication for readers |
+| `ShellIntegrationFilter` | Streaming rewrite of OSC 7 and OSC 133 into `OSC 1341;jasper;…`, plus a `cursor-reset` command after DECSCUSR 0, across read-chunk boundaries; drops `q`-final CSI without a space intermediate |
 | `ShellCommandTracker` | Ordered shell marks, command text, cwd and monotonic duration |
+| `DirectoryProvenance` | Classifies OSC 7 reports and clicked `file:` links as local or remote and applies the local path mapper |
+| `LinkDetector`, `PathDetector` | Plain-text URLs and file paths in a soft-wrap-joined row |
 | `TerminalAccess` | Unsupported concrete composition bridge; never the live buffer |
 | `TerminalView`, `Viewport` | Swing assembly, one viewport, coordinated invalidation, attachment lifecycle |
 | `KeyboardController`, `MouseController` | Key suppression/precedence and press-to-release gesture ownership |
@@ -76,13 +84,16 @@ are package-private in `internal.emulation`; native ownership lives in
 | `DesktopServices` | Clipboard and one shared lazy bounded browser worker |
 
 The builders produce immutable validated options. `TerminalAction` is a closed
-command enum reused by standalone shortcuts and the app's existing
-[WindowContent catalog](../jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java).
+command enum that `TerminalView.execute` dispatches. Jasper's
+[WorkspaceActions](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActions.java)
+maps its own action catalog ([ActionId](../jasper-app/src/main/java/dev/jasper/app/commands/ActionId.java):
+ids, labels, default shortcuts) onto it, except Find Next and Find Previous, which go through the
+app's find bar. The standalone shortcuts call the view's methods directly.
 Parameterized paste/search/resize use typed methods. No command objects are
 allocated for every keystroke. Vendor/native adapters and the filtered connector
 decorator isolate integration. `TerminalSessionListener` is the observer contract.
-These patterns give specific responsibilities homes; there is no general
-controller superclass, service locator or plugin registry.
+These patterns give specific responsibilities homes; the module has no general
+controller superclass, service locator or registry.
 
 ## Input and output
 
@@ -92,7 +103,7 @@ sequenceDiagram
     participant View as TerminalView (EDT)
     participant Keys as KeyboardController
     participant Access as TerminalAccess / engine
-    participant Child as PtyChild
+    participant Child as PtyChild or AttachedTransport
     App->>View: shortcut handler / execute(action)
     View->>Keys: pressed or typed event
     Keys->>Keys: app shortcut precedence, modifier and typed suppression
@@ -104,15 +115,21 @@ Mouse routing first decides between local gestures and terminal reports. A
 reported gesture uses geometry only; it must not copy screen rows or trigger a
 local repaint. Ownership and modifiers are captured at press and survive release.
 Shift bypasses application mouse capture. Fractional wheel motion accumulates.
+A mouse event an earlier listener consumed, such as the application's pane drag,
+is not the terminal's: the view neither reports nor selects with it.
+Without reporting, the wheel scrolls the view three lines per notch, or sends Up/Down arrow
+keys on the alternate screen; on macOS a Shift-wheel is ignored.
 A Cmd-click (Ctrl-click elsewhere) opens the URL under the pointer in the browser;
 otherwise, once the application set `setFileLinkHandler`, it reports the path or
-local `file:` link there as a `FileLink`; otherwise it starts a selection.
+local `file:` link there as a `FileLink`; otherwise it starts a selection. On macOS
+a Cmd-click stays local even while the program asks for mouse reports; on Linux and
+Windows a Ctrl-click is reported to such a program unless Shift is held.
 `internal.text.PathDetector` reads the soft-wrap-joined row, which `BufferQueries`
 captures under the buffer lock and matches after releasing it.
 
 ```mermaid
 sequenceDiagram
-    participant Child as PtyChild
+    participant Child as PtyChild or AttachedTransport
     participant Reader as Engine reader
     participant Buffer as Locked JediTerm buffer
     participant Schedule as RenderScheduler
@@ -182,9 +199,17 @@ links use the installed hyperlink filter: `http`, `https`, `ftp` and `mailto`
 targets open in the browser, a `file:` target that the OSC 7 host rule places on
 this machine is a file link, and other targets open nothing. CSI `q` lacking a space intermediate
 is dropped so XTVERSION/DECLL cannot override the configured cursor. DECSCUSR 0
-is rewritten to restore configuration. Keep split-chunk parsing and payload
+is followed by a cursor-reset command that restores the configured cursor. An OSC 7 or 133 sequence longer than 4096
+held characters passes through unrewritten. Keep split-chunk parsing and payload
 bounds. Do not infer a command's duration from session exit; commands run inside
 one long-lived shell session.
+
+Jasper's zsh, bash and fish scripts send the command line as
+`OSC 1341;jasper;cmd;<base64 UTF-8>` before mark C; JediTerm delivers OSC 1341 without a
+rewrite. A payload of at most 16 KiB decoded is the command text. Without one, or when it is
+malformed, the tracker reads the screen from the mark B position to the cursor, at most 64 rows,
+trimmed. Mark A also completes a command that received no D, with no exit status; a prompt
+redrawn on the same row is not a new prompt. Unknown `OSC 1341;jasper;…` commands are ignored.
 
 ## Attached sessions
 
@@ -196,7 +221,9 @@ cannot block the EDT; a write that does not fit is rejected whole and reported t
 `TerminalSessionListener.inputDropped`; a resize directly behind another queued resize replaces it.
 After the connection's `exited` future completes, output is read to its end or until a two-second
 drain window closes the connection. `close` reaches the connection exactly once, from whichever
-side ends first. `internal.emulation.AttachedConnector` adapts the transport to JediTerm, so
+side ends first; the connection's `close` must be idempotent, must unblock a pending read of
+`output` and must return promptly, because the reader depends on it to end.
+`internal.emulation.AttachedConnector` adapts the transport to JediTerm, so
 attached output runs through the same `ShellIntegrationConnector` chain as a PTY.
 
 An attached session differs from a PTY session in four ways: it writes no exit line into the
@@ -228,9 +255,13 @@ path that means on this machine, or empty, and then the report is ignored and th
 A mapper that throws or returns null counts as empty; it runs on the reader thread for a report and on
 the EDT for a click, and must not block. Remote reports never reach it. The
 default, `SessionLaunchOptions.DEFAULT_LOCAL_PATHS`, reads the path as a `file` URI path on this
-machine, as before. Jasper's WSL panes map `/mnt/c/...` to `C:\...` and any other path to the
+machine. Jasper's WSL panes map `/mnt/c/...` to `C:\...` and any other path to the
 distribution's `\\wsl.localhost` share, so a Linux path never reaches the local surface as `\home\x`. On Windows,
 Jasper's mappers also ignore a directory on a UNC host other than a WSL pane's own share.
+
+In an attached session no `file:` link is local, so a clicked one names nothing; a path written in
+the output is still reported as a `FileLink`, and Jasper ignores it in a pane without a local
+directory.
 
 ## Threads and failures
 
@@ -239,21 +270,23 @@ Jasper's mappers also ignore a directory on a UNC host other than a WSL pane's o
 | Emulator loop and shell cycle | One reader per session; hooks fully wired before start |
 | Live buffer rows, cursor and history | Every read holds reentrant buffer lock; regex and painting run after capture releases it |
 | Published metadata | Grid dimensions/title/cwd use volatile state; row epoch is atomic and prompt rows are copied from a concurrent list |
-| View, viewport, selections, highlights, fonts and timers | EDT; `execute` enforces this, other Swing methods rely on caller contract |
+| View, viewport, selections, highlights, fonts and timers | EDT; `execute` and `afterNextPaint` enforce this, other Swing methods rely on caller contract |
 | Regex | Worker over captured rows; latest generation publishes on EDT |
 | Screen/reset/alternate notifications | Synchronous on causing thread, possibly under buffer lock; never wait for EDT |
 | Title/cwd/command callbacks | Reader protocol path; command callbacks after capture releases lock |
-| Exit future | Completes after output ends, child wait and exit-message rendering into the buffer; continuation thread unspecified |
+| Exit future | Local: completes with the exit code after output ends, the child wait and the `[process exited with code N]` line's rendering into the buffer. Attached: completes with the connection's status, or exceptionally after a transport failure or without a status; no exit line. Continuation thread unspecified |
+| Attached I/O | Reader thread reads `output`; one writer thread delivers writes (each flushed) and resizes; callers only enqueue |
 | Foreground process lookup | Query off EDT; caller rejects stale results |
 | Browser | Shared lazy worker, queue capacity 8; fixed logs, no raw target in logs |
 | Child creation/waiting | Startup off EDT; close starts bounded asynchronous native cleanup |
+| Named threads | `jasper-session-reader` (daemon, one per session), `jasper-session-writer` (daemon, one per attached session), `jasper-terminal-search` (daemon, one per view, idles out after a second), `jasper-terminal-browser` (daemon, shared), `jasper-pty-close` (non-daemon, so closing the last window cannot end the JVM before the force-kill fallback) |
 
 | Failure or lifecycle event | Ownership and response |
 | --- | --- |
 | Invalid launch/options | Immutable value validation before process creation |
-| Startup after child creation fails | Factory closes child and preserves original error, cleanup failure suppressed |
-| Reader ends / child exits | Exit future completes; app decides whether to retain pane |
-| Close called repeatedly | Child's atomic close guard makes cleanup idempotent |
+| Startup after child creation fails | Factory closes the child or connection and preserves the original error, cleanup failure suppressed |
+| Reader ends / child or connection exits | Exit future completes; app decides whether to retain pane |
+| Close called repeatedly | The child's and the transport's atomic close guards make cleanup idempotent |
 | View removed | Listener removed, search cancelled, timers and queued attachment work invalidated; session stays open |
 | View reattached | New attachment generation; stale frame/bell/search work cannot act as current work |
 | Hidden view | Frame/blink work suppressed and pending search publication cancelled; existing highlights remain |
@@ -288,15 +321,15 @@ blank-cell semantics. Tests cover overwrite and append. No vendor values cross
 the row interface. Translate styles on read with reusable run scratch storage;
 do not allocate a new object for each screen cell or add another full-screen copy.
 
-This depends on pinned JediTerm 3.76 entry mutation behavior: revalidate on any
+This depends on pinned JediTerm 3.76 entry mutation behaviour: revalidate on any
 upgrade. Full-width cell arrays were measured and rejected for much higher
 capture allocation/time. The accepted representation and headless measurements
 are recorded in [verification](terminal-refactor-verification.md); headless
 painting cannot establish native GPU throughput, RSS or desktop fidelity.
 
-## Options and future extension
+## Options
 
-Font, ligatures, line height, palette, cursor defaults, Option-as-Meta,
+Font, fallback fonts, ligatures, line height, palette, cursor defaults, Option-as-Meta,
 copy-on-select and bell mode are live view options. `applyOptions` updates their
 owners and preserves the session. Shell, environment, working directory and
 scrollback capacity are new-session choices; changing the view's options does
@@ -306,9 +339,18 @@ defaults until reset. App configuration reload and temporary overrides remain
 app policy, tested separately. The palette's bold foreground colours bold text
 drawn in the default foreground; an explicit SGR colour stays.
 
-Future SDK work can adapt typed actions, immutable settings and listener events,
-with capability/lifetime/thread contracts decided at that time. Do not export
-controllers, `TerminalAccess`, mutable buffer state, vendor types or worker
-executors. Core plugins should eventually use the same supported SDK capabilities
-as external plugins. No plugin loader, SDK interface or emulator swap layer is
-implemented in this refactor.
+## Plugin access
+
+Plugins never import this module; the JDK-only SDK carries terminals to them as
+[`dev.jasper.sdk.terminal`](sdk-reference.html#package-dev.jasper.sdk.terminal), and
+`jasper-app` adapts the supported API to it. `plugins.HostedSessions` turns a plugin's
+`TerminalConnection` into an `AttachedConnection`, which `workspace.TerminalPane` passes to
+`TerminalSession.attach`. `plugins.HostedTerminals` answers
+[`PaneHandle`](sdk-reference.html#dev.jasper.sdk.terminal.PaneHandle) calls (pane info, the
+foreground job, sending text or bytes, paste, the selection) through the app's pane registry, and
+`plugins.TerminalBridge` republishes the registry's events (windows, tabs, panes, title, directory,
+commands, session state and bell) as
+[`TerminalEvents`](sdk-reference.html#dev.jasper.sdk.terminal.TerminalEvents) topics. Bundled and
+third-party plugins use the same SDK. When something new must reach plugins, add it to the SDK and
+adapt it in the app: do not export controllers, `TerminalAccess`, mutable buffer state, vendor types
+or worker executors.

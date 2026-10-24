@@ -97,4 +97,28 @@ class OptionsTest {
         assertThat(local.string("whichwrap")).isEqualTo("b,s,h,l");
         assertThatThrownBy(() -> local.apply("fo=tcqz")).hasMessage("E539: Illegal character <z>: fo=tcqz");
     }
+
+    /**
+     * Another window on a buffer (Vim's buffer and window options): the buffer-local values are the buffer's, which a
+     * change in either window changes for both and tells both; the window-local values start as the window's it came
+     * from and are each window's own after that.
+     */
+    @Test void windowsOfOneBufferShareItsBufferLocalValues() {
+        var global = new Options();
+        var first = global.local();
+        first.setLocal("relativenumber", true);
+        var second = first.window();
+        List<String> heard = new ArrayList<>();
+        second.onChanged(() -> heard.add("second"));
+        first.setLocal("shiftwidth", 2);
+        assertThat(second.number("shiftwidth")).isEqualTo(2);
+        assertThat(heard).as("a buffer-local change tells every window").containsExactly("second");
+        assertThat(second.flag("relativenumber")).as("a window starts with its source's window-local values").isTrue();
+        second.setLocal("relativenumber", false);
+        assertThat(first.flag("relativenumber")).isTrue();
+        second.close();
+        first.setLocal("tabstop", 4);
+        assertThat(heard).as("a closed window hears nothing").hasSize(2);
+        assertThat(global.local().number("shiftwidth")).as("another buffer has its own").isEqualTo(8);
+    }
 }

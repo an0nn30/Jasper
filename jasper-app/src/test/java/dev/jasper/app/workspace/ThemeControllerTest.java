@@ -5,9 +5,8 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.workspace.DesktopTestSupport;
-import dev.jasper.app.workspace.SplitTree;
 import dev.jasper.app.workspace.TerminalPane;
-import dev.jasper.app.workspace.TerminalTab;
+import dev.jasper.app.workspace.TerminalContent;
 import dev.jasper.app.workspace.WindowContent;
 import java.awt.Color;
 import java.util.*;
@@ -101,12 +100,13 @@ class ThemeControllerTest {
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
-    void sharedOwnersUpdateHiddenZoomedAndLatePanesWithoutChangingTheirState() throws Exception {
+    void sharedOwnersUpdateHiddenMaximizedAndLatePanesWithoutChangingTheirState() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owners = new WindowContent[3];
         ThemeController[] themes = new ThemeController[1];
-        TerminalTab[] retained = new TerminalTab[1];
+        TerminalContent[] retained = new TerminalContent[1];
         TerminalPane[] first = new TerminalPane[1];
+        TerminalPane[] sibling = new TerminalPane[1];
         TerminalSession[] session = new TerminalSession[1];
         edt(() -> {
             themes[0] = ThemeTestSupport.controller(true);
@@ -115,7 +115,7 @@ class ThemeControllerTest {
         });
         while (!pending.isEmpty()) pending.remove().run();
         edt(() -> {
-            retained[0] = owners[0].currentTab(); first[0] = owners[0].currentPane();
+            retained[0] = owners[0].currentTerminal(); first[0] = owners[0].currentPane();
             session[0] = first[0].session();
             first[0].findBar().queryField().removeCaretListener((javax.swing.event.CaretListener)
                 first[0].findBar().queryField().getAccessibleContext());
@@ -123,16 +123,17 @@ class ThemeControllerTest {
             first[0].view().setFontSize(23);
             first[0].findBar().open(); first[0].findBar().queryField().setText("[");
             first[0].findBar().regexButton().doClick();
-            retained[0].rename("retained"); retained[0].split(SplitTree.Axis.RIGHT);
+            retained[0].rename("retained"); owners[0].split(dev.jasper.app.layout.Side.RIGHT);
         });
         pending.remove().run();
         until(() -> first[0].findBar().result().error() != null);
         edt(() -> {
-            retained[0].toggleZoom();
+            sibling[0] = owners[0].currentPane();
+            owners[0].toggleMaximize();
             owners[0].newTab(HOME); // completion deliberately waits across theme selection
             owners[1].selectVariant(false);
             assertThat(themes[0].current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.generated(false));
-            for (TerminalPane pane : retained[0].panes()) {
+            for (TerminalPane pane : java.util.List.of(first[0], sibling[0])) {
                 assertThat(pane.view().palette().background()).isEqualTo(ThemeTestSupport.terminal(false).background());
                 // The invalid pattern keeps its no-match tint, in the new theme's colour.
                 assertThat(pane.findBar().queryField().getBackground()).isEqualTo(pane == first[0] ? dev.jasper.ui.theme.ColorMath.mix(dev.jasper.app.platform.ThemeZone.color(pane, dev.jasper.ui.theme.SemanticColor.BORDER_ERROR), dev.jasper.app.platform.ThemeZone.color(pane, dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT), .16)
@@ -143,10 +144,10 @@ class ThemeControllerTest {
             assertThat(first[0].findBar().isVisible()).isTrue();
             assertThat(first[0].findBar().queryField().getText()).isEqualTo("[");
             assertThat(first[0].findBar().result().error()).isNotNull();
-            assertThat(retained[0].tree().zoomed()).isTrue();
-            assertThat(retained[0].focusedPane()).isSameAs(retained[0].panes().get(1));
+            assertThat(owners[0].parentTabs().views().getFirst().model().maximized()).as("the first tab keeps its maximize").isPresent();
+            assertThat(javax.swing.SwingUtilities.isDescendingFrom(first[0], owners[0].workspace())).as("the maximize hides its group").isFalse();
             assertThat(retained[0].title()).isEqualTo("retained");
-            assertThat(owners[0].currentTab()).isNotSameAs(retained[0]);
+            assertThat(owners[0].currentTerminal()).isNotSameAs(retained[0]);
             assertThat(themes[0].current().chrome().dark()).isFalse();
             assertThat(owners[1].currentPane().view().getBackground()).isEqualTo(ThemeTestSupport.terminal(false).background());
             owners[2] = content(launcher(pending), themes[0]);
@@ -163,56 +164,42 @@ class ThemeControllerTest {
             owners[1].selectVariant(true);
             assertThat(first[0].view().getBackground()).isEqualTo(ThemeTestSupport.terminal(true).background());
             assertThat(first[0].findBar().result().error()).isNotNull();
-            for (TerminalPane pane : retained[0].panes()) assertThat(pane.view().palette()).isEqualTo(ThemeTestSupport.terminal(true));
+            for (TerminalPane pane : java.util.List.of(first[0], sibling[0])) assertThat(pane.view().palette()).isEqualTo(ThemeTestSupport.terminal(true));
             assertThat(first[0].session()).isSameAs(session[0]);
-            assertThat(retained[0].tree().zoomed()).isTrue();
+            assertThat(owners[0].workspace().model().maximized()).as("selecting the hidden tab moved the maximize to its group").isPresent();
             assertThat(themes[0].current().chrome().dark()).isTrue();
             owners[0].removeNotify();
         });
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
-    void delegateUpdatesRetainTheExistingSplitComponentsAndModelRatios() throws Exception {
+    void delegateUpdatesRetainTheSplitContainerAndTheLayoutsWeights() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owner = new WindowContent[1];
-        JSplitPane[] split = new JSplitPane[1];
-        javax.swing.plaf.SplitPaneUI[] oldUi = new javax.swing.plaf.SplitPaneUI[1];
-        SplitTree.Node[] before = new SplitTree.Node[1];
         edt(() -> owner[0] = content(launcher(pending)));
         pending.remove().run();
         edt(() -> owner[0].invoke(ActionId.SPLIT_RIGHT));
         pending.remove().run();
         edt(() -> {
-            split[0] = (JSplitPane) owner[0].currentTab().getComponent(0);
-            split[0].setSize(1000, 600); split[0].doLayout();
-        });
-        edt(() -> {});
-        edt(() -> {
-            split[0].setDividerLocation(0.7);
-            // Exercise a divider adjustment at the real UI-delegate replacement boundary.
-            // Theme/layout adjustments must not be treated as the user's divider drag.
-            split[0].addPropertyChangeListener("UI", event -> split[0].setDividerLocation(.2));
-            oldUi[0] = split[0].getUI();
-            before[0] = owner[0].currentTab().tree().root().orElseThrow();
+            owner[0].setSize(1200, 700); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner[0]);
+            owner[0].workspace().resizeSplit(java.util.List.of(), java.util.List.of(0.7, 0.3));
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner[0]);
+            var split = owner[0].workspace().split(java.util.List.of());
+            var left = split.children().get(0).getBounds();
+            var before = owner[0].workspace().model();
             owner[0].selectVariant(false);
-            split[0].doLayout();
-        });
-        edt(() -> {
-            split[0].doLayout();
-            assertThat(split[0].getUI()).isNotSameAs(oldUi[0]);
-            assertThat(owner[0].currentTab().getComponent(0)).isSameAs(split[0]);
-            assertThat(owner[0].currentTab().tree().root().orElseThrow()).isEqualTo(before[0]);
-            assertThat(split[0].getDividerLocation()).isBetween(685, 705);
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner[0]);
+            assertThat(owner[0].workspace().split(java.util.List.of())).as("a theme change rebuilds no split").isSameAs(split);
+            assertThat(owner[0].workspace().model()).isEqualTo(before);
+            assertThat(split.children().get(0).getBounds()).as("nor moves a divider").isEqualTo(left);
         });
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
-    void nestedSplitsKeepModelRatiosAndDividerPositionsAcrossRootDelegateChanges() throws Exception {
+    void nestedSplitsKeepTheirWeightsAndPositionsAcrossRootDelegateChanges() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owner = new WindowContent[1];
         JRootPane[] root = new JRootPane[1];
-        JSplitPane[] split = new JSplitPane[2];
-        SplitTree.Node[] before = new SplitTree.Node[1];
         edt(() -> owner[0] = content(launcher(pending)));
         pending.remove().run();
         edt(() -> owner[0].invoke(ActionId.SPLIT_RIGHT)); pending.remove().run();
@@ -220,25 +207,20 @@ class ThemeControllerTest {
         edt(() -> {
             root[0] = new JRootPane(); root[0].setContentPane(owner[0]); root[0].setJMenuBar(owner[0].menuBar());
             owner[0].installRootBindings(root[0]);
-            split[0] = (JSplitPane) owner[0].currentTab().getComponent(0);
-            split[1] = (JSplitPane) split[0].getRightComponent();
-            split[0].setSize(1200, 700); split[0].doLayout(); split[1].doLayout();
-        });
-        edt(() -> {});
-        edt(() -> {
-            split[0].setDividerLocation(.63); split[0].doLayout();
-            split[1].setDividerLocation(.31); split[1].doLayout();
-            before[0] = owner[0].currentTab().tree().root().orElseThrow();
+            root[0].setSize(1200, 700); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(root[0]);
+            owner[0].workspace().resizeSplit(java.util.List.of(), java.util.List.of(0.63, 0.37));
+            owner[0].workspace().resizeSplit(java.util.List.of(1), java.util.List.of(0.31, 0.69));
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(root[0]);
+            var bounds = owner[0].workspace().groupViews().stream()
+                .map(view -> javax.swing.SwingUtilities.convertRectangle(view.getParent(), view.getBounds(), root[0])).toList();
+            var before = owner[0].workspace().model();
             owner[0].selectVariant(false);
             owner[0].selectVariant(true);
-        });
-        edt(() -> {
-            split[0].doLayout(); split[1].doLayout();
-            assertThat(owner[0].currentTab().tree().root().orElseThrow()).isEqualTo(before[0]);
-            assertThat(split[0].getDividerLocation() / (double) (split[0].getWidth() - split[0].getDividerSize()))
-                .isCloseTo(.63, within(.003));
-            assertThat(split[1].getDividerLocation() / (double) (split[1].getHeight() - split[1].getDividerSize()))
-                .isCloseTo(.31, within(.003));
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(root[0]);
+            assertThat(owner[0].workspace().model()).isEqualTo(before);
+            assertThat(owner[0].workspace().groupViews().stream()
+                .map(view -> javax.swing.SwingUtilities.convertRectangle(view.getParent(), view.getBounds(), root[0])).toList())
+                .isEqualTo(bounds);
             var copy = owner[0].bindings().strokeFor(ActionId.COPY).orElseThrow();
             assertThat(root[0].getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(copy)).isEqualTo(ActionId.COPY.id());
         });

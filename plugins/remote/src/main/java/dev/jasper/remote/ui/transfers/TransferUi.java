@@ -10,7 +10,7 @@ import java.util.concurrent.*;
 import java.util.function.*;
 
 /**
- * The aggregate status item and every window's transfer rows over the plugin-owned queue: its SFTP sidebar shows them,
+ * The aggregate status item and the transfer rows over the plugin-owned queue: its SFTP sidebar shows them,
  * or under the classic composition its Transfers panel ({@link TransfersPanels}).
  */
 public final class TransferUi implements AutoCloseable {
@@ -54,7 +54,7 @@ public final class TransferUi implements AutoCloseable {
         refresh();
     }
 
-    /** The transfer rows for {@code window}'s SFTP sidebar or Transfers panel, which renders them; the same queue in every window. */
+    /** The transfer rows for {@code window}'s SFTP sidebar or Transfers panel, which renders them. */
     public TransferStrip strip(WindowHandle window) {
         var strip = new TransferStrip(new TransferStrip.Actions((id, action) -> act(window, id, action), coordinator::cancel, id -> dismiss(window, id)));
         strips.put(window.id(), strip);

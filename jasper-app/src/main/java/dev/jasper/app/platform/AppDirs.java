@@ -56,6 +56,11 @@ public record AppDirs(Path root, Path configFile, Path logs, boolean overridden)
         return root.resolve("ui-state.toml");
     }
 
+    /** The saved windows, their parent tabs, splits, groups and tabs ({@code workspace.toml}). */
+    public Path workspaceState() {
+        return root.resolve("workspace.toml");
+    }
+
     /**
      * The handoff endpoint's own directory. It is a subdirectory rather than {@link #root()}
      * because binding sets its parent to owner-only, and the root also holds the user's config.
@@ -72,21 +77,14 @@ public record AppDirs(Path root, Path configFile, Path logs, boolean overridden)
         return daemonDir().resolve("token");
     }
 
-    public Path daemonLock() {
-        return daemonDir().resolve("lock");
+    /** The instance lock: the process that holds it owns this home (workspace-tabs spec 5.1); its id is in {@code instance.pid} beside it. */
+    public Path instanceLock() {
+        return daemonDir().resolve("instance.lock");
     }
 
-    /** The command socket of every launch but a private one; the {@code jasper} command looks for it here. */
+    /** The command socket the home's owner serves; the {@code jasper} command looks for it here. */
     public Path commandSocket() {
         return daemonDir().resolve("commands");
-    }
-
-    /**
-     * A private launch's own command socket ({@code --config}, {@code --safe-mode}, {@code --plugin-dir},
-     * {@code --standalone}), named for its process.
-     */
-    public Path commandSocket(long pid) {
-        return daemonDir().resolve("commands-" + pid);
     }
 
     /** The subcommands the last launch offered, which {@code jasper --help} lists. */

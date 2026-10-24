@@ -6,8 +6,6 @@ import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.Nodes;
-import dev.jasper.sdk.ui.WindowSpec;
-import java.awt.Dimension;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -33,11 +31,9 @@ class DialogsTest {
     @BeforeEach void start() throws Exception {
         host = new FakePluginHost(home.resolve("plugins"));
         context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
-        edt(() -> {
-            var window = context.windows().create(new WindowSpec("dev.jasper.editor.window", "Editor", new Dimension(100, 100), true));
-            window.show();
-            owner = window;
-        });
+        // The main window owns the dialogs, as the selected content tab's window does in the Editor.
+        host.addTerminalWindow();
+        edt(() -> owner = context.terminals().windows().getFirst());
     }
 
     @AfterEach void stop() throws Exception { edt(host::close); }
@@ -50,13 +46,13 @@ class DialogsTest {
             assertThat(form(view).actions()).extracting(Nodes.Button::label).containsExactly("No", "Yes");
             assertThat(primaries(view)).extracting(Nodes.Button::label).containsExactly("Yes");
             click(view, form(view).actions().getLast().id());
-            assertThat(host.windows()).containsExactly("dev.jasper.editor.window|Editor|true");
+            assertThat(host.windows()).isEmpty();
             assertThat(closed(view)).as("closing the dialog disposed its view").isTrue();
             new DialogAsker(context.windows(), context.kit(), owner).apply(new Question("Overwrite", "Overwrite it?", List.of("Overwrite", "Cancel"), true));
             var destructive = host.windowView("dev.jasper.editor", "Overwrite").orElseThrow();
             assertThat(primaries(destructive)).extracting(Nodes.Button::label).containsExactly("Cancel");
             escape(destructive);
-            assertThat(host.windows()).as("Escape closes the question").containsExactly("dev.jasper.editor.window|Editor|true");
+            assertThat(host.windows()).as("Escape closes the question").isEmpty();
             assertThat(context.kit()).isInstanceOfSatisfying(dev.jasper.sdk.testing.FakeKit.class, kit -> assertThat(kit.failures()).isEmpty());
         });
     }
@@ -67,7 +63,7 @@ class DialogsTest {
             assertThat(wait.apply("Saving 1 file…", CompletableFuture.completedFuture(true))).isTrue();
             assertThat(wait.apply("Saving 1 file…", CompletableFuture.completedFuture(false))).isFalse();
             assertThat(wait.apply("Saving 1 file…", CompletableFuture.failedFuture(new IllegalStateException("x")))).isFalse();
-            assertThat(host.windows()).as("a finished save needs no dialog").hasSize(1);
+            assertThat(host.windows()).as("a finished save needs no dialog").isEmpty();
         });
     }
 
@@ -78,11 +74,11 @@ class DialogsTest {
         edt(() -> {
             var view = host.windowView("dev.jasper.editor", "Saving").orElseThrow();
             assertThat(node(view, Forms.SAVING_MESSAGE, Nodes.Text.class).text()).isEqualTo("Saving 2 files…");
-            assertThat(host.windows()).contains("dev.jasper.editor.window|Editor|true").hasSize(2);
+            assertThat(host.windows()).hasSize(1);
             saves.complete(true);
         });
         assertThat(result.get(10, TimeUnit.SECONDS)).isTrue();
-        edt(() -> assertThat(host.windows()).as("the dialog closes once the saves finish").containsExactly("dev.jasper.editor.window|Editor|true"));
+        edt(() -> assertThat(host.windows()).as("the dialog closes once the saves finish").isEmpty());
     }
 
     @Test @Timeout(value = 20, unit = TimeUnit.SECONDS)
@@ -96,9 +92,9 @@ class DialogsTest {
             });
             assertThat(result.get(10, TimeUnit.SECONDS)).as("cancelled (escape %s)", escape).isFalse();
             edt(() -> {
-                assertThat(host.windows()).containsExactly("dev.jasper.editor.window|Editor|true");
+                assertThat(host.windows()).isEmpty();
                 saves.complete(true);
-                assertThat(host.windows()).as("a save finishing after the dialog closed opens nothing").containsExactly("dev.jasper.editor.window|Editor|true");
+                assertThat(host.windows()).as("a save finishing after the dialog closed opens nothing").isEmpty();
                 assertThat(((dev.jasper.sdk.testing.FakeKit) context.kit()).failures()).isEmpty();
             });
         }

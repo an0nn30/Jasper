@@ -286,7 +286,7 @@ class WindowDragTest {
         edt(() -> {
             var f = new Fixture();
             assertThat(f.owner.rightStripe().isVisible()).as("nothing on the right").isFalse();
-            Rectangle terminal = SwingUtilities.convertRectangle(f.owner.tabStrip().getParent(), f.owner.tabStrip().getBounds(), f.owner);
+            Rectangle terminal = SwingUtilities.convertRectangle(f.owner.workspace().getParent(), f.owner.workspace().getBounds(), f.owner);
             Rectangle workspace = f.workspace();
             int width = f.owner.rightStripe().getPreferredSize().width;
             Point edge = f.rightRailTop();
@@ -298,7 +298,7 @@ class WindowDragTest {
             assertThat(placeholder.x).as("the guide sits in the stripe's place at the edge").isGreaterThanOrEqualTo(workspace.x + workspace.width - width);
             assertThat(placeholder.x + placeholder.width).isLessThanOrEqualTo(workspace.x + workspace.width);
             f.layout();
-            assertThat(SwingUtilities.convertRectangle(f.owner.tabStrip().getParent(), f.owner.tabStrip().getBounds(), f.owner))
+            assertThat(SwingUtilities.convertRectangle(f.owner.workspace().getParent(), f.owner.workspace().getBounds(), f.owner))
                 .as("the terminal neither moves nor resizes for the drag").isEqualTo(terminal);
             f.mouse(files, MouseEvent.MOUSE_RELEASED, edge);
             f.layout();
@@ -472,7 +472,7 @@ class WindowDragTest {
                 var source = f.drag(f.button("Files"), f.zone(Slot.BOTTOM_RIGHT));
                 assertThat(f.owner.dockDrag().target()).as("a release here would drop").isPresent();
                 assertThat(keys.dispatchers).as("the drag's Esc dispatcher").hasSize(before.size() + 1);
-                // TerminalWindow on windowDeactivated: a modal dialog opened, whose window takes the release, or
+                // WindowFrame on windowDeactivated: a modal dialog opened, whose window takes the release, or
                 // another application took focus.
                 f.owner.setActive(false);
                 assertThat(f.owner.dockDrag().active()).isFalse();

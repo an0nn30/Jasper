@@ -9,20 +9,44 @@ import java.util.Optional;
  */
 public enum ActionId {
     NEW_TAB("new_tab", "New Tab", "cmd+t", "ctrl+shift+t"),
+    CLOSE_PANE("close_pane", "Close Pane", "cmd+w", "ctrl+shift+w"),
     CLOSE_TAB("close_tab", "Close Tab", "alt+cmd+w", "ctrl+alt+shift+w"),
-    NEW_WINDOW("new_window", "New Window", "cmd+n", "ctrl+shift+n"),
+    NEW_TERMINAL_WINDOW("new_terminal_window", "New Terminal Window", "cmd+n", "ctrl+shift+n"),
+    CLOSE_WINDOW("close_window", "Close Window", "cmd+shift+w", "none"),
+    MOVE_TAB_TO_NEW_WINDOW("move_tab_to_new_window", "Move Tab to New Window", "none", "none"),
+    MOVE_TO_MAIN_WINDOW("move_to_main_window", "Move to Main Window", "none", "none"),
     OPEN_FILE("open_file", "Open File…", "none", "none"),
     SPLIT_RIGHT("split_right", "Split Right", "cmd+d", "ctrl+shift+d"),
     SPLIT_DOWN("split_down", "Split Down", "cmd+shift+d", "ctrl+alt+shift+d"),
-    CLOSE_PANE("close_pane", "Close Pane", "cmd+w", "ctrl+shift+w"),
-    ZOOM_PANE("zoom_pane", "Zoom Pane", "cmd+shift+enter", "ctrl+alt+shift+enter"),
+    MAXIMIZE_PANE("maximize_pane", "Maximize Pane", "cmd+shift+enter", "ctrl+alt+shift+enter"),
+    MOVE_PANE_TO_NEW_TAB("move_pane_to_new_tab", "Move Pane to New Tab", "alt+cmd+t", "ctrl+alt+shift+t"),
+    MOVE_PANE_TO_TAB_1("move_pane_to_tab_1", "Move Pane to Tab 1", "none", "none"),
+    MOVE_PANE_TO_TAB_2("move_pane_to_tab_2", "Move Pane to Tab 2", "none", "none"),
+    MOVE_PANE_TO_TAB_3("move_pane_to_tab_3", "Move Pane to Tab 3", "none", "none"),
+    MOVE_PANE_TO_TAB_4("move_pane_to_tab_4", "Move Pane to Tab 4", "none", "none"),
+    MOVE_PANE_TO_TAB_5("move_pane_to_tab_5", "Move Pane to Tab 5", "none", "none"),
+    MOVE_PANE_TO_TAB_6("move_pane_to_tab_6", "Move Pane to Tab 6", "none", "none"),
+    MOVE_PANE_TO_TAB_7("move_pane_to_tab_7", "Move Pane to Tab 7", "none", "none"),
+    MOVE_PANE_TO_TAB_8("move_pane_to_tab_8", "Move Pane to Tab 8", "none", "none"),
+    MOVE_PANE_TO_TAB_9("move_pane_to_tab_9", "Move Pane to Tab 9", "none", "none"),
+    MOVE_TAB_INTO_TAB_1("move_tab_into_tab_1", "Move Tab Into Tab 1", "none", "none"),
+    MOVE_TAB_INTO_TAB_2("move_tab_into_tab_2", "Move Tab Into Tab 2", "none", "none"),
+    MOVE_TAB_INTO_TAB_3("move_tab_into_tab_3", "Move Tab Into Tab 3", "none", "none"),
+    MOVE_TAB_INTO_TAB_4("move_tab_into_tab_4", "Move Tab Into Tab 4", "none", "none"),
+    MOVE_TAB_INTO_TAB_5("move_tab_into_tab_5", "Move Tab Into Tab 5", "none", "none"),
+    MOVE_TAB_INTO_TAB_6("move_tab_into_tab_6", "Move Tab Into Tab 6", "none", "none"),
+    MOVE_TAB_INTO_TAB_7("move_tab_into_tab_7", "Move Tab Into Tab 7", "none", "none"),
+    MOVE_TAB_INTO_TAB_8("move_tab_into_tab_8", "Move Tab Into Tab 8", "none", "none"),
+    MOVE_TAB_INTO_TAB_9("move_tab_into_tab_9", "Move Tab Into Tab 9", "none", "none"),
     TOGGLE_ZEN_MODE("toggle_zen_mode", "Zen", "none", "none"),
+    TOGGLE_RAIL("toggle_rail", "Rail", "none", "none"),
+    TOGGLE_STATUS_BAR("toggle_status_bar", "Status Bar", "none", "none"),
     FOCUS_PANE_LEFT("focus_pane_left", "Focus Pane Left", "cmd+alt+left", "ctrl+alt+shift+left"),
     FOCUS_PANE_RIGHT("focus_pane_right", "Focus Pane Right", "cmd+alt+right", "ctrl+alt+shift+right"),
     FOCUS_PANE_UP("focus_pane_up", "Focus Pane Up", "cmd+alt+up", "ctrl+alt+shift+up"),
     FOCUS_PANE_DOWN("focus_pane_down", "Focus Pane Down", "cmd+alt+down", "ctrl+alt+shift+down"),
-    NEXT_TAB("next_tab", "Next Tab", "cmd+shift+]", "ctrl+tab"),
-    PREVIOUS_TAB("previous_tab", "Previous Tab", "cmd+shift+[", "ctrl+shift+tab"),
+    NEXT_TAB("next_tab", "Next Tab", "cmd+shift+]", "ctrl+pagedown"),
+    PREVIOUS_TAB("previous_tab", "Previous Tab", "cmd+shift+[", "ctrl+pageup"),
     SELECT_TAB_1("select_tab_1", "Select Tab 1", "cmd+1", "ctrl+1"),
     SELECT_TAB_2("select_tab_2", "Select Tab 2", "cmd+2", "ctrl+2"),
     SELECT_TAB_3("select_tab_3", "Select Tab 3", "cmd+3", "ctrl+3"),
@@ -48,6 +72,7 @@ public enum ActionId {
     FONT_RESET("font_reset", "Reset Font Size", "cmd+0", "ctrl+shift+0"),
     OPEN_SETTINGS("open_settings", "Settings", "cmd+,", "ctrl+shift+,"),
     RELOAD_CONFIG("reload_config", "Reload Config", "none", "none"),
+    MANAGE_CYGWIN_PACKAGES("manage_cygwin_packages", "Manage Cygwin packages…", "none", "none"),
     QUIT("quit", "Quit", "cmd+q", "ctrl+alt+shift+q");
 
     private final String id;
@@ -66,6 +91,10 @@ public enum ActionId {
         this.macDefault = macDefault;
         this.otherDefault = otherDefault;
         this.context = context;
+    }
+
+    public boolean availableOn(String osName) {
+        return this != MANAGE_CYGWIN_PACKAGES || osName.startsWith("Windows");
     }
 
     public String id() {

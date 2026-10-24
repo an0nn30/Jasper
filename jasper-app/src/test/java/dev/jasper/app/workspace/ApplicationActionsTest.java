@@ -62,7 +62,7 @@ class ApplicationActionsTest {
             for (int i = 0; i < ui.menuBar().getMenuCount(); i++) if ("File".equals(ui.menuBar().getMenu(i).getText())) fileMenu = ui.menuBar().getMenu(i);
             var labels = new ArrayList<String>();
             for (var child : fileMenu.getMenuComponents()) if (child instanceof JMenuItem item) labels.add(item.getText());
-            assertThat(labels).containsSubsequence("New Window", "Open File…");
+            assertThat(labels).containsSubsequence("New Terminal Window", "Open File…", "Close Window");
             var command = ui.commands().find("open_file").orElseThrow();
             assertThat(command.title()).as("spec 14.7: also a palette command").isEqualTo("Open File…");
             assertThat(command.keywords()).contains("open file", "open", "editor", "browse");
@@ -106,7 +106,7 @@ class ApplicationActionsTest {
                 BindingRoot root = new BindingRoot(); root.setContentPane(owner);
                 owner.installRootBindings(root);
                 assertThat(root.activate(owner.bindings().strokeFor(ActionId.NEW_TAB).orElseThrow())).isTrue();
-                assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+                assertThat(owner.tabCount()).isEqualTo(2);
                 BindingField field = new BindingField(); owner.add(field, java.awt.BorderLayout.WEST);
                 int[] edits = {0};
                 // Override the installed native editor actions, retaining the real focused input map.

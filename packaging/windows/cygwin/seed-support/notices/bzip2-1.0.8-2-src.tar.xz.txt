@@ -1,0 +1,113 @@
+Package source: x86_64/release/bzip2/bzip2-1.0.8-2-src.tar.xz
+License identifier: BSD
+
+--- bzip2-1.0.8-2.src/bzip2.cygport ---
+# Package name
+NAME="bzip2"
+VERSION=1.0.8
+RELEASE=2
+
+# .hint generation
+CATEGORY="Archive"
+SUMMARY="BZip file de/compressor"
+DESCRIPTION="bzip2 is a freely available, patent free, high-quality data
+compressor. It typically compresses files to within 10% to 15% of the best
+available techniques, whilst being around twice as fast at compression and
+six times faster at decompression."
+
+# Homepage
+HOMEPAGE="https://sourceware.org/bzip2/"
+LICENSE="BSD"
+
+# Source and patch files
+SRC_URI="
+	https://sourceware.org/pub/bzip2/bzip2-${VERSION}.tar.gz
+	bzip2.pc.in
+"
+PATCH_URI="
+	1.0.8-cygwin-dll.patch
+"
+
+PKG_NAMES="bzip2 libbz2_1 libbz2-devel"
+bzip2_CONTENTS="usr/bin/b* usr/share/"
+libbz2_1_CONTENTS="usr/bin/cygbz2-1.dll"
+libbz2_devel_CONTENTS="usr/include/ usr/lib/"
+
+src_compile() {
+	lndirs
+	cd ${B}
+	# First build the shared library
+	cygmake -f Makefile-libbz2_so \
+		CC=${CC} AR=${AR} RANLIB=${RANLIB} \
+		CFLAGS="${CFLAGS} -D_FILE_OFFSET_BITS=64"
+	# build everything else static
+	rm -f *.o
+	cygmake libbz2.a bzip2 bzip2recover \
+		CC=${CC} AR=${AR} RANLIB=${RANLIB} \
+		CFLAGS="${CFLAGS} -D_FILE_OFFSET_BITS=64"
+
+	# Prepare support for pkg-config
+	cp ${S}/bzip2.pc.in bzip2.pc
+	sed "s|@VERSION@|${VERSION}|" -i bzip2.pc
+}
+
+src_test() {
+	cd ${B}
+	cygmake test \
+		CC=${CC} AR=${AR} RANLIB=${RANLIB} \
+		CFLAGS="${CFLAGS} -D_FILE_OFFSET_BITS=64"
+}
+
+src_install() {
+	cd ${B}
+	cyginstall PREFIX=${D}/usr
+	dobin *.dll
+	dolib *.dll.a
+	dopkgconfig bzip2.pc
+}
+
+Source archive: x86_64/release/bzip2/bzip2-1.0.8-2-src.tar.xz
+
+--- bzip2-1.0.8-2.src/bzip2-1.0.8.tar.gz!/bzip2-1.0.8/LICENSE ---
+
+--------------------------------------------------------------------------
+
+This program, "bzip2", the associated library "libbzip2", and all
+documentation, are copyright (C) 1996-2019 Julian R Seward.  All
+rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. The origin of this software must not be misrepresented; you must 
+   not claim that you wrote the original software.  If you use this 
+   software in a product, an acknowledgment in the product 
+   documentation would be appreciated but is not required.
+
+3. Altered source versions must be plainly marked as such, and must
+   not be misrepresented as being the original software.
+
+4. The name of the author may not be used to endorse or promote 
+   products derived from this software without specific prior written 
+   permission.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
+OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Julian Seward, jseward@acm.org
+bzip2/libbzip2 version 1.0.8 of 13 July 2019
+
+--------------------------------------------------------------------------

@@ -9,15 +9,13 @@ import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.pluginmanager.PluginManager;
 import dev.jasper.app.plugins.PluginRuntime;
-import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.presentation.Projections;
-import dev.jasper.app.restart.ResidentControl;
 import dev.jasper.app.restart.RestartFlow;
 import dev.jasper.app.shortcuthelp.KeymapPage;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.app.testsupport.KitTestSupport;
-import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.app.testsupport.PluginJars;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
@@ -49,7 +47,7 @@ import javax.swing.SwingUtilities;
  */
 final class EnterpriseSettings implements AutoCloseable {
     /** Where the renders go, under {@code light/} and {@code dark/}. */
-    static final Path OUT = MockProfile.ROOT.resolve("jasper-app/build/enterprise-settings");
+    static final Path OUT = EnterpriseResources.ROOT.resolve("jasper-app/build/enterprise-settings");
     /** The values the mocks show, as a config file (plan 9a Rulings 18). */
     static final String CONFIG = """
         [ui]
@@ -67,6 +65,8 @@ final class EnterpriseSettings implements AutoCloseable {
         rail_width = 28
         columns = 100
         lines = 35
+        [system]
+        run_in_background = true
         [notifications]
         system = true
         long_command_seconds = 10
@@ -151,8 +151,7 @@ final class EnterpriseSettings implements AutoCloseable {
             loaded.values(), false, defaults);
         // Spec 9.1's projections of the Enterprise kit file's chrome (6a's EnterpriseLook.CHROME) with its classic base and
         // named UI face, on the macOS host the mocks were drawn on.
-        var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, true),
-            Presentation.LANDED);
+        var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.MAC, true));
         var holder = new JComponent[1];
         // The application's mapping (plan 6b): under Enterprise the dialog's sheets and confirmations take the classic path.
         var windows = new AuxiliaryWindows(UiState.inMemory(), surface -> {
@@ -167,9 +166,10 @@ final class EnterpriseSettings implements AutoCloseable {
                 runtime[0] = new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")), home.resolve("plugins"), null, false,
                     home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
                     PluginRuntime.SettingsReports.IGNORED, contributions, windows, new TerminalRegistry());
-                // As JasperApplication gives its runtime before the plugins start: the look's kit and the current theme, so a
-                // plugin's own page paints the Enterprise theme (plan 9b Task 7: without them, the bundled theme's #C6CCD5 boxes).
-                runtime[0].presentation(themes[0].kit());
+                // As JasperApplication gives its runtime before the plugins start: the look's kit, what plugins learn of its look,
+                // its defaults and the current theme, so a plugin's own page paints the Enterprise theme (plan 9b Task 7: without
+                // them, the bundled theme's #C6CCD5 boxes).
+                runtime[0].presentation(themes[0].kit(), projections.plugins(), defaults);
                 runtime[0].appearance(themes[0]::current, handler -> themes[0].subscribe((value, changed) -> handler.accept(value)));
                 runtime[0].start(Map.of(), dark);
                 // The application's own actions, as it registers them at start (the mock's config, commandline and
@@ -181,9 +181,9 @@ final class EnterpriseSettings implements AutoCloseable {
                         {"notifications.errors", "Notifications: Show Errors"}, {"notifications.history", "Notifications: Show History"},
                         {"notifications.dismiss", "Notifications: Dismiss Cards"}})
                     contributions.addAction(action[0], action[1], null, List.of(), Optional.empty(), invocation -> { });
-                var flow = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run, Duration.ofMillis(20), Duration.ofMillis(1));
+                var flow = new RestartFlow(mode -> true);
                 var manager = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), flow, () -> { },
-                    ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }, uri -> { }));
+                    Runnable::run, path -> { }, path -> { }, uri -> { }));
                 var installed = new InstalledThemes(
                     List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", preview(enterprise, true)), new InstalledThemes.ThemeOption("enterprise", "Enterprise", preview(enterprise, true))),
                     List.of(new InstalledThemes.ThemeOption("slate-daylight", "Slate Daylight", preview(enterprise, false)), new InstalledThemes.ThemeOption("enterprise", "Enterprise", preview(enterprise, false))),
@@ -194,8 +194,9 @@ final class EnterpriseSettings implements AutoCloseable {
                 var keymapHooks = new KeymapPage.Hooks(contributions, Map::of, runtime[0]::pluginNames, true,
                     edits -> CompletableFuture.completedFuture(null));
                 var pages = new CorePages.Pages(context -> new KeymapPage(keymapHooks, context), context -> manager.page(context), context -> runtime[0].settingsPages(context));
+                // Match the mock's macOS workspace capability as well as its projections and shortcut labels.
                 dialog[0] = new SettingsDialog(windows, CorePages.pages(choices, new CorePages.SystemActions(() -> Path.of("/Users/RQ7RQVF/.config/jasper/config.toml"),
-                        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.of(vm()), Optional.of(commandLine())), ShellChoices.NONE, new NotificationGroupChoices(EnterpriseSettings::groups), pages),
+                        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.of(vm()), Optional.of(commandLine())), ShellChoices.NONE, new NotificationGroupChoices(EnterpriseSettings::groups), pages, true),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }), () -> { }, () -> { },
                         uri -> { }, (parent, count) -> true, () -> themes[0].appearance().context(ThemeRoute.CHROME), projections.settings(), projections.composition()));
                 dialog[0].open(null, "appearance");
@@ -240,9 +241,11 @@ final class EnterpriseSettings implements AutoCloseable {
         try {
             if (dialog != null) SwingUtilities.invokeAndWait(dialog::cancel);
             if (runtime != null) {
+                var workers = dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime);
                 var stopping = new CompletableFuture<List<CompletableFuture<?>>>();
                 SwingUtilities.invokeAndWait(() -> stopping.complete(runtime.stop()));
                 CompletableFuture.allOf(stopping.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+                workers.await();
             }
             SwingUtilities.invokeAndWait(() -> { windows.close(); if (themes != null) themes.close(); });
         } finally {

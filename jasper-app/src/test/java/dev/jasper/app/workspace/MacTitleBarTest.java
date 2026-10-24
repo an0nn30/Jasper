@@ -45,9 +45,9 @@ class MacTitleBarTest {
                 assertThat(SwingUtilities.convertPoint(owner.toolbar(), 0, 0, root).y).isZero();
                 assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
                 assertThat(field(owner).getToolTipText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
-                owner.currentTab().rename("arbitrary program title"); owner.update();
+                owner.currentTerminal().rename("arbitrary program title"); owner.update();
                 assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
-                var first = owner.currentTab();
+                var first = owner.currentTerminal();
                 owner.newTab(HOME.resolve("projects/moray")); owner.update();
                 assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~/projects/moray : sh");
                 owner.selectTab(first); owner.update();
@@ -152,7 +152,7 @@ class MacTitleBarTest {
                 assertThat(root.getClientProperty("apple.awt.transparentTitleBar")).isEqualTo(true);
                 assertThat(root.getClientProperty("apple.awt.windowTitleVisible")).isEqualTo(false);
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
-                owner.currentTab().rename("build logs"); owner.update();
+                owner.currentTerminal().rename("build logs"); owner.update();
                 assertThat(metadata.get()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
                 assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
                 assertThat(bar.getMouseListeners()).isEmpty();
@@ -174,7 +174,7 @@ class MacTitleBarTest {
             assertThat(root.getClientProperty("apple.awt.windowTitleVisible")).isNull();
             owner.selectVariant(false);
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isNull();
-            owner.currentTab().rename("plain window"); owner.update();
+            owner.currentTerminal().rename("plain window"); owner.update();
             assertThat(metadata.get()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
             assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
         });
@@ -205,7 +205,7 @@ class MacTitleBarTest {
                 bar.doLayout(); owner.chrome().header().doLayout();
                 assertThat(field.getX()).isGreaterThanOrEqualTo(130);
                 var before = bar.getMinimumSize();
-                owner.currentTab().rename("extremely long shell title ".repeat(100)); owner.update();
+                owner.currentTerminal().rename("extremely long shell title ".repeat(100)); owner.update();
                 assertThat(bar.getMinimumSize()).isEqualTo(before);
                 assertThat(bar.getPreferredSize().width).isLessThan(1400);
                 bar.setSize(80, 28); bar.doLayout(); owner.chrome().header().doLayout();

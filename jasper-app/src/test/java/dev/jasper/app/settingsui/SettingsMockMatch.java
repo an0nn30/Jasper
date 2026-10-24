@@ -1,5 +1,7 @@
 package dev.jasper.app.settingsui;
 
+import dev.jasper.app.testsupport.EnterpriseResources;
+import dev.jasper.app.testsupport.MockComparison;
 import dev.jasper.app.testsupport.MockProfile;
 import java.awt.Color;
 import java.awt.Rectangle;
@@ -28,7 +30,7 @@ final class SettingsMockMatch {
      */
     record Result(double matching, int dx, int dy) { }
 
-    /** The mock {@code name}, a path under {@link MockProfile#REFERENCE}, as opaque RGB over white. */
+    /** The mock {@code name}, a path under {@link EnterpriseResources#REFERENCE}, as opaque RGB over white. */
     static BufferedImage mock(String name) {
         var image = MockProfile.mock(name);
         var copy = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
@@ -45,19 +47,11 @@ final class SettingsMockMatch {
         return copy;
     }
 
-    /** The CIE76 distance between two sRGB colours, as {@link MockProfile#deltaE} measures it; alpha is ignored. */
-    static double deltaE(int a, int b) { return MockProfile.deltaE(new Color(a & 0xFFFFFF), new Color(b & 0xFFFFFF)); }
+    /** The CIE76 distance between two sRGB colours ({@link MockComparison#deltaE}); alpha is ignored. */
+    static double deltaE(int a, int b) { return MockComparison.deltaE(new Color(a & 0xFFFFFF), new Color(b & 0xFFFFFF)); }
 
-    private static double linear(double channel) { return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4); }
-    private static double f(double t) { return t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16.0 / 116.0; }
-
-    /** CIE L*a*b* of an sRGB colour under D65, MockProfile's conversion, kept here so {@link #compare} converts each colour once. */
-    private static double[] lab(int rgb) {
-        double r = linear(((rgb >> 16) & 0xFF) / 255.0), g = linear(((rgb >> 8) & 0xFF) / 255.0), b = linear((rgb & 0xFF) / 255.0);
-        double x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047, y = 0.2126 * r + 0.7152 * g + 0.0722 * b,
-            z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
-        return new double[] {116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))};
-    }
+    /** CIE L*a*b* of an sRGB colour ({@link MockComparison#lab}), cached by {@link #labs} so {@link #compare} converts each colour once. */
+    private static double[] lab(int rgb) { return MockComparison.lab(new Color(rgb & 0xFFFFFF)); }
 
     private static float[] labs(BufferedImage image) {
         int w = image.getWidth(), h = image.getHeight();

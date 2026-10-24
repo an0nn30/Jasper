@@ -1,8 +1,10 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.presentation.PaletteLook;
 import dev.jasper.app.presentation.TitleFormat;
 import dev.jasper.app.presentation.WorkspaceLook;
+import dev.jasper.ui.icons.ChromeArtwork;
 import java.util.Objects;
 
 /**
@@ -13,13 +15,14 @@ import java.util.Objects;
 public final class WorkspaceChrome {
     /** The default look's chrome. */
     public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"),
-        WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, DockChrome.STANDARD, PaletteLook.DEFAULT);
+        WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, DockChrome.STANDARD, PaletteLook.DEFAULT,
+        ChromeArtwork.NEW_UI, false);
 
     private final MenuBarLayout menus;
     private final TitleFormat title;
     /** The header's composition, made for each window by {@link #header()}. */
     private final WorkspaceLook.Header header;
-    /** The editor tabs, made for each window by {@link #tabs(WindowContent)}. */
+    /** The editor tabs, made for each window's tab strip by {@link #tabs(ParentTabBar)}. */
     private final WorkspaceLook.Tabs tabs;
     /** The status bar's layout, and whether it leads with the run item: made for each window by {@link #statusBar}. */
     private final WorkspaceLook.Status status;
@@ -30,14 +33,19 @@ public final class WorkspaceChrome {
     private final PaletteLook palette;
     /** Where the palette's view lives in each window: picked here once from the palette's home. */
     private final PaletteHome paletteHome;
+    /** The icon set each window's header and status bar receive: read here once from the look's icons. */
+    private final ChromeArtwork artwork;
+    /** Whether the classic header offers Search Everywhere as an icon button: read here once from the look's search. */
+    private final boolean iconSearch;
 
     private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header, WorkspaceLook.Tabs tabs,
-                            WorkspaceLook.Status status, boolean runItem, DockChrome dock, PaletteLook palette) {
+                            WorkspaceLook.Status status, boolean runItem, DockChrome dock, PaletteLook palette, ChromeArtwork artwork,
+                            boolean iconSearch) {
         this.dock = Objects.requireNonNull(dock);
         this.palette = Objects.requireNonNull(palette, "palette");
         this.paletteHome = switch (palette.home()) {
             case TITLE_FIELD -> new TitleFieldHome();
-            case CORNER -> new CornerHome();
+            case UPPER -> new UpperHome();
         };
         this.menus = Objects.requireNonNull(menus);
         this.title = Objects.requireNonNull(title);
@@ -45,6 +53,8 @@ public final class WorkspaceChrome {
         this.tabs = Objects.requireNonNull(tabs);
         this.status = Objects.requireNonNull(status);
         this.runItem = runItem;
+        this.artwork = Objects.requireNonNull(artwork, "artwork");
+        this.iconSearch = iconSearch;
     }
 
     /**
@@ -71,8 +81,17 @@ public final class WorkspaceChrome {
             case STANDARD -> new StandardMenuBar();
             case CLASSIC -> new ClassicMenuBar();
         };
+        ChromeArtwork artwork = switch (look.icons()) {
+            case NEW_UI -> ChromeArtwork.NEW_UI;
+            case CLASSIC -> ChromeArtwork.CLASSIC;
+        };
+        boolean iconSearch = switch (look.search()) {
+            case FIELD -> false;
+            case ICON -> true;
+        };
         return new WorkspaceChrome(menus, title, look.header(), look.tabs(), look.status(), look.runItem(),
-            new DockChrome(look.stripes() == WorkspaceLook.Stripes.LABELLED, look.frames() == WorkspaceLook.FrameStyle.FLUSH), palette);
+            new DockChrome(look.stripes() == WorkspaceLook.Stripes.LABELLED, look.frames() == WorkspaceLook.FrameStyle.FLUSH), palette,
+            artwork, iconSearch);
     }
 
     MenuBarLayout menus() { return menus; }
@@ -83,19 +102,32 @@ public final class WorkspaceChrome {
     PaletteLook palette() { return palette; }
     /** Where the palette's view lives in this window and how a drag attaches it there. */
     PaletteHome paletteHome() { return paletteHome; }
+    /** The icon set this window's header and status bar are marked with (plan 12 Rulings 6). */
+    ChromeArtwork chromeArtwork() { return artwork; }
     /** A new header composition for one window (spec 10.3). */
     HeaderComposition header() {
         return switch (header) {
             case UNIFIED -> new UnifiedHeader();
-            case CLASSIC -> new ClassicHeader();
+            case CLASSIC -> new ClassicHeader(iconSearch);
         };
     }
 
-    /** The tab strip for {@code owner} (spec 10.5). */
-    TabStrip tabs(WindowContent owner) {
+    /** A window's tab strip (spec 10.5; tabs and panes spec 5). */
+    TabStrip tabs(ParentTabBar bar) {
         return switch (tabs) {
-            case EQUAL -> new WindowTabs(owner);
-            case CLASSIC -> new ClassicTabs(owner);
+            case EQUAL -> new WindowTabs(bar);
+            case CLASSIC -> new ClassicTabs(bar);
+        };
+    }
+
+    /**
+     * Whether a window holding {@code count} tabs shows its tab strip (tabs and panes spec 5): the equal tabs from two
+     * tabs; the classic tabs (Enterprise) always, over the main window's empty workspace too.
+     */
+    boolean showsTabStrip(int count) {
+        return switch (tabs) {
+            case EQUAL -> count > 1;
+            case CLASSIC -> true;
         };
     }
 
@@ -105,15 +137,22 @@ public final class WorkspaceChrome {
             case SLASH -> new SlashSegments();
             case RULED -> new RuledCells();
         };
-        return new WindowStatusBar(cells, runItem ? new RunItem(open, paletteOpen) : null);
+        var bar = new WindowStatusBar(cells, runItem ? new RunItem(open, paletteOpen) : null);
+        AppIcons.chromeReceiver(bar, artwork);
+        return bar;
     }
 
-    /** Two chromes are equal when they choose the same strategies (the strategies hold no state) and the same template. */
+    /**
+     * Two chromes are equal when they choose the same strategies (the strategies hold no state), the same template, the same
+     * icon set and the same toolbar search.
+     */
     @Override public boolean equals(Object other) {
         return other instanceof WorkspaceChrome chrome && menus.getClass() == chrome.menus.getClass() && header == chrome.header
             && tabs == chrome.tabs && status == chrome.status && runItem == chrome.runItem && dock.equals(chrome.dock)
-            && title.equals(chrome.title) && palette.equals(chrome.palette);
+            && title.equals(chrome.title) && palette.equals(chrome.palette) && artwork == chrome.artwork
+            && iconSearch == chrome.iconSearch;
     }
 
-    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, tabs, status, runItem, dock, title, palette); }
+    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, tabs, status, runItem, dock, title, palette, artwork,
+        iconSearch); }
 }

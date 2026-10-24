@@ -113,12 +113,12 @@ class TunnelsPluginTest {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
             var tunnels = plugin.tunnels();
-            Kits.edt(() -> host.openPanel(TunnelsUi.PANEL, window));
-            assertThat(host.panelHeader(TunnelsUi.PANEL, window).detail()).as("no count while empty").isEmpty();
+            Kits.edt(() -> host.openPanel(TunnelsUi.PANEL));
+            assertThat(host.panelHeader(TunnelsUi.PANEL).detail()).as("no count while empty").isEmpty();
             Tunnel db = Tunnel.create("db", UUID.randomUUID(), TunnelKind.LOCAL, Tunnel.LOCALHOST, 5432, "db.internal", 5432);
             plugin.tunnelStore().put(db);
             RemotePluginTest.settle(host);
-            var header = host.panelHeader(TunnelsUi.PANEL, window);
+            var header = host.panelHeader(TunnelsUi.PANEL);
             assertThat(header.detail()).isEqualTo("1");
             assertThat(header.actions()).extracting(dev.jasper.sdk.ui.PanelHeader.Action::label).containsExactly("New Tunnel…");
             Kits.edt(() -> header.actions().getFirst().invoke().run());
@@ -129,7 +129,7 @@ class TunnelsPluginTest {
                 Kits.press(editor.view(), Kits.form(editor.view()).cancelAction());
             });
             assertThat(host.windows()).as("Escape cancelled").isEmpty();
-            var panel = Kits.value(() -> TunnelsTestAccess.panel(tunnels, window));
+            var panel = Kits.value(() -> TunnelsTestAccess.panel(tunnels));
             String row = "tunnel:" + db.id();
             Kits.edt(() -> {
                 var item = Kits.item(Kits.node(panel.view(), dev.jasper.remote.ui.tunnels.TunnelsPanel.ROWS, dev.jasper.sdk.ui.Nodes.ItemList.class), row);
@@ -146,11 +146,11 @@ class TunnelsPluginTest {
                 assertThat(toggle.state().error()).isEqualTo("Host missing");
                 assertThat(((dev.jasper.sdk.ui.Nodes.StatusDot) item.leading().orElseThrow()).kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.StatusKind.DANGER);
             });
-            Kits.edt(() -> host.closePanel(TunnelsUi.PANEL, window));
+            Kits.edt(() -> host.closePanel(TunnelsUi.PANEL));
             assertThat(Kits.closed(panel.view())).as("the host disposed the view").isTrue();
             Kits.edt(() -> tunnels.manager().stop(db.id()));
             RemotePluginTest.settle(host);
-            assertThat(Kits.value(() -> TunnelsTestAccess.panel(tunnels, window))).as("the closed panel left the plugin's map").isNull();
+            assertThat(Kits.value(() -> TunnelsTestAccess.panel(tunnels))).as("the closed panel left the plugin's map").isNull();
             assertThat(host.failures()).as("no late update reached the closed view").isEmpty();
         }
     }
@@ -243,8 +243,8 @@ class TunnelsPluginTest {
             RemotePluginTest.settle(host);
             // The Sessions panel and the confirmation are kit views (Task 8a): drive them on the EDT.
             var text = dev.jasper.remote.testsupport.Kits.value(() -> {
-                host.openPanel(RemotePlugin.PANEL, started.window());
-                HostsPanel hosts = started.plugin().hostsPanel(started.window());
+                host.openPanel(RemotePlugin.PANEL);
+                HostsPanel hosts = started.plugin().hostsPanel();
                 int row = -1;
                 for (int i = 0; i < UiTestAccess.rows(hosts).size(); i++)
                     if (UiTestAccess.rows(hosts).get(i) instanceof HostRows.Host entry && entry.host().id().equals(started.prod().id())) row = i;
@@ -311,8 +311,8 @@ class TunnelsPluginTest {
             assertThat(EchoServer.roundTrip(port, "quick")).isEqualTo("quick");
             // Save as Tunnel...: the panel's route for a quick forward; the editor keeps the id and the forwarding.
             Kits.edt(() -> {
-                host.openPanel(TunnelsUi.PANEL, started.window());
-                TunnelsTestAccess.activate(TunnelsTestAccess.panel(tunnels, started.window()), quick.id());
+                host.openPanel(TunnelsUi.PANEL);
+                TunnelsTestAccess.activate(TunnelsTestAccess.panel(tunnels), quick.id());
                 assertThat(host.windows()).as("Save as Tunnel").contains("dialog|Save as Tunnel|true");
                 TunnelsTestAccess.name(tunnels.currentEditor(), "kept");
                 TunnelsTestAccess.save(tunnels.currentEditor());
@@ -357,8 +357,8 @@ class TunnelsPluginTest {
             Tunnel db = Tunnel.create("db", started.prod().id(), TunnelKind.LOCAL, "127.0.0.1", 0, "127.0.0.1", echo.port());
             started.plugin().tunnelStore().put(db);
             RemotePluginTest.settle(host);
-            Kits.edt(() -> { host.openPanel(TunnelsUi.PANEL, started.window()); manager.start(db, null); });
-            var panel = Kits.value(() -> TunnelsTestAccess.panel(tunnels, started.window()));
+            Kits.edt(() -> { host.openPanel(TunnelsUi.PANEL); manager.start(db, null); });
+            var panel = Kits.value(() -> TunnelsTestAccess.panel(tunnels));
             await(host, () -> manager.state(db.id()) instanceof TunnelState.Up, "the tunnel to come up");
             int port = ((TunnelState.Up) manager.state(db.id())).boundPort();
             dev.jasper.remote.testsupport.Kits.edt(() -> {
@@ -383,8 +383,8 @@ class TunnelsPluginTest {
             Tunnel db = Tunnel.create("db", started.prod().id(), TunnelKind.LOCAL, "127.0.0.1", 0, "127.0.0.1", echo.port());
             store.put(db);
             RemotePluginTest.settle(host);
-            Kits.edt(() -> { host.openPanel(TunnelsUi.PANEL, started.window()); manager.start(db, null); });
-            var panel = Kits.value(() -> TunnelsTestAccess.panel(tunnels, started.window()));
+            Kits.edt(() -> { host.openPanel(TunnelsUi.PANEL); manager.start(db, null); });
+            var panel = Kits.value(() -> TunnelsTestAccess.panel(tunnels));
             await(host, () -> manager.state(db.id()) instanceof TunnelState.Up, "the tunnel to come up");
             int port = ((TunnelState.Up) manager.state(db.id())).boundPort();
             Files.writeString(store.file(), "[[tunnel]\nname = ");

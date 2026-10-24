@@ -150,7 +150,7 @@ final class ExInfo {
 
     private static void globalMark(VimEditor editor, List<String> lines, String arg, char name, Vim.GlobalMark mark) {
         if (mark == null) return;
-        String other = mark.editor() == editor ? null : mark.editor().documentName();
+        String other = mark.inFileOf(editor) ? null : mark.editor().documentName();
         mark(other == null ? editor : mark.editor(), lines, arg, name, mark.pos(), other);
     }
 

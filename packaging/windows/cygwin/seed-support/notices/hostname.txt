@@ -1,0 +1,90 @@
+Package source: x86_64/release/hostname/hostname-3.13-1-src.tar.bz2
+License identifier: LicenseRef-Upstream-hostname
+
+--- hostname-3.13-1.cygport ---
+# cygport script for hostname
+
+SUMMARY="Show host name, domain name or network addresses"
+
+DESCRIPTION="This package provides the Debian version of the hostname command.
+It can be used to display the system's host name, DNS domain name or
+network addresses."
+
+CATEGORY="Base"
+REQUIRES=""
+
+HOMEPAGE="http://packages.debian.org/unstable/hostname"
+SRC_URI="mirror://debian/pool/main/h/hostname/hostname_${PV}.tar.gz"
+
+src_compile() {
+	cd ${B}
+	lndirs
+	cygmake LIBS=
+}
+
+src_install() {
+	cd ${B}
+	dobin hostname.exe
+	dosym hostname.exe /usr/bin/domainname
+	dosym hostname.exe /usr/bin/dnsdomainname
+
+	doman hostname.1
+	dosym hostname.1 /usr/share/man/man1/domainname.1
+	dosym hostname.1 /usr/share/man/man1/dnsdomainname.1
+
+	dodoc COPYRIGHT
+	docinto debian
+	dodoc debian/changelog
+}
+
+
+Source archive: x86_64/release/hostname/hostname-3.13-1-src.tar.bz2
+
+--- hostname_3.13.tar.gz!/hostname-3.13/debian/copyright ---
+This package was written by Peter Tobias <tobias@et-inf.fho-emden.de>
+on Thu, 16 Jan 1997 01:00:34 +0100.
+
+License:
+
+	Copyright (C) 2009 Michael Meskes <meskes@debian.org>
+	Copyright (C) 2004-2005 Graham Wilson <graham@debian.org>
+	Copyright (C) 1997 Bernd Eckenfels
+	Copyright (C) 1997 Peter Tobias <tobias@et-inf.fho-emden.de>
+	Copyright (C) 1996 Free Software Foundation, Inc.
+
+	This program is free software; you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation; version 2 of the License.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program; if not, write to the Free Software
+	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+
+On Debian systems, the complete text of the GNU General Public License
+can be found in /usr/share/common-licenses/GPL-2 file.
+
+
+--- hostname_3.13.tar.gz!/hostname-3.13/COPYRIGHT ---
+hostname -- set the host name or show the host/domain name
+
+Copyright (C) 1994-1997 Peter Tobias <tobias@et-inf.fho-emden.de>
+              2009-     Michael Meskes <meskes@debian.org>
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2, or (at your option)
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.

@@ -66,22 +66,51 @@ class ApplicationBootstrapTest {
         assertThat(System.getProperty(appearanceKey)).isEqualTo("system");
     }
 
+    /** A home of this test's own: no test may take the user's instance lock (plan Ruling 19). */
+    private AppDirs dirs() { return new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs")); }
+
     @Test void helpAndErrorsExitBeforeConfigurationOrDesktopStartup() {
         var out = new ByteArrayOutputStream(); var error = new ByteArrayOutputStream();
         var stdout = new PrintStream(out); var stderr = new PrintStream(error);
-        assertThat(ApplicationBootstrap.start(new String[]{"--help"}, stdout, stderr,
+        assertThat(ApplicationBootstrap.start(new String[]{"--help"}, stdout, stderr, dirs(),
             (service, options) -> { throw new AssertionError("Unexpected startup"); })).isZero();
         assertThat(out.toString()).contains("--config", "--help");
-        assertThat(ApplicationBootstrap.start(new String[]{"--config"}, stdout, stderr,
+        assertThat(ApplicationBootstrap.start(new String[]{"--config"}, stdout, stderr, dirs(),
             (service, options) -> { throw new AssertionError("Unexpected startup"); })).isEqualTo(2);
         assertThat(error.toString()).contains("requires a file path");
+        assertThat(dirs().instanceLock()).as("both end before the lock").doesNotExist();
     }
+
+    /** Spec 5.2: a second launch in an owned home hands its request to the owner before reading anything. */
+    @Test void aSecondLaunchInAnOwnedHomeHandsOffAndALoginLaunchExits() throws Exception {
+        Files.writeString(directory.resolve("config.toml"), "");
+        var owner = new AtomicReference<ApplicationBootstrap.Startup>();
+        assertThat(ApplicationBootstrap.start(new String[0], System.out, System.err, dirs(), owner::set)).isZero();
+        try {
+            var seen = new java.util.concurrent.ConcurrentLinkedQueue<LaunchRequest>();
+            owner.get().instance().serve((request, updated) -> seen.add(request), () -> true, Runnable::run,
+                invocation -> CompletableFuture.completedFuture(0));
+            Path notes = Files.writeString(directory.resolve("notes.txt"), "");
+            assertThat(ApplicationBootstrap.start(new String[]{"--safe-mode", notes.toString()}, System.out, System.err, dirs(),
+                startup -> { throw new AssertionError("a second launch never starts"); })).isZero();
+            DesktopTestSupport.until(() -> seen.size() == 1);
+            assertThat(seen.peek().paths()).containsExactly(notes);
+            assertThat(seen.peek().ignoredFlags()).containsExactly("--safe-mode");
+            assertThat(ApplicationBootstrap.start(new String[]{"--background"}, System.out, System.err, dirs(),
+                startup -> { throw new AssertionError("a login launch never starts while an owner runs"); })).isZero();
+            assertThat(seen).as("the login launch handed nothing off").hasSize(1);
+        } finally {
+            owner.get().service().close();
+            owner.get().instance().close();
+        }
+    }
+
     @Test void explicitConfigurationIsReadBeforeDispatchToSwing() throws Exception {
         Path config = directory.resolve("config.toml");
         Files.writeString(config, "[window]\ntab_height=47\n");
         var received = new AtomicReference<ConfigService>();
         try {
-            int result = ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err, (service, options) -> {
+            int result = ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err, dirs(), (service, options) -> {
                 assertThat(SwingUtilities.isEventDispatchThread()).isFalse(); received.set(service);
             });
             assertThat(result).isZero();
@@ -96,7 +125,7 @@ class ApplicationBootstrapTest {
         Files.writeString(config, "ui.appearance='light'");
         var received = new AtomicReference<ConfigService>();
         try {
-            assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err,
+            assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err, dirs(),
                 (service, options) -> received.set(service))).isZero();
             assertThat(received.get().initialState().snapshot().appearance()).isEqualTo(dev.jasper.app.config.AppearanceMode.LIGHT);
         } finally {
@@ -104,64 +133,15 @@ class ApplicationBootstrapTest {
         }
     }
 
-    @Test void neitherAnotherConfigurationNorAResidentProcessHandsOff(@TempDir Path dir) throws Exception {
-        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
-        try (HandoffSocket endpoint = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(),
-                dirs.daemonLock(), request -> LaunchRequest.Response.OK)) {
-            assertThat(endpoint).isNotNull();
-            // The control: with this endpoint listening, an ordinary launch does hand off. That is
-            // what makes the two refusals below attributable to the guard rather than to silence.
-            assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false), dirs)).isTrue();
-            // A different configuration file is a different Jasper; the resident one holds another.
-            assertThat(ApplicationBootstrap.handsOff(new AppArguments(dir.resolve("other.toml"), false, false), dirs)).isFalse();
-            // And a resident process never hands off to itself.
-            assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, true), dirs)).isFalse();
-            // Recovery and development launches must never be swallowed by the process they are
-            // meant to get away from.
-            assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false, true, null, false), dirs)).isFalse();
-            assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false, false, dir.resolve("p"), false), dirs)).isFalse();
-            assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false, false, null, true), dirs)).isFalse();
-        }
-    }
-
-    @Test void withNothingListeningThereIsNothingToHandOffTo(@TempDir Path dir) {
-        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
-        assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false), dirs)).isFalse();
-    }
-
-    @Test void aLoginLaunchStopsBeforeStartingWhenAResidentAlreadyServes(@TempDir Path dir) throws Exception {
-        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
-        var background = new AppArguments(null, false, true);
-        assertThat(ApplicationBootstrap.alreadyResident(background, dirs)).as("nothing listening: it may become resident").isFalse();
-        try (HandoffSocket endpoint = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(),
-                dirs.daemonLock(), request -> { throw new AssertionError("a login launch never hands off"); })) {
-            assertThat(endpoint).isNotNull();
-            assertThat(ApplicationBootstrap.alreadyResident(background, dirs)).isTrue();
-            // An ordinary launch hands off instead, and a standalone one is refused later with its own warning.
-            assertThat(ApplicationBootstrap.alreadyResident(new AppArguments(null, false, false), dirs)).isFalse();
-            assertThat(ApplicationBootstrap.alreadyResident(new AppArguments(null, false, true, true, null, false), dirs)).isFalse();
-        }
-        assertThat(ApplicationBootstrap.alreadyResident(background, dirs)).as("the resident has gone").isFalse();
-    }
-
-    @Test void residentRoleIsOnlyTrueWithTheSettingOnAndNoConfigOverride() {
-        assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false), true)).isTrue();
-        assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false), false)).isFalse();
-        // A --config launch is standalone: it never claims the shared endpoint, setting or not.
-        assertThat(ApplicationBootstrap.residentRole(new AppArguments(Path.of("other.toml"), false, false), true)).isFalse();
-        assertThat(ApplicationBootstrap.residentRole(new AppArguments(Path.of("other.toml"), false, false), false)).isFalse();
-        assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false, true, null, false), true)).isFalse();
-        assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false, false, Path.of("p"), false), true)).isFalse();
-        assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false, false, null, true), true)).isFalse();
-    }
-
-    @Test void staleFlagsADifferentPathOrModificationTimeButNotAMatchingUnresolvedSource() {
-        Path source = Path.of("/app.jar");
-        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", source, 100L), source, 100L)).isFalse();
-        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", Path.of("/other.jar"), 100L), source, 100L)).isTrue();
-        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", source, 999L), source, 100L)).isTrue();
-        // An unresolvable code source normalises to the same empty path on both sides.
-        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", Path.of(""), 0L), null, 0L)).isFalse();
+    @Test void residencyIsForTheDefaultHomeLaunchedWithoutStartUpFlags() {
+        assertThat(ApplicationBootstrap.residentRole(AppArguments.parse(new String[0], directory), true)).isTrue();
+        assertThat(ApplicationBootstrap.residentRole(AppArguments.parse(new String[0], directory), false)).isFalse();
+        assertThat(ApplicationBootstrap.residentRole(AppArguments.parse(new String[]{"notes.txt"}, directory), true))
+            .as("paths are no start-up flag").isTrue();
+        for (String[] flags : new String[][]{{"--config", "other.toml"}, {"--safe-mode"}, {"--plugin-dir", "p"}})
+            assertThat(ApplicationBootstrap.residentRole(AppArguments.parse(flags, directory), true)).as(flags[0]).isFalse();
+        assertThat(ApplicationBootstrap.residentRole(AppArguments.parse(new String[0], directory).withHomeOverride(true), true))
+            .as("another home").isFalse();
     }
 
     @Test void loginItemReconcilerDedupesAndRunsOffTheCallingThread() throws Exception {
@@ -198,27 +178,35 @@ class ApplicationBootstrapTest {
         ApplicationBootstrap.reconcileLoginItem(true, null, fakeHome);
         assertThat(plist).doesNotExist();
     }
-    @Test void failedDesktopDispatchClosesConfigurationAndPreservesError() {
+    /**
+     * The {@code Consumer<Startup>} form leaves the owner to its caller, so only {@code start}'s own rollback can release the
+     * home here: a failed {@code main} must not keep the lock, whose endpoints answer handoffs on non-daemon threads.
+     */
+    @Test void failedDesktopDispatchClosesConfigurationAndPreservesError() throws Exception {
         var received = new AtomicReference<ConfigService>();
         var original = new AssertionError("desktop dispatch");
         try {
             assertThatThrownBy(() -> ApplicationBootstrap.start(new String[]{"--config", directory.resolve("config.toml").toString()},
-                System.out, System.err, (service, options) -> { received.set(service); throw original; })).isSameAs(original);
+                System.out, System.err, dirs(), startup -> { received.set(startup.service()); throw original; })).isSameAs(original);
             assertThat(received.get().reload()).isCompletedExceptionally();
+            assertThat(dirs().daemonSocket()).as("its endpoint is closed").doesNotExist();
+            try (var again = dev.jasper.app.residency.InstanceLock.tryAcquire(dirs().instanceLock())
+                    .orElseThrow(() -> new AssertionError("the rollback kept the home"))) {
+                assertThat(again.file()).isEqualTo(dirs().instanceLock());
+            }
         } finally { if (received.get() != null) received.get().close(); }
     }
 
-    @Test void onlyAPlainReplacementCanHandOffAndOnlyAPureStandaloneLaunchExplainsItself() {
-        Path file = Path.of("/tmp/other.toml"), plugin = Path.of("/tmp/plugin");
-        var safe = new AppArguments(null, false, false, true, null, false);
-        assertThat(ApplicationBootstrap.replacementHandsOff(safe)).as("--safe-mode restarts into a plain launch").isTrue();
-        assertThat(ApplicationBootstrap.replacementHandsOff(new AppArguments(file, false, false, true, null, false))).isFalse();
-        assertThat(ApplicationBootstrap.replacementHandsOff(new AppArguments(null, false, false, true, plugin, false))).isFalse();
-        assertThat(ApplicationBootstrap.replacementHandsOff(new AppArguments(null, false, false, true, null, true))).isFalse();
-        assertThat(ApplicationBootstrap.standaloneNotice(new AppArguments(null, false, false, false, null, true))).isTrue();
-        assertThat(ApplicationBootstrap.standaloneNotice(safe)).isFalse();
-        assertThat(ApplicationBootstrap.standaloneNotice(new AppArguments(file, false, false, false, null, true))).isFalse();
-        assertThat(ApplicationBootstrap.standaloneNotice(new AppArguments(null, false, false, false, plugin, true))).isFalse();
+    @Test void aFailedPrePassReleasesTheHome() throws Exception {
+        var original = new AssertionError("pre-pass");
+        assertThatThrownBy(() -> ApplicationBootstrap.start(new String[0], System.out, System.err, dirs(),
+            (dirs, options) -> { throw original; }, startup -> { throw new AssertionError("a failed pre-pass never starts"); }))
+            .isSameAs(original);
+        assertThat(dirs().daemonSocket()).as("its endpoint is closed").doesNotExist();
+        try (var again = dev.jasper.app.residency.InstanceLock.tryAcquire(dirs().instanceLock())
+                .orElseThrow(() -> new AssertionError("the rollback kept the home"))) {
+            assertThat(again.file()).isEqualTo(dirs().instanceLock());
+        }
     }
 
     @Test void onlyAPackagedMacLoginLaunchStartsHiddenFromTheDock() throws Exception {
@@ -254,73 +242,12 @@ class ApplicationBootstrapTest {
         assertThat(System.getProperty(key)).isEqualTo("true");
     }
 
-    @Test void aNoWindowLaunchNeverHandsOffAndStepsAsideWhileAJasperServes(@TempDir Path dir) throws Exception {
-        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
-        var noWindow = new AppArguments(null, false, false, false, null, false, false, true);
-        try (HandoffSocket endpoint = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(), dirs.daemonLock(),
-                request -> LaunchRequest.Response.OK)) {
-            assertThat(endpoint).isNotNull();
-            assertThat(ApplicationBootstrap.handsOff(noWindow, dirs)).as("a handoff would open a window").isFalse();
-        }
-        assertThat(ApplicationBootstrap.alreadyServing(noWindow, dirs)).isFalse();
-        CommandListener listener = CommandListener.bind(dirs.commandSocket(), invocation -> CompletableFuture.completedFuture(0));
-        try {
-            assertThat(listener).isNotNull();
-            assertThat(ApplicationBootstrap.alreadyServing(noWindow, dirs)).isTrue();
-            assertThat(ApplicationBootstrap.alreadyServing(new AppArguments(null, false, false), dirs)).as("a plain launch").isFalse();
-        } finally {
-            listener.close();
-        }
-    }
-
-    @Test void onlyAPrivateLaunchServesItsOwnCommandSocket(@TempDir Path dir) {
-        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
-        long pid = ProcessHandle.current().pid();
-        assertThat(ApplicationBootstrap.commandSocket(new AppArguments(null, false, false), dirs)).isEqualTo(dirs.commandSocket());
-        assertThat(ApplicationBootstrap.commandSocket(new AppArguments(null, false, false).withHomeOverride(true), dirs))
-            .isEqualTo(dirs.commandSocket());
-        assertThat(ApplicationBootstrap.commandSocket(new AppArguments(null, false, false, true, null, false), dirs))
-            .isEqualTo(dirs.commandSocket(pid));
-        assertThat(ApplicationBootstrap.commandSocket(new AppArguments(dir.resolve("other.toml"), false, false), dirs))
-            .isEqualTo(dirs.commandSocket(pid));
-    }
-
     private static JasperApplication application(Path dir, Runnable terminated) throws Exception {
         var made = new AtomicReference<JasperApplication>();
         // The initial read is refused on the EDT.
         var service = new ConfigService(dir.resolve("config.toml"), true);
         DesktopTestSupport.edt(() -> made.set(new JasperApplication(service, null, new CommandHistory(), null, terminated)));
         return made.get();
-    }
-
-    @Test void aLaunchThatFindsAnotherJasperServingTheSharedSocketServesItsOwnShellsPrivately(@TempDir Path dir) throws Exception {
-        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
-        long pid = ProcessHandle.current().pid();
-        Path own = dirs.commandSocket(pid);
-        CommandListener other = CommandListener.bind(dirs.commandSocket(), invocation -> CompletableFuture.completedFuture(0));
-        var terminated = new CountDownLatch(1);
-        JasperApplication application = application(dir, terminated::countDown);
-        var served = new AtomicReference<CommandListener>();
-        try {
-            assertThat(other).isNotNull();
-            DesktopTestSupport.edt(() -> served.set(
-                ApplicationBootstrap.serveCommands(application, new AppArguments(null, false, false), dirs, new StartupResources())));
-            assertThat(served.get()).as("a listener of its own").isNotNull();
-            assertThat(served.get().socket()).isEqualTo(own);
-            assertThat(CommandListener.live(own)).isTrue();
-            assertThat(application.commandSocket()).as("what its shells' JASPER_COMMAND_SOCKET names").isEqualTo(own);
-            var noWindow = new AppArguments(null, false, false, false, null, false, false, true);
-            assertThat(ApplicationBootstrap.bindCommands(noWindow, dirs, invocation -> CompletableFuture.completedFuture(0)))
-                .as("a --no-window launch exists only to serve the shared socket").isNull();
-            DesktopTestSupport.edt(application::quitNow);
-            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
-            assertThat(own).as("removed at quit, as a private launch's socket is").doesNotExist();
-            assertThat(own.resolveSibling(own.getFileName() + ".lock")).doesNotExist();
-            assertThat(CommandListener.live(dirs.commandSocket())).as("the other Jasper's socket is untouched").isTrue();
-        } finally {
-            if (served.get() != null) served.get().close();
-            if (other != null) other.close();
-        }
     }
 
     @Test void aNoWindowJasperThatIsNotResidentQuitsOnceItsCallIsServed(@TempDir Path dir) throws Exception {
@@ -362,25 +289,29 @@ class ApplicationBootstrapTest {
                 java.util.Map.of("look.kit.toml", "kit = 1\nbase = \"default\"\n[defaults]\n\"palette.visible_rows\" = 7\n")), false);
         var received = new AtomicReference<ApplicationBootstrap.Startup>();
         try {
-            assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err,
+            assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err, dirs(),
                 (dirs, options) -> new ApplicationBootstrap.Prepared(null, selection), received::set)).isZero();
             assertThat(received.get().selection()).isSameAs(selection);
             assertThat(received.get().service().initialState().snapshot().visibleRows()).isEqualTo(7);
             assertThat(received.get().service().defaults()).isSameAs(selection.presentation().defaults());
-        } finally { if (received.get() != null) received.get().service().close(); }
+        } finally {
+            if (received.get() != null) { received.get().service().close(); received.get().instance().close(); }
+        }
         var plain = new AtomicReference<ApplicationBootstrap.Startup>();
         try {
-            assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err, plain::set)).isZero();
+            assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err, dirs(), plain::set)).isZero();
             assertThat(plain.get().selection().isNone()).as("the test entry scans no home").isTrue();
             assertThat(plain.get().log()).isNull();
-        } finally { if (plain.get() != null) plain.get().service().close(); }
+        } finally {
+            if (plain.get() != null) { plain.get().service().close(); plain.get().instance().close(); }
+        }
     }
 
     /** Spec 4.6: pending only on the paths about to show a window or rehearse. */
     @Test void onlyAWindowOrAResidentRehearsalRecordsAPendingLook() {
-        var plain = new AppArguments(null, false, false, false, null, false, false, false);
-        var background = new AppArguments(null, false, true, false, null, false, false, false);
-        var noWindow = new AppArguments(null, false, false, false, null, false, false, true);
+        var plain = AppArguments.parse(new String[0], directory);
+        var background = AppArguments.parse(new String[]{"--background"}, directory);
+        var noWindow = AppArguments.parse(new String[]{"--no-window"}, directory);
         assertThat(ApplicationBootstrap.attemptBeforePresenting(plain, false, false)).as("the first window").isTrue();
         assertThat(ApplicationBootstrap.attemptBeforePresenting(background, true, false)).as("the resident rehearsal").isTrue();
         assertThat(ApplicationBootstrap.attemptBeforePresenting(background, false, false)).as("a background exit (quitNow)").isFalse();
@@ -389,11 +320,11 @@ class ApplicationBootstrapTest {
         assertThat(ApplicationBootstrap.attemptBeforePresenting(background, true, true)).isFalse();
     }
 
-    /** Spec 10.11: only a branded start that will open a window shows the splash. */
-    @Test void onlyABrandedStartThatOpensAWindowShowsTheSplash() {
+    /** Windowed starts show Meadow by default or the selected branded splash. */
+    @Test void aWindowedStartShowsTheDefaultOrBrandedSplash() {
         var plain = AppArguments.parse(new String[0], directory);
         assertThat(ApplicationBootstrap.splashWanted(plain, false, true)).isTrue();
-        assertThat(ApplicationBootstrap.splashWanted(plain, false, false)).as("no branding").isFalse();
+        assertThat(ApplicationBootstrap.splashWanted(plain, false, false)).as("default Meadow splash").isTrue();
         assertThat(ApplicationBootstrap.splashWanted(plain, true, true)).as("headless").isFalse();
         for (String flag : java.util.List.of("--background", "--no-window", "--safe-mode"))
             assertThat(ApplicationBootstrap.splashWanted(AppArguments.parse(new String[] {flag}, directory), false, true)).as(flag).isFalse();
@@ -405,18 +336,20 @@ class ApplicationBootstrapTest {
         var branded = dev.jasper.app.plugins.PluginSelection.of(dirs, null, "",
             dev.jasper.app.testsupport.BrandingFixtures.plugin(directory.resolve("dev"), "dev.example.look", "Example"), false);
         try {
-            var background = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[] {"--background"}, directory), dirs, null, branded);
+            var background = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[] {"--background"}, directory), dirs, null, branded, null);
             assertThat(ApplicationBootstrap.openSplash(background, false)).isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
             assertThat(dev.jasper.app.platform.ApplicationIcon.branded()).isTrue();
             assertThat(dev.jasper.app.platform.ApplicationIcon.images()).extracting(image -> image.getWidth(null))
                 .containsExactly(16, 32, 48, 64, 128, 256, 1024);
             dev.jasper.app.platform.ApplicationIcon.useLook(java.util.List.of());
-            var windowed = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null, branded);
+            var windowed = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null, branded, null);
             assertThat(ApplicationBootstrap.openSplash(windowed, true)).as("headless: no splash").isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
             dev.jasper.app.platform.ApplicationIcon.useLook(java.util.List.of());
             var standard = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null,
-                dev.jasper.app.plugins.PluginSelection.none());
-            assertThat(ApplicationBootstrap.openSplash(standard, false)).isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+                dev.jasper.app.plugins.PluginSelection.none(), null);
+            var standardSteps = ApplicationBootstrap.openSplash(standard, false);
+            assertThat(standardSteps).isNotSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+            javax.swing.SwingUtilities.invokeAndWait(standardSteps::done);
             assertThat(dev.jasper.app.platform.ApplicationIcon.branded()).as("the default look keeps Jasper's icons").isFalse();
         } finally {
             dev.jasper.app.platform.ApplicationIcon.useLook(java.util.List.of());
@@ -429,7 +362,7 @@ class ApplicationBootstrapTest {
         var branded = dev.jasper.app.plugins.PluginSelection.of(dirs, null, "",
             dev.jasper.app.testsupport.BrandingFixtures.plugin(directory.resolve("dev"), "dev.example.look", "Example"), false);
         try {
-            var windowed = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null, branded);
+            var windowed = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null, branded, null);
             // Headless here: the screen scale falls back to 1 and the posted window logs that it cannot open.
             var steps = ApplicationBootstrap.openSplash(windowed, false);
             assertThat(steps).isNotSameAs(dev.jasper.app.startup.StartupSteps.NONE);
@@ -456,6 +389,11 @@ class ApplicationBootstrapTest {
         assertThat(calls).containsExactly("show false", "show true", "icon", "show false", "show true", "icon");
     }
 
+    @Test void enterpriseUsesTheSameMeadowSplashBrandingAsNormalMode() {
+        var parsed = dev.jasper.app.testsupport.EnterpriseResources.facts().parsed().orElseThrow();
+        assertThat(parsed.branding()).isSameAs(dev.jasper.app.presentation.Branding.NONE);
+    }
+
     /** Spec 10.11: the splash shows the look's files, the version line and About's copyright. */
     @Test void theSplashContentIsTheLooksBrandingWithAboutsVersionAndCopyright() throws Exception {
         var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));
@@ -473,11 +411,14 @@ class ApplicationBootstrapTest {
         assertThat(content.versionFace()).isEmpty();
     }
 
-    /** Review Focus 1: a splash never outlives the start that opened it. */
-    @Test void theStepsEndWhetherTheStartSucceedsOrFails() {
+    /** Successful composition hands splash ownership to the visible window; failure closes it. */
+    @Test void successfulCompositionKeepsTheSplashUntilTheWindowPaints() {
         var closed = new java.util.concurrent.atomic.AtomicInteger();
         var steps = dev.jasper.app.startup.StartupSteps.of("JasperOps", 0, step -> { }, closed::incrementAndGet);
         ApplicationBootstrap.presenting(steps, () -> { });
+        assertThat(closed).hasValue(0);
+        assertThat(steps.active()).isTrue();
+        steps.done();
         assertThat(closed).hasValue(1);
         var failing = dev.jasper.app.startup.StartupSteps.of("JasperOps", 0, step -> { }, closed::incrementAndGet);
         assertThatThrownBy(() -> ApplicationBootstrap.presenting(failing, () -> { throw new IllegalStateException("composition failed"); }))

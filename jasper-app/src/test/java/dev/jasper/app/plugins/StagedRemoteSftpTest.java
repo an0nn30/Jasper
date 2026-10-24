@@ -212,7 +212,7 @@ class StagedRemoteSftpTest {
                     var name = label((Container) readme, "readme.txt");
                     assertThat(name.getFont().getSize2D()).as("the body text follows the enlarged font").isGreaterThanOrEqualTo(20f);
                     assertThat(readme.getHeight()).as("the row grows to fit it with room")
-                        .isGreaterThanOrEqualTo(name.getFontMetrics(name.getFont()).getHeight() + 8);
+                        .isGreaterThanOrEqualTo(name.getFontMetrics(name.getFont()).getHeight() + dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.ROW_VERTICAL_PADDING));
                 });
             } finally { onEdt(() -> { javax.swing.UIManager.put("Label.font", previous); javax.swing.UIManager.put("defaultFont", previousDefault); }); }
             assertThat(remote.problems).isEmpty();

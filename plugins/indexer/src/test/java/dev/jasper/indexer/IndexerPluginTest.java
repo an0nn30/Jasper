@@ -147,7 +147,7 @@ class IndexerPluginTest {
             host.cwdChanged(pane, app.resolve("src"));
             settle(host);
             assertThat(host.notifications().posts()).filteredOn(post -> post.spec().title().equals("Index project?")).singleElement()
-                .satisfies(post -> assertThat(post.spec().content()).isEqualTo("app · ~/src/app\nCargo project"));
+                .satisfies(post -> assertThat(post.spec().content()).isEqualTo("app · " + "~/src/app".replace('/', java.io.File.separatorChar) + "\nCargo project"));
             assertThat(host.notifications().runAction("Index project?", "Yes")).isTrue();
             settle(host);
             assertThat(host.notifications().lines()).contains("dev.jasper.indexer.results|INFO|Indexed app|2 files");

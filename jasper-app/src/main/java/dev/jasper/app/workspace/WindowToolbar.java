@@ -17,11 +17,14 @@ import javax.swing.*;
 
 /** One row of stable-size controls packed against the trailing edge, or with {@link #packLeading} against the leading
  * edge; lower-priority controls move whole
- * into a live overflow menu behind a vertical ellipsis. A contributed view never does: it hides while the row is too
- * narrow for it. */
+ * into a live overflow menu behind a horizontal ellipsis. A contributed view never does: it hides while the row is too
+ * narrow for it. A pinned control ({@link #pin}), a window's ⋮, ends the row, after the overflow button. */
 final class WindowToolbar extends JToolBar {
     private static final String MENU = "Jasper.overflowMenu", PRIORITY = "Jasper.toolbarPriority", VIEW = "Jasper.toolbarView";
-    private final JButton overflow = new JButton(AppIcons.semantic("more.vertical"));
+    /** Marks the control {@link #pin} pins. */
+    private static final String PINNED = "Jasper.toolbarPinned";
+    /** A horizontal ellipsis, so that it never looks like a window's ⋮ (workspace plan 7b Spec issues 3). */
+    private final JButton overflow = new JButton(AppIcons.semantic("more"));
     private final Runnable refreshActions;
     private int barHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
 
@@ -159,15 +162,16 @@ final class WindowToolbar extends JToolBar {
         }
         int x = padding;
         boolean previous = false, anyShown = false;
+        Component pin = pinned();
         for (Component child : getComponents()) {
-            if (child == overflow) continue;
+            if (child == overflow || child == pin) continue;
             if (placed(child)) {
                 boolean shown = !hidden.contains(child);
                 child.setVisible(shown);
                 if (!shown) { child.setBounds(0, 0, 0, 0); continue; }
                 if (previous) x += gap;
                 int width = child.getPreferredSize().width;
-                int height = isView(child) ? Math.min(getHeight(), child.getPreferredSize().height) : side;
+                int height = isView(child) ? Math.min(getHeight(), child.getPreferredSize().height) : child instanceof ClassicToolbarButton icon && icon.getText() == null ? Math.min(side, icon.getPreferredSize().height) : side;
                 child.setBounds(x, (getHeight() - height) / 2, width, height);
                 x += width;
                 previous = anyShown = true;
@@ -184,6 +188,13 @@ final class WindowToolbar extends JToolBar {
         overflow.setVisible(overflowing);
         if (overflowing) overflow.setBounds(anyShown ? x + gap : x, (getHeight() - side) / 2, side, side);
         else overflow.setBounds(0, 0, 0, 0);
+        // A pinned control, the window's ⋮, ends the row after the overflow button (workspace plan 7b Rulings 16).
+        if (pin != null) {
+            int at = overflowing ? overflow.getX() + side + gap : previous ? x + gap : x;
+            int height = pin instanceof ClassicToolbarButton icon && icon.getText() == null ? Math.min(side, icon.getPreferredSize().height) : side;
+            pin.setVisible(true);
+            pin.setBounds(at, (getHeight() - height) / 2, pin.getPreferredSize().width, height);
+        }
     }
     JButton overflowButton() { return overflow; }
 
@@ -270,11 +281,21 @@ final class WindowToolbar extends JToolBar {
         component.putClientProperty(VIEW, Boolean.TRUE);
     }
 
+    /**
+     * Pins {@code control}, a button with no overflow entry, to the row's trailing end: the row always ends with it, the
+     * overflow button just before it, as a window's ⋮ ends its toolbar (workspace plan 7b Rulings 16). One per row.
+     */
+    static void pin(JComponent control) { control.putClientProperty(PINNED, Boolean.TRUE); }
+
+    /** The control {@link #pin} pinned in this row; null when there is none. */
+    private Component pinned() {
+        for (Component child : getComponents())
+            if (placed(child) && Boolean.TRUE.equals(((JComponent) child).getClientProperty(PINNED))) return child;
+        return null;
+    }
+
     static JMenuItem menuItem(Action action) {
-        JMenuItem item = action.getValue(Action.SELECTED_KEY) instanceof Boolean
-            ? new JCheckBoxMenuItem(action) : new JMenuItem(action);
-        item.putClientProperty("html.disable", true);
-        return item;
+        return action.getValue(Action.SELECTED_KEY) instanceof Boolean ? PlainText.checkBox(action) : PlainText.item(action);
     }
 
     JPopupMenu overflowMenu() {
@@ -344,8 +365,9 @@ final class WindowToolbar extends JToolBar {
         // Separators share the inter-control spacing; they never consume button target space.
         int x = Math.max(padding, getWidth() - padding - trailing - shown), y = (getHeight() - side) / 2;
         boolean previousVisible = false;
+        Component pin = pinned();
         for (Component child : getComponents()) {
-            if (child == overflow) continue;
+            if (child == overflow || child == pin) continue;
             if (placed(child)) {
                 if (!child.isVisible()) continue;
                 int width = child.getPreferredSize().width;
@@ -365,8 +387,11 @@ final class WindowToolbar extends JToolBar {
                 if (shownRule) previousVisible = false;
             }
         }
-        if (hidden) overflow.setBounds(Math.max(0, getWidth() - padding - side), y, side, side);
+        // The overflow button follows the last control shown; a pinned control, the window's ⋮, ends the row after it
+        // (workspace plan 7b Rulings 16). The totals above count the pinned control, so it ends where the row does.
+        if (hidden) overflow.setBounds(pin == null ? Math.max(0, getWidth() - padding - side) : x, y, side, side);
         else overflow.setBounds(0, 0, 0, 0);
+        if (pin != null) pin.setBounds(hidden ? x + side + gap : x, y, pin.getPreferredSize().width, side);
     }
 
     private boolean hasFollowingVisibleControl(Component separator) {

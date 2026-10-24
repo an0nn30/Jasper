@@ -53,7 +53,16 @@ __jasper_prompt_command() {
     fi
     if [[ "$PWD" != "$__jasper_last_pwd" ]]; then
         __jasper_last_pwd="$PWD"
-        __jasper_osc "7;file://${HOSTNAME:-$(hostname)}$(__jasper_encode "$PWD")"
+        if [[ "${JASPER_CYGWIN-}" == 1 ]]; then
+            # Respect custom Cygwin mounts; conversion runs in Bash, never on Jasper's reader thread.
+            local __jasper_windows_pwd
+            __jasper_windows_pwd="$("${JASPER_CYGWIN_CYGPATH:-/usr/bin/cygpath}" -m -- "$PWD" 2>/dev/null)"
+            if [[ "$__jasper_windows_pwd" == [A-Za-z]:/* ]]; then
+                __jasper_osc "7;file://localhost/$(__jasper_encode "$__jasper_windows_pwd")"
+            fi
+        else
+            __jasper_osc "7;file://${HOSTNAME:-$(hostname)}$(__jasper_encode "$PWD")"
+        fi
     fi
     if [[ "$PS1" != *"$__jasper_mark_a"* ]] && __jasper_writable PS1; then
         PS1="\[$__jasper_mark_a\]$PS1\[$__jasper_mark_b\]"

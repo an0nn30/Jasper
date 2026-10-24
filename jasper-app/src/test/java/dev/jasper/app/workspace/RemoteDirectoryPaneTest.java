@@ -42,7 +42,7 @@ class RemoteDirectoryPaneTest {
             var registry = new TerminalRegistry();
             registry.onEvent(events::add);
             owner.connectTerminals(registry, () -> { });
-            pane = owner.openTab(HOME, new SessionRequest("dev.example.ssh", "build-host", false, attempts::add, Runnable::run)).focusedPane();
+            pane = owner.openTab(HOME, new SessionRequest("dev.example.ssh", "build-host", false, attempts::add, Runnable::run)).pane();
         });
         attempts.get(0).attach(new AttachedConnection(output, OutputStream.nullOutputStream(), (columns, rows) -> { }, new CompletableFuture<>(),
             () -> { try { output.close(); } catch (java.io.IOException ignored) { } }));

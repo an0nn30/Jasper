@@ -20,7 +20,7 @@ final class WindowPairs {
 
     private static PaintPair pair(ColorRole slot, ColorRole against, Guard guard) { return new PaintPair(slot, against, guard); }
 
-    /** An open classic menu's title on the accent ({@code ClassicMenuRow} paints it; the row is shared with auxiliary frames). */
+    /** An open classic menu's title on the accent ({@code ClassicMenuRow} paints it). */
     static final PaintPair OPEN_MENU = dev.jasper.app.platform.ClassicMenuRow.OPEN_TITLE;
     /** The toolbar row's and the status bar's rule, and the toolbar's separators. */
     static final PaintPair RULE = pair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_APP, Guard.STRUCTURAL);
@@ -62,17 +62,28 @@ final class WindowPairs {
     /** The configuration cell's text on its ground. */
     static final PaintPair WARNING_CELL = pair(SemanticColor.STATUS_WARNING, DerivedColor.WARNING_GROUND, Guard.TEXT),
         DANGER_CELL = pair(SemanticColor.STATUS_DANGER, DerivedColor.DANGER_GROUND, Guard.TEXT);
-    /** "▶ Run…" on ruled cells and on slash segments, and while the palette is open (spec 16.1.1's active run item). */
+    /**
+     * "▶ Run…" on ruled cells and on slash segments, and while the palette is open (spec 16.1.1's active run item): on
+     * ruled cells the open item lies on {@code surface.header.active}, as the 06 Run Dialog mocks paint it.
+     */
     static final PaintPair RUN = pair(DerivedColor.ACCENT_EDGE, SemanticColor.SURFACE_APP, Guard.TEXT),
         SLASH_RUN = pair(DerivedColor.ACCENT_EDGE, SemanticColor.SURFACE_STATUS, Guard.TEXT),
-        ACTIVE_RUN = pair(DerivedColor.ACCENT_EDGE, SemanticColor.SURFACE_CONTROL_SELECTED, Guard.TEXT);
+        ACTIVE_RUN = pair(DerivedColor.ACCENT_EDGE, DerivedColor.SURFACE_HEADER_ACTIVE, Guard.TEXT),
+        SLASH_ACTIVE_RUN = pair(DerivedColor.ACCENT_EDGE, SemanticColor.SURFACE_CONTROL_SELECTED, Guard.TEXT);
+    /**
+     * The Windows classic title bar's title, active and inactive (plan 14 Rulings 14): IntelliJ's TitlePane.infoForeground
+     * and inactiveInfoForeground.
+     */
+    static final PaintPair TITLE = pair(SemanticColor.TEXT_SECONDARY, SemanticColor.SURFACE_APP, Guard.TEXT),
+        INACTIVE_TITLE = pair(SemanticColor.TEXT_TERTIARY, SemanticColor.SURFACE_APP, Guard.INDICATOR);
 
     /** Every window pair, the declared table of spec 16.1.1. */
     static final List<PaintPair> ALL = List.of(OPEN_MENU, RULE, BUTTON_LABEL, HOVERED_BUTTON_LABEL, PRESSED_BUTTON_LABEL, BUTTON_FRAME,
         PRESSED_BUTTON_FRAME, SEARCH_EDGE, SEARCH_HOVER_EDGE,
         PLACEHOLDER, KEYCAP_TEXT, TAB_LABEL, SELECTED_TAB_LABEL, INACTIVE_TAB_LABEL, INACTIVE_SELECTED_TAB_LABEL,
         RUNNING_TAB_DOT, RUNNING_SELECTED_TAB_DOT, IDLE_TAB_DOT, IDLE_SELECTED_TAB_DOT, TAB_CLOSE, SELECTED_TAB_CLOSE,
-        TAB_INDICATOR, TAB_PLUS, CELL_TEXT, RUNNING_SESSION_DOT, IDLE_SESSION_DOT, WARNING_CELL, DANGER_CELL, RUN, SLASH_RUN, ACTIVE_RUN);
+        TAB_INDICATOR, TAB_PLUS, CELL_TEXT, RUNNING_SESSION_DOT, IDLE_SESSION_DOT, WARNING_CELL, DANGER_CELL, RUN, SLASH_RUN, ACTIVE_RUN,
+        SLASH_ACTIVE_RUN, TITLE, INACTIVE_TITLE);
 
     static PaintPair tabLabel(boolean activeWindow, boolean selected) {
         return activeWindow ? (selected ? SELECTED_TAB_LABEL : TAB_LABEL) : (selected ? INACTIVE_SELECTED_TAB_LABEL : INACTIVE_TAB_LABEL);
@@ -83,5 +94,5 @@ final class WindowPairs {
     static PaintPair tabClose(boolean selected) { return selected ? SELECTED_TAB_CLOSE : TAB_CLOSE; }
     static PaintPair sessionDot(boolean running) { return running ? RUNNING_SESSION_DOT : IDLE_SESSION_DOT; }
     static PaintPair configuration(SemanticColor problem) { return problem == SemanticColor.STATUS_DANGER ? DANGER_CELL : WARNING_CELL; }
-    static PaintPair run(boolean active, boolean ruled) { return active ? ACTIVE_RUN : ruled ? RUN : SLASH_RUN; }
+    static PaintPair run(boolean active, boolean ruled) { return active ? (ruled ? ACTIVE_RUN : SLASH_ACTIVE_RUN) : ruled ? RUN : SLASH_RUN; }
 }

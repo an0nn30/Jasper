@@ -48,6 +48,10 @@ class WindowPanelsTest {
         model.requestPanel(new Contributions.PanelRequest(owner.id(), id, Contributions.PanelRequest.Op.TOGGLE));
     }
 
+    private static void activatingShow(Contributions model, WindowContent owner, String id) {
+        model.requestPanel(new Contributions.PanelRequest(owner.id(), id, Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+    }
+
     private static List<String> tips(DockStripe stripe) { return stripe.buttons().stream().map(AbstractButton::getToolTipText).toList(); }
 
     private static Rectangle in(JComponent root, Component component) {
@@ -117,6 +121,213 @@ class WindowPanelsTest {
 
             files.close();
             assertThat(owner.leftStripe().buttons()).hasSize(1);
+        });
+    }
+
+    /** Plan 12 Rulings 18: under flush frames the View toggle action activates the panel it opens; a plugin's toggle does not. */
+    @Test void underFlushFramesTheViewToggleActivatesThePanelAndAPluginsToggleDoesNot() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            model.action("dev.x.hosts.toggle").orElseThrow().invoke(new Contributions.Invocation(owner.id(), Optional.empty()));
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).as("the View toggle is a user gesture").hasValue(Slot.LEFT_TOP);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            owner.area().focusMoved(null);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).as("a plugin's programmatic toggle").isEmpty();
+        });
+    }
+
+    private static void request(Contributions model, WindowContent owner, String id, Contributions.PanelRequest.Op op) {
+        model.requestPanel(new Contributions.PanelRequest(owner.id(), id, op));
+    }
+
+    /** A connected window with one panel, under flush frames (Enterprise's classic dock) or the default look's standard ones. */
+    private static WindowContent framed(Contributions model, boolean flush) {
+        var owner = flush
+            ? DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true), DockChromeTest.classicDock())
+            : window();
+        owner.connectContributions(model, UiState.inMemory());
+        model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+        return owner;
+    }
+
+    /** Plan 15b Rulings 1: a plugin's own toggle action arrives as an activating toggle, which activates what it shows. */
+    @Test void aPanelsActivatingToggleUnderFlushFramesActivatesIt() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    /** An activating toggle of the active tool window hides it and hands focus back, as a plain toggle does. */
+    @Test void anActivatingToggleThatHidesThePanelActivatesNothing() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            List<String> events = new ArrayList<>();
+            // The selected tab is hosted content, so handing focus back runs this instead of focusing a terminal.
+            model.tabs().open("dev.x", "doc", "Doc", owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            assertThat(events).as("focus is handed back").contains("focus");
+            assertThat(owner.area().focusedSlot()).isEmpty();
+        });
+    }
+
+    /** As IntelliJ's ActivateToolWindowAction: an activating toggle of a visible tool window that is not active activates it. */
+    @Test void anActivatingToggleOfAVisibleInactivePanelActivatesIt() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).isEmpty();
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("it stays open").isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("the active one hides").isNull();
+        });
+    }
+
+    @Test void underStandardFramesAnActivatingToggleIsAPlainToggle() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, false);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).isEmpty();
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+        });
+    }
+
+    /** Plan 15b Rulings 1: a show by the panel's own toggle action (Transfers' after its first open) activates it, and never hides. */
+    @Test void anActivatingShowUnderFlushFramesActivatesThePanel() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, true);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_SHOW);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            owner.area().focusMoved(null);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_SHOW);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("a show never hides").isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    @Test void underStandardFramesAnActivatingShowIsAPlainShow() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = framed(model, false);
+            request(model, owner, "dev.x.hosts", Contributions.PanelRequest.Op.ACTIVATING_SHOW);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).isEmpty();
+        });
+    }
+
+    /**
+     * Final review: a window toggled in by a user gesture in place of the active one keeps the activation. Handing focus
+     * back to the terminal first would post focus events that land after the activation and undo it.
+     */
+    @Test void underFlushFramesAnActivatingToggleThatReplacesAWindowDoesNotHandFocusBack() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            List<String> events = new ArrayList<>();
+            // The selected tab is hosted content, so handing focus back runs this instead of focusing a terminal.
+            model.tabs().open("dev.x", "doc", "Doc", owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
+            for (String name : List.of("log", "transfers"))
+                model.addPanel("dev.x." + name, name, new ImageIcon(), Slot.LEFT_TOP, site -> {
+                    site.onVisibility(visible -> events.add(name + ":" + visible));
+                    return new JLabel(name);
+                });
+            model.action("dev.x.log.toggle").orElseThrow().invoke(new Contributions.Invocation(owner.id(), Optional.empty()));
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            owner.leftStripe().buttons().get(1).doClick();
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isInstanceOfSatisfying(JLabel.class, label -> assertThat(label.getText()).isEqualTo("transfers"));
+            assertThat(events).as("no hand-back to the terminal").containsExactly("log:false", "transfers:true");
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            toggle(model, owner, "dev.x.log");
+            assertThat(events).as("a plugin's toggle still hands focus back").containsExactly("transfers:false", "focus", "log:true");
+        });
+    }
+
+    /** A child window's View toggle reaches the main window as an activating show: it shows the panel and activates it. */
+    @Test void underFlushFramesAnActivatingShowOfAHiddenPanelMakesItTheFocusedToolWindow() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            activatingShow(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            activatingShow(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("a show never hides").isNotNull();
+            activatingShow(model, owner, "dev.x.unknown");
+            assertThat(owner.area().focusedSlot()).as("a panel this window does not have changes nothing").hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    @Test void underFlushFramesAnActivatingShowThatReplacesAWindowDoesNotHandFocusBack() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            List<String> events = new ArrayList<>();
+            // The selected tab is hosted content, so handing focus back runs this instead of focusing a terminal.
+            model.tabs().open("dev.x", "doc", "Doc", owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
+            for (String name : List.of("log", "transfers"))
+                model.addPanel("dev.x." + name, name, new ImageIcon(), Slot.LEFT_TOP, site -> {
+                    site.onVisibility(visible -> events.add(name + ":" + visible));
+                    return new JLabel(name);
+                });
+            activatingShow(model, owner, "dev.x.log");
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+            events.clear();
+            activatingShow(model, owner, "dev.x.transfers");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isInstanceOfSatisfying(JLabel.class, label -> assertThat(label.getText()).isEqualTo("transfers"));
+            assertThat(events).as("no hand-back to the terminal").containsExactly("log:false", "transfers:true");
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    @Test void underFlushFramesAnActivatingShowOfAVisiblePanelActivatesIt() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).as("a plugin's toggle activates nothing").isEmpty();
+            activatingShow(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).hasValue(Slot.LEFT_TOP);
         });
     }
 
@@ -339,7 +550,7 @@ class WindowPanelsTest {
             owner.connectContributions(model, UiState.inMemory());
             List<String> events = new ArrayList<>();
             // The selected tab is hosted content, so focusing the selection runs this instead of focusing a terminal.
-            var doc = model.content().open("dev.x", "doc", "Doc", owner.id(), new JPanel());
+            var doc = model.tabs().open("dev.x", "doc", "Doc", owner.id(), new JPanel());
             doc.focusTarget(() -> events.add("focus"));
             for (String name : List.of("a", "b"))
                 model.addPanel("dev.x." + name, name.toUpperCase(java.util.Locale.ROOT), new ImageIcon(), Slot.LEFT_TOP, site -> {
@@ -423,7 +634,7 @@ class WindowPanelsTest {
             assertThat(owner.rightStripe().buttons()).as("rail actions live on the left stripe").isEmpty();
             assertThat(seen).hasSize(1);
 
-            owner.dispatchCommand(owner.commands().find("view.rail").orElseThrow());
+            owner.dispatchCommand(owner.commands().find("toggle_rail").orElseThrow());
             assertThat(owner.leftStripe().isVisible()).isFalse();
             assertThat(owner.rightStripe().isVisible()).isFalse();
             assertThat(state.railVisible()).isFalse();
@@ -435,7 +646,7 @@ class WindowPanelsTest {
 
     /** The frame around the terminal column: the area's child that holds the tab strip. */
     private static Component centerFrame(WindowContent owner) {
-        Component frame = owner.tabStrip();
+        Component frame = owner.workspace();
         while (frame.getParent() != owner.area()) frame = frame.getParent();
         return frame;
     }
@@ -549,7 +760,7 @@ class WindowPanelsTest {
             LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner);
 
             Rectangle toolbar = in(owner, owner.toolbar()), leftStripe = in(owner, owner.leftStripe()), rightStripe = in(owner, owner.rightStripe());
-            Rectangle strip = in(owner, owner.windowTabs()), deck = in(owner, owner.tabStrip());
+            Rectangle strip = in(owner, owner.windowTabs()), deck = in(owner, owner.selectedTab().component());
             Rectangle leftBounds = in(owner, left.getParent()), rightBounds = in(owner, right.getParent()), bottomBounds = in(owner, bottom.getParent());
             int underToolbar = toolbar.y + toolbar.height;
             assertThat(leftStripe.y).as("the left stripe starts under the toolbar").isEqualTo(underToolbar);
@@ -845,7 +1056,7 @@ class WindowPanelsTest {
             last.dock().resize(Side.LEFT, 243); last.dock().resize(Side.RIGHT, 317); last.dock().resize(Side.BOTTOM, 211);
             last.dock().setRatio(Side.LEFT, .37); last.dock().setRatio(Side.RIGHT, .64); last.dock().setRatio(Side.BOTTOM, .43);
             LayoutTestSupport.layoutTree(last);
-            var terminal = new Rectangle(last.tabStrip().getBounds());
+            var terminal = new Rectangle(last.workspace().getBounds());
             var panels = state.panels(); var dock = state.dock();
             // The other window edits last, but closes first.
             first.dock().resize(Side.LEFT, 499);
@@ -858,7 +1069,7 @@ class WindowPanelsTest {
             WindowContent restored = window(); restored.setSize(1403, 907);
             restored.connectContributions(model, loaded);
             LayoutTestSupport.layoutTree(restored);
-            assertThat(restored.tabStrip().getBounds()).isEqualTo(terminal);
+            assertThat(restored.workspace().getBounds()).isEqualTo(terminal);
             for (var entry : model.panels()) assertThat(restored.dock().visible(entry.id())).isTrue();
         });
     }
@@ -975,6 +1186,9 @@ class WindowPanelsTest {
             var model = new Contributions();
             WindowContent owner = window();
             owner.connectContributions(model, UiState.inMemory());
+            // The window's ⋮ never gives way (workspace plan 7b Rulings 16 and 20), so the toolbar's side of the centred
+            // header outgrows the bare workspace; without the toolbar the workspace decides the window's minimum width.
+            owner.setToolbarMode(dev.jasper.app.config.ToolbarMode.HIDDEN);
             // The stripes show without any dock sync (a panel is only registered, none shows), so only their own
             // appearing can tell the window what its minimum is with them.
             List<Boolean> stripes = new ArrayList<>();

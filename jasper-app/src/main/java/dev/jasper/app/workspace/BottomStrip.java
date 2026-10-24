@@ -1,11 +1,11 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.theme.GeneratedTheme;
@@ -14,6 +14,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -24,14 +25,16 @@ import java.util.Map;
 import java.util.Optional;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
+import javax.swing.Icon;
 
 /**
  * The classic look's bottom strip (spec 10.7): the Bottom Left windows' labels rightward from the side stripes' fill (their
  * thickness less their rule, where the mocks start them), each followed by a 1 px {@code border.divider}, and the Bottom
  * Right windows' labels ending that far from the right, each preceded by one; a 1 px rule along its top; 24 px above its
  * rule, as the mocks draw it, whatever {@code window.rail_width}. Labels read across, an open window's on its tile, a badge
- * as a count pill. Its two groups meet midway between them and lie across, for the drag. It shows no rail actions. EDT
- * only.
+ * as a count pill. Each label starts with its window's 13 px icon, centred down, then a 4 px gap (the user's direction of
+ * 2026-10-19, as IntelliJ's classic StripeButton). Its two groups meet midway between them and lie across, for the drag. It
+ * shows no rail actions. EDT only.
  */
 final class BottomStrip extends DockStripe {
     /** Where the last layout put everything: the labels, the dividers, each group's drop bounds and the gap. */
@@ -51,7 +54,6 @@ final class BottomStrip extends DockStripe {
     private final StripeLabels labels;
     private final EnumMap<Slot, List<StripeLabels.Label>> groups = new EnumMap<>(Slot.class);
     private final Map<String, StripeLabels.Label> byId = new LinkedHashMap<>();
-    private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
     private boolean dragging;
     private String lifted;
     private int liftedLength;
@@ -60,9 +62,10 @@ final class BottomStrip extends DockStripe {
     private Rectangle gap;
     private List<Integer> dividers = List.of();
 
-    BottomStrip(Kit kit) {
+    /** A strip over {@code kit}, its labels' icons in the look's {@code artwork}. */
+    BottomStrip(Kit kit, ChromeArtwork artwork) {
         super(null);
-        this.labels = new StripeLabels(kit);
+        this.labels = new StripeLabels(kit, artwork);
         setOpaque(true);
         getAccessibleContext().setAccessibleName("Bottom tool windows");
         render(List.of(), List.of());
@@ -77,7 +80,7 @@ final class BottomStrip extends DockStripe {
         for (Slot slot : SLOTS) groups.put(slot, new ArrayList<>());
         for (ToolStripe.Button window : toolWindows) {
             if (window.slot().side() != Side.BOTTOM) continue;
-            var label = new StripeLabels.Label(window, this::paintLabel);
+            var label = new StripeLabels.Label(window, labels.icon(window.icon()), this::paintLabel);
             label.setSelected(window.selected());
             label.addActionListener(event -> onToggle.accept(window.id()));
             label.setComponentPopupMenu(ToolWindowMenu.create(window.slot(), window.selected(),
@@ -116,18 +119,14 @@ final class BottomStrip extends DockStripe {
         return List.copyOf(all);
     }
 
-    @Override void setRailWidth(int width) {
-        if (railWidth == width) return;
-        railWidth = width;
-        revalidate();
-        repaint();
-    }
+    /** The strip and its labels' lead do not follow {@code window.rail_width}. */
+    @Override void setRailWidth(int width) { }
 
-    @Override void beginDrag(String id, String label) {
+    @Override void beginDrag(String id, String label, Icon icon) {
         dragging = true;
         lifted = id;
         StripeLabels.Label own = byId.get(id);
-        liftedLength = own != null ? labels.length(own.text(), own.badge()) : labels.length(label, Optional.empty());
+        liftedLength = own != null ? labels.length(own.text(), own.badge(), own.icon) : labels.length(label, Optional.empty(), labels.icon(icon));
         gapSlot = null;
         doLayout();
         repaint();
@@ -184,7 +183,7 @@ final class BottomStrip extends DockStripe {
         var items = new ArrayList<Item>();
         for (int i = 0; i <= shown.size(); i++) {
             if (gapHere && i == gapAt) items.add(new Item(null, liftedLength, true));
-            if (i < shown.size()) items.add(new Item(shown.get(i), labels.length(shown.get(i).text(), shown.get(i).badge()), false));
+            if (i < shown.size()) items.add(new Item(shown.get(i), labels.length(shown.get(i).text(), shown.get(i).badge(), shown.get(i).icon), false));
         }
         boolean liftedHere = dragging && groups.get(slot).stream().anyMatch(label -> label.id().equals(lifted));
         if (dragging && !gapHere && (shown.isEmpty() || liftedHere)) items.add(new Item(null, liftedLength, false));
@@ -195,7 +194,7 @@ final class BottomStrip extends DockStripe {
     private Placement place(boolean withGap) {
         var placement = new Placement();
         int rule = labels.styles().metric(DesignMetrics.Role.DOCK_RULE), across = Math.max(0, getHeight() - rule);
-        int lead = labels.thickness(railWidth, this) - rule;
+        int lead = labels.thickness() - rule;
         int x = lead;
         var left = new ArrayList<Rectangle>();
         for (Item item : items(Slot.BOTTOM_LEFT, withGap)) {
@@ -239,7 +238,7 @@ final class BottomStrip extends DockStripe {
         for (int x : dividers) graphics.fillRect(x, rule, rule, Math.max(0, getHeight() - rule));
     }
 
-    /** A label's tile, then its text and pill, reading across. */
+    /** A label's tile, its icon, then its text and pill, reading across. */
     private void paintLabel(StripeLabels.Label label, Graphics graphics) {
         var g = (Graphics2D) graphics.create();
         try {
@@ -251,7 +250,11 @@ final class BottomStrip extends DockStripe {
                 g.setColor(tile);
                 g.fillRect(0, 0, label.getWidth(), label.getHeight());
             }
-            labels.paint(g, label.text(), label.badge(), label.getHeight(), false, theme, open, hover);
+            if (label.icon != null) {
+                Point at = labels.iconAt(Side.BOTTOM, label.getWidth(), label.getHeight());
+                label.icon.paintIcon(label, g, at.x, at.y);
+            }
+            labels.paint(g, label.text(), label.badge(), label.icon != null, label.getHeight(), false, theme, open, hover);
         } finally { g.dispose(); }
     }
 }
