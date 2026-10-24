@@ -1,7 +1,7 @@
 # Buddy: tab titles, visibility and stacks
 
-Status: proposed for approval. The user selected the combined deliverable on 2026-10-24;
-the stand-up animation follows as a separate deliverable. Implementation has not started.
+Status: approved on 2026-10-24, with implementation planning and execution authorized.
+The stand-up animation follows as a separate deliverable.
 
 ## Intent
 
