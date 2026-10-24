@@ -30,7 +30,9 @@ public enum DerivedColor implements ColorRole {
     TAG_BORDER_GREEN("tag.border.green", false),
     TAG_BORDER_AMBER("tag.border.amber", false),
     TAG_BORDER_PURPLE("tag.border.purple", false),
-    TAG_BORDER_NEUTRAL("tag.border.neutral", false);
+    TAG_BORDER_NEUTRAL("tag.border.neutral", false),
+    FOCUS_HALO("focus.halo", true),
+    ERROR_HALO("error.halo", true);
 
     private final String key;
     private final boolean overridable;

@@ -167,7 +167,7 @@ final class ClassicRadiosFace implements ChoiceFace {
                 ThemePainting.antialias(g);
                 if (option instanceof Choices.SegmentButton button && button.focus != null && button.focus.visible()) {
                     int halo = ThemePainting.metric(c, DesignMetrics.Role.FOCUS_RING);
-                    g.setColor(ColorMath.opacity(ThemePainting.color(c, SemanticColor.BORDER_FOCUS), ThemePainting.focusHaloShare(c, false)));
+                    g.setColor(ThemePainting.focusHaloColor(c, false));
                     g.fill(new Ellipse2D.Double(x - halo, y - halo, ring() + 2.0 * halo, ring() + 2.0 * halo));
                 }
                 paintRadio(g, c, x, y, option.isSelected(), option.isEnabled());

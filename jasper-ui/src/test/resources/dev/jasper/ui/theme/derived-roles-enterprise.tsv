@@ -22,6 +22,8 @@ enterprise	dark	tag.border.green	#4e6045
 enterprise	dark	tag.border.amber	#635d3c
 enterprise	dark	tag.border.purple	#63566e
 enterprise	dark	tag.border.neutral	#5d5f63
+enterprise	dark	focus.halo	#366ace
+enterprise	dark	error.halo	#9c4e4e
 enterprise	light	surface.header	#f2f2f2
 enterprise	light	surface.header.active	#dfe2e9
 enterprise	light	surface.stripe	#eaeaea
@@ -45,3 +47,5 @@ enterprise	light	tag.border.green	#9bbc9f
 enterprise	light	tag.border.amber	#cbc099
 enterprise	light	tag.border.purple	#cb9bcb
 enterprise	light	tag.border.neutral	#b3b3b3
+enterprise	light	focus.halo	#2675bf
+enterprise	light	error.halo	#e53e4d
