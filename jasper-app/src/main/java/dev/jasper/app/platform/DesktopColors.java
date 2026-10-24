@@ -31,6 +31,23 @@ public final class DesktopColors implements AutoCloseable {
     private ExecutorService ownedManager;
     private boolean ownedTimer;
 
+    /** Absolute development override or helpers beside the installed application jar; never searches PATH or cwd. */
+    public static Optional<Path> helperDirectory() {
+        return helperDirectory(System.getProperty("os.name", ""), System.getProperty("jasper.desktopColors.helpers"), CodeLocation.of(DesktopColors.class));
+    }
+    static Optional<Path> helperDirectory(String os, String override, Path jar) {
+        if (!os.startsWith("Linux")) return Optional.empty();
+        try {
+            Path directory;
+            if (override != null && !override.isBlank()) directory = Path.of(override);
+            else if (jar != null && jar.isAbsolute() && jar.getFileName().toString().endsWith(".jar"))
+                directory = jar.resolveSibling("desktop-colors");
+            else return Optional.empty();
+            return directory.isAbsolute() && java.nio.file.Files.isDirectory(directory)
+                ? Optional.of(directory.normalize()) : Optional.empty();
+        } catch (java.nio.file.InvalidPathException | SecurityException unavailable) { return Optional.empty(); }
+    }
+
     /** Opens helpers from the absolute, packaged helper directory, without waiting for native initialization. */
     public static DesktopColors open(Path helperDirectory) {
         var manager = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("desktop-colors").factory());

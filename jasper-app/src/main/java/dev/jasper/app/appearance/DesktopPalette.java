@@ -30,6 +30,13 @@ public final class DesktopPalette {
         return gnome ? List.of(Source.GTK4, Source.GTK3) : List.of(Source.GTK3, Source.GTK4);
     }
 
+    /** Whether this observation supplies a readable opaque window for the requested appearance. */
+    public static boolean usable(boolean dark, Palette palette) {
+        return palette != null && palette.appearance() == (dark ? Polarity.DARK : Polarity.LIGHT)
+            && pair(palette.colors().get(Pair.WINDOW), null)
+                .filter(window -> ColorMath.contrast(window.background(), window.foreground()) >= 4.5).isPresent();
+    }
+
     /** A complete selected-source WINDOW pair is the sole admission gate; optional pairs stay with that source. */
     public static Result resolve(boolean dark, SourceMode mode, String currentDesktop, DesktopObservation input) {
         Objects.requireNonNull(input);
@@ -37,9 +44,7 @@ public final class DesktopPalette {
         Palette selected = null;
         for (var source : preferredSources(mode, currentDesktop)) {
             Palette candidate = input.palettes().get(source);
-            if (candidate == null || candidate.appearance() != (dark ? Polarity.DARK : Polarity.LIGHT)) continue;
-            var window = pair(candidate.colors().get(Pair.WINDOW), null);
-            if (window.isPresent() && ColorMath.contrast(window.get().background(), window.get().foreground()) >= 4.5) {
+            if (usable(dark, candidate)) {
                 selected = candidate; break;
             }
         }

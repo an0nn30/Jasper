@@ -30,6 +30,7 @@ import javax.swing.SwingUtilities;
 /** EDT-owned join between saved configuration and retained window contents. */
 final class ConfigurationController implements AutoCloseable {
     private final ThemeController themes;
+    private final DesktopAppearance desktop;
     private final ConfigService service;
     private final Set<WindowContent> owners = new LinkedHashSet<>();
     private final Consumer<Path> editor;
@@ -114,6 +115,14 @@ final class ConfigurationController implements AutoCloseable {
     /** As above, under the look's {@code motion}: the animations flag is the setting only while the look moves. */
     ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor,
                             dev.jasper.app.platform.SystemAppearance.Observation initialAppearance, Path themesFolder, LookMotion motion) {
+        this(themes, service, editor, initialAppearance, themesFolder, motion, null);
+    }
+
+    ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor,
+                            dev.jasper.app.platform.SystemAppearance.Observation initialAppearance, Path themesFolder,
+                            LookMotion motion, DesktopAppearance desktop) {
+        this.desktop = desktop;
+        if (desktop != null) desktop.onFailure(this::desktopFailed);
         this.motion = Objects.requireNonNull(motion, "motion");
         this.systemAppearance = Objects.requireNonNull(initialAppearance);
         requireEdt();
@@ -163,7 +172,7 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         if (closed || !owners.add(owner)) return;
         owner.connectConfiguration(() -> settingsOpener.accept(owner, null),
-            () -> reportFailure(owner, "Could not reload the configuration", service.reload()), () -> migrateFor(owner), () -> unregister(owner));
+            () -> reportFailure(owner, "Could not reload the configuration", reload()), () -> migrateFor(owner), () -> unregister(owner));
         owner.connectSettings(this::save, page -> settingsOpener.accept(owner, page));
         owner.applyConfiguration(state.snapshot(), service.macOs());
         owner.setConfigurationState(shown());
@@ -231,6 +240,7 @@ final class ConfigurationController implements AutoCloseable {
     /** Reads config.toml again and publishes it, even when it did not change. */
     CompletableFuture<ConfigService.State> reload() {
         requireEdt();
+        if (desktop != null) desktop.reload();
         return service.reload();
     }
 
@@ -261,12 +271,12 @@ final class ConfigurationController implements AutoCloseable {
     void accept(ConfigService.State next) {
         requireEdt();
         if (closed) return;
+        reported.clear();
         try { configureThemes(next); }
         catch (ThemeController.InstallationFailure failure) {
             owners.stream().findFirst().ifPresent(owner -> owner.onError.accept("Could not apply the theme", failure.getMessage()));
         }
         state = next;
-        reported.clear();
         applicationListener.accept(next.snapshot());
         for (WindowContent owner : List.copyOf(owners)) {
             owner.applyConfiguration(next.snapshot(), service.macOs());
@@ -290,8 +300,9 @@ final class ConfigurationController implements AutoCloseable {
         var selection = ThemeSelection.of(installed, snapshot.darkTheme(), snapshot.lightTheme(), snapshot.terminalScheme(),
             (key, message) -> problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, key, message)));
         try {
-            themes.configure(dark, selection, snapshot.uiFont());
             themeProblems = List.copyOf(problems);
+            if (desktop != null) desktop.update(snapshot, selection);
+            else themes.configure(dark, selection, snapshot.uiFont());
         } catch (ThemeController.InstallationFailure failure) {
             Throwable cause = failure.getCause();
             String name = selection.theme(dark) instanceof ThemePick.Authored authored ? authored.theme().name() : "Desktop colors";
@@ -303,12 +314,19 @@ final class ConfigurationController implements AutoCloseable {
         }
     }
 
+    /** Asynchronous installs use the same visible diagnostic and window error route as saved settings. */
+    private void desktopFailed(ThemeController.InstallationFailure failure) {
+        if (closed) return;
+        report("ui.appearance", failure.getMessage() + "; keeping the current appearance.");
+        owners.stream().findFirst().ifPresent(owner -> owner.onError.accept("Could not apply the theme", failure.getMessage()));
+    }
+
     /** Appearance-only publication: never feeds config listeners or rebases an open Settings draft. */
     void systemAppearanceChanged(dev.jasper.app.platform.SystemAppearance.Observation observation) {
         requireEdt();
         if (closed || systemAppearance.equals(observation)) return;
         systemAppearance = observation;
-        if (state.snapshot().appearance() != AppearanceMode.SYSTEM) return;
+        if (desktop != null || state.snapshot().appearance() != AppearanceMode.SYSTEM) return;
         try { configureThemes(state); }
         catch (ThemeController.InstallationFailure failure) {
             owners.stream().findFirst().ifPresent(owner -> owner.onError.accept("Could not apply the theme", failure.getMessage()));
