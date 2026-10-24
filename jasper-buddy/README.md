@@ -20,7 +20,8 @@ Only these top-level types and their nested values/builders are supported:
   over the notice model and lazy presentation, closed by the host. Its one public
   constructor takes `BuddyOptions`; every public method returns `void` except `show()`.
 - [BuddyNotice](src/main/java/dev/jasper/buddy/notice/BuddyNotice.java): validated kind/state,
-  title, nonblocking detail supplier and activation callback; `wantsAttention()`,
+  title, nonblocking detail supplier, activation callback and optional
+  `Group(BuddyNoticeId id, String title)`; `wantsAttention()`,
   `sameAs(BuddyNoticeId)` and `State.fits(Kind)`.
 - [BuddyNoticeId](src/main/java/dev/jasper/buddy/notice/BuddyNoticeId.java): source plus
   stable opaque key. A source does not have to be a terminal.
@@ -80,7 +81,7 @@ buffer or wait for a worker from one of these callbacks.
 | Operation | Model and resource effect |
 | --- | --- |
 | Construction | Allocates the model only: no native window, timer or worker. |
-| `post`, `updateTitle`, `dismiss`, `clear` | Update the model and refresh existing presentation; never create a native window. Posting while hidden is supported. |
+| `post`, `updateTitle`, `updateContext`, `dismiss`, `clear` | Update the model and refresh existing presentation; never create a native window. Posting while hidden is supported. |
 | `show` | Creates presentation on the first successful call, then shows Buddy with the two-second spawn animation; returns whether presentation is available. A call while visible changes nothing and returns true. |
 | `hide` | Stops presentation timers and pending drag frames, hides every Buddy window and resets the animation; retains notices, options and working intent. The next `show` plays the spawn again. |
 | `setWorking` | Sets host-supplied typing intent, including before first show; no threshold policy lives in Buddy. |
@@ -110,17 +111,29 @@ also compares callbacks and is not notice identity.
 | `TASK` | `RUNNING`, `NEEDS_INPUT` | `NEEDS_INPUT` | `RUNNING`: a highlight sweeps the detail text; `NEEDS_INPUT`: a dot |
 | `CONNECTION` | `UP`, `DEGRADED`, `DOWN` | `DEGRADED`, `DOWN` | `DEGRADED`: a dot; `DOWN`: a cross |
 
-Buddy shows live work only. A post promotes its ID to newest; updating a title does not.
-The model holds at most 50 notices, dropping the oldest beyond that limit. The column
-above or below Buddy shows the newest three, the newest carrying the total count when there are
-more; a single click on Buddy opens the drawer, which lists them all. A click on a capsule
-in the column or the drawer runs that notice's `activate` callback, which is required.
-A producer dismisses its notice when the work ends. The user may also dismiss one with
-its × in the drawer, or all of them with **Clear all** (shown when the drawer holds more
-than one); that removes them from the model without notifying the host, and the
-producer's next post of the same ID shows it again. Buddy keeps no outcomes: a host that
-wants to report how work ended does so elsewhere (Jasper posts a notification). Cancel
-producer work first, then dismiss. Hiding the companion does not stop producers.
+Buddy shows live work only. `post(BuddyNotice)` promotes its ID to newest and makes it
+visible; `post(BuddyNotice, boolean visible)` can retain it suppressed. The six-argument
+notice constructor remains ungrouped; its seven-argument form takes an optional `Group`.
+`updateContext(BuddyNoticeId, BuddyNotice.Group, boolean visible)` changes grouping and
+visibility in place; a null group makes the notice ungrouped. Context and title updates
+preserve arrival order and never recreate a dismissed ID. The model holds at most 50
+notices, including suppressed notices, dropping the oldest beyond that limit.
+
+The column shows the newest three groups or ungrouped cards. Groups sort by their newest
+member; a singleton uses the group title and activates directly. Multiple members form a
+stack with at most two backing silhouettes and exact `N running` detail. Clicking it
+opens a drawer filtered to that group without activating a member. The drawer uses the
+group title as its header and each member's own title and live detail; duplicate member
+titles gain stable discriminators. Clicking Buddy opens all visible notices with group
+context. Overflow counts groups/cards. Clicking a drawer entry runs its activation.
+
+A producer dismisses its notice when work ends. The drawer's × dismisses one entry;
+**Clear all**, shown for multiple entries, dismisses exactly the displayed entries,
+preserving suppressed notices and other groups. Dismissal removes the model entry without
+notifying the host; another post of the same ID shows it again. A filtered drawer closes
+when its group empties or is suppressed, and can remain open with one member. Buddy keeps
+no outcomes: hosts report those elsewhere (Jasper posts a notification). Cancel producer
+work first, then dismiss. Hiding the companion does not stop producers.
 
 ## Host appearance and position
 

@@ -32,15 +32,17 @@ gives app tests a companion over a model they can inspect from any thread.
 owns one [BuddyDeck](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyDeck.java).
 [BuddyGroups](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyGroups.java) projects its visible notices into immutable group or notice entries with distinct identity namespaces.
 The deck retains up to 50 notices (`MAX_NOTICES`) by source-qualified ID, newest first.
-Posts replace and promote; title changes preserve order, and a title equal to the current
-one changes nothing. Snapshots are cached immutable lists, invalidated by mutations. The
+Posts replace and promote; suppression and group/title changes preserve order. A title
+equal to the current one changes nothing. Snapshots are cached immutable lists, invalidated by mutations. The
 deck's `generation()` counter changes only on a post; tests use it to tell a post from a
 title change.
 
-Every retained notice is live work: the column shows the newest three and the drawer all of
-them. A producer dismisses its notice when the work ends; Buddy keeps no outcomes. Jasper
-posts how work ended as a notification instead ([guide](notifications.md)). The drawer's
-× and **Clear all** dismiss from the deck directly; no host callback runs.
+Every retained notice is live work, including suppressed entries. The column projects the
+visible snapshot into the newest three groups/cards; the drawer shows visible members,
+optionally filtered by source-qualified group ID. Suppression retains identity and arrival
+order within the same 50-notice bound. A producer dismisses its notice when the work ends;
+Buddy keeps no outcomes. Jasper posts how work ended as a notification instead ([guide](notifications.md)). The drawer's
+× and **Clear all** dismiss displayed IDs from the deck directly; no host callback runs.
 
 A notice retains its key, detail supplier and activation closure. Avoid UI objects in
 keys and unnecessary captures in callbacks. Replacement, dismissal, capacity eviction
@@ -68,8 +70,8 @@ The menu bubble keeps its fixed dark material.
 | Surface/owner | Responsibility and lifecycle |
 | --- | --- |
 | `BuddyWindow` | The 105 × 120 sprite window. Pointer entry greets; a single click opens the drawer; a double click runs `activateHost`; the popup trigger (right-click, or Ctrl+click on macOS) opens the menu bubble; a press closes it. A drag starts after 3 pixels and reports `positionChanged` on release. Its one-shot timer follows the animator's next deadline. |
-| `BuddyColumnWindow` / `BuddyColumnPanel` | At most three capsules (`BuddyDeckLayout.MAX_IN_COLUMN`), newest nearest the sprite; with more notices the newest shows the total count. A capsule click runs its activation; a click beside them opens the drawer. Arrival and hover motion, running shimmer and live detail. Hidden when the deck is empty. |
-| `BuddyDeckWindow` / `BuddyDeckPanel` | Every retained notice with wheel scrolling, activation, per-notice × dismissal and a **Clear all** row when there is more than one. No auto-hide timeout; pointer exit, activation, emptying and host hide close it, and it reopens scrolled to the top. Its height is capped by the usable screen height. |
+| `BuddyColumnWindow` / `BuddyColumnPanel` | At most three groups/cards (`BuddyDeckLayout.MAX_IN_COLUMN`), newest nearest the sprite; overflow counts groups/cards. Multiple members show at most two backing silhouettes and `N running`; clicking a stack opens its filtered drawer, while a singleton activates directly; a click beside them opens the drawer. Arrival and hover motion, running shimmer and live detail. Hidden when the deck is empty. |
+| `BuddyDeckWindow` / `BuddyDeckPanel` | Visible notices, optionally group-filtered with a group-title header, wheel scrolling, activation, per-notice × dismissal and a **Clear all** row when there is more than one. No auto-hide timeout; pointer exit, activation, emptying/suppressing its displayed group and host hide close it, and it reopens scrolled to the top. Its height is capped by the usable screen height. |
 | `BuddyBubble` / `BuddyBubblePanel` | Menu bubble with one entry, **Hide Jasper**, which runs `toggleRequested`; hides on pointer exit, activation or its five-second timeout. |
 | `BuddyDragFrames` | Coalesces pointer positions into roughly 16 ms presentation frames and keeps ticking while the button is held; finish presents the latest position, cancel discards it. |
 
@@ -152,9 +154,14 @@ second. Visibility reasons live in
 Two producers post notices. [CommandNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/CommandNotifier.java)
 (source `terminal`, keyed by pane) owns thresholds and command completion: a command that
 runs past `notifications.long_command_seconds`, or starts or continues out of sight, gets
-a `RUNNING` task with detail "Running · <elapsed>" (none while the setting is 0), and
-Jasper sets Buddy working while any of them runs. A long command's outcome reaches the
-operating system through the notification centre's delivery and
+a `RUNNING` task with detail "Running · <elapsed>" (none while the setting is 0).
+`WorkspaceActivity.Presentation` supplies current parent-tab identity, strip title, pane
+display title, watched state and activation. Notices group under source `terminal-tab`;
+all panes in the selected parent tab of an active, showing, non-minimized workspace window
+are suppressed. Settled workspace changes refresh context after moves and title changes;
+activation resolves current ownership. Command lifetime and dismissal remain independent
+of that visible projection, and qualified work keeps Buddy typing while suppressed. A long
+command's outcome reaches the operating system through the notification centre's delivery and
 `application.SystemNotices`, not through CommandNotifier.
 [ActivityNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/ActivityNotifier.java)
 (source: the plugin id) turns plugin activities into `RUNNING` tasks, whose detail

@@ -225,19 +225,28 @@ typing in a Jasper window wakes him.
 
 Work in progress shows as capsules beside him:
 
-- **A long-running command** gets a capsule once it has run `notifications.long_command_seconds`, or at once when it
-  starts out of sight or you look away from its pane (another tab, another window, Jasper in the background). The
-  capsule reads the command, or the title the program sets, and "Running · <time>"; it goes when the command ends.
-  While any long command runs he sits and types. Clicking the capsule focuses the pane.
+- **A running command** appears immediately when its workspace tab is out of sight. All commands in the selected
+  tab of an active, showing, non-minimised Jasper window stay hidden, including other split panes. Switching tabs
+  or leaving that window reveals work still running, preserving its elapsed time. `notifications.long_command_seconds`
+  set to `0` disables command capsules. Work qualifies for his typing pose immediately out of sight, or after the
+  threshold while visible; hiding or dismissing a capsule does not end that work.
+  Capsules use the current tab-strip label, including a user rename. One running pane activates directly;
+  several panes in the same tab form a stack labelled **N running**. Clicking the stack opens its drawer with
+  each pane's current program/command title and "Running · <time>". Clicking an entry brings its current window
+  forward, selects the tab and focuses the pane. Finishing removes the entry, including while hidden.
 - **A plugin's background work**, such as a File Server transfer that takes longer than a second, shows with its
   progress until it ends; clicking it brings Jasper forward and runs the plugin's action for it.
 - **A connection a plugin reports** shows its state: a dot while it has a problem, a cross while it is down.
 
-At most three capsules show, the newest nearest him, carrying the total count when there are more. The column sits
-above him, or below him when he is in the upper half of the screen or there is no room above. A single click on him
-opens the drawer, which lists everything still going, newest first (up to 50): × on a capsule dismisses it, and
-**Clear all** (with more than one) empties the drawer. Dismissing a capsule does not stop its work. The drawer hides
-when the pointer leaves it, after you click a capsule, or when it is empty.
+At most three groups or ungrouped capsules show, the newest nearest him, carrying the total group/card count when
+there are more. Stacks have at most two backing silhouettes. The column sits above him, or below him when he is
+in the upper half of the screen or there is no room above. A single click on him opens all visible work, newest
+first, with tab context beside the pane titles. Buddy retains up to 50 notices, including hidden work. A stack's drawer
+has its tab title as the header; identical pane titles have stable numbered labels. × dismisses one entry and
+**Clear all** (with more than one) dismisses only the displayed entries. Dismissal lasts for that command;
+switching tabs does not restore it, and a new command in the pane can appear again. Dismissing does not stop work.
+The drawer hides when the pointer leaves it, after activation, when its displayed group empties or is hidden,
+or when Jasper hides Buddy. Moving panes or tabs updates their groups and activation targets in place.
 
 ### His place
 

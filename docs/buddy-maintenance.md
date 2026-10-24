@@ -15,7 +15,9 @@ covers translating a terminal/workspace event into a notice.
 2. Keep the producer outside the library. Post on EDT; detail suppliers read a cheap
    snapshot (Buddy reads them on every paint) and activation requests return quickly.
    Repost an ID for a new state; use `updateTitle` for wording that must not count as a
-   new post, and let the supplier carry changing detail without a repost.
+   new post, and let the supplier carry changing detail without a repost. Use optional
+   `BuddyNotice.Group` metadata and `post(notice, visible)` for atomic initial visibility;
+   use `updateContext(id, group, visible)` for later grouping/suppression without promotion.
 3. When the work ends, and on producer close, invalidate identity before cancelling delayed
    callbacks, then `dismiss` the notice. Report how the work ended through the host's
    notifications, never through Buddy. The user can dismiss a notice from the drawer
@@ -72,12 +74,13 @@ how `buddy.toml` saves his position.
 Edit [BuddyDeck](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyDeck.java),
 then its model tests. Preserve source-plus-key identity, newest-first replacement, the
 50-notice bound (`MAX_NOTICES`) and immutable snapshots. Every retained notice is live
-work; the column and the drawer read the same snapshot. The column's three-capsule limit
-(`BuddyDeckLayout.MAX_IN_COLUMN`) is separate from retained model capacity. Exercise the
+work, including suppressed entries. `BuddyGroups` projects visible snapshots into groups;
+context updates preserve arrival order and cannot restore dismissed IDs. The column's
+three-group/card limit (`BuddyDeckLayout.MAX_IN_COLUMN`) is separate from retained model capacity. Exercise the
 panels too when a model change affects what is displayed.
 
 ```sh
-./gradlew :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddyDeckLayoutTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest'
+./gradlew :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddyDeckLayoutTest' --tests '*BuddyGroupsPresentationTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest'
 ```
 
 ## Change sprite animation or capsule motion
@@ -128,11 +131,12 @@ human-run acceptance. Do not claim those checks from image previews.
 
 ## Preview and verify
 
-The three tools below use actual components headlessly (`-Djava.awt.headless=true`),
+The four tools below use actual components headlessly (`-Djava.awt.headless=true`),
 open no window and are opt-in, outside `check`:
 
 ```sh
 ./gradlew :jasper-buddy:buddyNotificationPreview
+./gradlew :jasper-buddy:buddyGroupsPreview
 ./gradlew :jasper-buddy:buddyMotionPreview
 ./gradlew :jasper-buddy:buddyPerformanceMeasurement
 ```
@@ -148,6 +152,9 @@ moves the sprite up and back down a 600 × 700 screen so the column flips, and w
 it takes no output-directory argument and prints the directory; both previews paint the sprite at scale 2
 (84 × 96), smaller than the app's 105 × 120. Relative paths use the
 Gradle subproject working directory.
+
+`buddyGroupsPreview` writes dark/light 2× contact sheets of a singleton, stacks, a
+filtered drawer and group overflow under `jasper-buddy/build/reports/buddy-groups/`.
 
 The [performance measurement](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyPerformanceMeasurement.java)
 paints three running capsules at 2× density for 200 warm-up frames and 600 measured

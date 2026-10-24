@@ -109,6 +109,20 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Tab-aware Buddy — 2026-10-24** (`codex/buddy-tab-awareness`, base `f8aa4bca6`; not merged or pushed):
+terminal notices follow their current parent tab's strip title, pane title and membership. The selected tab of an
+active, showing, non-minimized workspace window suppresses all its terminal entries, retaining command lifetime,
+elapsed time and dismissal; hidden work appears immediately and qualified hidden work still drives typing.
+Multiple running panes form a stack with exact counts and at most two backing silhouettes; its filtered drawer
+activates individual panes and clears only displayed entries. Plugins keep their existing ungrouped SDK path.
+The [plan](superpowers/plans/2026-10-24-buddy-tab-awareness.md) reused the dedicated checkout and delegated detailed
+implementation bodies rather than providing complete code. Task 2's overlapping Gradle result writes invalidated
+its broad run; the serialized final check replaces it. Tasks 1–3 passed task review, including the shrinking-drawer
+scroll fix. `./gradlew check --continue` with the installed uv Python 3.13 passed in 7m 50s: 12,865 tests,
+zero failures/errors, 29 skips. Existing compiler and ByteBuddy 1.18.3 JDK Unsafe deprecation warnings remain.
+Whole-branch review and user GUI acceptance remain pending: titled program, tab/window switching, split-tab expansion,
+pane activation and tab moves. Stand-up animation is a separate deliverable. No GUI, benchmark or AOT run.
+
 **Shared display scaling — 2026-10-24** (`codex/shared-display-scaling`; not merged or pushed): terminal fonts,
 initial window geometry and pane padding follow FlatLaf's user scale while font settings and per-pane zoom stay in
 logical points (6–72, with rendered sizes allowed above 72). Scale changes refit the existing PTY and closing a pane
