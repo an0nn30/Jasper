@@ -116,6 +116,10 @@ public final class DesktopPaintPairs {
         for (var hue : List.of(HUE_BLUE, HUE_GREEN, HUE_AMBER, HUE_PURPLE, HUE_NEUTRAL)) {
             // Tags paint their surface hue at the kit tile opacity, including integer alpha rounding.
             pairs.add(new Requirement("tag/" + hue.key(), hue, SURFACE_CARD, null, true, .17));
+            // InteractiveRows and its viewport are transparent. Chips inherit the mounted panel, app or
+            // sidebar surface; their translucent tile must retain text contrast on those parents too.
+            for (var surface : List.of(SURFACE_APP, SURFACE_PANEL, SURFACE_SIDEBAR))
+                pairs.add(new Requirement("tag/" + hue.key() + "/" + surface.key(), hue, surface, null, true, .17));
         }
         for (var surface : List.of(ACCENT, TOGGLE_TRACK_OFF, STATUS_WARNING))
             pairs.add(new Requirement("switch/knob/" + surface.key(), TOGGLE_KNOB, surface, null, false, 0));
