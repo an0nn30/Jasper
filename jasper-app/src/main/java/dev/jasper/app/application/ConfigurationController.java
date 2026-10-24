@@ -7,6 +7,7 @@ import java.util.Optional;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeLibrary;
 import dev.jasper.app.appearance.ThemeSelection;
+import dev.jasper.app.appearance.ThemePick;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -293,8 +294,9 @@ final class ConfigurationController implements AutoCloseable {
             themeProblems = List.copyOf(problems);
         } catch (ThemeController.InstallationFailure failure) {
             Throwable cause = failure.getCause();
+            String name = selection.theme(dark) instanceof ThemePick.Authored authored ? authored.theme().name() : "Desktop colors";
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.appearance",
-                "Could not apply " + selection.theme(dark).name() + (dark ? " Dark" : " Light") + ": "
+                "Could not apply " + name + (dark ? " Dark" : " Light") + ": "
                     + (cause != null ? cause.getMessage() : failure.getMessage()) + "; keeping the current appearance."));
             themeProblems = List.copyOf(problems);
             throw failure;

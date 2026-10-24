@@ -3,6 +3,7 @@ package dev.jasper.app.testsupport;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeLibrary;
 import dev.jasper.app.appearance.ThemeSelection;
+import dev.jasper.app.appearance.ThemePick;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.app.presentation.ChromeSpec;
@@ -53,7 +54,8 @@ public final class EnterpriseLook {
     /** A controller showing the Enterprise theme's Light or Dark variant under the shipped kit. EDT. */
     public static ThemeController controller(boolean dark) {
         var shown = theme();
-        return ThemeController.startup(dark, new ThemeSelection(ThemeLibrary.bundledOnly(), shown, shown, TerminalSchemeChoice.MATCH), kit(),
+        return ThemeController.startup(dark, new ThemeSelection(ThemeLibrary.bundledOnly(), new ThemePick.Authored(shown), new ThemePick.Authored(shown),
+            TerminalSchemeChoice.MATCH), kit(),
             failure -> { throw new AssertionError("the Enterprise look must install", failure); });
     }
 
@@ -66,7 +68,8 @@ public final class EnterpriseLook {
     /** The shipped theme for both appearances, as a selection (plan 10a). */
     public static ThemeSelection selection() {
         var shown = theme();
-        return new ThemeSelection(ThemeLibrary.bundledOnly(), shown, shown, TerminalSchemeChoice.MATCH);
+        return new ThemeSelection(ThemeLibrary.bundledOnly(), new ThemePick.Authored(shown), new ThemePick.Authored(shown),
+            TerminalSchemeChoice.MATCH);
     }
 
     /** The shipped theme resolved for {@code dark}, as the staged panel fixtures take it (plan 10a). */

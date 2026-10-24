@@ -8,17 +8,19 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
- * The themes shown with the Dark and Light appearances and the terminal scheme, all from {@code library}. Every pick
+ * The themes shown with the Dark and Light appearances and the terminal scheme, resolved through {@code library}. Every pick
  * is one the library can honour: {@link #of} replaces any other by its default and reports it, silently for a disabled
  * plugin's theme or scheme (spec 7.5). Immutable; a selection
  * from a refreshed library is a different selection, even when its picks are the same.
  */
-public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme light, TerminalSchemeChoice scheme) {
+public record ThemeSelection(ThemeLibrary library, ThemePick dark, ThemePick light, TerminalSchemeChoice scheme) {
     public ThemeSelection {
         Objects.requireNonNull(library, "library"); Objects.requireNonNull(dark, "dark");
         Objects.requireNonNull(light, "light"); Objects.requireNonNull(scheme, "scheme");
-        if (!dark.has(true)) throw new IllegalArgumentException(dark.name() + " has no Dark variant");
-        if (!light.has(false)) throw new IllegalArgumentException(light.name() + " has no Light variant");
+        if (dark instanceof ThemePick.Authored authored && !authored.theme().has(true))
+            throw new IllegalArgumentException(authored.theme().name() + " has no Dark variant");
+        if (light instanceof ThemePick.Authored authored && !authored.theme().has(false))
+            throw new IllegalArgumentException(authored.theme().name() + " has no Light variant");
         if (scheme.scheme().isPresent() && library.scheme(scheme.scheme().get()).isEmpty())
             throw new IllegalArgumentException("Not an installed scheme: " + scheme.key());
     }
@@ -47,9 +49,10 @@ public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme
         return new ThemeSelection(library, darkTheme, lightTheme, choice);
     }
 
-    private static JasperTheme pick(ThemeLibrary library, String id, boolean dark, BiConsumer<String, String> problems) {
+    private static ThemePick pick(ThemeLibrary library, String id, boolean dark, BiConsumer<String, String> problems) {
+        if (ThemeLibrary.desktopId(id)) return new ThemePick.Desktop();
         var theme = library.theme(id);
-        if (theme.isPresent() && theme.get().has(dark)) return theme.get();
+        if (theme.isPresent() && theme.get().has(dark)) return new ThemePick.Authored(theme.get());
         // Spec 7.5: the pick of a theme whose plugin is off is kept, and shows the default without a warning.
         if (theme.isEmpty() && library.dormant().contains(id)) return defaultTheme(dark);
         String reason = theme.isPresent() ? "\"" + id + "\" has no " + (dark ? "Dark" : "Light") + " variant."
@@ -59,12 +62,12 @@ public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme
         return defaultTheme(dark);
     }
 
-    private static JasperTheme defaultTheme(boolean dark) {
-        return JasperTheme.builtIn(dark ? JasperTheme.DARK_DEFAULT_ID : JasperTheme.LIGHT_DEFAULT_ID).orElseThrow();
+    private static ThemePick defaultTheme(boolean dark) {
+        return new ThemePick.Authored(JasperTheme.builtIn(dark ? JasperTheme.DARK_DEFAULT_ID : JasperTheme.LIGHT_DEFAULT_ID).orElseThrow());
     }
 
     /** The theme shown with the Dark or Light appearance. */
-    public JasperTheme theme(boolean dark) { return dark ? this.dark : light; }
+    public ThemePick theme(boolean dark) { return dark ? this.dark : light; }
 
     /** The terminal scheme shown with the Dark or Light appearance: the chosen one, or with match the shown theme's own. */
     public TerminalScheme terminal(boolean dark) {

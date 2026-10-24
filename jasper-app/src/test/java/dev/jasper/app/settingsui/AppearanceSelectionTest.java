@@ -120,7 +120,7 @@ class AppearanceSelectionTest {
         var specs = CorePages.specs(AppearanceChoices.of(DARK, LIGHT), system, ShellChoices.NONE, ignored -> { }, false);
         var appearance = specs.getFirst();
         assertThat(appearance.settings()).startsWith(CoreSettings.UI_APPEARANCE, CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT,
-            CoreSettings.TERMINAL_SCHEME);
+            CoreSettings.UI_THEME_DESKTOP_SOURCE, CoreSettings.TERMINAL_SCHEME);
     }
 
     /** Spec 5.8: under a kit default, the untouched pick is the kit's; picking the core default saves it explicitly. */

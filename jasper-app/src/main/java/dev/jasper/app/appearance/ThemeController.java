@@ -108,7 +108,7 @@ public final class ThemeController implements AutoCloseable {
                          java.util.function.Function<Kit, Predicate<GeneratedTheme>> installers,
                          java.util.function.Consumer<InstallationFailure> fallingBack) {
         record Attempt(Shown shown, Kit kit, Step step) { }
-        var cobalt = JasperTheme.bundled();
+        var cobalt = new ThemePick.Authored(JasperTheme.bundled());
         var chosen = new Shown(dark, selection);
         var fallback = new Shown(true, new ThemeSelection(selection.library(), cobalt, cobalt, selection.scheme()));
         boolean other = !kit.equals(Kit.DEFAULT);
@@ -135,7 +135,7 @@ public final class ThemeController implements AutoCloseable {
         try { return new ThemeController(new Shown(dark, selection), Kit.DEFAULT, installer); }
         catch (InstallationFailure failure) {
             fallingBack.accept(failure);
-            var cobalt = JasperTheme.bundled();
+            var cobalt = new ThemePick.Authored(JasperTheme.bundled());
             return new ThemeController(new Shown(true, new ThemeSelection(selection.library(), cobalt, cobalt, selection.scheme())), Kit.DEFAULT, installer);
         }
     }

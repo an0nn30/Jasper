@@ -28,7 +28,7 @@ class CoreSettingsTest {
     }
 
     @Test void everySettingIsDescribedAndItsTemplateValueRoundTrips() {
-        assertThat(CoreSettings.SCHEMA.settings()).hasSize(44);
+        assertThat(CoreSettings.SCHEMA.settings()).hasSize(45);
         for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
             assertThat(setting.label()).as(setting.name()).isNotBlank();
             assertThat(setting.description()).as(setting.name()).isNotBlank();
@@ -107,4 +107,38 @@ class CoreSettingsTest {
         assertThat(CoreSettings.WINDOW_MEMORY_INDICATOR.defaultValue()).isFalse();
         assertThat(CoreSettings.WINDOW_MEMORY_INDICATOR.label()).isEqualTo("Show memory indicator");
     }
+    @Test void desktopSourceIsAnIndependentChoiceAndRoundTripsEverySnapshotPath() {
+        var setting = CoreSettings.UI_THEME_DESKTOP_SOURCE;
+        assertThat(setting.name()).isEqualTo("ui.theme.desktop_source");
+        assertThat(setting.label()).isEqualTo("Desktop color source");
+        assertThat(setting.defaultValue()).isEqualTo("auto");
+        assertThat(((SettingKind.Choice<String>) setting.kind()).tokens()).containsExactly(
+            Map.entry("auto", "auto"), Map.entry("gtk3", "gtk3"), Map.entry("gtk4", "gtk4"));
+        assertThat(ConfigSnapshot.defaults().desktopSource()).isEqualTo("auto");
+        for (String token : List.of("auto", "gtk3", "gtk4")) {
+            var values = SettingValues.builder(CoreSettings.SCHEMA).put(setting, token, setting.key()).build();
+            var read = ConfigSnapshot.from(values, Map.of(), Map.of());
+            assertThat(read.desktopSource()).isEqualTo(token);
+            assertThat(read.toBuilder().build()).isEqualTo(read);
+            assertThat(ConfigSnapshot.builder().desktopSource(token).build()).isEqualTo(read);
+            assertThat(read.appearance()).isEqualTo(AppearanceMode.SYSTEM);
+            assertThat(read.darkTheme()).isEqualTo("jasper-meadow");
+            var look = new DefaultSource(Map.of(CoreSettings.UI_THEME_DARK, "slate-cobalt"));
+            assertThat(ConfigSnapshot.from(values, look, Map.of(), Map.of()).desktopSource()).isEqualTo(token);
+            assertThat(ConfigSnapshot.defaults(look).desktopSource()).isEqualTo("auto");
+        }
+    }
+
+    @Test void aSnapshotBuilderRefusesAnInvalidDesktopSource() {
+        assertThatThrownBy(() -> ConfigSnapshot.builder().desktopSource("qt").build()).isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("ui.theme.desktop_source");
+    }
+
+    @Test void invalidDesktopSourceFallsBackWithAnOrdinaryDiagnostic() {
+        var result = ConfigLoader.parse(java.nio.file.Path.of("config.toml"), "[ui.theme]\ndesktop_source = 'qt'\n", false);
+        assertThat(result.snapshot().desktopSource()).isEqualTo("auto");
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic ->
+            assertThat(diagnostic.key()).isEqualTo("ui.theme.desktop_source"));
+    }
+
 }
