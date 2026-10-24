@@ -5,13 +5,16 @@ import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Slot;
+import java.awt.AWTEvent;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.KeyEventDispatcher;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
 import java.awt.Window;
+import java.awt.event.AWTEventListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.KeyEvent;
@@ -50,8 +53,9 @@ import javax.swing.SwingUtilities;
  * guide and no ghost, and {@link TabDragLabel} shows the window's title and icon beside the cursor, as a torn-out tab's
  * does (floating tool windows spec, "The drag out"). Releasing the left button over a target hands the drop to
  * {@link #onDrop}, and on Detach hands {@link #onDetach} the release; releasing it on no target inside the window, Esc
- * in its window, {@link #cancel} or another press (a right or middle click, or a left press after a lost release) ends
- * the drag without either. A window resize while dragging forgets the old place and resolves the target again. EDT only.
+ * in its window, {@link #cancel}, or a plain move or a press anywhere (a lost release, as {@code TabDrag} reads one)
+ * ends the drag without either, and so does a release whose handling fails. A window resize while dragging forgets the
+ * old place and resolves the target again. EDT only.
  */
 final class DockDrag {
     private final JComponent root;
@@ -66,12 +70,14 @@ final class DockDrag {
     /** The dragged window's title and icon beside the cursor while the target is Detach. */
     private final TabDragLabel label = new TabDragLabel();
     private final KeyEventDispatcher escape = this::dispatchKeyEvent;
+    private final AWTEventListener lostRelease = this::lostRelease;
 
     /**
      * A release on Detach: the dragged window leaves the dock for a window of its own there.
      *
      * @param screen the release point on screen
-     * @param grab where the press held the pressed component (a stripe button, a header or its title), in its coordinates
+     * @param grab where the press held the dragged surface, in its coordinates: the stripe button, or the header wherever
+     *             in it (its title, its detail) the press landed
      */
     record Detach(Point screen, Point grab) {
         /** Copies both points. */
@@ -103,7 +109,7 @@ final class DockDrag {
     private String pressedId;
     private JComponent source;
     private Point pressedAt;
-    /** Where the press held {@link #source}, in its coordinates. */
+    /** Where the press held the dragged surface ({@link #surface}), in its coordinates. */
     private Point grab;
     private String dragging;
     /** Whether the target is Detach: the cursor outside the window's frame or over another of Jasper's windows. */
@@ -151,7 +157,8 @@ final class DockDrag {
     /** Lets a drag start from the component for the window with that id: a stripe button, a header or its title. */
     private static final String LISTENER = "Jasper.dock.dragListener";
 
-    private record Registration(DockDrag owner, MouseAdapter listener) {}
+    /** A drag surface: the drag that hears it, its listener and the window it drags. */
+    private record Registration(DockDrag owner, MouseAdapter listener, String id) {}
 
     void uninstall(JComponent component) {
         if (!(component.getClientProperty(LISTENER) instanceof Registration registration) || registration.owner() != this) return;
@@ -168,7 +175,7 @@ final class DockDrag {
             @Override public void mouseDragged(MouseEvent event) { dragged(component, event); }
             @Override public void mouseReleased(MouseEvent event) { released(component, event); }
         };
-        component.putClientProperty(LISTENER, new Registration(this, mouse));
+        component.putClientProperty(LISTENER, new Registration(this, mouse, id));
         component.addMouseListener(mouse);
         component.addMouseMotionListener(mouse);
     }
@@ -220,7 +227,20 @@ final class DockDrag {
         pressedId = id;
         source = component;
         pressedAt = toRoot(component, event.getPoint());
-        grab = new Point(event.getPoint());
+        grab = SwingUtilities.convertPoint(component, event.getPoint(), surface(component, id));
+    }
+
+    /**
+     * The surface a press on {@code component} drags by: the outermost of the window's drag surfaces that holds it, so a
+     * press on a header's title, detail or labels holds the header, and the same point is the same grab whichever of them
+     * took the press; a stripe button stands alone and is its own.
+     */
+    private JComponent surface(JComponent component, String id) {
+        JComponent outer = component;
+        while (outer.getParent() instanceof JComponent parent && parent.getClientProperty(LISTENER) instanceof Registration held
+                && held.owner() == this && held.id().equals(id))
+            outer = parent;
+        return outer;
     }
 
     private void dragged(JComponent component, MouseEvent event) {
@@ -236,18 +256,28 @@ final class DockDrag {
     private void released(JComponent component, MouseEvent event) {
         if (component != source || event.getButton() != MouseEvent.BUTTON1) return;
         if (!active()) { finish(); return; }
-        Point at = toRoot(component, event.getPoint());
-        update(at);
         String id = dragging;
-        Optional<DockDropResolver.Target> drop = target;
-        Detach detach = detaching ? new Detach(toScreen(at), grab) : null;
-        finish();
+        Optional<DockDropResolver.Target> drop = Optional.empty();
+        Detach detach = null;
+        // Resolving the release can build the label's window and ask which windows are in front: whatever fails, the
+        // drag ends, and nothing drops.
+        try {
+            Point at = toRoot(component, event.getPoint());
+            update(at);
+            if (detaching) detach = new Detach(toScreen(at), grab);
+            else drop = target;
+        } finally {
+            finish();
+        }
         if (detach != null) onDetach.accept(id, detach);
         else drop.ifPresent(where -> onDrop.accept(id, where));
     }
 
+    /** Starts the drag: what ends it is in place before anything shows, so {@link #finish} can always take it away. */
     private void start() {
         dragging = pressedId;
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(escape);
+        Toolkit.getDefaultToolkit().addAWTEventListener(lostRelease, AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
         ghost = set.ghost(icons.apply(dragging));
         // Where a stripe button was, from the normal layout, before beginDrag lifts it out of it.
         if (stripes.stream().anyMatch(stripe -> SwingUtilities.isDescendingFrom(source, stripe)) && state.slot(dragging).isPresent()) {
@@ -270,7 +300,14 @@ final class DockDrag {
         }
         JLayeredPane layers = layers();
         if (layers != null) layers.add(overlay, JLayeredPane.DRAG_LAYER);
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(escape);
+    }
+
+    /**
+     * A release Swing lost: while the left button is held, Swing sends only drag events, to the pressed component, so a
+     * plain move or a press anywhere means the drag's release never came ({@code TabDrag}'s rule).
+     */
+    private void lostRelease(AWTEvent event) {
+        if (active() && (event.getID() == MouseEvent.MOUSE_MOVED || event.getID() == MouseEvent.MOUSE_PRESSED)) cancel();
     }
 
     /**
@@ -386,8 +423,9 @@ final class DockDrag {
         detaching = false;
         forgetHome();
         if (!wasActive) return;
-        label.hide();
         KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(escape);
+        Toolkit.getDefaultToolkit().removeAWTEventListener(lostRelease);
+        label.hide();
         for (DockStripe stripe : stripes) stripe.endDrag();
         // A hidden stripe's place lasted for the drag; the layout places it again when it shows.
         for (DockStripe stripe : targets) if (!stripe.isVisible()) stripe.setBounds(0, 0, 0, 0);

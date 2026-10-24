@@ -2,9 +2,12 @@ package dev.jasper.app.workspace;
 
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static dev.jasper.app.workspace.DetachedToolWindowsTest.text;
+import static dev.jasper.app.workspace.TabDragTestSupport.broadcast;
+import static dev.jasper.app.workspace.TabDragTestSupport.motionListeners;
 import static dev.jasper.app.workspace.TabDragTestSupport.mouse;
 import static dev.jasper.app.workspace.TabDragTestSupport.onTitleBar;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.appearance.ThemeTestSupport;
@@ -18,6 +21,7 @@ import java.awt.Dimension;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -56,6 +60,8 @@ class DockDragDetachTest {
     private CommandPaletteShortcutsTest.RecordingFocusManager keys;
     private KeyboardFocusManager previousKeys;
     private final List<Fixture> fixtures = new ArrayList<>();
+    /** The mouse motion listeners before the test: a running drag adds its lost-release listener. */
+    private int listeners;
 
     @BeforeEach void recordKeyDispatchers() throws Exception {
         edt(() -> {
@@ -63,10 +69,14 @@ class DockDragDetachTest {
             previousKeys = KeyboardFocusManager.getCurrentKeyboardFocusManager();
             keys = new CommandPaletteShortcutsTest.RecordingFocusManager();
             KeyboardFocusManager.setCurrentKeyboardFocusManager(keys);
+            listeners = motionListeners();
         });
     }
 
-    /** A drag that outlived its test would keep its Esc dispatcher and its label into the next test of this JVM. */
+    /**
+     * A drag that outlived its test would keep its Esc dispatcher, its lost-release listener and its label into the next
+     * test of this JVM.
+     */
     @AfterEach void cleanup() throws Exception {
         edt(() -> {
             try {
@@ -75,6 +85,7 @@ class DockDragDetachTest {
                     assertThat(f.drag().label().showing()).as("no label is left showing").isFalse();
                 }
                 assertThat(keys.dispatchers).as("no Esc dispatcher is left behind").isEmpty();
+                assertThat(motionListeners()).as("no lost-release listener is left behind").isEqualTo(listeners);
             } finally {
                 KeyboardFocusManager.setCurrentKeyboardFocusManager(previousKeys);
             }
@@ -85,8 +96,14 @@ class DockDragDetachTest {
     /** A detach the window heard: the dragged tool window and the drag's release. */
     private record Heard(String id, DockDrag.Detach detach) { }
 
-    private Fixture fixture() {
-        var f = new Fixture();
+    private Fixture fixture() { return fixture(Slot.LEFT_TOP, false); }
+
+    /**
+     * Alpha and Beta in {@code slot}, under the Enterprise look's labelled stripes and bottom strip when {@code labelled},
+     * else the default look's rails.
+     */
+    private Fixture fixture(Slot slot, boolean labelled) {
+        var f = new Fixture(slot, labelled);
         fixtures.add(f);
         return f;
     }
@@ -97,7 +114,7 @@ class DockDragDetachTest {
      */
     private static final class Fixture {
         final Contributions model = new Contributions();
-        final WindowContent content = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+        final WindowContent content;
         final JPanel frame;
         final DetachedToolWindowsTest.Shells shells = new DetachedToolWindowsTest.Shells();
         /** Alpha's content, which takes the keyboard when its frame is activated. */
@@ -105,11 +122,15 @@ class DockDragDetachTest {
         final List<Heard> detaches = new ArrayList<>();
         final List<String> drops = new ArrayList<>();
 
-        Fixture() {
+        Fixture(Slot slot, boolean labelled) {
+            content = labelled
+                ? DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true),
+                    DockChromeTest.classicDock())
+                : DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
             content.connectContributions(model, UiState.inMemory());
             Icon icon = new ImageIcon(new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB));
-            model.addPanel(A, "Alpha", icon, Slot.LEFT_TOP, site -> alpha);
-            model.addPanel(B, "Beta", icon, Slot.LEFT_TOP, site -> new JLabel("beta"));
+            model.addPanel(A, "Alpha", icon, slot, site -> alpha);
+            model.addPanel(B, "Beta", icon, slot, site -> new JLabel("beta"));
             frame = TabDragTestSupport.frame(content, 100, 100, 1000, 700);
             DetachedToolWindows windows = content.detachedWindows();
             windows.ready = () -> true;
@@ -126,10 +147,22 @@ class DockDragDetachTest {
 
         void relayout() { TabDragTestSupport.relayout(frame); }
 
+        /**
+         * The tool window's button on any stripe: a rail icon, or a labelled stripe's or the bottom strip's tab, whose
+         * tooltip leads with its number when it has one.
+         */
         AbstractButton button(String title) {
-            for (DockStripe stripe : List.of(content.leftStripe(), content.rightStripe()))
-                for (AbstractButton button : stripe.buttons()) if (title.equals(button.getToolTipText())) return button;
+            for (DockStripe stripe : content.stripes().all())
+                for (AbstractButton button : stripe.buttons()) {
+                    String tip = button.getToolTipText();
+                    if (title.equals(tip) || tip != null && tip.endsWith(": " + title)) return button;
+                }
             throw new AssertionError("No stripe button " + title);
+        }
+
+        /** {@code grab}, a point in a header's {@code part}, in the header's own coordinates: where the drag holds it. */
+        Point inHeader(Component part, Point grab) {
+            return SwingUtilities.convertPoint(part, grab, content.area().headerOf(Slot.LEFT_TOP));
         }
 
         /**
@@ -211,10 +244,11 @@ class DockDragDetachTest {
             f.content.dock().show(A);
             f.relayout();
             JLabel title = f.content.area().headerOf(Slot.LEFT_TOP).titleLabel();
-            Point grab = f.start(title, OUTSIDE);
+            Point grab = f.inHeader(title, f.start(title, OUTSIDE));
             assertThat(f.drag().detaching()).isTrue();
             mouse(title, MouseEvent.MOUSE_RELEASED, OUTSIDE);
-            assertThat(f.detaches).containsExactly(new Heard(A, new DockDrag.Detach(OUTSIDE, grab)));
+            assertThat(f.detaches).as("the grab is the header's, though its title took the press")
+                .containsExactly(new Heard(A, new DockDrag.Detach(OUTSIDE, grab)));
             assertThat(f.drops).isEmpty();
             assertThat(f.content.dock().visible(A)).as("it still shows, in its own window").isTrue();
         });
@@ -374,7 +408,7 @@ class DockDragDetachTest {
             assertThat(docked.width).as("the docked frame is at least the minimum").isGreaterThanOrEqualTo(minimum.width);
             assertThat(docked.height).isGreaterThanOrEqualTo(minimum.height);
             JLabel title = f.content.area().headerOf(Slot.LEFT_TOP).titleLabel();
-            Point grab = f.start(title, OUTSIDE);
+            Point grab = f.inHeader(title, f.start(title, OUTSIDE));
             mouse(title, MouseEvent.MOUSE_RELEASED, OUTSIDE);
 
             var opened = new Rectangle(OUTSIDE.x - grab.x, OUTSIDE.y - grab.y, docked.width, docked.height);
@@ -394,7 +428,7 @@ class DockDragDetachTest {
                 .hasValueSatisfying(docked -> assertThat(docked.getSize()).isNotEqualTo(BEFORE.getSize()));
             f.shells.take();
             JLabel title = f.content.area().headerOf(Slot.LEFT_TOP).titleLabel();
-            Point grab = f.start(title, OUTSIDE);
+            Point grab = f.inHeader(title, f.start(title, OUTSIDE));
             mouse(title, MouseEvent.MOUSE_RELEASED, OUTSIDE);
 
             var opened = new Rectangle(OUTSIDE.x - grab.x, OUTSIDE.y - grab.y, BEFORE.width, BEFORE.height);
@@ -564,6 +598,162 @@ class DockDragDetachTest {
             mouse(beta, MouseEvent.MOUSE_RELEASED, overlap);
             assertThat(f.drops).containsExactly(B);
             assertThat(f.content.dock().slot(B)).hasValue(Slot.RIGHT_TOP);
+        });
+    }
+
+    /** The drag is over, nothing of it is left, and the release that comes late detaches and drops nothing. */
+    private void endedWithNothingLeft(Fixture f, AbstractButton button) {
+        assertThat(f.drag().active()).isFalse();
+        assertThat(f.drag().label().showing()).as("the label goes").isFalse();
+        assertThat(keys.dispatchers).as("the Esc dispatcher goes").isEmpty();
+        assertThat(motionListeners()).as("the lost-release listener goes").isEqualTo(listeners);
+        for (DockStripe stripe : f.content.stripes().all()) assertThat(stripe.dragging()).as("the stripes are whole again").isFalse();
+        assertThat(f.drag().overlay().getParent()).as("the overlay goes").isNull();
+        mouse(button, MouseEvent.MOUSE_RELEASED, OUTSIDE);
+        assertThat(f.detaches).as("nothing detaches").isEmpty();
+        assertThat(f.drops).as("nothing drops").isEmpty();
+        assertThat(f.content.dock().slot(A)).hasValue(Slot.LEFT_TOP);
+    }
+
+    /**
+     * Final review 1: while the left button is held Swing sends only drag events, to the pressed component, so a plain
+     * move or a press anywhere means the drag's release never came, as {@code TabDrag} reads it. Outside the window, the
+     * always-on-top label goes with the drag.
+     */
+    @Test void aLostReleaseEndsTheDragAndTakesTheLabelAway() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            AbstractButton button = f.button("Alpha");
+            f.start(button, OUTSIDE);
+            assertThat(f.drag().label().showing()).isTrue();
+            assertThat(motionListeners()).as("it listens for a lost release while it runs").isEqualTo(listeners + 1);
+            broadcast(new MouseEvent(f.content, MouseEvent.MOUSE_MOVED, 0, 0, 5, 5, 0, false, MouseEvent.NOBUTTON));
+            endedWithNothingLeft(f, button);
+
+            f.start(button, OUTSIDE);
+            assertThat(f.drag().label().showing()).isTrue();
+            broadcast(new MouseEvent(f.content, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON1_DOWN_MASK, 5, 5, 1, false,
+                MouseEvent.BUTTON1));
+            endedWithNothingLeft(f, button);
+        });
+    }
+
+    /**
+     * Final review 3: a release whose handling fails (here the query for windows in front, inside the frame) still ends
+     * the drag: its Esc dispatcher, its listener, the lifted stripes and the label go, and nothing detaches or drops.
+     */
+    @Test void aReleaseWhoseHandlingFailsStillEndsTheDrag() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            AbstractButton button = f.button("Alpha");
+            f.start(button, OUTSIDE);
+            assertThat(f.drag().label().showing()).isTrue();
+            var failure = new IllegalStateException("the windows in front are unknown");
+            f.drag().covered = screen -> { throw failure; };
+            Point inside = f.zone(Slot.RIGHT_TOP);
+            assertThatThrownBy(() -> mouse(button, MouseEvent.MOUSE_RELEASED, inside)).isSameAs(failure);
+            endedWithNothingLeft(f, button);
+        });
+    }
+
+    /**
+     * Final review 2: the header's title, detail and labels are drag surfaces of their own, yet the grab is always in the
+     * header: a press on its title and one on the header itself at the same point on screen open the window in the same
+     * place.
+     */
+    @Test void theGrabIsTheHeadersWhicheverOfItsPartsTookThePress() throws Exception {
+        edt(() -> {
+            var byTitle = fixture();
+            var byHeader = fixture();
+            for (Fixture f : List.of(byTitle, byHeader)) {
+                f.content.dock().show(A);
+                f.relayout();
+            }
+            JLabel title = byTitle.content.area().headerOf(Slot.LEFT_TOP).titleLabel();
+            Component header = byHeader.content.area().headerOf(Slot.LEFT_TOP);
+            Point press = TabDragTestSupport.middle(title);
+            assertThat(SwingUtilities.convertPoint(title, 0, 0, byTitle.content.area().headerOf(Slot.LEFT_TOP)))
+                .as("the title stands inside the header, away from its corner").isNotEqualTo(new Point());
+
+            Point inTitle = new Point(press), inHeader = new Point(press);
+            SwingUtilities.convertPointFromScreen(inTitle, title);
+            SwingUtilities.convertPointFromScreen(inHeader, header);
+            byTitle.startAt(title, inTitle, OUTSIDE);
+            mouse(title, MouseEvent.MOUSE_RELEASED, OUTSIDE);
+            byHeader.startAt(header, inHeader, OUTSIDE);
+            mouse(header, MouseEvent.MOUSE_RELEASED, OUTSIDE);
+
+            assertThat(byTitle.detaches).containsExactly(new Heard(A, new DockDrag.Detach(OUTSIDE, inHeader)));
+            assertThat(byHeader.detaches).containsExactly(new Heard(A, new DockDrag.Detach(OUTSIDE, inHeader)));
+            Rectangle opened = byHeader.content.dock().bounds(A).orElseThrow();
+            assertThat(byTitle.content.dock().bounds(A)).as("the same place, whichever part took the press").hasValue(opened);
+            assertThat(opened.getLocation()).isEqualTo(new Point(OUTSIDE.x - inHeader.x, OUTSIDE.y - inHeader.y));
+        });
+    }
+
+    /** Final review 4: under the Enterprise look, a labelled stripe's tab dragged out opens its tool window in a Float window. */
+    @Test void aLabelledStripesTabDetaches() throws Exception {
+        edt(() -> {
+            var f = fixture(Slot.LEFT_TOP, true);
+            assertThat(f.content.leftStripe()).as("the Enterprise look's labelled stripes").isInstanceOf(LabelledStripe.class);
+            detachesFromItsTab(f, f.content.leftStripe(), OUTSIDE);
+        });
+    }
+
+    /** Final review 4: under the Enterprise look, the bottom strip's tab dragged out opens its tool window in a Float window. */
+    @Test void theBottomStripsTabDetaches() throws Exception {
+        edt(() -> {
+            var f = fixture(Slot.BOTTOM_LEFT, true);
+            DockStripe strip = f.content.bottomStrip().orElseThrow();
+            assertThat(strip.isVisible()).as("it holds Alpha and Beta").isTrue();
+            // Left of the stand-in frame, where the bottom area's wide window fits on the display.
+            detachesFromItsTab(f, strip, new Point(50, 300));
+        });
+    }
+
+    /**
+     * Drags Alpha's tab on {@code stripe} out, held 6, 9 from its corner, and releases it at {@code release}, outside the
+     * frame: a Float window opens there.
+     */
+    private static void detachesFromItsTab(Fixture f, DockStripe stripe, Point release) {
+        AbstractButton tab = f.button("Alpha");
+        assertThat(SwingUtilities.isDescendingFrom(tab, stripe)).as("Alpha's tab is on that stripe").isTrue();
+        Dimension size = f.landing();
+        var opened = new Rectangle(release.x - 6, release.y - 9, size.width, size.height);
+        assertThat(SCREEN.contains(opened)).as("on the display, so fitting keeps it").isTrue();
+        f.startAt(tab, new Point(6, 9), release);
+        assertThat(f.drag().detaching()).isTrue();
+        assertThat(f.drag().label().showing()).isTrue();
+        mouse(tab, MouseEvent.MOUSE_RELEASED, release);
+
+        assertThat(f.detaches).containsExactly(new Heard(A, new DockDrag.Detach(release, new Point(6, 9))));
+        assertThat(f.drops).isEmpty();
+        assertThat(f.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, opened), "show " + A, "toFront " + A);
+        assertThat(f.content.dock().mode(A)).isEqualTo(ToolWindowMode.FLOAT);
+        assertThat(f.content.dock().visible(A)).isTrue();
+        assertThat(SwingUtilities.isDescendingFrom(f.button("Alpha"), stripe)).as("its tab stays on its stripe").isTrue();
+    }
+
+    /** Final review 4: a hidden tool window whose mode is Window, dragged out, opens in a Window of its own, not a Float. */
+    @Test void aHiddenWindowModeToolWindowDraggedOutOpensAsAWindow() throws Exception {
+        edt(() -> {
+            var f = fixture();
+            f.content.dock().detach(A, ToolWindowMode.WINDOW, BEFORE);
+            f.relayout();
+            f.content.dock().hide(A);
+            f.relayout();
+            f.shells.take();
+            assertThat(f.content.dock().visible(A)).isFalse();
+            assertThat(f.content.dock().mode(A)).isEqualTo(ToolWindowMode.WINDOW);
+            AbstractButton button = f.button("Alpha");
+            f.startAt(button, new Point(6, 9), OUTSIDE);
+            mouse(button, MouseEvent.MOUSE_RELEASED, OUTSIDE);
+
+            var opened = new Rectangle(OUTSIDE.x - 6, OUTSIDE.y - 9, BEFORE.width, BEFORE.height);
+            assertThat(f.shells.take()).as("its own Window, at the size it last had")
+                .containsExactly(open(ToolWindowMode.WINDOW, opened), "show " + A, "toFront " + A);
+            assertThat(f.content.dock().mode(A)).isEqualTo(ToolWindowMode.WINDOW);
+            assertThat(f.content.dock().visible(A)).isTrue();
         });
     }
 }
