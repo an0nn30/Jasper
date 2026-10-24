@@ -32,6 +32,11 @@ public final class DesktopColors implements AutoCloseable {
     private ExecutorService ownedManager;
     private boolean ownedTimer;
 
+    /** Fixed executable names in distribution order: portal, GTK 3, GTK 4. */
+    public static List<String> helperNames() {
+        return List.of("jasper-desktop-portal", "jasper-desktop-gtk3", "jasper-desktop-gtk4");
+    }
+
     /** Absolute development override or helpers beside the installed application jar; never searches PATH or cwd. */
     public static Optional<Path> helperDirectory() {
         return helperDirectory(System.getProperty("os.name", ""), System.getProperty("jasper.desktopColors.helpers"), CodeLocation.of(DesktopColors.class));
@@ -116,8 +121,8 @@ public final class DesktopColors implements AutoCloseable {
     private void start(Slot slot) {
         if (closed.get() || !active(slot)) return;
         var process = new DesktopProcess(timer, manager, clock, launcher); slot.process = process; slot.owner = -1;
-        String name = slot.source == null ? "portal" : slot.source == Source.GTK3 ? "gtk3" : "gtk4";
-        process.launch(List.of(directory.resolve("jasper-desktop-" + name).toString(), "--protocol=1"),
+        String name = helperNames().get(slot.source == null ? 0 : slot.source == Source.GTK3 ? 1 : 2);
+        process.launch(List.of(directory.resolve(name).toString(), "--protocol=1"),
             message -> observed(slot, process, message), reason -> failed(slot, process, reason));
         if (slot.source != null) process.sample(demand.generation(), demand.dark());
     }

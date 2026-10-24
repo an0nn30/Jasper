@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class DesktopColorsTest {
+    private static final Path HELPERS = Path.of("packaged", "helpers").toAbsolutePath();
 
     @Test void resampleBoundaryIsIndependentOfEqualObservationsAndStopsAtUnsubscribeOrClose() {
         try (var f = new DesktopProcessTest.Fixture()) {
@@ -45,13 +46,33 @@ class DesktopColorsTest {
         }
     }
 
+    @Test void portalOnlyDistributionKeepsPreferencesWhenToolkitExecutablesAreMissing() {
+        try (var f = new DesktopProcessTest.Fixture()) {
+            var desktop = new DesktopColors(Path.of("installed helpers").toAbsolutePath(), f.time, f.queue::add, f.time::now, command -> {
+                if (!command.getFirst().endsWith("jasper-desktop-portal"))
+                    throw new java.io.UncheckedIOException(new java.io.FileNotFoundException(command.getFirst()));
+                return f.launch(DesktopProcessTest.child("echo"));
+            });
+            f.await(() -> desktop.current().portal().appearance() == Polarity.DARK);
+            desktop.request(7, Set.of(Source.GTK3, Source.GTK4), true);
+            f.await(() -> desktop.current().palettes().size() == 2);
+            assertThat(desktop.current().palettes().values()).allSatisfy(palette -> {
+                assertThat(palette.colors()).isEmpty();
+                assertThat(palette.reason()).isNotBlank();
+            });
+            assertThat(desktop.current().portal().appearance()).isEqualTo(Polarity.DARK);
+            assertThat(f.children).hasSize(1);
+            desktop.close(); f.pump();
+            f.await(() -> f.children.stream().noneMatch(Process::isAlive));
+        }
+    }
     @Test void startsOnlyPortalUntilToolkitDemandAndStopsUnusedToolkit() {
         try (var f = new DesktopProcessTest.Fixture()) {
             var commands = new java.util.concurrent.CopyOnWriteArrayList<List<String>>();
             var desktop = service(f, commands, "echo");
             f.await(() -> desktop.current().portal().appearance() == Polarity.DARK);
             assertThat(commands).hasSize(1);
-            assertThat(commands.getFirst()).containsExactly("/packaged/helpers/jasper-desktop-portal", "--protocol=1");
+            assertThat(commands.getFirst()).containsExactly(HELPERS.resolve("jasper-desktop-portal").toString(), "--protocol=1");
             desktop.request(7, Set.of(Source.GTK3), true);
             f.await(() -> desktop.current().palettes().containsKey(Source.GTK3));
             assertThat(commands).hasSize(2);
@@ -94,13 +115,13 @@ class DesktopColorsTest {
         try (var f = new DesktopProcessTest.Fixture()) {
             var commands = new java.util.concurrent.CopyOnWriteArrayList<List<String>>();
             var owners = new java.util.concurrent.ConcurrentHashMap<String, Process>();
-            var desktop = new DesktopColors(Path.of("/packaged/helpers"), f.time, f.queue::add, f.time::now, command -> {
+            var desktop = new DesktopColors(HELPERS, f.time, f.queue::add, f.time::now, command -> {
                 commands.add(command); Process process = f.launch(DesktopProcessTest.child("echo"));
                 owners.put(command.getFirst(), process); return process;
             });
             desktop.request(1, Set.of(Source.GTK3), true);
             f.await(() -> desktop.current().palettes().containsKey(Source.GTK3));
-            Process old = owners.get("/packaged/helpers/jasper-desktop-gtk3"); old.destroyForcibly();
+            Process old = owners.get(HELPERS.resolve("jasper-desktop-gtk3").toString()); old.destroyForcibly();
             f.await(() -> desktop.current().palettes().get(Source.GTK3).reason().contains("exit"));
             f.time.advance(1, TimeUnit.SECONDS); f.pump();
             f.await(() -> commands.size() == 3 && desktop.current().palettes().get(Source.GTK3).reason().isEmpty());
@@ -170,7 +191,7 @@ class DesktopColorsTest {
     @Test void longLaunchFailureRemainsBoundedDataAndRetries() {
         try (var f = new DesktopProcessTest.Fixture()) {
             var attempts = new AtomicInteger();
-            var desktop = new DesktopColors(Path.of("/packaged/helpers"), f.time, f.queue::add, f.time::now, command -> {
+            var desktop = new DesktopColors(HELPERS, f.time, f.queue::add, f.time::now, command -> {
                 attempts.incrementAndGet(); throw new IllegalStateException("x".repeat(2000));
             });
             f.await(() -> !desktop.current().portal().reason().equals("Desktop preferences pending"));
@@ -183,7 +204,7 @@ class DesktopColorsTest {
         try (var f = new DesktopProcessTest.Fixture()) {
             var attempts = new AtomicInteger();
             var toolkit = new java.util.concurrent.atomic.AtomicReference<Process>();
-            var desktop = new DesktopColors(Path.of("/packaged/helpers"), f.time, f.queue::add, f.time::now, command -> {
+            var desktop = new DesktopColors(HELPERS, f.time, f.queue::add, f.time::now, command -> {
                 boolean gtk = command.getFirst().endsWith("gtk3");
                 int attempt = gtk ? attempts.incrementAndGet() : 0;
                 Process process = f.launch(DesktopProcessTest.child(gtk && attempt <= 2 ? "capability" : "echo"));
@@ -207,7 +228,7 @@ class DesktopColorsTest {
     @Test void portalOwnerSequenceMayRestartAtZeroInANewProcess() {
         try (var f = new DesktopProcessTest.Fixture()) {
             var attempts = new AtomicInteger();
-            var desktop = new DesktopColors(Path.of("/packaged/helpers"), f.time, f.queue::add, f.time::now,
+            var desktop = new DesktopColors(HELPERS, f.time, f.queue::add, f.time::now,
                 command -> f.launch(DesktopProcessTest.child(attempts.incrementAndGet() == 1 ? "portal9" : "echo")));
             f.await(() -> desktop.current().portal().owner() == 9);
             f.children.getFirst().destroyForcibly();
@@ -254,7 +275,7 @@ class DesktopColorsTest {
         }
     }
     static DesktopColors service(DesktopProcessTest.Fixture f, List<List<String>> commands, String mode) {
-        return new DesktopColors(Path.of("/packaged/helpers"), f.time, f.queue::add, f.time::now, command -> {
+        return new DesktopColors(HELPERS, f.time, f.queue::add, f.time::now, command -> {
             synchronized (commands) { commands.add(command); } return f.launch(DesktopProcessTest.child(mode));
         });
     }

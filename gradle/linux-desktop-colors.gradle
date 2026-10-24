@@ -145,14 +145,14 @@ def testGtk = tasks.register('testDesktopGtk') {
     group = 'verification'
     description = 'Runs GTK extraction assertions on a private Xvfb display and private D-Bus session.'
     onlyIf { linux }
-    dependsOn(compileGtkShim, verifyGtkAbi, gtkOutputs.values().collect { it.compileTests })
+    dependsOn(compileGtkShim, verifyGtkAbi, 'stageDesktopHelpers', gtkOutputs.values().collect { it.compileTests })
     doLast {
         [3, 4].each { major ->
             providers.exec {
                 ignoreExitValue = true
                 environment('DC_GTK_FIXTURES', new File(fixtures, 'themes').absolutePath)
-                environment('DC_GTK3_HELPER', gtkOutputs[3].helper.get().asFile.absolutePath)
-                environment('DC_GTK4_HELPER', gtkOutputs[4].helper.get().asFile.absolutePath)
+                environment('DC_GTK3_HELPER', layout.buildDirectory.file('desktop-helpers/jasper-desktop-gtk3').get().asFile.absolutePath)
+                environment('DC_GTK4_HELPER', layout.buildDirectory.file('desktop-helpers/jasper-desktop-gtk4').get().asFile.absolutePath)
                 environment('DC_GTK_SHIM', gtkShim.get().asFile.absolutePath)
                 environment('GTK_USE_PORTAL', '0')
                 environment('GTK_A11Y', 'none')
@@ -171,3 +171,57 @@ def testGtk = tasks.register('testDesktopGtk') {
     }
 }
 if (linux) tasks.named('check') { dependsOn(testGtk) }
+
+// Stage only the production executables: fixtures and the fault-injection shim never ship.
+def helperNames = ['jasper-desktop-portal', 'jasper-desktop-gtk3', 'jasper-desktop-gtk4']
+def compileHelpers = tasks.register('compileDesktopHelpers') {
+    group = 'build'
+    description = 'Builds the Linux portal and optional toolkit probes for the host architecture.'
+    onlyIf { linux }
+    dependsOn(compilePortal, gtkOutputs.values().collect { it.compile })
+}
+def stagedHelpers = layout.buildDirectory.dir('desktop-helpers')
+def stageHelpers = tasks.register('stageDesktopHelpers', Sync) {
+    onlyIf { linux }
+    dependsOn(compileHelpers)
+    from(layout.buildDirectory.dir('desktop-colors')) { include(helperNames) }
+    into(stagedHelpers)
+    filePermissions { unix('rwxr-xr-x') }
+}
+def verifyHelpers = tasks.register('verifyDesktopHelpers') {
+    group = 'verification'
+    description = 'Verifies Linux helper modes, ELF architecture and optional toolkit dependency boundaries.'
+    onlyIf { linux }
+    dependsOn(stageHelpers)
+    inputs.dir(stagedHelpers)
+    doLast {
+        int expectedMachine = System.getProperty('os.arch') in ['aarch64', 'arm64'] ? 0xB7 : 0x3E
+        helperNames.each { name ->
+            File binary = new File(stagedHelpers.get().asFile, name)
+            if (!binary.isFile() || !binary.canExecute()) throw new GradleException("Missing executable helper: ${binary}")
+            byte[] header = binary.bytes
+            if (header.length < 20 || header[0] != 0x7F || header[1] != 69 || header[2] != 76 || header[3] != 70 ||
+                    header[4] != 2 || header[5] != 1 || ((header[18] & 255) | ((header[19] & 255) << 8)) != expectedMachine)
+                throw new GradleException("Helper is not a host-architecture ELF executable: ${binary}")
+            String dynamic = providers.exec { commandLine('readelf', '-d', binary.absolutePath) }.standardOutput.asText.get()
+            if (dynamic =~ /(?i)NEEDED.*(gtk|adwaita)/) throw new GradleException("Helper links an optional toolkit: ${name}")
+            String linkage = providers.exec { commandLine('ldd', binary.absolutePath) }.standardOutput.asText.get()
+            if (linkage.contains('not found')) throw new GradleException("Helper has unresolved runtime dependencies: ${name}\n${linkage}")
+            logger.lifecycle("${name}: host ELF; executable; no GTK/libadwaita DT_NEEDED entries\n${dynamic}${linkage}")
+        }
+    }
+}
+if (linux) {
+    distributions.main.contents { from(stageHelpers) { into('lib/desktop-colors') } }
+    tasks.named('stagePackage') { from(stageHelpers) { into('desktop-colors') } }
+    tasks.named('run', JavaExec) {
+        dependsOn(stageHelpers)
+        systemProperty('jasper.desktopColors.helpers', stagedHelpers.get().asFile.absolutePath)
+    }
+    tasks.named('check') { dependsOn(verifyHelpers) }
+    tasks.named('verifyPackage') { dependsOn(verifyHelpers) }
+}
+tasks.named('test', Test) {
+    if (linux) inputs.files(stageHelpers).withPropertyName('desktopHelpers').withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty('jasper.stagedDesktopHelpers', stagedHelpers.get().asFile.absolutePath)
+}

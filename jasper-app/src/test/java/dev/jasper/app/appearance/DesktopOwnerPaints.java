@@ -124,25 +124,34 @@ public final class DesktopOwnerPaints {
                         KitTestSupport.layout(host);
                         var input=KitTestSupport.require(view,"field.input",JTextField.class);
                         var surface=(JComponent)input.getParent();
-                        if(state.equals("focus")) {
-                            focus.target(input);
-                            var event=new FocusEvent(input,FocusEvent.FOCUS_GAINED,false,null,FocusEvent.Cause.TRAVERSAL_FORWARD);
-                            for(var listener:input.getFocusListeners())listener.focusGained(event);
+                        try {
+                            if(state.equals("focus")) {
+                                focus.target(input);
+                                var event=new FocusEvent(input,FocusEvent.FOCUS_GAINED,false,null,FocusEvent.Cause.TRAVERSAL_FORWARD);
+                                for(var listener:input.getFocusListeners())listener.focusGained(event);
+                            }
+                            var image=paint(host);var origin=SwingUtilities.convertPoint(surface,0,0,host);
+                            double x=origin.x+surface.getWidth()/2.0;
+                            int edge=pixel(image,x,origin.y+.5),inside=pixel(image,x,origin.y+3),outside=pixel(image,x,origin.y-5);
+                            String role="border."+(state.equals("normal")?"input":state);
+                            samples.add(new Sample("field-edge",state+"-on-"+parent.key(),role,"surface.input",edge,inside,3));
+                            samples.add(new Sample("field-edge",state+"-on-"+parent.key()+"-outside",role,parent.key(),edge,outside,3));
+                            if(!state.equals("normal")) {
+                                assertThat(surface.getClientProperty("Jasper.kit.halo")).as("actual field registered its halo").isNotNull();
+                                int halo=pixel(image,x,origin.y-.5);
+                                samples.add(new Sample("field-halo",state+"-on-"+parent.key(),state+".halo",parent.key(),halo,outside,3));
+                            }
+                            if(state.equals("normal")&&parent==SemanticColor.SURFACE_PANEL)
+                                selectedText(host,input,"field-selection","selection.bg",high,samples);
+                        } finally {
+                            if(state.equals("focus")) {
+                                var event=new FocusEvent(input,FocusEvent.FOCUS_LOST,false,null,FocusEvent.Cause.TRAVERSAL_FORWARD);
+                                for(var listener:input.getFocusListeners())listener.focusLost(event);
+                            }
+                            focus.target(null);
                         }
-                        var image=paint(host);var origin=SwingUtilities.convertPoint(surface,0,0,host);
-                        double x=origin.x+surface.getWidth()/2.0;
-                        int edge=pixel(image,x,origin.y+.5),inside=pixel(image,x,origin.y+3),outside=pixel(image,x,origin.y-5);
-                        String role="border."+(state.equals("normal")?"input":state);
-                        samples.add(new Sample("field-edge",state+"-on-"+parent.key(),role,"surface.input",edge,inside,3));
-                        samples.add(new Sample("field-edge",state+"-on-"+parent.key()+"-outside",role,parent.key(),edge,outside,3));
-                        if(!state.equals("normal")) {
-                            assertThat(surface.getClientProperty("Jasper.kit.halo")).as("actual field registered its halo").isNotNull();
-                            int halo=pixel(image,x,origin.y-.5);
-                            samples.add(new Sample("field-halo",state+"-on-"+parent.key(),state+".halo",parent.key(),halo,outside,3));
-                        }
-                        if(state.equals("normal")&&parent==SemanticColor.SURFACE_PANEL)
-                            selectedText(host,input,"field-selection","selection.bg",high,samples);
-                        focus.target(null);
+                        if(state.equals("focus")) assertThat(input.getCaret().isVisible())
+                            .as("synthetic focus must retire the caret blink timer before releasing the fixture").isFalse();
                     }
                 }
             }

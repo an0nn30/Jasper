@@ -12,7 +12,7 @@ public final class DesktopColorsHarness implements AutoCloseable {
     private final DesktopProcessTest.Fixture fixture = new DesktopProcessTest.Fixture();
     private final Map<String, PipeProcess> processes = new ConcurrentHashMap<>();
     private final List<String> launches = new CopyOnWriteArrayList<>();
-    public final DesktopColors service = new DesktopColors(Path.of("/test/helpers"), fixture.time,
+    public final DesktopColors service = new DesktopColors(Path.of("test", "helpers").toAbsolutePath(), fixture.time,
         fixture.queue::add, fixture.time::now, command -> {
             String name = Path.of(command.getFirst()).getFileName().toString();
             var process = new PipeProcess(); processes.put(name, process); launches.add(name); return process;

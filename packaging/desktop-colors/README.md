@@ -88,3 +88,14 @@ D-Bus. Production compilation needs only GIO headers. Fixture CSS is loaded into
 subprocess fault injection covers absent libraries and unsupported runtimes. Ubuntu 24.04 CI covers named colors;
 a digest-pinned Ubuntu 26.04 container requires GTK 4.16+ and covers overridden variables. Linux `check` includes
 this gate; other hosts skip it without discovering native dependencies.
+
+`compileDesktopHelpers` builds all three production executables; `stageDesktopHelpers` places only those files in
+`jasper-app/build/desktop-helpers` with mode 0755. Linux installDist ships them in `lib/desktop-colors`; jpackage
+ships them in `lib/app/desktop-colors`. Other operating systems omit them. `run` supplies the absolute
+`jasper.desktopColors.helpers` development path. Installed resolution uses `CodeLocation` and the application jar's
+sibling directory; an invalid explicit path is unavailable. `verifyDesktopHelpers` checks the host ELF architecture,
+executable modes, `readelf` DT_NEEDED entries and `ldd` resolution. `verifyPackage` checks the packaged bytes, modes
+and architecture. Release packaging uses Ubuntu 22.04 on both x86_64 and aarch64; GTK and libadwaita remain optional
+runtime capabilities, while GLib/GIO are required. The install matrix exercises Debian 12, Ubuntu 24.04, Fedora and
+openSUSE, including headless helper responses. A portal-only directory still reports preferences while unavailable
+GTK probes retain the bundled theme fallback.

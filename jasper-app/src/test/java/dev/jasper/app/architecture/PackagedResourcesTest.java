@@ -5,6 +5,26 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class PackagedResourcesTest {
+    @Test void desktopHelpersAreExternalLinuxExecutables() throws Exception {
+        try (var jar = new JarFile(System.getProperty("jasper.appJar"))) {
+            assertThat(jar.stream().map(java.util.jar.JarEntry::getName).toList())
+                .noneMatch(name -> name.contains("jasper-desktop-"));
+        }
+        var staged = java.nio.file.Path.of(System.getProperty("jasper.stagedDesktopHelpers"));
+        if (System.getProperty("os.name").startsWith("Linux")) {
+            try (var files = java.nio.file.Files.list(staged)) {
+                assertThat(files.map(path -> path.getFileName().toString()).toList())
+                    .containsExactlyInAnyOrderElementsOf(dev.jasper.app.platform.DesktopColors.helperNames());
+            }
+            for (String name : dev.jasper.app.platform.DesktopColors.helperNames()) {
+                var helper = staged.resolve(name);
+                assertThat(java.nio.file.Files.isExecutable(helper)).as(name).isTrue();
+                byte[] bytes = java.nio.file.Files.readAllBytes(helper);
+                assertThat(java.util.Arrays.copyOf(bytes, 4)).containsExactly((byte) 0x7f, (byte) 'E', (byte) 'L', (byte) 'F');
+            }
+        } else assertThat(staged).doesNotExist();
+    }
+
     @Test void bundledTerminalFontsLoadFromTheProductionJarWithTheirNotices() throws Exception {
         try (var jar = new JarFile(System.getProperty("jasper.appJar"))) {
             String root = "dev/jasper/app/fonts/cousine/";
@@ -82,7 +102,7 @@ class PackagedResourcesTest {
                 .containsExactlyInAnyOrder("dev/jasper/app/icons/intellij/terminal/toolwindow/terminal.svg",
                     "dev/jasper/app/icons/intellij/nodes/pluginLogo.svg", "dev/jasper/app/icons/intellij/nodes/pluginLogo_dark.svg");
             assertThat(names).noneMatch(n -> n.startsWith("dev/jasper/buddy/") || n.startsWith("dev/jasper/app/buddy/")
-                || n.contains("TestSupport") || n.contains("Preview.class") || n.contains("ControlledSessionChild"));
+                || n.contains("TestSupport") || (n.contains("Preview.class") && !n.equals("dev/jasper/app/application/DesktopAppearance$Preview.class")) || n.contains("ControlledSessionChild"));
             assertThat(jar.getJarEntry("dev/jasper/app/themes/FlatLaf.properties")).isNull();
             String border = "dev.jasper.app.workspace.SplitDividerBorder";
             assertThat(jar.getJarEntry(border.replace('.', '/') + ".class")).isNotNull();
