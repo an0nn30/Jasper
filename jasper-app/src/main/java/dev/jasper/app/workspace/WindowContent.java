@@ -208,6 +208,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** The tab the palette last heard was active: a layout change that keeps it, such as a maximize, leaves the palette open. */
     private Tab paletteTab;
     private boolean active = true;
+    /** Native showing/non-iconified state used only for Buddy attention. */
+    private boolean buddyWindowVisible;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
     public Runnable onManageCygwinPackages;
     private Runnable openSettings, reloadConfiguration, migrateConfiguration;
@@ -269,6 +271,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         try {
             for (TerminalContent terminal : terminalTabs())
                 listener.accept(new WorkspaceActivity.PaneState(terminal.pane().id(), WorkspaceActivity.State.OPENED));
+            publishPresentation(listener);
         } catch (RuntimeException | Error failure) { activityListeners.remove(listener); throw failure; }
         return new Subscription(() -> activityListeners.remove(listener));
     }
@@ -2312,6 +2315,41 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void invoke(ActionId id) { workspaceActions.invoke(id); }
     public void updateActions() { workspaceActions.update(); }
 
+    /** Native visibility affects Buddy independently of activation event ordering. */
+    void buddyWindowState(boolean showing, boolean iconified) {
+        boolean visible = showing && !iconified;
+        if (buddyWindowVisible == visible) return;
+        buddyWindowVisible = visible;
+        publishPresentation();
+    }
+
+    boolean buddyWatched(Tab tab) {
+        return buddyWindowVisible && isActiveAndOpen()
+            && parentTabOf(tab).filter(activeParentTab()::equals).isPresent();
+    }
+
+    /** Publishes only committed layout membership; held moves publish when they settle. */
+    void publishPresentation() { publishPresentation(this::emit); }
+
+    private void publishPresentation(Consumer<WorkspaceActivity.Event> listener) {
+        if (closed || holding > 0) return;
+        for (WorkspaceView view : parentTabs.views()) {
+            Tab selected = view.selected();
+            if (selected == null) continue;
+            String groupTitle = tabTitle(selected);
+            boolean watched = view == parentTabs.active() && isActiveAndOpen() && buddyWindowVisible;
+            for (Tab tab : view.tabs()) {
+                if (tab.content() instanceof TerminalContent terminal) {
+                    listener.accept(new WorkspaceActivity.Presentation(terminal.pane().id(), view.id().value(),
+                        groupTitle, tabTitle(tab), watched, () -> {
+                            tab.select();
+                            terminal.pane().focusTerminal();
+                        }));
+                }
+            }
+        }
+    }
+
     void update() {
         // A held move's items hear where it ends, once (workspace plan 8c Rulings 17).
         if (closed || holding > 0) return;
@@ -2330,6 +2368,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         syncContentBindings();
         updateActions(); refreshTabs(); onMinimumSizeChanged.run();
         if (terminals != null) terminals.refresh();
+        publishPresentation();
     }
 
     ResolvedTheme theme() { return themes.current(); }

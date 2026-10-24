@@ -580,6 +580,8 @@ public final class JasperApplication {
             content.anyWindowActive = () -> windows.windows().stream().anyMatch(open -> open.content().isActiveAndOpen());
             content.activity(event -> {
                 switch (event) {
+                    case WorkspaceActivity.Presentation value -> notifications.presentation(value.id(), value.groupId(),
+                        value.groupTitle(), value.title(), value.watched(), value.activate());
                     case WorkspaceActivity.Started value -> notifications.started(value.id(), value.command(),
                         value.elapsedNanos(), value.activate(), value.watched());
                     case WorkspaceActivity.Finished value -> notifications.finished(value.id(), value.command(),
@@ -591,7 +593,7 @@ public final class JasperApplication {
                             case OPENED -> notifications.opened(value.id());
                             case CLOSED -> notifications.closed(value.id());
                             case FOCUSED -> { }
-                            case BLURRED -> notifications.hidden(value.id());
+                            case BLURRED -> { }
                         }
                     }
                 }

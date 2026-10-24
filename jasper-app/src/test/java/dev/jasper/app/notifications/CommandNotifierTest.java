@@ -52,6 +52,61 @@ class CommandNotifierTest {
     private static final CommandNotice.Origin UNFOCUSED_SPLIT = new CommandNotice.Origin(true, true, true, false);
 
     /** Workspace tabs spec 9.3: a click resolves the pane's window from the notification's producer. */
+    @Test void presentationSuppressesWithoutEndingOrRestartingTheCommand() {
+        var notifier = notifier(10);
+        var group = UUID.randomUUID();
+        long[] elapsed = {11_000_000_000L};
+        var activated = new ArrayList<String>();
+        notifier.presentation("pane", group, "Builds", "worker", true, () -> activated.add("old"));
+        notifier.started("pane", "command", () -> elapsed[0], () -> {}, false);
+        passThreshold();
+        assertThat(working).containsExactly(true);
+        assertThat(deck.notices()).isEmpty();
+        int generation = deck.generation();
+        notifier.presentation("pane", group, "Renamed", "program", false, () -> activated.add("current"));
+        assertThat(deck.notices()).singleElement().satisfies(notice -> {
+            assertThat(notice.title()).isEqualTo("program");
+            assertThat(notice.group().id()).isEqualTo(new BuddyNoticeId("terminal-tab", group));
+            assertThat(notice.group().title()).isEqualTo("Renamed");
+            assertThat(notice.detail().get()).isEqualTo("Running · 11s");
+            notice.activate().run();
+        });
+        assertThat(activated).containsExactly("current");
+        assertThat(deck.generation()).isEqualTo(generation);
+        notifier.presentation("pane", group, "Renamed", "program", true, () -> {});
+        assertThat(deck.notices()).isEmpty();
+        notifier.finished("pane", "command", OptionalInt.of(0), Duration.ofSeconds(11), FOCUSED_PANE, window, () -> {});
+        notifier.presentation("pane", group, "Renamed", "program", false, () -> {});
+        assertThat(deck.notices()).isEmpty();
+        assertThat(working).containsExactly(true, false);
+    }
+
+    @Test void hidingTheParentPromotesBeforeThresholdAndZeroStillDisables() {
+        for (int seconds : new int[] {0, 10}) {
+            var notifier = notifier(seconds);
+            var group = UUID.randomUUID();
+            notifier.presentation("pane", group, "Build", "worker", true, () -> {});
+            notifier.started("pane", "command", () -> 1L, () -> {}, true);
+            notifier.presentation("pane", group, "Build", "worker", false, () -> {});
+            assertThat(deck.notices()).hasSize(seconds == 0 ? 0 : 1);
+            assertThat(scheduled).isEmpty();
+            notifier.close();
+        }
+    }
+
+    @Test void dismissalSurvivesVisibilityChangesButAFreshCommandCanAppear() {
+        var notifier = notifier(10);
+        var group = UUID.randomUUID();
+        notifier.presentation("pane", group, "Work", "worker", false, () -> {});
+        notifier.started("pane", "command", () -> 0L, () -> {}, true);
+        deck.dismiss(new BuddyNoticeId(CommandNotifier.SOURCE, "pane"));
+        notifier.presentation("pane", group, "Work", "worker", true, () -> {});
+        notifier.presentation("pane", group, "Work", "worker", false, () -> {});
+        assertThat(deck.notices()).isEmpty();
+        notifier.started("pane", "next", () -> 0L, () -> {}, true);
+        assertThat(deck.notices()).hasSize(1);
+    }
+
     @Test void aNotificationNamesThePaneThatPostedItUntilThePaneCloses() {
         var notifier = notifier(10);
         notifier.finished("pane", "make", OptionalInt.of(0), Duration.ofSeconds(30), HIDDEN_TAB, window, () -> {});
@@ -73,11 +128,7 @@ class CommandNotifierTest {
         CommandNotifier notifier = notifier(10);
         notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
         passThreshold();
-        assertThat(deck.notices()).singleElement().satisfies(notice -> {
-            assertThat(notice.title()).isEqualTo("./gradlew build");
-            assertThat(notice.kind()).isEqualTo(BuddyNotice.Kind.TASK);
-            assertThat(notice.state()).isEqualTo(BuddyNotice.State.RUNNING);
-        });
+        assertThat(deck.notices()).isEmpty();
         assertThat(center.history()).isEmpty();
         assertThat(working).containsExactly(true);
     }
@@ -87,6 +138,7 @@ class CommandNotifierTest {
         long[] elapsed = {Duration.ofSeconds(11).toNanos()};
         notifier.started("pane", "sleep 600", () -> elapsed[0], () -> {}, WATCHED);
         passThreshold();
+        notifier.hidden("pane");
         assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Running · 11s");
         elapsed[0] = Duration.ofSeconds(72).toNanos();
         assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Running · 1m 12s");
@@ -179,7 +231,7 @@ class CommandNotifierTest {
         assertThat(working).containsExactly(true);
         notifier.finished("a", "one", OptionalInt.of(0), Duration.ofSeconds(11), HIDDEN_TAB, window, () -> {});
         assertThat(working).as("one still running").containsExactly(true);
-        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("two");
+        assertThat(deck.notices()).isEmpty();
         notifier.finished("b", "two", OptionalInt.of(0), Duration.ofSeconds(11), HIDDEN_TAB, window, () -> {});
         assertThat(working).containsExactly(true, false);
     }
@@ -298,6 +350,7 @@ class CommandNotifierTest {
         notifier.titleChanged("a", "Indexing the repository");
         assertThat(deck.notices()).isEmpty();
         passThreshold();
+        notifier.hidden("a");
         assertThat(deck.notices().getFirst().title()).isEqualTo("Indexing the repository");
     }
 
@@ -359,6 +412,7 @@ class CommandNotifierTest {
             notifier.started(key, "late", () -> 20_000_000_000L, () -> {}, UNWATCHED);
             notifier.finished(key, "late", OptionalInt.of(0), Duration.ofSeconds(20), HIDDEN_TAB, window, () -> {});
             notifier.hidden(key); notifier.titleChanged(key, "late");
+            notifier.presentation(key, UUID.randomUUID(), "late", "late", false, () -> {});
             assertThat(deck.generation()).isEqualTo(generation);
             assertThat(working).hasSize(changes);
             assertThat(center.history()).hasSize(posted);

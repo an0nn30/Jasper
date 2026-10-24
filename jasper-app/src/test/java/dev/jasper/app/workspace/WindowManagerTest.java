@@ -68,6 +68,28 @@ class WindowManagerTest {
             () -> closings.add("closing all"))));
     }
 
+    @Test void buddyWatchesOnlyShowingNonIconifiedWindowsEvenBeforeDeactivation() throws Exception {
+        edt(() -> {
+            var window = manager.ensureMain("cold", null).orElseThrow();
+            var presentations = new ArrayList<WorkspaceActivity.Presentation>();
+            window.content().activity(event -> {
+                if (event instanceof WorkspaceActivity.Presentation value) presentations.add(value);
+            });
+            window.events().activated().accept(true);
+            window.events().state().accept(true, false);
+            assertThat(presentations.getLast().watched()).isTrue();
+            window.events().state().accept(true, true);
+            assertThat(window.content().isActiveAndOpen()).isTrue();
+            assertThat(presentations.getLast().watched()).isFalse();
+            window.events().state().accept(true, false);
+            assertThat(presentations.getLast().watched()).isTrue();
+            window.events().state().accept(false, false);
+            assertThat(presentations.getLast().watched()).isFalse();
+            window.events().state().accept(true, false);
+            assertThat(presentations.getLast().watched()).isTrue();
+        });
+    }
+
     @AfterEach void cleanup() throws Exception {
         edt(() -> manager.closeAll());
         closeOwners();
