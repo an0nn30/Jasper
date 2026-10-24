@@ -76,6 +76,12 @@ tasks.named<ProcessResources>("processResources") {
 // under build/, apart from the installed app's ~/.config/jasper. The IntelliJ run configuration in
 // .run/ sets the same two properties. Override with -Pjasper.home=<dir>; this property wins over JASPER_HOME.
 tasks.named<JavaExec>("run") {
+    // Throwaway Windows 11 prototype; keep packaged defaults unchanged until native acceptance.
+    providers.gradleProperty("jasper.windows.glass").orNull?.let {
+        require(it == "dwm" || it == "layered") { "jasper.windows.glass must be dwm or layered" }
+        systemProperty("jasper.windows.glass", it)
+        jvmArgs("--add-opens=java.desktop/java.awt=ALL-UNNAMED", "--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED")
+    }
     dependsOn(stagePlugins)
     systemProperty("jasper.plugins.bundled", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
     systemProperty("jasper.home", (project.findProperty("jasper.home") as String?)

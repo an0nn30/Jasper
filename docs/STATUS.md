@@ -107,6 +107,12 @@ Open items, as the entries below record them:
 
 ## Handoff log
 
+**Windows 11 workspace glass prototype — 2026-10-24** (`codex/windows-glass-prototype`, isolated Codex worktree;
+not merged or pushed): opt-in `dwm` (Desktop Acrylic) and `layered` (plain AWT alpha) experiments reuse the workspace
+opacity settings. The focused 66 tests and application architecture gate pass on macOS. Native Windows acceptance is pending with the
+user; a successful DWM call does not verify Swing's alpha composition. This is an authorized throwaway spike, deviating from the usual plan/subagent workflow. Commands,
+limitations and the native checklist: [prototype record](superpowers/plans/2026-10-24-windows-glass-prototype.md).
+
 Newest first. Each entry describes its change as it stood when the entry was written.
 
 **Editor Color scheme setting — 2026-10-23** (`claude/editor-color-scheme`, worktree

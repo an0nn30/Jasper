@@ -113,7 +113,7 @@ public final class CorePages {
     static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
                                        java.util.function.Consumer<String> navigate, boolean macOs, NotificationGroupChoices groups) {
         return List.of(
-            appearance(appearance, macOs),
+            appearance(appearance, macOs || dev.jasper.app.platform.WindowGlass.windowsPrototypeEnabled()),
             SchemaPage.page("window", "Window").parent("appearance-behavior")
                 .section("Toolbar & Status Bar")
                 .row(WINDOW_TOOLBAR, Editors.segments(Map.of("icons_and_labels", "Icons & Labels", "icons", "Icons Only", "hidden", "Hidden")))

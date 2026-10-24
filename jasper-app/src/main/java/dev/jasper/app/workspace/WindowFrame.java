@@ -99,9 +99,8 @@ public final class WindowFrame {
             frame.setFocusTraversalPolicy(content.getFocusTraversalPolicy());
             content.onMinimumSizeChanged = this::updateMinimumSize;
             if (bar != null) bar.attach(frame);
-            // Workspace glass exists only on macOS: elsewhere WindowGlass is never loaded and its
-            // requests are never made.
-            if (SystemInfo.isMacOS && !GraphicsEnvironment.isHeadless()) {
+            // The Windows backend is a process-local, explicitly opted-in prototype.
+            if ((SystemInfo.isMacOS || WindowGlass.windowsPrototypeEnabled()) && !GraphicsEnvironment.isHeadless()) {
                 made = new WindowGlass(frame.getRootPane(), WindowGlass.Platform.current(),
                     content::applyBackgroundOpacity);
                 WindowGlass requested = made;

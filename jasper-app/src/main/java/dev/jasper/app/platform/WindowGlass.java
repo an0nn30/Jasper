@@ -63,10 +63,21 @@ public final class WindowGlass implements AutoCloseable {
          */
         public static Platform current() {
             boolean mac = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("mac");
-            if (!mac || GraphicsEnvironment.isHeadless()) return NONE;
+            if (GraphicsEnvironment.isHeadless()) return NONE;
+            if (windowsPrototypeEnabled())
+                return new Platform(true, WindowsGlass::translucent, WindowsGlass::opaque, WindowsGlass::blur, WindowsGlass::watch);
+            if (!mac) return NONE;
             return new Platform(true, MacGlass::translucent, MacGlass::opaque, MacGlass::blur, MacGlass::watch);
         }
     }
+
+    /** Whether this process explicitly opted into the throwaway Windows glass experiment. No native calls. */
+    public static boolean windowsPrototypeEnabled() {
+        return System.getProperty("os.name", "").startsWith("Windows")
+            && prototypeMode(System.getProperty("jasper.windows.glass", ""));
+    }
+
+    static boolean prototypeMode(String mode) { return "dwm".equals(mode) || "layered".equals(mode); }
 
     private final JRootPane root;
     private final Platform platform;
