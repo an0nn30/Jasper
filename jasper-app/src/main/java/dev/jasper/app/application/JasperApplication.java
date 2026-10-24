@@ -1412,7 +1412,7 @@ public final class JasperApplication {
                 : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder, () -> pluginThemes),
                     surface -> surface == null ? Optional.empty() : this.shells.chooseFile(surface, "Import Theme", ".json"),
                     this::confirmOver, this::informOver, configuration::save, configuration::reload));
-            var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library, imports);
+            var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library, imports, desktopAppearance);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(appearanceChoices, system, shells,
                     new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName, plugins == null ? Map.of() : plugins.pluginIcons())),

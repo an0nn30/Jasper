@@ -71,7 +71,7 @@ class AppearanceSelectionTest {
             .as("Ocean has no Light variant").isFalse();
         var reset = (Nodes.Button) ((Nodes.Stack) ((Nodes.SettingRow) parts(editor).get(1)).control()).children().get(1);
         assertThat(reset.state().visible()).isTrue();
-        assertThat(editor.relatedSettings()).containsExactly(CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT);
+        assertThat(editor.relatedSettings()).containsExactly(CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT, CoreSettings.UI_THEME_DESKTOP_SOURCE);
     }
 
     @Test void aSavedPickIsKeptAsSavedAndOneThatIsNotInstalledIsShownAsSuch() {

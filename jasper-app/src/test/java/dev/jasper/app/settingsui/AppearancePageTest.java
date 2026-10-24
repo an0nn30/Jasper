@@ -201,6 +201,66 @@ class AppearancePageTest {
         assertThat(selected(kit(page, "ui.appearance:light-theme.input", JComboBox.class))).isEqualTo("Jasper Meadow");
     }
 
+    @Test void applyingASourceSavesItAndCancelDiscardsTheNextSourceDraft() {
+        try (var fixture = new DesktopSourceSelectionTest.Fixture("", true)) {
+            var saved = new java.util.concurrent.atomic.AtomicReference<>(sourceState("auto"));
+            var writes = new ArrayList<dev.jasper.app.config.SettingsEdit>();
+            var hooks = new SettingsDialog.Hooks(edit -> {
+                writes.add(edit);
+                saved.set(sourceState((String) edit.changes().get(CoreSettings.UI_THEME_DESKTOP_SOURCE).orElseThrow()));
+                return java.util.concurrent.CompletableFuture.completedFuture(saved.get());
+            }, saved::get, listener -> new Subscription(() -> {}), () -> {}, () -> {}, uri -> {}, (parent, count) -> true,
+                dev.jasper.app.testsupport.KitTestSupport::context);
+            var dialog = new SettingsDialog(SettingsChromeTest.windows(), context -> List.of(
+                CorePages.specs(fixture.choices, system).getFirst().build(context), SchemaPage.page("other", "Other").build(context)), hooks);
+            try {
+                dialog.open(null,"appearance");
+                var source = dev.jasper.app.testsupport.KitTestSupport.require(SettingsDialogTest.page(dialog),
+                    "ui.appearance:desktop-source.input", JComboBox.class);
+                source.setSelectedIndex(2);
+                dialog.select("other"); dialog.select("appearance");
+                assertThat(dev.jasper.app.testsupport.KitTestSupport.require(SettingsDialogTest.page(dialog),
+                    "ui.appearance:desktop-source.input", JComboBox.class)).isSameAs(source);
+                assertThat(fixture.demands).containsExactly("gtk4:true");
+                dialog.apply();
+                var loop = java.awt.Toolkit.getDefaultToolkit().getSystemEventQueue().createSecondaryLoop();
+                javax.swing.SwingUtilities.invokeLater(loop::exit);
+                assertThat(loop.enter()).isTrue();
+                assertThat(writes).singleElement().satisfies(edit -> assertThat(edit.changes())
+                    .containsOnlyKeys(CoreSettings.UI_THEME_DESKTOP_SOURCE));
+                assertThat(saved.get().snapshot().desktopSource()).isEqualTo("gtk4");
+                assertThat(dialog.draft().modified()).isFalse();
+                source.setSelectedIndex(1);
+                assertThat(dialog.draft().value(CoreSettings.UI_THEME_DESKTOP_SOURCE)).isEqualTo("gtk3");
+                dialog.cancel(); dialog.open(null,"appearance");
+                var reopened = dev.jasper.app.testsupport.KitTestSupport.require(SettingsDialogTest.page(dialog),
+                    "ui.appearance:desktop-source.input", JComboBox.class);
+                assertThat(DesktopSourceSelectionTest.selected(reopened)).isEqualTo("gtk4");
+                assertThat(writes).hasSize(1);
+            } finally { dialog.cancel(); }
+            assertThat(fixture.demands).isEmpty();
+        }
+    }
+
+    @Test void desktopThemeKeepsImportAvailableAndCannotBeRemoved() {
+        var choices = ClassicCompositionsTest.withImports();
+        var draft = AppearanceSelectionTest.draft("[ui.theme]\ndark='desktop-colors'\n");
+        var page = CorePages.specs(choices, system).getFirst().build(PageKit.context(draft, id -> {}, () -> {}));
+        try {
+            page.component();
+            var menu = (Nodes.MenuButton)node(page, "ui.appearance:dark-gear");
+            assertThat(menu.items().getFirst().label()).isEqualTo("Import Theme…");
+            assertThat(menu.items().getFirst().enabled()).isTrue();
+            assertThat(menu.items().getLast().enabled()).isFalse();
+        } finally { page.dispose(); }
+    }
+
+    private static dev.jasper.app.config.ConfigService.State sourceState(String source) {
+        var parsed = ConfigLoader.parse(Path.of("config.toml"), "[ui.theme]\ndark='desktop-colors'\ndesktop_source='" + source + "'\n", true);
+        return new dev.jasper.app.config.ConfigService.State(parsed.snapshot(), parsed.diagnostics(), Path.of("config.toml"), true,
+            parsed.legacyKeys(), parsed.deadTables(), parsed.values(), parsed.rejected());
+    }
+
     @Test void theTerminalSchemeIsADropdownOfTheFourSchemes() {
         var box = combo("terminal.scheme");
         assertThat(items(box)).containsExactly("Same as UI theme", "Slate Cobalt Dark", "Slate Cobalt Light", "High Contrast");
