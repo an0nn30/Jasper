@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use superpowers:subagent-driven-development, with one implementer, task review and whole-branch review.
 
-**Status:** Implemented; eight focused pixel tests and all 162 Buddy tests pass. Full `check` passed: 12,850 tests, zero failures/errors, 29 skipped (Python 3.12.14). Task and whole-branch reviews approved without findings. Scope expanded by one explanatory sentence in `docs/buddy-architecture.md`; the controller runs full `check` once, alongside report preparation. Native Ubuntu GNOME Wayland acceptance remains user-run.
+**Status:** Implemented; eight focused pixel tests and all 162 Buddy tests pass. Full `check` passed: 12,850 tests, zero failures/errors, 29 skipped (Python 3.12.14). Task and whole-branch reviews approved without findings. Scope expanded by one explanatory sentence in `docs/buddy-architecture.md`; the controller runs full `check` once, alongside report preparation. The user verified on Ubuntu GNOME Wayland that the black box and flickering are gone (2026-10-24) and authorized merge and push. Other desktop checks remain unrecorded.
 
 **Goal:** Preserve Buddy's transparent surfaces and present each animation frame in one blit on Linux.
 
@@ -21,7 +21,7 @@ User recording on Ubuntu GNOME Wayland shows opaque rectangles behind capsules a
 - JDK-only Buddy module; no new public API, external dependency or app import.
 - Headless tests only; never launch GUI, benchmark or AOT training.
 - Keep existing movement, animation timing, hide/dispose and appearance behavior.
-- Work on codex/buddy-wayland-rendering; no merge or push.
+- Work on codex/buddy-wayland-rendering; merge and push authorized by the user after Ubuntu verification (2026-10-24).
 - Commit ends with Co-Authored-By: Codex <noreply@openai.com>.
 
 ## Review focus
@@ -48,4 +48,4 @@ Transparent pixels must erase previous frames; clipping must preserve untouched 
 - Green: the same focused command passed all eight tests after implementation. `./gradlew :jasper-buddy:test` then passed all 162 tests, zero failures/errors/skips (XML results).
 - Tests compare actual premultiplied ARGB pixels against fresh direct rendering, including 1×, 2×, 1.25×, independent axis scales and translated destination bounds. They also exercise changed scale with unchanged pixel dimensions, target damage clipping, zero dimensions and dispose/repaint.
 - Source hygiene scanned all 2,930 Java source files with zero findings; `git diff --check` passed.
-- Full `./gradlew check -Pjasper.python=/Users/dustin/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3` passed in 16m 57s: 12,850 tests, zero failures/errors, 29 skipped. Existing compiler/JavaDoc and Byte Buddy deprecation warnings remain. Task and final whole-branch reviews approved without findings. Native Ubuntu acceptance is pending as listed above.
+- Full `./gradlew check -Pjasper.python=/Users/dustin/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3` passed in 16m 57s: 12,850 tests, zero failures/errors, 29 skipped. Existing compiler/JavaDoc and Byte Buddy deprecation warnings remain. Task and final whole-branch reviews approved without findings. The user confirmed the Ubuntu black-box and flickering fix; other desktop checks remain unrecorded.
