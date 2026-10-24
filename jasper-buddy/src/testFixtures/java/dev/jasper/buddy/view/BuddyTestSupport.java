@@ -18,6 +18,10 @@ public final class BuddyTestSupport {
     public int generation() { return edt(deck::generation); }
     public int size() { return edt(deck::size); }
     public boolean isEmpty() { return edt(deck::isEmpty); }
+    public void post(BuddyNotice notice, boolean visible) { edt(() -> { companion.post(notice, visible); return null; }); }
+    public void updateContext(BuddyNoticeId id, BuddyNotice.Group group, boolean visible) {
+        edt(() -> { companion.updateContext(id, group, visible); return null; });
+    }
     public void dismiss(BuddyNoticeId id) { edt(() -> { companion.dismiss(id); return null; }); }
     private static <T> T edt(Supplier<T> action) {
         if (SwingUtilities.isEventDispatchThread()) return action.get();

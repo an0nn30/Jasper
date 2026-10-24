@@ -22,9 +22,28 @@ import java.util.function.Supplier;
  * @param state nonnull state compatible with kind
  * @param detail nonnull nonblocking detail supplier; presentation tolerates a failed supplier
  * @param activate nonnull activation request
+ * @param group nullable display grouping context
  */
 public record BuddyNotice(BuddyNoticeId id, Kind kind, String title, State state,
-                   Supplier<String> detail, Runnable activate) {
+                   Supplier<String> detail, Runnable activate, Group group) {
+
+    /** Creates an ungrouped notice. */
+    public BuddyNotice(BuddyNoticeId id, Kind kind, String title, State state,
+                       Supplier<String> detail, Runnable activate) {
+        this(id, kind, title, state, detail, activate, null);
+    }
+
+    /** Generic display group with stable identity.
+     * @param id nonnull source-qualified group identity
+     * @param title nonblank display title
+     */
+    public record Group(BuddyNoticeId id, String title) {
+        /** Validates group identity and display title. */
+        public Group {
+            Objects.requireNonNull(id, "id");
+            if (title == null || title.isBlank()) throw new IllegalArgumentException("A group needs a non-blank title");
+        }
+    }
 
     /** What sort of thing this is, which is what decides how it ends. */
     public enum Kind {
