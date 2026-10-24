@@ -20,6 +20,7 @@ public final class DesktopColors implements AutoCloseable {
     private final Function<List<String>, Process> launcher;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final List<Consumer<DesktopObservation>> listeners = new ArrayList<>();
+    private final List<Runnable> resampleListeners = new ArrayList<>();
     private final Slot portal = new Slot(null);
     private final Map<Source, Slot> toolkits = new EnumMap<>(Source.class);
     private volatile DesktopObservation current = new DesktopObservation(
@@ -69,6 +70,14 @@ public final class DesktopColors implements AutoCloseable {
     public synchronized Runnable subscribe(Consumer<DesktopObservation> listener) {
         Objects.requireNonNull(listener); if (!closed.get()) listeners.add(listener);
         return () -> { synchronized (this) { listeners.remove(listener); } };
+    }
+    /**
+     * Registers future 30-second sampling boundaries on the manager thread, independently of palette equality.
+     * The returned removal is idempotent; removal and close suppress delivery of queued boundaries.
+     */
+    public synchronized Runnable subscribeResample(Runnable listener) {
+        Objects.requireNonNull(listener); if (!closed.get()) resampleListeners.add(listener);
+        return () -> { synchronized (this) { resampleListeners.remove(listener); } };
     }
     /** Replaces aggregate demand; the caller's generation belongs to its source/appearance request. */
     public void request(long generation, Set<Source> sources, boolean dark) {
@@ -164,6 +173,15 @@ public final class DesktopColors implements AutoCloseable {
             if (closed.get()) return;
             for (Slot slot : toolkits.values()) if (active(slot) && slot.process != null)
                 slot.process.sample(demand.generation(), demand.dark());
+            List<Runnable> targets;
+            synchronized (this) { targets = List.copyOf(resampleListeners); }
+            for (Runnable target : targets) {
+                synchronized (this) { if (closed.get()) return; if (!resampleListeners.contains(target)) continue; }
+                try { target.run(); }
+                catch (RuntimeException failure) {
+                    System.getLogger(getClass().getName()).log(System.Logger.Level.WARNING, "Desktop colors resample listener failed", failure);
+                }
+            }
             scheduleResample();
         }), 30, TimeUnit.SECONDS);
     }
@@ -191,7 +209,7 @@ public final class DesktopColors implements AutoCloseable {
     private static void cancel(ScheduledFuture<?> task) { if (task != null) task.cancel(false); }
     @Override public void close() {
         if (!closed.compareAndSet(false, true)) return;
-        synchronized (this) { listeners.clear(); }
+        synchronized (this) { listeners.clear(); resampleListeners.clear(); }
         manage(() -> {
             cancel(publication); cancel(resample); stop(portal); toolkits.values().forEach(this::stop);
             // Process retirement is queued on the same manager before executor shutdown.

@@ -24,7 +24,7 @@ final class DesktopAppearance implements AutoCloseable {
     private final DesktopColors desktop;
     private final String currentDesktop;
     private final Executor worker, edt;
-    private final Runnable unsubscribe;
+    private final Runnable unsubscribe, unsubscribeResample;
     private final Map<Key, Palette> cache = new HashMap<>();
     private final List<Preview> previews = new ArrayList<>();
     private final Set<Runnable> listeners = new LinkedHashSet<>();
@@ -47,6 +47,7 @@ final class DesktopAppearance implements AutoCloseable {
         observation = desktop.current();
         current = new DesktopPalette.Result(themes.current().chrome(), Optional.empty(), "Desktop palette pending");
         unsubscribe = desktop.subscribe(value -> edt.execute(() -> observed(value)));
+        unsubscribeResample = desktop.subscribeResample(() -> edt.execute(this::resamplePreviews));
     }
     void onFailure(Consumer<ThemeController.InstallationFailure> listener) { failure = Objects.requireNonNull(listener); }
     void update(ConfigSnapshot config) {
@@ -87,6 +88,15 @@ final class DesktopAppearance implements AutoCloseable {
     private Applied applied() {
         if (config == null) return null;
         return new Applied(config, selection, dark(), DesktopPalette.SourceMode.valueOf(config.desktopSource().toUpperCase(Locale.ROOT)));
+    }
+    /** Every retained polarity gets a bounded refresh even when the active polarity is content-equal. */
+    private void resamplePreviews() {
+        if (closed || previews.isEmpty()) return;
+        // The supervisor already samples the current polarity at this boundary. An equal reply is suppressed,
+        // so it must not remain ahead of the other polarity in the pending queue.
+        previews.forEach(preview -> preview.sampled = demand != null && preview.dark == demand.dark());
+        revision++;
+        syncDemand(); resolve();
     }
     private void observed(DesktopObservation value) {
         if (closed) return;
@@ -198,7 +208,7 @@ final class DesktopAppearance implements AutoCloseable {
     }
     @Override public void close() {
         requireEdt(); if (closed) return;
-        closed = true; revision++; unsubscribe.run(); previews.clear(); listeners.clear(); cache.clear(); desktop.close();
+        closed = true; revision++; unsubscribe.run(); unsubscribeResample.run(); previews.clear(); listeners.clear(); cache.clear(); desktop.close();
         if (worker instanceof ExecutorService service) service.shutdown();
     }
     private static void requireEdt() {

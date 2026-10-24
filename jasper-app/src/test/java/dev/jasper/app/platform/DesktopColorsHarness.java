@@ -26,6 +26,12 @@ public final class DesktopColorsHarness implements AutoCloseable {
         publish();
     }
     public void palette(Source source, boolean dark, String background, String reason) {
+        palette(source, dark, background, reason, true);
+    }
+    public void reply(Source source, boolean dark, String background, String reason) {
+        palette(source, dark, background, reason, false);
+    }
+    private void palette(Source source, boolean dark, String background, String reason, boolean accepted) {
         pump();
         var process = processes.get("jasper-desktop-" + source.name().toLowerCase(Locale.ROOT));
         fixture.await(() -> process.commands().contains("sample"));
@@ -36,7 +42,7 @@ public final class DesktopColorsHarness implements AutoCloseable {
             + ",\"source\":\"" + source.name().toLowerCase(Locale.ROOT) + "\",\"appearance\":\"" + (dark ? "dark" : "light")
             + "\",\"window.bg\":\"" + background + "\",\"window.fg\":\"" + (dark ? "1,1,1,1" : "0,0,0,1")
             + "\",\"implementation\":\"fixture\",\"libraryVersion\":\"1\",\"reason\":\"" + reason + "\"}");
-        fixture.await(() -> service.current().palettes().get(source) != null
+        if (accepted) fixture.await(() -> service.current().palettes().get(source) != null
             && service.current().palettes().get(source).generation() == generation
             && service.current().palettes().get(source).reason().equals(reason));
         publish();
@@ -54,6 +60,12 @@ public final class DesktopColorsHarness implements AutoCloseable {
             String last = process.commands().lines().filter(line -> line.contains("sample")).reduce((a, b) -> b).orElse("");
             return last.contains("\"appearance\":\"" + (dark ? "dark" : "light") + "\"");
         });
+    }
+    public void advance(long seconds) { fixture.time.advance(seconds, TimeUnit.SECONDS); pump(); }
+    public long sampleCount(Source source) {
+        pump();
+        var process = processes.get("jasper-desktop-" + source.name().toLowerCase(Locale.ROOT));
+        return process == null ? 0 : process.commands().lines().filter(line -> line.contains("sample")).count();
     }
     public void retry() { fixture.time.advance(1, TimeUnit.SECONDS); pump(); }
     public boolean toolkitAlive(Source source) {

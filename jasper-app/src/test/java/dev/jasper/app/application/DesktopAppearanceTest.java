@@ -234,6 +234,41 @@ class DesktopAppearanceTest {
         }
     }
 
+
+    @Test void unchangedDarkSamplesStillRefreshTheRetainedLightPreviewAtTheBoundedSamplingInterval() throws Exception {
+        try (var f = new Fixture()) {
+            f.nativeInput.portal(1, true, ""); f.drain();
+            f.owner.update(config("gtk4", true)); f.drain();
+            f.nativeInput.palette(Source.GTK4, true, "0.1,0.1,0.1,1", ""); f.drain();
+            var darkDemand = f.owner.preview(DesktopPalette.SourceMode.GTK4, true, value -> { }); f.drain();
+            var previews = new ArrayList<DesktopPalette.Result>();
+            var demand = f.owner.preview(DesktopPalette.SourceMode.GTK4, false, previews::add); f.drain();
+            f.nativeInput.palette(Source.GTK4, false, "0.95,0.95,0.95,1", ""); f.drain();
+            f.nativeInput.awaitRequested(Source.GTK4, true);
+            f.nativeInput.palette(Source.GTK4, true, "0.1,0.1,0.1,1", ""); f.drain();
+            int installs = f.installs.get(), delivered = previews.size();
+            long samples = f.nativeInput.sampleCount(Source.GTK4);
+            f.nativeInput.advance(29); f.drain();
+            assertThat(f.nativeInput.sampleCount(Source.GTK4)).isEqualTo(samples);
+            f.nativeInput.advance(1); f.drain();
+            // The periodic Dark reply is exactly unchanged; only the unobserved Light colors changed.
+            // The preview may already supersede this in-flight generation, so no accepted publication is required.
+            f.nativeInput.reply(Source.GTK4, true, "0.1,0.1,0.1,1", ""); f.drain();
+            f.nativeInput.awaitRequested(Source.GTK4, false);
+            f.nativeInput.palette(Source.GTK4, false, "0.85,0.85,0.85,1", ""); f.drain();
+            f.nativeInput.awaitRequested(Source.GTK4, true);
+            f.nativeInput.palette(Source.GTK4, true, "0.1,0.1,0.1,1", ""); f.drain();
+            assertThat(previews).hasSize(delivered + 1);
+            assertThat(previews.getLast().theme().semantic().color(SemanticColor.SURFACE_APP))
+                .isEqualTo(new java.awt.Color(217, 217, 217));
+            assertThat(f.installs.get()).isEqualTo(installs);
+            assertThat(f.nativeInput.sampleCount(Source.GTK4)).isEqualTo(samples + 3);
+            f.drain();
+            assertThat(f.nativeInput.sampleCount(Source.GTK4)).as("no reply-triggered sampling loop").isEqualTo(samples + 3);
+            demand.close(); darkDemand.close();
+        }
+    }
+
     static ConfigSnapshot config(String source, boolean dark) {
         return ConfigSnapshot.defaults().toBuilder().darkTheme("desktop-colors").lightTheme("desktop-colors")
             .desktopSource(source).appearance(dark ? AppearanceMode.DARK : AppearanceMode.LIGHT).build();

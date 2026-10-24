@@ -9,6 +9,42 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class DesktopColorsTest {
+
+    @Test void resampleBoundaryIsIndependentOfEqualObservationsAndStopsAtUnsubscribeOrClose() {
+        try (var f = new DesktopProcessTest.Fixture()) {
+            var desktop = service(f, new ArrayList<>(), "echo");
+            f.await(() -> desktop.current().portal().appearance() == Polarity.DARK);
+            var boundaries = new AtomicInteger();
+            Runnable remove = desktop.subscribeResample(boundaries::incrementAndGet);
+            f.time.advance(29, TimeUnit.SECONDS); f.pump();
+            assertThat(boundaries.get()).isZero();
+            f.time.advance(1, TimeUnit.SECONDS); f.pump();
+            assertThat(boundaries.get()).isEqualTo(1);
+            remove.run(); remove.run();
+            f.time.advance(30, TimeUnit.SECONDS); f.pump();
+            assertThat(boundaries.get()).isEqualTo(1);
+            desktop.subscribeResample(boundaries::incrementAndGet);
+            f.time.advance(30, TimeUnit.SECONDS); // Boundary queued on manager, not delivered yet.
+            desktop.close(); f.pump();
+            assertThat(boundaries.get()).isEqualTo(1);
+        }
+    }
+    @Test void aFailingResampleSubscriberDoesNotSuppressOtherSubscribersOrFutureIntervals() {
+        try (var warnings = new CapturedWarnings(DesktopColors.class);
+             var f = new DesktopProcessTest.Fixture()) {
+            var desktop = service(f, new ArrayList<>(), "echo");
+            f.await(() -> desktop.current().portal().appearance() == Polarity.DARK);
+            var failed = new java.util.concurrent.atomic.AtomicBoolean();
+            desktop.subscribeResample(() -> { if (failed.compareAndSet(false, true)) throw new IllegalStateException("listener"); });
+            var boundaries = new AtomicInteger(); desktop.subscribeResample(boundaries::incrementAndGet);
+            f.time.advance(30, TimeUnit.SECONDS); f.pump();
+            f.time.advance(30, TimeUnit.SECONDS); f.pump();
+            assertThat(boundaries.get()).isEqualTo(2);
+            desktop.close(); f.pump();
+            warnings.assertListenerFailure("Desktop colors resample listener failed");
+        }
+    }
+
     @Test void startsOnlyPortalUntilToolkitDemandAndStopsUnusedToolkit() {
         try (var f = new DesktopProcessTest.Fixture()) {
             var commands = new java.util.concurrent.CopyOnWriteArrayList<List<String>>();
