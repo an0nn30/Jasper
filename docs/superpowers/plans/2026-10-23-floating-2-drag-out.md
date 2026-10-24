@@ -1,6 +1,7 @@
 # Floating tool windows 2: drag a tool window out Implementation Plan
 
-**Status: executed on 2026-10-23** (`f26c98276..7e5abb606`, then the documentation commit); see `docs/STATUS.md`.
+**Status: executed on 2026-10-23** (`67a7a0c5a..12f936f60`, then the final review's documentation commit); see
+`docs/STATUS.md`.
 Deviations from the plan's text: (1) a detach drop activates the new window, as View Mode from a menu does (Task 2); (2)
 Task 2 reuses `DetachedToolWindows`' size rule (a private `size`, shared by `initialBounds` and the new `droppedBounds`)
 instead of copying it into `WindowContributions`; (3) Detach also holds over another workspace window in front of the
@@ -8,7 +9,10 @@ main window (`TabDrag.behind`, a new method beside `covers`), which Task 1's `co
 (4) `DockDrag.frameOnScreen` replaces `SwingUtilities.getRoot`, which returns null for the stand-in frame in JDK 25, and
 the label's title comes from a new `DockDrag.titles` hook; (5) the display is picked by whole bounds, then the window is
 fitted to its usable part, through `WindowPlacement.Display` and `WindowFrame.displays()` (`7e5abb606`), where Task 2
-named `WindowPlacement.displayFor` over the usable bounds.
+named `WindowPlacement.displayFor` over the usable bounds; (6) the final review's fixes (`12f936f60`): a lost release
+ends the dock drag as it ends a tab drag, the grab is the header's wherever in it the press landed, a release whose
+handling fails still ends the drag, and the new window's title bar is not counted, so the guide says it opens near the
+pointer.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

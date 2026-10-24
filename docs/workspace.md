@@ -349,13 +349,14 @@ start, and one saved on a display that is no longer connected opens on a connect
   another button or switching windows cancels the drag. An empty, hidden rail still takes a drop at its window edge.
 - **Drag it out of the main window** (a rail button, a labelled stripe's or the bottom strip's tab, or a docked tool
   window's header) and release it outside the window, or over another of Jasper's windows that lies in front of it, to
-  open the tool window in a Float window there, focused, whether it was showing or not ([Float and
-  Window](#float-and-window)). While the pointer is there, the rails' gap and the outline go and the tool window's title
-  and icon follow the pointer; moving back over the window brings them back. The window opens with the point you
-  pressed under the pointer, at the size it last had or else its frame's, on the display under the pointer. Dragging out
-  the button of a tool window that has a window of its own moves that window there, Float or Window as it was; released
-  on a rail, it keeps its own window and its button moves to that slot, and released over the workspace it docks there
-  and shows.
+  open the tool window in a window of its own there, focused, whether it was showing or not: a Float window, or a
+  Window if that is its mode ([Float and Window](#float-and-window)). While the pointer is there, the rails' gap and the
+  outline go and the tool window's title and icon follow the pointer; moving back over the window brings them back. The
+  window opens near the pointer, its corner as far from it as your press was from the button's or header's corner, at
+  the size its window last had, else its docked frame's, else (a hidden tool window's) the size it would dock at, on the
+  display under the pointer. Dragging out the button of a tool window whose window shows moves that window there.
+  Dragged back into the window instead, it keeps its own window when released on a rail, where its button moves, and
+  docks there and shows when released over the workspace.
 - **Move to** on the right-click or Options menu moves it straight to a named slot.
 - **Resize** by dragging the gap between a tool window and the terminal, or between the two tool windows on a side.
   The change applies when you release. A side or the bottom area snaps to its default size (260 logical pixels wide,

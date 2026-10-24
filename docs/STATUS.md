@@ -111,8 +111,8 @@ Open items, as the entries below record them:
 Newest first. Each entry describes its change as it stood when the entry was written.
 
 **Floating tool windows, plan 2: drag a tool window out — 2026-10-23** (`claude/floating-tool-windows`, worktree
-`.claude/worktrees/workspace-tabs`, `f26c98276..7e5abb606` and the documentation commit, on plan 1's branch; not merged
-or pushed; [plan](superpowers/plans/2026-10-23-floating-2-drag-out.md),
+`.claude/worktrees/workspace-tabs`, `67a7a0c5a..12f936f60` and the final review's documentation commit, on plan 1's
+branch; not merged or pushed; [plan](superpowers/plans/2026-10-23-floating-2-drag-out.md),
 [spec](superpowers/specs/2026-10-23-jasper-floating-tool-windows-design.md), "The drag out"; executed with per-task
 subagents and reviews). Releasing a dragged rail button, labelled stripe tab, bottom strip tab or docked header outside
 the main window, or over another of Jasper's windows in front of it, opens the tool window in a Float window there. What
@@ -134,6 +134,12 @@ landed, in task order:
 4. Review fix: the display is the one whose whole bounds hold the pointer, then the window is fitted to its usable part,
    so a release over a menu bar, Dock or taskbar lands on that display, not the default one (`WindowPlacement.Display`,
    `WindowFrame.displays()`, shared with plan 1's `initialBounds`) (`7e5abb606`).
+5. Final review fixes: a plain move or a press anywhere while a dock drag runs is a lost release, as `TabDrag` reads
+   one, and ends the drag and its label (an `AWTEventListener` added in `start`, removed in `finish`); a press on a
+   header's title, detail or labels holds the header (`surface`, the outermost of the id's drag surfaces), so the grab
+   no longer depends on which took the press; a release whose handling fails still ends the drag (`finish` in a
+   `finally`), and `start` puts the Esc dispatcher and the listener in place before anything shows. `WindowDragTest`'s
+   badge test drags in one window at a time, since a press in the other window now ends the first drag (`12f936f60`).
 Documentation: [Float and Window](workspace.md#float-and-window) and
 [Moving and resizing](workspace.md#moving-and-resizing), the `workspace` row of the [architecture](app-architecture.md),
 the dock recipes in [app maintenance](app-maintenance.md) (the Detach paragraph and the focused test command), and the
@@ -145,11 +151,19 @@ Rulings (each costs what its last words say if wrong):
 - Over another of Jasper's workspace windows in front, not only the outside, is Detach, as the spec says; the tab drag's
   activation order decides "in front" (a small `TabDrag` extension).
 - `DockDrag.frameOnScreen` walks up to the native `Window` (a stand-in's outermost component for a headless test) instead
-  of `SwingUtilities.getRoot`, which returns null for the stand-in in JDK 25, as `TabDrag` does.
+  of `SwingUtilities.getRoot`, which returns null for the stand-in in JDK 25, as `TabDrag` does (a second copy of
+  `TabDrag.outermost`'s walk).
 - The label shows the tool window's title, from a new `DockDrag.titles` wired in `WindowContributions`, not the stripe
   label, which carries "N: " under labelled stripes; its icon is the drag's ghost, the stripe-sized one (one more hook).
 - The display is picked by whole bounds, then fitted to the usable part (the review's Important finding; the first cut
-  used usable bounds, so a drop over a menu bar landed on the default display).
+  used usable bounds, so a drop over a menu bar landed on the default display) (`WindowPlacement.Display`, a record of
+  both bounds, through `WindowFrame`, `DetachedToolWindows` and their tests).
+- Final review: the dock drag ends on a lost release as the tab drag does (a plain move or a press anywhere), so its
+  always-on-top label cannot stay on screen (a drag ended by a stray plain move, which Swing does not send while the
+  button is held).
+- Final review: the grab is the header's wherever in it the press landed, and the window's outer corner is placed by it,
+  so its title bar is not counted; the guide says the window opens near the pointer (a window that opens a title bar's
+  height off the press point).
 
 Deferred, worth knowing:
 - The dock drag's own label window is not excluded from `TabDrag`'s other-windows list; its 8 px offset keeps it from
@@ -168,12 +182,15 @@ Check: `./gradlew check --continue` (BUILD SUCCESSFUL in 10m 20s; the Buddy, SDK
 `checkThemeTool` were up to date): **12,968 tests, 0 failures, 0 errors, 29 skipped** (this run's XML holds 5,941, from
 `:jasper-app`, `:jasper-terminal` and `:jasper-ui`; the up-to-date tasks' results are the other 7,027). The plan's new
 test class is `DockDragDetachTest` (16 cases); `DetachedToolWindowsTest`, `DetachedShortcutsTest` and `WindowManagerTest`
-only took the new display record. GUI checks for the user, none run (no window was launched), on each
-platform in the default look, and for the labelled stripes and the bottom strip in the Enterprise look:
+only took the new display record. After the final review's fixes, `./gradlew verifyApplicationArchitecture
+:jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests '*AppDocumentationTest' --tests
+'*ThemeMigrationCoverageTest'` (BUILD SUCCESSFUL): **1,373 tests in 161 classes, 0 failures, 0 errors, 11 skipped**,
+`DockDragDetachTest` now 22 cases; no full check was run. GUI checks for the user, none run (no window was launched), on
+each platform in the default look, and for the labelled stripes and the bottom strip in the Enterprise look:
 - All: drag a rail button, a labelled stripe tab (Enterprise), the bottom strip's tab (Enterprise) and a docked tool
-  window's header (shown) out of the main window and release: a Float window opens at the pointer, with the point you
-  pressed under it, focused and above the main window; a hidden tool window shows in it; its button stays on its stripe,
-  highlighted.
+  window's header (shown) out of the main window and release: a Float window opens at the pointer, the point you
+  pressed about its title bar's height below it, focused and above the main window; a hidden tool window shows in it;
+  its button stays on its stripe, highlighted.
 - All: while the pointer is outside, the stripes' gap and the outline are gone and a label with the tool window's title and
   icon follows the pointer; moving back over the window brings the gap and the outline back and the label goes; Escape,
   a right click, or another application coming to the front while outside cancels with nothing opened.
@@ -186,6 +203,9 @@ platform in the default look, and for the labelled stripes and the bottom strip 
 - macOS (in the packaged Jasper.app): the label over the Dock and the menu bar, and a release there; the Float above the
   main window after the drop. Windows: the label over the taskbar and a release there. Linux (x64 and aarch64): the label
   (an override-redirect window on X11) and the window manager's placement of the Float.
+- macOS full screen: on a single display a full-screen main window has no outside, so only a release over another of
+  Jasper's windows in front of it (Settings, a Float tool window) detaches; with two displays, a release on the second
+  opens the Float, owned by the full-screen main window, on that display (where it shows and whether it stays above).
 
 **Floating tool windows, plan 1: Float and Window — 2026-10-23** (`claude/floating-tool-windows`, worktree
 `.claude/worktrees/workspace-tabs`, `6cef314c3..2a5f0d62e` and the documentation commit, from `main` at `5db3524b4`; not
