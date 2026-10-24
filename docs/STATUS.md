@@ -120,7 +120,7 @@ implementation bodies rather than providing complete code. Task 2's overlapping 
 its broad run; the serialized final check replaces it. Tasks 1–3 passed task review, including the shrinking-drawer
 scroll fix. `./gradlew check --continue` with the installed uv Python 3.13 passed in 7m 50s: 12,865 tests,
 zero failures/errors, 29 skips. Existing compiler and ByteBuddy 1.18.3 JDK Unsafe deprecation warnings remain.
-Whole-branch review and user GUI acceptance remain pending: titled program, tab/window switching, split-tab expansion,
+Whole-branch review found no actionable issues. User GUI acceptance remains pending: titled program, tab/window switching, split-tab expansion,
 pane activation and tab moves. Stand-up animation is a separate deliverable. No GUI, benchmark or AOT run.
 
 **Shared display scaling — 2026-10-24** (`codex/shared-display-scaling`; not merged or pushed): terminal fonts,
