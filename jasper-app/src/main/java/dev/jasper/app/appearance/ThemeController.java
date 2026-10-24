@@ -46,6 +46,8 @@ public final class ThemeController implements AutoCloseable {
     /** The look's standard UI font ({@code ui.font.family = "system"}): the kit's own face when registered, else FlatLaf's. */
     private final Font platformFont;
     private final float platformLabelSize;
+    /** FlatLaf's desktop font size, kept apart from the look's body size for scale derivation. */
+    private final float platformScaleSize;
     private static final List<String> FORM_FONTS = List.of("Label.font", "List.font", "TextField.font",
         "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font", "Button.font");
 
@@ -170,6 +172,8 @@ public final class ThemeController implements AutoCloseable {
         appearance = new AppearanceBindings(current.pair(), kit, ThemeController::reportFailure, () -> animationsEnabled);
         new dev.jasper.ui.swing.AppearanceTransaction(appearance.binding(), ignored -> installOrThrow(current.chrome()), ignored -> {}).apply(current.pair());
         Font look = lookFace(kit);
+        Font desktop = UIManager.getFont("defaultFont");
+        platformScaleSize = (desktop != null ? desktop : UIManager.getFont("Label.font")).getSize2D();
         platformFont = look != null ? new FontUIResource(look.deriveFont(com.formdev.flatlaf.util.UIScale.scale(kit.type().body())))
             : UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
@@ -249,7 +253,7 @@ public final class ThemeController implements AutoCloseable {
         Font family = choice.family().equalsIgnoreCase("system") ? platformFont : new Font(choice.family(), Font.PLAIN, 13);
         if (family.getFamily().equals(Font.DIALOG) && !choice.family().equalsIgnoreCase(Font.DIALOG)) family = platformFont;
         // Retain the platform's title/menu offset relative to ordinary form text.
-        float size = choice.size() == 0 ? platformFont.getSize2D()
+        float size = choice.size() == 0 ? platformScaleSize
             : choice.size() + platformFont.getSize2D() - platformLabelSize;
         return new FontUIResource(family.deriveFont(Font.PLAIN, size));
     }

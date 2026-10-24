@@ -231,7 +231,8 @@ platform face.
   the platform family lacks it too (Liberation Sans on Linux, for example), so Java's installed fallback fonts fill it
   in glyph by glyph.
 - Under a kit whose regular UI face is registered, `FlatLafInstaller` gives FlatLaf's component fonts that face at the
-  kit's body size; menu accelerators keep the platform face.
+  kit's body size times the user scale; menu accelerators keep the platform face. A family-only override retains
+  FlatLaf's desktop font size for scale derivation while native and kit text retain the look's body size.
 
 ## Motion
 

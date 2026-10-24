@@ -242,6 +242,7 @@ The view's hooks, all on the EDT:
 | `setOnCloseRequest(Runnable)` | called on a key press other than a modifier once the exit future has completed normally; the view then consumes every key |
 | `afterNextPaint(Runnable)` | runs once after the next completed paint |
 | `setPalette`, `setFontSize`, `resetFontSize` | recolour or resize this view only; `setFontSize` clamps to 6–72 points and refits the session, `resetFontSize` sets 14 points |
+| `setUserScaleFactor(float)` | applies a finite positive host user scale (default 1) to rendering metrics and refits the session; font sizes and zoom remain logical points |
 | `setInactiveDim(float)` | overlays the palette background from 0 (clear) to 1 (fully dimmed) |
 | `setBackgroundOpacity(float)` | makes the default background translucent from 1 (opaque, the default) to 0; below 1 the view is not opaque, while explicit cell colours, the selection and the cursor stay solid |
 
