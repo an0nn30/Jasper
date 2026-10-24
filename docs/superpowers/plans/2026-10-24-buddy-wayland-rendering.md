@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use superpowers:subagent-driven-development, with one implementer, task review and whole-branch review.
 
-**Status:** Implemented; eight focused pixel tests and all 162 Buddy tests pass. Full `check` and independent review are pending. Scope expanded by one explanatory sentence in `docs/buddy-architecture.md`; the controller runs full `check` once, alongside report preparation. Native Ubuntu GNOME Wayland acceptance remains user-run.
+**Status:** Implemented; eight focused pixel tests and all 162 Buddy tests pass. Full `check` passed: 12,850 tests, zero failures/errors, 29 skipped (Python 3.12.14). Task and whole-branch reviews approved without findings. Scope expanded by one explanatory sentence in `docs/buddy-architecture.md`; the controller runs full `check` once, alongside report preparation. Native Ubuntu GNOME Wayland acceptance remains user-run.
 
 **Goal:** Preserve Buddy's transparent surfaces and present each animation frame in one blit on Linux.
 
@@ -38,8 +38,8 @@ Transparent pixels must erase previous frames; clipping must preserve untouched 
 - [x] Run ./gradlew :jasper-buddy:test --tests '*BuddyFrameBufferTest' and record expected failure.
 - [x] Implement renderer with cached TYPE_INT_ARGB_PRE BufferedImage sized ceil(logical width * device scale X) by ceil(logical height * device scale Y). For each frame clear entire image using AlphaComposite.Clear, restore SrcOver, scale graphics to device pixels and clip to logical window bounds, invoke painter on that offscreen graphics, dispose it. On a copy of target graphics, retain caller clip, intersect logical bounds, use AlphaComposite.Src and draw image with inverse-scale AffineTransform (avoids rounding-induced resampling), then dispose. Cache by pixel dimensions; ensure current transform is applied each paint. Flush replaced/released images; no per-frame image allocation when dimensions unchanged. Normal window transforms are axis aligned positive scales. Handle zero dimensions before allocating.
 - [x] Implement shared window as above. Replace all four `new JWindow()` with `new BuddySurfaceWindow()`. Leave panels and timers unchanged. Explain in a short code comment why Swing's opaque X11 buffer and native clear are avoided.
-- [ ] Run ./gradlew :jasper-buddy:test and ./gradlew check with Python 3.11–3.13 via -Pjasper.python if needed. Controller may run the full check while review runs; report all failures explicitly. Test source hygiene and git diff --check. Update plan status and short STATUS entry with verified results and pending Ubuntu acceptance (capsules, sprite, dragging, hide/show, menu/drawer and scaling).
-- [ ] Commit task with required trailer. Per-task review then final whole-branch review; fix findings and update evidence before final delivery.
+- [x] Run ./gradlew :jasper-buddy:test and ./gradlew check with Python 3.11–3.13 via -Pjasper.python if needed. Controller may run the full check while review runs; report all failures explicitly. Test source hygiene and git diff --check. Update plan status and short STATUS entry with verified results and pending Ubuntu acceptance (capsules, sprite, dragging, hide/show, menu/drawer and scaling).
+- [x] Commit task with required trailer. Per-task review then final whole-branch review; fix findings and update evidence before final delivery.
 
 
 ## Implementation evidence
@@ -48,4 +48,4 @@ Transparent pixels must erase previous frames; clipping must preserve untouched 
 - Green: the same focused command passed all eight tests after implementation. `./gradlew :jasper-buddy:test` then passed all 162 tests, zero failures/errors/skips (XML results).
 - Tests compare actual premultiplied ARGB pixels against fresh direct rendering, including 1×, 2×, 1.25×, independent axis scales and translated destination bounds. They also exercise changed scale with unchanged pixel dimensions, target damage clipping, zero dimensions and dispose/repaint.
 - Source hygiene scanned all 2,930 Java source files with zero findings; `git diff --check` passed.
-- The controller owns full `./gradlew check` evidence and independent reviews. Native Ubuntu acceptance is pending as listed above.
+- Full `./gradlew check -Pjasper.python=/Users/dustin/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3` passed in 16m 57s: 12,850 tests, zero failures/errors, 29 skipped. Existing compiler/JavaDoc and Byte Buddy deprecation warnings remain. Task and final whole-branch reviews approved without findings. Native Ubuntu acceptance is pending as listed above.
