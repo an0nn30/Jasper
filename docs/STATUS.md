@@ -1,6 +1,6 @@
 # Jasper — Status and Handoff
 
-**Linux Desktop colors — 2026-10-24.** Continuing the approved [plan](superpowers/plans/2026-10-17-jasper-linux-desktop-colors.md) on `codex/linux-desktop-colors`, refreshed from main `22a611145`. Protocol, portal, GTK extraction and Java supervision are implemented and independently reviewed; palette mapping is in progress. Earlier native verification covers the Ubuntu 26.04 VM and private Ubuntu 24.04/22.04 userspaces. Verification after this refresh is pending.
+**Linux Desktop colors — 2026-10-24.** Continuing the approved [plan](superpowers/plans/2026-10-17-jasper-linux-desktop-colors.md) on `codex/linux-desktop-colors`, refreshed from main `22a611145`. Protocol, portal, GTK extraction and Java supervision are implemented and independently reviewed; palette mapping is also implemented and independently reviewed. Earlier native verification covers the Ubuntu 26.04 VM and private Ubuntu 24.04/22.04 userspaces. Palette validation includes a narrow read-only exception for inspecting both shipped kits; runtime kit selection stays unchanged. Refreshed focused checks: 439 passed, four Windows-only skips, UI/application architecture guards passed; the selection-contrast fix passed 131 covering tests and re-review.
 
 ## Current state — 2026-10-22
 
