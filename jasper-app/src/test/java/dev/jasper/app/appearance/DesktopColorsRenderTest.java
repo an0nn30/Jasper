@@ -61,17 +61,17 @@ class DesktopColorsRenderTest {
                 else assertThat(resolved.source()).contains(fixture.input().palettes().keySet().iterator().next());
                 var theme = resolved.theme();
                 assertThat(DesktopPaintPairs.validate(theme, fixture.high())).as(fixture.name()).isEmpty();
-                var visited = new LinkedHashSet<String>();
+                var modeled = new LinkedHashSet<String>();
                 for (var pair : DesktopPaintPairs.all()) {
                     double ratio = ColorMath.contrast(pair.foreground(theme), pair.background(theme));
                     assertThat(ratio).as(fixture.name()+" "+pair.name()).isGreaterThanOrEqualTo(pair.minimum(fixture.high()));
-                    visited.add(pair.name());
+                    modeled.add(pair.name());
                     report.add(String.format(Locale.ROOT, "%s\t%s\t%s\t%s\t%08x\t%08x\t%.6f\t%.1f",
-                        fixture.name(), fixture.dark(), fixture.high(), pair.name(), pair.foreground(theme).getRGB(),
+                        fixture.name(), fixture.dark(), fixture.high(), "constraint/"+pair.name(), pair.foreground(theme).getRGB(),
                         pair.background(theme).getRGB(), ratio, pair.minimum(fixture.high())));
                 }
                 var inventory = resource("desktop-paint-pairs.tsv").stream().skip(1).map(row -> row.split("\t")[0]).toList();
-                assertThat(visited).containsExactlyElementsOf(inventory);
+                assertThat(modeled).as("resolver constraint catalog; rendered coverage is checked separately").containsExactlyElementsOf(inventory);
                 var roles = new LinkedHashSet<String>();
                 for (var role : SemanticColor.values()) { assertThat(role.color(theme)).isNotNull(); roles.add(role.key()); }
                 for (var role : DerivedColor.values()) if (role.overridable()) { assertThat(role.color(theme)).isNotNull(); roles.add(role.key()); }
@@ -81,10 +81,14 @@ class DesktopColorsRenderTest {
                     var context = KitFixtures.context(theme, kit);
                     String stem = fixture.name()+"-"+(fixture.dark()?"dark":"light")+"-"+kit.id();
                     try {
+                        var ownerSamples=DesktopOwnerPaints.measure(context,fixture.high(),stem,output);
+                        DesktopPaintCoverage.verify(kit.id(),fixture.high(),ownerSamples,output.resolve(stem+"-coverage.tsv"));
                         for (var scene : catalog) try (var view = new KitView(context, scene.spec(), ignored -> {})) {
                             view.paintsSurface(true); // The actual workspace-content host paints the route panel.
                             var image = KitFixtures.render(view, scene.width(), scene.height(), 1);
-                            paintedLabels(view,fixture.high(),stem+"/"+scene.name(),report);
+                            int labels=paintedLabels(view,fixture.high(),stem+"/"+scene.name(),report);
+                            long custom=ownerSamples.stream().filter(s->scene.name().equals("picker-menu")?s.owner().equals("picker-row"):scene.name().equals("tabs")&&s.owner().equals("tabs")).count();
+                            assertThat(labels+custom).as(stem+" "+scene.name()+" actual measured owner states").isPositive();
                             ImageIO.write(image, "png", output.resolve(stem+"-"+scene.name()+".png").toFile());
                             assertThat(Arrays.stream(image.getRGB(0,0,image.getWidth(),image.getHeight(),null,0,image.getWidth())).distinct().count())
                                 .as(stem+" "+scene.name()+" paints visible content").isGreaterThan(12);
@@ -102,6 +106,28 @@ class DesktopColorsRenderTest {
             UIManager.setLookAndFeel(previous);
             Files.write(output.resolve("measured-pairs.tsv"), report);
         }
+    }
+
+    @Test void coverageCannotPassWithoutTheRenderedOwnersEvenWhenTheResolverIsValid() throws Exception {
+        assertThat(DesktopPaintCoverage.entries()).hasSize(307);
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->DesktopPaintCoverage.verify("default",false,List.of(),Path.of("build/desktop-colors/missing-owner.tsv")))
+            .isInstanceOf(AssertionError.class).hasMessageContaining("requires actual default pixels");
+    }
+
+    @Test void hoveredNoticeLinksRetainHighContrastOnTheirPaintedTint() throws Exception {
+        var fixture=DesktopRenderFixtures.read().stream().filter(f->f.name().equals("yellow-high-contrast")&&!f.dark()).findFirst().orElseThrow();
+        var theme=DesktopPalette.resolve(false,DesktopPalette.SourceMode.AUTO,"GNOME",fixture.input()).theme();
+        var previous=UIManager.getLookAndFeel();
+        try {
+            for(var kit:List.of(dev.jasper.ui.kit.Kit.DEFAULT,dev.jasper.ui.kit.Kit.CLASSIC)) {
+                FlatLafInstaller.install(theme,kit);var context=KitFixtures.context(theme,kit);
+                try {
+                    var samples=new ArrayList<DesktopOwnerPaints.Sample>();DesktopRolePaints.measure(context,true,samples);
+                    for(var sample:samples)if(sample.owner().equals("notice")&&sample.state().endsWith("-hover"))
+                        assertThat(sample.ratio()).as(kit.id()+" "+sample.key()+" ink="+Integer.toHexString(sample.ink())+" background="+Integer.toHexString(sample.background())).isGreaterThanOrEqualTo(7);
+                } finally {context.icons().close();context.binding().close();}
+            }
+        } finally {UIManager.setLookAndFeel(previous);}
     }
 
     @Test void lowContrastImportedSurfaceWithSharedTextIsRejectedBeforePainting() throws Exception {
@@ -210,7 +236,7 @@ class DesktopColorsRenderTest {
         if(component instanceof JLabel label) labels.add(label);
         if(component instanceof Container container) for(var child:container.getComponents()) labels(child,labels);
     }
-    private static void paintedLabels(JComponent root, boolean high, String name, List<String> report) {
+    private static int paintedLabels(JComponent root, boolean high, String name, List<String> report) {
         var labels=new ArrayList<JLabel>(); labels(root,labels);
         int measured=0;
         for(var label:labels) {
@@ -225,8 +251,7 @@ class DesktopColorsRenderTest {
             assertThat(ratio).as(name+" actual label "+label.getName()+" ["+text+"]").isGreaterThanOrEqualTo(high?7:4.5);
             report.add(name+"\tNA\t"+high+"\tpixel/"+label.getName()+"\t"+Integer.toHexString(pair.ink())+"\t"+Integer.toHexString(pair.background())+"\t"+ratio+"\t"+(high?7:4.5));measured++;
         }
-        if(!name.endsWith("/picker-menu") && !name.endsWith("/tabs"))
-            assertThat(measured).as(name+" visible enabled labels measured").isPositive();
+        return measured;
     }
 
     private static void settings(KitContext context, String name, Path output,
@@ -244,7 +269,7 @@ class DesktopColorsRenderTest {
                 var image=new BufferedImage(1000,1100,BufferedImage.TYPE_INT_RGB);
                 var g=image.createGraphics();try{shell.paint(g);}finally{g.dispose();}
                 ImageIO.write(image,"png",output.resolve(name+"-settings.png").toFile());
-                paintedLabels(shell,high,name+"/settings",report);
+                assertThat(paintedLabels(shell,high,name+"/settings",report)).as("Settings actual labels").isPositive();
             }
         } finally {page.dispose();}
     }

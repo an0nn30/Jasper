@@ -168,7 +168,7 @@ public final class DesktopPalette {
             GeneratedTheme current = theme(base, colors, overrides);
             for (var ink : SemanticColor.values()) {
                 var uses = requirements.stream().filter(requirement -> requirement.ink() == ink
-                    && (requirement.guard() == null || requirement.minimum(high) > requirement.guard().guard().floor())).toList();
+                    && requirement.needsRoleRepair(high)).toList();
                 if (uses.isEmpty() || ink == TEXT_ONACCENT || ink == TEXT_ONACCENT_SECONDARY || ink == TOGGLE_KNOB) continue;
                 var snapshot = current;
                 var backgrounds = uses.stream().map(use -> use.background(snapshot)).toList();
@@ -196,7 +196,7 @@ public final class DesktopPalette {
                 var inks = new ArrayList<Color>();
                 for (var requirement : requirements) if (requirement.surface() == role && requirement.text()
                         && requirement.ink() != DerivedColor.ACCENT_EDGE
-                        && (requirement.guard() == null || minimum > requirement.guard().guard().floor()))
+                        && requirement.needsRoleRepair(high))
                     inks.add(requirement.ink().color(current));
                 if (!inks.isEmpty()) {
                     var repaired = DesktopContrast.repair(role.color(current), inks, minimum);

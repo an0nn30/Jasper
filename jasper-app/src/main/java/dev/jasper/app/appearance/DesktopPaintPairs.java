@@ -27,6 +27,9 @@ public final class DesktopPaintPairs {
                 under = SurfaceContrast.apart(SURFACE_TABSTRIP.color(theme), SURFACE_TERMINAL.color(theme), SurfaceContrast.TAB_LIGHTNESS);
                 if (name.startsWith("tab-hover/")) under = paintedComposite(ColorMath.opacity(HOVER_OVERLAY.color(theme), .08), under);
             }
+            // LINK hover paints an 8% accent fill over its owner, including a Notice severity ground.
+            if (ink == TEXT_LINK_HOVER && (name.startsWith("form/") || name.startsWith("notice/")))
+                under = paintedComposite(ColorMath.opacity(ACCENT.color(theme), .08), under);
             if (tint > 0) {
                 Color fill = SemanticColor.of(ink.key() + ".surface").map(role -> role.color(theme)).orElse(ink.color(theme));
                 double share = (theme.dark() ? 17 : 13) / 100.0;
@@ -37,10 +40,18 @@ public final class DesktopPaintPairs {
         Color foreground(GeneratedTheme theme) {
             Color paint = ink == DerivedColor.FOCUS_HALO || ink == DerivedColor.ERROR_HALO
                 ? halo(theme, ink == DerivedColor.ERROR_HALO, name.startsWith("classic."))
-                : guard == null ? ink.color(theme) : SurfaceContrast.painted(theme, guard, background(theme));
+                : guard == null ? ink.color(theme)
+                // Notices.link guards against the severity ground before Buttons paints its hover tint.
+                : name.startsWith("notice/") && ink == TEXT_LINK_HOVER ? SurfaceContrast.painted(theme, guard)
+                : SurfaceContrast.painted(theme, guard, background(theme));
             return flat(paint, background(theme));
         }
         double minimum(boolean highContrast) { return text ? highContrast ? 7 : 4.5 : 3; }
+        /** A guard cannot replace role repair when it runs before the owner composites a different backdrop. */
+        boolean needsRoleRepair(boolean highContrast) {
+            return guard == null || minimum(highContrast) > guard.guard().floor()
+                || name.startsWith("notice/") && ink == TEXT_LINK_HOVER;
+        }
     }
 
     static List<Requirement> all() { return requirements(); }
