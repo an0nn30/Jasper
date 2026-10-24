@@ -197,12 +197,12 @@ class BuddyColumnPanelTest {
         assertThat(panel.cardBounds(2).y - panel.getPreferredSize().height).isEqualTo(interrupted);
     }
 
-    @Test void inputFollowsTheMovingCapsuleAndIgnoresItsTransparentCorners() {
+    @Test void inputFollowsTheMovingCapsuleAcrossItsFullFrontBounds() {
         deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "one", BuddyNotice.State.RUNNING, () -> "d", () -> activated.add("one")));
         panel.refresh();
         Rectangle bounds = panel.cardBounds(0);
         panel.handleMove(new Point(bounds.x + 1, bounds.y + 1));
-        assertThat(panel.hovered()).isEqualTo(-1);
+        assertThat(panel.hovered()).isZero();
         assertThat(panel.handleClick(inBubble(0))).isTrue();
         assertThat(activated).containsExactly("one");
         now += BubbleMotion.IN_NANOS;

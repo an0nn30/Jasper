@@ -84,6 +84,8 @@ final class BuddyDeckWindow {
         }
     }
 
+    void setGroupFilter(dev.jasper.buddy.notice.BuddyNoticeId filter) { panel.setGroupFilter(filter); }
+
     /** Remembers where the buddy is and shows the drawer there, if there is anything in it. */
     void showBeside(Rectangle anchorOnScreen) {
         if (disposed) return;
@@ -126,7 +128,7 @@ final class BuddyDeckWindow {
     private void layout() {
         if (disposed || anchor == null) return;
         Dimension size = panel.getPreferredSize();
-        if (!shows(false, anchor, deck.isEmpty(), size)) { frames.stop(); window.setVisible(false); return; }
+        if (!shows(false, anchor, panel.displayed().isEmpty(), size)) { frames.stop(); window.setVisible(false); return; }
         if (!size.equals(window.getSize())) window.setSize(size);
         Point next = BuddyBubblePlacement.beside(anchor, size, screenFor(anchor));
         if (!next.equals(window.getLocation())) window.setLocation(next);

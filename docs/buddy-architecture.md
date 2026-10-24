@@ -30,6 +30,7 @@ gives app tests a companion over a model they can inspect from any thread.
 
 [BuddyCompanion](../jasper-buddy/src/main/java/dev/jasper/buddy/view/BuddyCompanion.java)
 owns one [BuddyDeck](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyDeck.java).
+[BuddyGroups](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyGroups.java) projects its visible notices into immutable group or notice entries with distinct identity namespaces.
 The deck retains up to 50 notices (`MAX_NOTICES`) by source-qualified ID, newest first.
 Posts replace and promote; title changes preserve order, and a title equal to the current
 one changes nothing. Snapshots are cached immutable lists, invalidated by mutations. The

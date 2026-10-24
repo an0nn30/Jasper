@@ -64,6 +64,12 @@ final class BuddyCard {
         paint(options, g2, owner, notice, bounds, hover, opacity, dismissable, count, System.nanoTime());
     }
 
+    /** A backing silhouette contains no duplicated text or affordance. */
+    static void paintBacking(BuddyOptions options, Graphics2D g, Rectangle bounds) {
+        g.drawImage(material(bounds.width, bounds.height, options.dark()), bounds.x - SHADOW_MARGIN,
+            bounds.y - SHADOW_MARGIN, bounds.width + 2 * SHADOW_MARGIN, bounds.height + 2 * SHADOW_MARGIN, null);
+    }
+
     static boolean shimmers(BuddyNotice notice) {
         return notice.state() == BuddyNotice.State.RUNNING;
     }

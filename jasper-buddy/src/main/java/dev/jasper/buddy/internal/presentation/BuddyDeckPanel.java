@@ -51,6 +51,33 @@ final class BuddyDeckPanel extends JComponent {
      * graphics device from here would throw in the headless test JVM.
      */
     private IntSupplier maxListHeight = () -> Integer.MAX_VALUE / 4;
+    private BuddyNoticeId groupFilter;
+    private final java.util.Map<BuddyNoticeId, Integer> discriminators = new java.util.LinkedHashMap<>();
+    private int nextDiscriminator;
+    private final java.util.Set<BuddyNoticeId> duplicateIds = new java.util.HashSet<>();
+    void setGroupFilter(BuddyNoticeId filter) { groupFilter = filter; reset(); changed(); }
+    int headerHeight() { return groupFilter == null ? 0 : 28; }
+    String header() {
+        return deck.notices().stream().filter(n -> n.group() != null && n.group().id().equals(groupFilter))
+            .map(n -> n.group().title()).findFirst().orElse("");
+    }
+    List<BuddyNotice> displayed() {
+        List<BuddyNotice> visible = deck.notices();
+        var retained = deck.retainedNotices();
+        var retainedIds = retained.stream().map(BuddyNotice::id).toList();
+        discriminators.keySet().retainAll(retainedIds);
+        duplicateIds.retainAll(retainedIds);
+        for (BuddyNotice n : retained) discriminators.computeIfAbsent(n.id(), ignored -> ++nextDiscriminator);
+        return visible.stream().filter(n -> groupFilter == null || n.group() != null && n.group().id().equals(groupFilter))
+            .map(n -> {
+                boolean duplicate = n.group() != null && visible.stream().anyMatch(other -> !other.id().equals(n.id())
+                    && other.group() != null && other.group().id().equals(n.group().id()) && other.title().equals(n.title()));
+                if (duplicate) duplicateIds.add(n.id());
+                String title = n.title() + (duplicateIds.contains(n.id()) ? " · " + discriminators.get(n.id()) : "");
+                if (groupFilter == null && n.group() != null) title = n.group().title() + " · " + title;
+                return new BuddyNotice(n.id(), n.kind(), title, n.state(), n.detail(), n.activate(), n.group());
+            }).toList();
+    }
     private int scroll;
     private int hovered = -1;
     /** The card the pointer just left, so only that one animates back rather than every card. */
@@ -80,9 +107,9 @@ final class BuddyDeckPanel extends JComponent {
 
     int hovered() { return hovered; }
 
-    boolean needsAnimationFrames() { return animating() || deck.notices().stream().anyMatch(BuddyCard::shimmers); }
+    boolean needsAnimationFrames() { return animating() || displayed().stream().anyMatch(BuddyCard::shimmers); }
 
-    boolean needsDetailUpdates() { return !deck.isEmpty(); }
+    boolean needsDetailUpdates() { return !displayed().isEmpty(); }
 
     int cardHeight() { return BuddyCard.height(this); }
 
@@ -102,19 +129,23 @@ final class BuddyDeckPanel extends JComponent {
     }
 
     /** A notice was posted, dismissed or cleared: re-size around the new list. */
-    void refresh() { changed(); }
-
-    @Override public Dimension getPreferredSize() {
-        int count = deck.size();
-        if (count == 0) return new Dimension(0, 0);
-        int height = Math.min(BuddyDeckLayout.expandedHeight(count, cardHeight()),
-            Math.max(cardHeight(), maxListHeight.getAsInt()));
-        return new Dimension(BuddyCard.WIDTH + 2 * MOTION_MARGIN, height + 2 * MOTION_MARGIN);
+    void refresh() {
+        scroll = BuddyDeckLayout.clampScroll(scroll, contentHeight(), viewportHeight());
+        hovered = -1; leaving = -1;
+        changed();
     }
 
-    private int viewportHeight() { return Math.max(0, getHeight() - 2 * MOTION_MARGIN); }
+    @Override public Dimension getPreferredSize() {
+        int count = displayed().size();
+        if (count == 0) return new Dimension(0, 0);
+        int height = Math.min(BuddyDeckLayout.expandedHeight(count, cardHeight()),
+            Math.max(cardHeight(), maxListHeight.getAsInt() - headerHeight()));
+        return new Dimension(BuddyCard.WIDTH + 2 * MOTION_MARGIN, height + 2 * MOTION_MARGIN + headerHeight());
+    }
 
-    private int contentHeight() { return BuddyDeckLayout.expandedHeight(deck.size(), cardHeight()); }
+    private int viewportHeight() { return Math.max(0, getHeight() - 2 * MOTION_MARGIN - headerHeight()); }
+
+    private int contentHeight() { return BuddyDeckLayout.expandedHeight(displayed().size(), cardHeight()); }
 
     // --- input -------------------------------------------------------------------------------
 
@@ -149,18 +180,18 @@ final class BuddyDeckPanel extends JComponent {
      * and the window it points at is about to come forward.
      */
     boolean handleClick(Point point) {
-        if (deck.isEmpty()) return false;
-        Point local = new Point(point.x - MOTION_MARGIN, point.y - MOTION_MARGIN);
-        Rectangle clear = BuddyDeckLayout.clearRow(deck.size(), BuddyCard.WIDTH, cardHeight(), scroll);
+        if (displayed().isEmpty()) return false;
+        Point local = new Point(point.x - MOTION_MARGIN, point.y - MOTION_MARGIN - headerHeight());
+        Rectangle clear = BuddyDeckLayout.clearRow(displayed().size(), BuddyCard.WIDTH, cardHeight(), scroll);
         if (clear != null && clear.contains(local)) {
-            deck.clear();
+            for (BuddyNotice notice : displayed()) deck.dismiss(notice.id());
             onNoticesChanged.run();
             reset();
             return false;
         }
         int index = indexAt(point);
         if (index < 0) return true;
-        List<BuddyNotice> notices = deck.notices();
+        List<BuddyNotice> notices = displayed();
         BuddyNotice notice = notices.get(index);
         Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, cardHeight(), scroll);
         if (BuddyDeckLayout.dismissTarget(card).contains(local)) {
@@ -168,7 +199,7 @@ final class BuddyDeckPanel extends JComponent {
             onNoticesChanged.run();
             hovered = -1;
             leaving = -1;
-            if (deck.isEmpty()) { reset(); return false; }
+            if (displayed().isEmpty()) { reset(); return false; }
             scroll = BuddyDeckLayout.clampScroll(scroll, contentHeight(), viewportHeight());
             changed();
             return true;
@@ -178,10 +209,10 @@ final class BuddyDeckPanel extends JComponent {
     }
 
     private int indexAt(Point point) {
-        if (deck.isEmpty()) return -1;
-        Point local = new Point(point.x - MOTION_MARGIN, point.y - MOTION_MARGIN);
+        if (displayed().isEmpty()) return -1;
+        Point local = new Point(point.x - MOTION_MARGIN, point.y - MOTION_MARGIN - headerHeight());
         if (local.y < 0 || local.y >= viewportHeight()) return -1;
-        int index = BuddyDeckLayout.cardAt(local.y, deck.size(), cardHeight(), scroll);
+        int index = BuddyDeckLayout.cardAt(local.y, displayed().size(), cardHeight(), scroll);
         if (index < 0) return -1;
         Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, cardHeight(), scroll);
         return new java.awt.geom.RoundRectangle2D.Float(card.x, card.y, card.width, card.height,
@@ -197,7 +228,7 @@ final class BuddyDeckPanel extends JComponent {
     // --- painting ----------------------------------------------------------------------------
 
     @Override protected void paintComponent(Graphics g) {
-        List<BuddyNotice> notices = deck.notices();
+        List<BuddyNotice> notices = displayed();
         if (notices.isEmpty()) return;
         Graphics2D g2 = (Graphics2D) g.create();
         try {
@@ -205,7 +236,17 @@ final class BuddyDeckPanel extends JComponent {
             g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g2.translate(MOTION_MARGIN, MOTION_MARGIN);
-            g2.setClip(-MOTION_MARGIN, -MOTION_MARGIN, BuddyCard.WIDTH + 2 * MOTION_MARGIN, getHeight());
+            if (headerHeight() > 0) {
+                g2.setFont(BuddyCard.detailFont(options));
+                g2.setColor(BuddyCard.detailColor(options));
+                String title = header();
+                while (!title.isEmpty() && g2.getFontMetrics().stringWidth(title) > BuddyCard.WIDTH - 2 * BuddyCard.PAD_X)
+                    title = title.substring(0, title.length() - 1);
+                g2.drawString(title, BuddyCard.PAD_X, 18);
+                g2.translate(0, headerHeight());
+            }
+            g2.setClip(-MOTION_MARGIN, headerHeight() > 0 && scroll > 0 ? 0 : -MOTION_MARGIN,
+                BuddyCard.WIDTH + 2 * MOTION_MARGIN, viewportHeight() + MOTION_MARGIN);
             int height = cardHeight();
             for (int index = 0; index < notices.size(); index++) {
                 Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, height, scroll);

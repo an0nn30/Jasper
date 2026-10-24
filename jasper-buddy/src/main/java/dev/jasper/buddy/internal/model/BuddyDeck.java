@@ -101,6 +101,9 @@ public final class BuddyDeck {
         return snapshot;
     }
 
+    /** Immutable retained membership for bounded presentation identity bookkeeping. */
+    public List<BuddyNotice> retainedNotices() { return List.copyOf(notices); }
+
     /** Changes when, and only when, something is posted. */
     public int generation() { return generation; }
 

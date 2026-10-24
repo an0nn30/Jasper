@@ -182,8 +182,11 @@ public final class BuddyWindow {
     }
 
     /** Single click: double-click already raises the terminal and right-click opens his menu. */
-    private void openDrawer() {
+    private void openDrawer() { openDrawer(null); }
+
+    private void openDrawer(dev.jasper.buddy.notice.BuddyNoticeId filter) {
         if (drawer == null || !window.isVisible()) return;
+        drawer.setGroupFilter(filter);
         drawer.showBeside(window.getBounds());
     }
 

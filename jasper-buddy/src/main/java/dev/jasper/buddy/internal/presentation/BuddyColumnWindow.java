@@ -29,7 +29,7 @@ final class BuddyColumnWindow {
     private boolean disposed, dragging;
     private List<Rectangle> screens = List.of();
 
-    BuddyColumnWindow(BuddyOptions options, BuddyDeck deck, Runnable onOpenDrawer) {
+    BuddyColumnWindow(BuddyOptions options, BuddyDeck deck, java.util.function.Consumer<dev.jasper.buddy.notice.BuddyNoticeId> onOpenDrawer) {
         this.deck = Objects.requireNonNull(deck, "deck");
         this.panel = new BuddyColumnPanel(options, deck, this::onPanelChanged, Objects.requireNonNull(onOpenDrawer, "onOpenDrawer"));
         try {

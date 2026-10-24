@@ -4,6 +4,8 @@ import dev.jasper.buddy.config.BuddyOptions;
 import dev.jasper.buddy.internal.animation.BubbleSpring;
 import dev.jasper.buddy.internal.animation.BubbleMotion;
 import dev.jasper.buddy.internal.model.BuddyDeck;
+import dev.jasper.buddy.internal.model.BuddyGroups;
+import java.util.function.Consumer;
 import dev.jasper.buddy.notice.BuddyNoticeId;
 import dev.jasper.buddy.notice.BuddyNotice;
 
@@ -31,16 +33,17 @@ final class BuddyColumnPanel extends JComponent {
     static final int MARGIN = BuddyCard.SHADOW_MARGIN;
     static final int ARRIVAL_ROOM = (int) BubbleMotion.IN_TRAVEL;
 
-    private record Motion(BuddyNotice notice, float from, float to, long started) {
+    private record Motion(BuddyGroups.Entry notice, float from, float to, long started) {
         float at(long now) { return to + (from - to) * BubbleMotion.remaining(now - started); }
         boolean active(long now) { return from != to && now - started < BubbleMotion.IN_NANOS; }
     }
 
     private final BuddyDeck deck;
     private final Runnable onLayoutChanged;
-    private final Runnable onOpenDrawer;
+    private final Consumer<BuddyNoticeId> onOpenDrawer;
     private LongSupplier clock = System::nanoTime;
     private List<Motion> motions = List.of();
+    private final java.util.Map<BuddyGroups.Identity, Motion> remembered = new java.util.HashMap<>();
     private boolean below;
     private final BubbleSpring direction = new BubbleSpring(0);
     private int hovered = -1;
@@ -49,6 +52,10 @@ final class BuddyColumnPanel extends JComponent {
     private boolean lastFrameMoving = true;
 
     BuddyColumnPanel(BuddyOptions options, BuddyDeck deck, Runnable onLayoutChanged, Runnable onOpenDrawer) {
+        this(options, deck, onLayoutChanged, ignored -> onOpenDrawer.run());
+    }
+
+    BuddyColumnPanel(BuddyOptions options, BuddyDeck deck, Runnable onLayoutChanged, Consumer<BuddyNoticeId> onOpenDrawer) {
         this.deck = Objects.requireNonNull(deck, "deck");
         this.onLayoutChanged = Objects.requireNonNull(onLayoutChanged, "onLayoutChanged");
         this.onOpenDrawer = Objects.requireNonNull(onOpenDrawer, "onOpenDrawer");
@@ -74,11 +81,11 @@ final class BuddyColumnPanel extends JComponent {
     /** Sample interrupted motion before retargeting, keeping existing capsules continuous. */
     void refresh() {
         long now = clock.getAsLong();
-        List<BuddyNotice> column = deck.notices();
+        List<BuddyGroups.Entry> column = BuddyGroups.project(deck.notices());
         List<Motion> next = new ArrayList<>();
         for (int i = 0; i < BuddyDeckLayout.visibleInColumn(column.size()); i++) {
-            BuddyNotice notice = column.get(i);
-            float target = i * (BuddyCard.HEIGHT + BuddyDeckLayout.COLUMN_GAP);
+            BuddyGroups.Entry notice = column.get(i);
+            float target = i * (BuddyCard.HEIGHT + stackRoom() + BuddyDeckLayout.COLUMN_GAP);
             Motion old = motionFor(notice);
             if (old != null && old.to == target) next.add(new Motion(notice, old.from, old.to, old.started));
             else next.add(new Motion(notice, old == null ? target + BubbleMotion.IN_TRAVEL : old.at(now), target, now));
@@ -87,7 +94,10 @@ final class BuddyColumnPanel extends JComponent {
             hovered = -1;
             leaving = -1;
         }
+        for (Motion motion : motions) remembered.put(motion.notice.identity(), motion);
         motions = List.copyOf(next);
+        var retained = BuddyGroups.project(deck.retainedNotices()).stream().map(BuddyGroups.Entry::identity).toList();
+        remembered.keySet().retainAll(retained);
         revalidate();
         repaint();
         onLayoutChanged.run();
@@ -95,13 +105,13 @@ final class BuddyColumnPanel extends JComponent {
 
     private static boolean sameOrder(List<Motion> first, List<Motion> second) {
         for (int i = 0; i < first.size(); i++)
-            if (!first.get(i).notice.sameAs(second.get(i).notice.id())) return false;
+            if (!first.get(i).notice.identity().equals(second.get(i).notice.identity())) return false;
         return true;
     }
 
-    private Motion motionFor(BuddyNotice notice) {
-        for (Motion motion : motions) if (motion.notice.sameAs(notice.id())) return motion;
-        return null;
+    private Motion motionFor(BuddyGroups.Entry notice) {
+        for (Motion motion : motions) if (motion.notice.identity().equals(notice.identity())) return motion;
+        return remembered.get(notice.identity());
     }
 
     boolean animating() {
@@ -119,7 +129,7 @@ final class BuddyColumnPanel extends JComponent {
         boolean moving = animating();
         if (moving || lastFrameMoving) repaint();
         else {
-            List<BuddyNotice> column = deck.notices();
+            List<BuddyGroups.Entry> column = BuddyGroups.project(deck.notices());
             for (int i = 0; i < BuddyDeckLayout.visibleInColumn(column.size()); i++) {
                 Rectangle bounds = cardBounds(i);
                 repaint(bounds.x + BuddyCard.PAD_X, bounds.y + 28,
@@ -132,21 +142,24 @@ final class BuddyColumnPanel extends JComponent {
     int hovered() { return hovered; }
 
     @Override public Dimension getPreferredSize() {
-        int count = deck.notices().size();
+        int count = BuddyGroups.project(deck.notices()).size();
         if (count == 0) return new Dimension(0, 0);
-        return new Dimension(BuddyCard.WIDTH + 2 * MARGIN,
-            BuddyDeckLayout.columnHeight(count, BuddyCard.HEIGHT) + 2 * MARGIN + ARRIVAL_ROOM);
+        return new Dimension(BuddyCard.WIDTH + 2 * MARGIN + stackRoom(),
+            BuddyDeckLayout.columnHeight(count, BuddyCard.HEIGHT + stackRoom()) + 2 * MARGIN + ARRIVAL_ROOM);
     }
+
+    private int stackRoom() { return BuddyGroups.project(deck.notices()).stream().anyMatch(e -> e.backingLayers() > 0) ? 8 : 0; }
 
     /** Actual painted rectangle, used for input too while a capsule is moving. */
     Rectangle cardBounds(int index) {
-        List<BuddyNotice> column = deck.notices();
-        Rectangle card = BuddyDeckLayout.column(index, column.size(), BuddyCard.WIDTH, BuddyCard.HEIGHT, false);
+        List<BuddyGroups.Entry> column = BuddyGroups.project(deck.notices());
+        Rectangle card = BuddyDeckLayout.column(index, column.size(), BuddyCard.WIDTH, BuddyCard.HEIGHT + stackRoom(), false);
+        card.height = BuddyCard.HEIGHT;
         Motion motion = motionFor(column.get(index));
-        float target = index * (BuddyCard.HEIGHT + BuddyDeckLayout.COLUMN_GAP);
+        float target = index * (BuddyCard.HEIGHT + stackRoom() + BuddyDeckLayout.COLUMN_GAP);
         float offset = motion == null ? 0 : motion.at(clock.getAsLong()) - target;
         double blend = direction.at(clock.getAsLong());
-        int belowY = BuddyDeckLayout.column(index, column.size(), BuddyCard.WIDTH, BuddyCard.HEIGHT, true).y;
+        int belowY = BuddyDeckLayout.column(index, column.size(), BuddyCard.WIDTH, BuddyCard.HEIGHT + stackRoom(), true).y;
         double top = card.y + ARRIVAL_ROOM;
         card.setLocation(MARGIN, MARGIN + (int) Math.round(top + (belowY - top) * blend + (2 * blend - 1) * offset));
         return card;
@@ -176,29 +189,32 @@ final class BuddyColumnPanel extends JComponent {
      * and it always does now: every capsule is work still going, the clicked one included.
      */
     boolean handleClick(Point point) {
-        List<BuddyNotice> column = deck.notices();
+        List<BuddyGroups.Entry> column = BuddyGroups.project(deck.notices());
         if (column.isEmpty()) return true;
         int index = indexAt(point);
         if (index < 0) {
-            onOpenDrawer.run();
+            onOpenDrawer.accept(null);
             return true;
         }
-        BuddyNotice notice = column.get(index);
-        notice.activate().run();
+        BuddyGroups.Entry entry = column.get(index);
+        if (entry.members().size() > 1) onOpenDrawer.accept(entry.group().id());
+        else entry.members().getFirst().activate().run();
         return true;
     }
 
     private int indexAt(Point point) {
-        for (int i = 0; i < BuddyDeckLayout.visibleInColumn(deck.notices().size()); i++) {
+        for (int i = 0; i < BuddyDeckLayout.visibleInColumn(BuddyGroups.project(deck.notices()).size()); i++) {
             Rectangle card = cardBounds(i);
-            if (new java.awt.geom.RoundRectangle2D.Float(card.x, card.y, card.width, card.height,
-                card.height, card.height).contains(point)) return i;
+            int backing = BuddyGroups.project(deck.notices()).get(i).backingLayers() * 4;
+            card.width += backing;
+            card.height += backing;
+            if (card.contains(point)) return i;
         }
         return -1;
     }
 
     @Override protected void paintComponent(Graphics g) {
-        List<BuddyNotice> column = deck.notices();
+        List<BuddyGroups.Entry> column = BuddyGroups.project(deck.notices());
         if (column.isEmpty()) return;
         Graphics2D g2 = (Graphics2D) g.create();
         try {
@@ -215,7 +231,12 @@ final class BuddyColumnPanel extends JComponent {
                 try {
                     // Keep subpixel motion when the recording advances by half a logical pixel.
                     card.translate(0, signed - Math.round(signed));
-                    BuddyCard.paint(options, card, this, column.get(index), bounds, hoverAmount(index), 1f, false, count, clock.getAsLong());
+                    for (int layer = column.get(index).backingLayers(); layer > 0; layer--) {
+                        Rectangle back = new Rectangle(bounds);
+                        back.translate(layer * 4, layer * 4);
+                        BuddyCard.paintBacking(options, card, back);
+                    }
+                    BuddyCard.paint(options, card, this, column.get(index).collapsed(), bounds, hoverAmount(index), 1f, false, count, clock.getAsLong());
                 } finally { card.dispose(); }
             }
         } finally { g2.dispose(); }
