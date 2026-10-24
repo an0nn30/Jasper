@@ -20,6 +20,7 @@ public final class DesktopPaintPairs {
 
     record Requirement(String name, ColorRole ink, ColorRole surface, PaintPair guard, boolean text, double tint) {
         Color background(GeneratedTheme theme) {
+            if (surface == DerivedColor.SURFACE_TEXT_SELECTION) return UiColorKeys.textSelection(theme);
             Color under = flat(surface == DerivedColor.SURFACE_HEADER_ACTIVE && name.startsWith("dock/")
                 ? SurfaceContrast.painted(theme, ChromePainter.FOCUSED_HEADER) : surface.color(theme), SURFACE_APP.color(theme));
             if (name.startsWith("tab-inactive/") || name.startsWith("tab-hover/")) {
@@ -94,6 +95,7 @@ public final class DesktopPaintPairs {
             addGuard(pairs, "classic-run", new PaintPair(DerivedColor.ACCENT_EDGE, surface, SurfaceContrast.Guard.TEXT));
         texts(pairs, "title", List.of(SURFACE_TITLEBAR), TEXT_TITLEBAR);
         texts(pairs, "action", List.of(ACCENT, ACCENT_HOVER), TEXT_ONACCENT, TEXT_ONACCENT_SECONDARY);
+        texts(pairs, "inherited-text-selection", List.of(DerivedColor.SURFACE_TEXT_SELECTION), TEXT_PRIMARY);
         texts(pairs, "selection", List.of(SELECTION_BG), TEXT_ONSELECTION, TEXT_ONSELECTION_SECONDARY, TEXT_PRIMARY);
         texts(pairs, "inactive-list-selection", List.of(SURFACE_CONTROL_SELECTED), TEXT_ONSELECTION);
         texts(pairs, "segment", List.of(SEGMENT_SELECTED_BG), TEXT_PRIMARY);

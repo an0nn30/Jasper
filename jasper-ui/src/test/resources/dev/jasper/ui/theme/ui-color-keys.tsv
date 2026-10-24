@@ -1,11 +1,11 @@
-# FlatLaf key → source, frozen from UiTemplate's parity (1e37d390): a SemanticColor, terminal.selection or error.tint.
+# FlatLaf key → source, frozen from UiTemplate's parity (1e37d390): a SemanticColor, text.selection or error.tint. text.selection is the optional surface.textSelection override, else terminal.selection.
 *.background	SURFACE_PANEL
 *.foreground	TEXT_PRIMARY
 *.disabledForeground	TEXT_PLACEHOLDER
 *.inactiveForeground	TEXT_PLACEHOLDER
-*.selectionBackground	terminal.selection
+*.selectionBackground	text.selection
 *.selectionForeground	TEXT_PRIMARY
-*.selectionInactiveBackground	terminal.selection
+*.selectionInactiveBackground	text.selection
 *.selectionInactiveForeground	TEXT_PRIMARY
 @background	SURFACE_PANEL
 @foreground	TEXT_PRIMARY

@@ -10,7 +10,7 @@ import java.util.Objects;
 
 /**
  * FlatLaf's colour defaults for a theme variant in a {@link UiKeySet}, each from a semantic role (or, in the classic
- * set, a derived one); text selection in text components takes the variant's terminal selection and a search field's
+ * set, a derived one); text selection in text components takes an explicit interface override or the variant's terminal selection and a search field's
  * no-match background the {@linkplain #errorTint error tint}. Order matters: a {@code *.suffix} key recolours the keys
  * before it that end in the suffix.
  */
@@ -30,7 +30,7 @@ public final class UiColorKeys {
 
     /**
      * {@code set}'s keys for {@code theme} in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}: the roles from
-     * the theme's palette (and, in the classic set, its derived roles), text selection from its terminal colours; a
+     * the theme's palette (and, in the classic set, its derived roles), text selection from its interface override or terminal colours; a
      * classic key with no colour is the string {@code "null"}, FlatLaf's null, which removes FlatLaf's default.
      */
     public static Map<String, Object> flatLaf(GeneratedTheme theme, UiKeySet set) {
@@ -38,7 +38,12 @@ public final class UiColorKeys {
             case DEFAULT -> KEYS;
             case CLASSIC -> CLASSIC_KEYS;
         };
-        return values(sources, theme, theme.terminal().selection());
+        return values(sources, theme, textSelection(theme));
+    }
+
+    /** The inherited text-component selection fill: an explicit UI override or the authored terminal selection. */
+    public static Color textSelection(GeneratedTheme theme) {
+        return theme.derivedOverrides().getOrDefault(DerivedColor.SURFACE_TEXT_SELECTION, theme.terminal().selection());
     }
 
     private static Map<String, Object> values(Map<String, Source> sources, GeneratedTheme theme, Color textSelection) {

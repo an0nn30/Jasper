@@ -69,6 +69,38 @@ class DesktopPaintedContrastTest {
         } finally { UIManager.setLookAndFeel(previous); }
     }
 
+    @Test void inheritedPickerSearchSelectionMeetsTheFinalPaintTarget() throws Exception {
+        var previous = UIManager.getLookAndFeel();
+        try {
+            for (boolean dark : List.of(true, false)) for (boolean high : List.of(true, false))
+                for (var kit : List.of(Kit.DEFAULT, Kit.CLASSIC)) {
+                    var theme = theme(dark, high, false);
+                    assertThat(DesktopPaintPairs.validate(theme, high)).isEmpty();
+                    FlatLafInstaller.install(theme, kit);
+                    var context = KitFixtures.context(theme, kit);
+                    var menu = new Nodes.PickerMenu("menu", ControlState.READY, "MMMM", "Search", List.of(),
+                        "", "", "No matches", "Create", "create", "cancel");
+                    try (var view = new KitView(context, new ViewSpec(menu), ignored -> { })) {
+                        KitFixtures.render(view, 300, 160, 1);
+                        var search = KitTestSupport.require(view, "menu.search", JTextField.class);
+                        search.setSize(200, 30); search.selectAll(); search.getCaret().setSelectionVisible(true);
+                        Color ink = search.getSelectedTextColor(), fill = search.getSelectionColor();
+                        assertThat(ColorMath.contrast(ink, fill)).as("%s dark=%s high=%s inherited selection", kit.id(), dark, high)
+                            .isGreaterThanOrEqualTo(high ? 7 : 4.5);
+                        var image = paint(search, theme.semantic().color(SemanticColor.SURFACE_INPUT));
+                        var pixels = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+                        assertThat(java.util.Arrays.stream(pixels).filter(pixel -> pixel == ink.getRGB()).count()).isGreaterThan(8);
+                        assertThat(java.util.Arrays.stream(pixels).filter(pixel -> pixel == fill.getRGB()).count()).isGreaterThan(8);
+                        var base = JasperTheme.bundled().generated(dark);
+                        assertThat(theme.terminal()).isSameAs(base.terminal());
+                        assertThat(theme.editor()).isSameAs(base.editor());
+                        assertThat(theme.syntax()).isEqualTo(base.syntax());
+                        assertThat(theme.glass()).isSameAs(base.glass());
+                    } finally { context.icons().close(); context.binding().close(); }
+                }
+        } finally { UIManager.setLookAndFeel(previous); }
+    }
+
     private static void checkLabel(JLabel label, Color parent, boolean high, String where) {
         label.setSize(160, 30);
         var image = paint(label, parent);

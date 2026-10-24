@@ -140,6 +140,9 @@ public final class DesktopPalette {
             colors.put(TEXT_ONSELECTION, colors.get(TEXT_PRIMARY));
             colors.put(TEXT_ONSELECTION_SECONDARY, colors.get(TEXT_PRIMARY));
         }
+        // Searchable popup fields inherit FlatLaf's wildcard text selection. Give that UI paint its own fill;
+        // the authored terminal/editor selections remain content values, independent of interface contrast.
+        overrides.put(DerivedColor.SURFACE_TEXT_SELECTION, colors.get(SELECTION_BG));
         // Iteration accounts for backgrounds derived from inks (tinted tags, notice fills and the classic gradient).
         for (int pass = 0; pass < 5; pass++) {
             // The same switch knob stands on off, on and pending tracks. Repair the track family together;

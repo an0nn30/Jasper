@@ -117,6 +117,7 @@ public final class DerivedPalette {
             case TAG_BORDER_NEUTRAL -> mix(in, HUE_NEUTRAL, SURFACE_CARD, EDGE);
             case FOCUS_HALO -> flat(in.apply(BORDER_FOCUS), in.apply(SURFACE_APP));
             case ERROR_HALO -> flat(in.apply(BORDER_ERROR), in.apply(SURFACE_APP));
+            case SURFACE_TEXT_SELECTION -> flat(in.apply(SELECTION_BG), in.apply(SURFACE_APP));
         };
     }
 

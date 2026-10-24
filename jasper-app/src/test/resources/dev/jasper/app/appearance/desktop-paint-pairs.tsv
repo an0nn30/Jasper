@@ -85,6 +85,7 @@ action/text.onAccent/accent	text.onAccent	accent	text
 action/text.onAccent.secondary/accent	text.onAccent.secondary	accent	text
 action/text.onAccent/accent.hover	text.onAccent	accent.hover	text
 action/text.onAccent.secondary/accent.hover	text.onAccent.secondary	accent.hover	text
+inherited-text-selection/text.primary/surface.textSelection	text.primary	surface.textSelection	text
 selection/text.onSelection/selection.bg	text.onSelection	selection.bg	text
 selection/text.onSelection.secondary/selection.bg	text.onSelection.secondary	selection.bg	text
 selection/text.primary/selection.bg	text.primary	selection.bg	text

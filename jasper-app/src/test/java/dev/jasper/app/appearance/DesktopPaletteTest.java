@@ -130,6 +130,18 @@ class DesktopPaletteTest {
         assertThat(rows.stream().skip(1).map(row -> row.split("\t")[0])).containsExactlyElementsOf(expected);
     }
 
+    @Test void validatorIncludesInheritedTextSelectionInsteadOfOnlyListSelection() {
+        var repaired = resolve(true, true, Map.of(), Optional.empty()).theme();
+        var overrides = new EnumMap<DerivedColor, Color>(DerivedColor.class);
+        overrides.putAll(repaired.derivedOverrides());
+        overrides.remove(DerivedColor.SURFACE_TEXT_SELECTION);
+        var inherited = new GeneratedTheme(repaired.name(), repaired.dark(), repaired.author(), repaired.semantic(),
+            repaired.terminal(), repaired.editor(), repaired.syntax(), repaired.glass(), overrides);
+        assertThat(DesktopPaintPairs.validate(inherited, true))
+            .contains("inherited-text-selection/text.primary/surface.textSelection");
+        assertThat(DesktopPaintPairs.validate(repaired, true)).isEmpty();
+    }
+
     @Test void paintRequirementsMatchReviewedInventory() throws Exception {
         var actual = new ArrayList<String>();
         actual.add("name\tink\tsurface\tkind");

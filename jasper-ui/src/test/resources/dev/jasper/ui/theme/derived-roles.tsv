@@ -24,6 +24,7 @@ slate-cobalt	dark	tag.border.purple	#6c6089
 slate-cobalt	dark	tag.border.neutral	#6f737b
 slate-cobalt	dark	focus.halo	#2f6fdb
 slate-cobalt	dark	error.halo	#f0716b
+slate-cobalt	dark	surface.textSelection	#2f5fa8
 slate-cobalt	light	surface.header	#dfe2e6
 slate-cobalt	light	surface.header.active	#d3dcea
 slate-cobalt	light	surface.stripe	#e2e5e9
@@ -49,6 +50,7 @@ slate-cobalt	light	tag.border.purple	#cab2d8
 slate-cobalt	light	tag.border.neutral	#bdc0c6
 slate-cobalt	light	focus.halo	#2563c9
 slate-cobalt	light	error.halo	#c42b31
+slate-cobalt	light	surface.textSelection	#2563c9
 catppuccin-latte	light	surface.header	#e6e9ef
 catppuccin-latte	light	surface.header.active	#e6e9ef
 catppuccin-latte	light	surface.stripe	#d7dbe4
@@ -74,6 +76,7 @@ catppuccin-latte	light	tag.border.purple	#dabbd9
 catppuccin-latte	light	tag.border.neutral	#b4b7c3
 catppuccin-latte	light	focus.halo	#8839ef
 catppuccin-latte	light	error.halo	#d20f39
+catppuccin-latte	light	surface.textSelection	#d8dae1
 catppuccin-frappe	dark	surface.header	#292c3c
 catppuccin-frappe	dark	surface.header.active	#292c3c
 catppuccin-frappe	dark	surface.stripe	#292c3b
@@ -99,6 +102,7 @@ catppuccin-frappe	dark	tag.border.purple	#756781
 catppuccin-frappe	dark	tag.border.neutral	#61667e
 catppuccin-frappe	dark	focus.halo	#ca9ee6
 catppuccin-frappe	dark	error.halo	#e78284
+catppuccin-frappe	dark	surface.textSelection	#44495d
 catppuccin-macchiato	dark	surface.header	#1e2030
 catppuccin-macchiato	dark	surface.header.active	#1e2030
 catppuccin-macchiato	dark	surface.stripe	#1e202d
@@ -124,6 +128,7 @@ catppuccin-macchiato	dark	tag.border.purple	#6f627a
 catppuccin-macchiato	dark	tag.border.neutral	#5c6076
 catppuccin-macchiato	dark	focus.halo	#c6a0f6
 catppuccin-macchiato	dark	error.halo	#ed8796
+catppuccin-macchiato	dark	surface.textSelection	#3a3e53
 catppuccin-mocha	dark	surface.header	#181825
 catppuccin-mocha	dark	surface.header.active	#181825
 catppuccin-mocha	dark	surface.stripe	#181823
@@ -149,6 +154,7 @@ catppuccin-mocha	dark	tag.border.purple	#6c5e74
 catppuccin-mocha	dark	tag.border.neutral	#595c6f
 catppuccin-mocha	dark	focus.halo	#cba6f7
 catppuccin-mocha	dark	error.halo	#f38ba8
+catppuccin-mocha	dark	surface.textSelection	#353749
 ubuntu-yaru	dark	surface.header	#303030
 ubuntu-yaru	dark	surface.header.active	#303030
 ubuntu-yaru	dark	surface.stripe	#242424
@@ -174,6 +180,7 @@ ubuntu-yaru	dark	tag.border.purple	#786076
 ubuntu-yaru	dark	tag.border.neutral	#6c6c6c
 ubuntu-yaru	dark	focus.halo	#c34113
 ubuntu-yaru	dark	error.halo	#f07885
+ubuntu-yaru	dark	surface.textSelection	#a63b16
 ubuntu-yaru	light	surface.header	#fafafa
 ubuntu-yaru	light	surface.header.active	#fafafa
 ubuntu-yaru	light	surface.stripe	#f0f0f0
@@ -199,6 +206,7 @@ ubuntu-yaru	light	tag.border.purple	#c8a8c7
 ubuntu-yaru	light	tag.border.neutral	#bebebe
 ubuntu-yaru	light	focus.halo	#c34113
 ubuntu-yaru	light	error.halo	#c7162b
+ubuntu-yaru	light	surface.textSelection	#c34113
 jasper-meadow	dark	surface.header	#323f3b
 jasper-meadow	dark	surface.header.active	#36443c
 jasper-meadow	dark	surface.stripe	#303c39
@@ -224,6 +232,7 @@ jasper-meadow	dark	tag.border.purple	#72757e
 jasper-meadow	dark	tag.border.neutral	#707e74
 jasper-meadow	dark	focus.halo	#a8bf8f
 jasper-meadow	dark	error.halo	#e6a39a
+jasper-meadow	dark	surface.textSelection	#a8bf8f
 jasper-meadow	light	surface.header	#e9e8df
 jasper-meadow	light	surface.header.active	#e1e2d6
 jasper-meadow	light	surface.stripe	#ecebe2
@@ -249,3 +258,4 @@ jasper-meadow	light	tag.border.purple	#cab1d5
 jasper-meadow	light	tag.border.neutral	#c2c3bb
 jasper-meadow	light	focus.halo	#52643f
 jasper-meadow	light	error.halo	#c42b31
+jasper-meadow	light	surface.textSelection	#52643f

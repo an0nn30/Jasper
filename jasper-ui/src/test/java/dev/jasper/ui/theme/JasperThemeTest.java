@@ -233,7 +233,7 @@ class JasperThemeTest {
             entry(DerivedColor.SURFACE_TABLE_HEADER, new Color(0xF0F1F3)), entry(DerivedColor.WARNING_GROUND, new Color(0xFBF1DA)));
         assertThat(theme.generated(true).derivedOverrides()).as("the other variant lists none").isEmpty();
         assertThat(theme.palette(false)).as("the semantic palette is untouched").isEqualTo(JasperTheme.bundled().palette(false));
-        assertThat(JasperTheme.DERIVED_OVERRIDES).hasSize(11).allSatisfy((key, role) -> {
+        assertThat(JasperTheme.DERIVED_OVERRIDES).hasSize(12).allSatisfy((key, role) -> {
             assertThat(role.key()).isEqualTo(key);
             assertThat(role.overridable()).isTrue();
         });
@@ -245,6 +245,15 @@ class JasperThemeTest {
         assertThat(DerivedPalette.halo(theme, false, .25)).isEqualTo(new Color(0xF0F1F3));
         assertThat(DerivedPalette.halo(theme, true, .22)).isEqualTo(new Color(0xFBF1DA));
         assertThat(failure(json.replace("#F0F1F3", "#F0F1F380"))).hasMessageContaining("ui.light.focus.halo: Expected #RRGGBB");
+    }
+
+    @Test void textSelectionOverrideParsesWithoutChangingContentSelections() throws Exception {
+        String json = withOverrides().replace("surface.tableHeader", "surface.textSelection");
+        var theme = JasperTheme.parse(json, "selection").generated(false);
+        assertThat(UiColorKeys.textSelection(theme)).isEqualTo(new Color(0xF0F1F3));
+        assertThat(theme.terminal()).isEqualTo(JasperTheme.bundled().generated(false).terminal());
+        assertThat(theme.editor()).isEqualTo(JasperTheme.bundled().generated(false).editor());
+        assertThat(failure(json.replace("#F0F1F3", "#F0F1F380"))).hasMessageContaining("ui.light.surface.textSelection: Expected #RRGGBB");
     }
 
     @Test void anOverrideKeyTakesAnOpaqueColourAndOnlyTheDeclaredRolesAreKeys() throws Exception {

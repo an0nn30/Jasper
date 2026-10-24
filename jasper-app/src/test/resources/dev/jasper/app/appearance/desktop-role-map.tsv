@@ -80,3 +80,4 @@ warning.border	classic-boundary	existing derived recipe	black/white high contras
 border.divider	classic-boundary	existing derived recipe	black/white high contrast ink
 focus.halo	ring	opaque repaired border.focus / border.error against ring parents	authored metric opacity when absent
 error.halo	ring	opaque repaired border.focus / border.error against ring parents	authored metric opacity when absent
+surface.textSelection	interface-selection	selection.bg repaired against text.primary for inherited text fields	authored terminal selection when override absent

@@ -55,8 +55,8 @@ the palettes). `generated(dark)` assembles a variant's `GeneratedTheme`: the pal
 editor scheme and syntax, opaque glass (`GlassLevels.OPAQUE`; workspace glass is a setting) and the derived-role
 overrides the file lists.
 
-- **Derived roles.** `DerivedPalette.of(theme)` gives all 25 `DerivedColor`s, each the override or its recipe over
-  semantic roles and the derived roles before it, cached by theme identity. Eleven are overridable
+- **Derived roles.** `DerivedPalette.of(theme)` gives all 26 `DerivedColor`s, each the override or its recipe over
+  semantic roles and the derived roles before it, cached by theme identity. Twelve are overridable
   (`GeneratedTheme.derivedOverrides()`). Every derived colour is opaque.
 - **Contrast guards.** A `PaintPair` declares a pair a painter paints, naming either kind of `ColorRole`, with its
   `SurfaceContrast.Guard`: text 4.5:1, indicator 3:1, structural boundary 1.3:1, control boundary 1.5:1, or a CIE L*
@@ -64,6 +64,8 @@ overrides the file lists.
   a role.
 - **FlatLaf keys.** `UiColorKeys.flatLaf(theme, keys)` derives FlatLaf's colour keys from the roles. `UiKeySet.DEFAULT`
   is the default look's set; `UiKeySet.CLASSIC` adds the classic overlay (table headers, zebra rows, gradient buttons).
+  `surface.textSelection` optionally overrides inherited text-component selection fills; otherwise they keep the
+  variant's terminal selection.
   A kit names its set, so the theme engine never sees the kit.
 - **Title bar.** `TitleBarTheme.of(theme)` is the window header's theme: when a variant sets `surface.titlebar` or
   `text.titlebar`, the header's surface and inks derive from them.
