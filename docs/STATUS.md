@@ -109,6 +109,20 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Buddy stand-up — 2026-10-24** (`codex/buddy-stand-up`, base `c4dda9b0b`; not merged or pushed):
+Buddy finishes typing with a 500 ms hand-rest, laptop-close/lower and rise sequence. Renewed work interrupts
+immediately; repeated intent and attention keep the phase deadline, and idle timing starts at standing completion.
+Three appended poses preserve the original twenty cells; the 23-frame master/runtime strip verifies pixel-exactly.
+The [plan](superpowers/plans/2026-10-24-buddy-stand-up.md) records the implementation-body planning deviation.
+Task 1 (`b36aa2833`) passed review. Task 2 adds clock-explicit intent, timer rescheduling and arithmetic typing
+catch-up, with 29 animator tests and normal/interrupted production-sprite GIF/contact previews. Full check exposed
+the splash's exact old strip-width guard: it now validates complete cells and the pose columns it uses, a scoped
+integration deviation covered by 30 focused bootstrap/splash tests. First full run: 12,872 tests, three splash
+failures, zero errors, 29 skips; after the compatibility fix, the full headless rerun passed in 7m 39s:
+12,874 tests, zero failures/errors, 29 skips (173 Buddy tests). Task 2 and whole-branch reviews pending.
+User GUI acceptance remains pending: finish the last running command, watch standing, then begin new work mid-rise.
+No GUI, benchmark, AOT, push or merge.
+
 **Tab-aware Buddy — 2026-10-24** (`codex/buddy-tab-awareness`, base `f8aa4bca6`; not merged or pushed):
 terminal notices follow their current parent tab's strip title, pane title and membership. The selected tab of an
 active, showing, non-minimized workspace window suppresses all its terminal entries, retaining command lifetime,

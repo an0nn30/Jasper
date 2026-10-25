@@ -44,4 +44,18 @@ class MeadowSplashTest {
             assertThat(SplashPainterTest.pixels(actual)).containsExactly(SplashPainterTest.pixels(expected));
         } finally { a.dispose(); b.dispose(); }
     }
+
+    @Test void sharedSpriteAcceptsRequiredPosesAndAppendedColumns() {
+        MeadowSplash.validateSprites(new BufferedImage(5 * 84, 96, BufferedImage.TYPE_INT_ARGB));
+        MeadowSplash.validateSprites(new BufferedImage(23 * 84, 96, BufferedImage.TYPE_INT_ARGB));
+    }
+
+    @Test void sharedSpriteRejectsMissingPosesPartialCellsAndInvalidHeight() {
+        for (int[] size : new int[][]{{4 * 84, 96}, {23 * 84 + 1, 96}, {23 * 84, 95}}) {
+            org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() ->
+                MeadowSplash.validateSprites(new BufferedImage(size[0], size[1], BufferedImage.TYPE_INT_ARGB)));
+        }
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException()
+            .isThrownBy(() -> MeadowSplash.validateSprites(null));
+    }
 }

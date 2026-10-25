@@ -192,8 +192,8 @@ public final class BuddyWindow {
 
     /** Applies host working intent to the animator without acquiring presentation or deciding policy. */
     public void setWorking(boolean working) {
-        animator.setWorking(working);
-        window.repaint();
+        animator.setWorking(working, System.nanoTime());
+        paintAndSchedule();
     }
 
     public void show() {

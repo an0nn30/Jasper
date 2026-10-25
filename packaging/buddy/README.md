@@ -53,7 +53,7 @@ Column order is fixed by [BuddyFrame](../../jasper-buddy/src/main/java/dev/jaspe
 Frames 17–19 are the working animation (A, B, A, B, rest at 250 ms per frame), requested
 by the host through `setWorking(true)`. Jasper requests it while a terminal command runs
 past `notifications.long_command_seconds`, or runs out of sight, unless that setting is 0;
-Buddy has no notification threshold. Frames 0–13 and 17–19 are poses. Frames 14–16 are overlays:
+Buddy has no notification threshold. Frames 0–13 and 17–22 are poses. Frames 14–16 are overlays:
 transparent except for the stars, cycled on top of the body while he fades in at spawn, so they never replace a pose. [BuddyAnimator](../../jasper-buddy/src/main/java/dev/jasper/buddy/internal/animation/BuddyAnimator.java)
 sequences the frames; [Buddy architecture](../../docs/buddy-architecture.md#animation-drawing-and-placement)
 lists the timings.

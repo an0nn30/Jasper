@@ -551,7 +551,8 @@ class BuddyAnimatorTest {
         runUntil(animator, 10 * SECOND);
 
         animator.setWorking(false);
-        List<Event> after = runUntil(animator, 14 * SECOND);
+        List<Event> after = runUntil(animator, 14 * SECOND).stream()
+            .filter(event -> event.at() >= 10_500 * MILLIS).toList();
 
         assertThat(after).extracting(Event::frame)
             .doesNotContain(BuddyFrame.TYPE_A, BuddyFrame.TYPE_B, BuddyFrame.TYPE_REST);
@@ -591,4 +592,115 @@ class BuddyAnimatorTest {
         assertThat(animator.frame()).isEqualTo(before);
         assertThat(animator.nextDueNanos()).hasValue(due);
     }
+    private static BuddyAnimator workingAnimator() {
+        var animator = new BuddyAnimator(new Random(7));
+        animator.shown(0);
+        spawned(animator, 0);
+        animator.setWorking(true);
+        animator.tick(3 * SECOND);
+        return animator;
+    }
+
+    @Test void workingEndsWithExactlyHalfASecondOfRising() {
+        var animator = workingAnimator();
+        animator.setWorking(false);
+        BuddyFrame[] frames = {BuddyFrame.TYPE_REST, BuddyFrame.CLOSE_LAPTOP,
+            BuddyFrame.LOWER_LAPTOP, BuddyFrame.RISE};
+        long[] boundaries = {0, 100, 225, 350, 500};
+        for (int index = 0; index < frames.length; index++) {
+            animator.tick(3 * SECOND + boundaries[index] * MILLIS);
+            assertThat(animator.frame()).isEqualTo(frames[index]);
+            assertThat(animator.nextDueNanos()).hasValue(3 * SECOND + boundaries[index + 1] * MILLIS);
+            animator.setWorking(false);
+            animator.greet(3 * SECOND + (boundaries[index + 1] - 1) * MILLIS);
+            animator.poke(3 * SECOND + (boundaries[index + 1] - 1) * MILLIS);
+            assertThat(animator.frame()).isEqualTo(frames[index]);
+        }
+        animator.tick(3_500 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.IDLE);
+        assertThat(firstSit(runUntil(animator, 24 * SECOND)).at()).isEqualTo(23_500 * MILLIS);
+    }
+
+    @Test void renewedWorkInterruptsEveryRisingPhaseAndCanFinishAgain() {
+        for (long offset : new long[]{0, 100, 225, 350}) {
+            var animator = workingAnimator();
+            animator.setWorking(false);
+            animator.tick(3 * SECOND + offset * MILLIS);
+            animator.setWorking(true);
+            assertThat(animator.frame()).isEqualTo(BuddyFrame.TYPE_A);
+            assertThat(animator.nextDueNanos()).hasValue(3 * SECOND + (offset + 250) * MILLIS);
+            animator.setWorking(false);
+            assertThat(animator.frame()).isEqualTo(BuddyFrame.TYPE_REST);
+            assertThat(animator.nextDueNanos()).hasValue(3 * SECOND + (offset + 100) * MILLIS);
+            animator.tick(3 * SECOND + (offset + 500) * MILLIS);
+            assertThat(animator.frame()).isEqualTo(BuddyFrame.IDLE);
+        }
+    }
+
+    @Test void lateTickFinishesRisingAndHideCancelsIt() {
+        var animator = workingAnimator();
+        animator.setWorking(false);
+        animator.tick(4 * SECOND);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.IDLE);
+        assertThat(firstSit(runUntil(animator, 24 * SECOND)).at()).isEqualTo(23_500 * MILLIS);
+        animator.setWorking(true);
+        animator.setWorking(false);
+        animator.hidden();
+        assertThat(animator.nextDueNanos()).isEmpty();
+        animator.shown(30 * SECOND);
+        assertThat(animator.opacity()).isZero();
+        spawned(animator, 30 * SECOND);
+    }
+
+    @Test void intentUsesCurrentTimeBetweenScheduledTicksAndRepeatedFalseKeepsDeadline() {
+        var animator = workingAnimator();
+        animator.setWorking(false, 3_037 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.TYPE_REST);
+        assertThat(animator.nextDueNanos()).hasValue(3_137 * MILLIS);
+        animator.setWorking(false, 3_200 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.CLOSE_LAPTOP);
+        assertThat(animator.nextDueNanos()).hasValue(3_262 * MILLIS);
+        animator.setWorking(true, 3_271 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.TYPE_A);
+        assertThat(animator.nextDueNanos()).hasValue(3_521 * MILLIS);
+    }
+
+    @Test void typingCatchupMatchesEveryScheduledStepAndHandlesYearsLate() {
+        for (int count = 0; count < 100; count++) {
+            var scheduled = workingAnimator();
+            var late = workingAnimator();
+            long end = 3 * SECOND + count * 137 * MILLIS;
+            runUntil(scheduled, end);
+            late.tick(end);
+            assertThat(late.frame()).isEqualTo(scheduled.frame());
+            assertThat(late.nextDueNanos()).isEqualTo(scheduled.nextDueNanos());
+        }
+        var animator = workingAnimator();
+        long end = TimeUnit.DAYS.toNanos(3650) + 3_111 * MILLIS;
+        animator.setWorking(true, end);
+        long steps = (end - 2 * SECOND) / BuddyAnimator.TYPE_STEP_NANOS;
+        assertThat(animator.frame()).isEqualTo(BuddyAnimator.TYPING.get((int) (steps % 5)));
+        assertThat(animator.nextDueNanos()).hasValue(2 * SECOND + (steps + 1) * BuddyAnimator.TYPE_STEP_NANOS);
+        animator.setWorking(false, end);
+        assertThat(animator.nextDueNanos()).hasValue(end + 100 * MILLIS);
+    }
+
+    @Test void clearingWorkDuringBusyStagesDoesNotInventATypingExit() {
+        for (int stage = 0; stage < 3; stage++) {
+            var animator = new BuddyAnimator(new Random(7));
+            animator.shown(0);
+            long at = 500 * MILLIS;
+            if (stage > 0) {
+                spawned(animator, 0);
+                if (stage == 1) { animator.greet(3 * SECOND); at = 3_250 * MILLIS; }
+                else { animator.tick(63 * SECOND); animator.poke(63 * SECOND); at = 63_100 * MILLIS; }
+            }
+            animator.setWorking(true, at);
+            animator.setWorking(false, at + 10 * MILLIS);
+            assertThat(runUntil(animator, at + 2 * SECOND)).extracting(Event::frame)
+                .doesNotContain(BuddyFrame.TYPE_REST, BuddyFrame.CLOSE_LAPTOP,
+                    BuddyFrame.LOWER_LAPTOP, BuddyFrame.RISE);
+        }
+    }
+
 }

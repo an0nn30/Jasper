@@ -24,8 +24,7 @@ final class MeadowSplash {
         try (var input = MeadowSplash.class.getResourceAsStream("jasper-pixel.png")) {
             if (input == null) throw new IllegalArgumentException("Missing splash sprite");
             sprites = ImageIO.read(input);
-            if (sprites == null || sprites.getWidth() != 1680 || sprites.getHeight() != 96)
-                throw new IllegalArgumentException("Invalid splash sprite strip");
+            validateSprites(sprites);
             try (var art = MeadowSplash.class.getResourceAsStream("meadow.svg")) {
                 if (art == null) throw new IllegalArgumentException("Missing meadow artwork");
                 landscape = new EncodedArtwork(EncodedArtwork.Format.SVG, art.readAllBytes());
@@ -33,6 +32,13 @@ final class MeadowSplash {
             landscape.prepare();
             background(scale);
         } catch (IOException failure) { throw new UncheckedIOException(failure); }
+    }
+
+    static void validateSprites(BufferedImage sprites) {
+        if (sprites == null || sprites.getWidth() % 84 != 0
+                || sprites.getWidth() / 84 <= java.util.Arrays.stream(POSES).max().orElseThrow()
+                || sprites.getHeight() != 96)
+            throw new IllegalArgumentException("Invalid splash sprite strip");
     }
 
     void frame(int tick) { column = POSES[Math.floorMod(tick, POSES.length)]; }
