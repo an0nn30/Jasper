@@ -3,6 +3,7 @@ package dev.jasper.app.settingsui;
 import static dev.jasper.app.config.CoreSettings.UI_APPEARANCE;
 import static dev.jasper.app.config.CoreSettings.UI_THEME_DARK;
 import static dev.jasper.app.config.CoreSettings.UI_THEME_LIGHT;
+import static dev.jasper.app.config.CoreSettings.UI_THEME_DESKTOP_SOURCE;
 
 import dev.jasper.app.config.AppearanceMode;
 import dev.jasper.app.lifecycle.Subscription;
@@ -17,19 +18,23 @@ import java.util.Optional;
  * Settings › Appearance's theme card: the Dark / Light / Match System tiles for {@code ui.appearance}, each previewing
  * the theme picked for it, then the Dark theme and Light theme rows ({@code ui.theme.dark}, {@code ui.theme.light}),
  * which list the installed themes with that variant; a pick that lacks it shows as {@code Dawn (no Dark variant)}, and one
- * that nothing installed has as {@code dawn (not installed)}. The picks are staged with the tiles; Reset returns all three
- * to their defaults. When the application supplies {@link ThemeImports}, a gear beside each dropdown imports and removes
- * themes ({@link ThemeMenu}). EDT only.
+ * that nothing installed has as {@code dawn (not installed)}. The picks and Desktop color source are staged with the tiles;
+ * Reset returns all four settings to their defaults. When the application supplies {@link ThemeImports}, a gear beside
+ * each dropdown imports and removes themes ({@link ThemeMenu}). EDT only.
  */
 final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     private final AppearanceChoices choices;
     private final SettingsDraft draft;
     private final PageContext context;
-    private final Subscription listening;
+    private final Subscription listening, desktopListening;
+    private Subscription darkDemand, lightDemand;
+    private String requestedSource;
+    private boolean disposed;
     private final Optional<ThemeMenu> darkMenu, lightMenu;
     private InstalledThemes themes;
     private AppearanceMode value = UI_APPEARANCE.defaultValue();
     private String dark = UI_THEME_DARK.defaultValue(), light = UI_THEME_LIGHT.defaultValue();
+    private String source = UI_THEME_DESKTOP_SOURCE.defaultValue();
     private Runnable render = () -> { };
 
     AppearanceSelection(AppearanceChoices choices, PageContext context) {
@@ -41,7 +46,8 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         darkMenu = choices.imports().map(hooks -> new ThemeMenu(hooks, choices.themes(), context, ThemeMenu.Target.DARK, () -> render.run(), icon));
         lightMenu = choices.imports().map(hooks -> new ThemeMenu(hooks, choices.themes(), context, ThemeMenu.Target.LIGHT, () -> render.run(), icon));
         themes = choices.themes().get();
-        listening = choices.onChanged().apply(() -> render.run());
+        listening = choices.onChanged().apply(this::dataChanged);
+        desktopListening = choices.desktop().onChanged().apply(this::dataChanged);
         showRelated();
     }
 
@@ -51,8 +57,8 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
         var plain = new ControlState(state.visible(), state.enabled(), state.busy(), "");
         Optional<Boolean> system = choices.systemDark().get();
-        var darkPreview = preview(themes.dark(), dark, UI_THEME_DARK.defaultValue());
-        var lightPreview = preview(themes.light(), light, UI_THEME_LIGHT.defaultValue());
+        var darkPreview = preview(true, dark);
+        var lightPreview = preview(false, light);
         var tiles = new Nodes.Choice(id + ":policy", plain, Nodes.ChoiceKind.PREVIEWS, List.of(
             tile("dark", "Dark", label(true, dark), new Option.Preview(darkPreview, Optional.empty())),
             tile("light", "Light", label(false, light), new Option.Preview(lightPreview, Optional.empty())),
@@ -60,9 +66,9 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
                 .orElse("System appearance unavailable; using Dark"), new Option.Preview(darkPreview, Optional.of(lightPreview)))),
             token(value), "Appearance", "");
         boolean modified = value != draft.defaultValue(UI_APPEARANCE) || !dark.equals(draft.defaultValue(UI_THEME_DARK))
-            || !light.equals(draft.defaultValue(UI_THEME_LIGHT));
+            || !light.equals(draft.defaultValue(UI_THEME_LIGHT)) || !source.equals(draft.defaultValue(UI_THEME_DESKTOP_SOURCE));
         var reset = new Nodes.Button(id + ":reset", new ControlState(modified, true, false, ""), "",
-            "reset", Nodes.ButtonKind.GHOST, id + ":reset", "Reset " + UI_APPEARANCE.label() + " and its themes to their defaults");
+            "reset", Nodes.ButtonKind.GHOST, id + ":reset", "Reset " + UI_APPEARANCE.label() + " and its themes and Desktop color source to their defaults");
         var darkPick = new Nodes.Choice(id + ":dark-theme", plain, Nodes.ChoiceKind.DROPDOWN, options(true, dark), dark,
             UI_THEME_DARK.label(), "");
         var lightPick = new Nodes.Choice(id + ":light-theme", plain, Nodes.ChoiceKind.DROPDOWN, options(false, light), light,
@@ -75,11 +81,19 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
             inline ? List.of(withGear(id + ":dark", plain, darkPick, darkMenu, dark), reset) : List.of(withGear(id + ":dark", plain, darkPick, darkMenu, dark)));
         var lightControls = new Nodes.Stack(id + ":light-controls", plain, Nodes.LayoutRole.SETTINGS_TRAILING,
             inline ? List.of(withGear(id + ":light", plain, lightPick, lightMenu, light), lane) : List.of(withGear(id + ":light", plain, lightPick, lightMenu, light)));
-        // Spec 12.1: without an inline Reset, both theme rows offer Reset to Default for the policy and its two themes.
+        // Spec 12.1: without an inline Reset, the rows' menus reset the policy, themes and desktop source together.
         var menu = SchemaPage.resetMenu(context, id + ":reset", modified);
+        boolean desktop = desktop(dark) || desktop(light);
+        var desktopState = new ControlState(desktop, state.enabled(), state.busy(), "");
+        var sourcePick = new Nodes.Choice(id + ":desktop-source", desktopState, Nodes.ChoiceKind.DROPDOWN, List.of(
+            new Option("auto", "Automatic", Optional.empty()), new Option("gtk3", "GTK 3", Optional.empty()),
+            new Option("gtk4", "GTK 4 / libadwaita", Optional.empty())), source, UI_THEME_DESKTOP_SOURCE.label(), "");
+        var sourceControls = new Nodes.Stack(id + ":desktop-controls", desktopState, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(sourcePick));
         return new Nodes.Stack(id + ":selection", plain, Nodes.LayoutRole.VERTICAL, List.of(tiles,
             new Nodes.SettingRow("row:" + id, plain, UI_THEME_DARK.label(), "", darkControls, false, highlighted, "", menu),
-            new Nodes.SettingRow("row:" + id + ":light", plain, UI_THEME_LIGHT.label(), "", lightControls, false, highlighted, "", menu)));
+            new Nodes.SettingRow("row:" + id + ":light", plain, UI_THEME_LIGHT.label(), "", lightControls, false, highlighted, "", menu),
+            new Nodes.SettingRow("row:" + id + ":desktop", desktopState, UI_THEME_DESKTOP_SOURCE.label(), "", sourceControls, false, highlighted, "", menu),
+            new Nodes.Text(id + ":desktop-status", desktopState, status(), Nodes.TextRole.SUPPORTING)));
     }
 
     /** {@code pick}, followed by its gear {@code id + "-gear"} when there is one. */
@@ -103,7 +117,10 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     }
 
     /** The picked theme's preview, falling back to the same appearance default as the application. */
-    private static Option.Palette preview(List<InstalledThemes.ThemeOption> installed, String picked, String defaultId) {
+    private Option.Palette preview(boolean dark, String picked) {
+        if (desktop(picked)) return choices.desktop().preview().apply(source, dark);
+        var installed = dark ? themes.dark() : themes.light();
+        String defaultId = dark ? UI_THEME_DARK.defaultValue() : UI_THEME_LIGHT.defaultValue();
         return installed.stream().filter(theme -> theme.id().equals(picked)).findFirst()
             .orElseGet(() -> installed.stream().filter(theme -> theme.id().equals(defaultId)).findFirst()
                 .orElse(installed.getFirst())).preview();
@@ -116,6 +133,7 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
 
     /** What a pick with no entry in the Dark or Light list is called: the installed theme that lacks the variant, or one that is not installed. */
     private String unavailable(boolean dark, String picked) {
+        if (desktop(picked)) return "Desktop colors (unavailable on this platform)";
         String name = themes.names().get(picked);
         return name == null ? picked + " (not installed)" : name + " (no " + (dark ? "Dark" : "Light") + " variant)";
     }
@@ -128,6 +146,7 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     @Override public void show(AppearanceMode value) { this.value = value; }
     @Override public boolean event(String id, UiEvent event) {
         // A gear's items act at once; they are never an edit of the picks.
+        if (disposed) return false;
         if (event instanceof UiEvent.Action) {
             if (!darkMenu.map(menu -> menu.event(id + ":dark-gear", event, dark)).orElse(false))
                 lightMenu.ifPresent(menu -> menu.event(id + ":light-gear", event, light));
@@ -135,14 +154,18 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         }
         if (!(event instanceof UiEvent.Selected selected)) return false;
         String picked = selected.ids().stream().findFirst().orElse("");
+        if (selected.id().equals(id + ":desktop-source")) {
+            if (!(desktop(dark) || desktop(light)) || !List.of("auto", "gtk3", "gtk4").contains(picked) || source.equals(picked)) return false;
+            source = picked; syncDemand(); return true;
+        }
         if (selected.id().equals(id + ":dark-theme")) {
             if (picked.isEmpty() || picked.equals(dark) || themes.dark().stream().noneMatch(theme -> theme.id().equals(picked))) return false;
-            dark = picked;
+            dark = picked; syncDemand();
             return true;
         }
         if (selected.id().equals(id + ":light-theme")) {
             if (picked.isEmpty() || picked.equals(light) || themes.light().stream().noneMatch(theme -> theme.id().equals(picked))) return false;
-            light = picked;
+            light = picked; syncDemand();
             return true;
         }
         if (!selected.id().equals(id + ":policy")) return false;
@@ -158,7 +181,8 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     }
 
     @Override public Map<Setting<?>, Optional<?>> companionValues() {
-        return Map.of(UI_THEME_DARK, staged(UI_THEME_DARK, dark), UI_THEME_LIGHT, staged(UI_THEME_LIGHT, light));
+        return Map.of(UI_THEME_DARK, staged(UI_THEME_DARK, dark), UI_THEME_LIGHT, staged(UI_THEME_LIGHT, light),
+            UI_THEME_DESKTOP_SOURCE, staged(UI_THEME_DESKTOP_SOURCE, source));
     }
 
     /** The saved value when the pick is what the file already means, so an untouched pick never becomes an edit. */
@@ -170,9 +194,42 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         return pick.equals(effective) ? Optional.empty() : Optional.of(pick);
     }
 
-    @Override public void showRelated() { dark = draft.value(UI_THEME_DARK); light = draft.value(UI_THEME_LIGHT); }
-    @Override public List<Setting<?>> relatedSettings() { return List.of(UI_THEME_DARK, UI_THEME_LIGHT); }
+    @Override public void showRelated() {
+        dark = draft.value(UI_THEME_DARK); light = draft.value(UI_THEME_LIGHT); source = draft.value(UI_THEME_DESKTOP_SOURCE); syncDemand();
+    }
+    @Override public List<Setting<?>> relatedSettings() { return List.of(UI_THEME_DARK, UI_THEME_LIGHT, UI_THEME_DESKTOP_SOURCE); }
     @Override public void refresh() { themes = choices.themes().get(); }
     @Override public void onChanged(Runnable render) { this.render = render; }
-    @Override public void dispose() { listening.close(); }
+    private static boolean desktop(String pick) { return pick.equals("desktop-colors"); }
+
+    private String status() {
+        String applied = choices.desktop().status().get();
+        String saved = draft.saved(UI_THEME_DESKTOP_SOURCE).orElseGet(() -> draft.defaultValue(UI_THEME_DESKTOP_SOURCE));
+        if (source.equals(saved)) return applied;
+        String label = switch (source) { case "gtk3" -> "GTK 3"; case "gtk4" -> "GTK 4 / libadwaita"; default -> "Automatic"; };
+        return "Pending Apply: " + label + ". Applied: " + applied;
+    }
+
+    private void dataChanged() { if (!disposed) render.run(); }
+
+    private void syncDemand() {
+        if (disposed) return;
+        if (!source.equals(requestedSource)) {
+            if (darkDemand != null) darkDemand.close();
+            if (lightDemand != null) lightDemand.close();
+            darkDemand = lightDemand = null; requestedSource = source;
+        }
+        boolean wantsDark = choices.desktop().available() && desktop(dark), wantsLight = choices.desktop().available() && desktop(light);
+        if (!wantsDark && darkDemand != null) { darkDemand.close(); darkDemand = null; }
+        if (!wantsLight && lightDemand != null) { lightDemand.close(); lightDemand = null; }
+        if (wantsDark && darkDemand == null) darkDemand = choices.desktop().acquire().apply(source, true);
+        if (wantsLight && lightDemand == null) lightDemand = choices.desktop().acquire().apply(source, false);
+    }
+
+    @Override public void dispose() {
+        if (disposed) return;
+        disposed = true; listening.close(); desktopListening.close();
+        if (darkDemand != null) darkDemand.close();
+        if (lightDemand != null) lightDemand.close();
+    }
 }

@@ -40,6 +40,12 @@ public final class DerivedPalette {
         return palette;
     }
 
+    /** Final ring paint: an opaque override, or the authored border at the kit's existing opacity. */
+    public static Color halo(GeneratedTheme theme, boolean error, double share) {
+        Color override = theme.derivedOverrides().get(error ? DerivedColor.ERROR_HALO : DerivedColor.FOCUS_HALO);
+        return override != null ? override : ColorMath.opacity(theme.semantic().color(error ? BORDER_ERROR : BORDER_FOCUS), share);
+    }
+
     /** The colour of {@code role}; opaque. */
     public Color color(DerivedColor role) { return values.get(Objects.requireNonNull(role, "role")); }
 
@@ -109,6 +115,9 @@ public final class DerivedPalette {
             case TAG_BORDER_AMBER -> mix(in, HUE_AMBER, SURFACE_CARD, EDGE);
             case TAG_BORDER_PURPLE -> mix(in, HUE_PURPLE, SURFACE_CARD, EDGE);
             case TAG_BORDER_NEUTRAL -> mix(in, HUE_NEUTRAL, SURFACE_CARD, EDGE);
+            case FOCUS_HALO -> flat(in.apply(BORDER_FOCUS), in.apply(SURFACE_APP));
+            case ERROR_HALO -> flat(in.apply(BORDER_ERROR), in.apply(SURFACE_APP));
+            case SURFACE_TEXT_SELECTION -> flat(in.apply(SELECTION_BG), in.apply(SURFACE_APP));
         };
     }
 

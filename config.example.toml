@@ -150,6 +150,8 @@ appearance = "system"
 # save an explicit choice.
 dark = "jasper-meadow"
 light = "jasper-meadow"
+# Desktop colors source on Linux: auto, gtk3 or gtk4; retained on every platform.
+desktop_source = "auto"
 
 [ui.font]
 # Live UI font for app chrome and plugin controls, independent of [terminal.font].

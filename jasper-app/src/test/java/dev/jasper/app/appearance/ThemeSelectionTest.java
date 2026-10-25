@@ -26,8 +26,8 @@ class ThemeSelectionTest {
         assertThat(config.darkTheme()).isEqualTo("jasper-meadow");
         var selection = ThemeSelection.of(ThemeLibrary.bundledOnly(), config.darkTheme(), config.lightTheme(),
             TerminalSchemeChoice.MATCH, (key, message) -> fail(message));
-        assertThat(selection.theme(false).name()).isEqualTo("Jasper Meadow");
-        assertThat(selection.theme(true)).isSameAs(selection.theme(false));
+        assertThat(((ThemePick.Authored) selection.theme(false)).theme().name()).isEqualTo("Jasper Meadow");
+        assertThat(selection.theme(true)).isEqualTo(selection.theme(false));
         assertThat(selection.terminal(true)).isSameAs(selection.theme(true).matching(true));
         assertThat(selection.terminal(false)).isSameAs(selection.theme(false).matching(false));
     }
@@ -63,8 +63,8 @@ class ThemeSelectionTest {
         var zenburn = TerminalSchemeChoice.parse("zenburn/dark").orElseThrow();
         var selection = ThemeSelection.of(library, "ocean", "slate-cobalt", zenburn, problems::put);
         assertThat(problems).isEmpty();
-        assertThat(selection.theme(true)).isSameAs(library.theme("ocean").orElseThrow());
-        assertThat(selection.theme(false)).isSameAs(JasperTheme.bundled());
+        assertThat(((ThemePick.Authored) selection.theme(true)).theme()).isSameAs(library.theme("ocean").orElseThrow());
+        assertThat(((ThemePick.Authored) selection.theme(false)).theme()).isSameAs(JasperTheme.bundled());
         assertThat(selection.terminal(true).name()).isEqualTo("Zenburn");
         assertThat(selection.terminal(false).name()).as("a chosen scheme whatever the appearance").isEqualTo("Zenburn");
         var matching = selection.withScheme(TerminalSchemeChoice.MATCH);
@@ -76,8 +76,8 @@ class ThemeSelectionTest {
         var library = library();
         var problems = new LinkedHashMap<String, String>();
         var selection = ThemeSelection.of(library, "zenburn", "nord", TerminalSchemeChoice.parse("nord/dark").orElseThrow(), problems::put);
-        assertThat(selection.theme(true)).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow());
-        assertThat(selection.theme(false)).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow());
+        assertThat(((ThemePick.Authored) selection.theme(true)).theme()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow());
+        assertThat(((ThemePick.Authored) selection.theme(false)).theme()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow());
         assertThat(selection.scheme()).isEqualTo(TerminalSchemeChoice.MATCH);
         assertThat(problems).containsExactly(
             Map.entry("ui.theme.dark", "\"zenburn\" has no Dark variant. Use one of \"slate-cobalt\", \"catppuccin-frappe\", "

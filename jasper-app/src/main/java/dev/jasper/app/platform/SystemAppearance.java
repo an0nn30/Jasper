@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /** Application-owned operating-system appearance input. Native callbacks are coalesced onto EDT. */
@@ -44,6 +45,29 @@ public final class SystemAppearance implements AutoCloseable {
             }
         }
         return monitor;
+    }
+    /** Uses the application-owned Linux portal service for the same appearance policy input. */
+    public static SystemAppearance open(DesktopColors desktop) {
+        return open(desktop, System.getProperty("os.name", ""), java.awt.GraphicsEnvironment.isHeadless(), SwingUtilities::invokeLater);
+    }
+    static SystemAppearance open(DesktopColors desktop, String os, boolean headless, Consumer<Runnable> dispatch) {
+        if (!os.startsWith("Linux") || headless) return open();
+        return open(desktop, dispatch, desktop::current);
+    }
+    static SystemAppearance open(DesktopColors desktop, Consumer<Runnable> dispatch, Supplier<DesktopObservation> initial) {
+        Objects.requireNonNull(desktop);
+        var monitor = new SystemAppearance(Observation.unavailable("Desktop preferences pending"), dispatch);
+        synchronized (monitor) {
+            monitor.nativeClose = desktop.subscribe(value -> monitor.portalObservation(value.portal()));
+            monitor.portalObservation(initial.get().portal());
+        }
+        return monitor;
+    }
+    private void portalObservation(DesktopObservation.Portal portal) {
+        observed(switch (portal.appearance()) {
+            case DARK -> Observation.dark(); case LIGHT -> Observation.light();
+            case UNKNOWN -> Observation.unavailable(portal.reason());
+        });
     }
     private void nativeObservation(int preference) {
         observed(switch (preference) { case 1 -> Observation.dark(); case 0 -> Observation.light(); default -> Observation.unavailable("macOS did not report an application appearance."); });

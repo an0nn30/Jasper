@@ -180,4 +180,29 @@ class ConfigTemplateTest {
         assertThatExceptionOfType(IOException.class).isThrownBy(() -> ConfigTemplate.ensureExists(parent.resolve("config.toml"), true));
         assertThat(Files.readString(parent)).isEqualTo("user data");
     }
+    @Test void desktopSourceAndPickRemainSavedOnBothPlatformSettingsPaths() throws Exception {
+        for (boolean macOs : new boolean[]{true, false}) {
+            assertThat(ConfigTemplate.text(macOs)).contains("# desktop_source = \"auto\"");
+            var loaded = ConfigLoader.parse(directory.resolve("config.toml"),
+                "[ui.theme]\ndark = 'desktop-colors'\nlight = 'desktop-colors'\ndesktop_source = 'gtk4'\n", macOs);
+            assertThat(loaded.diagnostics()).isEmpty();
+            assertThat(loaded.snapshot().darkTheme()).isEqualTo("desktop-colors");
+            assertThat(loaded.snapshot().lightTheme()).isEqualTo("desktop-colors");
+            assertThat(loaded.snapshot().desktopSource()).isEqualTo("gtk4");
+            assertThat(loaded.values().saved(CoreSettings.UI_THEME_DESKTOP_SOURCE)).contains("gtk4");
+            var file = directory.resolve("saved-" + macOs + ".toml");
+            Files.writeString(file, "[ui.theme]\ndark = 'desktop-colors'\nlight = 'desktop-colors'\ndesktop_source = 'gtk4'\n");
+            try (var service = new ConfigService(file, macOs)) {
+                var saved = service.save(SettingsEdit.of(CoreSettings.UI_THEME_DESKTOP_SOURCE, "gtk3", loaded.values()))
+                    .get(5, TimeUnit.SECONDS);
+                assertThat(saved.snapshot().desktopSource()).isEqualTo("gtk3");
+                assertThat(saved.snapshot().darkTheme()).isEqualTo("desktop-colors");
+                assertThat(saved.snapshot().lightTheme()).isEqualTo("desktop-colors");
+            }
+            var reread = ConfigLoader.parse(file, Files.readString(file), macOs);
+            assertThat(reread.diagnostics()).isEmpty();
+            assertThat(reread.snapshot().desktopSource()).isEqualTo("gtk3");
+        }
+    }
+
 }

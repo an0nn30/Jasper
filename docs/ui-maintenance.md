@@ -112,7 +112,7 @@ These tables freeze values; a change to what they freeze edits the table in the 
 | Test | Rule |
 | --- | --- |
 | `verifyUiArchitecture` | The package edges each package-info lists, no package cycle, no other Jasper module, JDK-only `theme`, `model` and `kit` |
-| `StaticDefaultTest` (jasper-app) | Geometry and type follow a kit: outside `dev.jasper.ui.metrics` and `dev.jasper.ui.kit`, only `AnimationSettings` reads `DesignMetrics.DEFAULT`; nothing reads `TypeScale.DEFAULT`, `FaceSet.PLATFORM`, `DesignMetrics.CLASSIC` or `TypeScale.CLASSIC`; only the kit parser reads `Kit.CLASSIC`; only the classes that choose the start-up kit or fall back to it read `Kit.DEFAULT`; no static initializer reads a metric or builds a painter |
+| `StaticDefaultTest` (jasper-app) | Geometry and type follow a kit: outside `dev.jasper.ui.metrics` and `dev.jasper.ui.kit`, only `AnimationSettings` reads `DesignMetrics.DEFAULT`; nothing reads `TypeScale.DEFAULT`, `FaceSet.PLATFORM`, `DesignMetrics.CLASSIC` or `TypeScale.CLASSIC`; the kit parser reads `Kit.CLASSIC`, and the classes that choose the start-up kit or fall back to it read `Kit.DEFAULT`; `DesktopPaintPairs` reads both solely to validate generated palettes against the shipped definitions; no static initializer reads a metric or builds a painter |
 | `VariantReadTest` (jasper-app) | `ControlVariants` is read only in `dev.jasper.ui.kit`, `dev.jasper.app.presentation` and `KitFaces` |
 | `StrategyIsolationTest` (jasper-app) | Faces never reference `Kit`, `ControlVariants` or `ChromeSpec`; the reconciler references control classes only, never a face or `KitFaces` |
 | `ProjectionReadTest` (jasper-app) | Each look projection's variants are read only by the factory or supplier that owns them |

@@ -96,6 +96,7 @@ public final class CorePages {
             .row(UI_APPEARANCE, Editors.appearance(appearance))
             .row(UI_THEME_DARK).shownWhen(false)
             .row(UI_THEME_LIGHT).shownWhen(false)
+            .row(UI_THEME_DESKTOP_SOURCE).shownWhen(false)
             .row(TERMINAL_SCHEME, Editors.schemeChoice(appearance)).note("Colors for terminal panes")
             .section("Workspace")
             .row(UI_WORKSPACE_OPACITY, WorkspaceEditors.opacity(appearance)).shownWhen(glass)

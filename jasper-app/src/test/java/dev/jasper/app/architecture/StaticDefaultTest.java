@@ -34,15 +34,17 @@ import org.junit.jupiter.api.Test;
  * Enterprise presentation spec 6.6 and 16.1.7: geometry and type follow a kit. Outside the catalog's own packages
  * (dev.jasper.ui.metrics and dev.jasper.ui.kit) only AnimationSettings reads DesignMetrics.DEFAULT (ConfigSnapshot is
  * built before any window, so the tab durations come from the default catalog), nothing reads TypeScale.DEFAULT,
- * FaceSet.PLATFORM, DesignMetrics.CLASSIC or TypeScale.CLASSIC, only the kit parser reads Kit.CLASSIC, only the classes
- * that choose the start-up kit or fall back to it read Kit.DEFAULT, and no static
+ * FaceSet.PLATFORM, DesignMetrics.CLASSIC or TypeScale.CLASSIC. The kit parser and read-only desktop palette validator
+ * read Kit.CLASSIC; start-up selection, fallback and palette validation read Kit.DEFAULT. No static
  * initializer reads a metric or builds a painter, itself or through the methods it calls.
  */
 class StaticDefaultTest {
     static final String METRICS = "dev/jasper/ui/metrics/DesignMetrics", ROLE = "Ldev/jasper/ui/metrics/DesignMetrics$Role;";
     static final String ANIMATION = "dev/jasper/app/config/AnimationSettings", DEFAULT_KIT = "dev/jasper/ui/kit/Kit.DEFAULT";
-    /** The classic base; only the kit parser, which starts a classic kit from it, reads it. */
+    /** The classic base: selected by the kit parser, enumerated by read-only palette validation. */
     static final String CLASSIC_KIT = "dev/jasper/ui/kit/Kit.CLASSIC";
+    /** Read-only validation enumerates shipped definitions without choosing the process kit. */
+    static final String DESKTOP_PAIRS = "dev/jasper/app/appearance/DesktopPaintPairs";
     static final String PROBE = "dev/jasper/app/architecture/StaticDefaultTest$";
     /** How many calls deep a static initializer's calls are followed through the scanned classes. */
     static final int DEPTH = 4;
@@ -57,10 +59,10 @@ class StaticDefaultTest {
     static final Set<String> PAINTERS = Set.of("dev/jasper/ui/swing/NativeStyles", "dev/jasper/ui/swing/ChromePainter");
     /**
      * The classes that read Kit.DEFAULT: the kit parser's default base, the default presentation and its fallback, the
-     * installed-kit fallback and the controllers made without a kit.
+     * installed-kit fallback, controllers made without a kit, and read-only validation of both shipped definitions.
      */
     static final Set<String> DEFAULT_KIT_READERS = Set.of("dev/jasper/app/presentation/KitParser", "dev/jasper/app/presentation/Presentation",
-        "dev/jasper/ui/swing/FlatLafInstaller", "dev/jasper/app/appearance/ThemeController");
+        "dev/jasper/ui/swing/FlatLafInstaller", "dev/jasper/app/appearance/ThemeController", DESKTOP_PAIRS);
 
     static boolean owner(String type) { return type.startsWith("dev/jasper/ui/metrics/") || type.startsWith("dev/jasper/ui/kit/"); }
 
@@ -175,7 +177,7 @@ class StaticDefaultTest {
             .as("the one allowed read, so the scan is live").hasSize(3);
         Set<String> classicReaders = found.stream().filter(read -> read.endsWith(": " + CLASSIC_KIT))
             .map(read -> read.substring(0, read.indexOf('.'))).collect(Collectors.toCollection(TreeSet::new));
-        assertThat(classicReaders).as("the classes that read Kit.CLASSIC").containsExactly("dev/jasper/app/presentation/KitParser");
+        assertThat(classicReaders).as("the classes that read Kit.CLASSIC").containsExactlyInAnyOrder("dev/jasper/app/presentation/KitParser", DESKTOP_PAIRS);
         assertThat(found.stream().filter(read -> !read.startsWith(ANIMATION + ".<clinit>: ") && !read.endsWith(": " + DEFAULT_KIT)
                 && !read.endsWith(": " + CLASSIC_KIT)))
             .as("default-catalog reads and static metric finals outside the catalog").isEmpty();

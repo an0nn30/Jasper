@@ -1,5 +1,16 @@
 # Jasper — Status and Handoff
 
+**Linux Desktop colors — 2026-10-24.** Implemented on `codex/linux-desktop-colors`, refreshed from main `22a611145`, with all ten task reviews and the final fix review complete through `42e9c4dfe`. The optional interface theme offers Automatic, GTK 3 and GTK 4 / libadwaita sources, portal preferences, live previews and bounded fallback/recovery. Main’s Meadow defaults, independent Editor scheme and terminal choices are preserved. Linux distributions carry the three isolated executable helpers; other platforms retain saved Desktop choices as unavailable. See the approved [plan](superpowers/plans/2026-10-17-jasper-linux-desktop-colors.md) for the execution record.
+
+Execution adjustments: source metadata, appearance/platform declarations and helper lookup moved earlier to keep each integration valid. Preview demand carries source/polarity and follows retained Settings-page lifetime through disposal, including while another page is visible; the existing resampling boundary refreshes inactive variants. Generic optional halo and interface-selection overrides, a narrow read-only cross-kit validation exception, shared cache admission and corrected final-hover constraints meet contrast targets while preserving authored paints. The converter reserves the dynamic id separately from file-backed themes. Modern libadwaita uses modern variables; plain GTK4 may use paired named fallbacks. Deterministic initialization seams cover subscription races. Rendering evidence links 269 of 307 inventory entries to pixels, classifies 37 conservative constraints and one native-title entry separately, and preserves all 356 authored captures. Native evidence uses the authorized VM and older userspaces, with the limits below.
+
+Final plain verification (2026-10-24): `./gradlew check --continue --max-workers=2` with the verified Python 3.13.15 interpreter passed on macOS aarch64: **13,017 tests, 12,987 passed, zero failures/errors, 30 skips**. The default 512 MiB test heap is unchanged. The first full runs exposed a Task 9 fixture leak: 180 synthetic focus-gained events left 180 caret timers active. A failing teardown assertion and matching focus-lost callbacks in `finally` fixed it; the live timer count fell to one during later tests, with 180 fewer KitViews at nearby later-test sampling points. Refreshed main's 4,412-test app baseline passed before that fix. Task 10 also completes the deferred owner ledger and makes supervisor fixture paths absolute on Windows; Windows execution remains pending. Final Mac `:jasper-app:installDist :jasper-app:packageApp :jasper-app:verifyPackage` passed without application AOT training.
+
+The pre-final-fix native Ubuntu 26.04 aarch64 full check completed **13,013 tests, 11 failures, zero errors, 59 skips**, with no heap failure after the fixture repair. All 11 rendering/geometry assertions reproduce on refreshed main `22a611145` (PaintedContrast, SelectionRendering, EditorComposition, VaultSheetRender, ClassicWindowsTitle, CollapsibleNavigation, EditorKit, PanelSurfaces and SettingsShellFrame); their expectations remain intact. Its GTK task also encountered a reused daemon's missing private Xvfb path; the explicit fresh-JVM `:jasper-app:testDesktopProtocol :jasper-app:testDesktopPortal :jasper-app:testDesktopGtk :jasper-app:verifyDesktopHelpers` gate passed: 409 protocol checks, 12 portal tests/46 snapshot assertions and 33 GTK tests, with no skips. Final focused Java checks passed 50/50 on Linux and 49/50 on macOS (one Linux-only skip). The private Python 3.12.3 wrapper avoids the host's unsupported 3.14 converter runtime. Ubuntu 22.04 userspace builds and verifies the portable/native aarch64 images against glibc 2.35/GLib 2.72.4; PRoot needs the repository wrapper's Java entry and direct-loader linkage shim because its shell access predicate rejects valid executables. GTK 4.6.9 there reports clean unavailability. Ubuntu 24.04 userspace passes 25 native GTK tests (GTK 3.24.41, GTK 4.14.5, libadwaita 1.5.0); the 26 VM uses GTK 3.24.52, GTK 4.22.4 and libadwaita 1.9.1. Older userspaces share the 26 kernel. Hosted x86_64/Windows runners, the digest-pinned 26 container and Debian/Fedora/openSUSE package installations were not run locally. GNOME, GTK 3 desktops, KDE and Wayland/X11 native acceptance remain user-run.
+
+
+The final review fixes close the application owner’s initial subscription race, add bounded portal acquisition/resnapshot recovery, accept readable translucent foregrounds over opaque windows, and preserve implementation/version/failure status. Final focused verification passes 109 Java tests on each Mac/Linux host, architecture checks, 409 protocol checks, 19 portal tests/60 assertions, 35 modern GTK tests and 27 Ubuntu 24 GTK tests. Portal ASan/UBSan and Ubuntu 22 baseline/unsupported-GTK checks pass. An extra PRoot24 portal run fails credential emulation before observer startup and is not runtime evidence. The final plain Mac full check and package verification ran after these fixes, without diagnostic instrumentation or AOT. Work remains unmerged and unpushed; native desktop acceptance remains user-run.
+
 ## Current state — 2026-10-22
 
 Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core is the workspace (windows, tabs, panes
@@ -109,6 +120,10 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Buddy integration — 2026-10-25:** merged tab-aware bubbles and the stand-up animation with current `main`,
+including Linux translucent rendering and Desktop colors. Resolved the status-log overlap by retaining both histories;
+production code merged cleanly. Full headless `check` with Python 3.13 passed in 8m 17s. No push.
+
 **Buddy stand-up — 2026-10-24** (`codex/buddy-stand-up`, base `c4dda9b0b`; not merged or pushed):
 Buddy finishes typing with a 500 ms hand-rest, laptop-close/lower and rise sequence. Renewed work interrupts
 immediately; repeated intent and attention keep the phase deadline, and idle timing starts at standing completion.
@@ -137,7 +152,7 @@ zero failures/errors, 29 skips. Existing compiler and ByteBuddy 1.18.3 JDK Unsaf
 Whole-branch review found no actionable issues. User GUI acceptance remains pending: titled program, tab/window switching, split-tab expansion,
 pane activation and tab moves. Stand-up animation is a separate deliverable. No GUI, benchmark or AOT run.
 
-**Shared display scaling — 2026-10-24** (`codex/shared-display-scaling`; not merged or pushed): terminal fonts,
+**Shared display scaling — 2026-10-24** (`codex/shared-display-scaling`; merged into `main` for Linux testing): terminal fonts,
 initial window geometry and pane padding follow FlatLaf's user scale while font settings and per-pane zoom stay in
 logical points (6–72, with rendered sizes allowed above 72). Scale changes refit the existing PTY and closing a pane
 releases its observer. Enterprise family-only UI font changes retain the desktop font size used for scale derivation.
@@ -146,6 +161,15 @@ deviation from the complete-code planning convention. Independent task and whole
 focused and fresh 1.25/1.5/2 scale checks passed. `./gradlew check --continue` with Python 3.13 passed: 12,847 tests,
 zero failures/errors, 29 skips. The first run found the corrected source-inventory omission for the two new app tests.
 Native GNOME Wayland and KDE acceptance remains pending. No GUI or AOT run.
+
+**Buddy translucent Linux rendering — 2026-10-24** (`codex/buddy-wayland-rendering`; Ubuntu fix verified by the user, approved for merge):
+all four Buddy windows compose complete frames in reusable device-resolution ARGB buffers, then replace native
+pixels in one clipped blit. This avoids X11 Swing's opaque backbuffer and the native background clear between
+frames. Headless pixel tests cover transparency, old-frame erasure, clipping, resize, disposal and 1×, 2× and
+1.25× scaling; `:jasper-buddy:test` passed (162 tests, zero failures, errors or skips). Full `check` passed with
+Python 3.12.14: **12,850 tests, zero failures/errors, 29 skipped**. Task and whole-branch reviews approved. The [plan](superpowers/plans/2026-10-24-buddy-wayland-rendering.md) records the implementation;
+its scope grew by one architecture-guide sentence. The user confirmed on Ubuntu GNOME Wayland that the black box
+and flickering are gone (2026-10-24). Dragging, repeated hide/show, menu/drawer and display scaling remain unrecorded.
 
 **Editor Color scheme setting — 2026-10-23** (`claude/editor-color-scheme`, worktree
 `.claude/worktrees/editor-color-scheme`, from local `main` at `f30067a2d`; not merged or pushed): the Editor's

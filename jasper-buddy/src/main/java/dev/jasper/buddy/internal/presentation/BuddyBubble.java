@@ -17,7 +17,7 @@ import javax.swing.Timer;
 final class BuddyBubble {
     static final int AUTO_HIDE_MILLIS = 5_000;
 
-    private final JWindow window = new JWindow();
+    private final JWindow window = new BuddySurfaceWindow();
     private final BuddyBubblePanel panel;
     private final Timer autoHide;
     private final Runnable onActivate;

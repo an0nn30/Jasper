@@ -1,0 +1,8 @@
+@define-color theme_bg_color rgb(10%,20%,30%);
+@define-color theme_fg_color white;
+@define-color theme_base_color rgb(20%,30%,40%);
+@define-color theme_text_color white;
+@define-color theme_selected_bg_color blue;
+@define-color theme_selected_fg_color white;
+@define-color window_bg_color rgb(10%,20%,30%);
+@define-color window_fg_color white;

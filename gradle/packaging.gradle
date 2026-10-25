@@ -452,6 +452,17 @@ def verifyPackage = tasks.register('verifyPackage') {
             linux: [app: 'lib/app', runtime: 'lib/runtime', launcher: 'bin/Jasper'],
         ][context.host.os]
         File appDir = new File(image, layoutFor.app)
+        File helperDirectory = new File(appDir, 'desktop-colors')
+        List<File> desktopHelpers = []
+        if (context.host.os == 'linux') {
+            ['jasper-desktop-portal', 'jasper-desktop-gtk3', 'jasper-desktop-gtk4'].each { name ->
+                File helper = new File(helperDirectory, name)
+                File stagedHelper = new File(inputDirectory.get().asFile, 'desktop-colors/' + name)
+                if (!helper.isFile() || !helper.canExecute() || Files.mismatch(stagedHelper.toPath(), helper.toPath()) != -1L)
+                    throw new GradleException("Package verification failed: missing or changed executable ${helper}")
+                desktopHelpers.add(helper)
+            }
+        } else if (helperDirectory.exists()) throw new GradleException('Package verification failed: Linux desktop helpers on another OS')
         File runtimeHome = new File(image, layoutFor.runtime)
         File nativeLauncher = new File(image, layoutFor.launcher)
         File config = new File(appDir, 'Jasper.cfg')
@@ -722,7 +733,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         if (context.host.os == 'linux') {
             // Read the ELF header rather than trusting `file`: e_machine at offset 18 is 0x3E for x86-64, 0xB7 for AArch64.
             int expectedMachine = context.host.architecture == 'aarch64' ? 0xB7 : 0x3E
-            [nativeLauncher, watcher, new File(runtimeHome, 'bin/java')].each { binary ->
+            ([nativeLauncher, watcher, new File(runtimeHome, 'bin/java')] + desktopHelpers).each { binary ->
                 byte[] header = new byte[20]
                 binary.withInputStream { it.readNBytes(header, 0, header.length) }
                 boolean elf = header[0] == 0x7F && header[1] == ('E' as char) && header[2] == ('L' as char) && header[3] == ('F' as char)

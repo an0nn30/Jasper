@@ -23,7 +23,7 @@ import javax.swing.Timer;
  * activation, when emptied or when the companion hides; hiding does not clear the model.
  */
 final class BuddyDeckWindow {
-    private final JWindow window = new JWindow();
+    private final JWindow window = new BuddySurfaceWindow();
     private final BuddyDeck deck;
     private final BuddyDeckPanel panel;
     /** Animates hover and running-text shimmer; other live detail ticks once per second. */

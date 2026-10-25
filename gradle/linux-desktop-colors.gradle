@@ -1,0 +1,227 @@
+// Linux helper targets need a C11 compiler; the portal additionally uses GIO.
+def linux = System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('linux')
+def source = rootProject.file('packaging/desktop-colors/src')
+def fixtures = rootProject.file('packaging/desktop-colors/test')
+def executable = layout.buildDirectory.file('desktop-colors/protocol-tests')
+def compileProtocol = tasks.register('compileDesktopProtocolTests', Exec) {
+    onlyIf { linux }
+    inputs.files(new File(source, 'protocol.c'), new File(source, 'protocol.h'), new File(fixtures, 'protocol_test.c'))
+    outputs.file(executable)
+    doFirst {
+        executable.get().asFile.parentFile.mkdirs()
+        commandLine('cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I' + source.absolutePath,
+            new File(source, 'protocol.c').absolutePath, new File(fixtures, 'protocol_test.c').absolutePath,
+            '-o', executable.get().asFile.absolutePath)
+    }
+}
+def testProtocol = tasks.register('testDesktopProtocol', Exec) {
+    group = 'verification'
+    description = 'Tests Linux desktop helper commands, palette serialization and shared protocol vectors.'
+    onlyIf { linux }
+    dependsOn(compileProtocol)
+    inputs.files(new File(fixtures, 'vectors.jsonl'), new File(fixtures, 'vectors.tsv'))
+    commandLine(executable.get().asFile.absolutePath, new File(fixtures, 'vectors.jsonl').absolutePath,
+        new File(fixtures, 'vectors.tsv').absolutePath)
+}
+if (linux) tasks.named('check') { dependsOn(testProtocol) }
+
+// Resolve GIO only inside Linux task actions, so other platforms never need pkg-config.
+def gioFlags = {
+    providers.exec {
+        commandLine('pkg-config', '--cflags', '--libs', 'gio-2.0', 'gio-unix-2.0')
+    }.standardOutput.asText.get().trim().split('\\s+') as List
+}
+def portalExecutable = layout.buildDirectory.file('desktop-colors/jasper-desktop-portal')
+def compilePortal = tasks.register('compileDesktopPortal', Exec) {
+    onlyIf { linux }
+    inputs.files(new File(source, 'protocol.c'), new File(source, 'protocol.h'), new File(source, 'portal.c'))
+    outputs.file(portalExecutable)
+    doFirst {
+        portalExecutable.get().asFile.parentFile.mkdirs()
+        commandLine(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I' + source.absolutePath,
+            new File(source, 'protocol.c').absolutePath, new File(source, 'portal.c').absolutePath,
+            '-o', portalExecutable.get().asFile.absolutePath] + gioFlags())
+    }
+}
+def portalTests = layout.buildDirectory.file('desktop-colors/portal-tests')
+def compilePortalTests = tasks.register('compileDesktopPortalTests', Exec) {
+    onlyIf { linux }
+    inputs.files(new File(source, 'protocol.c'), new File(source, 'protocol.h'), new File(source, 'portal.c'),
+        new File(fixtures, 'portal_test.c'), new File(fixtures, 'fake_portal.c'))
+    outputs.file(portalTests)
+    doFirst {
+        portalTests.get().asFile.parentFile.mkdirs()
+        commandLine(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-DDC_PORTAL_NO_MAIN',
+            '-I' + source.absolutePath, new File(source, 'protocol.c').absolutePath,
+            new File(source, 'portal.c').absolutePath, new File(fixtures, 'portal_test.c').absolutePath,
+            '-o', portalTests.get().asFile.absolutePath] + gioFlags())
+    }
+}
+def testPortal = tasks.register('testDesktopPortal', Exec) {
+    group = 'verification'
+    description = 'Tests owner-safe Linux portal observation against a fake service on a private D-Bus session.'
+    onlyIf { linux }
+    dependsOn(compilePortal, compilePortalTests)
+    environment('DC_PORTAL_TEST_HELPER', portalExecutable.get().asFile.absolutePath)
+    commandLine('dbus-run-session', '--', portalTests.get().asFile.absolutePath)
+}
+if (linux) tasks.named('check') { dependsOn(testPortal) }
+
+// GTK executables link GLib/GIO and dl only; toolkit libraries are optional dlopen capabilities.
+def gtkOutputs = [:]
+[3, 4].each { major ->
+    def helper = layout.buildDirectory.file("desktop-colors/jasper-desktop-gtk${major}")
+    def tests = layout.buildDirectory.file("desktop-colors/gtk${major}-tests")
+    def compile = tasks.register("compileDesktopGtk${major}", Exec) {
+        onlyIf { linux }
+        inputs.files(new File(source, 'gtk_api.c'), new File(source, 'gtk_api.h'), new File(source, "gtk${major}.c"),
+            new File(source, 'protocol.c'), new File(source, 'protocol.h'))
+        outputs.file(helper)
+        doFirst {
+            helper.get().asFile.parentFile.mkdirs()
+            commandLine(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I' + source.absolutePath,
+                new File(source, 'protocol.c').absolutePath, new File(source, 'gtk_api.c').absolutePath,
+                new File(source, "gtk${major}.c").absolutePath, '-o', helper.get().asFile.absolutePath,
+                '-ldl', '-lm'] + gioFlags())
+        }
+    }
+    def compileTests = tasks.register("compileDesktopGtk${major}Tests", Exec) {
+        onlyIf { linux }
+        inputs.files(new File(source, 'gtk_api.c'), new File(source, 'gtk_api.h'), new File(source, "gtk${major}.c"),
+            new File(source, 'protocol.c'), new File(source, 'protocol.h'),
+            new File(fixtures, "gtk${major}_test.c"), new File(fixtures, 'probe_test_support.c'))
+        outputs.file(tests)
+        doFirst {
+            tests.get().asFile.parentFile.mkdirs()
+            commandLine(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-DDC_GTK_NO_MAIN',
+                '-I' + source.absolutePath, new File(source, 'protocol.c').absolutePath,
+                new File(source, "gtk${major}.c").absolutePath,
+                new File(fixtures, "gtk${major}_test.c").absolutePath, new File(fixtures, 'probe_test_support.c').absolutePath,
+                '-o', tests.get().asFile.absolutePath, '-ldl', '-lm'] + gioFlags())
+        }
+    }
+    gtkOutputs[major] = [helper: helper, tests: tests, compile: compile, compileTests: compileTests]
+}
+def gtkShim = layout.buildDirectory.file('desktop-colors/gtk-runtime-shim.so')
+def compileGtkShim = tasks.register('compileDesktopGtkTestShim', Exec) {
+    onlyIf { linux }
+    inputs.file(new File(fixtures, 'probe_test_support.c'))
+    outputs.file(gtkShim)
+    doFirst {
+        gtkShim.get().asFile.parentFile.mkdirs()
+        commandLine('cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-shared', '-fPIC', '-DDC_TEST_SHIM',
+            new File(fixtures, 'probe_test_support.c').absolutePath, '-ldl', '-o', gtkShim.get().asFile.absolutePath)
+    }
+}
+def verifyGtkAbi = tasks.register('verifyDesktopGtkAbi') {
+    group = 'verification'
+    description = 'Verifies opaque GTK ABI layouts/signatures against development headers and absence of GTK linkage.'
+    onlyIf { linux }
+    dependsOn(gtkOutputs.values().collect { it.compile })
+    doLast {
+        [3, 4].each { major ->
+            def flags = providers.exec {
+                commandLine(major == 3 ? ['pkg-config', '--cflags', 'gtk+-3.0'] : ['pkg-config', '--cflags', 'gtk4', 'libadwaita-1'])
+            }.standardOutput.asText.get().trim().split('\\s+') as List
+            providers.exec {
+                ignoreExitValue = true
+                commandLine(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations',
+                    '-DDC_GTK_ABI=' + major, '-fsyntax-only', '-I' + source.absolutePath,
+                    new File(fixtures, 'probe_test_support.c').absolutePath] + flags)
+            }.with { execution ->
+                def errors = execution.standardError.asText.get()
+                if (!errors.isBlank()) logger.lifecycle(errors)
+                execution.result.get().assertNormalExitValue()
+            }
+            def linkage = providers.exec {
+                commandLine('readelf', '-d', gtkOutputs[major].helper.get().asFile.absolutePath)
+            }.standardOutput.asText.get()
+            if (linkage =~ /NEEDED.*(gtk|adwaita)/) throw new GradleException('GTK helper links a toolkit library')
+            println("GTK ${major} public ABI and optional linkage verified")
+        }
+    }
+}
+def testGtk = tasks.register('testDesktopGtk') {
+    group = 'verification'
+    description = 'Runs GTK extraction assertions on a private Xvfb display and private D-Bus session.'
+    onlyIf { linux }
+    dependsOn(compileGtkShim, verifyGtkAbi, 'stageDesktopHelpers', gtkOutputs.values().collect { it.compileTests })
+    doLast {
+        [3, 4].each { major ->
+            providers.exec {
+                ignoreExitValue = true
+                environment('DC_GTK_FIXTURES', new File(fixtures, 'themes').absolutePath)
+                environment('DC_GTK3_HELPER', layout.buildDirectory.file('desktop-helpers/jasper-desktop-gtk3').get().asFile.absolutePath)
+                environment('DC_GTK4_HELPER', layout.buildDirectory.file('desktop-helpers/jasper-desktop-gtk4').get().asFile.absolutePath)
+                environment('DC_GTK_SHIM', gtkShim.get().asFile.absolutePath)
+                environment('GTK_USE_PORTAL', '0')
+                environment('GTK_A11Y', 'none')
+                environment('NO_AT_BRIDGE', '1')
+                environment('GSETTINGS_BACKEND', 'memory')
+                environment('GIO_USE_VFS', 'local')
+                commandLine('xvfb-run', '-a', '-s', '-screen 0 1024x768x24 -nolisten tcp',
+                    'dbus-run-session', '--config-file=' + new File(fixtures, 'themes/private-bus.conf').absolutePath, '--', gtkOutputs[major].tests.get().asFile.absolutePath)
+            }.with { execution ->
+                println(execution.standardOutput.asText.get())
+                def errors = execution.standardError.asText.get()
+                if (!errors.isBlank()) logger.lifecycle(errors)
+                execution.result.get().assertNormalExitValue()
+            }
+        }
+    }
+}
+if (linux) tasks.named('check') { dependsOn(testGtk) }
+
+// Stage only the production executables: fixtures and the fault-injection shim never ship.
+def helperNames = ['jasper-desktop-portal', 'jasper-desktop-gtk3', 'jasper-desktop-gtk4']
+def compileHelpers = tasks.register('compileDesktopHelpers') {
+    group = 'build'
+    description = 'Builds the Linux portal and optional toolkit probes for the host architecture.'
+    onlyIf { linux }
+    dependsOn(compilePortal, gtkOutputs.values().collect { it.compile })
+}
+def stagedHelpers = layout.buildDirectory.dir('desktop-helpers')
+def stageHelpers = tasks.register('stageDesktopHelpers', Sync) {
+    onlyIf { linux }
+    dependsOn(compileHelpers)
+    from(layout.buildDirectory.dir('desktop-colors')) { include(helperNames) }
+    into(stagedHelpers)
+    filePermissions { unix('rwxr-xr-x') }
+}
+def verifyHelpers = tasks.register('verifyDesktopHelpers') {
+    group = 'verification'
+    description = 'Verifies Linux helper modes, ELF architecture and optional toolkit dependency boundaries.'
+    onlyIf { linux }
+    dependsOn(stageHelpers)
+    inputs.dir(stagedHelpers)
+    doLast {
+        int expectedMachine = System.getProperty('os.arch') in ['aarch64', 'arm64'] ? 0xB7 : 0x3E
+        helperNames.each { name ->
+            File binary = new File(stagedHelpers.get().asFile, name)
+            if (!binary.isFile() || !binary.canExecute()) throw new GradleException("Missing executable helper: ${binary}")
+            byte[] header = binary.bytes
+            if (header.length < 20 || header[0] != 0x7F || header[1] != 69 || header[2] != 76 || header[3] != 70 ||
+                    header[4] != 2 || header[5] != 1 || ((header[18] & 255) | ((header[19] & 255) << 8)) != expectedMachine)
+                throw new GradleException("Helper is not a host-architecture ELF executable: ${binary}")
+            String dynamic = providers.exec { commandLine('readelf', '-d', binary.absolutePath) }.standardOutput.asText.get()
+            if (dynamic =~ /(?i)NEEDED.*(gtk|adwaita)/) throw new GradleException("Helper links an optional toolkit: ${name}")
+            String linkage = providers.exec { commandLine('ldd', binary.absolutePath) }.standardOutput.asText.get()
+            if (linkage.contains('not found')) throw new GradleException("Helper has unresolved runtime dependencies: ${name}\n${linkage}")
+            logger.lifecycle("${name}: host ELF; executable; no GTK/libadwaita DT_NEEDED entries\n${dynamic}${linkage}")
+        }
+    }
+}
+if (linux) {
+    distributions.main.contents { from(stageHelpers) { into('lib/desktop-colors') } }
+    tasks.named('stagePackage') { from(stageHelpers) { into('desktop-colors') } }
+    tasks.named('run', JavaExec) {
+        dependsOn(stageHelpers)
+        systemProperty('jasper.desktopColors.helpers', stagedHelpers.get().asFile.absolutePath)
+    }
+    tasks.named('check') { dependsOn(verifyHelpers) }
+    tasks.named('verifyPackage') { dependsOn(verifyHelpers) }
+}
+tasks.named('test', Test) {
+    if (linux) inputs.files(stageHelpers).withPropertyName('desktopHelpers').withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty('jasper.stagedDesktopHelpers', stagedHelpers.get().asFile.absolutePath)
+}

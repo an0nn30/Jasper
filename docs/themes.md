@@ -59,12 +59,13 @@ scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
 
 | Setting | Default | Values |
 |---|---|---|
-| `ui.appearance` | `"system"` | `"system"` follows the operating system's light or dark setting, live; only macOS reports it, so on Linux and Windows `"system"` shows Dark. `"dark"` and `"light"` choose one. A change of the system's setting never writes `config.toml`. |
+| `ui.appearance` | `"system"` | `"system"` follows the operating system's light or dark setting, live; macOS reports it directly and Linux uses the desktop portal. If unavailable, `"system"` shows Dark. `"dark"` and `"light"` choose one. A change of the system's setting never writes `config.toml`. |
 | `ui.theme.dark` | `"jasper-meadow"`, or the active look's default | The id of a theme with a Dark variant: built in, from a plugin, or installed |
 | `ui.theme.light` | `"jasper-meadow"`, or the active look's default | The id of a theme with a Light variant |
+| `ui.theme.desktop_source` | `"auto"` | Desktop colors source: `"auto"`, `"gtk3"` or `"gtk4"` |
 | `terminal.scheme` | `"match"` | `"match"` uses the shown theme's own scheme, so it follows the appearance; a scheme id, `<theme id>/<scheme key>`, chooses one in either appearance |
 
-All four apply live in every window.
+These settings apply live in every window.
 
 **Settings › Appearance & Behavior › Appearance** holds them:
 
@@ -85,6 +86,19 @@ Ctrl+Shift+P on Linux and Windows), **Themes…** opens it too, and **Terminal S
 **Terminal Scheme: *scheme name*** command per installed scheme, such as **Terminal Scheme: High Contrast**, save
 `terminal.scheme` at once for every window. While `config.toml` has errors they are refused: "config.toml has errors,
 so changes can't be saved until they're fixed."
+
+On Linux, **Desktop colors** (`desktop-colors`) is available in both theme dropdowns. It derives interface colours
+from GTK 3.24+ or GTK 4.10+ with optional libadwaita. **Desktop source** offers Automatic, GTK 3 and GTK 4 / libadwaita;
+Automatic prefers GTK 4 on GNOME and GTK 3 elsewhere, falling back to the other toolkit when necessary. An explicit
+source keeps that choice. The status beneath it identifies the source and library version, or explains unavailable
+helpers, toolkit/display support or the bundled fallback. The selector and status appear when a Desktop colors pick
+is active or staged. Match System follows the portal appearance; explicit Dark or Light takes precedence. Portal
+accent and high contrast influence Desktop colors.
+
+Desktop colours affect the interface. The Editor keeps its selected colour scheme; terminal **Same as UI theme**
+uses Slate Cobalt's matching appearance, and an explicit terminal scheme stays selected. When extraction is
+unavailable Jasper uses the bundled Slate Cobalt interface for that appearance and preserves the Desktop colors
+pick. A saved pick moved to another operating system remains saved and shows the fallback and unavailable status.
 
 ## What the terminal scheme colours
 

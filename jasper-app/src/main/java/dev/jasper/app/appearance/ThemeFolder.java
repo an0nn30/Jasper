@@ -71,15 +71,19 @@ public final class ThemeFolder {
         }
         String id = id(theme.name());
         if (id.isEmpty()) throw new ImportFailure("The theme's name has no letters or digits Jasper can use for a file name");
-        var builtIn = JasperTheme.builtIn(id);
-        if (builtIn.isPresent()) throw new ImportFailure(builtIn.get().name() + " is built in and can't be replaced");
-        var provider = library.get().reservedBy(id);
+        var installed = library.get();
+        var reserved = installed.reservedLabel(id);
+        if (reserved.isPresent() && (ThemeLibrary.desktopId(id) || builtIn(id)))
+            throw new ImportFailure(reserved.get() + (ThemeLibrary.desktopId(id) ? " is reserved" : " is built in") + " and can't be replaced");
+        var provider = installed.reservedBy(id);
         if (provider.isPresent()) throw new ImportFailure(theme.name() + " is provided by the " + provider.get() + " plugin and can't be replaced");
         return new Candidate(id, theme.name(), Files.exists(file(id)), bytes);
     }
 
     /** Writes the candidate's bytes to {@code <id>.json} through a temporary file and a move, so a failed write keeps the old file. */
     public void install(Candidate candidate) throws IOException {
+        if (!JasperTheme.validId(candidate.id()) || fixed(candidate.id()))
+            throw new IllegalArgumentException("Not an imported theme: " + candidate.id());
         Files.createDirectories(folder);
         Path temporary = Files.createTempFile(folder, candidate.id() + "-", ".tmp");
         try {
@@ -96,12 +100,12 @@ public final class ThemeFolder {
 
     /** Deletes the imported theme {@code id}'s file. */
     public void remove(String id) throws IOException {
-        if (!JasperTheme.validId(id) || builtIn(id)) throw new IllegalArgumentException("Not an imported theme: " + id);
+        if (!JasperTheme.validId(id) || fixed(id)) throw new IllegalArgumentException("Not an imported theme: " + id);
         Files.delete(file(id));
     }
 
-    /** Whether {@code id} is a built-in theme's or a plugin's, which Settings neither replaces nor removes. */
-    public boolean fixed(String id) { return builtIn(id) || library.get().reservedBy(id).isPresent(); }
+    /** Whether {@code id} is reserved for Desktop colors, a built-in or a plugin, which Settings neither replaces nor removes. */
+    public boolean fixed(String id) { return library.get().reservedLabel(id).isPresent(); }
 
     /** Whether {@code id} is a built-in theme's, which no file in the folder replaces or removes. */
     public static boolean builtIn(String id) { return JasperTheme.builtIn(id).isPresent(); }
