@@ -7,7 +7,8 @@ import java.util.function.Consumer;
 /** The panel's place in the main window. All methods are UI-thread only. */
 public interface PanelHost {
     /**
-     * The main window, which holds the panel.
+     * The main window, which holds the panel; the main window also while the panel has a window of its own
+     * ({@link PanelPlacement#ownWindow()}), which it owns.
      *
      * @return the window
      */
@@ -43,6 +44,27 @@ public interface PanelHost {
      * @return the registration
      */
     Subscription onVisibility(Consumer<Boolean> handler);
+
+    /**
+     * Where the panel is: its side and half, and whether it is docked or has a window of its own. A panel built in a
+     * window of its own, as one restored there at start-up is, reads that in its factory.
+     *
+     * @return the current placement
+     * @since 0.21.0
+     */
+    PanelPlacement placement();
+
+    /**
+     * Runs the handler after each change of the panel's placement, once its content is in its new place: a move to
+     * another side or half, or another mode. A move within its half (its stripe button reordered) and a change of
+     * visibility alone run nothing. A panel that lays itself out another way in a window of its own describes the other
+     * {@link ViewSpec} here and passes it to {@link UiView#update(ViewSpec)}.
+     *
+     * @param handler receives the new placement
+     * @return the registration
+     * @since 0.21.0
+     */
+    Subscription onPlacement(Consumer<PanelPlacement> handler);
 
     /**
      * Runs the handler when this instance is discarded because the main window closed or the panel was removed.

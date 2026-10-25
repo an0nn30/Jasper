@@ -356,7 +356,8 @@ class AppContractTest extends PluginContractTest {
                     if (components.containsKey(panelId)) return components.get(panelId);
                     return contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
                         .map(panel -> {
-                            var site = new dev.jasper.app.contributions.PanelSite(window, () -> { }, () -> { }, () -> true, header -> headers.put(panelId, header));
+                            var site = new dev.jasper.app.contributions.PanelSite(window, () -> { }, () -> { }, () -> true, header -> headers.put(panelId, header),
+                                () -> new dev.jasper.app.contributions.PanelSite.Placement(panel.defaultSlot(), dev.jasper.app.dock.ToolWindowMode.DOCKED));
                             var built = panel.factory().apply(site);
                             if (built != null) { sites.put(panelId, site); components.put(panelId, built); }
                             return built;

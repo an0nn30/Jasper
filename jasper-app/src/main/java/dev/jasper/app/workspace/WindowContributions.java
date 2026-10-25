@@ -58,6 +58,8 @@ final class WindowContributions implements AutoCloseable {
         JComponent component;
         /** What the panel last heard: a nested change can overtake a notification, which then must not be sent. */
         boolean notified;
+        /** The place the panel was built in or last heard, as {@link #notified} is its visibility; null until it is built. */
+        PanelSite.Placement placed;
         PanelInstance(PanelEntry entry) { this.entry = entry; }
     }
 
@@ -402,8 +404,9 @@ final class WindowContributions implements AutoCloseable {
     /**
      * The one place a dock change takes effect: build what now shows, lay out, match the detached windows' own windows,
      * render the stripes, tell the hidden panels, return focus to the terminal if a docked window hid, tell the shown
-     * panels, save. Focus returns before the shown panels hear it, so a window that takes focus when it shows keeps it
-     * when it replaces another.
+     * panels, tell the panels placed in another slot or mode, save. Focus returns before the shown panels hear it, so a
+     * window that takes focus when it shows keeps it when it replaces another; a placed panel hears once its component is
+     * in its new place.
      */
     private void docked(DockState.Change change) {
         // A dock change mid-drag (a plugin unloading, a panel showing itself) ends the drag: what it drew renders again.
@@ -421,6 +424,7 @@ final class WindowContributions implements AutoCloseable {
         if (dockedHid && (activating == null || !(change.shown().contains(activating) || change.placed().contains(activating))))
             owner.focusSelected();
         for (String id : change.shown()) notifyVisibility(id, true);
+        for (String id : change.placed()) notifyPlacement(id);
         persist();
     }
 
@@ -452,7 +456,10 @@ final class WindowContributions implements AutoCloseable {
     private void build(String id) {
         PanelInstance panel = panels.get(id);
         if (panel == null || panel.component != null) return;
-        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id), header -> owner.area().setHeader(id, header));
+        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id),
+            header -> owner.area().setHeader(id, header), () -> placement(panel));
+        // The factory reads where the panel is: the change that builds it has nothing more to tell it.
+        panel.placed = placement(panel);
         JComponent built = null;
         try { built = panel.entry.factory().apply(panel.site); }
         catch (RuntimeException failure) {
@@ -466,12 +473,31 @@ final class WindowContributions implements AutoCloseable {
         owner.area().setContent(id, panel.entry.title(), panel.component);
     }
 
+    /** Where the panel is now: its slot, or its default one while it has none, and its mode. */
+    private PanelSite.Placement placement(PanelInstance panel) {
+        String id = panel.entry.id();
+        return new PanelSite.Placement(dock.slot(id).orElse(panel.entry.defaultSlot()), dock.mode(id));
+    }
+
     /** Tells the panel only what is still true and not yet told: a listener's own show or hide may have changed it. */
     private void notifyVisibility(String id, boolean visible) {
         PanelInstance panel = panels.get(id);
         if (panel == null || panel.site == null || dock.visible(id) != visible || panel.notified == visible) return;
         panel.notified = visible;
         panel.site.notifyVisibility(visible);
+    }
+
+    /**
+     * Tells a built panel where it is now, if that is not where it was built or what it last heard: a listener's own move,
+     * told by the nested change, leaves nothing to tell.
+     */
+    private void notifyPlacement(String id) {
+        PanelInstance panel = panels.get(id);
+        if (panel == null || panel.component == null) return;
+        PanelSite.Placement now = placement(panel);
+        if (now.equals(panel.placed)) return;
+        panel.placed = now;
+        panel.site.notifyPlacement(now);
     }
 
     /**

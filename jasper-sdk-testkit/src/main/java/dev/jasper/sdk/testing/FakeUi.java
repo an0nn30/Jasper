@@ -394,9 +394,15 @@ final class FakeUi {
         boolean visible = true;
         boolean done;
         dev.jasper.sdk.ui.PanelHeader header = dev.jasper.sdk.ui.PanelHeader.EMPTY;
+        /** Where the panel is: its spec's anchor and half, docked, until a placement is driven. */
+        dev.jasper.sdk.ui.PanelPlacement placement;
         final List<Consumer<Boolean>> visibility = new ArrayList<>();
+        final List<Consumer<dev.jasper.sdk.ui.PanelPlacement>> placements = new ArrayList<>();
         final List<Runnable> closed = new ArrayList<>();
-        PanelInstance(UUID windowId) { this.windowId = windowId; }
+        PanelInstance(UUID windowId, PanelSpec spec) {
+            this.windowId = windowId;
+            placement = new dev.jasper.sdk.ui.PanelPlacement(spec.defaultAnchor(), spec.split(), dev.jasper.sdk.ui.PanelMode.DOCKED);
+        }
         @Override public WindowHandle window() { return context.terminals.windowHandle(windowId); }
         @Override public void setHeader(dev.jasper.sdk.ui.PanelHeader value) {
             java.util.Objects.requireNonNull(value);
@@ -420,6 +426,12 @@ final class FakeUi {
         }
         @Override public boolean visible() { return !done && visible; }
         @Override public Subscription onVisibility(Consumer<Boolean> handler) { visibility.add(handler); return () -> visibility.remove(handler); }
+        @Override public dev.jasper.sdk.ui.PanelPlacement placement() { return placement; }
+        @Override public Subscription onPlacement(Consumer<dev.jasper.sdk.ui.PanelPlacement> handler) {
+            java.util.Objects.requireNonNull(handler, "handler");
+            placements.add(handler);
+            return () -> placements.remove(handler);
+        }
         @Override public Subscription onClosed(Runnable handler) { closed.add(handler); return () -> closed.remove(handler); }
         void close() {
             if (done) return;
@@ -428,7 +440,7 @@ final class FakeUi {
             for (var handler : List.copyOf(closed)) {
                 try { handler.run(); } catch (RuntimeException failure) { host.recordFailure(pluginId() + " panel closed: " + failure); }
             }
-            closed.clear(); visibility.clear();
+            closed.clear(); visibility.clear(); placements.clear();
         }
     }
 
@@ -471,7 +483,7 @@ final class FakeUi {
             var existing = panel.instance;
             if (existing != null) { existing.show(); return existing.content; }
             try {
-                var instance = new PanelInstance(main.id);
+                var instance = new PanelInstance(main.id, panel.spec);
                 var view=context.kit().requireOwned(panel.factory.create(instance));view.mount(instance);instance.onClosed(view::close);instance.content = view.component;
                 if (instance.content != null) panel.instance = instance;
                 return instance.content;
