@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-24-buddy-stand-up-design.md`.
 
-**Status:** Task 1 implemented (`b36aa2833`), Task 2 implementation, headless preview and full verification complete (12,874 tests, zero failures/errors, 29 skips); shared splash-strip validation fixed; controller and whole-branch reviews pending. Reuse current checkout on `codex/buddy-stand-up`, based on `c4dda9b0b` (includes the completed tab-aware work). Plan pins contracts, timing and algorithms; artwork packing coordinates and fixture adaptation remain implementer decisions, a recorded deviation from complete-code planning.
+**Status:** Task 1 implemented (`b36aa2833`), Task 2 implementation, headless preview and full verification complete (12,874 tests, zero failures/errors, 29 skips); shared splash-strip validation fixed; task and whole-branch reviews complete, with the documentation-count correction verified in `752283a40`. Reuse current checkout on `codex/buddy-stand-up`, based on `c4dda9b0b` (includes the completed tab-aware work). Plan pins contracts, timing and algorithms; artwork packing coordinates and fixture adaptation remain implementer decisions, a recorded deviation from complete-code planning.
 
 ## Global Constraints
 
@@ -68,6 +68,6 @@ Dispatch RISING in tick; default greet/poke ignores it. `setWorking(false, now)`
 
 Execution deviation: the app copies the Buddy strip for Meadow splash artwork. Full check exposed its stale exact 1680-pixel width guard. Validate complete 84-pixel cells, 96-pixel height and all actually consumed pose columns instead, with focused invalid/append-only cases; the splash stays independent of Buddy internals.
 - [x] Run relevant documentation checks after edits, source hygiene and diff check. Commit `feat: animate Buddy standing up after thinking` with coauthor trailer.
-- [ ] Controller task review, fixes as needed, then whole-branch review versus c4dda9b0b. Record outcome; no merge/push. User GUI check: finish final running command and watch standing transition; start new work midway.
+- [x] Controller task review, fixes as needed, then whole-branch review versus c4dda9b0b. Record outcome; no merge/push. User GUI check: finish final running command and watch standing transition; start new work midway.
 
 Task 2 verification: 29 animator tests; 173 Buddy tests; 30 focused bootstrap/splash tests. Final full `check --continue` with Python 3.13 passed in 7m 39s, 12,874 tests, zero failures/errors, 29 skips. The first full run exposed three splash failures among 12,872 tests; the compatibility fix and two validator tests account for the final count. Preview GIFs/contact sheets inspected; native GUI acceptance remains with the user.

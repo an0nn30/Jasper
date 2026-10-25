@@ -119,7 +119,7 @@ catch-up, with 29 animator tests and normal/interrupted production-sprite GIF/co
 the splash's exact old strip-width guard: it now validates complete cells and the pose columns it uses, a scoped
 integration deviation covered by 30 focused bootstrap/splash tests. First full run: 12,872 tests, three splash
 failures, zero errors, 29 skips; after the compatibility fix, the full headless rerun passed in 7m 39s:
-12,874 tests, zero failures/errors, 29 skips (173 Buddy tests). Task 2 and whole-branch reviews pending.
+12,874 tests, zero failures/errors, 29 skips (173 Buddy tests). Task and whole-branch reviews passed; the final documentation-count correction was verified.
 User GUI acceptance remains pending: finish the last running command, watch standing, then begin new work mid-rise.
 No GUI, benchmark, AOT, push or merge.
 
