@@ -5,8 +5,8 @@ The homepage keeps its existing dimensional illustration.
 Each frame holds 84 × 96 source pixels and paints into a 42 × 48 logical frame; Buddy's scale of 2.5
 displays the companion at 105 × 120. Nearest-neighbour sampling keeps the pixel edges hard.
 
-- [jasper-buddy.ase](jasper-buddy.ase) — editable master for [LibreSprite](https://libresprite.github.io). One RGBA layer, 20 frames of 84 × 96.
-- [jasper-buddy.png](../../jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png) — runtime strip, 1680 × 96, 20 frames left to right in `BuddyFrame` order with no inter-frame padding.
+- [jasper-buddy.ase](jasper-buddy.ase) — editable master for [LibreSprite](https://libresprite.github.io). One RGBA layer, 23 frames of 84 × 96.
+- [jasper-buddy.png](../../jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png) — runtime strip, 1932 × 96, 23 frames left to right in `BuddyFrame` order with no inter-frame padding.
 - [source-atlas.png](../../docs/design/jasper-pixel/source-atlas.png) — the generated poses of the approved pixel character
   ([how it was made](../../docs/design/jasper-pixel/README.md)).
 - [pack-atlas.swift](pack-atlas.swift) — packs that atlas into the runtime strip on macOS: slicing, one shared scale,
@@ -46,6 +46,9 @@ Column order is fixed by [BuddyFrame](../../jasper-buddy/src/main/java/dev/jaspe
 | 17 | `TYPE_A` | Sitting with a laptop in his lap, left hand raised off the keys |
 | 18 | `TYPE_B` | As A, right hand raised instead |
 | 19 | `TYPE_REST` | As A with both hands down, the beat between bursts |
+| 20 | `CLOSE_LAPTOP` | Seated, lowering the laptop lid |
+| 21 | `LOWER_LAPTOP` | Feet planted, laptop lowered out of view |
+| 22 | `RISE` | Legs extending toward standing |
 
 Frames 17–19 are the working animation (A, B, A, B, rest at 250 ms per frame), requested
 by the host through `setWorking(true)`. Jasper requests it while a terminal command runs
@@ -69,7 +72,7 @@ python3 packaging/buddy/generate.py --verify-only
 
 The first command writes the runtime strip from the master, then checks that each master frame matches its PNG cell;
 it never writes the master. `--verify-only` makes the same comparison without writing anything. Both print
-`ok: 20 pixel frames; master and runtime match` on success; otherwise an assertion names what failed: a malformed
+`ok: 23 pixel frames; master and runtime match` on success; otherwise an assertion names what failed: a malformed
 `.ase` (header, frame magic or chunk sizes), a master in another layout (more than one layer, or trimmed, offset or
 linked cels), the frame count, the strip's dimensions, or the first frame, by its `FRAMES` name, whose `.ase` and PNG
 cells differ. Keep the Java enum order, the `FRAMES` order, the master and the runtime PNG synchronized.
@@ -110,3 +113,20 @@ hop raised above it, draws the three spawn sparkles of the earlier 42 × 48 stri
 (`original-sparkle-source.png`) at twice their size, and makes every pixel fully opaque or fully transparent. Runtime
 geometry does not change. See [Buddy maintenance](../../docs/buddy-maintenance.md) for headless image previews and the
 manual native-acceptance boundary.
+
+The three transition poses come from [the stand-up atlas](../../docs/design/jasper-stand-up/source-atlas.png)
+([prompt and provenance](../../docs/design/jasper-stand-up/README.md)). Append them to an existing runtime strip
+without re-rendering its original twenty cells, then synchronize the master:
+
+```sh
+swift packaging/buddy/pack-stand-up.swift docs/design/jasper-stand-up/source-atlas.png /tmp/buddy-transition.png
+python3 packaging/buddy/append-stand-up.py \
+  jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png /tmp/buddy-transition.png
+python3 packaging/buddy/generate.py --import-strip
+python3 packaging/buddy/generate.py --verify-only
+```
+
+The historical atlas packer above writes only twenty cells; follow it with this append step before importing.
+The transition packer uses measured transparent gutters, one shared scale of 0.15, nearest-neighbour sampling,
+binary alpha and the existing foot baseline at row 91. The append step checks opaque bounds and preserves the
+original decoded RGBA pixels exactly. It also accepts a 23-cell strip for reproducible repacking.
