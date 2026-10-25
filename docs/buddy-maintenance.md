@@ -131,7 +131,7 @@ human-run acceptance. Do not claim those checks from image previews.
 
 ## Preview and verify
 
-The four tools below use actual components headlessly (`-Djava.awt.headless=true`),
+The five tools below use actual components headlessly (`-Djava.awt.headless=true`),
 open no window and are opt-in, outside `check`:
 
 ```sh
