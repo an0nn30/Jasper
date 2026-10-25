@@ -150,7 +150,7 @@ public class SurfacePanel extends JPanel {
                 if (focused) {
                     var halo = new Area(new RoundRectangle2D.Double(0, 0, w, h, 2 * (radius + focusRing), 2 * (radius + focusRing)));
                     halo.subtract(new Area(box));
-                    g.setColor(ColorMath.opacity(ThemePainting.color(context, SemanticColor.BORDER_FOCUS), ThemePainting.focusHaloShare(context, false)));
+                    g.setColor(ThemePainting.focusHaloColor(context, false));
                     g.fill(halo);
                 }
                 var inside = new RoundRectangle2D.Double(focusRing + hair, focusRing + hair, w - 2.0 * (focusRing + hair), h - 2.0 * (focusRing + hair),

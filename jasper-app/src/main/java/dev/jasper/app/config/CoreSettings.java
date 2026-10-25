@@ -251,6 +251,11 @@ public final class CoreSettings {
             + "built-in \"slate-cobalt\", \"ubuntu-yaru\" or \"catppuccin-latte\", a theme a plugin ships, or an imported\n"
             + "theme's id, its file name in the themes folder without .json. A theme without a Light variant is\n"
             + "reported and Jasper Meadow Light is used. Switches live.").build();
+    public static final Setting<String> UI_THEME_DESKTOP_SOURCE = Setting.of("ui.theme.desktop_source", SettingKind.choice(List.of(
+            Map.entry("auto", "auto"), Map.entry("gtk3", "gtk3"), Map.entry("gtk4", "gtk4"))), "auto")
+        .label("Desktop color source").keywords("desktop", "theme", "gtk", "source")
+        .description("The source for Desktop colors on Linux: \"auto\" (the default), \"gtk3\" or \"gtk4\". Switches live.\n"
+            + "The saved source is retained on every platform.").build();
     static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.";
     public static final Setting<String> TERMINAL_SCHEME = Setting.of("terminal.scheme",
             SettingKind.string(text -> TerminalSchemeChoice.parse(text).isPresent(), SCHEME_ID), TerminalSchemeChoice.MATCH.key())
@@ -276,7 +281,7 @@ public final class CoreSettings {
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
-            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_THEME_DARK, UI_THEME_LIGHT, UI_FONT_FAMILY, UI_FONT_SIZE,
+            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_THEME_DARK, UI_THEME_LIGHT, UI_THEME_DESKTOP_SOURCE, UI_FONT_FAMILY, UI_FONT_SIZE,
             UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR, UI_ANIMATIONS_ENABLED),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(

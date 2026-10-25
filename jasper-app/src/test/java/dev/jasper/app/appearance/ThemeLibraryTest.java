@@ -153,4 +153,19 @@ class ThemeLibraryTest {
         assertThat(ThemeLibrary.reason(new java.nio.file.FileSystemException("/x/secret.json", null, "Input/output error")))
             .isEqualTo("Could not read this file: Input/output error.");
     }
+    @Test void desktopColorsIdIsReservedWithoutAnAuthoredTheme() throws Exception {
+        Files.writeString(themes().resolve("desktop-colors.json"), uiTheme("Impostor"));
+        var library = ThemeLibrary.read(themes(), ThemeLibrary.bundledOnly());
+        assertThat(ThemeLibrary.desktopId("desktop-colors")).isTrue();
+        assertThat(ThemeLibrary.desktopId("Desktop-colors")).isFalse();
+        assertThat(ThemeLibrary.desktopId(null)).isFalse();
+        assertThat(library.reservedLabel("desktop-colors")).contains("Desktop colors");
+        assertThat(library.reservedLabel("slate-cobalt")).contains("Slate Cobalt");
+        assertThat(library.reservedLabel("ocean")).isEmpty();
+        assertThat(library.theme("desktop-colors")).isEmpty();
+        assertThat(library.imported()).isEmpty();
+        assertThat(library.problems()).singleElement().satisfies(problem ->
+            assertThat(problem.message()).contains("Desktop colors", "ignored"));
+    }
+
 }

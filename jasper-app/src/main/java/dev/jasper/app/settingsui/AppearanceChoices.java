@@ -18,13 +18,20 @@ import java.util.function.Supplier;
  * @param onChanged runs its argument whenever the operating system's appearance changes
  * @param themes the installed themes and schemes, read again whenever the page refreshes
  * @param imports the theme gears' hooks; empty shows no gears
+ * @param desktop the desktop previews, applied status and page-owned sampling demand
  */
 public record AppearanceChoices(float opacity, boolean blur, Supplier<Optional<Boolean>> systemDark,
                                 Function<Runnable, Subscription> onChanged, Supplier<InstalledThemes> themes,
-                                Optional<ThemeImports> imports) {
+                                Optional<ThemeImports> imports, DesktopChoices desktop) {
     public AppearanceChoices {
         Objects.requireNonNull(systemDark, "systemDark"); Objects.requireNonNull(onChanged, "onChanged");
-        Objects.requireNonNull(themes, "themes"); Objects.requireNonNull(imports, "imports");
+        Objects.requireNonNull(themes, "themes"); Objects.requireNonNull(imports, "imports"); Objects.requireNonNull(desktop, "desktop");
+    }
+
+    /** Choices without a desktop palette provider. */
+    public AppearanceChoices(float opacity, boolean blur, Supplier<Optional<Boolean>> systemDark,
+                             Function<Runnable, Subscription> onChanged, Supplier<InstalledThemes> themes, Optional<ThemeImports> imports) {
+        this(opacity, blur, systemDark, onChanged, themes, imports, DesktopChoices.UNAVAILABLE);
     }
 
     /** Fixed previews, Slate Cobalt alone, an opaque workspace and no system appearance, for pages built without an application. */

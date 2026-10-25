@@ -28,7 +28,7 @@ interface and the Editor stay on Harbour. Switch the system to Light Mode and th
 
 A theme sets:
 
-- every interface colour role of each UI variant: 60 required roles, 2 optional title bar roles and 9 optional derived
+- every interface colour role of each UI variant: 60 required roles, 2 optional title bar roles and 12 optional derived
   colours ([UI roles](#ui-roles));
 - the terminal text area's background, text, bold text, cursor, selection and 16 ANSI colours, in as many schemes as
   it likes ([Terminal schemes](#terminal-schemes));
@@ -183,7 +183,7 @@ are ignored. The seven surfaces take no style, and a trailing comma is an error.
 ## UI roles
 
 Each UI variant lists all 60 roles of the eight tables below, and may add the 2 [title bar roles](#title-bar-roles)
-and the 9 overridable [derived roles](#derived-roles). Eight more roles always follow another role and must not be
+and the 12 overridable [derived roles](#derived-roles). Eight more roles always follow another role and must not be
 listed ([Roles you do not list](#roles-you-do-not-list)). The Slate Cobalt columns are the values of the built-in Slate Cobalt
 theme, as a guide to how the roles relate.
 
@@ -339,13 +339,13 @@ These roles always follow another; listing one is an error (`Unknown colour`).
 
 ### Derived roles
 
-Jasper computes 23 more colours from each variant, mostly for the classic controls and chrome of the Enterprise look,
+Jasper computes 26 more colours from each variant, mostly for the classic controls and chrome of the Enterprise look,
 and for notices. Every derived colour is opaque. In the recipes, "X at N% over Y" mixes two colours, and "at least
 N L\* past Y" moves the result further from Y, toward the variant's text, until the two are N apart in CIE L\*
 (perceived lightness).
 
-Nine of them are overridable: a variant may list them like roles, as `#RRGGBB` only, and the listed colour is used
-instead of the recipe. The Catppuccin themes override five, Ubuntu Yaru all nine.
+Twelve of them are overridable: a variant may list them like roles, as `#RRGGBB` only, and the listed colour is used
+instead of the recipe. The Catppuccin themes override five, Ubuntu Yaru nine.
 
 | Overridable role | Recipe | Paints |
 |---|---|---|
@@ -358,6 +358,8 @@ instead of the recipe. The Catppuccin themes override five, Ubuntu Yaru all nine
 | `warning.ground` | `status.warning` at 14% over `surface.card` | Warning notices and warning status cells |
 | `warning.border` | `status.warning` at 40% over `surface.card` | The edge of warning notices |
 | `border.divider` | `border.window`, raised to 1.3:1 on `surface.card`, at 73% over `surface.card` | Classic grid lines and separators, the rules of the classic menu row and status cells, the bottom strip's dividers |
+| `focus.halo`, `error.halo` | `border.focus` and `border.error`, flattened over `surface.app` | Explicit overrides supply the final opaque focus/error ring paint; without overrides, rings retain their kit opacity |
+| `surface.textSelection` | `selection.bg`, flattened over `surface.app` | An explicit override sets inherited text-component selection fills; without it, they use the matching terminal scheme's selection |
 
 The other fourteen are always computed; listing one is an error (`Unknown colour`).
 
@@ -380,11 +382,11 @@ These treatments are fixed; design the roles with them in mind.
 |---|---|
 | Hover on rows, tables and trees | `hover.overlay` at 5% |
 | Hover on icon and toolbar buttons and window chrome | `hover.overlay` at 8% |
-| Focus ring | `accent` at 32% in Dark and 25% in Light around the focused control |
-| Error ring | `border.error` at 22% |
+| Focus ring | `border.focus` at 32% in Dark and 25% in Light around the focused control, or the opaque `focus.halo` override |
+| Error ring | `border.error` at 22%, or the opaque `error.halo` override |
 | Category tiles and chips | The hue at 17% in Dark and 13% in Light |
 | Search field that finds nothing | `border.error` at 16% over `surface.input` |
-| Selected text in text components without Jasper's own styling | `text.primary` over the matching terminal scheme's `selection` (the shown variant's own scheme, not the user's pick) |
+| Selected text in text components without Jasper's own styling | `text.primary` over `surface.textSelection` when overridden, otherwise the matching terminal scheme's `selection` (the shown variant's own scheme, not the user's pick) |
 | Menu highlight | `accent` with `text.onAccent` |
 | Workspace tabs, default look | The selected tab is `surface.terminal` with its `tab.indicator` line. The others are `surface.tabstrip`; when it is within 9 CIE L\* of `surface.terminal`, it is moved toward black (toward white when `surface.terminal` is darker than 9 L\*) until it is 9 L\* away |
 | Workspace tabs, Enterprise look | The strip is `surface.tabstrip`; the selected tab is `surface.card` with `tab.indicator` along its bottom |
@@ -924,7 +926,7 @@ title bar is the window chrome and every derived colour follows its recipe.
       plugin's.
 - [ ] `"jasper-theme": 1`, a non-empty `name`, and no top-level keys but the six.
 - [ ] Each UI variant lists all 60 roles, none of the eight that follow other roles, the title bar roles only for a
-      title bar of its own, and overrides only for the nine overridable derived roles, as `#RRGGBB`.
+      title bar of its own, and overrides only for the twelve overridable derived roles, as `#RRGGBB`.
 - [ ] `terminal.dark` for `ui.dark` and `terminal.light` for `ui.light`, each with a `name` and exactly 21 colours.
 - [ ] `editor` has exactly the variants of `ui`, each with the 7 surfaces and the 16 syntax roles; no style on a
       surface, no share on `background`.

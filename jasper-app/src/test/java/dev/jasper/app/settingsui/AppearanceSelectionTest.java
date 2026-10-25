@@ -71,7 +71,7 @@ class AppearanceSelectionTest {
             .as("Ocean has no Light variant").isFalse();
         var reset = (Nodes.Button) ((Nodes.Stack) ((Nodes.SettingRow) parts(editor).get(1)).control()).children().get(1);
         assertThat(reset.state().visible()).isTrue();
-        assertThat(editor.relatedSettings()).containsExactly(CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT);
+        assertThat(editor.relatedSettings()).containsExactly(CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT, CoreSettings.UI_THEME_DESKTOP_SOURCE);
     }
 
     @Test void aSavedPickIsKeptAsSavedAndOneThatIsNotInstalledIsShownAsSuch() {
@@ -120,7 +120,7 @@ class AppearanceSelectionTest {
         var specs = CorePages.specs(AppearanceChoices.of(DARK, LIGHT), system, ShellChoices.NONE, ignored -> { }, false);
         var appearance = specs.getFirst();
         assertThat(appearance.settings()).startsWith(CoreSettings.UI_APPEARANCE, CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT,
-            CoreSettings.TERMINAL_SCHEME);
+            CoreSettings.UI_THEME_DESKTOP_SOURCE, CoreSettings.TERMINAL_SCHEME);
     }
 
     /** Spec 5.8: under a kit default, the untouched pick is the kit's; picking the core default saves it explicitly. */

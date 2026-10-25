@@ -1,0 +1,12 @@
+/* The compatibility name deliberately disagrees with the variable. */
+@define-color window_bg_color red;
+window { --window-bg-color: rgb(10%,20%,30%); --window-fg-color: white;
+  --view-bg-color: magenta; --view-fg-color: black;
+  --headerbar-bg-color: cyan; --headerbar-fg-color: black;
+  --sidebar-bg-color: initial; --sidebar-fg-color: initial;
+  --dialog-bg-color: initial; --dialog-fg-color: white;
+  --popover-bg-color: rgb(10%,20%,30%); --popover-fg-color: white;
+  --accent-bg-color: blue; --accent-fg-color: white;
+}
+/* User label styling must not replace the instrumentation color expression. */
+label { color: red; }

@@ -10,12 +10,16 @@ on:
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
+      - gradle/linux-desktop-colors.gradle
+      - jasper-app/build.gradle.kts
       - packaging/**
       - .github/workflows/linux-packages.yml
   pull_request:
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
+      - gradle/linux-desktop-colors.gradle
+      - jasper-app/build.gradle.kts
       - packaging/**
       - .github/workflows/linux-packages.yml
 
@@ -46,7 +50,7 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils g++
+          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils build-essential pkg-config libglib2.0-dev
       - uses: actions/setup-java@v6
         with:
           distribution: jetbrains

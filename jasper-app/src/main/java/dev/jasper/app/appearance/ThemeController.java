@@ -43,6 +43,7 @@ public final class ThemeController implements AutoCloseable {
     private Shown shown;
     private ResolvedTheme current;
     private UiFontConfig uiFont = UiFontConfig.defaults();
+    private GeneratedTheme desktop;
     /** The look's standard UI font ({@code ui.font.family = "system"}): the kit's own face when registered, else FlatLaf's. */
     private final Font platformFont;
     private final float platformLabelSize;
@@ -108,7 +109,7 @@ public final class ThemeController implements AutoCloseable {
                          java.util.function.Function<Kit, Predicate<GeneratedTheme>> installers,
                          java.util.function.Consumer<InstallationFailure> fallingBack) {
         record Attempt(Shown shown, Kit kit, Step step) { }
-        var cobalt = JasperTheme.bundled();
+        var cobalt = new ThemePick.Authored(JasperTheme.bundled());
         var chosen = new Shown(dark, selection);
         var fallback = new Shown(true, new ThemeSelection(selection.library(), cobalt, cobalt, selection.scheme()));
         boolean other = !kit.equals(Kit.DEFAULT);
@@ -135,7 +136,7 @@ public final class ThemeController implements AutoCloseable {
         try { return new ThemeController(new Shown(dark, selection), Kit.DEFAULT, installer); }
         catch (InstallationFailure failure) {
             fallingBack.accept(failure);
-            var cobalt = JasperTheme.bundled();
+            var cobalt = new ThemePick.Authored(JasperTheme.bundled());
             return new ThemeController(new Shown(true, new ThemeSelection(selection.library(), cobalt, cobalt, selection.scheme())), Kit.DEFAULT, installer);
         }
     }
@@ -168,7 +169,8 @@ public final class ThemeController implements AutoCloseable {
         // look's face for a user font size.
         UIManager.put("defaultFont", null);
         UIManager.put("Jasper.uiFontFamilyOverride", false);
-        current = ResolvedTheme.of(shown.dark(), shown.selection());
+        desktop = JasperTheme.bundled().generated(shown.dark());
+        current = ResolvedTheme.of(shown.dark(), shown.selection(), desktop);
         appearance = new AppearanceBindings(current.pair(), kit, ThemeController::reportFailure, () -> animationsEnabled);
         new dev.jasper.ui.swing.AppearanceTransaction(appearance.binding(), ignored -> installOrThrow(current.chrome()), ignored -> {}).apply(current.pair());
         Font look = lookFace(kit);
@@ -192,8 +194,16 @@ public final class ThemeController implements AutoCloseable {
     /** {@code selection} in {@code dark} with {@code font}. */
     public void configure(boolean dark, ThemeSelection selection, UiFontConfig font) {
         requireEdt();
+        configure(dark, selection, font, desktop.dark() == dark ? desktop : JasperTheme.bundled().generated(dark));
+    }
+    /** Applies a complete desktop snapshot through the same transaction as authored themes and fonts. */
+    public void configure(boolean dark, ThemeSelection selection, UiFontConfig font, GeneratedTheme desktop) {
+        requireEdt();
+        Objects.requireNonNull(desktop);
+        if (desktop.dark() != dark) throw new IllegalArgumentException("Desktop appearance does not match the request");
         var next = new Shown(dark, Objects.requireNonNull(selection));
-        apply(next, ResolvedTheme.of(dark, selection), Objects.requireNonNull(font));
+        apply(next, ResolvedTheme.of(dark, selection, desktop), Objects.requireNonNull(font));
+        this.desktop = desktop;
     }
     /** The current themes in {@code dark} with {@code scheme} and {@code font}. */
     public void configure(boolean dark, TerminalSchemeChoice scheme, UiFontConfig font) {
@@ -207,7 +217,7 @@ public final class ThemeController implements AutoCloseable {
 
     private void apply(Shown nextShown, ResolvedTheme next, UiFontConfig font) {
         ResolvedTheme previous = current;
-        boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
+        boolean chromeChanged = !previous.chrome().equals(next.chrome()) || !uiFont.equals(font);
         boolean selectionChanged = !Objects.equals(shown, nextShown);
         if (applying) throw new IllegalStateException("Theme configuration cannot re-enter");
         applying = true;
