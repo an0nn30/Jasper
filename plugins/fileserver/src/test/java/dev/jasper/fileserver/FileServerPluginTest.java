@@ -18,7 +18,10 @@ import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionState;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.testing.FakePresentations;
+import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.PanelMode;
+import dev.jasper.sdk.ui.PanelPlacement;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.vault.api.LockState;
 import java.net.URI;
@@ -202,6 +205,56 @@ class FileServerPluginTest {
             assertThat(host.clipboard().copies()).containsExactly("copy|dev.jasper.fileserver|" + fingerprint);
             plugin.registry().stopAll();
             await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
+    /** The open panel's view describes a node with this id; the kit's views are read on the EDT. */
+    static boolean has(FakePluginHost host, String id) {
+        var found = new java.util.concurrent.atomic.AtomicBoolean();
+        UiTestAccess.edt(() -> found.set(UiTestAccess.find(host.panelView(FileServerPlugin.PANEL).orElseThrow(), id).isPresent()));
+        return found.get();
+    }
+
+    static void place(FakePluginHost host, PanelPlacement placement) {
+        UiTestAccess.edt(() -> host.placePanel(FileServerPlugin.PANEL, placement));
+    }
+
+    /** Wide tool window layouts: a window of its own (Float or Window) and the bottom lay the list beside the details. */
+    @Test void theFileServersPanelIsWideInAWindowOfItsOwnAndAtTheBottom() {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            host.addTerminalWindow();
+            plugin.store().put(http("docs", home, Ports.free(), Login.ANONYMOUS, false));
+            settle(host);
+            openPanel(host, plugin);
+            assertThat(has(host, FileServersPanel.COLUMNS)).as("docked on the left").isFalse();
+            place(host, new PanelPlacement(Anchor.LEFT, false, PanelMode.FLOAT));
+            assertThat(has(host, FileServersPanel.COLUMNS)).as("floating").isTrue();
+            place(host, new PanelPlacement(Anchor.LEFT, false, PanelMode.WINDOW));
+            assertThat(has(host, FileServersPanel.COLUMNS)).as("a window of its own too").isTrue();
+            place(host, new PanelPlacement(Anchor.LEFT, false, PanelMode.DOCKED));
+            assertThat(has(host, FileServersPanel.COLUMNS)).as("docked again").isFalse();
+            place(host, new PanelPlacement(Anchor.BOTTOM, false, PanelMode.DOCKED));
+            assertThat(has(host, FileServersPanel.COLUMNS)).as("docked at the bottom").isTrue();
+            place(host, new PanelPlacement(Anchor.RIGHT, false, PanelMode.DOCKED));
+            assertThat(has(host, FileServersPanel.COLUMNS)).as("docked on the right").isFalse();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** A panel built while it has a window of its own, as one moved while closed or restored there is, starts wide. */
+    @Test void aFileServersPanelBuiltInAWindowOfItsOwnStartsWide() {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            host.addTerminalWindow();
+            plugin.store().put(http("docs", home, Ports.free(), Login.ANONYMOUS, false));
+            settle(host);
+            place(host, new PanelPlacement(Anchor.LEFT, false, PanelMode.WINDOW));
+            openPanel(host, plugin);
+            assertThat(has(host, FileServersPanel.COLUMNS)).isTrue();
+            assertThat(host.failures()).isEmpty();
         }
     }
 

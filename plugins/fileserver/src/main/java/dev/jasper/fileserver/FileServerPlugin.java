@@ -266,6 +266,10 @@ public final class FileServerPlugin implements Plugin {
             registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone(),
             "add", layout);
         panel.onHeaderChanged(host::setHeader);
+        // In a window of its own or docked at the bottom the list sits beside the details; the panel is right from the start
+        // and follows each move.
+        panel.wide(dev.jasper.fileserver.workstation.Layout.wide(host.placement()));
+        host.onPlacement(placement -> panel.wide(dev.jasper.fileserver.workstation.Layout.wide(placement)));
         panel.setTlsFingerprint(tls.cachedFingerprint());
         panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
         panel.setServers(registry.servers(), store.error());

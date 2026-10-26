@@ -40,6 +40,12 @@ import java.util.function.Function;
  *
  * <p>Under {@link Layout#CLASSIC} (Enterprise presentation spec 14.5) the rows are a Folder, Address and Status table;
  * the chosen server's Properties and status line follow it, the row menu reads Copy URI and Show Activity.
+ *
+ * <p>In a window of its own or docked at the bottom ({@link #wide(boolean)}) the panel lays its list beside the details:
+ * under {@link Layout#ROWS} the selected (else the first) server's card contents, actions and activity, always shown and
+ * with no Show or Hide Details in the row menu; under {@link Layout#CLASSIC} the table beside the chosen server's
+ * Properties, status line and activity, with no Show or Hide Activity in the row menu. With no server listed the wide
+ * layout is the docked one.
  */
 public final class FileServersPanel implements AutoCloseable {
     public record Actions(Consumer<UUID> toggle, Consumer<Optional<UUID>> edit, Consumer<UUID> duplicate, Consumer<UUID> delete,
@@ -50,6 +56,9 @@ public final class FileServersPanel implements AutoCloseable {
         EMPTY = "fileserver.empty", DETAILS = "fileserver.details", ACTIVATE = "fileserver.details.open",
         ENTER_TOGGLE = "fileserver.toggle.selected", KEY_DETAILS = "fileserver.details.key",
         KEY_COPY = "fileserver.copy.key", KEY_CANCEL = "fileserver.details.close.key";
+    /** The wide layout's nodes: the split, its list and detail columns, and what the detail column holds. */
+    public static final String COLUMNS = "fileserver.columns", LIST_COLUMN = "fileserver.list", DETAIL_COLUMN = "fileserver.detail",
+        DETAIL_CONTENT = "fileserver.detail.content", DETAIL_NONE = "fileserver.detail.none";
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT);
 
     private final UiView view;
@@ -70,6 +79,8 @@ public final class FileServersPanel implements AutoCloseable {
     /** The row the user (or {@link #select}) selected, shown as selected; {@code selected} falls back to the first row. */
     private UUID chosen;
     private boolean detailsOpen, closed;
+    /** Whether the panel is asked for its wide layout (a window of its own, or docked at the bottom). */
+    private boolean wide;
 
     public FileServersPanel(UiKit kit, Actions actions, Function<UUID, List<ActivityLog.Entry>> log,
                             Path home, String firewallHint, ZoneId zone, String headerAddIcon) {
@@ -86,6 +97,27 @@ public final class FileServersPanel implements AutoCloseable {
     }
 
     public UiView view() { return view; }
+
+    /**
+     * Asks for the wide layout, the list beside the details, or the docked one. Nothing changes while the value is the
+     * same or after {@link #close()}. With no server listed the panel keeps its docked composition, whose empty state
+     * fills the window.
+     *
+     * @param value true for the wide layout
+     */
+    public void wide(boolean value) {
+        if (closed || value == wide) return;
+        wide = value;
+        render();
+        revealLatestActivity();
+    }
+
+    /** Whether the wide layout is asked for, as {@link #wide(boolean)} last set it. */
+    public boolean wide() { return wide; }
+
+    /** Whether the columns are drawn: the wide layout, with a server to show. */
+    private boolean columns() { return wide && !servers.isEmpty(); }
+
     @Override public void close() { if (closed) return; closed = true; view.close(); headerChanged = header -> { }; }
 
     /** Supplies the window-owned count and New action; never adds another title row. */
@@ -215,8 +247,10 @@ public final class FileServersPanel implements AutoCloseable {
 
     private void render() { if (!closed) view.update(new ViewSpec(node())); }
     private void revealLatestActivity() {
-        if (!closed && detailsOpen && !activityLines.isEmpty()) view.reveal("fileserver.activity.text." + (activityLines.size() - 1));
+        if (!closed && activityShown() && !activityLines.isEmpty()) view.reveal("fileserver.activity.text." + (activityLines.size() - 1));
     }
+    /** Whether the activity is on screen: docked, once Show Details or Show Activity opened it; wide, always (the classic look's with a chosen server). */
+    private boolean activityShown() { return columns() ? layout != Layout.CLASSIC || chosen != null : detailsOpen; }
     private static ControlState state(boolean visible, boolean enabled) { return new ControlState(visible, enabled, false, ""); }
     private static Nodes.Text text(String id, String value, Nodes.TextRole role) { return new Nodes.Text(id, ControlState.READY, value, role); }
 
@@ -251,6 +285,8 @@ public final class FileServersPanel implements AutoCloseable {
         var list = new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.DOUBLE, rows,
             chosen == null ? Set.of() : Set.of(rowId(chosen)), ACTIVATE, List.of(), Nodes.SelectionMode.SINGLE,
             Optional.empty(), OptionalInt.empty(), ENTER_TOGGLE, "", KEY_DETAILS, KEY_COPY, KEY_CANCEL);
+        if (columns()) return wideNode(header, Optional.empty(), list,
+            selectedView().map(this::detailNodes).orElseGet(() -> List.of(noneSelected())));
         var body = new ArrayList<Nodes.Node>();
         body.add(list);
         selectedView().ifPresent(server -> body.add(details(server)));
@@ -308,8 +344,11 @@ public final class FileServersPanel implements AutoCloseable {
         result.add(menuItem("copy", id, "Copy Address", !server.addresses().isEmpty()));
         result.add(menuItem("password", id, "Copy Password", phase == Phase.RUNNING && server.user().isPresent()));
         result.add(menuItem("fingerprints", id, "Show Fingerprints…", server.definition().tls() || server.definition().protocol() == Protocol.SFTP));
-        result.add(separator("second", id));
-        result.add(menuItem("details", id, detailsOpen ? "Hide Details" : "Show Details", true));
+        // The wide layout always shows the details, so the row menu has nothing to show or hide.
+        if (!columns()) {
+            result.add(separator("second", id));
+            result.add(menuItem("details", id, detailsOpen ? "Hide Details" : "Show Details", true));
+        }
         return List.copyOf(result);
     }
 
@@ -321,7 +360,7 @@ public final class FileServersPanel implements AutoCloseable {
     // ---- the classic composition (Enterprise presentation spec 14.5)
 
     /** The classic table's columns, in the Workstation mock's proportions. */
-    static final List<Column> COLUMNS = List.of(new Column("folder", "Folder", Nodes.TextRole.BODY, false, 110, Optional.empty()),
+    static final List<Column> TABLE_COLUMNS = List.of(new Column("folder", "Folder", Nodes.TextRole.BODY, false, 110, Optional.empty()),
         new Column("address", "Address", Nodes.TextRole.MONO, true, 117, Optional.empty()), new Column("status", "Status", Nodes.TextRole.BODY, false, 73, Optional.empty()));
     public static final String PROPERTIES = "fileserver.properties", FOOTER = "fileserver.footer", NOTICE = "fileserver.notice";
 
@@ -340,7 +379,7 @@ public final class FileServersPanel implements AutoCloseable {
             "No File Servers", "Share a local folder over HTTP with devices on your network.",
             List.of(new Nodes.Button("fileserver.empty.new", ControlState.READY, "Share Folder…", "", Nodes.ButtonKind.SECONDARY, "fileserver.empty.new", ""))))
             : Optional.empty();
-        var table = new Nodes.Table(ROWS, ControlState.READY, COLUMNS, rows, chosen == null ? Set.of() : Set.of(rowId(chosen)), ENTER_TOGGLE, List.of(),
+        var table = new Nodes.Table(ROWS, ControlState.READY, TABLE_COLUMNS, rows, chosen == null ? Set.of() : Set.of(rowId(chosen)), ENTER_TOGGLE, List.of(),
             Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD, empty, "");
         Optional<Nodes.Node> top = problem.map(error -> new Nodes.Stack(NOTICE + ".stack", ControlState.READY, Nodes.LayoutRole.VERTICAL,
             List.of(new Nodes.Notice(NOTICE, ControlState.READY, Nodes.Severity.DANGER, "servers.toml: " + error, List.of()))));
@@ -351,8 +390,9 @@ public final class FileServersPanel implements AutoCloseable {
             below.add(properties(server));
             below.add(new Nodes.Text(FOOTER, ControlState.READY,
                 server.definition().name() + " — " + ServerRows.state(server.state()).toLowerCase(Locale.ROOT) + ". Click to toggle.", Nodes.TextRole.CAPTION));
-            if (detailsOpen) below.addAll(activity());
+            if (detailsOpen || columns()) below.addAll(activity());
         });
+        if (columns()) return wideNode(header, top, table, below.isEmpty() ? List.of(noneSelected()) : below);
         return new Nodes.Panel(ROOT, ControlState.READY, header, top, table,
             below.isEmpty() ? Optional.empty() : Optional.of(new Nodes.Stack("fileserver.below", ControlState.READY, Nodes.LayoutRole.VERTICAL, below)));
     }
@@ -431,6 +471,11 @@ public final class FileServersPanel implements AutoCloseable {
     }
 
     private Nodes.Node details(ServerRegistry.View server) {
+        return new Nodes.Card(DETAILS, state(detailsOpen, true), Nodes.CardKind.MIXED, detailNodes(server));
+    }
+
+    /** The server's name, state, folder, access, addresses, actions and activity: the docked card's contents and the wide detail column's. */
+    private List<Nodes.Node> detailNodes(ServerRegistry.View server) {
         ServerDefinition definition = server.definition();
         Phase phase = server.state().phase();
         var details = new ArrayList<Nodes.Node>();
@@ -469,6 +514,26 @@ public final class FileServersPanel implements AutoCloseable {
         details.add(new Nodes.Stack("fileserver.activity.actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
             new Nodes.Button("fileserver.activity.clear", ControlState.READY, "Clear", "remove", Nodes.ButtonKind.GHOST, "fileserver.activity.clear", ""),
             new Nodes.Button("fileserver.activity.copy", ControlState.READY, "Copy", "copy", Nodes.ButtonKind.GHOST, "fileserver.activity.copy", ""))));
-        return new Nodes.Card(DETAILS, state(detailsOpen, true), Nodes.CardKind.MIXED, details);
+        return details;
+    }
+
+    // ---- the wide composition: the list beside the details
+
+    private static Nodes.Text noneSelected() {
+        return text(DETAIL_NONE, "Select a file server to see its properties.", Nodes.TextRole.DESCRIPTION);
+    }
+
+    /** The list in a column beside a detail column holding {@code detail}; {@code top} stays above both. */
+    private static Nodes.Panel wideNode(Nodes.Header header, Optional<Nodes.Node> top, Nodes.Node list, List<Nodes.Node> detail) {
+        var listColumn = new Nodes.Panel(LIST_COLUMN, ControlState.READY, hiddenHeader(LIST_COLUMN + ".header", "File Servers"), Optional.empty(), list, Optional.empty());
+        var detailColumn = new Nodes.Panel(DETAIL_COLUMN, ControlState.READY, hiddenHeader(DETAIL_COLUMN + ".header", "Details"), Optional.empty(),
+            new Nodes.Stack(DETAIL_CONTENT, ControlState.READY, Nodes.LayoutRole.DETAIL, detail), Optional.empty());
+        return new Nodes.Panel(ROOT, ControlState.READY, header, top,
+            new Nodes.Split(COLUMNS, ControlState.READY, Nodes.SplitKind.SIDEBAR_DETAIL, List.of(listColumn, detailColumn)), Optional.empty());
+    }
+
+    /** A column's header, which the column does not draw. */
+    private static Nodes.Header hiddenHeader(String id, String title) {
+        return new Nodes.Header(id, new ControlState(false, true, false, ""), title, OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
     }
 }
