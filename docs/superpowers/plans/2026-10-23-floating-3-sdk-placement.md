@@ -1,13 +1,16 @@
 # Floating tool windows 3: SDK panel placement Implementation Plan
 
-**Status: executed on 2026-10-26** (`ecb632dd8`, `bd2f01e92`, `a8f542f78`, then the documentation commit); see
-`docs/STATUS.md`.
+**Status: executed on 2026-10-26** (`ecb632dd8`, `bd2f01e92`, `a8f542f78`, then the documentation commit, then the
+final review's fixes `5d3e0071b` and their documentation commit); see `docs/STATUS.md`.
 Deviations from the plan's text: (1) Task 1's review fixes: `PanelHost.window()` and the class Javadoc no longer say the
 host owns the main window or that the place is in it, and a panel's baseline is recorded after its factory returns
 (`bd2f01e92`); (2) `PanelSite.notifyPlacement` has a round counter, so a listener whose own move started a newer
 notification ends the round; (3) the Sample's body comes from `panelBody(boolean ownWindow)`, not `spec(placement)`; (4)
 Task 3 also corrects the other statements that a tool window lives only in the main window, and the ones about a toggle
-from a child window (`Panels` and `PanelFactory`'s Javadoc, guides 07, 08 and 13, plugin authoring).
+from a child window (`Panels` and `PanelFactory`'s Javadoc, guides 07, 08 and 13, plugin authoring); (5) the final
+review: `placePanel` on a panel that is not open records the placement, which `openPanel` builds it with, also after
+`closePanel` (the plan's Task 2 has it do nothing), and a child window's plain toggle of a detached tool window raises
+its window.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

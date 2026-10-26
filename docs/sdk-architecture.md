@@ -183,7 +183,8 @@ lazily built instance per panel and docks the panels in the window's `DockState`
 showing window; per-side sizes and ratios). One listener on that state builds what starts showing, lays out
 `ToolWindowArea` (the terminal column, the tab strip over the deck, and a frame with a `ToolWindowHeader` for each
 showing slot, placed by the pure `DockGeometry`: the bottom area spans the full width, the sides and the terminal
-column run from the toolbar to it), renders the window's stripes (the two `ToolStripe` rails, or under the Enterprise
+column run from the toolbar to it), opens, moves and closes the native windows of the tool windows detached as Float or
+Window (`DetachedToolWindows`), renders the window's stripes (the two `ToolStripe` rails, or under the Enterprise
 look the labelled `LabelledStripe`s and the `BottomStrip`, all `DockStripe`s of its `StripeSet`), tells the panels and
 saves.
 
@@ -193,11 +194,15 @@ left, right and bottom edges, a side split at half the side panels' visible heig
 the stripes open a gap, and `DockDropOverlay` on the layered pane's `DRAG_LAYER` previews the landing with
 `DockGeometry.landing`, the layout's function on a copy of the state, except that the guide for a second slot (Left
 Bottom, Right Bottom, Bottom Right) is always that slot's half. A stripe drop moves the window and keeps its
-visibility; a workspace drop moves and shows it.
+visibility; a workspace drop moves and shows it. A release outside the window, or over another of Jasper's windows in
+front of it, is the Detach target: the tool window opens in a Float window where it is released, or a detached one's
+window moves there.
 
 Requests to show, hide or toggle a panel travel through the model tagged with a window id, and
-`Contributions.panelRoute` sends a child window's to the main window. Every panel's toggle action is listed under View › Tool Windows (in the
-Enterprise look, the Window menu): the application-registered `<panel id>.toggle`, or the plugin's own action named by
+`Contributions.panelRoute` sends a child window's to the main window, where a toggle only shows: the main window comes
+forward, or for a detached tool window its own window (an activating show raises it even when it already shows). Every
+panel's toggle action is listed under View › Tool Windows (in the Enterprise look, the Window menu): the
+application-registered `<panel id>.toggle`, or the plugin's own action named by
 `PanelSpec.toggleActionId`, which must already be registered, so a plugin action that toggles a panel appears once in
 the menu and the palette. The application-registered toggle requests an activating toggle
 (`PanelRequest.Op.ACTIVATING_TOGGLE`), and a stripe press toggles the same way: under flush frames
@@ -224,10 +229,11 @@ visibility alone or a move within its half. A listener that moves the panel agai
 never hear the place it overtook; a failing handler is contained, and nothing runs after the panel closes. A plugin that lays
 a panel out another way describes another `ViewSpec` and calls `UiView.update`, as the Sample plugin's does.
 
-`persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order and visibility, the dock's sizes
-and ratios (the default look's, and each other look's under `[look."<id>"]`), Zen mode, stripe visibility, auxiliary
-window bounds and the dragged command palette's place; `workspace.toml` holds the windows themselves. It is application state, not configuration: a bad
-panel, window or dock entry falls back alone, an unreadable file falls back to defaults, and writes are atomic.
+`persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order, visibility, mode and own window's
+bounds, the dock's sizes and ratios (the default look's, and each other look's under `[look."<id>"]`), Zen mode, stripe
+visibility, auxiliary window bounds and the dragged command palette's place; `workspace.toml` holds the windows
+themselves. It is application state, not configuration: a bad panel, window or dock entry falls back alone, an
+unreadable file falls back to defaults, and writes are atomic.
 
 Plugin dialogs and the application's auxiliary windows follow the `WindowFrame`/`WindowContent` split.
 `AuxiliarySurface` holds the content, title, closing guards and lifetime and is tested headlessly; `NativeShells` is
