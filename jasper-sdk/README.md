@@ -63,7 +63,7 @@ as the bundled plugins do:
 sdk = ">=0.22.0, <0.23"
 ```
 
-A plugin that uses something only a later 0.21 version has starts its range there. Every bundled plugin declares
+A plugin that uses something only a later 0.22 version has starts its range there. Every bundled plugin declares
 `sdk = ">=0.22.0, <0.23"`.
 
 Jasper checks the range at launch: a plugin whose range does not contain the running SDK is skipped, and Settings ›
