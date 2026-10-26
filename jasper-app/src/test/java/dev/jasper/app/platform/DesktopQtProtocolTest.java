@@ -4,6 +4,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
+import dev.jasper.app.appearance.DesktopPalette;
+import dev.jasper.ui.theme.SemanticColor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -51,6 +59,42 @@ class DesktopQtProtocolTest {
         for (String generation : new String[] { "1.0", "1e0", "-1", "9223372036854775808" })
             assertThatIllegalArgumentException().isThrownBy(() -> decode(wire("qt5", "light", "", "")
                 .replace("\"generation\":7", "\"generation\":" + generation)));
+    }
+
+    @Test void initializationExitFallsBackWithinQtFamilyAndRetryRecoversThroughRealChildPipes() {
+        try (var f = new DesktopProcessTest.Fixture()) {
+            var recovered = new AtomicBoolean();
+            var launched = new CopyOnWriteArrayList<String>();
+            try (var service = new DesktopColors(Path.of("test", "helpers").toAbsolutePath(), f.time, f.queue::add, f.time::now, command -> {
+                String helper = Path.of(command.getFirst()).getFileName().toString();
+                launched.add(helper);
+                String mode = helper.equals("jasper-desktop-portal") ? "echo"
+                    : helper.equals("jasper-desktop-qt6") && !recovered.get() ? "exit" : "qt";
+                var child = new ArrayList<>(DesktopProcessTest.child(mode));
+                child.add(helper.substring("jasper-desktop-".length()));
+                return f.launch(child);
+            })) {
+                service.request(1, Set.of(Source.QT6, Source.QT5), true);
+                f.await(() -> service.current().palettes().containsKey(Source.QT6)
+                    && !service.current().palettes().get(Source.QT6).reason().isBlank()
+                    && service.current().palettes().containsKey(Source.QT5));
+                var context = DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "LXQt"));
+                var fallback = DesktopPalette.resolve(true, DesktopPalette.SourceMode.QT, context, service.current());
+                assertThat(fallback.source()).contains(Source.QT5);
+                assertThat(SemanticColor.SURFACE_APP.color(fallback.theme())).isEqualTo(new java.awt.Color(26,26,26));
+                assertThat(launched).containsExactlyInAnyOrder("jasper-desktop-portal", "jasper-desktop-qt5", "jasper-desktop-qt6");
+                recovered.set(true);
+                f.time.advance(1, TimeUnit.SECONDS); f.pump();
+                f.await(() -> service.current().palettes().get(Source.QT6).colors().containsKey(Pair.WINDOW));
+                var current = DesktopPalette.resolve(true, DesktopPalette.SourceMode.QT, context, service.current());
+                assertThat(current.source()).contains(Source.QT6);
+                assertThat(SemanticColor.SURFACE_APP.color(current.theme())).isEqualTo(new java.awt.Color(51,51,51));
+                assertThat(current.status()).doesNotContain("last good");
+                assertThat(launched.stream().filter("jasper-desktop-qt5"::equals).count()).isEqualTo(1);
+                assertThat(launched.stream().filter("jasper-desktop-qt6"::equals).count()).isEqualTo(2);
+            }
+            f.pump(); f.await(() -> f.children.stream().noneMatch(Process::isAlive));
+        }
     }
 
     private static String wire(String source, String appearance, String reason, String colors) {

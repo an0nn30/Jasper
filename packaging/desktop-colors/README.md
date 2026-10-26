@@ -105,7 +105,8 @@ GTK probes retain the bundled theme fallback.
 KColorScheme extraction. The four executables link only their matching Qt/KF major. Generic Qt needs
 Widgets 5.15 or 6.2; KDE needs KF5 5.92 with Qt5.15, or KF6 6.0 with Qt6.5. Qt/KF are external
 runtime capabilities. The app image contains the helper executables and no Qt/KF SDK or platform plugins.
-The Java source policy remains GTK-only until the application integration deliverable.
+Automatic ranks the toolkit sources from captured desktop hints; explicit Qt / KDE stays within its family.
+Qt/KDE replies carry actual palette polarity and remain live when the requested appearance is unavailable.
 
 `compileDesktopQtHelpers` configures each target separately. Select baseline SDKs with
 `jasper.qt5Prefix`, `jasper.qt6Prefix`, `jasper.kf5Prefix`, `jasper.kde6QtPrefix` and `jasper.kf6Prefix`;

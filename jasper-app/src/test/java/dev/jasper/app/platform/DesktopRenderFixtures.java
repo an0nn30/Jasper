@@ -17,7 +17,7 @@ public final class DesktopRenderFixtures {
                     + (fields.containsKey("accent") ? ",\"accent\":\"" + fields.get("accent") + "\"" : "") + "}";
                 var portal = ((DesktopProtocol.PortalMessage) DesktopProtocol.decode(portalLine.getBytes(StandardCharsets.UTF_8))).value();
                 result.add(new Fixture((String) fields.get("name"), (Boolean) fields.get("dark"), (Boolean) fields.get("highContrast"),
-                    new DesktopObservation(portal, Map.of(palette.source(), palette))));
+                    new DesktopObservation(portal, fields.containsKey("allUnavailable") ? Map.of() : Map.of(palette.source(), palette))));
             }
             return List.copyOf(result);
         }

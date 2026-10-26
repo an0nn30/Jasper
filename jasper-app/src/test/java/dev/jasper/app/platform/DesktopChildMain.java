@@ -43,6 +43,13 @@ public final class DesktopChildMain {
                     System.out.flush(); continue;
                 }
                 String appearance = line.contains("\"dark\"") ? "dark" : "light";
+                if (mode.equals("qt")) {
+                    String source = args[1];
+                    String background = source.equals("qt6") ? "0.2,0.2,0.2,1" : "0.1,0.1,0.1,1";
+                    System.out.println("{\"v\":1,\"kind\":\"palette\",\"generation\":" + generation
+                        + ",\"source\":\"" + source + "\",\"appearance\":\"dark\",\"implementation\":\"Java protocol fixture\",\"libraryVersion\":\"synthetic\",\"reason\":\"\",\"window.bg\":\"" + background + "\",\"window.fg\":\"1,1,1,1\"}");
+                    System.out.flush(); continue;
+                }
                 System.out.println("{\"v\":1,\"kind\":\"palette\",\"generation\":" + generation
                     + ",\"source\":\"gtk3\",\"appearance\":\"" + appearance
                     + "\",\"implementation\":\"fixture\",\"libraryVersion\":\"" + (mode.equals("count") ? samples : 1) + "\",\"reason\":\"\",\"window.bg\":\"0,0,0,1\",\"window.fg\":\"1,1,1,1\"}");

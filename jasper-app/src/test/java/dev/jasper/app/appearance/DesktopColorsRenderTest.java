@@ -40,11 +40,71 @@ class DesktopColorsRenderTest {
 
     @Test void nativeFixtureMatrixCoversBothAppearancesAndEveryRequiredSourceShape() throws Exception {
         var fixtures = DesktopRenderFixtures.read();
-        assertThat(fixtures).hasSize(18);
-        assertThat(fixtures.stream().map(DesktopRenderFixtures.Fixture::name).distinct()).containsExactly(
+        var gtk = fixtures.stream().filter(f -> f.input().palettes().keySet().stream().anyMatch(source ->
+            source == DesktopObservation.Source.GTK3 || source == DesktopObservation.Source.GTK4)).toList();
+        assertThat(gtk).hasSize(18);
+        assertThat(gtk.stream().map(DesktopRenderFixtures.Fixture::name).distinct()).containsExactly(
             "gtk3", "libadwaita-override", "plain-gtk4", "partial-source", "mismatched-appearance",
             "low-contrast-shared-text", "transparent-input", "white-accent", "yellow-high-contrast");
+        for (String source : List.of("qt5", "qt6", "kde5", "kde6")) {
+            for (boolean dark : List.of(false, true)) for (boolean high : List.of(false, true)) {
+                var fixture = fixtures.stream().filter(f -> f.name().equals(source + (high ? "-high-contrast" : ""))
+                    && f.dark() == dark).findFirst();
+                assertThat(fixture).as("native %s dark=%s high=%s must reach the actual paint inventory", source, dark, high).isPresent();
+                assertThat(fixture.orElseThrow().high()).isEqualTo(high);
+                var palette = fixture.orElseThrow().input().palettes().values().iterator().next();
+                assertThat(palette.source().name().toLowerCase(Locale.ROOT)).isEqualTo(source);
+                assertThat(palette.appearance()).isEqualTo(dark ? DesktopObservation.Polarity.DARK : DesktopObservation.Polarity.LIGHT);
+                var ground = dark ? new DesktopObservation.Rgba(.08,.09,.1,1) : new DesktopObservation.Rgba(.96,.97,.98,1);
+                var ink = dark ? new DesktopObservation.Rgba(1,1,1,1) : new DesktopObservation.Rgba(0,0,0,1);
+                assertThat(palette.colors().get(DesktopObservation.Pair.WINDOW)).isEqualTo(new DesktopObservation.Colors(ground, ink));
+                assertThat(palette.colors().get(DesktopObservation.Pair.DIALOG)).isEqualTo(new DesktopObservation.Colors(ground, ink));
+                assertThat(palette.colors().get(DesktopObservation.Pair.VIEW)).isEqualTo(new DesktopObservation.Colors(ground, ink));
+                assertThat(palette.colors().get(DesktopObservation.Pair.POPOVER)).isEqualTo(new DesktopObservation.Colors(ground, ink));
+                var selectionGround = dark ? new DesktopObservation.Rgba(.8,.85,.9,1) : new DesktopObservation.Rgba(.1,.15,.2,1);
+                var selectionInk = dark ? new DesktopObservation.Rgba(0,0,0,1) : new DesktopObservation.Rgba(1,1,1,1);
+                assertThat(palette.colors().get(DesktopObservation.Pair.SELECTION)).isEqualTo(new DesktopObservation.Colors(selectionGround, selectionInk));
+                assertThat(palette.colors()).doesNotContainKey(DesktopObservation.Pair.SIDEBAR);
+                if (source.startsWith("qt")) assertThat(palette.colors()).doesNotContainKey(DesktopObservation.Pair.HEADER);
+                else assertThat(palette.colors().get(DesktopObservation.Pair.HEADER)).isEqualTo(new DesktopObservation.Colors(ground, ink));
+                var resolved = DesktopPalette.resolve(dark, DesktopPalette.SourceMode.AUTO,
+                    DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "KDE")), fixture.orElseThrow().input());
+                assertThat(resolved.source()).contains(palette.source());
+                assertThat(SemanticColor.SURFACE_APP.color(resolved.theme())).isEqualTo(
+                    dark ? new Color(20,23,26) : new Color(245,247,250));
+            }
+        }
+        for (String shape : List.of("qt-incomplete-optionals", "qt-translucent-ink", "kde-shared-role-conflict", "all-sources-unavailable"))
+            for (boolean dark : List.of(false, true)) assertThat(fixtures.stream().filter(f -> f.name().equals(shape) && f.dark() == dark))
+                .as("%s dark=%s actual paint input", shape, dark).hasSize(1);
         assertThat(fixtures.stream().map(f -> f.name()+"/"+f.dark())).doesNotHaveDuplicates();
+    }
+
+    @Test void qtOptionalPairsAndTranslucentInkNormalizeBeforePainting() throws Exception {
+        for (var fixture : DesktopRenderFixtures.read()) {
+            var result = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO,
+                DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "KDE")), fixture.input());
+            var theme = result.theme();
+            if (fixture.name().equals("qt-incomplete-optionals")) {
+                var palette = fixture.input().palettes().get(DesktopObservation.Source.QT6);
+                assertThat(palette.colors()).containsOnlyKeys(DesktopObservation.Pair.WINDOW, DesktopObservation.Pair.DIALOG);
+                assertThat(result.source()).contains(DesktopObservation.Source.QT6);
+                assertThat(SemanticColor.SURFACE_INPUT.color(theme)).isEqualTo(SemanticColor.SURFACE_APP.color(theme));
+                assertThat(SemanticColor.SURFACE_MENU.color(theme)).isEqualTo(SemanticColor.SURFACE_APP.color(theme));
+            }
+            if (fixture.name().equals("qt-translucent-ink")) {
+                var palette = fixture.input().palettes().get(DesktopObservation.Source.QT5);
+                assertThat(palette.colors().get(DesktopObservation.Pair.WINDOW).foreground().alpha()).isEqualTo(.75);
+                assertThat(result.source()).contains(DesktopObservation.Source.QT5);
+                assertThat(SemanticColor.TEXT_PRIMARY.color(theme).getAlpha()).isEqualTo(255);
+                assertThat(ColorMath.contrast(SemanticColor.TEXT_PRIMARY.color(theme), SemanticColor.SURFACE_APP.color(theme))).isGreaterThanOrEqualTo(4.5);
+            }
+            if (fixture.name().equals("all-sources-unavailable")) {
+                assertThat(fixture.input().palettes()).isEmpty();
+                assertThat(result.source()).isEmpty();
+                assertThat(result.status()).contains("unavailable", "Slate Cobalt");
+            }
+        }
     }
 
     @Test void nativePalettesPaintFormsMenusTablesTreesTabsAndDialogsInBothKits() throws Exception {
@@ -57,8 +117,8 @@ class DesktopColorsRenderTest {
         assertThat(catalog).hasSize(8);
         try {
             for (var fixture : DesktopRenderFixtures.read()) {
-                var resolved = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")), fixture.input());
-                if (fixture.name().equals("mismatched-appearance")) assertThat(resolved.source()).isEmpty();
+                var resolved = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "KDE")), fixture.input());
+                if (fixture.name().equals("mismatched-appearance") || fixture.name().equals("all-sources-unavailable")) assertThat(resolved.source()).isEmpty();
                 else assertThat(resolved.source()).contains(fixture.input().palettes().keySet().iterator().next());
                 var theme = resolved.theme();
                 assertThat(DesktopPaintPairs.validate(theme, fixture.high())).as(fixture.name()).isEmpty();
@@ -132,8 +192,11 @@ class DesktopColorsRenderTest {
     }
 
     @Test void lowContrastImportedSurfaceWithSharedTextIsRejectedBeforePainting() throws Exception {
-        for (var fixture : DesktopRenderFixtures.read()) if (fixture.name().equals("low-contrast-shared-text")) {
-            var theme = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of()), fixture.input()).theme();
+        for (var fixture : DesktopRenderFixtures.read()) if (fixture.name().equals("low-contrast-shared-text") || fixture.name().equals("kde-shared-role-conflict")) {
+            var result = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO,
+                DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "KDE")), fixture.input());
+            assertThat(result.source()).contains(fixture.input().palettes().keySet().iterator().next());
+            var theme = result.theme();
             assertThat(ColorMath.contrast(SemanticColor.TEXT_PRIMARY.color(theme),
                 SemanticColor.SURFACE_DIALOG.color(theme))).isGreaterThanOrEqualTo(4.5);
             assertThat(SemanticColor.SURFACE_DIALOG.color(theme)).isNotEqualTo(fixture.dark() ? new Color(230,230,230) : new Color(26,26,26));

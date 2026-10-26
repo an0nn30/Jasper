@@ -311,3 +311,20 @@ Logs: `/private/tmp/jasper-final-baseline-helper-tests.log`,
 `/private/tmp/jasper-native4-package-runtime-tests.log`,
 `/private/tmp/jasper-native4-package-runtime-hashes.log`,
 `/private/tmp/jasper-task4-final-equipped-rpm.log`, `/private/tmp/jasper-task4-mac-check-final.log`.
+
+
+### Application integration follow-up — 2026-10-26
+
+On macOS aarch64, the application integration extends Java protocol/normalization, actual-paint and retained-owner
+coverage to 42 GTK/Qt/KDE inputs across both kits. The original GTK fixture bytes, frozen authored capture manifest
+and contrast thresholds are unchanged. The full JBR25.0.4.1/Python3.13.15 headless check passes 13,111 JUnit tests
+with zero failures/errors and 30 skips, plus 72 theme-tool tests. A final single-method normalization assertion and
+headless `installDist packageApp verifyPackage` pass; the Mac image omits Linux helpers. Logs are
+`/private/tmp/jasper-qt-app-task4-full-check.log` and `/private/tmp/jasper-qt-app-task4-final-package.log`.
+
+These synthetic Java protocol inputs and child doubles supplement the native evidence above. Updated-source Linux
+full/source verification, refreshed-base confirmation of historical Linux rendering failures, real-helper sampling
+through current Java, Windows/CI, complete Automatic-candidate/dual-preview CPU/RSS/process-churn measurement and
+actual desktop acceptance remain open. The earlier four-helper idle numbers retain their original native scope.
+The optional Fedora source copy remains pending explicit permission after automatic approval review rejected it;
+this application task transferred no source and launched no GUI, AOT training or benchmark.

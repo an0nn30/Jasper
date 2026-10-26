@@ -3,7 +3,6 @@ package dev.jasper.app.plugins;
 import dev.jasper.app.platform.DesktopEnvironment;
 import dev.jasper.app.appearance.*;
 import dev.jasper.app.config.*;
-import dev.jasper.app.platform.DesktopObservation;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.theme.JasperTheme;
 import java.nio.file.*;
@@ -27,24 +26,29 @@ class DesktopEditorSchemeTest {
             kit -> theme -> true, failure -> { throw failure; }).controller());
         var appearance = onEdtValue(() -> new WorkspaceAppearanceFixture(themes.current()));
         var subscription = onEdtValue(() -> themes.subscribe((value, changed) -> appearance.setPair(value)));
+        var fixtures = dev.jasper.app.platform.DesktopRenderFixtures.read();
         try (var editor = new StagedEditorHost(home, true, appearance)) {
             onEdt(() -> {
                 StagedEditorHost.call(editor.editorWindow(), "newUntitled");
                 var area = editor.documentText();
-                var expected = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false).editor();
-                assertThat(background(editor)).isEqualTo(expected.background().getRGB() & 0xffffff);
-                area.setText("int preserved = 1;\n"); area.select(4, 13);
-                var terminal = themes.current().palette();
-                for (boolean dark : new boolean[] { true, false, true }) {
-                    var portal = new DesktopObservation.Portal(3, DesktopObservation.Polarity.LIGHT,
-                        Optional.of(new DesktopObservation.Rgba(.8, .2, .4, 1)), Optional.of(true), "");
-                    var result = DesktopPalette.resolve(dark, DesktopPalette.SourceMode.GTK3, DesktopEnvironment.from(Map.of()), new DesktopObservation(portal, Map.of()));
-                    themes.configure(dark, selection, UiFontConfig.defaults(), result.theme());
+                try {
+                    var expected = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false).editor();
                     assertThat(background(editor)).isEqualTo(expected.background().getRGB() & 0xffffff);
-                    assertThat(area.getForeground()).isEqualTo(expected.foreground());
-                    assertThat(area.getText()).isEqualTo("int preserved = 1;\n");
-                    assertThat(area.getSelectedText()).isEqualTo("preserved");
-                    assertThat(themes.current().palette()).isEqualTo(terminal);
+                    area.setText("int preserved = 1;\n"); area.select(4, 13);
+                    var terminal = themes.current().palette();
+                    for (var fixture : fixtures) {
+                        boolean dark = fixture.dark();
+                        var result = DesktopPalette.resolve(dark, DesktopPalette.SourceMode.AUTO,
+                            DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "KDE")), fixture.input());
+                        themes.configure(dark, selection, UiFontConfig.defaults(), result.theme());
+                        assertThat(background(editor)).isEqualTo(expected.background().getRGB() & 0xffffff);
+                        assertThat(area.getForeground()).isEqualTo(expected.foreground());
+                        assertThat(area.getText()).isEqualTo("int preserved = 1;\n");
+                        assertThat(area.getSelectedText()).isEqualTo("preserved");
+                        assertThat(themes.current().palette()).isEqualTo(terminal);
+                    }
+                } finally {
+                    StagedEditorHost.call(area,"setMarkOccurrences",new Class<?>[]{boolean.class},false);
                 }
             });
             assertThat(editor.problems).isEmpty();
