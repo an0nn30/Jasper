@@ -29,6 +29,9 @@ public record TitleTemplate(List<String> literals, List<String> names) {
         if (literals.size() != names.size() + 1) throw new IllegalArgumentException("A template has one more text than pieces");
     }
 
+    /** Whether {@code name} is a piece name: 1 to 32 lowercase letters, digits and {@code _}, starting with a letter. */
+    public static boolean isName(String name) { return name != null && NAME.matcher(name).matches(); }
+
     /**
      * Reads a template.
      *
@@ -47,7 +50,7 @@ public record TitleTemplate(List<String> literals, List<String> names) {
             int end = text.indexOf('}', i + 1);
             if (end < 0) throw new IllegalArgumentException("The { at character " + (i + 1) + " has no }");
             String name = text.substring(i + 1, end);
-            if (!NAME.matcher(name).matches())
+            if (!isName(name))
                 throw new IllegalArgumentException("{" + name + "} is not a piece name: use up to 32 lowercase letters, digits and _, starting with a letter");
             literals.add(literal.toString());
             literal.setLength(0);

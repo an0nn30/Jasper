@@ -30,6 +30,9 @@ public final class Contributions {
     public TabRegistry tabs() { return tabs; }
     private final QuitGuards quitGuards = new QuitGuards();
     public QuitGuards quitGuards() { return quitGuards; }
+    private final TabNamePieces tabNamePieces = new TabNamePieces();
+    /** The pieces plugins add to Terminal tab names (tab names spec 6). */
+    public TabNamePieces tabNamePieces() { return tabNamePieces; }
 
     /**
      * Which part changed. {@code RAIL} is the rail actions' placement and {@code BADGES} a panel's unread mark, which a
