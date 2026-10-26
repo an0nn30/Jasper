@@ -1,11 +1,13 @@
 # Jasper — Status and Handoff
 
 **Linux package identity — 2026-10-26:** Linux packages use `jasper-workstation`, preserving the Jasper display name,
-`jasper` command, `/opt/jasper` layout and published filenames. Package options invalidate cached artifacts; RPM
-resources and desktop checks follow the new identity. Disposable install checks preserve an existing distro
-`jasper-libs`, which the Fedora equipped-runtime check now installs first. Portable packaging fixtures and shell syntax
-pass; actual RPM/DEB and Fedora coexistence verification remain with the parent task. The scoped documentation update
-also corrects the current getting-started uninstall commands. No SDK change, GUI, AOT, merge or push.
+`jasper` command and published filenames. Package options invalidate cached artifacts; RPM resources and desktop checks
+follow the new identity. Actual RPM/DEB builds exposed that JBR appends the package name beneath `--install-dir`;
+its source confirms the old `/opt/jasper` root cannot be retained through supported options. The approved correction
+uses `--install-dir /opt` and verifies `/opt/jasper-workstation`, updating the live package/command guides and packaged
+README. Disposable install checks preserve existing distro `jasper-libs`, which the Fedora equipped-runtime check now
+installs first. Portable packaging fixtures, four documentation checks and shell syntax pass; actual corrected RPM/DEB
+and Fedora coexistence verification remain with the parent task. No SDK change, GUI, AOT, merge or push.
 
 **Linux distribution packaging — 2026-10-26:** `packageDist` selects only RPM on recognized Fedora/RHEL and SUSE
 families from `os-release`; Debian/Ubuntu and unknown hosts retain both formats. Explicit DEB/RPM tasks and mandatory

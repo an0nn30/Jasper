@@ -6,7 +6,7 @@ set -eu
 package=$1
 runtime=${2:-missing}
 case "$runtime" in missing|equipped) ;; *) echo "Expected missing or equipped runtime mode" >&2; exit 1 ;; esac
-root=/opt/jasper
+root=/opt/jasper-workstation
 identity=jasper-workstation
 distro_jasper=''
 check_distro_jasper() {

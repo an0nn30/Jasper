@@ -104,7 +104,7 @@ or `rpm-work/` under `jasper-app/build/packaging/`) for diagnosis and publishes 
 
 ## Image layout
 
-| Item | macOS (`Jasper.app`) | Windows (`Jasper`) | Linux (`Jasper`, installed as `/opt/jasper`) |
+| Item | macOS (`Jasper.app`) | Windows (`Jasper`) | Linux (`Jasper`, installed as `/opt/jasper-workstation`) |
 |---|---|---|---|
 | Launcher | `Contents/MacOS/Jasper` | `Jasper.exe` | `bin/Jasper`, with `lib/libapplauncher.so` |
 | `jasper-watch` | `Contents/MacOS/jasper-watch` | `jasper-watch.exe` | `bin/jasper-watch` |
@@ -454,9 +454,9 @@ sudo apt-get install fakeroot rpm cpio binutils g++
 ./gradlew :jasper-app:packageDeb    # or packageRpm, for one format only
 ```
 
-Both packages are named `jasper-workstation` and install the image to `/opt/jasper`, with the launcher at `/opt/jasper/bin/Jasper`
-and a desktop menu entry (`/opt/jasper/lib/jasper-workstation-Jasper.desktop`, categories
-`System;TerminalEmulator;Network;RemoteAccess;`, icon `/opt/jasper/lib/Jasper.png`) registered through
+Both packages are named `jasper-workstation` and install the image to `/opt/jasper-workstation`, with the launcher at `/opt/jasper-workstation/bin/Jasper`
+and a desktop menu entry (`/opt/jasper-workstation/lib/jasper-workstation-Jasper.desktop`, categories
+`System;TerminalEmulator;Network;RemoteAccess;`, icon `/opt/jasper-workstation/lib/Jasper.png`) registered through
 `xdg-desktop-menu`. The package description, which is also the menu entry's comment, is "Jasper DevOps workstation" and
 the home page `https://github.com/an0nn30/Jasper`. DEB builds require `fakeroot`, `dpkg-deb` and a Debian-family host
 whose package database resolves the runtime's mandatory shared libraries to Debian packages. The `.rpm` requires,
@@ -466,6 +466,7 @@ RPM lookup asks the build machine's RPM database, which is empty on a Debian-fam
 the task checks its name, version and architecture, unpacks it without installing it, compares every file with the
 verified image byte for byte (jpackage rewrites only `lib/app/.jpackage.xml`), checks the executable bits and the
 desktop entry, and checks the install scripts.
+jpackage appends the package name beneath `--install-dir /opt` to form the installation root.
 
 jpackage's install scripts register the menu entry under `set -e`, and `xdg-desktop-menu` fails unless
 `/usr/share/applications` (or `/usr/local/share/applications`) and `/usr/share/desktop-directories` exist, which would
@@ -660,4 +661,4 @@ cannot mask a packaging problem.
 - [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off; a Remote SSH connection works.
 - [ ] Install the `jasper` command from Settings: `~/.local/bin/jasper --help` lists the plugin commands.
 - [ ] Upgrade to a package with a higher version: settings, Vault data and plugins are kept. Remove the package:
-  `/opt/jasper` and the menu entry are gone, and `~/.config/jasper` remains.
+  `/opt/jasper-workstation` and the menu entry are gone, and `~/.config/jasper` remains.

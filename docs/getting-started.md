@@ -56,7 +56,7 @@ sudo dnf install ./Jasper-<version>-linux-x86_64.rpm                        # Fe
 sudo zypper install --allow-unsigned-rpm ./Jasper-<version>-linux-x86_64.rpm  # openSUSE
 ```
 
-Both packages install Jasper to `/opt/jasper`, with the launcher at `/opt/jasper/bin/Jasper` and an entry in the
+Both packages install Jasper to `/opt/jasper-workstation`, with the launcher at `/opt/jasper-workstation/bin/Jasper` and an entry in the
 desktop menu. The package is named `jasper-workstation`. The packages are unsigned.
 
 ## First launch
@@ -243,7 +243,7 @@ option:
 | Platform | Command |
 | --- | --- |
 | macOS | `/Applications/Jasper.app/Contents/MacOS/Jasper --safe-mode` |
-| Linux | `/opt/jasper/bin/Jasper --safe-mode` |
+| Linux | `/opt/jasper-workstation/bin/Jasper --safe-mode` |
 | Windows | `Jasper.exe --safe-mode`, from Jasper's installation folder or the portable folder |
 
 `--safe-mode` applies only to a Jasper that starts, so quit Jasper completely first: a launch while Jasper runs, in
