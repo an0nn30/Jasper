@@ -1100,9 +1100,11 @@ A tab is named after its active pane:
 In the next paragraph, replace "followed by ` : ` and the name from steps 3 to 5" with "followed by ` : ` and the
 running command with shell integration, else the foreground program, else the shell's name".
 
-`docs/workspace.md`: replace "otherwise the title a program set, the running command, the foreground program or the
-shell's name ([Titles](terminal.md#titles))" with "otherwise the [Tab name](configuration.md#tab-names) pattern
-filled in from that pane ([Titles](terminal.md#titles))".
+`docs/workspace.md`: replace the first line below with the second (written as code so this plan's own links are not checked):
+
+`otherwise the title a program set, the running command, the foreground program or the shell's name ([Titles](terminal.md#titles))`
+
+`otherwise the [Tab name](configuration.md#tab-names) pattern filled in from that pane ([Titles](terminal.md#titles))`
 
 `docs/app-maintenance.md`, `### Header and title bar`: replace "An explicit OSC title replaces the complete automatic
 header and tab title. Automatic tabs show only the running command or shell; renamed tabs keep their names." with "An

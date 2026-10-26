@@ -1088,20 +1088,20 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - `docs/plugin-authoring.md`: in the capabilities table's `terminal.observe` row, add "read a tab's name pieces and add
   your own" to what it allows. In `## Terminals`, after the paragraph on tab titles, add:
 
-  ```markdown
-  A terminal tab's automatic name comes from the user's Tab name pattern ([Tab names](configuration.md#tab-names)).
-  `TabHandle.namePieces()` returns the pieces it is made from that have a value: Jasper's `dir`, `full`, `process` and
-  `title`, and every plugin's. `Terminals.addTabNamePiece(new TabNamePieceSpec("host", "the SSH host this tab is
-  connected to"))` adds a piece users can write as `{host}`; the `TabNamePiece` it returns sets the piece's value per
-  tab with `set(tab, value)`, from any thread. A name is held by one plugin at a time, Jasper's four are reserved, and
-  the piece ends with its handle or its plugin. Both need `terminal.observe`.
-  ```
+```markdown
+A terminal tab's automatic name comes from the user's Tab name pattern ([Tab names](configuration.md#tab-names)).
+`TabHandle.namePieces()` returns the pieces it is made from that have a value: Jasper's `dir`, `full`, `process` and
+`title`, and every plugin's. `Terminals.addTabNamePiece(new TabNamePieceSpec("host", "the SSH host this tab is
+connected to"))` adds a piece users can write as `{host}`; the `TabNamePiece` it returns sets the piece's value per
+tab with `set(tab, value)`, from any thread. A name is held by one plugin at a time, Jasper's four are reserved, and
+the piece ends with its handle or its plugin. Both need `terminal.observe`.
+```
 
 - `docs/sdk-architecture.md`, `## Terminal API`: add one sentence: "Tab name pieces (`TabNamePieceSpec`,
   `TabNamePiece`, `Terminals.addTabNamePiece`, `TabHandle.namePieces`) feed the Tab name pattern; the app keeps plugin
   pieces in `contributions.TabNamePieces`, which windows and Settings read."
-- `docs/remote.md`, `## SSH sessions`: add "An SSH tab's `{host}` [tab name piece](configuration.md#tab-names) is the
-  address of the saved host it opened, such as `db1.example.com`, and stays while the tab shows that host."
+- `docs/remote.md`, `## SSH sessions`: add this sentence (written as code so this plan's own links are not checked):
+  `` An SSH tab's `{host}` [tab name piece](configuration.md#tab-names) is the address of the saved host it opened, such as `db1.example.com`, and stays while the tab shows that host. ``
 - `jasper-sdk/README.md`: add `TabNamePiece` and `TabNamePieceSpec` to the `dev.jasper.sdk.terminal` row.
 - `jasper-sdk-testkit/README.md`: where it lists `FakePluginHost`'s terminal scripting methods, add
   `setTabNamePieces`, `tabNamePieces` and `tabNamePieceSpecs`.
