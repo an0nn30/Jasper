@@ -13,7 +13,7 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 <tr><td>Toolbar items</td><td>{@link Toolbar#add(ToolbarItem)}</td><td></td><td>In the main window's toolbar, after Jasper's Split and Maximize buttons and before Find and Settings</td></tr>
 <tr><td>Status items and progress</td><td>{@link StatusBar#add(StatusItemSpec)}, {@link StatusBar#addProgress(StatusItemSpec)}</td><td></td><td>Either end of the main window's status bar</td></tr>
 <tr><td>Rail buttons</td><td>{@link Rail#add(String)}</td><td></td><td>The left tool window stripe, after the tool window buttons</td></tr>
-<tr><td>Tool windows</td><td>{@link Panels#register(PanelSpec,PanelFactory)}, {@link Panels#toggle(String,WindowHandle)}</td><td></td><td>A stripe button and a tool window in one of six dock slots of the main window; View › Tool Windows</td></tr>
+<tr><td>Tool windows</td><td>{@link Panels#register(PanelSpec,PanelFactory)}, {@link Panels#toggle(String,WindowHandle)}</td><td></td><td>A stripe button and a tool window in one of six dock slots of the main window or in a window of its own; View › Tool Windows</td></tr>
 <tr><td>Dialogs</td><td>{@link Windows#dialog(DialogSpec)}, {@link Windows#overlay(OverlaySpec)}, {@link Windows#popover(UiAnchor)}</td><td></td><td>Dialogs and sheets, in-window overlays, popovers below a control</td></tr>
 <tr><td>Content tabs</td><td>{@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)}</td><td></td><td>A document in a new tab, a new pane beside the focused one or a new child window, beside terminals</td></tr>
 <tr><td>Split items</td><td>{@link Windows#splitItem(SplitItemSpec,BiConsumer)}</td><td></td><td>Every Split list, after the terminal, with two bindable actions</td></tr>
@@ -104,18 +104,25 @@ adds a progress control that {@link StatusProgress#update(StatusProgressState)} 
 two actions.</p>
 
 <h3>Tool windows and the rail</h3>
-<p>A registered panel gets a stripe button in the main window, the only window with tool windows: its icon, or under
+<p>A registered panel gets a stripe button in the main window, the only window with a dock: its icon, or under
 the Enterprise look's labelled stripes a label that starts with the icon and reads its title. Its {@link PanelFactory}
-builds its view on the UI thread the first time the panel shows in the main window, and again after the main window
-closed and opened anew; a toggle from a child window shows it in the main
-window and brings that window to the front. The
-{@link PanelSpec}'s anchor and {@link PanelSpec#withSplit()} pick the default slot (Left Top, Left Bottom, Bottom Left,
-Right Top, Right Bottom or Bottom Right); the user can move it with the header's Options menu, and Jasper remembers where.
+builds its view on the UI thread the first time the panel shows, and again after the main window
+closed and opened anew; a toggle from a child window shows it and brings its window to the front, the main window or the
+panel's own. The {@link PanelSpec}'s anchor and {@link PanelSpec#withSplit()} pick the default slot (Left Top, Left Bottom,
+Bottom Left, Right Top, Right Bottom or Bottom Right); the user can move it with the header's Options menu, and Jasper
+remembers where. The menu's View Mode gives it a window of its own, {@link PanelMode#FLOAT} (above the main window and
+shown only with it) or {@link PanelMode#WINDOW} (an ordinary window), and {@link PanelMode#DOCKED} puts it back; dragging
+its button or header out of the main window gives it a Float window. A panel with a window of its own keeps its stripe
+button and its slot, where it docks again.
 Unless the spec names a toggle action of the plugin's own ({@link PanelSpec#withToggleActionId(String)}), Jasper
 registers {@code <panel id>.toggle}, titled "Toggle <i>title</i>", with no default shortcut, and View › Tool Windows lists
-it. {@link PanelHost} is the panel's place in the main window: {@link PanelHost#show()}, {@link PanelHost#hide()},
-{@link PanelHost#setHeader(PanelHeader)} for a detail, a status dot and icon actions in the header. A factory that throws
-shows "This panel could not be loaded." Under the Enterprise look, whose tool windows are flush, the
+it. {@link PanelHost} is the panel's place: {@link PanelHost#show()}, {@link PanelHost#hide()},
+{@link PanelHost#setHeader(PanelHeader)} for a detail, a status dot and icon actions in the header, and
+{@link PanelHost#placement()}, a {@link PanelPlacement} of the side and half and the mode, which
+{@link PanelHost#onPlacement(Consumer)} reports after each change, once the content is in its new place;
+{@link PanelHost#window()} stays the main window while the panel has a window of its own. A panel that lays itself out
+another way in a window of its own describes the other {@link ViewSpec} and passes it to {@link UiView#update(ViewSpec)}.
+A factory that throws shows "This panel could not be loaded." Under the Enterprise look, whose tool windows are flush, the
 toggle action makes the tool window it shows the active one, which takes the keyboard, and activates a showing tool
 window that is not the active one instead of hiding it; a plugin's own toggle action does this when its handler calls
 {@link Panels#toggle(String,WindowHandle)} or {@link PanelHost#show()} for its panel, and any other call only shows or

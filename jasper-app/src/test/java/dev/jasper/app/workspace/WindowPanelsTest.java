@@ -10,6 +10,7 @@ import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Component;
@@ -401,6 +402,27 @@ class WindowPanelsTest {
             assertThat(owner.dock().visible("dev.x.hosts")).isFalse();
             assertThat(owner.leftStripe().buttons().getFirst().isSelected()).isFalse();
             assertThat(view.getParent()).as("hidden content leaves the tree").isNull();
+        });
+    }
+
+    @Test void aViewModeChoiceReachesTheDockAndTheStripeButtonChecksTheNewMode() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            var view = new JTextField("hosts");
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> view);
+            toggle(model, owner, "dev.x.hosts");
+            ToolWindowHeaderTest.item(owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float").doClick();
+            assertThat(owner.dock().mode("dev.x.hosts")).isEqualTo(ToolWindowMode.FLOAT);
+            assertThat(owner.dock().slot("dev.x.hosts")).as("a detached window keeps its slot").hasValue(Slot.LEFT_TOP);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("it leaves its docked frame").isNull();
+            var menu = owner.leftStripe().buttons().getFirst().getComponentPopupMenu();
+            assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(menu, "Float")).isSelected()).as("its button checks Float").isTrue();
+            ToolWindowHeaderTest.item(menu, "Docked").doClick();
+            assertThat(owner.dock().mode("dev.x.hosts")).isEqualTo(ToolWindowMode.DOCKED);
+            assertThat(owner.area().content(Slot.LEFT_TOP)).as("docked again, it shows in its slot").isSameAs(view);
+            assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(owner.leftStripe().buttons().getFirst().getComponentPopupMenu(), "Docked")).isSelected()).isTrue();
         });
     }
 

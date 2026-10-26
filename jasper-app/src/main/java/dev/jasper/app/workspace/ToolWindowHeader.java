@@ -23,7 +23,7 @@ import javax.swing.JPopupMenu;
 
 /**
  * The header at the top of a tool window's frame, as in IntelliJ's new UI: the title on the left and, on the right,
- * contributed icon actions, an options menu (Move to, Hide), and a collapse chevron. It takes the
+ * contributed icon actions, an options menu (View Mode, Move to, Hide), and a collapse chevron. It takes the
  * tool window background and its non-control area is a drag handle. A flush frame's header is a header strip instead
  * (spec 10.7): its surface shows whether the frame holds the focus, a 1 px rule runs under it, a digits-only detail is
  * parenthesised, and its actions, Hide's minus among them, are small glyphs in one ink. EDT only.
@@ -52,8 +52,9 @@ final class ToolWindowHeader extends JPanel {
             return flush && painter != null ? painter.headerTitle(ThemeZone.theme(this), focused) : super.getForeground();
         }
     };
-    // Module glyphs: "more" is the horizontal ellipsis and "collapse" the down chevron main's panel redesign chose.
-    private final JButton options = button("more", "Options");
+    // Module glyphs: "more.vertical" is the vertical ellipsis, as IntelliJ's tool window options, and "collapse" the down
+    // chevron main's panel redesign chose.
+    private final JButton options = button("more.vertical", "Options");
     private final JButton hide = button("collapse", "Hide");
     private final Supplier<JPopupMenu> menu;
     /** Count or connection name beside the title: the kit panel header's count typography and colour. */
@@ -160,7 +161,7 @@ final class ToolWindowHeader extends JPanel {
             // A header strip's hide glyph is the minus, and its actions are 16 px squares 2 apart (Rulings 14 and 15), each
             // glyph in the strip's glyph box and action ink.
             hide.setIcon(stripGlyph(AppIcons.semantic("remove")));
-            options.setIcon(stripGlyph(AppIcons.semantic("more")));
+            options.setIcon(stripGlyph(AppIcons.semantic("more.vertical")));
             for (JButton button : java.util.List.of(options, hide)) actionSize(button);
             contributed.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING, 2, 0));
             // A box row stretches the actions' row to the strip's height and a flow lays it at the top; a grid bag

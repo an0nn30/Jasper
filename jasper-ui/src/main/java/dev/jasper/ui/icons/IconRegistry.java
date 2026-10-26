@@ -23,7 +23,12 @@ public final class IconRegistry implements AutoCloseable {
     // retain the common optical stroke; custom registrations never enter this catalog.
     private static final Set<String> FINE_PANEL_BUILT_INS = Set.of("add", "search", "edit", "import");
     /** Panel-context overflow dots are drawn two logical pixels across, as every plugin-panel reference header shows. */
-    private static final Set<String> DOT_PANEL_BUILT_INS = Set.of("more");
+    private static final Set<String> DOT_PANEL_BUILT_INS = Set.of("more", "more.vertical");
+    /**
+     * Authored meanings a header strip draws as their vector in the strip's one action ink: the authored art keeps its own
+     * colours, and every action on a strip is in the declared ink (spec 16.1.2). Any other context draws the authored art.
+     */
+    private static final Set<String> STRIP_INK_BUILT_INS = Set.of("more.vertical");
     private final Map<String, Received> encoded = new LinkedHashMap<>();
     private final Map<String, IconArtwork> artworks = new LinkedHashMap<>();
     private record Received(DecodedArtwork artwork, Nodes.Hue tileHue, IdentityArtwork.SelectedInk selectedInk) { }
@@ -199,7 +204,7 @@ public final class IconRegistry implements AutoCloseable {
      */
     public synchronized Icon panel(String name, SemanticPalette palette, Color foreground, int logicalSize) {
         return painted(name, Objects.requireNonNull(foreground), null, logicalSize, logicalSize, false, false, 0,
-            artworks.get(name) == BUILT_INS.get(name), select(name, null, palette, false), false);
+            artworks.get(name) == BUILT_INS.get(name), STRIP_INK_BUILT_INS.contains(name) ? null : select(name, null, palette, false), false);
     }
     /** Explicit semantic text tint for hover, accent fills and status indications. */
     public Icon icon(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
@@ -426,6 +431,8 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("zoom", "M 2 6 V 2 H 6 M 10 2 H 14 V 6 M 14 10 V 14 H 10 M 6 14 H 2 V 10"),
             Map.entry("add", "M 8 3 V 13 M 3 8 H 13"),
             Map.entry("more", "M 3 8 H 3.1 M 8 8 H 8.1 M 13 8 H 13.1"),
+            // The vertical ellipsis: authored art in every context but a header strip's ink (STRIP_INK_BUILT_INS).
+            Map.entry("more.vertical", "M 8 3 V 3.1 M 8 8 V 8.1 M 8 13 V 13.1"),
             Map.entry("menu", "M 3 4 H 13 M 3 8 H 13 M 3 12 H 13"),
             Map.entry("collapse", "M 4 6 L 8 10 L 12 6"),
             Map.entry("chevron.down", "M 4 6 L 8 10 L 12 6"),

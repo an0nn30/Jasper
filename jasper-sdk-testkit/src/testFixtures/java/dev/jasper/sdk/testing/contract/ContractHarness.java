@@ -77,8 +77,8 @@ public interface ContractHarness extends AutoCloseable {
     List<String> panels();
 
     /**
-     * UI thread: invokes the panel's factory as the main window showing it would, or returns the panel built there;
-     * null when no main window is open, there is no such panel or the factory failed.
+     * UI thread: invokes the panel's factory as the main window showing it would, at the panel's placement, or returns
+     * the panel built there; null when no main window is open, there is no such panel or the factory failed.
      */
     javax.swing.JComponent openPanel(String panelId);
 
@@ -92,8 +92,19 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: activates the labelled header action of the open panel as its header would; false when there is none. */
     boolean runPanelHeaderAction(String panelId, String label);
 
-    /** UI thread: discards the open panel as the main window would when it closes or the registration goes away. */
+    /**
+     * UI thread: discards the open panel as the main window would when it closes or the registration goes away; its
+     * placement stays, as the dock keeps it, for the next {@link #openPanel}.
+     */
     void closePanel(String panelId);
+
+    /**
+     * UI thread: moves the panel as the main window would, open or not, to the side, half and mode the placement names.
+     * A different placement is the open panel's {@code PanelHost.placement()} from then on and reaches each
+     * {@code onPlacement} handler once; the same placement changes nothing; a panel that is not open hears nothing and
+     * is built there by the next {@link #openPanel}.
+     */
+    void placePanel(String panelId, dev.jasper.sdk.ui.PanelPlacement placement);
     /**
      * UI thread: the theme slot the host paints a kit view of this runtime from, {@code CHROME} or {@code WORKSPACE}. A view
      * mounted as a workspace content tab ({@code Windows.openTab}) takes {@code WORKSPACE}, as terminals and editors do;

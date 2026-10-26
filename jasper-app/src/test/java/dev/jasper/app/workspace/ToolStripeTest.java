@@ -4,6 +4,7 @@ import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Component;
 import java.awt.Rectangle;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import javax.swing.AbstractAction;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
@@ -112,6 +114,35 @@ class ToolStripeTest {
         assertThat(ToolWindowHeaderTest.item(buttons.get(2).getComponentPopupMenu(), "Hide").isEnabled()).isFalse();
         assertThat(buttons.get(1).getComponentPopupMenu()).as("an action has no window menu").isNull();
         assertThat(events).containsExactly("toggle:a", "Open", "move:a:RIGHT_BOTTOM", "hide:a");
+    }
+
+    @Test void aRightClickMenuChecksTheButtonsModeAndChoosingAnotherSetsIt() {
+        List<String> events = new ArrayList<>();
+        var stripe = new ToolStripe(Side.LEFT);
+        stripe.onMode = (id, mode) -> events.add("mode:" + id + ":" + mode);
+        stripe.render(List.of(new ToolStripe.Button("a", "A", null, Slot.LEFT_TOP, false, Optional.empty(), OptionalInt.empty(), ToolWindowMode.FLOAT),
+            new ToolStripe.Button("b", "B", null, Slot.LEFT_TOP, true)), List.of());
+        var floating = stripe.buttons().get(0).getComponentPopupMenu();
+        assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(floating, "Float")).isSelected()).isTrue();
+        assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(floating, "Docked")).isSelected()).isFalse();
+        ToolWindowHeaderTest.item(floating, "Float").doClick();
+        assertThat(events).as("the current mode does nothing").isEmpty();
+        ToolWindowHeaderTest.item(floating, "Docked").doClick();
+        ToolWindowHeaderTest.item(floating, "Window").doClick();
+        assertThat(events).containsExactly("mode:a:DOCKED", "mode:a:WINDOW");
+        assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(stripe.buttons().get(1).getComponentPopupMenu(), "Docked")).isSelected())
+            .as("a button built without a mode is docked").isTrue();
+    }
+
+    @Test void aBadgeChangeKeepsTheButtonsMode() {
+        var stripe = new ToolStripe(Side.LEFT);
+        stripe.render(List.of(new ToolStripe.Button("a", "A", null, Slot.LEFT_TOP, false, Optional.empty(), OptionalInt.empty(), ToolWindowMode.WINDOW)), List.of());
+        stripe.updateBadge("a", Optional.of(new PanelBadge(1, PanelBadge.Tone.ACCENT, "1 new item")));
+        assertThat(stripe.window("a")).hasValueSatisfying(window -> {
+            assertThat(window.badge()).as("the badge changed").isPresent();
+            assertThat(window.mode()).as("the mode is kept").isEqualTo(ToolWindowMode.WINDOW);
+        });
+        assertThat(stripe.window("x")).as("a window this stripe does not show").isEmpty();
     }
 
     @Test void theStripeLaysOutItsButtonsFromItsWidth() {

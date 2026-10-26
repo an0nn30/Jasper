@@ -389,14 +389,16 @@ built-in names and the artwork rules.
 
 ## Tool windows
 
-A tool window is a view of the plugin's docked in the main window, the only window with tool windows, as in IntelliJ.
-Register it once with `context.panels().register(new PanelSpec(id, title, icon, Anchor.LEFT), factory)`. Jasper asks
-the factory for it on the UI thread the first time the tool window is shown (a toggle from a child window shows it in
-the main window), and again after the main window closed and opened anew; the factory returns a view made
+A tool window is a view of the plugin's in the main window's dock or, when the user gives it one (View Mode › Float or
+Window), in a window of its own, as in IntelliJ; a child window has none. Register it once with
+`context.panels().register(new PanelSpec(id, title, icon, Anchor.LEFT), factory)`. Jasper asks
+the factory for it on the UI thread the first time the tool window is shown (a toggle from a child window shows it),
+and again after the main window closed and opened anew; the factory returns a view made
 with the plugin's kit, and one that throws shows "This panel could not be loaded." Jasper adds:
 
 - a stripe button, the spec's icon (under the Enterprise look a label that starts with the icon and reads the title),
-  and a header with the title, an **Options** menu (**Move to** one of six places, **Hide**) and a **Hide** button;
+  and a header with the title, an **Options** menu (**View Mode**: Docked, Float or Window; **Move to** one of six
+  places; **Hide**) and a **Hide** button;
 - the action `<panel id>.toggle`, "Toggle *title*", with no default shortcut, listed in View › Tool Windows (the Window
   menu under the Enterprise look) and the palette. To give the toggle a shortcut, register an action of your own that
   calls `context.panels().toggle(id, invoked.window())`, register it before the tool window, and name it with
@@ -422,19 +424,16 @@ keyboard does not move into it.
 <!-- example:pluginpanels -->
 ```java
 private static void installPanelAndAboutTab(PluginContext context, long stepMillis) {
-    // Built the first time the panel shows in the main window, the only window with tool windows. Its body is the kit's empty state:
-    // a tile, a title, one sentence and one secondary action, centered in the panel.
-    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host ->
-        context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
-            new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
-            Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
-                new Nodes.Icon("sample.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"),
-                "Sample Activity", "Runs a short demo activity in the background.",
-                List.of(new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run Sample Activity", "", Nodes.ButtonKind.SECONDARY, RUN_BUTTON, ""))),
-            Optional.empty())), event -> {
-                if (event instanceof UiEvent.Action action && action.id().equals(RUN_BUTTON))
-                    context.background().execute(() -> demo(context, stepMillis));
-            }));
+    // Built the first time the panel shows, docked in the main window or in a window of its own, as the user chooses.
+    // The view starts with the body for where the panel is now; a move to or from a window of its own describes the other.
+    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host -> {
+        UiView view = context.kit().create(panelBody(host.placement().ownWindow()), event -> {
+            if (event instanceof UiEvent.Action action && action.id().equals(RUN_BUTTON))
+                context.background().execute(() -> demo(context, stepMillis));
+        });
+        host.onPlacement(placement -> view.update(panelBody(placement.ownWindow())));
+        return view;
+    });
 
     ContentTab[] about = {null};
     // A tab in the given window, which Jasper draws with its strip; an open About is selected again.
@@ -471,21 +470,40 @@ private static void installPanelAndAboutTab(PluginContext context, long stepMill
     });
     context.rail().add("dev.jasper.sample.about");
 }
+
+/** The kit's empty state: a tile, a title, one sentence and one secondary action, centered in the panel. */
+private static ViewSpec panelBody(boolean ownWindow) {
+    String sentence = ownWindow ? "This tool window has a window of its own. It runs a short demo activity in the background."
+        : "Runs a short demo activity in the background.";
+    return new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
+        new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+        Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
+            new Nodes.Icon("sample.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"),
+            "Sample Activity", sentence,
+            List.of(new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run Sample Activity", "", Nodes.ButtonKind.SECONDARY, RUN_BUTTON, ""))),
+        Optional.empty()));
+}
 ```
 
 - Share your own model between instances; never share views or components.
-- [`PanelHost`](sdk-reference.html#dev.jasper.sdk.ui.PanelHost) is the tool window's place in the main window: `window()`,
-  `show()`, `hide()`, `visible()`, `onVisibility(...)`, the moment to start or stop refreshing, and `onClosed(...)`,
-  when the window closes or the tool window is removed. A drag reaches `onVisibility` only when it shows a hidden tool
-  window or hides one to make room in its new place.
+- [`PanelHost`](sdk-reference.html#dev.jasper.sdk.ui.PanelHost) is the tool window's place: `window()`, the main window
+  even while the tool window has a window of its own, `show()`, `hide()`, `visible()`, `onVisibility(...)`, the moment to
+  start or stop refreshing, and `onClosed(...)`, when the window closes or the tool window is removed.
+- `host.placement()` is a [`PanelPlacement`](sdk-reference.html#dev.jasper.sdk.ui.PanelPlacement): the side and half
+  (`anchor`, `split`; its stripe button's while it has a window of its own) and the
+  [`PanelMode`](sdk-reference.html#dev.jasper.sdk.ui.PanelMode), `DOCKED`, `FLOAT` or `WINDOW`; `ownWindow()` is true
+  for the last two. A factory reads it, since one restored in a window of its own is built there. `host.onPlacement(...)`
+  runs after each move to another side or half or to another mode, once the content is in its new place, and not for
+  visibility alone or a move within its half. A tool window that lays itself out another way in a window of its own
+  describes the other `ViewSpec` and passes it to `UiView.update`, as the Sample does: the kit keeps each control by id.
 - `host.setHeader(new PanelHeader(detail, active, actions))`, from the factory or when the model changes, adds a detail
   (a count, passed as digits, or a connection name), a status dot while `active`, and icon-only
   [`PanelHeader.Action`](sdk-reference.html#dev.jasper.sdk.ui.PanelHeader.Action)s, each with a label for its tooltip
   and accessible name, before Options and Hide. The header survives hiding and moving; callbacks stop when the
   instance closes; `PanelHeader.EMPTY` clears it. A kit `Panel` view's own header row joins the tool window's header;
   do not add a second action row inside the tool window.
-- `context.panels().toggle(id, window)` opens or hides one of the plugin's tool windows in the main window, creating
-  it the first time; a child window's toggle opens it and brings the main window to the front.
+- `context.panels().toggle(id, window)` opens or hides one of the plugin's tool windows, creating it the first time; a
+  child window's toggle opens it and brings its window to the front, the main window or the tool window's own.
 - `panelAnchor(context)` picks the Sample's starting side from the look Jasper runs with
   ([adapting to the look](#adapting-to-the-look)).
 
@@ -1376,7 +1394,7 @@ try (var host = new FakePluginHost()) {
 | Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView` (an event a standard row handles there calls `pendingChanged()`), `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel`; `setKitDefault(id, key, value)` (a look's default, before any plugin starts) and `lookDefaultProblems(id)` |
 | The look and the terminal font | `setPresentation(presentation)` before any plugin starts, with `FakePresentations.STANDARD` (what the fake reports until told otherwise) or `CLASSIC`; `presentation()`; `setTerminalTypography(value)`, delivered by `flush()` |
 | Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `status()`, `progress()`, `rail()` |
-| Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the main window), `panelView`, `panelHeader`, `closePanel`; `windows()` (the open dialogs and overlays), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
+| Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the main window), `panelView`, `panelHeader`, `placePanel` (moves the tool window as a drag would, to a `PanelPlacement`; one that is not open is built there), `closePanel`; `windows()` (the open dialogs and overlays), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
 | Terminals | `addTerminalWindow()` (the first one added while no main window is open is the main window), `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`, `moveTab`, `closeTab`, `windowTabs(windowId)` (a window's tabs, each its items pane by pane), `focusTerminalPane`, `closeTerminalPane`, `holdPane` (a local pane that waits, `NOT_STARTED`, until its tab is shown), `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |

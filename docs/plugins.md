@@ -27,8 +27,8 @@ Shortcuts below are given as macOS / Linux and Windows.
   item beside themselves, can be offered in the Split menus, and can come back when Jasper restores its windows.
 - Background activities, shown on [Desk Buddy](notifications.md#desk-buddy) while they run and posted in the plugin's
   "*name* activities" notification group when they succeed or fail.
-- Tool windows in the main window, each with a toggle in View › Tool Windows (in the Window menu under the Enterprise
-  look).
+- Tool windows, docked in the main window or in a window of their own, each with a toggle in View › Tool Windows (in
+  the Window menu under the Enterprise look).
 - Command palette scopes, and places in Jasper's file chooser.
 - Terminal sessions of its own, such as SSH, which can come back when Jasper restores its windows, and variables in
   the environment of new shells.

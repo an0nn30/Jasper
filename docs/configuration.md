@@ -610,6 +610,7 @@ next one's, a resident Jasper's included. The windows themselves are in [`worksp
 | `[dock]` `left_width`, `right_width`, `bottom_height` | The dock areas' sizes, in unscaled pixels |
 | `[dock]` `left_ratio`, `right_ratio`, `bottom_ratio` | How each area divides between its two slots |
 | `[panels."<id>"]` `slot`, `order`, `visible` | A tool window's slot (`LEFT_TOP`, `LEFT_BOTTOM`, `BOTTOM_LEFT`, `RIGHT_TOP`, `RIGHT_BOTTOM` or `BOTTOM_RIGHT`), its place on the stripe, and whether it showed |
+| `[panels."<id>"]` `mode`, `window` | `"float"` or `"window"` for a tool window with a window of its own (a docked one has no `mode`; the `slot` of one with a window is where its button sits and where it docks back), and that window's bounds, `{ x, y, width, height }` in screen coordinates, kept after the tool window docks again ([Float and Window](workspace.md#float-and-window)) |
 | `[look."<plugin id>".dock]`, `[look."<plugin id>".panels."<id>"]` | The same for a plugin's look, such as Enterprise, which keeps a layout of its own |
 | `[windows."<id>"]` `x`, `y`, `width`, `height` | Where Settings (`app.settings`), the file chooser (`file-chooser`), About (`jasper.about`), Licenses (`jasper.licenses`) and a plugin's window-sized dialog, under its plugin id and title, such as the Credential Vault manager (`dev.jasper.vault\|Credential Vault`), were |
 | `[palette]` `center_x`, `top` | Where the palette card was dragged, as fractions of the window |

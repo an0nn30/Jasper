@@ -33,7 +33,7 @@ class DockDropModelTest {
         assertThat(state.ids(Slot.BOTTOM_RIGHT)).containsExactly("b", "c", "a");
         assertThat(state.active(Slot.BOTTOM_RIGHT)).hasValue("a");
         assertThat(state.ids(Slot.BOTTOM_RIGHT)).as("the hidden window stays on the stripe").contains("b");
-        assertThat(changes).containsExactly(new DockState.Change(true, true, List.of("b"), List.of("a")));
+        assertThat(changes).containsExactly(new DockState.Change(true, true, List.of("b"), List.of("a"), List.of("a")));
     }
 
     @Test void moveAndShowOfAShowingWindowIsAMoveForThePlugins() {
@@ -44,7 +44,7 @@ class DockDropModelTest {
         assertThat(state.ids(Slot.RIGHT_TOP)).containsExactly("a", "b");
         assertThat(state.active(Slot.RIGHT_TOP)).hasValue("a");
         assertThat(state.active(Slot.LEFT_TOP)).isEmpty();
-        assertThat(changes).as("a stays visible: no shown entry").containsExactly(new DockState.Change(true, true, List.of("b"), List.of()));
+        assertThat(changes).as("a stays visible: no shown entry").containsExactly(new DockState.Change(true, true, List.of("b"), List.of(), List.of("a")));
     }
 
     @Test void moveAndShowWhereTheWindowAlreadyShowsChangesNothing() {

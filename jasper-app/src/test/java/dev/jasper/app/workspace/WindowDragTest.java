@@ -570,35 +570,46 @@ class WindowDragTest {
         });
     }
 
+    /**
+     * A badge change reaches every window's stripes and cancels no dock drag, in the window whose panel changed or in the
+     * other. One drag runs at a time, as one pointer allows: a press in another window while one runs is that drag's lost
+     * release (floating tool windows plan 2's final review).
+     */
     @Test void aBadgeChangeDoesNotCancelADragInAnyWindow() throws Exception {
         edt(() -> {
             var first = new Fixture();
             var second = new Fixture(first);
             first.layout();
             second.layout();
-            AbstractButton inFirst = first.button("Files"), inSecond = second.button("Sessions");
+            AbstractButton inFirst = first.button("Files");
             first.drag(inFirst, first.zone(Slot.BOTTOM_RIGHT));
-            second.drag(inSecond, second.zone(Slot.BOTTOM_RIGHT));
             assertThat(first.owner.dockDrag().active()).isTrue();
-            assertThat(second.owner.dockDrag().active()).isTrue();
 
             first.files.setBadge(Optional.of(new PanelBadge(3, PanelBadge.Tone.ACCENT, "3 unread notifications")));
             second.sessions.setBadge(Optional.of(new PanelBadge(1, PanelBadge.Tone.ERROR, "1 unread notification, 1 error")));
 
-            assertThat(first.owner.dockDrag().active()).as("the window that heard the change").isTrue();
-            assertThat(second.owner.dockDrag().active()).as("and the other window").isTrue();
+            assertThat(first.owner.dockDrag().active()).as("a change to the dragged panel and to another").isTrue();
             assertThat(first.owner.leftStripe().buttons()).contains(inFirst);
-            assertThat(second.owner.leftStripe().buttons()).contains(inSecond);
             assertThat(inFirst.getWidth()).isZero();
-            assertThat(inSecond.getWidth()).isZero();
             assertThat(second.button("Files (3 unread notifications)").getIcon()).as("every window's stripes show it")
                 .isInstanceOf(BadgedIcon.class);
             assertThat(first.button("Sessions (1 unread notification, 1 error)").getIcon()).isInstanceOf(BadgedIcon.class);
             first.mouse(inFirst, MouseEvent.MOUSE_RELEASED, first.zone(Slot.BOTTOM_RIGHT));
-            second.mouse(inSecond, MouseEvent.MOUSE_RELEASED, second.zone(Slot.BOTTOM_RIGHT));
             first.layout();
-            second.layout();
             assertThat(first.owner.dock().slot("dev.x.files")).hasValue(Slot.BOTTOM_RIGHT);
+
+            AbstractButton inSecond = second.button("Sessions (1 unread notification, 1 error)");
+            second.drag(inSecond, second.zone(Slot.BOTTOM_RIGHT));
+            assertThat(second.owner.dockDrag().active()).isTrue();
+
+            first.files.setBadge(Optional.of(new PanelBadge(4, PanelBadge.Tone.ACCENT, "4 unread notifications")));
+            second.sessions.setBadge(Optional.of(new PanelBadge(2, PanelBadge.Tone.ERROR, "2 unread notifications, 1 error")));
+
+            assertThat(second.owner.dockDrag().active()).as("in the other window too").isTrue();
+            assertThat(second.owner.leftStripe().buttons()).contains(inSecond);
+            assertThat(inSecond.getWidth()).isZero();
+            second.mouse(inSecond, MouseEvent.MOUSE_RELEASED, second.zone(Slot.BOTTOM_RIGHT));
+            second.layout();
             assertThat(second.owner.dock().slot("dev.x.sessions")).hasValue(Slot.BOTTOM_RIGHT);
         });
     }
