@@ -1,5 +1,10 @@
 # Wide Tool Window Layouts Implementation Plan
 
+> **Status (2026-10-26):** Tasks 1–5 done as written. Deviation: the first full check found the theme migration ledger
+> (`docs/design/theme-engine/migration.csv`) needs a row per new test file, and the staged-panel fixture
+> (`PanelSurfaceFixture`) turned out to reach a real `PanelSite` placement headlessly, so Task 6 (real-host renders of
+> the wide layouts, and the ledger rows) was added before the full check, which became Task 7.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remote's Sessions, SFTP and Tunnels tool windows and File Server's File Servers tool window take a wide layout in a window of their own or docked at the bottom, and their docked layout elsewhere.
@@ -281,7 +286,37 @@ git add plugins/remote/src/main/resources/plugin.toml plugins/fileserver/src/mai
 git commit -m "Remote 0.17.0, File Server 0.7.0: wide tool window layouts, documented"
 ```
 
-### Task 6: Full check
+### Task 6: Real-host renders of the wide layouts, and the ledger rows
+
+**Files:**
+- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/PanelSurfaceFixture.java` (a placement the test can change)
+- Create: `jasper-app/src/test/java/dev/jasper/app/plugins/WideLayoutRenderTest.java`
+- Modify: `docs/design/theme-engine/migration.csv` (rows for the five new plugin test files and the new render test)
+
+**Interfaces:**
+- Produces: `PanelSurfaceFixture.place(PanelSite.Placement placement)`: the site's placement supplier returns it from then on and `site.notifyPlacement(placement)` runs on the EDT, followed by `StagedVaultHost.settle()`.
+
+- [ ] **Step 1: Write the test**
+
+`WideLayoutRenderTest`, one test per tool window (Sessions with two hosts and one selected; SFTP with a page of a folder and two files shown through the fixture's `sftp(...)`; Tunnels with two tunnels, one up; File Servers with two servers), each under the default look (as `PanelSurfacePreview` builds its fixture) and under Enterprise (as `ClassicCompositionRenderTest.under` does): after `place(new Placement(<its slot>, ToolWindowMode.FLOAT))` and `size(760, 460)`, the list and detail column components (`<prefix>.list`, `<prefix>.detail`; for SFTP the `sftp.files` table's four column headers) are showing with positive widths and the list column is the narrower; the render saved as `jasper-app/build/wide-layouts/<look>/<panel>.png` is not a single colour; after `place(<its slot>, DOCKED)` the split's `<prefix>.columns` component is gone or not showing. Timeouts as `ClassicCompositionRenderTest`'s.
+
+- [ ] **Step 2: Add the ledger rows**
+
+Run: `./gradlew :jasper-app:test --tests '*ThemeMigrationCoverageTest'` first to see the missing paths, then add one row each, in the shape of the existing test-only rows (`…,dev.jasper.remote,<Class>,nonvisual-helper,none,none,<path>,Test/fixture ownership; New in wide tool window layouts plan Task <n>`).
+
+- [ ] **Step 3: Run**
+
+Run: `./gradlew :jasper-app:test --tests '*WideLayoutRenderTest' --tests '*ThemeMigrationCoverageTest' --tests '*ClassicCompositionRenderTest'`
+Expected: PASS; eight PNGs under `jasper-app/build/wide-layouts/`.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add jasper-app/src/test docs/design/theme-engine/migration.csv
+git commit -m "Tests: real-host renders of the wide tool window layouts; the migration ledger lists the new tests"
+```
+
+### Task 7: Full check
 
 - [ ] **Step 1:** Run `./gradlew check` in the background (about 8 minutes); expected BUILD SUCCESSFUL. Read the test counts from `*/build/test-results/test/*.xml`.
 - [ ] **Step 2:** Run the source hygiene script from AGENTS.md over the changed Java files; expected no output.
