@@ -4,11 +4,11 @@ import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.WindowHandle;
 import java.util.function.Consumer;
 
-/** The panel's place in the main window. All methods are UI-thread only. */
+/** The panel's place: in the main window's dock or in a window of its own. All methods are UI-thread only. */
 public interface PanelHost {
     /**
      * The main window, which holds the panel; the main window also while the panel has a window of its own
-     * ({@link PanelPlacement#ownWindow()}), which it owns.
+     * ({@link PanelPlacement#ownWindow()}).
      *
      * @return the window
      */

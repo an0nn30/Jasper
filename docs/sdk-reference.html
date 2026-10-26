@@ -6352,7 +6352,7 @@ menu, or the context menu of a list, table, row or crumb.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.OverlaySpec"><code>OverlaySpec</code></a></td><td><span class="kind kind-record">record</span></td><td>Centered, non-movable progress content inside a Jasper window; no native window is created.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.PanelFactory"><code>PanelFactory</code></a></td><td><span class="kind kind-interface">functional interface</span></td><td>Builds a panel's content, in the main window.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.PanelHeader"><code>PanelHeader</code></a></td><td><span class="kind kind-record">record</span></td><td>A panel's header metadata.</td></tr>
-<tr><td><a href="#dev.jasper.sdk.ui.PanelHost"><code>PanelHost</code></a></td><td><span class="kind kind-interface">interface</span></td><td>The panel's place in the main window.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.ui.PanelHost"><code>PanelHost</code></a></td><td><span class="kind kind-interface">interface</span></td><td>The panel's place: in the main window's dock or in a window of its own.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.PanelMode"><code>PanelMode</code></a></td><td><span class="kind kind-enum">enum</span></td><td>Where a tool window is: docked in the main window's dock, or in a window of its own.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.PanelPlacement"><code>PanelPlacement</code></a></td><td><span class="kind kind-record">record</span></td><td>A tool window's place: its side and half, and its mode.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.PanelSpec"><code>PanelSpec</code></a></td><td><span class="kind kind-record">record</span></td><td>A panel as the stripes show it: an icon on a tool window stripe (under a classic look a labelled button starting
@@ -9047,12 +9047,12 @@ error placeholder instead of breaking the window.</p></div>
 <article class="type" id="dev.jasper.sdk.ui.PanelHost">
 <header class="type-head"><span class="kind kind-interface">interface</span><h4><a class="self" href="#dev.jasper.sdk.ui.PanelHost">PanelHost</a></h4><span class="pkg">dev.jasper.sdk.ui</span></header>
 <pre class="sig"><code><span class="kw">interface</span> <b>PanelHost</b></code></pre>
-<div class="doc"><p>The panel's place in the main window. All methods are UI-thread only.</p></div>
+<div class="doc"><p>The panel's place: in the main window's dock or in a window of its own. All methods are UI-thread only.</p></div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.sdk.ui.PanelHost.window()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.PanelHost.window()" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.terminal.WindowHandle">WindowHandle</a> <b>window</b>()</code></pre>
 <div class="doc"><p>The main window, which holds the panel; the main window also while the panel has a window of its own
-(<a href="#dev.jasper.sdk.ui.PanelPlacement.ownWindow()"><code>PanelPlacement.ownWindow()</code></a>), which it owns.</p></div>
+(<a href="#dev.jasper.sdk.ui.PanelPlacement.ownWindow()"><code>PanelPlacement.ownWindow()</code></a>).</p></div>
 <dl class="tags"><dt>Returns</dt><dd>the window</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.PanelHost.setHeader(PanelHeader)">

@@ -458,14 +458,15 @@ final class WindowContributions implements AutoCloseable {
         if (panel == null || panel.component != null) return;
         panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id),
             header -> owner.area().setHeader(id, header), () -> placement(panel));
-        // The factory reads where the panel is: the change that builds it has nothing more to tell it.
-        panel.placed = placement(panel);
         JComponent built = null;
         try { built = panel.entry.factory().apply(panel.site); }
         catch (RuntimeException failure) {
             // A plugin's adapter turns its own failures into null, so an exception reaching here came from no adapter.
             LOG.log(System.Logger.Level.WARNING, "The panel " + id + " could not be built; showing a placeholder.", failure);
         }
+        // Its place once the factory returned is what it last read: the change that builds it has nothing more to tell it,
+        // and a move made while the factory ran leaves no stale baseline.
+        panel.placed = placement(panel);
         if (built == null) panel.site.setHeader(dev.jasper.app.contributions.PanelHeaderState.EMPTY);
         panel.component = built != null ? built : new JLabel("This panel could not be loaded.", SwingConstants.CENTER);
         if (built == null) dev.jasper.ui.swing.NativeStyles.installed().label((JLabel) panel.component, dev.jasper.ui.metrics.Typography.Role.LABEL,

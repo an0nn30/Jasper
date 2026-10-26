@@ -134,6 +134,29 @@ class PanelPlacementNotificationsTest {
         });
     }
 
+    /**
+     * Fix round 1: the place a panel is in once its factory returns is the baseline, so a move made while the factory ran,
+     * then a move back to where the factory started, is told.
+     */
+    @Test void aMoveWhileTheFactoryRunsLeavesNoStaleBaseline() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture();
+            var heard = new ArrayList<String>();
+            fixture.model.addPanel(B, "Beta", new ImageIcon(), Slot.LEFT_BOTTOM, site -> {
+                fixture.owner.dock().move(B, Slot.RIGHT_TOP, 0);
+                site.onPlacement(placement -> heard.add(placement.slot() + " " + placement.mode()));
+                return new JLabel("Beta");
+            });
+            fixture.relayout();
+            fixture.toggle(B);
+            assertThat(fixture.owner.dock().slot(B)).hasValue(Slot.RIGHT_TOP);
+            assertThat(heard).as("nothing before the factory returned, and nothing for its own move").isEmpty();
+
+            fixture.owner.dock().move(B, Slot.LEFT_BOTTOM, 0);
+            assertThat(heard).containsExactly("LEFT_BOTTOM DOCKED");
+        });
+    }
+
     /** Review focus 2: Move to another slot tells the panel once; reordering within its slot tells it nothing. */
     @Test void movingToAnotherSlotNotifiesOnce() throws Exception {
         edt(() -> {
