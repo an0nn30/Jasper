@@ -59,7 +59,9 @@ Window. Dock Unpinned and Undock (sliding) are not added.
   220 px thumbnail is a nicety not worth a second drag-image mechanism).
 - Palette actions or shortcuts for view modes; alpha (fade) for inactive floating windows (Jasper has no animations).
 - Bundled panels adopting the new placement API with alternate layouts (Sessions, SFTP, Tunnels, File Servers): a
-  follow-up per plugin. The Sample plugin and the plugin-authoring example demonstrate it.
+  follow-up per plugin. The Sample plugin and the plugin-authoring example demonstrate it. (Done on 2026-10-26: the
+  [wide tool window layouts design](2026-10-26-jasper-wide-tool-window-layouts-design.md) and its
+  [plan](../plans/2026-10-26-wide-tool-window-layouts.md).)
 
 ## Design
 

@@ -1,5 +1,7 @@
 package dev.jasper.remote.workstation;
 
+import dev.jasper.sdk.ui.Anchor;
+import dev.jasper.sdk.ui.PanelPlacement;
 import dev.jasper.sdk.ui.Presentation;
 
 /**
@@ -20,5 +22,17 @@ public enum Layout {
      */
     public static Layout of(Presentation presentation) {
         return presentation.classic() ? CLASSIC : ROWS;
+    }
+
+    /**
+     * Whether a tool window takes its wide layout. It does in a window of its own and docked at the bottom, where
+     * IntelliJ's Services tool window also puts an item's details beside its list; on the left or right it keeps its
+     * docked layout.
+     *
+     * @param placement where the tool window is now
+     * @return true in a window of its own (Float or Window) and docked at the bottom, else false
+     */
+    public static boolean wide(PanelPlacement placement) {
+        return placement.ownWindow() || placement.anchor() == Anchor.BOTTOM;
     }
 }

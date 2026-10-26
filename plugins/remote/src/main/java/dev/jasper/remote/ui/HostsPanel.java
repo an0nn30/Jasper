@@ -45,6 +45,10 @@ import java.util.function.ToIntFunction;
  * <p>Under {@link Layout#CLASSIC} (Enterprise presentation spec 14.4) the same rows are a Name, Host and Port column tree,
  * whose disclosure collapses a group, over the selected row's Properties and Edit… and Connect; the header detail is the
  * count.
+ *
+ * <p>In a window of its own or docked at the bottom ({@link #wide(boolean)}) the panel lays its list beside the selected
+ * row's detail: under {@link Layout#ROWS} the host's or distribution's fields and its actions, under
+ * {@link Layout#CLASSIC} the tree beside its Properties. With nothing listed the wide layout is the docked one.
  */
 public final class HostsPanel implements AutoCloseable {
     public record Actions(Consumer<RemoteHost> connect, Consumer<RemoteHost> connectSplit, Consumer<Optional<RemoteHost>> edit, Consumer<RemoteHost> duplicate,
@@ -54,6 +58,10 @@ public final class HostsPanel implements AutoCloseable {
         FOOTER = "sessions.footer", HINT = "sessions.hint", CARD = "card", CARD_TILE = "card.tile", CARD_NAME = "card.name",
         CARD_ADDRESS = "card.address", CARD_INFO = "card.info", CARD_JUMP = "card.jump", CARD_CREDENTIAL = "card.credential",
         CARD_CONNECTED = "card.connected", CARD_LOCKED = "card.locked", EDIT = "card.edit", CONNECT = "card.connect", ACTIVATE = "activate";
+    /** The wide layout's nodes: the split, its list and detail columns, and the detail's content, fields and actions. */
+    public static final String COLUMNS = "sessions.columns", LIST_COLUMN = "sessions.list", DETAIL_COLUMN = "sessions.detail",
+        DETAIL_CONTENT = "sessions.detail.content", DETAIL_EMPTY = "sessions.detail.empty", DETAIL_FIELDS = "sessions.detail.fields",
+        DETAIL_ACTIONS = "sessions.detail.actions", SPLIT_BUTTON = "sessions.detail.split", BROWSE_BUTTON = "sessions.detail.browse";
     /** Star actions are this prefix and the host's id; menu actions are {@code menu:<verb>:<row id>}. */
     static final String FAVORITE = "favorite:", MENU = "menu:";
     private static final String WSL_GROUP = "group.wsl", ERROR = "error";
@@ -83,6 +91,8 @@ public final class HostsPanel implements AutoCloseable {
     private Consumer<PanelHeader> headerChanged;
     private int headerCount = -1;
     private boolean closed;
+    /** Whether the panel is asked for its wide layout (a window of its own, or docked at the bottom). */
+    private boolean wide;
     private final LongSupplier clock;
     private final long multiClickNanos;
     private String lastStar;
@@ -138,6 +148,20 @@ public final class HostsPanel implements AutoCloseable {
 
     /** Focus an explicit opening in a visible window; a panel that is not showing yet keeps focus where it is. */
     public void focusWhenOpened() { if (!closed) view.focus(ROWS); }
+
+    /**
+     * Asks for the wide layout, the list beside the selected row's detail, or the docked one. Nothing changes while the
+     * value is the same or after {@link #close()}. With no host and no distribution listed the panel keeps its docked
+     * composition, whose empty state fills the window.
+     */
+    public void wide(boolean value) {
+        if (closed || value == wide) return;
+        wide = value;
+        render();
+    }
+
+    /** Whether the wide layout is asked for, as {@link #wide(boolean)} last set it. */
+    public boolean wide() { return wide; }
 
     public void setDefaultGroup(String name) { defaultGroup = name; rebuild(); }
     public void onRenameDefaultGroup(Runnable rename) { renameDefaultGroup = rename; }
@@ -328,26 +352,44 @@ public final class HostsPanel implements AutoCloseable {
 
     private static ControlState state(boolean visible) { return new ControlState(visible, true, false, ""); }
 
-    private Nodes.Panel node() { return layout == Layout.CLASSIC ? classicNode() : rowsNode(); }
+    private Nodes.Panel node() {
+        // With nothing listed the wide layout is the docked one, whose empty state fills the window.
+        boolean columns = wide && !(hosts.isEmpty() && distros.isEmpty());
+        if (layout == Layout.CLASSIC) return columns ? classicWideNode() : classicNode();
+        return columns ? rowsWideNode() : rowsNode();
+    }
 
-    private Nodes.Panel rowsNode() {
-        var header = new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.of(hosts.size() + distros.size()), Optional.empty(), Optional.empty(), List.of());
-        var search = new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Search sessions", "Search sessions", "");
+    private Nodes.Header rowsHeader() {
+        return new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.of(hosts.size() + distros.size()), Optional.empty(), Optional.empty(), List.of());
+    }
+
+    private Nodes.Field rowsSearch() {
+        return new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Search sessions", "Search sessions", "");
+    }
+
+    private Nodes.ItemList rowsList() {
         var items = rows.stream().map(this::item).toList();
-        var list = new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.SINGLE, items,
+        return new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.SINGLE, items,
             selectedRow == null ? Set.of() : Set.of(selectedRow), ACTIVATE, List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(), "", "");
-        var footer = new ArrayList<Nodes.Node>();
+    }
+
+    /** What the list says when it has no row to show, the same in every composition. */
+    private Optional<Nodes.Text> hint() {
         boolean searching = !query.strip().isEmpty();
         // With a WSL group shown, the hint sits under it and speaks of SSH hosts only; without WSL the panel holds hosts alone.
-        if (hosts.isEmpty() || (searching && rows.size() == (error.isPresent() ? 1 : 0))) {
-            String hint = hosts.isEmpty() ? (distros.isEmpty() ? "No hosts yet" : "No SSH hosts yet") + " — Add or Import from ~/.ssh/config"
-                : distros.isEmpty() ? "No hosts match" : "No sessions match";
-            footer.add(new Nodes.Text(HINT, ControlState.READY, hint, Nodes.TextRole.DESCRIPTION));
-        }
+        if (!(hosts.isEmpty() || (searching && rows.size() == (error.isPresent() ? 1 : 0)))) return Optional.empty();
+        String hint = hosts.isEmpty() ? (distros.isEmpty() ? "No hosts yet" : "No SSH hosts yet") + " — Add or Import from ~/.ssh/config"
+            : distros.isEmpty() ? "No hosts match" : "No sessions match";
+        return Optional.of(new Nodes.Text(HINT, ControlState.READY, hint, Nodes.TextRole.DESCRIPTION));
+    }
+
+    private Nodes.Panel rowsNode() {
+        var footer = new ArrayList<Nodes.Node>();
+        hint().ifPresent(footer::add);
         card().ifPresent(footer::add);
         Optional<Nodes.Node> bottom = footer.isEmpty() ? Optional.empty()
             : Optional.of(new Nodes.Stack(FOOTER, ControlState.READY, Nodes.LayoutRole.DETAIL, footer));
-        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(search), list, bottom);
+        return new Nodes.Panel(ROOT, ControlState.READY, rowsHeader(), Optional.of(rowsSearch()), rowsList(), bottom);
     }
 
     private ListItem item(HostRows.Row row) {
@@ -459,10 +501,102 @@ public final class HostsPanel implements AutoCloseable {
         return Optional.of(new Nodes.Stack(CARD, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(identity, actionsRow)));
     }
 
+    // ---- the wide composition: the list beside the selected row's detail
+
+    /** A column's header, which the column does not draw; its count still hides the search while nothing is listed. */
+    private static Nodes.Header hiddenHeader(String id, String title, OptionalInt count) {
+        return new Nodes.Header(id, state(false), title, count, Optional.empty(), Optional.empty(), List.of());
+    }
+
+    /** The hint under a list column's rows, in the same footer stack the docked layout puts it in. */
+    private Optional<Nodes.Node> hintFooter(Nodes.LayoutRole role) {
+        return hint().map(text -> (Nodes.Node) new Nodes.Stack(FOOTER, ControlState.READY, role, List.of(text)));
+    }
+
+    private Nodes.Panel rowsWideNode() {
+        var listColumn = new Nodes.Panel(LIST_COLUMN, ControlState.READY, hiddenHeader(LIST_COLUMN + ".header", "Sessions", OptionalInt.of(hosts.size() + distros.size())),
+            Optional.of(rowsSearch()), rowsList(), hintFooter(Nodes.LayoutRole.DETAIL));
+        var detailColumn = new Nodes.Panel(DETAIL_COLUMN, ControlState.READY, hiddenHeader(DETAIL_COLUMN + ".header", "Details", OptionalInt.empty()),
+            Optional.empty(), detail(), Optional.empty());
+        return new Nodes.Panel(ROOT, ControlState.READY, rowsHeader(), Optional.empty(),
+            new Nodes.Split(COLUMNS, ControlState.READY, Nodes.SplitKind.SIDEBAR_DETAIL, List.of(listColumn, detailColumn)), Optional.empty());
+    }
+
+    /** The selected host's or distribution's heading, fields and actions; the empty state while no session is selected. */
+    private Nodes.Node detail() {
+        Optional<RemoteHost> host = selectedHost();
+        if (host.isPresent()) return hostDetail(host.get());
+        Optional<ShellProfileInfo> distro = selectedDistro();
+        if (distro.isPresent()) return distroDetail(distro.get());
+        return new Nodes.Empty(DETAIL_EMPTY, ControlState.READY,
+            new Nodes.Icon(DETAIL_EMPTY + ".icon", ControlState.READY, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Sessions"),
+            "No Session Selected", "Select a host or a WSL distribution to see its details.", List.of());
+    }
+
+    private Nodes.Node hostDetail(RemoteHost host) {
+        int sessions = sessionCount.applyAsInt(host);
+        boolean connected = sessions > 0;
+        String credential = credentialLabels.apply(host), via = via(host), system = metadata.apply(host);
+        var fields = new ArrayList<Nodes.Node>();
+        fields.add(field("host", "Host", host.hostname(), Nodes.TextRole.MONO_SMALL, Optional.empty()));
+        fields.add(field("user", "User", host.username(), Nodes.TextRole.MONO_SMALL, Optional.empty()));
+        fields.add(field("port", "Port", String.valueOf(host.port()), Nodes.TextRole.MONO_SMALL, Optional.empty()));
+        fields.add(field("credentials", "Credentials", credential, Nodes.TextRole.BODY,
+            credential.equals("Vault locked") ? Optional.of(Nodes.Severity.WARNING) : Optional.empty()));
+        if (via != null) fields.add(field("jump", "Jump host", via, Nodes.TextRole.BODY, Optional.empty()));
+        fields.add(field("group", "Group", host.group().isEmpty() ? defaultGroup : host.group(), Nodes.TextRole.BODY, Optional.empty()));
+        if (!system.isBlank()) fields.add(field("system", "System", system, Nodes.TextRole.BODY, Optional.empty()));
+        fields.add(field("sessions", "Sessions", sessionsText(sessions, "Not connected"), Nodes.TextRole.BODY, Optional.empty()));
+        var buttons = new ArrayList<Nodes.Node>();
+        buttons.add(new Nodes.Button(SPLIT_BUTTON, ControlState.READY, "Connect in Split", "", Nodes.ButtonKind.SECONDARY, MENU + "split:" + selectedRow, ""));
+        if (browseFiles != null)
+            buttons.add(new Nodes.Button(BROWSE_BUTTON, ControlState.READY, "Browse Files", "", Nodes.ButtonKind.SECONDARY, MENU + "browse:" + selectedRow, ""));
+        return detailContent(heading("server", "SSH host", host.name(), host.label(), true, connected ? "Open Shell" : "Connect", connected), fields, buttons);
+    }
+
+    private Nodes.Node distroDetail(ShellProfileInfo profile) {
+        var fields = List.<Nodes.Node>of(
+            field("distribution", "Distribution", profile.name(), Nodes.TextRole.BODY, Optional.empty()),
+            field("version", "Version", profile.detail().orElse(HostRows.WSL), Nodes.TextRole.BODY, Optional.empty()),
+            field("command", "Command", "wsl.exe -d " + profile.name(), Nodes.TextRole.MONO_SMALL, Optional.empty()),
+            field("sessions", "Sessions", sessionsText(distroSessions.applyAsInt(profile), "Not open"), Nodes.TextRole.BODY, Optional.empty()));
+        var buttons = List.<Nodes.Node>of(
+            new Nodes.Button(SPLIT_BUTTON, ControlState.READY, "Open in Split", "", Nodes.ButtonKind.SECONDARY, MENU + "open-split:" + selectedRow, ""));
+        return detailContent(heading("terminal", "WSL distribution", profile.name(), profile.detail().orElse(HostRows.WSL), false, "Open", true), fields, buttons);
+    }
+
+    private static Nodes.Node detailContent(Nodes.Node heading, List<Nodes.Node> fields, List<Nodes.Node> buttons) {
+        return new Nodes.Stack(DETAIL_CONTENT, ControlState.READY, Nodes.LayoutRole.DETAIL, List.of(heading,
+            new Nodes.Card(DETAIL_FIELDS, ControlState.READY, Nodes.CardKind.FORM, fields),
+            new Nodes.Stack(DETAIL_ACTIONS, ControlState.READY, Nodes.LayoutRole.ACTIONS, buttons)));
+    }
+
+    /** The row's tile, its name and address, Edit… for a host and the primary action: the card's controls, with the card's ids. */
+    private static Nodes.Node heading(String icon, String iconName, String name, String address, boolean editable, String connect, boolean terminal) {
+        var children = new ArrayList<Nodes.Node>();
+        children.add(new Nodes.Icon(CARD_TILE, ControlState.READY, icon, Nodes.Hue.NEUTRAL, Nodes.IconSize.PROMPT, iconName));
+        children.add(new Nodes.Stack("sessions.detail.identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Text(CARD_NAME, ControlState.READY, name, Nodes.TextRole.DETAIL_TITLE),
+            new Nodes.Text(CARD_ADDRESS, ControlState.READY, address, Nodes.TextRole.MONO_CAPTION))));
+        if (editable) children.add(new Nodes.Button(EDIT, ControlState.READY, "Edit…", "", Nodes.ButtonKind.SECONDARY, EDIT, "Edit session"));
+        children.add(new Nodes.Button(CONNECT, ControlState.READY, connect, terminal ? "terminal" : "", Nodes.ButtonKind.PRIMARY, CONNECT, ""));
+        return new Nodes.Stack("sessions.detail.heading", ControlState.READY, Nodes.LayoutRole.NAVIGATION, children);
+    }
+
+    /** One captioned value of the detail card, as the Vault manager's detail rows. */
+    private static Nodes.Node field(String key, String caption, String value, Nodes.TextRole role, Optional<Nodes.Severity> severity) {
+        String id = DETAIL_COLUMN + "." + key;
+        return new Nodes.Stack(id + ".row", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Text(id + ".label", ControlState.READY, caption, Nodes.TextRole.CAPTION),
+            new Nodes.Text(id, ControlState.READY, value, role, severity, OptionalInt.empty())));
+    }
+
+    private static String sessionsText(int sessions, String none) { return sessions == 0 ? none : sessions == 1 ? "1 session" : sessions + " sessions"; }
+
     // ---- the classic composition (Enterprise presentation spec 14.4)
 
     /** The classic tree's columns: the title, then a host's address and port (its trailing values). */
-    static final List<Column> COLUMNS = List.of(new Column("name", "Name", Nodes.TextRole.BODY, false, 3, Optional.empty()),
+    static final List<Column> TREE_COLUMNS = List.of(new Column("name", "Name", Nodes.TextRole.BODY, false, 3, Optional.empty()),
         new Column("host", "Host", Nodes.TextRole.MONO, false, 2.3, Optional.empty()), new Column("port", "Port", Nodes.TextRole.MONO, true, 1, Optional.empty()));
     public static final String PROPERTIES = "sessions.properties", PROPERTY_ACTIONS = "sessions.properties.actions";
 
@@ -477,10 +611,16 @@ public final class HostsPanel implements AutoCloseable {
 
     private boolean collapsedGroup(HostRows.Group group) { return group.wsl() ? wslCollapsed : collapsed.contains(group.name()); }
 
-    private Nodes.Panel classicNode() {
+    private Nodes.Header classicHeader() {
         // The count is the window header's detail (refreshHeader), which the strip draws as "(n)": not a second count here.
-        var header = new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
-        var filter = new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Filter sessions", "Filter sessions", "");
+        return new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+    }
+
+    private Nodes.Field classicFilter() {
+        return new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Filter sessions", "Filter sessions", "");
+    }
+
+    private Nodes.Tree classicTree() {
         boolean searching = !query.strip().isEmpty();
         var roots = new ArrayList<TreeItem>();
         var expanded = new HashSet<String>();
@@ -495,17 +635,28 @@ public final class HostsPanel implements AutoCloseable {
             else roots.add(treeItem(row));
         }
         if (group != null) roots.add(groupItem(group, children));
-        var tree = new Nodes.Tree(ROWS, ControlState.READY, roots, expanded, selectedRow == null ? Set.of() : Set.of(selectedRow), ACTIVATE, COLUMNS);
+        return new Nodes.Tree(ROWS, ControlState.READY, roots, expanded, selectedRow == null ? Set.of() : Set.of(selectedRow), ACTIVATE, TREE_COLUMNS);
+    }
+
+    private Nodes.Panel classicNode() {
         var footer = new ArrayList<Nodes.Node>();
-        if (hosts.isEmpty() || (searching && rows.size() == (error.isPresent() ? 1 : 0))) {
-            String hint = hosts.isEmpty() ? (distros.isEmpty() ? "No hosts yet" : "No SSH hosts yet") + " — Add or Import from ~/.ssh/config"
-                : distros.isEmpty() ? "No hosts match" : "No sessions match";
-            footer.add(new Nodes.Text(HINT, ControlState.READY, hint, Nodes.TextRole.DESCRIPTION));
-        }
+        hint().ifPresent(footer::add);
         footer.addAll(classicDetails());
         Optional<Nodes.Node> bottom = footer.isEmpty() ? Optional.empty()
             : Optional.of(new Nodes.Stack(FOOTER, ControlState.READY, Nodes.LayoutRole.VERTICAL, footer));
-        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(filter), tree, bottom);
+        return new Nodes.Panel(ROOT, ControlState.READY, classicHeader(), Optional.of(classicFilter()), classicTree(), bottom);
+    }
+
+    /** The tree in a list column beside the selected row's Properties and actions, which the docked tree holds under it. */
+    private Nodes.Panel classicWideNode() {
+        var listColumn = new Nodes.Panel(LIST_COLUMN, ControlState.READY, hiddenHeader(LIST_COLUMN + ".header", "Sessions", OptionalInt.empty()),
+            Optional.of(classicFilter()), classicTree(), hintFooter(Nodes.LayoutRole.VERTICAL));
+        List<Nodes.Node> details = classicDetails();
+        if (details.isEmpty()) details = List.of(new Nodes.Text(DETAIL_EMPTY, ControlState.READY, "Select a session to see its properties.", Nodes.TextRole.DESCRIPTION));
+        var detailColumn = new Nodes.Panel(DETAIL_COLUMN, ControlState.READY, hiddenHeader(DETAIL_COLUMN + ".header", "Details", OptionalInt.empty()),
+            Optional.empty(), new Nodes.Stack(DETAIL_CONTENT, ControlState.READY, Nodes.LayoutRole.DETAIL, details), Optional.empty());
+        return new Nodes.Panel(ROOT, ControlState.READY, classicHeader(), Optional.empty(),
+            new Nodes.Split(COLUMNS, ControlState.READY, Nodes.SplitKind.SIDEBAR_DETAIL, List.of(listColumn, detailColumn)), Optional.empty());
     }
 
     private TreeItem groupItem(HostRows.Group group, List<TreeItem> children) {

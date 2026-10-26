@@ -879,6 +879,10 @@ public class RemotePlugin implements Plugin {
         panel.setWslCollapsed(panelState.wslCollapsed());
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed(), panel.wslCollapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
         panel.setHosts(store.hosts(), store.error());
+        // In a window of its own or docked at the bottom the list sits beside the detail; the panel is right from the start
+        // and follows each move.
+        panel.wide(dev.jasper.remote.workstation.Layout.wide(host.placement()));
+        host.onPlacement(placement -> panel.wide(dev.jasper.remote.workstation.Layout.wide(placement)));
         sessionsPanel = panel; sessionsHost = host;
         seedSessions(window.id(), panel);
         // Shown again, the first host is selected as when the old list was shown (under CLASSIC the window's row, which the

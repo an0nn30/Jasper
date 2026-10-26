@@ -241,19 +241,32 @@ public final class TunnelEditor implements AutoCloseable {
 
     /** The route the tunnel's connections take, left to right, as the strip under the ports shows it. */
     private Nodes.Node route(String via) {
-        String listen = endpoint(listenAddress, listenPort, true), target = endpoint(forwardHost, forwardPort, false);
+        return route(ROUTE, kind, endpoint(listenAddress, listenPort, true), via, endpoint(forwardHost, forwardPort, false));
+    }
+
+    /**
+     * The route strip of a tunnel of {@code kind}, its steps {@code id.from}, {@code id.via} and {@code id.to}: the editor
+     * draws it under the ports and the Tunnels panel's wide detail draws it for the selected tunnel.
+     *
+     * @param id the strip's id, the prefix of its steps' ids
+     * @param kind which way the tunnel forwards
+     * @param listen where the tunnel listens, as {@code host:port}
+     * @param via the host the tunnel goes through
+     * @param target where it forwards to, as {@code host:port}; a SOCKS proxy has none
+     */
+    static Nodes.Node route(String id, TunnelKind kind, String listen, String via, String target) {
         var steps = switch (kind) {
-            case LOCAL -> List.of(step(ROUTE + ".from", "laptop", Nodes.Hue.NEUTRAL, "This computer", listen, true, "This computer"),
-                step(ROUTE + ".via", "server", Nodes.Hue.BLUE, "Via", via, true, "Host"),
-                step(ROUTE + ".to", "target", Nodes.Hue.GREEN, "Target on " + via, target, true, "Target"));
-            case REMOTE -> List.of(step(ROUTE + ".from", "server", Nodes.Hue.BLUE, "On " + via, listen, true, "Host"),
-                step(ROUTE + ".via", "laptop", Nodes.Hue.NEUTRAL, "Via", "this computer", false, "This computer"),
-                step(ROUTE + ".to", "target", Nodes.Hue.GREEN, "Target", target, true, "Target"));
-            case DYNAMIC -> List.of(step(ROUTE + ".from", "laptop", Nodes.Hue.NEUTRAL, "SOCKS5 proxy", listen, true, "This computer"),
-                step(ROUTE + ".via", "server", Nodes.Hue.BLUE, "Via", via, true, "Host"),
-                step(ROUTE + ".to", "target", Nodes.Hue.GREEN, "Destinations", "as each client asks", false, "Target"));
+            case LOCAL -> List.of(step(id + ".from", "laptop", Nodes.Hue.NEUTRAL, "This computer", listen, true, "This computer"),
+                step(id + ".via", "server", Nodes.Hue.BLUE, "Via", via, true, "Host"),
+                step(id + ".to", "target", Nodes.Hue.GREEN, "Target on " + via, target, true, "Target"));
+            case REMOTE -> List.of(step(id + ".from", "server", Nodes.Hue.BLUE, "On " + via, listen, true, "Host"),
+                step(id + ".via", "laptop", Nodes.Hue.NEUTRAL, "Via", "this computer", false, "This computer"),
+                step(id + ".to", "target", Nodes.Hue.GREEN, "Target", target, true, "Target"));
+            case DYNAMIC -> List.of(step(id + ".from", "laptop", Nodes.Hue.NEUTRAL, "SOCKS5 proxy", listen, true, "This computer"),
+                step(id + ".via", "server", Nodes.Hue.BLUE, "Via", via, true, "Host"),
+                step(id + ".to", "target", Nodes.Hue.GREEN, "Destinations", "as each client asks", false, "Target"));
         };
-        return new Nodes.Stack(ROUTE, ControlState.READY, Nodes.LayoutRole.ROUTE, steps);
+        return new Nodes.Stack(id, ControlState.READY, Nodes.LayoutRole.ROUTE, steps);
     }
 
     private Nodes.Form form() {

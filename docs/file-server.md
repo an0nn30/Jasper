@@ -109,6 +109,10 @@ starts"); every address the server answers on, each with **Copy**; **Start**, **
 **Stop** or **Stopping…**; **Edit…** (**Save as a Server…** on a temporary server); and the
 [activity log](#activity-and-transfers).
 
+In a window of its own ([Float and Window](workspace.md#float-and-window)) or docked at the bottom, the details stand
+beside the list and are always shown: the row menu has no Show Details or Hide Details, and the keys above that show
+and hide them have no visible effect.
+
 While the File Servers tool window is visible, the addresses are recomputed every 10 seconds and each time it is shown, so
 a server reachable from all networks picks up a network you joined.
 
@@ -123,8 +127,10 @@ table of **Folder** (name and protocol), **Address** and **Status** (a status do
 click starts or stops the selected server. A chosen server's details are **Properties — *name***: Folder, Protocol,
 Port, Access, Reachable from, User, TLS certificate, SSH host key, its addresses and Warning. The row menu reads **Copy
 URI** for Copy Address, adds **Copy *address*** for each further address, and has **Show Activity** / **Hide Activity**
-in place of Show Details, which shows the activity log under the properties. New File Server lists the authorized keys
-as a Type / Fingerprint / Comment table.
+in place of Show Details, which shows the activity log under the properties. In a window of its own or docked at the
+bottom, the chosen server's properties, status line and activity stand beside the table, always shown, and the row menu
+has no Show Activity or Hide Activity. New File Server lists the authorized keys as a Type / Fingerprint / Comment
+table.
 
 Under labelled tool window stripes, as in Enterprise, **Toggle File Servers** makes the tool window the active one when
 it shows it, which takes the keyboard, and activates a shown tool window that is not the active one instead of hiding

@@ -15,6 +15,7 @@ import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.sdk.ui.ViewSpec;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -47,6 +48,11 @@ import java.util.function.Supplier;
  * <p>Under {@link Layout#CLASSIC} (Enterprise presentation spec 14.4) the same rows are a Type, Local, Remote and Via
  * table over the selected (else the first) tunnel's status line; Enter or a double click starts or stops a row, in
  * place of the switch, and the row menu holds the other gestures.
+ *
+ * <p>In a window of its own or docked at the bottom ({@link #wide(boolean)}) the panel lays its list beside the
+ * selected (else the first) tunnel's detail: under {@link Layout#ROWS} the state, the route strip the tunnel editor
+ * draws, the fields and the Start or Stop, Edit, Open in Browser and Copy Address buttons, under {@link Layout#CLASSIC}
+ * the table beside the tunnel's Properties and status line. With nothing listed the wide layout is the docked one.
  */
 public final class TunnelsPanel implements AutoCloseable {
     /** What the panel asks for; the plugin decides how. */
@@ -57,6 +63,12 @@ public final class TunnelsPanel implements AutoCloseable {
     public static final String ROOT = "tunnels", HEADER = "tunnels.header", FILTER = "tunnels.filter", ROWS = "tunnels.rows",
         NO_MATCH = "tunnels.no-match", EMPTY = "tunnels.empty", EMPTY_NEW = "tunnels.empty.new", PROBLEM = "tunnels.problem",
         QUICK_HEADING = "heading.quick", PROBLEM_ROW = "problem", ACTIVATE = "activate", TOGGLE = "toggle", DELETE = "delete";
+    /** The wide layout's nodes: the split, its list and detail columns, and the detail's heading, route, fields and actions. */
+    public static final String COLUMNS = "tunnels.columns", LIST_COLUMN = "tunnels.list", DETAIL_COLUMN = "tunnels.detail",
+        DETAIL_CONTENT = "tunnels.detail.content", DETAIL_NONE = "tunnels.detail.none", DETAIL_TITLE = "tunnels.detail.title",
+        DETAIL_STATE = "tunnels.detail.state", DETAIL_ROUTE = "tunnels.detail.route", DETAIL_FIELDS = "tunnels.detail.fields",
+        DETAIL_ACTIONS = "tunnels.detail.actions", DETAIL_TOGGLE = "tunnels.detail.toggle", DETAIL_EDIT = "tunnels.detail.edit",
+        DETAIL_BROWSE = "tunnels.detail.browse", DETAIL_COPY = "tunnels.detail.copy", PROPERTIES = "tunnels.properties";
     /** A row's switch is this prefix and the tunnel's id; menu actions are {@code menu:<verb>:<row id>}. */
     static final String SWITCH = "switch:", MENU = "menu:", ROW = "tunnel:";
 
@@ -74,6 +86,8 @@ public final class TunnelsPanel implements AutoCloseable {
     private Consumer<PanelHeader> headerChanged;
     private String query = "", selectedRow, lastSwitch;
     private long lastSwitchAt;
+    /** Whether the panel is asked for its wide layout (a window of its own, or docked at the bottom). */
+    private boolean wide;
     private boolean closed;
 
     /** {@code icons} supplies the header action's artwork, which the window draws. */
@@ -123,6 +137,20 @@ public final class TunnelsPanel implements AutoCloseable {
 
     void setClock(Supplier<Instant> value) { clock = value; render(); }
 
+    /**
+     * Asks for the wide layout, the list beside the selected (else the first) tunnel's detail, or the docked one. Nothing
+     * changes while the value is the same or after {@link #close()}. With no tunnel listed the panel keeps its docked
+     * composition, whose empty state fills the window.
+     */
+    public void wide(boolean value) {
+        if (closed || value == wide) return;
+        wide = value;
+        render();
+    }
+
+    /** Whether the wide layout is asked for, as {@link #wide(boolean)} last set it. */
+    public boolean wide() { return wide; }
+
     /** The rows shown now, in order: tunnels by row id, the quick forwards' heading and the broken-file row. */
     List<String> rowIds() { return shown().stream().map(Row::id).toList(); }
 
@@ -132,12 +160,12 @@ public final class TunnelsPanel implements AutoCloseable {
     // ---- the classic composition (Enterprise presentation spec 14.4)
 
     /** The classic table's columns, in the Workstation mock's proportions. */
-    static final List<Column> COLUMNS = List.of(new Column("type", "Type", Nodes.TextRole.BODY, false, 76, Optional.empty()),
+    static final List<Column> TABLE_COLUMNS = List.of(new Column("type", "Type", Nodes.TextRole.BODY, false, 76, Optional.empty()),
         new Column("local", "Local", Nodes.TextRole.MONO, false, 87, Optional.empty()), new Column("remote", "Remote", Nodes.TextRole.MONO, false, 110, Optional.empty()),
         new Column("via", "Via", Nodes.TextRole.BODY, false, 77, Optional.empty()));
     public static final String FOOTER = "tunnels.footer", TOP = "tunnels.top";
 
-    private Nodes.Panel classicNode() {
+    private Nodes.Panel classicNode(boolean columns) {
         var header = new Nodes.Header(HEADER, ControlState.READY, "Tunnels", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
         List<Row> rows = shown();
         if (selectedRow != null && rows.stream().noneMatch(row -> row.id().equals(selectedRow) && row.tunnel() != null)) selectedRow = null;
@@ -152,7 +180,7 @@ public final class TunnelsPanel implements AutoCloseable {
             "Forward a local port to a remote host, or use Forward Port from an SSH pane.",
             List.of(new Nodes.Button(EMPTY_NEW, ControlState.READY, "New Tunnel…", "", Nodes.ButtonKind.SECONDARY, EMPTY_NEW, "")))) : Optional.empty();
         boolean filtered = !none && tableRows.stream().noneMatch(row -> row.heading().isEmpty());
-        var table = new Nodes.Table(ROWS, ControlState.READY, COLUMNS, tableRows, selectedRow == null ? Set.of() : Set.of(selectedRow), TOGGLE, List.of(),
+        var table = new Nodes.Table(ROWS, ControlState.READY, TABLE_COLUMNS, tableRows, selectedRow == null ? Set.of() : Set.of(selectedRow), TOGGLE, List.of(),
             Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD, empty, filtered ? "No tunnels match" : "");
         var top = new ArrayList<Nodes.Node>();
         error.ifPresent(message -> top.add(new Nodes.Notice(PROBLEM, ControlState.READY, Nodes.Severity.DANGER, problemText(), List.of())));
@@ -160,41 +188,83 @@ public final class TunnelsPanel implements AutoCloseable {
         Optional<Nodes.Node> search = top.isEmpty() ? Optional.empty()
             : top.size() == 1 && top.getFirst() instanceof Nodes.Field ? Optional.of(top.getFirst())
             : Optional.of(new Nodes.Stack(TOP, ControlState.READY, Nodes.LayoutRole.VERTICAL, top));
-        Optional<Nodes.Node> footer = selected().or(() -> rows.stream().map(Row::tunnel).filter(Objects::nonNull).findFirst())
-            .map(tunnel -> new Nodes.Text(FOOTER, ControlState.READY, footerText(tunnel), Nodes.TextRole.CAPTION));
-        return new Nodes.Panel(ROOT, ControlState.READY, header, search, table, footer);
+        Optional<Tunnel> detailed = detailed(rows);
+        if (!columns) return new Nodes.Panel(ROOT, ControlState.READY, header, search, table, detailed.<Nodes.Node>map(this::statusLine));
+        // The table in a list column beside the tunnel's Properties and status line, which the docked table holds under it.
+        var listColumn = new Nodes.Panel(LIST_COLUMN, ControlState.READY, hiddenHeader(LIST_COLUMN + ".header", "Tunnels"), search, table, Optional.empty());
+        var details = new ArrayList<Nodes.Node>();
+        detailed.ifPresentOrElse(tunnel -> { details.add(properties(tunnel)); details.add(statusLine(tunnel)); },
+            () -> details.add(new Nodes.Text(DETAIL_NONE, ControlState.READY, "Select a tunnel to see its properties.", Nodes.TextRole.DESCRIPTION)));
+        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.empty(),
+            split(listColumn, new Nodes.Stack(DETAIL_CONTENT, ControlState.READY, Nodes.LayoutRole.DETAIL, details)), Optional.empty());
     }
 
     private TableRow tableRow(Row row) {
         Tunnel tunnel = row.tunnel(); String id = row.id();
         TunnelState state = states.apply(tunnel.id());
         Optional<String> hostName = hostNames.apply(tunnel.hostId());
-        String word = switch (tunnel.kind()) { case LOCAL -> "Local"; case REMOTE -> "Remote"; case DYNAMIC -> "Dynamic"; };
         var type = new Nodes.Stack("row." + id + ".type", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-            new Nodes.StatusDot("row." + id + ".dot", ControlState.READY, dot(state)), new Nodes.Text("row." + id + ".kind", ControlState.READY, word, Nodes.TextRole.BODY)));
-        String port = TunnelRows.port(tunnel, state);
-        String listen = (tunnel.bindAddress().equals(Tunnel.LOCALHOST) ? "" : bracketed(tunnel.bindAddress())) + ":" + port;
-        String target = bracketed(tunnel.targetHost()) + ":" + tunnel.targetPort();
-        String local = tunnel.kind() == TunnelKind.REMOTE ? target : listen;
-        String remote = switch (tunnel.kind()) { case LOCAL -> target; case REMOTE -> listen; case DYNAMIC -> "SOCKS5"; };
+            new Nodes.StatusDot("row." + id + ".dot", ControlState.READY, dot(state)),
+            new Nodes.Text("row." + id + ".kind", ControlState.READY, kindWord(tunnel.kind()), Nodes.TextRole.BODY)));
+        Ends ends = ends(tunnel, state);
         String detail = TunnelRows.detail(tunnel, state, hostName, clock.get());
-        return new TableRow(id, Map.of("local", local, "remote", remote, "via", hostName.orElse("—")), Optional.empty(), false,
+        return new TableRow(id, Map.of("local", ends.local(), "remote", ends.remote(), "via", hostName.orElse("—")), Optional.empty(), false,
             Optional.of(menu(id, tunnel, state)), TunnelRows.title(tunnel, state) + ", " + TunnelRows.mapping(tunnel, state) + ", " + detail,
             Map.of("type", type), Optional.empty());
     }
 
+    private static String kindWord(TunnelKind kind) { return switch (kind) { case LOCAL -> "Local"; case REMOTE -> "Remote"; case DYNAMIC -> "Dynamic"; }; }
+
+    /** The Local and Remote values of the classic table and of its Properties. */
+    private record Ends(String local, String remote) { }
+
+    private static Ends ends(Tunnel tunnel, TunnelState state) {
+        String listen = (tunnel.bindAddress().equals(Tunnel.LOCALHOST) ? "" : bracketed(tunnel.bindAddress())) + ":" + TunnelRows.port(tunnel, state);
+        String target = bracketed(tunnel.targetHost()) + ":" + tunnel.targetPort();
+        String remote = switch (tunnel.kind()) { case LOCAL -> target; case REMOTE -> listen; case DYNAMIC -> "SOCKS5"; };
+        return new Ends(tunnel.kind() == TunnelKind.REMOTE ? target : listen, remote);
+    }
+
     private static String bracketed(String host) { return host.contains(":") ? "[" + host + "]" : host; }
 
-    /** The selected tunnel's, else the first one's, line: its name, its confirmed state and the gesture. */
-    private String footerText(Tunnel tunnel) {
-        TunnelState state = states.apply(tunnel.id());
-        String word = switch (state) {
+    /** The classic look's word for a confirmed state, as its status line and Properties both say it. */
+    private static String stateWord(TunnelState state) {
+        return switch (state) {
             case TunnelState.Up up -> "active";
             case TunnelState.Starting starting -> "starting";
             case TunnelState.Failed failed -> "failed: " + failed.reason();
             case TunnelState.Stopped stopped -> "inactive";
         };
-        return TunnelRows.title(tunnel, state) + " — " + word + ". Click to toggle.";
+    }
+
+    /** The selected tunnel's, else the first one's, line: its name, its confirmed state and the gesture. */
+    private String footerText(Tunnel tunnel) {
+        TunnelState state = states.apply(tunnel.id());
+        return TunnelRows.title(tunnel, state) + " — " + stateWord(state) + ". Click to toggle.";
+    }
+
+    private Nodes.Text statusLine(Tunnel tunnel) { return new Nodes.Text(FOOTER, ControlState.READY, footerText(tunnel), Nodes.TextRole.CAPTION); }
+
+    /** The tunnel's Properties beside the classic table: its type, ends, host and state, and while up what it counted. */
+    private Nodes.Properties properties(Tunnel tunnel) {
+        TunnelState state = states.apply(tunnel.id());
+        Ends ends = ends(tunnel, state);
+        var rows = new ArrayList<Nodes.PropertyRow>(List.of(new Nodes.PropertyRow("Type", kindWord(tunnel.kind()), false),
+            new Nodes.PropertyRow("Local", ends.local(), true), new Nodes.PropertyRow("Remote", ends.remote(), true),
+            new Nodes.PropertyRow("Via", hostNames.apply(tunnel.hostId()).orElse("—"), false),
+            new Nodes.PropertyRow("State", stateWord(state), false)));
+        if (state instanceof TunnelState.Up up) counts(up).forEach(fact -> rows.add(new Nodes.PropertyRow(fact.caption(), fact.value(), false)));
+        return new Nodes.Properties(PROPERTIES, ControlState.READY, "Properties — " + TunnelRows.title(tunnel, state), rows);
+    }
+
+    /** A captioned value of the wide detail: what a tunnel that is up counted, and how long it has been up. */
+    private record Fact(String key, String caption, String value) { }
+
+    private List<Fact> counts(TunnelState.Up up) {
+        var counters = up.counters();
+        return List.of(new Fact("connections", "Connections", String.valueOf(counters.open())),
+            new Fact("traffic", "Traffic", "↓" + TunnelRows.bytes(counters.received()) + " ↑" + TunnelRows.bytes(counters.sent())),
+            new Fact("uptime", "Uptime", TunnelRows.duration(Duration.between(up.since(), clock.get()))));
     }
 
     @Override public void close() {
@@ -316,9 +386,13 @@ public final class TunnelsPanel implements AutoCloseable {
         return new Nodes.Icon(id, ControlState.READY, glyph, Nodes.Hue.NONE, size, name, Optional.of(severity));
     }
 
-    private Nodes.Panel node() { return layout == Layout.CLASSIC ? classicNode() : rowsNode(); }
+    private Nodes.Panel node() {
+        // With nothing listed the wide layout is the docked one, whose empty state fills the window.
+        boolean columns = wide && !(saved.isEmpty() && quick.isEmpty());
+        return layout == Layout.CLASSIC ? classicNode(columns) : rowsNode(columns);
+    }
 
-    private Nodes.Panel rowsNode() {
+    private Nodes.Panel rowsNode(boolean columns) {
         var header = new Nodes.Header(HEADER, ControlState.READY, "Tunnels", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
         if (saved.isEmpty() && quick.isEmpty()) {
             Nodes.Node empty = new Nodes.Empty(EMPTY, ControlState.READY,
@@ -344,7 +418,89 @@ public final class TunnelsPanel implements AutoCloseable {
             TOGGLE, DELETE);
         Optional<Nodes.Node> footer = rows.stream().noneMatch(row -> row.tunnel() != null)
             ? Optional.of(new Nodes.Text(NO_MATCH, ControlState.READY, "No tunnels match", Nodes.TextRole.DESCRIPTION)) : Optional.empty();
-        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(filter), list, footer);
+        if (!columns) return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(filter), list, footer);
+        var listColumn = new Nodes.Panel(LIST_COLUMN, ControlState.READY, hiddenHeader(LIST_COLUMN + ".header", "Tunnels"), Optional.of(filter), list, footer);
+        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.empty(), split(listColumn, detail(detailed(rows))), Optional.empty());
+    }
+
+    // ---- the wide composition: the list beside the selected tunnel's detail
+
+    /** The tunnel the wide detail describes: the selected one, else the first listed. */
+    private Optional<Tunnel> detailed(List<Row> rows) {
+        return selected().or(() -> rows.stream().map(Row::tunnel).filter(Objects::nonNull).findFirst());
+    }
+
+    /** A column's header, which the column does not draw. */
+    private static Nodes.Header hiddenHeader(String id, String title) {
+        return new Nodes.Header(id, new ControlState(false, true, false, ""), title, OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+    }
+
+    private static Nodes.Split split(Nodes.Panel listColumn, Nodes.Node detail) {
+        var detailColumn = new Nodes.Panel(DETAIL_COLUMN, ControlState.READY, hiddenHeader(DETAIL_COLUMN + ".header", "Details"), Optional.empty(), detail, Optional.empty());
+        return new Nodes.Split(COLUMNS, ControlState.READY, Nodes.SplitKind.SIDEBAR_DETAIL, List.of(listColumn, detailColumn));
+    }
+
+    /** The tunnel's heading, route, fields and actions; the empty state while no tunnel is listed. */
+    private Nodes.Node detail(Optional<Tunnel> shown) {
+        if (shown.isEmpty()) return new Nodes.Empty(DETAIL_NONE, ControlState.READY,
+            new Nodes.Icon(DETAIL_NONE + ".icon", ControlState.READY, "tunnel", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Tunnels"),
+            "No Tunnel Selected", "", List.of());
+        Tunnel tunnel = shown.get();
+        String id = rowId(tunnel.id());
+        TunnelState state = states.apply(tunnel.id());
+        Optional<String> hostName = hostNames.apply(tunnel.hostId());
+        boolean running = state.running();
+        var heading = new Nodes.Stack(DETAIL_COLUMN + ".heading", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
+            new Nodes.Icon(DETAIL_COLUMN + ".icon", ControlState.READY, "tunnel", Nodes.Hue.NEUTRAL, Nodes.IconSize.PROMPT, "Tunnel"),
+            new Nodes.Stack(DETAIL_COLUMN + ".identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+                new Nodes.Text(DETAIL_TITLE, ControlState.READY, TunnelRows.title(tunnel, state), Nodes.TextRole.DETAIL_TITLE),
+                stateLine(state, hostName.isEmpty()))),
+            button(DETAIL_EDIT, tunnel.quick() ? "Save as Tunnel…" : "Edit…", Nodes.ButtonKind.SECONDARY, tunnel.quick() ? "save" : "edit", id, true),
+            button(DETAIL_TOGGLE, running ? "Stop" : "Start", Nodes.ButtonKind.PRIMARY, running ? "stop" : "start", id, true)));
+        String listen = bracketed(tunnel.bindAddress()) + ":" + TunnelRows.port(tunnel, state);
+        String target = bracketed(tunnel.targetHost()) + ":" + tunnel.targetPort();
+        var route = TunnelEditor.route(DETAIL_ROUTE, tunnel.kind(), listen, hostName.orElse("Host missing"), target);
+        var fields = new ArrayList<Nodes.Node>();
+        fields.add(field("type", "Type", kindWord(tunnel.kind())));
+        fields.add(hostName.map(name -> field("via", "Via", name)).orElseGet(() -> field("via", "Via", "Host missing", Optional.of(Nodes.Severity.WARNING))));
+        if (state instanceof TunnelState.Up up) counts(up).forEach(fact -> fields.add(field(fact.key(), fact.caption(), fact.value())));
+        return new Nodes.Stack(DETAIL_CONTENT, ControlState.READY, Nodes.LayoutRole.DETAIL, List.of(heading, route,
+            new Nodes.Card(DETAIL_FIELDS, ControlState.READY, Nodes.CardKind.FORM, fields),
+            new Nodes.Stack(DETAIL_ACTIONS, ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+                button(DETAIL_BROWSE, "Open in Browser", Nodes.ButtonKind.SECONDARY, "browse", id, browsable(tunnel, state)),
+                button(DETAIL_COPY, "Copy Address", Nodes.ButtonKind.SECONDARY, "copy", id, copyable(tunnel, state))))));
+    }
+
+    /**
+     * What the tunnel is doing, as the docked row says it: its failure or its stage first, then a missing host, then an up
+     * tunnel's warning or how long it has been up, else Stopped.
+     */
+    private Nodes.Text stateLine(TunnelState state, boolean hostMissing) {
+        if (state instanceof TunnelState.Failed failed) return new Nodes.Text(DETAIL_STATE, ControlState.READY, failed.reason(), Nodes.TextRole.DESCRIPTION,
+            Optional.of(Nodes.Severity.DANGER), OptionalInt.empty());
+        if (state instanceof TunnelState.Starting starting) return new Nodes.Text(DETAIL_STATE, ControlState.READY, starting.stage(), Nodes.TextRole.DESCRIPTION);
+        if (hostMissing) return new Nodes.Text(DETAIL_STATE, ControlState.READY, "Host missing · Edit to choose a host", Nodes.TextRole.DESCRIPTION,
+            Optional.of(Nodes.Severity.WARNING), OptionalInt.empty());
+        if (state instanceof TunnelState.Up up) return up.counters().warning()
+            .map(warning -> new Nodes.Text(DETAIL_STATE, ControlState.READY, warning, Nodes.TextRole.DESCRIPTION, Optional.of(Nodes.Severity.WARNING), OptionalInt.empty()))
+            .orElseGet(() -> new Nodes.Text(DETAIL_STATE, ControlState.READY, "Up for " + TunnelRows.duration(Duration.between(up.since(), clock.get())),
+                Nodes.TextRole.DESCRIPTION));
+        return new Nodes.Text(DETAIL_STATE, ControlState.READY, "Stopped", Nodes.TextRole.DESCRIPTION);
+    }
+
+    /** A button that does what the row's menu item of the same verb does, to this row. */
+    private static Nodes.Button button(String id, String label, Nodes.ButtonKind kind, String verb, String rowId, boolean enabled) {
+        return new Nodes.Button(id, new ControlState(true, enabled, false, ""), label, "", kind, MENU + verb + ":" + rowId, "");
+    }
+
+    /** One captioned value of the detail card, as the Vault manager's detail rows. */
+    private static Nodes.Node field(String key, String caption, String value) { return field(key, caption, value, Optional.empty()); }
+
+    private static Nodes.Node field(String key, String caption, String value, Optional<Nodes.Severity> severity) {
+        String id = DETAIL_FIELDS + "." + key;
+        return new Nodes.Stack(id + ".row", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Text(id + ".label", ControlState.READY, caption, Nodes.TextRole.CAPTION),
+            new Nodes.Text(id, ControlState.READY, value, Nodes.TextRole.BODY, severity, OptionalInt.empty())));
     }
 
     private ListItem item(Row row) {
@@ -412,8 +568,8 @@ public final class TunnelsPanel implements AutoCloseable {
         menu.add(state.running() ? item("stop", rowId, "Stop", true) : item("start", rowId, "Start", true));
         if (state instanceof TunnelState.Failed) menu.add(item("stop", rowId, "Stop", true));
         menu.add(separator(1));
-        menu.add(item("browse", rowId, "Open in Browser", TunnelRows.browseUri(tunnel, state).isPresent()));
-        menu.add(item("copy", rowId, "Copy Address", state instanceof TunnelState.Up || tunnel.bindPort() != 0));
+        menu.add(item("browse", rowId, "Open in Browser", browsable(tunnel, state)));
+        menu.add(item("copy", rowId, "Copy Address", copyable(tunnel, state)));
         menu.add(separator(2));
         if (tunnel.quick()) menu.add(item("save", rowId, "Save as Tunnel…", true));
         else {
@@ -423,6 +579,12 @@ public final class TunnelsPanel implements AutoCloseable {
         }
         return menu;
     }
+
+    /** Whether Open in Browser has a page to open: a running local tunnel. */
+    private static boolean browsable(Tunnel tunnel, TunnelState state) { return TunnelRows.browseUri(tunnel, state).isPresent(); }
+
+    /** Whether Copy Address has an address: the port is bound, or saved. */
+    private static boolean copyable(Tunnel tunnel, TunnelState state) { return state instanceof TunnelState.Up || tunnel.bindPort() != 0; }
 
     private static MenuItem item(String verb, String rowId, String label, boolean enabled) {
         return new MenuItem("menu." + verb, label, "", MENU + verb + ":" + rowId, enabled, false);

@@ -76,6 +76,8 @@ public final class UiTestAccess {
             case Nodes.Panel value -> { children.add(value.header()); value.searchOrNavigation().ifPresent(children::add); children.add(value.body()); value.footer().ifPresent(children::add); }
             case Nodes.Header value -> { value.context().ifPresent(children::add); value.primary().ifPresent(children::add); }
             case Nodes.Stack value -> children.addAll(value.children());
+            case Nodes.Split value -> children.addAll(value.children());
+            case Nodes.Table value -> value.empty().ifPresent(children::add);
             case Nodes.Form value -> { value.hero().ifPresent(children::add); children.addAll(value.sections()); value.preview().ifPresent(children::add); children.addAll(value.actions()); }
             case Nodes.Card value -> children.addAll(value.children());
             case Nodes.Section value -> children.add(value.body());
