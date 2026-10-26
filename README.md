@@ -92,7 +92,7 @@ sources (`Jasper-<version>-cygwin-sources-<amd64|aarch64>.zip`) beside the packa
 | --- | --- |
 | macOS (Apple Silicon) | `Jasper-<version>-macos-aarch64.dmg`: drag `Jasper.app` to Applications |
 | Windows x64 / ARM64 | `Jasper-<version>-windows-<x64\|aarch64>-setup.exe`, a per-user setup wizard, or `Jasper-<version>-windows-<x64\|aarch64>.zip`, a portable folder |
-| Linux x64 / ARM64 | `Jasper-<version>-linux-<amd64\|arm64>.deb` or `Jasper-<version>-linux-<x86_64\|aarch64>.rpm`, installing to `/opt/jasper` |
+| Linux x64 / ARM64 | `Jasper-<version>-linux-<amd64\|arm64>.deb` or `Jasper-<version>-linux-<x86_64\|aarch64>.rpm`, package `jasper-workstation` installed to `/opt/jasper` |
 
 Every package bundles its own Java runtime. On Windows the setup wizard also installs a Cygwin environment, offered as
 the **Cygwin Bash** shell; with the portable ZIP, run `provision-cygwin.cmd` in its folder once. The packages are not

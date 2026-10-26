@@ -73,6 +73,22 @@ verifySupport.configure {
     }
 }
 
+verifySupport.configure {
+    doLast {
+        // Changing the package-manager identity must preserve the installed image root.
+        assert linuxPackageOptions() == ['--linux-package-name', 'jasper-workstation', '--install-dir', '/opt/jasper']
+        if (System.getProperty('os.name').startsWith('Linux')) {
+            ['packageDeb', 'packageRpm'].each { name ->
+                def packageTask = tasks.named(name).get()
+                // Artifact filenames stay stable across identity changes, so options must invalidate old outputs.
+                assert packageTask.inputs.properties.linuxPackageOptions ==
+                    ['--linux-package-name', 'jasper-workstation', '--install-dir', '/opt/jasper']
+            }
+        }
+        logger.lifecycle('Verified Linux package identity, install root and task input wiring')
+    }
+}
+
 // Inspect only resolved graph data, never another project's mutable state under --parallel.
 gradle.taskGraph.whenReady { graph ->
     if (graph.hasTask("${project.path}:installWindowsUser")) {

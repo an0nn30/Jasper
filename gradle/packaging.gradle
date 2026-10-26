@@ -887,7 +887,7 @@ if (normalizedHost().os == 'windows') {
         x64: [deb: 'amd64', rpm: 'x86_64'],
         aarch64: [deb: 'arm64', rpm: 'aarch64'],
     ][normalizedHost().architecture]
-    def installRoot = '/opt/jasper'
+    def installRoot = linuxInstallRoot
     // A terminal emulator first (desktops list TerminalEmulator entries as default-terminal choices), and a
     // remote access tool for its SSH sessions, transfers and tunnels.
     def menuCategories = 'System;TerminalEmulator;Network;RemoteAccess;'
@@ -918,7 +918,7 @@ if (normalizedHost().os == 'windows') {
         Map<String, List> overrides = type == 'deb' ?
             ['template.postinst': ['postinst', ['DESKTOP_COMMANDS_INSTALL']], 'template.prerm': ['prerm', ['DESKTOP_COMMANDS_UNINSTALL']],
              'template.control': ['control', []]] :
-            ['template.spec': ['jasper.spec', ['DESKTOP_COMMANDS_INSTALL', 'DESKTOP_COMMANDS_UNINSTALL']]]
+            ['template.spec': ["${linuxPackageName}.spec", ['DESKTOP_COMMANDS_INSTALL', 'DESKTOP_COMMANDS_UNINSTALL']]]
         new ZipFile(new File(sdkHome, 'jmods/jdk.jpackage.jmod')).withCloseable { archive ->
             overrides.each { template, override ->
                 def entry = archive.getEntry("classes/jdk/jpackage/internal/resources/${template}")
@@ -945,7 +945,7 @@ if (normalizedHost().os == 'windows') {
     // Checks the generated maintainer scripts: jpackage's menu commands inside the wrappers, all placeholders filled.
     def verifyInstallScripts = { String scripts, String label ->
         [menuDirectories, 'jasper_menu_install "$@" || ', 'jasper_menu_uninstall "$@" || ',
-         'xdg-desktop-menu install /opt/jasper/lib/jasper-Jasper.desktop', 'xdg-desktop-menu uninstall'].each { expected ->
+         "xdg-desktop-menu install ${installRoot}/lib/${linuxPackageName}-Jasper.desktop", 'xdg-desktop-menu uninstall'].each { expected ->
             if (!scripts.contains(expected)) throw new GradleException("${label} verification failed: install scripts lack '${expected}'\n${scripts}")
         }
         if (scripts.contains('DESKTOP_COMMANDS_')) throw new GradleException("${label} verification failed: install scripts keep an unfilled placeholder\n${scripts}")
@@ -964,8 +964,8 @@ if (normalizedHost().os == 'windows') {
             }
             if (expected.canExecute() && !actual.canExecute()) throw new GradleException("${label} verification failed: ${actual} lost its executable bit")
         }
-        File desktop = new File(installed, 'lib').listFiles()?.find { it.name.endsWith('.desktop') }
-        String entry = desktop?.getText('UTF-8') ?: ''
+        File desktop = new File(installed, "lib/${linuxPackageName}-Jasper.desktop")
+        String entry = desktop.isFile() ? desktop.getText('UTF-8') : ''
         if (!entry.contains("${installRoot}/bin/Jasper") || !entry.contains("${installRoot}/lib/Jasper.png") || !entry.contains("Categories=${menuCategories}")) {
             throw new GradleException("${label} verification failed: the desktop entry is missing or incomplete\n${entry}")
         }
@@ -980,6 +980,7 @@ if (normalizedHost().os == 'windows') {
             inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
             inputs.file(rootProject.file('packaging/linux/dependencies.py')).withPathSensitivity(PathSensitivity.RELATIVE)
             inputs.property('version', version)
+            inputs.property('linuxPackageOptions', linuxPackageOptions())
             outputs.file(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-linux-${packageArchitecture}.${type}") })
             doLast {
                 def context = nativeContext()
@@ -1005,7 +1006,7 @@ if (normalizedHost().os == 'windows') {
                         '--icon', nativeIcon.get().absolutePath,
                         '--app-image', image.absolutePath, '--resource-dir', resources.absolutePath,
                         '--dest', output.absolutePath, '--temp', new File(temporary, 'jpackage').absolutePath,
-                        '--linux-package-name', 'jasper', '--linux-shortcut',
+                        *linuxPackageOptions(), '--linux-shortcut',
                         '--linux-menu-group', menuCategories,
                         '--linux-app-category', type == 'deb' ? 'x11' : 'Applications/System']
                     executeNative(args, "jpackage Linux .${type} (install ${requirement})")
@@ -1032,7 +1033,7 @@ if (normalizedHost().os == 'windows') {
                             'bash', unpacked.absolutePath, generated.absolutePath], 'rpm2cpio | cpio (install rpm2cpio and cpio)')
                         verifyInstallScripts(executeNative(['rpm', '--query', '--package', '--scripts', generated.absolutePath], 'rpm --scripts').stdout, '.rpm')
                     }
-                    def expectedIdentity = ~/^jasper ${java.util.regex.Pattern.quote(context.version)}(-[0-9]+)? ${packageArchitecture}$/
+                    def expectedIdentity = ~/^${java.util.regex.Pattern.quote(linuxPackageName)} ${java.util.regex.Pattern.quote(context.version)}(-[0-9]+)? ${packageArchitecture}$/
                     if (!(identity ==~ expectedIdentity)) throw new GradleException(".${type} verification failed: package identity is '${identity}'")
                     // Compare actual metadata with the mandatory scan, including optional-only
                     // transitive libraries: no global Qt/KF name filtering can hide a dependency.

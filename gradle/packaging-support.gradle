@@ -17,6 +17,14 @@ import java.util.zip.ZipOutputStream
 // (verifyPackagingSupport, part of check). The imports serve helpers further down: Groovy accepts imports only before
 // the first statement.
 
+// Fedora's JasPer image library owns the generic jasper package identity. Keep our install layout explicit:
+// jpackage otherwise derives the root from the package name as well as its desktop/spec resource names.
+ext.linuxPackageName = 'jasper-workstation'
+ext.linuxInstallRoot = '/opt/jasper'
+ext.linuxPackageOptions = {
+    ['--linux-package-name', linuxPackageName, '--install-dir', linuxInstallRoot]
+}
+
 // os-release is data, never a shell script; only exact distro IDs select the RPM-only aggregate.
 // Other hosts retain both formats, including Debian/Ubuntu's RPM cross-packaging support.
 ext.linuxPackageTasks = { String osRelease ->

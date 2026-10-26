@@ -57,7 +57,7 @@ sudo zypper install --allow-unsigned-rpm ./Jasper-<version>-linux-x86_64.rpm  # 
 ```
 
 Both packages install Jasper to `/opt/jasper`, with the launcher at `/opt/jasper/bin/Jasper` and an entry in the
-desktop menu. The package is named `jasper`. The packages are unsigned.
+desktop menu. The package is named `jasper-workstation`. The packages are unsigned.
 
 ## First launch
 
@@ -274,8 +274,8 @@ Then remove the application:
 | macOS app | Move `Jasper.app` from Applications to the Trash |
 | Windows setup | Settings › Apps › Installed apps › Jasper › Uninstall |
 | Windows portable | Delete the `Jasper` folder |
-| Linux `.deb` | `sudo apt remove jasper` |
-| Linux `.rpm` | `sudo dnf remove jasper` or `sudo zypper remove jasper` |
+| Linux `.deb` | `sudo apt remove jasper-workstation` |
+| Linux `.rpm` | `sudo dnf remove jasper-workstation` or `sudo zypper remove jasper-workstation` |
 
 Removing the application leaves [Jasper home](#jasper-home) in place, with your settings, plugins and Vault. Delete that
 folder to remove them too. On Windows it also leaves the Cygwin environment in `%LOCALAPPDATA%\Jasper\cygwin`; close
