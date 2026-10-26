@@ -38,25 +38,36 @@ Header detection compiles `KColorScheme(QPalette::Active, KColorScheme::Header)`
 selected imported libraries and defines `DC_HAVE_KCOLORSCHEME_HEADER=0|1`. The pinned
 [KF5 header](https://invent.kde.org/frameworks/kconfigwidgets/-/blob/v5.92.0/src/kcolorscheme.h)
 and [KF6 header](https://invent.kde.org/frameworks/kcolorscheme/-/blob/v6.0.0/src/kcolorscheme.h)
-contain this enum. Modern Fedora KF5/KF6 compile checks passed; floor-version checks remain
-pending. Theme support separately needs
+contain this enum. Compile checks passed with modern Fedora and pinned KF5.92/KF6.0
+SDK headers. Theme support separately needs
 `Colors:Header` evidence. No Header color is inferred from a Window fallback.
 
 ## Source preparation
 
 [`manifest.toml`](../../packaging/desktop-colors/toolchains/manifest.toml) pins QtBase
 5.15.2, 6.2.4 and 6.5.0, KF5 5.92.0 and KF6 6.0.0. Its 16 SHA256 values were read from
-the official Qt/KDE `.sha256` URLs recorded per source on 2026-10-25; no archive download,
-source compilation or artifact digest is claimed. KF5's required Qt build version is
+the official Qt/KDE `.sha256` URLs recorded per source on 2026-10-25 and verified against
+the downloaded archives during baseline validation. KF5's required Qt build version is
 5.15.2. KF6 ColorScheme requires Qt 6.5.0.
 
 The opt-in recipe builds QtBase only, KF5's ConfigWidgets dependency chain, and KF6's
 Config/GuiAddons/I18n/ColorScheme chain. It disables KAuth, designer/documentation/QML
 and GuiAddons Wayland/X11 features that these extraction APIs do not need. Qt's XCB
-platform and DBus remain enabled. This dependency reduction and the full system header
-prerequisite list need Linux configure/build confirmation. Source license files are
-identified in the manifest; per-component license review and shipped notices remain
-pending extraction and packaging. No dependency is shipped by this preparation change.
+platform and DBus remain enabled. Build-only prerequisites include gperf, Qt5 Linguist
+tools/CMake metadata, Qt private headers for KI18n, and Qt5's xcb-util development module.
+Extracted source license files and archive digests were inventoried; KColorScheme source
+in both framework pins declares LGPL-2.0-or-later. Final packaged notices remain pending.
+
+The recipe pins three build-only patches separately from unchanged tarball hashes:
+Qt5's include-only GCC11 fixes from upstream commits
+[0afad46](https://code.qt.io/cgit/qt/qtbase.git/commit/?id=0afad46bb71b106780dd641de768a81d9f6c6a51)
+and [813a928](https://code.qt.io/cgit/qt/qtbase.git/commit/?id=813a928c7c3cf98670b6043149880ed5c955efb9),
+the KConfig6 QML-off [upstream fix](https://invent.kde.org/frameworks/kconfig/-/commit/e372f1ddbab0a39373da5025d2866dfeba217bdf),
+and an analogous local KI18n6 build-system guard. KF6 skips unused framework translation
+compilation with ECM's supported `KF_SKIP_PO_PROCESSING=ON`; KF5 still needs Linguist.
+Qt6 explicitly sets `INPUT_opengl=no`, and Qt5 rechecks configure tests after prerequisite
+changes. Each patch has exact original/result file hashes and a patch hash; changed or
+partially patched sources fail before mutation, while exact reruns are idempotent.
 
 On an authorized baseline Linux userspace, choose a dedicated private area:
 
@@ -98,9 +109,10 @@ unresolved optional Qt/KF in minimal userspaces is distinct from a baseline ABI 
 
 On the macOS development host with AppleClang 21, CMake and Python 3.14.7:
 
-- `python3 packaging/desktop-colors/test/toolchains_test.py`: 5 tests passed, including
+- `python3 packaging/desktop-colors/test/toolchains_test.py`: 12 tests passed, including
   independent Qt6/KDE6 plans, KDE5 dependency order, invalid argument handling, corrupt
-  archive rejection, and all three Qt floor diagnostics. Initial runs failed against
+  archive/patch rejection, patch idempotence/partial-state handling, named preflight
+  failures, target SDK paths under a root containing `qt5`, and all three Qt floor diagnostics. Initial runs failed against
   absent preparer/CMake files; these are tooling contract failures, not native assertion RED.
 - `bash -n packaging/desktop-colors/toolchains/build-baseline.sh`: passed.
 - `./gradlew :jasper-app:verifyDesktopQtCompatibility --no-daemon --console=plain`:
@@ -158,10 +170,37 @@ not establish clean desktop integration or the complete release gate. The Gradle
 uses `ctest --verbose --output-on-failure` so successful version/event/Header/mapping
 evidence is visible in its captured output, as it is in these manually verbose runs.
 
-Pinned private SDK preparation, minimum-version runtime tests, baseline ELF requirements,
-external mapped-window/config-write audit, real theme-engine events and x86_64 evidence
-remain pending. Task 1 and the native gate remain open; source/UI activation must wait
-for their evidence.
+## Ubuntu22 baseline SDK and floor evidence
+
+The disposable `jasper-qt-baseline` container on Fedora runs Ubuntu22 aarch64 userspace,
+GNU11.4, CMake3.22.1 and glibc2.35. Isolated CPython3.13.17 runs the preparation script.
+Pinned QtBase5.15.2/6.2.4/6.5.0 and both framework dependency chains built and installed
+after the documented corrections; the KF5 build used system Qt5.15.3. The final corrected
+script was checked against pristine archive members for every patch and all four
+preflights. It has not had a fresh end-to-end rebuild; KF5 against private Qt5.15.2 remains
+pending. Source/build/diagnostic logs are preserved in `/private/tmp/jasper-qt-baseline-sdk-logs.tgz`,
+`/private/tmp/jasper-kf5-baseline-sdk-logs.tgz` and `/private/tmp/jasper-qt5-baseline-build-recheck.log`.
+
+| Probe build SDK | Runtime tested | Result |
+| --- | --- | --- |
+| System Qt5.15.3 | System Qt5.15.3 | Pass |
+| Private Qt6.2.4 | System Qt6.2.4 and Fedora Qt6.11.2 | Same binary passes both |
+| Private KF5.92 / system Qt5.15.3 | System KF5.92 / Qt5.15.3 and Fedora KF5.116 / Qt5.15.18 | Same binary passes both |
+| Private KF6.0 / Qt6.5.0 | Private SDK runtime smoke, then Fedora system KF6.31 / Qt6.11.2 | Same binary passes both; minimum installed system runtime pending |
+
+All report zero visible windows; both pinned KDE Header APIs compile and distinctive
+pair/reparse assertions pass. Probe executables have no RPATH/RUNPATH, highest direct
+GLIBC2.34 and CXXABI1.3.9. Task2 source `98a1b1d4` also passes all three CTests on each
+system floor Qt5.15.3/Qt6.2.4: 27 extraction and 79 process checks per major, including
+the real 30-second refresh. Those production helpers require at most GLIBC2.34,
+GLIBCXX3.4.26 and CXXABI1.3.9 and resolve system libraries without RPATH/RUNPATH.
+Exact logs: `/private/tmp/jasper-task2-baseline-floor-tests.log`,
+`/private/tmp/jasper-final-recipe-patch-validation.log`, and
+`/private/tmp/jasper-baseline-artifacts-newer-system-runtimes.log`.
+
+The minimum KDE6 separately installed runtime, x86_64 matrix, production package/linkage
+gates and real theme-engine/desktop acceptance remain pending. Task 1 and the native
+release gate stay open; this container evidence does not activate source/UI choices.
 
 ## KDE helper extraction evidence — 2026-10-25
 

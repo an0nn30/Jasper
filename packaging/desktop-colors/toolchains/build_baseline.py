@@ -11,6 +11,7 @@ import sys
 import tarfile
 import urllib.request
 import tomllib
+import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
 
@@ -34,10 +35,87 @@ def plan(target, root, manifest):
         paths = [root / "prefixes" / qt]
         if target.startswith("kde"):
             paths.insert(0, root / "prefixes" / ("kf" + target[-1]))
-        result.append(dict(source, key=key, prefix=str(prefix),
+        result.append(dict(source, key=key, prefix=str(prefix), qt_prefix=str(root / "prefixes" / qt),
             build=str(root / "build" / qt / key),
-            cmake_prefix_path=";".join(map(str, paths))))
+            cmake_prefix_path=";".join(map(str, paths)),
+            patches=[manifest['patches'][patch] for patch in source.get('patches', [])]))
     return result
+
+
+def step_environment(step, inherited):
+    env = dict(inherited)
+    for key in ("CMAKE_PREFIX_PATH", "Qt5_DIR", "Qt6_DIR", "QTDIR", "QT_PLUGIN_PATH",
+                "QT_QPA_PLATFORM_PLUGIN_PATH", "LD_LIBRARY_PATH"):
+        env.pop(key, None)
+    env['PATH'] = str(pathlib.Path(step['qt_prefix']) / 'bin') + os.pathsep + inherited.get('PATH', '')
+    return env
+
+
+def check_tools(steps, search_path=None):
+    required = ['cmake', 'ninja', 'cc', 'c++', 'pkg-config', 'make', 'perl', 'patch']
+    required += [tool for step in steps for tool in step.get('build_tools', [])]
+    for command in dict.fromkeys(required):
+        if not shutil.which(command, path=search_path):
+            raise ValueError(f"missing build dependency: {command}")
+
+
+def check_pkg_config(steps, env):
+    for requirement in dict.fromkeys(module for step in steps for module in step.get('pkg_config', [])):
+        result = subprocess.run(['pkg-config', '--exists', requirement], env=env,
+                                capture_output=True, text=True)
+        if result.returncode:
+            raise ValueError(f"missing build dependency: pkg-config {requirement}")
+
+
+def cmake_options(step):
+    options = ["-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_INSTALL_LIBDIR=lib",
+        "-DCMAKE_INSTALL_PREFIX=" + step['prefix'],
+        "-DCMAKE_PREFIX_PATH=" + step['cmake_prefix_path'],
+        "-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF", "-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF"]
+    if step['name'] == 'qtbase':
+        options += ["-DQT_BUILD_TESTS=OFF", "-DQT_BUILD_EXAMPLES=OFF",
+            "-DFEATURE_xcb=ON", "-DFEATURE_opengl=OFF", "-DINPUT_opengl=no", "-DFEATURE_dbus=ON"]
+    else:
+        options += ["-DBUILD_TESTING=OFF", "-DBUILD_QCH=OFF", "-DBUILD_DOC=OFF",
+            "-DQT_MAJOR_VERSION=" + ("5" if step['version'].startswith('5') else "6")]
+    return options + step.get('cmake_options', [])
+
+
+def checked_path(root, relative):
+    path = (root / relative).resolve()
+    if not path.is_relative_to(root.resolve()):
+        raise ValueError(f"patch path escapes source: {relative}")
+    return path
+
+
+def apply_patches(source, patches, patch_root=HERE):
+    for spec in patches:
+        patch = checked_path(patch_root, spec['file'])
+        verify_archive(patch, spec['sha256'])
+        files = spec['files']
+        current = {file['path']: checked_path(source, file['path']).read_bytes() for file in files}
+        digests = {name: hashlib.sha256(data).hexdigest() for name, data in current.items()}
+        if all(digests[file['path']] == file['after'] for file in files):
+            continue
+        if not all(digests[file['path']] == file['before'] for file in files):
+            raise ValueError(f"source precondition failed for {spec['file']}; expected original or fully patched files")
+        # Apply to an isolated copy; rejected hunks/result hashes never mutate SDK sources.
+        with tempfile.TemporaryDirectory(prefix='jasper-sdk-patch-') as directory:
+            stage = pathlib.Path(directory)
+            for name, data in current.items():
+                target = checked_path(stage, name)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
+            result = subprocess.run(['patch', '-p1', '-F', '0', '-f', '-i', str(patch)],
+                                    cwd=stage, capture_output=True, text=True)
+            if result.returncode:
+                raise ValueError(f"patch failed for {spec['file']}: {result.stdout}{result.stderr}")
+            for file in files:
+                data = checked_path(stage, file['path']).read_bytes()
+                if hashlib.sha256(data).hexdigest() != file['after']:
+                    raise ValueError(f"patched result SHA256 mismatch for {file['path']}")
+            for file in files:
+                checked_path(source, file['path']).write_bytes(checked_path(stage, file['path']).read_bytes())
 
 
 def run(command, log, env, cwd=None):
@@ -50,17 +128,11 @@ def run(command, log, env, cwd=None):
 def build(steps, root, jobs):
     if platform.system() != "Linux":
         raise ValueError("--build requires Linux; run in the authorized baseline userspace")
-    for command in ("cmake", "ninja", "cc", "c++", "pkg-config", "make", "perl"):
-        if not shutil.which(command):
-            raise ValueError(f"missing build dependency: {command}")
+    check_tools(steps)
+    check_pkg_config(steps, step_environment(steps[0], os.environ))
     root.mkdir(parents=True, exist_ok=True)
     for directory in ("downloads", "src", "logs"):
         (root / directory).mkdir(exist_ok=True)
-    env = dict(os.environ)
-    # SDK versions are selected by this plan, never by an inherited user's Qt prefix.
-    for key in ("CMAKE_PREFIX_PATH", "Qt5_DIR", "Qt6_DIR", "QTDIR", "QT_PLUGIN_PATH",
-                "QT_QPA_PLATFORM_PLUGIN_PATH", "LD_LIBRARY_PATH"):
-        env.pop(key, None)
     for step in steps:
         archive = root / "downloads" / step["url"].rsplit("/", 1)[1]
         if not archive.exists():
@@ -74,11 +146,11 @@ def build(steps, root, jobs):
             with tarfile.open(archive) as tar:
                 # Reject traversal and unsafe links before extracting upstream sources.
                 tar.extractall(root / "src", filter="data")
+        apply_patches(source, step.get('patches', []))
         build_dir = pathlib.Path(step["build"])
         build_dir.mkdir(parents=True, exist_ok=True)
         prefix = pathlib.Path(step["prefix"])
-        env["PATH"] = str(root / "prefixes" / ("qt5" if "qt5" in step["cmake_prefix_path"] else
-            "kde6-qt" if "kde6-qt" in step["cmake_prefix_path"] else "qt6") / "bin") + os.pathsep + os.environ["PATH"]
+        env = step_environment(step, os.environ)
         log_path = root / "logs" / (step["key"] + ".log")
         print(f"desktop-colors: preparing {step['key']}; log={log_path}", flush=True)
         with log_path.open("w") as log:
@@ -89,22 +161,11 @@ def build(steps, root, jobs):
             if step["key"] == "qt5":
                 run([source / "configure", "-prefix", prefix, "-opensource", "-confirm-license",
                      "-release", "-nomake", "tests", "-nomake", "examples", "-no-opengl",
-                     "-xcb", "-dbus-linked", "-no-icu"], log, env, cwd=build_dir)
+                     "-xcb", "-dbus-linked", "-no-icu"] + step.get('configure_options', []), log, env, cwd=build_dir)
                 run(["make", "-C", build_dir, f"-j{jobs}"], log, env)
                 run(["make", "-C", build_dir, "install"], log, env)
             else:
-                options = ["-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_INSTALL_LIBDIR=lib",
-                    "-DCMAKE_INSTALL_PREFIX=" + str(prefix),
-                    "-DCMAKE_PREFIX_PATH=" + step["cmake_prefix_path"],
-                    "-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF", "-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF"]
-                if step["name"] == "qtbase":
-                    options += ["-DQT_BUILD_TESTS=OFF", "-DQT_BUILD_EXAMPLES=OFF",
-                        "-DFEATURE_xcb=ON", "-DFEATURE_opengl=OFF", "-DFEATURE_dbus=ON"]
-                else:
-                    options += ["-DBUILD_TESTING=OFF", "-DBUILD_QCH=OFF", "-DBUILD_DOC=OFF",
-                        "-DQT_MAJOR_VERSION=" + ("5" if step["version"].startswith("5") else "6")]
-                options += step.get("cmake_options", [])
-                run(["cmake", "-S", source, "-B", build_dir, "-G", "Ninja"] + options, log, env)
+                run(["cmake", "-S", source, "-B", build_dir, "-G", "Ninja"] + cmake_options(step), log, env)
                 run(["cmake", "--build", build_dir, "--parallel", str(jobs)], log, env)
                 run(["cmake", "--install", build_dir], log, env)
     (root / "logs" / "resolved-plan.json").write_text(json.dumps(steps, indent=2) + "\n")
