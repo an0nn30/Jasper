@@ -9,8 +9,11 @@ README. Disposable install checks preserve existing distro `jasper-libs`, which 
 installs first. Corrected DEB install/check/remove and equipped Fedora RPM coexistence pass. The real Gradle RPM
 extraction exposed writer SIGPIPE after cpio's successful early exit; conversion now finishes into a work-directory
 archive before separately verified extraction. Its unread-padding and both-stage failure fixtures pass, as do portable
-packaging fixtures, four documentation checks and shell syntax. Final RPM packageDist retry and independent review
-remain with the parent task. No SDK change, GUI, AOT, merge or push.
+packaging fixtures, four documentation checks and shell syntax. Actual Fedora `packageDist` passes after the extraction
+fix; DEB metadata and installation pass in the Ubuntu baseline/minimal containers. Both formats provide only
+`jasper-workstation`; Fedora coexistence preserves `jasper-libs-4.2.8-2.fc44.aarch64`. Independent review approves the
+final fixes. Latest main (`84cb18f25`) merges cleanly; packaging fixtures and documentation checks pass on the combined
+code. No GUI or AOT.
 
 **Linux distribution packaging — 2026-10-26:** `packageDist` selects only RPM on recognized Fedora/RHEL and SUSE
 families from `os-release`; Debian/Ubuntu and unknown hosts retain both formats. Explicit DEB/RPM tasks and mandatory
