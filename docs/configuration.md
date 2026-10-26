@@ -148,7 +148,7 @@ the reason in the footer.
 | System Settings | Appearance & Behavior | **General**: Run in background; **Java Virtual Machine**; **Command line**; **Configuration file**: Location (**Open in Editor**, **Reveal**), Reload from disk (**Reload**), Migrate old settings (**Migrate…**) | [Background residency](#background-residency) |
 | Keymap | | Every shortcut | [Shortcuts](#shortcuts) |
 | Plugins | | Installed plugins ([Plugins](plugins.md)) | [Plugins](#plugins) |
-| Terminal | | Scrollback lines, Bell, When the shell exits, Copy on select, Option key as Meta (macOS), Dim inactive panes | [Supported settings](#supported-settings) |
+| Terminal | | Tab name, Scrollback lines, Bell, When the shell exits, Copy on select, Option key as Meta (macOS), Dim inactive panes | [Supported settings](#supported-settings) |
 | Font & Colors | Terminal | **Font**: Font, Font size, Fallback fonts, Ligatures, Line height; **Colors**: Terminal colors (**Choose Scheme…** opens Appearance) | [Terminal colors](#terminal-colors) |
 | Cursor | Terminal | Cursor shape, Blinking cursor | [Supported settings](#supported-settings) |
 | Shell | Terminal | Shell profile, Shell program, Shell arguments, Environment variables, Shell integration | [Shell, environment and history](#shell-environment-and-history) |
@@ -409,14 +409,14 @@ Claude runs and has set a title, and `moray zsh` at the prompt.
 
 | Piece | Shows |
 | --- | --- |
-| `{dir}` | The current folder's name, `~` for your home folder; on another host, the last name of the path its shell reports |
-| `{full}` | The whole path, with your home folder as `~`; on another host, the path its shell reports |
+| `{dir}` | The name of the pane's [working directory](terminal.md#working-directory), `~` for your home folder: the folder its shell last reported, else the one the pane started in (PowerShell and Command Prompt report one only with [setup of your own](terminal.md#wsl-powershell-and-other-shells)); on another host, the last name of the path its shell reports |
+| `{full}` | The whole path of that directory, with your home folder as `~`; on another host, the path its shell reports |
 | `{process}` | The running program, such as `zsh`, `vim` or `claude`; on Windows and in a plugin's session, the shell's or session's name |
 | `{title}` | The title the shell or a program set (OSC 0, 1 or 2) |
 
-Plugins add pieces of their own, such as Remote's `{host}`; a piece that nothing provides shows nothing. Text between
-two pieces shows only when both have a value, so `{dir} | {process} | {title}` without a title reads `moray | zsh`.
-Text before the first piece and after the last always shows. `{{` and `}}` write a brace. A pattern that comes out
+Plugins add pieces of their own, such as Remote's `{host}`; a piece that nothing provides shows nothing. A piece without a
+value takes the text before it with it, or the text after it when no piece before it shows, so
+`{dir} | {process} | {title}` without a title reads `moray | zsh`. Text before the first piece and after the last always shows. `{{` and `}}` write a brace. A pattern that comes out
 empty names the tab after its shell. Settings › Terminal › Tab name previews the name the pattern gives the tab you
 are using.
 

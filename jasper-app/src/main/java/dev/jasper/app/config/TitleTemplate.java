@@ -8,9 +8,8 @@ import java.util.regex.Pattern;
 
 /**
  * A title template: free text with {@code {name}} pieces, as {@code terminal.tab_name} and a look's
- * {@code [chrome].window_title} use (tab names spec 3); <code>{{</code> and <code>}}</code> write a brace. The text
- * between two pieces shows only when both have a value: an empty piece goes with the text before it, or with the text
- * after it when it comes first. When every piece is empty, the leading and trailing text stay without the separators
+ * {@code [chrome].window_title} use (tab names spec 3); <code>{{</code> and <code>}}</code> write a brace. An empty
+ * piece goes with the text before it, or with the text after it when no piece before it has a value. When every piece is empty, the leading and trailing text stay without the separators
  * next to the pieces. A template without pieces is its text.
  *
  * @param literals the text before the first piece, between pieces and after the last: one more than {@code names}

@@ -164,8 +164,8 @@ public final class CoreSettings {
         .label("Tab name").keywords("tab", "title", "name", "format", "pattern", "folder", "directory", "process")
         .description("Live. How Terminal tabs are named: free text with pieces in braces. {dir} is the current folder's name,\n"
             + "{full} its whole path, {process} the running program and {title} the title the shell or a program set;\n"
-            + "plugins add their own, such as Remote's {host}. Text between two pieces shows only when both have a value.\n"
-            + "A tab named with Rename Tab keeps its name.").build();
+            + "plugins add their own, such as Remote's {host}. A piece without a value shows nothing and takes the text\n"
+            + "before it along, or the text after it when no piece before it shows. A tab named with Rename Tab keeps its name.").build();
     public static final Setting<String> TERMINAL_FONT_FAMILY = Setting.of("terminal.font.family",
             SettingKind.string(CoreSettings::fontName, FONT_NAME), FontConfig.defaults().family())
         .alias("font.family").label("Font").keywords("font", "typeface", "family")
