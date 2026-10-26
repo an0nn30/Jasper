@@ -6,7 +6,8 @@ task/connection counts, duplicate labels, suppression and activation remain expl
 focus and native-owner selection; passive refresh and drag cannot reopen it. The [plan](superpowers/plans/2026-10-25-buddy-compact-activity.md)
 records delegated implementation bodies. Buddy check and application architecture passed: 175 tests,
 zero failures/errors/skips. Inspected light/dark headless previews under `jasper-buddy/build/reports/buddy-groups/`.
-Task review, whole-branch review and full headless check are pending. GUI focus/outside-click acceptance
+Task and whole-branch reviews passed with no findings. Full headless check with Python 3.13 passed in
+8m 13s: 13,038 tests, zero failures/errors, 30 skips. GUI focus/outside-click acceptance
 remains user-run; no GUI, AOT, benchmark, merge or push.
 
 

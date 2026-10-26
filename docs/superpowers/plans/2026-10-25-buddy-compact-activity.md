@@ -8,7 +8,7 @@
 **Spec:** docs/superpowers/specs/2026-10-25-buddy-compact-activity-design.md
 
 Status: implemented; Buddy check (175 tests), application architecture and headless preview inspection passed.
-Task/whole-branch review and full headless check pending. Existing checkout reused on dedicated branch.
+Task/whole-branch reviews passed with no findings; full check passed in 8m 13s (13,038 tests, zero failures/errors, 30 skips). Existing checkout reused on dedicated branch.
 Deviation: detailed implementation bodies delegated to implementer; exact behaviors and verification
 below replace duplicating the production implementation in this plan.
 
@@ -52,5 +52,5 @@ production-used lifecycle seams may be introduced with concrete responsibilities
   Adapt old stack/arrival assumptions deliberately; remove dead tests with removed internals only.
 - [x] Generate headless light/dark previews of one summary, mixed/attention summary and grouped drawer
   including collapsed group. Inspect at rendered size. Update current docs and STATUS minimally.
-- [ ] Commit with Co-Authored-By trailer; task review and final whole-branch review, fix findings.
-- [ ] Run ./gradlew check --continue with Python 3.13; record results and finish locally.
+- [x] Commit with Co-Authored-By trailer; task review and final whole-branch review, fix findings.
+- [x] Run ./gradlew check --continue with Python 3.13; record results and finish locally.
