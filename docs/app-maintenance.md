@@ -657,6 +657,36 @@ the plugins) outside the built-in and plugin theme files and `SplashColors`; `Ui
 
 Run `./gradlew check` and all architecture guards; hand native visual acceptance to the user ([themes](themes.md)).
 
+### Linux Desktop colors diagnostics
+
+`platform.DesktopColors` owns the portal and requested GTK/Qt/KDE children; `application.DesktopAppearance` handles demand,
+generations and EDT publication through the existing theme transaction. `appearance.DesktopPalette` maps complete
+observations and checks final paint pairs. Automatic uses desktop hints captured at startup or Reload; explicit Qt / KDE
+falls back within that family. Qt/KDE report the current palette polarity, so an opposite appearance uses compatible
+last-good colors or the bundled fallback while the healthy helper remains observable. Authored-only configurations
+request the portal without toolkit children.
+The helpers are siblings of the application jar in `desktop-colors/` (`lib/desktop-colors` in installDist,
+`lib/app/desktop-colors` in a Linux native image). Gradle `run` sets the absolute `jasper.desktopColors.helpers`
+development override. `compileDesktopHelpers`, `stageDesktopHelpers` and `verifyDesktopHelpers` build, stage and
+check modes, ELF architecture and runtime linkage; packaging builds on Ubuntu 22.04 for the glibc 2.35 baseline.
+
+For protocol diagnostics, start a helper with `--protocol=1` and keep its input open while sending one JSON line:
+`{"v":1,"kind":"sample","generation":7,"appearance":"dark"}` to a toolkit helper, or
+`{"v":1,"kind":"ping","generation":7}` to any helper. Await the response before closing stdin: EOF cancels pending
+extraction. Preserve the complete line, generation, source, library version and reason when diagnosing a failure.
+The protocol is bounded to 64 KiB per line; the supervisor retains a 16 KiB stderr tail. Use the fixture tests instead
+of changing desktop settings:
+
+```sh
+./gradlew :jasper-app:test --tests '*Desktop*'
+./gradlew :jasper-app:testDesktopProtocol :jasper-app:testDesktopPortal :jasper-app:testDesktopGtk :jasper-app:checkDesktopQtNative :jasper-app:verifyDesktopHelpers
+```
+
+Native fixtures use private Xvfb and D-Bus with service activation disabled. They cover absent optional libraries,
+forced appearances, modern CSS variables, portal replacement and EOF cleanup. Dependencies and ABI details are in
+[the helper README](../packaging/desktop-colors/README.md). GNOME, GTK 3 desktops, KDE and Wayland/X11 acceptance
+requires the user's desktop session.
+
 ### Maintaining the Appearance section
 
 The Appearance page's Theme section is `Editors.appearance(AppearanceChoices)`: `settingsui.AppearanceSelection` edits

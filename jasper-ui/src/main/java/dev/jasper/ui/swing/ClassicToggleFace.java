@@ -44,8 +44,7 @@ final class ClassicToggleFace implements ToggleFace {
         int x = (button.getWidth() - box) / 2, y = (button.getHeight() - box) / 2;
         boolean enabled = button.isEnabled(), on = button.isSelected() || button.pending;
         if (enabled && (button.error || button.focus != null && button.focus.visible())) {
-            g.setColor(ColorMath.opacity(ThemePainting.color(c, button.error ? SemanticColor.BORDER_ERROR : SemanticColor.BORDER_FOCUS),
-                ThemePainting.focusHaloShare(c, button.error)));
+            g.setColor(ThemePainting.focusHaloColor(c, button.error));
             g.fill(new RoundRectangle2D.Double(x - ring, y - ring, box + 2.0 * ring, box + 2.0 * ring, 2.0 * (radius + ring), 2.0 * (radius + ring)));
         }
         Color fill, border, ink;

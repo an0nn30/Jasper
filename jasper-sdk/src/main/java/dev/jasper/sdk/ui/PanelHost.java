@@ -52,7 +52,7 @@ public interface PanelHost {
      * it closed.
      *
      * @return the current placement
-     * @since 0.21.0
+     * @since 0.22.0
      */
     PanelPlacement placement();
 
@@ -65,7 +65,7 @@ public interface PanelHost {
      *
      * @param handler receives the new placement
      * @return the registration
-     * @since 0.21.0
+     * @since 0.22.0
      */
     Subscription onPlacement(Consumer<PanelPlacement> handler);
 

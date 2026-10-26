@@ -452,6 +452,20 @@ def verifyPackage = tasks.register('verifyPackage') {
             linux: [app: 'lib/app', runtime: 'lib/runtime', launcher: 'bin/Jasper'],
         ][context.host.os]
         File appDir = new File(image, layoutFor.app)
+        File helperDirectory = new File(appDir, 'desktop-colors')
+        List<File> desktopHelpers = []
+        if (context.host.os == 'linux') {
+            ['jasper-desktop-portal', 'jasper-desktop-gtk3', 'jasper-desktop-gtk4',
+             'jasper-desktop-qt5', 'jasper-desktop-qt6', 'jasper-desktop-kde5', 'jasper-desktop-kde6'].each { name ->
+                File helper = new File(helperDirectory, name)
+                File stagedHelper = new File(inputDirectory.get().asFile, 'desktop-colors/' + name)
+                if (!helper.isFile() || !helper.canExecute() || Files.mismatch(stagedHelper.toPath(), helper.toPath()) != -1L)
+                    throw new GradleException("Package verification failed: missing or changed executable ${helper}")
+                desktopHelpers.add(helper)
+            }
+            if ((helperDirectory.listFiles().collect { it.name } as Set) != (desktopHelpers.collect { it.name } as Set))
+                throw new GradleException('Package verification failed: unexpected desktop helper files')
+        } else if (helperDirectory.exists()) throw new GradleException('Package verification failed: Linux desktop helpers on another OS')
         File runtimeHome = new File(image, layoutFor.runtime)
         File nativeLauncher = new File(image, layoutFor.launcher)
         File config = new File(appDir, 'Jasper.cfg')
@@ -722,7 +736,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         if (context.host.os == 'linux') {
             // Read the ELF header rather than trusting `file`: e_machine at offset 18 is 0x3E for x86-64, 0xB7 for AArch64.
             int expectedMachine = context.host.architecture == 'aarch64' ? 0xB7 : 0x3E
-            [nativeLauncher, watcher, new File(runtimeHome, 'bin/java')].each { binary ->
+            ([nativeLauncher, watcher, new File(runtimeHome, 'bin/java')] + desktopHelpers).each { binary ->
                 byte[] header = new byte[20]
                 binary.withInputStream { it.readNBytes(header, 0, header.length) }
                 boolean elf = header[0] == 0x7F && header[1] == ('E' as char) && header[2] == ('L' as char) && header[3] == ('F' as char)
@@ -878,25 +892,13 @@ if (normalizedHost().os == 'windows') {
     // remote access tool for its SSH sessions, transfers and tunnels.
     def menuCategories = 'System;TerminalEmulator;Network;RemoteAccess;'
 
-    // jpackage's rpm spec turns rpmbuild's dependency scan off and asks the host's rpm database instead,
-    // which is empty on a Debian-family build machine. Require the image's external shared libraries by
-    // soname, as rpmbuild itself would: every rpm distribution resolves "libX11.so.6()(64bit)".
-    def rpmLibraryRequirements = { File image ->
-        List<File> elfFiles = []
-        image.eachFileRecurse(groovy.io.FileType.FILES) { candidate ->
-            byte[] magic = new byte[4]
-            int read = candidate.withInputStream { it.readNBytes(magic, 0, 4) }
-            if (read == 4 && magic[0] == 0x7F && magic[1] == ('E' as char) && magic[2] == ('L' as char) && magic[3] == ('F' as char)) {
-                elfFiles << candidate
-            }
-        }
-        Set<String> bundled = elfFiles.collect { it.name } as Set
-        Set<String> needed = new TreeSet<>()
-        elfFiles.each { elf ->
-            String dynamic = executeNative(['readelf', '--dynamic', '--wide', elf.absolutePath], "readelf ${elf.name} (install binutils)").stdout
-            (dynamic =~ /\(NEEDED\)\s+Shared library: \[([^\]]+)\]/).each { needed << it[1] }
-        }
-        (needed - bundled).collect { "${it}()(64bit)".toString() }
+    // JBR's default lookup scans every executable, including optional helpers, and custom
+    // --linux-package-deps only appends. Compute mandatory requirements by exact image path
+    // and replace ONLY the dependency placeholders in the selected JBR templates below.
+    def linuxLibraryRequirements = { File image, String type ->
+        executeNative([providers.gradleProperty('jasper.python').getOrElse('python3'),
+            rootProject.file('packaging/linux/dependencies.py').absolutePath, type, image.absolutePath],
+            "mandatory ${type} image dependencies").stdout.trim()
     }
 
     // jpackage's install scripts register the menu entry with xdg-desktop-menu under `set -e`. xdg-desktop-menu fails
@@ -911,10 +913,11 @@ if (normalizedHost().os == 'windows') {
         DESKTOP_COMMANDS_UNINSTALL: 'jasper_menu_uninstall () {\nDESKTOP_COMMANDS_UNINSTALL\n}\n' +
             'jasper_menu_uninstall "$@" || echo "jasper: the desktop menu entry was not removed" >&2',
     ]
-    def writeInstallScripts = { File sdkHome, File resources, String type ->
+    def writeInstallScripts = { File sdkHome, File resources, String type, String requirements ->
         // Resource-directory names jpackage looks for, and the placeholders each template must contain.
         Map<String, List> overrides = type == 'deb' ?
-            ['template.postinst': ['postinst', ['DESKTOP_COMMANDS_INSTALL']], 'template.prerm': ['prerm', ['DESKTOP_COMMANDS_UNINSTALL']]] :
+            ['template.postinst': ['postinst', ['DESKTOP_COMMANDS_INSTALL']], 'template.prerm': ['prerm', ['DESKTOP_COMMANDS_UNINSTALL']],
+             'template.control': ['control', []]] :
             ['template.spec': ['jasper.spec', ['DESKTOP_COMMANDS_INSTALL', 'DESKTOP_COMMANDS_UNINSTALL']]]
         new ZipFile(new File(sdkHome, 'jmods/jdk.jpackage.jmod')).withCloseable { archive ->
             overrides.each { template, override ->
@@ -925,7 +928,16 @@ if (normalizedHost().os == 'windows') {
                     if (lines.count { it == placeholder } != 1) throw new GradleException("jpackage's ${template} no longer has exactly one ${placeholder} line; review the install-script override")
                     lines[lines.indexOf(placeholder)] = menuCommands[placeholder]
                 }
-                new File(resources, override[0]).setText(lines.join('\n'), 'UTF-8')
+                String text = lines.join('\n')
+                if (template in ['template.control', 'template.spec']) {
+                    String dependencyLine = type == 'deb' ?
+                        'Depends: PACKAGE_DEFAULT_DEPENDENCIES PACKAGE_CUSTOM_DEPENDENCIES' :
+                        'Requires: PACKAGE_DEFAULT_DEPENDENCIES PACKAGE_CUSTOM_DEPENDENCIES'
+                    if (lines.count { it == dependencyLine } != 1)
+                        throw new GradleException("JBR ${template} dependency template changed; review exact-path dependency override")
+                    text = text.replace('PACKAGE_DEFAULT_DEPENDENCIES', requirements).replace('PACKAGE_CUSTOM_DEPENDENCIES', '')
+                }
+                new File(resources, override[0]).setText(text, 'UTF-8')
             }
         }
     }
@@ -966,6 +978,7 @@ if (normalizedHost().os == 'windows') {
             description = "Creates and verifies the Linux .${type} package for this host's architecture (requires ${requirement})."
             dependsOn(verifyPackage)
             inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
+            inputs.file(rootProject.file('packaging/linux/dependencies.py')).withPathSensitivity(PathSensitivity.RELATIVE)
             inputs.property('version', version)
             outputs.file(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-linux-${packageArchitecture}.${type}") })
             doLast {
@@ -984,7 +997,8 @@ if (normalizedHost().os == 'windows') {
                     File resources = new File(temporary, 'resources')
                     resources.mkdirs()
                     Files.copy(nativeIcon.get().toPath(), new File(resources, 'Jasper.png').toPath())
-                    writeInstallScripts(context.sdkHome, resources, type)
+                    String mandatoryRequirements = linuxLibraryRequirements(image, type)
+                    writeInstallScripts(context.sdkHome, resources, type, mandatoryRequirements)
                     List<String> args = [context.jpackage.absolutePath, jpackageLauncherOption(), '--type', type, '--name', 'Jasper',
                         '--app-version', context.version, '--vendor', 'Jasper', '--description', packageDescription,
                         '--about-url', 'https://github.com/an0nn30/Jasper',
@@ -994,10 +1008,6 @@ if (normalizedHost().os == 'windows') {
                         '--linux-package-name', 'jasper', '--linux-shortcut',
                         '--linux-menu-group', menuCategories,
                         '--linux-app-category', type == 'deb' ? 'x11' : 'Applications/System']
-                    if (type == 'rpm') {
-                        List<String> requirements = rpmLibraryRequirements(image)
-                        if (requirements) args.addAll(['--linux-package-deps', requirements.join(', ')])
-                    }
                     executeNative(args, "jpackage Linux .${type} (install ${requirement})")
                     File generated = output.listFiles()?.find { it.name.endsWith(".${type}") }
                     if (generated == null) throw new GradleException("jpackage completed without producing a .${type}; inspect ${temporary}")
@@ -1024,6 +1034,20 @@ if (normalizedHost().os == 'windows') {
                     }
                     def expectedIdentity = ~/^jasper ${java.util.regex.Pattern.quote(context.version)}(-[0-9]+)? ${packageArchitecture}$/
                     if (!(identity ==~ expectedIdentity)) throw new GradleException(".${type} verification failed: package identity is '${identity}'")
+                    // Compare actual metadata with the mandatory scan, including optional-only
+                    // transitive libraries: no global Qt/KF name filtering can hide a dependency.
+                    Set<String> expectedRequirements = mandatoryRequirements.split(/,\s*/) as Set
+                    if (type == 'deb') {
+                        String dependencies = executeNative(['dpkg-deb', '--field', generated.absolutePath, 'Depends'], 'dpkg-deb Depends').stdout.trim()
+                        String preDependencies = executeNative(['dpkg-deb', '--field', generated.absolutePath, 'Pre-Depends'], 'dpkg-deb Pre-Depends').stdout.trim()
+                        if ((dependencies.split(/,\s*/) as Set) != expectedRequirements || !preDependencies.isEmpty())
+                            throw new GradleException(".deb dependency policy differs from mandatory image scan: ${dependencies}; Pre-Depends=${preDependencies}; expected=${mandatoryRequirements}")
+                    } else {
+                        String dependencies = executeNative(['rpm', '--query', '--package', '--requires', generated.absolutePath], 'rpm Requires').stdout
+                        Set<String> actualRequirements = dependencies.readLines().findAll { !it.startsWith('rpmlib(') && it != '/bin/sh' } as Set
+                        if (actualRequirements != expectedRequirements)
+                            throw new GradleException(".rpm dependency policy differs from mandatory image scan: ${actualRequirements}; expected=${mandatoryRequirements}")
+                    }
                     verifyUnpackedPackage(image, unpacked, ".${type}")
                     Files.move(generated.toPath(), artifact.toPath())
                 } finally {
@@ -1034,12 +1058,15 @@ if (normalizedHost().os == 'windows') {
             }
         }
     }
-    def packageDeb = linuxPackage('deb', 'packageDeb', 'dpkg-deb and fakeroot')
-    def packageRpm = linuxPackage('rpm', 'packageRpm', 'rpmbuild, readelf, rpm2cpio and cpio')
+    linuxPackage('deb', 'packageDeb', 'dpkg-deb and fakeroot')
+    linuxPackage('rpm', 'packageRpm', 'rpmbuild, readelf, rpm2cpio and cpio')
+    File osRelease = new File('/etc/os-release')
+    if (!osRelease.exists()) osRelease = new File('/usr/lib/os-release')
+    List<String> aggregatePackages = linuxPackageTasks(osRelease.isFile() ? osRelease.getText('UTF-8') : '')
     tasks.register('packageDist') {
         group = 'distribution'
-        description = 'Creates the Linux .deb and .rpm packages after verifying their image.'
-        dependsOn(packageDeb, packageRpm)
+        description = 'Creates the Linux packages for this host distribution after verifying their image.'
+        dependsOn(aggregatePackages)
     }
 } else {
     def aotTrainingDirectory = packagingRoot.map { it.dir('aot-training') }

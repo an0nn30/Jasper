@@ -34,10 +34,33 @@ class BuddyCompanionTest {
         var holder = new BuddyCompanion[1];
         SwingUtilities.invokeAndWait(() -> holder[0] = new BuddyCompanion(options()));
         var b = holder[0]; var id = new BuddyNoticeId("test",1);
-        for (Runnable call : java.util.List.<Runnable>of(() -> b.post(null), () -> b.updateTitle(id,"title"),
+        for (Runnable call : java.util.List.<Runnable>of(() -> b.post(null), () -> b.post(null, false), () -> b.updateContext(id, null, true), () -> b.updateTitle(id,"title"),
             () -> b.dismiss(id),
             b::clear, () -> b.setWorking(true), () -> b.show(), b::hide, b::greet, b::poke,
             () -> b.applyOptions(options()), b::close)) assertThatIllegalStateException().isThrownBy(call::run);
         SwingUtilities.invokeAndWait(b::close);
+        assertThatIllegalStateException().isThrownBy(() -> b.post(null, false));
+        assertThatIllegalStateException().isThrownBy(() -> b.updateContext(null, null, true));
+    }
+    @Test void contextAndVisibilityFollowFacadeLifecycle() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var deck = new BuddyDeck();
+            var buddy = new BuddyCompanion(options(), deck);
+            var id = new BuddyNoticeId("terminal", "pane");
+            var group = new BuddyNotice.Group(new BuddyNoticeId("terminal-tab", "tab"), "Claude");
+            var notice = new BuddyNotice(id, BuddyNotice.Kind.TASK, "Claude", BuddyNotice.State.RUNNING,
+                () -> "Running", () -> {}, group);
+            buddy.post(notice, false);
+            assertThat(deck.notices()).isEmpty();
+            buddy.updateContext(id, group, true);
+            assertThat(deck.notices()).containsExactly(notice);
+            assertThatNullPointerException().isThrownBy(() -> buddy.post(null, false));
+            assertThatNullPointerException().isThrownBy(() -> buddy.updateContext(null, null, true));
+            buddy.updateContext(id, null, false);
+            buddy.close();
+            buddy.post(null, false); buddy.updateContext(null, null, true);
+            buddy.updateContext(id, group, true);
+            assertThat(deck.notices()).isEmpty();
+        });
     }
 }

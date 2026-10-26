@@ -12,6 +12,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BuddySpriteTest {
+    @Test void transitionPosesAppendWithoutChangingExistingArtwork() throws Exception {
+        assertThat(BuddyFrame.values()).hasSize(23);
+        assertThat(BuddyFrame.valueOf("CLOSE_LAPTOP").column()).isEqualTo(20);
+        assertThat(BuddyFrame.valueOf("LOWER_LAPTOP").column()).isEqualTo(21);
+        assertThat(BuddyFrame.valueOf("RISE").column()).isEqualTo(22);
+        BuddySprite sprite = BuddySprite.load();
+        var digest = java.security.MessageDigest.getInstance("SHA-256");
+        try (var in = BuddySprite.class.getResourceAsStream(BuddySprite.RESOURCE)) {
+            var sheet = javax.imageio.ImageIO.read(in);
+            for (int y = 0; y < 96; y++) for (int x = 0; x < 84 * 20; x++) {
+                int pixel = sheet.getRGB(x, y);
+                digest.update(java.nio.ByteBuffer.allocate(4).putInt(pixel).array());
+            }
+        }
+        assertThat(java.util.HexFormat.of().formatHex(digest.digest()))
+            .isEqualTo("07627f6cacddaa18c64a1ac3863621a97c6880dbfb20b56f416eb1417db90b40");
+        for (int i = 19; i < 23; i++) for (int j = i + 1; j < 23; j++)
+            assertThat(pixels(sprite.frame(BuddyFrame.values()[i])))
+                .isNotEqualTo(pixels(sprite.frame(BuddyFrame.values()[j])));
+    }
+
     @Test void pixelArtworkKeepsTheCompanionsLogicalSize() throws Exception {
         try (var in = BuddySprite.class.getResourceAsStream(BuddySprite.RESOURCE)) {
             var sheet = javax.imageio.ImageIO.read(in);

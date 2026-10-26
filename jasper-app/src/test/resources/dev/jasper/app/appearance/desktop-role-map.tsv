@@ -1,0 +1,83 @@
+role	family	input	fallback
+surface.app	window	WINDOW.background	Slate Cobalt variant
+surface.status	window	WINDOW.background	Slate Cobalt variant
+surface.panel	window	WINDOW.background	Slate Cobalt variant
+surface.panel.raised	raised	3% WINDOW.foreground over WINDOW.background	Slate Cobalt variant
+surface.dialog	dialog	DIALOG.background over accepted WINDOW; shared ink check	accepted WINDOW / bundled neutral family
+surface.card	raised	3% WINDOW.foreground over WINDOW.background	Slate Cobalt variant
+surface.sidebar	sidebar	SIDEBAR.background over accepted WINDOW; shared ink check	accepted WINDOW / bundled neutral family
+surface.input	view	VIEW.background over accepted WINDOW; shared ink check	accepted WINDOW / bundled neutral family
+surface.control	raised	3% WINDOW.foreground over WINDOW.background	Slate Cobalt variant
+surface.control.hover	state	8% WINDOW.foreground over WINDOW.background	Slate Cobalt variant
+surface.menu	menu	POPOVER.background over accepted WINDOW; shared ink check	accepted WINDOW / bundled neutral family
+surface.terminal	window	WINDOW.background	Slate Cobalt variant
+surface.scrim	overlay	bundled value	bundled value
+border.window	structural-boundary	bundled value; existing paint guards	black/white high contrast
+border.subtle	structural-boundary	bundled value; existing paint guards	black/white high contrast
+border.input	control-boundary	bundled color repaired to 3:1 for actual boundaries	bundled neutral family; black/white high contrast
+border.control	control-boundary	bundled color repaired to 3:1 for actual boundaries	bundled neutral family; black/white high contrast
+border.identity	structural-boundary	bundled value; existing paint guards	black/white high contrast
+border.menu	structural-boundary	bundled value; existing paint guards	black/white high contrast
+border.focus	control-boundary	bundled color repaired to 3:1 for actual boundaries	bundled neutral family; black/white high contrast
+border.error	control-boundary	bundled color repaired to 3:1 for actual boundaries	bundled neutral family; black/white high contrast
+text.primary	shared-ink	WINDOW.foreground; deterministic repair against actual uses	bundled neutral family; black/white high contrast
+text.secondary	shared-ink	WINDOW.foreground; deterministic repair against actual uses	bundled neutral family; black/white high contrast
+text.tertiary	shared-ink	WINDOW.foreground; deterministic repair against actual uses	bundled neutral family; black/white high contrast
+text.placeholder	shared-ink	WINDOW.foreground; deterministic repair against actual uses	bundled neutral family; black/white high contrast
+text.onAccent	accent-ink	highest contrast black/white against accepted accent	deterministic accent repair
+text.onAccent.secondary	accent-ink	highest contrast black/white against accepted accent	deterministic accent repair
+text.onSelection	selection	compatible SELECTION pair; text.primary also paints selection	accepted accent tint / shared primary; black/white high contrast
+text.onSelection.secondary	selection	compatible SELECTION pair; text.primary also paints selection	accepted accent tint / shared primary; black/white high contrast
+text.link	colored-ink	bundled hue repaired for actual backgrounds	bundled neutral family; black/white high contrast
+text.link.hover	colored-ink	bundled hue repaired for actual backgrounds	bundled neutral family; black/white high contrast
+text.error	colored-ink	bundled hue repaired for actual backgrounds	bundled neutral family; black/white high contrast
+text.success	colored-ink	bundled hue repaired for actual backgrounds	bundled neutral family; black/white high contrast
+accent	accent	opaque portal accent then compatible SELECTION.background; hover 8% primary; final-paint repair	bundled accent
+accent.hover	accent	opaque portal accent then compatible SELECTION.background; hover 8% primary; final-paint repair	bundled accent
+selection.bg	selection	compatible SELECTION pair; text.primary also paints selection	accepted accent tint / shared primary; black/white high contrast
+hover.overlay	hover	WINDOW.foreground	bundled; high contrast background
+segment.selected.bg	state	8% WINDOW.foreground over WINDOW.background	Slate Cobalt variant
+toggle.track.off	indicator	bundled track repaired against knob and control parents	black/white high contrast neutral family
+toggle.knob	indicator	black/white opposite primary ink; all track states repaired together	black/white high contrast neutral family
+status.success	status-hue	bundled hue repaired for actual text and tint uses	bundled hue
+status.warning	status-hue	bundled hue repaired for actual text and tint uses	bundled hue
+status.danger	status-hue	bundled hue repaired for actual text and tint uses	bundled hue
+status.idle	status-hue	bundled hue repaired for actual text and tint uses	bundled hue
+hue.blue	status-hue	bundled hue repaired for actual text and tint uses	bundled hue
+hue.green	status-hue	bundled hue repaired for actual text and tint uses	bundled hue
+hue.amber	status-hue	bundled hue repaired for actual text and tint uses	bundled hue
+hue.purple	status-hue	bundled hue repaired for actual text and tint uses	bundled hue
+hue.neutral	status-hue	bundled hue repaired for actual text and tint uses	bundled hue
+hue.blue.surface	tint	repaired corresponding hue; kit tile opacity	bundled corresponding hue
+hue.green.surface	tint	repaired corresponding hue; kit tile opacity	bundled corresponding hue
+hue.amber.surface	tint	repaired corresponding hue; kit tile opacity	bundled corresponding hue
+hue.purple.surface	tint	repaired corresponding hue; kit tile opacity	bundled corresponding hue
+hue.neutral.surface	tint	repaired corresponding hue; kit tile opacity	bundled corresponding hue
+button.secondary.bg	raised	3% WINDOW.foreground over WINDOW.background	Slate Cobalt variant
+button.secondary.bg.hover	state	8% WINDOW.foreground over WINDOW.background	Slate Cobalt variant
+surface.field.raised	view	VIEW.background over accepted WINDOW; shared ink check	accepted WINDOW / bundled neutral family
+surface.control.selected	state	8% WINDOW.foreground over WINDOW.background	Slate Cobalt variant
+surface.tabstrip	window	WINDOW.background	Slate Cobalt variant
+surface.emptyTile	raised	3% WINDOW.foreground over WINDOW.background	Slate Cobalt variant
+border.field.raised	control-boundary	bundled color repaired to 3:1 for actual boundaries	bundled neutral family; black/white high contrast
+border.field.raised.hover	control-boundary	bundled color repaired to 3:1 for actual boundaries	bundled neutral family; black/white high contrast
+text.strong.secondary	shared-ink	WINDOW.foreground; deterministic repair against actual uses	bundled neutral family; black/white high contrast
+text.field.raised	shared-ink	WINDOW.foreground; deterministic repair against actual uses	bundled neutral family; black/white high contrast
+segment.track	raised	3% WINDOW.foreground over WINDOW.background	Slate Cobalt variant
+button.secondary.border	control-boundary	bundled color repaired to 3:1 for actual boundaries	bundled neutral family; black/white high contrast
+tab.indicator	indicator	bundled value	black/white high contrast neutral family
+tab.indicator.inactive	indicator	bundled value	black/white high contrast neutral family
+surface.titlebar	header	HEADER pair; independent foreground	accepted WINDOW pair / bundled neutral family
+text.titlebar	header	HEADER pair; independent foreground	accepted WINDOW pair / bundled neutral family
+surface.header	classic-surface	existing derived recipe; repaired against actual shared text	black/white high contrast background
+surface.header.active	classic-surface	existing derived recipe; repaired against actual shared text	black/white high contrast background
+surface.stripe	classic-surface	existing derived recipe; repaired against actual shared text	black/white high contrast background
+surface.tableHeader	classic-surface	existing derived recipe; repaired against actual shared text	black/white high contrast background
+surface.zebra	classic-surface	existing derived recipe; repaired against actual shared text	black/white high contrast background
+surface.rowHover	classic-surface	existing derived recipe; repaired against actual shared text	black/white high contrast background
+warning.ground	notice	existing derived warning tint	black/white high contrast background
+warning.border	classic-boundary	existing derived recipe	black/white high contrast ink
+border.divider	classic-boundary	existing derived recipe	black/white high contrast ink
+focus.halo	ring	opaque repaired border.focus / border.error against ring parents	authored metric opacity when absent
+error.halo	ring	opaque repaired border.focus / border.error against ring parents	authored metric opacity when absent
+surface.textSelection	interface-selection	selection.bg repaired against text.primary for inherited text fields	authored terminal selection when override absent

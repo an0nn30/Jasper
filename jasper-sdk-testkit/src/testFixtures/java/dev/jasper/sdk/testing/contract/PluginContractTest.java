@@ -457,11 +457,86 @@ public abstract class PluginContractTest {
         assertThat(alpha.activities().current()).isEmpty();
     }
 
+    @Test void activityInputPhasesRetainIdentityFractionAndAction() {
+        PluginContext alpha = started("test.alpha", Set.of());
+        var task = alpha.activities().begin(new ActivitySpec("Upload", "start", Optional.of("test.alpha.open"), Optional.empty()));
+        h.flush();
+        task.progress(.4, "uploaded"); h.flush();
+        task.needsInput("choose destination"); h.flush();
+        task.detail("still waiting"); h.flush();
+        assertThat(alpha.activities().current()).singleElement().satisfies(event -> {
+            assertThat(event.state()).isEqualTo(ActivityEvent.State.NEEDS_INPUT);
+            assertThat(event.fraction()).hasValue(.4);
+            assertThat(event.activateActionId()).contains("test.alpha.open");
+        });
+        task.resume("continuing"); h.flush();
+        assertThat(h.notifications()).as("waiting and resuming are live work, not outcomes").isEmpty();
+        task.progress(.8, "nearly"); h.flush();
+        task.succeed("done"); h.flush();
+        assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED, PROGRESS,
+            ActivityEvent.State.NEEDS_INPUT, ActivityEvent.State.NEEDS_INPUT, ActivityEvent.State.RESUMED, PROGRESS, SUCCEEDED);
+        assertThat(h.activityLog()).allSatisfy(event -> assertThat(event.id()).isEqualTo(task.id()));
+    }
+
+    @Test void pendingCallbacksCannotConsumeReportsAcrossPhaseBoundaries() {
+        PluginContext alpha = started("test.alpha", Set.of());
+        h.ui(() -> {
+            var task = alpha.activities().begin(ActivitySpec.of("Upload"));
+            task.progress(.1, "old running");
+            task.needsInput("first wait");
+            task.detail("old waiting");
+            task.resume("first resume");
+            task.progress(.4, "old resumed");
+            task.needsInput("second wait");
+            task.needsInput("latest waiting");
+            task.progress(.5, "latest fraction");
+        });
+        h.flush();
+        assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED,
+            ActivityEvent.State.NEEDS_INPUT, ActivityEvent.State.RESUMED, ActivityEvent.State.NEEDS_INPUT,
+            ActivityEvent.State.NEEDS_INPUT);
+        assertThat(h.activityLog()).extracting(ActivityEvent::detail).containsExactly("", "first wait", "first resume", "second wait", "latest fraction");
+        assertThat(alpha.activities().current()).singleElement().satisfies(event -> assertThat(event.fraction()).hasValue(.5));
+    }
+
+    @Test void repeatingRunningPhaseCoalescesDetailWithoutAnotherTransition() {
+        PluginContext alpha = started("test.alpha", Set.of());
+        h.ui(() -> {
+            var task = alpha.activities().begin(ActivitySpec.of("Upload"));
+            task.needsInput("choose");
+            task.resume("continue");
+            task.resume("first detail");
+            task.resume("last detail");
+        });
+        h.flush();
+        assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED,
+            ActivityEvent.State.NEEDS_INPUT, ActivityEvent.State.RESUMED, PROGRESS);
+        assertThat(h.activityLog().getLast().detail()).isEqualTo("last detail");
+    }
+
+    @Test void stoppedWaitingHandleCannotDeliverPendingReportsOrResurrect() {
+        PluginContext alpha = started("test.alpha", Set.of());
+        var task = alpha.activities().begin(ActivitySpec.of("Upload"));
+        h.flush();
+        h.ui(() -> {
+            task.needsInput("input");
+            task.progress(.4, "pending");
+            h.stopAll();
+            task.resume("late"); task.needsInput("late"); task.detail("late");
+            task.progress(.9, "late"); task.succeed("late"); task.fail("late"); task.cancelled();
+        });
+        h.flush();
+        assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED, ActivityEvent.State.NEEDS_INPUT, FAILED);
+        assertThat(alpha.activities().current()).isEmpty();
+    }
+
     @Test void activitiesLeftOpenFailWhenTheirPluginStops() {
         PluginContext alpha = started("test.alpha", Set.of());
-        alpha.activities().begin(ActivitySpec.of("Sync"));
+        var handle = alpha.activities().begin(ActivitySpec.of("Sync"));
         h.flush();
         h.stopAll();
+        handle.detail("late"); handle.needsInput("late"); handle.resume("late");
+        handle.succeed("late"); handle.fail("late"); handle.cancelled();
         h.flush();
         assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED, FAILED);
         assertThat(h.active("test.alpha")).isFalse();

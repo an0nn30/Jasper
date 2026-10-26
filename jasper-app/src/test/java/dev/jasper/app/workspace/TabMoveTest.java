@@ -38,6 +38,10 @@ class TabMoveTest {
 
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
+    private static void terminalTitle(Tab tab, String value) {
+        ((TerminalContent) tab.content()).rename(value);
+    }
+
     @Test void aTerminalTabMovedBetweenWindowsKeepsItsSession() throws Exception {
         edt(() -> {
             Tab tab = source.selectedTab();
@@ -73,14 +77,19 @@ class TabMoveTest {
             Tab tab = source.selectedTab();
             var pane = ((TerminalContent) tab.content()).pane();
             model.tabs().move(tab, target.id());
-            assertThat(after).as("a moved pane is not opened again").isEmpty();
+            assertThat(after).as("a moved pane is not opened again")
+                .noneMatch(event -> event instanceof WorkspaceActivity.PaneState);
+            assertThat(after).filteredOn(WorkspaceActivity.Presentation.class::isInstance).isNotEmpty();
             assertThat(facts).as("one move, reported where it arrives").filteredOn(TerminalEvent.TabMoved.class::isInstance)
                 .containsExactly(new TerminalEvent.TabMoved(tab.id().value(), source.id(), target.id()));
             assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
             assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.PaneOpened || fact instanceof TerminalEvent.PaneClosed);
             assertThat(registry.tab(tab.id().value()).orElseThrow().windowId()).isEqualTo(target.id());
-            pane.onTitleChanged.accept("moved");
-            assertThat(after).containsExactly(new WorkspaceActivity.TitleChanged(pane.id(), "moved"));
+            before.clear(); after.clear();
+            pane.onTitleChanged.accept("reported program title");
+            assertThat(facts).contains(new TerminalEvent.TitleChanged(pane.id(), "reported program title"));
+            terminalTitle(tab, "moved");
+            assertThat(after).filteredOn(WorkspaceActivity.Presentation.class::isInstance).isNotEmpty();
             assertThat(before).isEmpty();
             tab.close();
             assertThat(after).contains(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.CLOSED));

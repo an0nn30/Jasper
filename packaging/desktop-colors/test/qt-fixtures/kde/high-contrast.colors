@@ -1,0 +1,6 @@
+[Colors:Window]
+BackgroundNormal=255,255,255
+ForegroundNormal=0,0,0
+[Colors:View]
+BackgroundNormal=255,255,255
+ForegroundNormal=0,0,0

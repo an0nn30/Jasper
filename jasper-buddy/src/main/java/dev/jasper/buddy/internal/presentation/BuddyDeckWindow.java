@@ -18,57 +18,83 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
 /**
- * The drawer's window: translucent, always on top and never focused, like the bubble it replaces.
- * Unlike the menu bubble it has no auto-hide timeout. It hides on pointer exit, after card
- * activation, when emptied or when the companion hides; hiding does not clear the model.
+ * Focusable activity drawer, opened deliberately and closed on Escape, focus loss or activation.
  */
 final class BuddyDeckWindow {
-    private final JWindow window = new JWindow();
+    private Window window;
+    private Window owner;
+    private final BuddyDrawerLifetime lifetime = new BuddyDrawerLifetime();
     private final BuddyDeck deck;
     private final BuddyDeckPanel panel;
-    /** Animates hover and running-text shimmer; other live detail ticks once per second. */
+    /** Animates brief hover feedback; live detail ticks once per second. */
     private final Timer frames = new Timer(16, event -> tick());
-    private Rectangle anchor;
+    private Rectangle anchor() { return lifetime.anchor(); }
     private boolean disposed;
 
     BuddyDeckWindow(BuddyOptions options, BuddyDeck deck, Runnable onNoticesChanged) {
         this.deck = Objects.requireNonNull(deck, "deck");
         this.panel = new BuddyDeckPanel(options, deck, this::onPanelChanged, onNoticesChanged);
         panel.setMaxListHeight(this::usableHeight);
-        try {
-            window.setType(Window.Type.UTILITY);
-            window.setAlwaysOnTop(true);
-            window.setFocusableWindowState(false);
-            window.setBackground(new Color(0, 0, 0, 0));
-            window.setContentPane(panel);
-            MouseAdapter mouse = new MouseAdapter() {
-                @Override public void mouseMoved(MouseEvent event) { panel.handleMove(event.getPoint()); }
-                @Override public void mouseExited(MouseEvent event) {
-                    // Moving within the panel still reports an exit for child bounds; only a real one counts.
-                    if (panel.contains(event.getPoint())) return;
-                    panel.handleExit();
-                    hide();
-                }
-                // A macOS control-click is the popup trigger yet reports the left button; it must not activate.
-                @Override public void mouseClicked(MouseEvent event) {
-                    if (!SwingUtilities.isLeftMouseButton(event) || event.isControlDown()) return;
-                    if (!panel.handleClick(event.getPoint())) hide();
-                }
-                @Override public void mouseWheelMoved(MouseWheelEvent event) {
-                    panel.handleWheel(event.getWheelRotation());
-                }
-            };
-            panel.addMouseListener(mouse);
-            panel.addMouseMotionListener(mouse);
-            panel.addMouseWheelListener(mouse);
-        } catch (RuntimeException | Error failure) {
-            try { window.dispose(); } catch (Throwable cleanup) { failure.addSuppressed(cleanup); }
-            throw failure;
-        }
+        MouseAdapter mouse = new MouseAdapter() {
+            @Override public void mouseMoved(MouseEvent event) { panel.handleMove(event.getPoint()); }
+            @Override public void mouseExited(MouseEvent event) {
+                // Moving within the panel still reports an exit for child bounds; only a real one counts.
+                if (panel.contains(event.getPoint())) return;
+                panel.handleExit();
+            }
+            // A macOS control-click is the popup trigger yet reports the left button; it must not activate.
+            @Override public void mouseClicked(MouseEvent event) {
+                if (!SwingUtilities.isLeftMouseButton(event) || event.isControlDown()) return;
+                if (!panel.handleClick(event.getPoint())) hide();
+            }
+            @Override public void mouseWheelMoved(MouseWheelEvent event) {
+                panel.handleWheel(event.getWheelRotation());
+            }
+        };
+        panel.addMouseListener(mouse);
+        panel.addMouseMotionListener(mouse);
+        panel.addMouseWheelListener(mouse);
+        panel.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).put(
+            javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0), "close");
+        panel.getActionMap().put("close", new javax.swing.AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) { hide(); }
+        });
     }
 
+    /** Owner selection happens only on explicit opening, preserving workspace activation. */
+    private Window eligibleOwner() {
+        Window active = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow();
+        for (Window candidate = active; candidate != null; candidate = candidate.getOwner())
+            if (eligible(candidate)) return candidate;
+        for (Window candidate : Window.getWindows()) if (eligible(candidate)) return candidate;
+        return null;
+    }
+
+    private boolean eligible(Window candidate) {
+        return candidate != window && candidate.isShowing() && candidate.isFocusableWindow()
+            && (candidate instanceof java.awt.Frame || candidate instanceof java.awt.Dialog)
+            && (!(candidate instanceof java.awt.Frame frame) || (frame.getExtendedState() & java.awt.Frame.ICONIFIED) == 0);
+    }
+
+    private void ensureWindow() {
+        Window nextOwner = eligibleOwner();
+        if (window != null && owner == nextOwner) return;
+        if (window != null) { window.removeWindowFocusListener(focus); window.dispose(); }
+        owner = nextOwner;
+        window = owner == null ? new BuddySurfaceDialog() : new BuddySurfaceWindow(owner);
+        window.setType(Window.Type.UTILITY);
+        window.setAlwaysOnTop(true);
+        window.setFocusableWindowState(true);
+        window.setBackground(new Color(0, 0, 0, 0));
+        ((javax.swing.RootPaneContainer) window).setContentPane(panel);
+    }
+
+    private final java.awt.event.WindowFocusListener focus = new java.awt.event.WindowAdapter() {
+        @Override public void windowLostFocus(java.awt.event.WindowEvent event) { hide(); }
+    };
+
     private void tick() {
-        if (disposed || !window.isVisible()) { frames.stop(); return; }
+        if (disposed || (window == null || !window.isVisible())) { frames.stop(); return; }
         panel.repaint();
         if (!panel.needsAnimationFrames() && !panel.needsDetailUpdates()) frames.stop();
         else frames.setDelay(panel.needsAnimationFrames() ? 16 : 1000);
@@ -76,7 +102,7 @@ final class BuddyDeckWindow {
 
     private void onPanelChanged() {
         layout();
-        if (!disposed && window.isVisible() && (panel.needsAnimationFrames() || panel.needsDetailUpdates())) {
+        if (!disposed && window != null && window.isVisible() && (panel.needsAnimationFrames() || panel.needsDetailUpdates())) {
             int delay = panel.needsAnimationFrames() ? 16 : 1000;
             boolean speedUp = delay < frames.getDelay();
             frames.setDelay(delay);
@@ -84,36 +110,47 @@ final class BuddyDeckWindow {
         }
     }
 
-    /** Remembers where the buddy is and shows the drawer there, if there is anything in it. */
+    /** Explicit user opening is the only path which can request focus or choose an owner. */
     void showBeside(Rectangle anchorOnScreen) {
-        if (disposed) return;
-        anchor = new Rectangle(anchorOnScreen);
+        if (disposed || deck.isEmpty()) return;
+        ensureWindow();
+        lifetime.open(anchorOnScreen);
+        window.removeWindowFocusListener(focus);
+        window.addWindowFocusListener(focus);
         layout();
+        if (lifetime.takeFocusRequest() && window.isVisible()) {
+            window.toFront(); window.requestFocus(); panel.requestFocusInWindow();
+        }
     }
 
-    /** The drawer changed: re-size and re-place it, or take it away when it is now empty. */
-    void refresh() { layout(); }
+    void moveBeside(Rectangle anchorOnScreen) { lifetime.move(anchorOnScreen); layout(); }
+    void refresh() { panel.refresh(); }
 
     void hide() {
         if (disposed) return;
+        lifetime.close();
         frames.stop();
+        if (window != null) {
+            window.removeWindowFocusListener(focus);
+            window.setVisible(false);
+        }
         panel.reset();
-        window.setVisible(false);
     }
 
     void applyOptions(BuddyOptions options) {
         panel.applyOptions(options);
-        window.pack();
+        layout();
     }
 
     void dispose() {
         if (disposed) return;
         disposed = true;
         frames.stop();
-        window.dispose();
+        lifetime.dispose();
+        if (window != null) { window.removeWindowFocusListener(focus); window.dispose(); }
     }
 
-    boolean isShowing() { return !disposed && window.isVisible(); }
+    boolean isShowing() { return !disposed && window != null && window.isVisible(); }
 
     /**
      * Whether the drawer has anything to show. Extracted because the test JVM is headless and a
@@ -123,10 +160,14 @@ final class BuddyDeckWindow {
         return !disposed && anchor != null && !deckEmpty && size.width > 0 && size.height > 0;
     }
 
+    /** Shared by model refresh and anchor placement; headless-testable without constructing a window. */
+    static Dimension reconcilePanel(BuddyDeckPanel panel) { return panel.reconcileSize(); }
+
     private void layout() {
-        if (disposed || anchor == null) return;
-        Dimension size = panel.getPreferredSize();
-        if (!shows(false, anchor, deck.isEmpty(), size)) { frames.stop(); window.setVisible(false); return; }
+        Rectangle anchor = anchor();
+        if (disposed || anchor == null || window == null) return;
+        Dimension size = reconcilePanel(panel);
+        if (!shows(false, anchor, panel.displayed().isEmpty(), size)) { hide(); return; }
         if (!size.equals(window.getSize())) window.setSize(size);
         Point next = BuddyBubblePlacement.beside(anchor, size, screenFor(anchor));
         if (!next.equals(window.getLocation())) window.setLocation(next);
@@ -140,6 +181,7 @@ final class BuddyDeckWindow {
 
     /** How tall the expanded list may grow: the screen it sits on, less room to breathe. */
     private int usableHeight() {
+        Rectangle anchor = anchor();
         Rectangle screen = anchor == null ? null : screenFor(anchor);
         return screen == null ? 800 : Math.max(120, screen.height - 4 * BuddyDeckPanel.MOTION_MARGIN);
     }

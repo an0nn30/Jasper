@@ -30,7 +30,7 @@ class UiColorKeysTest {
     static LinkedHashMap<String, Object> expected(SemanticPalette palette, Color selection) throws IOException {
         var sources = new LinkedHashMap<String, Object>();
         for (var role : SemanticColor.values()) sources.put(role.name(), ColorMath.hex(palette.color(role)));
-        sources.put("terminal.selection", ColorMath.hex(selection));
+        sources.put("text.selection", ColorMath.hex(selection));
         sources.put("error.tint", ColorMath.hex(UiColorKeys.errorTint(palette)));
         var expected = new LinkedHashMap<String, Object>();
         for (var entry : frozenSources().entrySet()) {
@@ -109,6 +109,22 @@ class UiColorKeysTest {
             for (var entry : UiColorKeys.flatLaf(JasperTheme.bundled().generated(dark), UiKeySet.DEFAULT).entrySet())
                 assertThat(entry.getValue()).as("%s in %s", entry.getKey(), dark ? "dark" : "light").isIn(allowed);
         }
+    }
+
+    @Test void anExplicitTextSelectionOverrideFeedsBothKitsWithoutChangingAuthoredDefaults() {
+        var base = JasperTheme.bundled().generated(true);
+        var fill = new Color(0x12, 0x23, 0x34);
+        var theme = new GeneratedTheme(base.name(), base.dark(), base.author(), base.semantic(), base.terminal(),
+            base.editor(), base.syntax(), base.glass(), Map.of(DerivedColor.SURFACE_TEXT_SELECTION, fill));
+        for (var set : UiKeySet.values()) {
+            var keys = UiColorKeys.flatLaf(theme, set);
+            for (String key : new String[] {"*.selectionBackground", "*.selectionInactiveBackground"}) {
+                assertThat(keys.get(key)).isEqualTo(ColorMath.hex(fill));
+                assertThat(UiColorKeys.flatLaf(base, set).get(key)).isEqualTo(ColorMath.hex(base.terminal().selection()));
+            }
+        }
+        assertThat(theme.terminal()).isSameAs(base.terminal());
+        assertThat(theme.editor()).isSameAs(base.editor());
     }
 
     @Test void textSelectionAndTheSearchTintKeepTheirSources() {

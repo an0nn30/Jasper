@@ -21,7 +21,7 @@ import java.util.function.LongSupplier;
 import javax.swing.JComponent;
 
 /**
- * The drawer: everything that happened this run, newest first, on demand. The column above his head
+ * The drawer: retained live work in stable groups, on demand. The summary above his head
  * is the surface you watch; this is the one you go and ask. Every decision it makes comes from
  * {@link BuddyDeckLayout}, and every card is drawn by {@link BuddyCard}, so the two surfaces cannot
  * drift apart.
@@ -40,7 +40,7 @@ final class BuddyDeckPanel extends JComponent {
     /** Space for the soft capsule shadow. */
     static final int MOTION_MARGIN = BuddyCard.SHADOW_MARGIN;
     static final int WHEEL_STEP = 24;
-    private static final String CLEAR_ALL = "Clear all";
+    private static final String CLEAR_ALL = "Dismiss all";
 
     private final BuddyDeck deck;
     private final Runnable onLayoutChanged;
@@ -51,6 +51,44 @@ final class BuddyDeckPanel extends JComponent {
      * graphics device from here would throw in the headless test JVM.
      */
     private IntSupplier maxListHeight = () -> Integer.MAX_VALUE / 4;
+    private final dev.jasper.buddy.internal.model.BuddyGroups groups = new dev.jasper.buddy.internal.model.BuddyGroups();
+    private final java.util.Map<BuddyNoticeId, Integer> discriminators = new java.util.LinkedHashMap<>();
+    private int nextDiscriminator;
+    private final java.util.Set<BuddyNoticeId> duplicateIds = new java.util.HashSet<>();
+    record Row(dev.jasper.buddy.internal.model.BuddyGroups.Entry section, BuddyNotice notice, Rectangle bounds) { }
+    List<BuddyNotice> displayed() {
+        var retained = deck.retainedNotices();
+        var ids = retained.stream().map(BuddyNotice::id).toList();
+        discriminators.keySet().retainAll(ids); duplicateIds.retainAll(ids);
+        for (BuddyNotice n : retained) discriminators.computeIfAbsent(n.id(), ignored -> ++nextDiscriminator);
+        var visible = groups.reconcile(deck).stream().flatMap(e -> e.members().stream()).toList();
+        return visible.stream().map(n -> {
+            if (n.group() != null && visible.stream().anyMatch(other -> !other.id().equals(n.id())
+                && other.group() != null && other.group().id().equals(n.group().id()) && other.title().equals(n.title())))
+                duplicateIds.add(n.id());
+            String title = n.title() + (duplicateIds.contains(n.id()) ? " · " + discriminators.get(n.id()) : "");
+            return new BuddyNotice(n.id(), n.kind(), title, n.state(), n.detail(), n.activate(), n.group());
+        }).toList();
+    }
+    List<Row> rows() {
+        var labels = displayed().stream().collect(java.util.stream.Collectors.toMap(BuddyNotice::id, n -> n));
+        var rows = new java.util.ArrayList<Row>();
+        int y = -scroll;
+        for (var entry : groups.reconcile(deck)) {
+            if (entry.group() != null) {
+                rows.add(new Row(entry, null, new Rectangle(0, y, BuddyCard.WIDTH, 28)));
+                y += 28 + BuddyDeckLayout.ROW_GAP;
+            }
+            if (entry.group() == null || groups.expanded(entry.identity())) {
+                for (var n : entry.members()) {
+                    rows.add(new Row(null, labels.get(n.id()), new Rectangle(0, y, BuddyCard.WIDTH, cardHeight())));
+                    y += cardHeight() + BuddyDeckLayout.ROW_GAP;
+                }
+            }
+        }
+        if (labels.size() > 1) rows.add(new Row(null, null, new Rectangle(0, y, BuddyCard.WIDTH, BuddyDeckLayout.CLEAR_ROW_HEIGHT)));
+        return java.util.List.copyOf(rows);
+    }
     private int scroll;
     private int hovered = -1;
     /** The card the pointer just left, so only that one animates back rather than every card. */
@@ -67,6 +105,7 @@ final class BuddyDeckPanel extends JComponent {
         this.deck = Objects.requireNonNull(deck, "deck");
         this.onLayoutChanged = Objects.requireNonNull(onLayoutChanged, "onLayoutChanged");
         setOpaque(false);
+        setFocusable(true);
     }
 
     /** Tests advance time instead of sleeping; the window leaves this as {@code System::nanoTime}. */
@@ -80,9 +119,9 @@ final class BuddyDeckPanel extends JComponent {
 
     int hovered() { return hovered; }
 
-    boolean needsAnimationFrames() { return animating() || deck.notices().stream().anyMatch(BuddyCard::shimmers); }
+    boolean needsAnimationFrames() { return animating(); }
 
-    boolean needsDetailUpdates() { return !deck.isEmpty(); }
+    boolean needsDetailUpdates() { return !displayed().isEmpty(); }
 
     int cardHeight() { return BuddyCard.height(this); }
 
@@ -102,19 +141,34 @@ final class BuddyDeckPanel extends JComponent {
     }
 
     /** A notice was posted, dismissed or cleared: re-size around the new list. */
-    void refresh() { changed(); }
+    void refresh() {
+        reconcileSize();
+        hovered = -1; leaving = -1;
+        changed();
+    }
+
+    /** Reconcile external membership changes against the viewport the owner is about to install. */
+    Dimension reconcileSize() {
+        Dimension size = getPreferredSize();
+        int nextViewport = Math.max(0, size.height - 2 * MOTION_MARGIN);
+        scroll = BuddyDeckLayout.clampScroll(scroll, contentHeight(), nextViewport);
+        return size;
+    }
 
     @Override public Dimension getPreferredSize() {
-        int count = deck.size();
+        int count = displayed().size();
         if (count == 0) return new Dimension(0, 0);
-        int height = Math.min(BuddyDeckLayout.expandedHeight(count, cardHeight()),
+        int height = Math.min(contentHeight(),
             Math.max(cardHeight(), maxListHeight.getAsInt()));
         return new Dimension(BuddyCard.WIDTH + 2 * MOTION_MARGIN, height + 2 * MOTION_MARGIN);
     }
 
     private int viewportHeight() { return Math.max(0, getHeight() - 2 * MOTION_MARGIN); }
 
-    private int contentHeight() { return BuddyDeckLayout.expandedHeight(deck.size(), cardHeight()); }
+    private int contentHeight() {
+        var rows = rows();
+        return rows.isEmpty() ? 0 : rows.getLast().bounds().y + rows.getLast().bounds().height + scroll;
+    }
 
     // --- input -------------------------------------------------------------------------------
 
@@ -149,43 +203,35 @@ final class BuddyDeckPanel extends JComponent {
      * and the window it points at is about to come forward.
      */
     boolean handleClick(Point point) {
-        if (deck.isEmpty()) return false;
-        Point local = new Point(point.x - MOTION_MARGIN, point.y - MOTION_MARGIN);
-        Rectangle clear = BuddyDeckLayout.clearRow(deck.size(), BuddyCard.WIDTH, cardHeight(), scroll);
-        if (clear != null && clear.contains(local)) {
-            deck.clear();
-            onNoticesChanged.run();
-            reset();
-            return false;
-        }
+        if (displayed().isEmpty()) return false;
         int index = indexAt(point);
         if (index < 0) return true;
-        List<BuddyNotice> notices = deck.notices();
-        BuddyNotice notice = notices.get(index);
-        Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, cardHeight(), scroll);
-        if (BuddyDeckLayout.dismissTarget(card).contains(local)) {
-            deck.dismiss(new BuddyNoticeId(notice.id().source(), notice.id().key()));
-            onNoticesChanged.run();
-            hovered = -1;
-            leaving = -1;
-            if (deck.isEmpty()) { reset(); return false; }
-            scroll = BuddyDeckLayout.clampScroll(scroll, contentHeight(), viewportHeight());
-            changed();
-            return true;
+        Row row = rows().get(index);
+        if (row.section() != null) {
+            groups.toggle(row.section().identity()); refresh(); return true;
         }
-        notice.activate().run();
-        return false;
+        if (row.notice() == null) {
+            for (var notice : displayed()) deck.dismiss(notice.id());
+            onNoticesChanged.run(); reset(); return false;
+        }
+        Point local = new Point(point.x - MOTION_MARGIN, point.y - MOTION_MARGIN);
+        if (BuddyDeckLayout.dismissTarget(row.bounds()).contains(local)) {
+            deck.dismiss(row.notice().id()); onNoticesChanged.run();
+            refresh(); return !displayed().isEmpty();
+        }
+        row.notice().activate().run(); return false;
     }
 
     private int indexAt(Point point) {
-        if (deck.isEmpty()) return -1;
         Point local = new Point(point.x - MOTION_MARGIN, point.y - MOTION_MARGIN);
         if (local.y < 0 || local.y >= viewportHeight()) return -1;
-        int index = BuddyDeckLayout.cardAt(local.y, deck.size(), cardHeight(), scroll);
-        if (index < 0) return -1;
-        Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, cardHeight(), scroll);
-        return new java.awt.geom.RoundRectangle2D.Float(card.x, card.y, card.width, card.height,
-            card.height, card.height).contains(local) ? index : -1;
+        var rows = rows();
+        for (int i = 0; i < rows.size(); i++) {
+            var row = rows.get(i); var b = row.bounds();
+            if (row.notice() == null ? b.contains(local) : new java.awt.geom.RoundRectangle2D.Float(
+                b.x, b.y, b.width, b.height, b.height, b.height).contains(local)) return i;
+        }
+        return -1;
     }
 
     private void changed() {
@@ -197,7 +243,7 @@ final class BuddyDeckPanel extends JComponent {
     // --- painting ----------------------------------------------------------------------------
 
     @Override protected void paintComponent(Graphics g) {
-        List<BuddyNotice> notices = deck.notices();
+        List<BuddyNotice> notices = displayed();
         if (notices.isEmpty()) return;
         Graphics2D g2 = (Graphics2D) g.create();
         try {
@@ -205,20 +251,23 @@ final class BuddyDeckPanel extends JComponent {
             g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g2.translate(MOTION_MARGIN, MOTION_MARGIN);
-            g2.setClip(-MOTION_MARGIN, -MOTION_MARGIN, BuddyCard.WIDTH + 2 * MOTION_MARGIN, getHeight());
-            int height = cardHeight();
-            for (int index = 0; index < notices.size(); index++) {
-                Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, height, scroll);
-                if (card.y + card.height < 0 || card.y > getHeight()) continue;
-                BuddyCard.paint(options, g2, this, notices.get(index), card, hoverAmount(index), 1f, true, 0, clock.getAsLong());
+            g2.clipRect(-MOTION_MARGIN, 0, BuddyCard.WIDTH + 2 * MOTION_MARGIN, viewportHeight());
+            var rows = rows();
+            for (int index = 0; index < rows.size(); index++) {
+                Row row = rows.get(index); Rectangle bounds = row.bounds();
+                if (bounds.y + bounds.height <= 0 || bounds.y >= viewportHeight()) continue;
+                if (row.notice() != null) {
+                    BuddyCard.paint(options, g2, this, row.notice(), bounds, hoverAmount(index), 1f, true, 0, clock.getAsLong());
+                } else {
+                    String text = row.section() == null ? CLEAR_ALL :
+                        (groups.expanded(row.section().identity()) ? "▾ " : "▸ ") + row.section().group().title()
+                            + " · " + row.section().members().size();
+                    g2.setFont(BuddyCard.detailFont(options));
+                    g2.setColor(BuddyCard.detailColor(options));
+                    text = BuddyCard.fit(g2.getFontMetrics(), text, BuddyCard.WIDTH - 2 * BuddyCard.PAD_X);
+                    g2.drawString(text, BuddyCard.PAD_X, bounds.y + 19);
+                }
             }
-            Rectangle clear = BuddyDeckLayout.clearRow(notices.size(), BuddyCard.WIDTH, height, scroll);
-            if (clear == null) return;
-            g2.setFont(BuddyCard.detailFont(options));
-            FontMetrics metrics = g2.getFontMetrics();
-            g2.setColor(BuddyCard.detailColor(options));
-            g2.drawString(CLEAR_ALL, clear.x + BuddyCard.WIDTH - BuddyCard.PAD_X - metrics.stringWidth(CLEAR_ALL),
-                clear.y + (clear.height - metrics.getHeight()) / 2 + metrics.getAscent());
         } finally { g2.dispose(); }
     }
 

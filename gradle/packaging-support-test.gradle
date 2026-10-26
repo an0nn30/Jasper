@@ -29,6 +29,50 @@ def verifySupport = tasks.register('verifyPackagingSupport') {
 }
 tasks.named('check') { dependsOn(verifySupport) }
 
+verifySupport.configure {
+    doLast {
+        // Format choice follows distro metadata even when an RPM host also has dpkg installed.
+        [
+            ['ID=fedora\n', ['packageRpm']],
+            ['ID=rhel\n', ['packageRpm']],
+            ['ID=centos\n', ['packageRpm']],
+            ['ID=rocky\n', ['packageRpm']],
+            ['ID=almalinux\n', ['packageRpm']],
+            ['ID=ol\n', ['packageRpm']],
+            ['ID=amzn\n', ['packageRpm']],
+            ['ID=custom\nID_LIKE="rhel fedora"\n', ['packageRpm']],
+            ['ID=sles\n', ['packageRpm']],
+            ['ID=sled\n', ['packageRpm']],
+            ['ID=opensuse-leap\n', ['packageRpm']],
+            ['ID=opensuse-tumbleweed\n', ['packageRpm']],
+            ['ID=custom\nID_LIKE="suse opensuse"\n', ['packageRpm']],
+            ['ID="FeDoRa"\n', ['packageRpm']],
+            ["ID='custom'\nID_LIKE='linux RHEL'\n", ['packageRpm']],
+            ['ID=debian\n', ['packageDeb', 'packageRpm']],
+            ['ID=ubuntu\nID_LIKE=debian\n', ['packageDeb', 'packageRpm']],
+            ['ID=notfedora\nID_LIKE="prerhel suseish"\n', ['packageDeb', 'packageRpm']],
+            ['ID=custom\nPRETTY_NAME="Fedora Linux"\n# ID_LIKE=rhel\n', ['packageDeb', 'packageRpm']],
+            ['ID="$(echo fedora)"\n', ['packageDeb', 'packageRpm']],
+            ['', ['packageDeb', 'packageRpm']],
+            [null, ['packageDeb', 'packageRpm']],
+        ].each { metadata, expected ->
+            assert linuxPackageTasks(metadata) == expected : metadata
+        }
+        if (System.getProperty('os.name').startsWith('Linux')) {
+            File release = new File('/etc/os-release')
+            if (!release.exists()) release = new File('/usr/lib/os-release')
+            String metadata = release.isFile() ? release.getText('UTF-8') : ''
+            def aggregate = tasks.named('packageDist').get()
+            assert aggregate.taskDependencies.getDependencies(aggregate)*.name.toSet() == linuxPackageTasks(metadata).toSet()
+            ['packageDeb', 'packageRpm'].each { name ->
+                def individual = tasks.named(name).get()
+                assert individual.taskDependencies.getDependencies(individual)*.name.contains('verifyPackage')
+            }
+        }
+        logger.lifecycle('Verified Linux aggregate package selection and task wiring')
+    }
+}
+
 // Inspect only resolved graph data, never another project's mutable state under --parallel.
 gradle.taskGraph.whenReady { graph ->
     if (graph.hasTask("${project.path}:installWindowsUser")) {

@@ -100,7 +100,7 @@ id = "dev.example.harbour"
 name = "Harbour"
 version = "1.0.0"
 entry = "dev.example.harbour.HarbourPlugin"
-sdk = ">=0.21.0, <0.22"
+sdk = ">=0.22.0, <0.23"
 capabilities = ["presentation.provide"]
 presentation = "presentation/harbour.kit.toml"
 themes = ["themes/harbour.json"]

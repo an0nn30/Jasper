@@ -47,4 +47,12 @@ class BuddyNoticeTest {
         assertThatNullPointerException().isThrownBy(() -> new BuddyNotice(new BuddyNoticeId("terminal", "k"),
             BuddyNotice.Kind.TASK, "sleep 600", BuddyNotice.State.RUNNING, () -> "d", null));
     }
+    @Test void oldConstructorIsUngroupedAndGroupsValidateTheirValues() {
+        assertThat(of(BuddyNotice.Kind.TASK, BuddyNotice.State.RUNNING).group()).isNull();
+        var id = new BuddyNoticeId("tab", 1);
+        assertThat(new BuddyNotice.Group(id, "Claude").id()).isEqualTo(id);
+        assertThatNullPointerException().isThrownBy(() -> new BuddyNotice.Group(null, "title"));
+        assertThatIllegalArgumentException().isThrownBy(() -> new BuddyNotice.Group(id, null));
+        assertThatIllegalArgumentException().isThrownBy(() -> new BuddyNotice.Group(id, "  "));
+    }
 }

@@ -76,7 +76,7 @@ final class ThemeMenu {
     /** The imported theme {@code shown} belongs to, if there is one to remove. */
     private Optional<String> removable(String shown) {
         String theme = target != Target.TERMINAL ? shown : shown.contains("/") ? shown.substring(0, shown.indexOf('/')) : "";
-        return theme.isEmpty() || hooks.folder().fixed(theme) || !themes.get().names().containsKey(theme) ? Optional.empty() : Optional.of(theme);
+        return theme.isEmpty() || theme.equals("desktop-colors") || hooks.folder().fixed(theme) || !themes.get().names().containsKey(theme) ? Optional.empty() : Optional.of(theme);
     }
 
     private String label(String theme) { return themes.get().names().getOrDefault(theme, theme); }

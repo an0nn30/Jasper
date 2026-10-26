@@ -66,6 +66,7 @@ public final class FakePluginHost implements AutoCloseable {
     private final Map<String, Class<?>> topicTypes = new ConcurrentHashMap<>();
     private final Map<String, CopyOnWriteArrayList<Entry>> subscribers = new ConcurrentHashMap<>();
     private final Map<UUID, ActivityEvent> running = new ConcurrentHashMap<>();
+    private final Map<UUID, FakeActivity> activityHandles = new ConcurrentHashMap<>();
     private final List<ActivityEvent> activityLog = new CopyOnWriteArrayList<>();
     private final Map<UUID, FakeConnection> connections = new ConcurrentHashMap<>();
     private final List<ConnectionEvent> connectionLog = new CopyOnWriteArrayList<>();
@@ -907,12 +908,8 @@ public final class FakePluginHost implements AutoCloseable {
         clipboard.ownerStopped(context.plugin().id());
         String id = context.plugin().id();
         for (var list : subscribers.values()) list.removeIf(entry -> entry.pluginId().equals(id));
-        for (ActivityEvent open : List.copyOf(running.values())) {
-            if (!open.sourcePluginId().equals(id)) continue;
-            running.remove(open.id());
-            enqueue(new ActivityEvent(open.id(), id, open.title(), ActivityEvent.State.FAILED,
-                open.fraction(), reason, open.activateActionId()));
-        }
+        for (FakeActivity open : List.copyOf(activityHandles.values()))
+            if (open.pluginId.equals(id)) open.fail(reason);
         for (FakeConnection open : List.copyOf(connections.values()))
             if (open.pluginId.equals(id)) open.close();
     }
@@ -997,8 +994,11 @@ public final class FakePluginHost implements AutoCloseable {
     ActivityHandle begin(String pluginId, ActivitySpec spec) {
         var activity = new FakeActivity(pluginId, spec);
         var started = activity.event(ActivityEvent.State.STARTED, OptionalDouble.empty(), spec.detail());
-        running.put(activity.id, started);
-        enqueue(started);
+        synchronized (activity) {
+            running.put(activity.id, started);
+            activityHandles.put(activity.id, activity);
+            enqueue(started);
+        }
         return activity;
     }
 
@@ -1009,6 +1009,8 @@ public final class FakePluginHost implements AutoCloseable {
         private boolean ended;
         private OptionalDouble fraction = OptionalDouble.empty();
         private ActivityEvent waiting;
+        private boolean input;
+        private long deliveryToken;
 
         FakeActivity(String pluginId, ActivitySpec spec) { this.pluginId = pluginId; this.spec = spec; }
 
@@ -1018,47 +1020,62 @@ public final class FakePluginHost implements AutoCloseable {
 
         @Override public UUID id() { return id; }
 
-        @Override public void progress(double value, String detail) {
-            report(OptionalDouble.of(value), detail);
-        }
+        @Override public synchronized void progress(double value, String detail) { report(OptionalDouble.of(value), detail); }
 
-        @Override public void detail(String detail) {
-            OptionalDouble last;
-            synchronized (this) { last = fraction; }
-            report(last, detail);
-        }
+        @Override public synchronized void detail(String detail) { report(fraction, detail); }
 
         private void report(OptionalDouble value, String detail) {
-            ActivityEvent event = event(ActivityEvent.State.PROGRESS, value, Objects.requireNonNull(detail, "detail"));
-            boolean schedule;
-            synchronized (this) {
-                if (ended || !running.containsKey(id)) return;
-                fraction = value;
-                running.put(id, event);
-                schedule = waiting == null;
-                waiting = event;
+            ActivityEvent next = event(input ? ActivityEvent.State.NEEDS_INPUT : ActivityEvent.State.PROGRESS,
+                value, Objects.requireNonNull(detail, "detail"));
+            if (ended) return;
+            fraction = value;
+            running.put(id, next);
+            boolean schedule = waiting == null;
+            waiting = next;
+            if (schedule) {
+                long token = ++deliveryToken;
+                events.add(() -> {
+                    ActivityEvent latest;
+                    synchronized (this) {
+                        if (token != deliveryToken) return;
+                        latest = waiting; waiting = null;
+                    }
+                    if (latest != null) deliver(Activities.TOPIC.id(), latest);
+                });
             }
-            if (schedule) events.add(() -> {
-                ActivityEvent latest;
-                synchronized (this) { latest = waiting; waiting = null; }
-                if (latest != null) deliver(Activities.TOPIC.id(), latest);
-            });
+        }
+
+        @Override public void needsInput(String detail) { phase(true, detail); }
+        @Override public void resume(String detail) { phase(false, detail); }
+
+        private synchronized void phase(boolean needsInput, String detail) {
+            Objects.requireNonNull(detail, "detail");
+            if (ended) return;
+            if (input == needsInput) { report(fraction, detail); return; }
+            input = needsInput;
+            waiting = null;
+            deliveryToken++;
+            ActivityEvent next = event(input ? ActivityEvent.State.NEEDS_INPUT : ActivityEvent.State.RESUMED, fraction, detail);
+            running.put(id, next);
+            events.add(() -> deliver(Activities.TOPIC.id(), next));
         }
 
         @Override public void succeed(String detail) { end(ActivityEvent.State.SUCCEEDED, detail); }
         @Override public void fail(String detail) { end(ActivityEvent.State.FAILED, detail); }
         @Override public void cancelled() { end(ActivityEvent.State.CANCELLED, ""); }
 
-        private void end(ActivityEvent.State state, String detail) {
-            OptionalDouble last;
-            synchronized (this) {
-                if (ended || running.remove(id) == null) { ended = true; return; }
-                ended = true;
-                waiting = null;
-                last = fraction;
-            }
-            enqueue(event(state, last, Objects.requireNonNull(detail, "detail")));
+        private synchronized void end(ActivityEvent.State state, String detail) {
+            Objects.requireNonNull(detail, "detail");
+            if (ended) return;
+            ended = true;
+            waiting = null;
+            deliveryToken++;
+            ActivityEvent next = event(state, fraction, detail);
+            running.remove(id);
+            activityHandles.remove(id);
+            events.add(() -> deliver(Activities.TOPIC.id(), next));
         }
+
     }
 
     ConnectionHandle connection(String pluginId, ConnectionSpec spec) {
@@ -1175,7 +1192,7 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param panelId panel identifier
      * @param placement where the panel is now
-     * @since 0.21.0
+     * @since 0.22.0
      */
     public void placePanel(String panelId, dev.jasper.sdk.ui.PanelPlacement placement) {
         java.util.Objects.requireNonNull(placement, "placement");

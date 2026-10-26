@@ -57,7 +57,8 @@ class ConfigTemplateTest {
         expected.add(List.of("version"));
         for (Setting<?> setting : CoreSettings.SCHEMA.settings())
             if (!(setting.kind() instanceof SettingKind.StringMap) && setting != CoreSettings.UI_FONT_SIZE
-                && setting != CoreSettings.SYSTEM_RUN_IN_BACKGROUND && setting != CoreSettings.UI_WORKSPACE_OPACITY)
+                && setting != CoreSettings.SYSTEM_RUN_IN_BACKGROUND && setting != CoreSettings.UI_WORKSPACE_OPACITY
+                && setting != CoreSettings.UI_THEME_DARK && setting != CoreSettings.UI_THEME_LIGHT)
                 expected.add(setting.key());
         // Its default depends on the platform, so the example shows it commented out, like the platform-sized UI font.
         assertThat(text).contains("\n# run_in_background = true\n");
@@ -180,4 +181,29 @@ class ConfigTemplateTest {
         assertThatExceptionOfType(IOException.class).isThrownBy(() -> ConfigTemplate.ensureExists(parent.resolve("config.toml"), true));
         assertThat(Files.readString(parent)).isEqualTo("user data");
     }
+    @Test void desktopSourceAndPickRemainSavedOnBothPlatformSettingsPaths() throws Exception {
+        for (boolean macOs : new boolean[]{true, false}) {
+            assertThat(ConfigTemplate.text(macOs)).contains("# desktop_source = \"auto\"");
+            var loaded = ConfigLoader.parse(directory.resolve("config.toml"),
+                "[ui.theme]\ndark = 'desktop-colors'\nlight = 'desktop-colors'\ndesktop_source = 'gtk4'\n", macOs);
+            assertThat(loaded.diagnostics()).isEmpty();
+            assertThat(loaded.snapshot().darkTheme()).isEqualTo("desktop-colors");
+            assertThat(loaded.snapshot().lightTheme()).isEqualTo("desktop-colors");
+            assertThat(loaded.snapshot().desktopSource()).isEqualTo("gtk4");
+            assertThat(loaded.values().saved(CoreSettings.UI_THEME_DESKTOP_SOURCE)).contains("gtk4");
+            var file = directory.resolve("saved-" + macOs + ".toml");
+            Files.writeString(file, "[ui.theme]\ndark = 'desktop-colors'\nlight = 'desktop-colors'\ndesktop_source = 'gtk4'\n");
+            try (var service = new ConfigService(file, macOs)) {
+                var saved = service.save(SettingsEdit.of(CoreSettings.UI_THEME_DESKTOP_SOURCE, "qt", loaded.values()))
+                    .get(5, TimeUnit.SECONDS);
+                assertThat(saved.snapshot().desktopSource()).isEqualTo("qt");
+                assertThat(saved.snapshot().darkTheme()).isEqualTo("desktop-colors");
+                assertThat(saved.snapshot().lightTheme()).isEqualTo("desktop-colors");
+            }
+            var reread = ConfigLoader.parse(file, Files.readString(file), macOs);
+            assertThat(reread.diagnostics()).isEmpty();
+            assertThat(reread.snapshot().desktopSource()).isEqualTo("qt");
+        }
+    }
+
 }

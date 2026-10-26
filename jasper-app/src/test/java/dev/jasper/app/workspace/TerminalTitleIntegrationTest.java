@@ -59,6 +59,7 @@ class TerminalTitleIntegrationTest {
         Fixture[] fixture = new Fixture[1];
         edt(() -> {
             WindowContent window = content(launcher);
+            window.setActive(false);
             BuddyTestSupport deck = new BuddyTestSupport();
             // In the background, as when a command finishes out of sight.
             var center = new NotificationCenter(Runnable::run, Clock.systemUTC(), () -> Delivery.Presence.BACKGROUND);
@@ -66,6 +67,8 @@ class TerminalTitleIntegrationTest {
                 working -> {}, (delay, run) -> () -> {});
             window.activity(event -> {
             switch (event) {
+                case WorkspaceActivity.Presentation value -> notifier.presentation(value.id(), value.groupId(),
+                    value.groupTitle(), value.title(), value.watched(), value.activate());
                 case WorkspaceActivity.Started value -> notifier.started(value.id(), value.command(),
                     value.elapsedNanos(), value.activate(), false);
                 case WorkspaceActivity.Finished value -> notifier.finished(value.id(), value.command(),
@@ -77,7 +80,7 @@ class TerminalTitleIntegrationTest {
                         case OPENED -> notifier.opened(value.id());
                         case CLOSED -> notifier.closed(value.id());
                         case FOCUSED -> { }
-                        case BLURRED -> notifier.hidden(value.id());
+                        case BLURRED -> { }
                     }
                 }
             }
@@ -130,7 +133,7 @@ class TerminalTitleIntegrationTest {
     }
 
     @Test void oscTitlesUpdateTheTabWindowAndBubbleWhileACommandRuns() throws Exception {
-        Fixture f = open("read step; printf '" + start("worker") + "'; "
+        Fixture f = open("printf '\\033]2;Prompt directory\\007'; read step; printf '" + start("worker") + "'; "
             + "while read title; do printf '\\033]2;%s\\007' \"$title\"; done");
         edt(() -> f.content.currentPane().session().write("start\n"));
         until(() -> !f.deck.isEmpty());
@@ -151,7 +154,16 @@ class TerminalTitleIntegrationTest {
             f.content.currentPane().session().write("\n");
         });
         until(() -> f.deck.notices().getFirst().title().equals("worker"));
-        edt(() -> assertThat(f.content.tabs().get(0).title()).isEqualTo("worker"));
+        edt(() -> {
+            assertThat(f.content.tabs().get(0).title()).isEqualTo("worker");
+            int generation = f.deck.generation();
+            f.content.currentTerminal().rename("Pinned worker");
+            assertThat(f.deck.notices().getFirst().title()).isEqualTo("Pinned worker");
+            assertThat(f.deck.notices().getFirst().group().title()).isEqualTo("Pinned worker");
+            assertThat(f.deck.generation()).isEqualTo(generation);
+            f.content.currentTerminal().rename("");
+            assertThat(f.deck.notices().getFirst().title()).isEqualTo("worker");
+        });
     }
 
     @Test void aBurstEndingWithAPromptTitleCannotOverwriteTheCompletedNotice() throws Exception {

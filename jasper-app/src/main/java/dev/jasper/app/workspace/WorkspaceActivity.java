@@ -9,7 +9,15 @@ import java.util.function.LongSupplier;
 public final class WorkspaceActivity {
     private WorkspaceActivity() {}
     /** Closed family of local events, not an external extension API. */
-    public sealed interface Event permits Started, Finished, TitleChanged, PaneState {}
+    public sealed interface Event permits Started, Finished, TitleChanged, PaneState, Presentation {}
+    /** Settled parent membership and display labels for one terminal pane. */
+    public record Presentation(Object id, Object groupId, String groupTitle, String title,
+                               boolean watched, Runnable activate) implements Event {
+        public Presentation {
+            Objects.requireNonNull(id); Objects.requireNonNull(groupId); Objects.requireNonNull(groupTitle);
+            Objects.requireNonNull(title); Objects.requireNonNull(activate);
+        }
+    }
     /** Captured focus facts at completion time. */
     public record Origin(boolean anyWindowActive, boolean ownWindowActive,
                          boolean ownTabSelected, boolean ownPaneFocused) {}

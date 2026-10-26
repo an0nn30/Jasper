@@ -39,6 +39,7 @@ class PluginThemesTest {
         assertThat(library.themes()).extracting(theme -> theme.id()).containsSubsequence("slate-cobalt", "catppuccin-mocha", "own", "shared");
         assertThat(library.theme("slate-cobalt").orElseThrow().name()).isEqualTo("Slate Cobalt");
         assertThat(library.provider("shared")).contains("Zulu");
+        assertThat(library.reservedLabel("shared")).contains("Shared Zulu");
         assertThat(library.provider("slate-cobalt")).isEmpty();
         assertThat(library.problems()).hasSize(3);
     }
@@ -51,6 +52,7 @@ class PluginThemesTest {
         Path folder = Files.createDirectories(home.resolve("themes"));
         Files.writeString(folder.resolve("enterprise.json"), ThemeTestSupport.uiThemeJson("Impostor"));
         var library = ThemeLibrary.read(folder, ThemeLibrary.of(tier), tier);
+        assertThat(library.reservedLabel("enterprise")).contains("enterprise");
         assertThat(library.theme("enterprise")).as("a folder file with a reserved id is ignored").isEmpty();
         assertThat(library.problems()).extracting(ThemeLibrary.Problem::message)
             .containsExactly("enterprise is provided by the Enterprise plugin; this file is ignored.");
@@ -122,4 +124,16 @@ class PluginThemesTest {
         assertThat(tier.provided()).extracting(PluginThemes.Provided::pluginName).containsExactly("Bundled");
         assertThat(tier.reserved()).containsEntry("look", "Bundled");
     }
+    @Test void desktopColorsCannotBeShadowedByEnabledOrDormantPlugins() {
+        for (boolean loadable : new boolean[]{true, false}) {
+            var tier = PluginThemes.of(List.of(declared("p.fake", "Fake", 1, loadable, "desktop-colors", "Impostor")));
+            assertThat(tier.provided()).isEmpty();
+            assertThat(tier.reserved()).doesNotContainKey("desktop-colors");
+            assertThat(tier.dormant()).doesNotContain("desktop-colors");
+            assertThat(tier.problems()).singleElement().satisfies(problem ->
+                assertThat(problem.message()).contains("Desktop colors", "ignored"));
+            assertThat(ThemeLibrary.of(tier).reservedLabel("desktop-colors")).contains("Desktop colors");
+        }
+    }
+
 }

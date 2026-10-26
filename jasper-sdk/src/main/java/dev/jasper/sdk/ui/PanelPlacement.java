@@ -11,7 +11,7 @@ import java.util.Objects;
  * @param split whether it is in its side's secondary half: the lower half of the left or right side, or the right half
  *              of the bottom area, as {@link PanelSpec#split()} says of the place it starts in
  * @param mode docked, or in a window of its own
- * @since 0.21.0
+ * @since 0.22.0
  */
 public record PanelPlacement(Anchor anchor, boolean split, PanelMode mode) {
     /** Requires the anchor and the mode. */

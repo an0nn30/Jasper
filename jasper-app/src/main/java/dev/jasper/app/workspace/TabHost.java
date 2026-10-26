@@ -80,13 +80,16 @@ final class TabHost {
         // Focus going into the pane makes its tab the window's active tab, focus staying put (Rulings 26).
         pane.onFocused = () -> owner.tabFocused(tab);
         pane.onCommandStarted = command -> {
+            present(tab, (TerminalContent) tab.content());
+            owner.publishPresentation();
             long startedAt = System.nanoTime();
             owner.emit(new WorkspaceActivity.Started(pane.id(), command, () -> System.nanoTime() - startedAt,
-                () -> goTo(tab, pane), pane.watched() && owner.isActiveAndOpen() && tab == owner.selectedTab()));
+                () -> goTo(tab, pane), owner.buddyWatched(tab)));
             owner.report(new TerminalEvent.CommandStarted(pane.id(), command));
         };
         pane.onTitleChanged = title -> {
-            owner.emit(new WorkspaceActivity.TitleChanged(pane.id(), title));
+            present(tab, (TerminalContent) tab.content());
+            owner.publishPresentation();
             owner.report(new TerminalEvent.TitleChanged(pane.id(), title));
         };
         pane.onClosed = () -> {

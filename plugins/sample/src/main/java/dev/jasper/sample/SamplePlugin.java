@@ -81,6 +81,7 @@ public final class SamplePlugin implements Plugin {
 
     // example:pluginui:start
     private static void installUi(PluginContext context, long stepMillis) {
+        installInputDemo(context);
         PluginAction[] demo = new PluginAction[1];
         demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
                 .withIcon("dev.jasper.sample:flask")
@@ -269,6 +270,26 @@ public final class SamplePlugin implements Plugin {
         });
     }
     // example:pluginpalette:end
+
+    // example:plugininput:start
+    private static void installInputDemo(PluginContext context) {
+        String actionId = "dev.jasper.sample.input";
+        ActivityHandle[] waiting = new ActivityHandle[1]; // accessed only by the UI-thread action
+        context.actions().register(ActionSpec.of(actionId, "Run or Confirm Sample Input Activity"), invoked -> {
+            if (waiting[0] == null) {
+                waiting[0] = context.activities().begin(new ActivitySpec("Sample confirmation", "Preparing",
+                    Optional.of(actionId), Optional.empty()));
+                waiting[0].needsInput("Activate this activity to confirm and continue");
+            } else {
+                ActivityHandle activity = waiting[0];
+                waiting[0] = null;
+                activity.resume("Confirmed; continuing");
+                context.background().execute(() -> activity.succeed("Confirmed"));
+            }
+        });
+        context.menus().standard(StandardMenu.TOOLS).add(actionId);
+    }
+    // example:plugininput:end
 
     private static void demo(PluginContext context, long stepMillis) {
         ActivityHandle activity = context.activities().begin(

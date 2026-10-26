@@ -90,6 +90,7 @@ public final class JasperApplication {
     /** The application's theme controller. */
     ThemeController themes() { return themes; }
     private final dev.jasper.app.platform.SystemAppearance systemAppearance;
+    private DesktopAppearance desktopAppearance;
     private Runnable systemAppearanceListening = () -> { };
     /** Workspace glass exists only on macOS; elsewhere plugins see {@code GlassSource.NONE} and windows make no glass requests. */
     private static final boolean WORKSPACE_GLASS = com.formdev.flatlaf.util.SystemInfo.isMacOS;
@@ -326,6 +327,14 @@ public final class JasperApplication {
     JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection,
                       java.util.function.Function<dev.jasper.ui.kit.Kit, java.util.function.Predicate<dev.jasper.ui.theme.GeneratedTheme>> installers) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, themesFolder, bootstrapSelection,
+            installers, () -> dev.jasper.app.platform.DesktopColors.helperDirectory().map(dev.jasper.app.platform.DesktopColors::open).orElse(null));
+    }
+
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection,
+                      java.util.function.Function<dev.jasper.ui.kit.Kit, java.util.function.Predicate<dev.jasper.ui.theme.GeneratedTheme>> installers,
+                      Supplier<dev.jasper.app.platform.DesktopColors> openDesktop) {
         // Not named selection: the field changes during construction when the kit is blamed (spec 4.7), the parameter never.
         this.selection = Objects.requireNonNull(bootstrapSelection, "bootstrapSelection");
         presentation = this.selection.presentation();
@@ -334,7 +343,9 @@ public final class JasperApplication {
         lookFontProblems = LookFonts.register(presentation.faces());
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
         startupViewMode = startup.viewMode();
-        systemAppearance = dev.jasper.app.platform.SystemAppearance.open();
+        var desktopColors = openDesktop.get();
+        systemAppearance = desktopColors == null ? dev.jasper.app.platform.SystemAppearance.open()
+            : dev.jasper.app.platform.SystemAppearance.open(desktopColors);
         try {
         boolean dark = AppearancePolicy.dark(startup.appearance(), systemAppearance.current());
         // First Swing work: every later component may read the installed snapshot. A variant that cannot be installed
@@ -379,9 +390,14 @@ public final class JasperApplication {
             themes.current().chrome().dark(), this::raiseTerminal, this::toggleBuddy, this::owns);
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
-            buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
+            buddy.companion(), notificationCenter, buddy::terminalWorking, JasperApplication::afterDelay);
+        if (desktopColors != null) desktopAppearance = new DesktopAppearance(themes, desktopColors,
+            dev.jasper.app.platform.DesktopEnvironment::capture, java.util.concurrent.Executors.newSingleThreadExecutor(
+                Thread.ofPlatform().daemon().name("jasper-desktop-palette").factory()));
+        // The owner is reachable by failure/shutdown cleanup before any asynchronous resolution can publish.
         configuration = service == null ? null : new ConfigurationController(themes, service, this::openForEditing,
-            systemAppearance.current(), themesFolder, LookMotion.of(presentation.projections()));
+            systemAppearance.current(), themesFolder, LookMotion.of(presentation.projections()), desktopAppearance);
+        if (configuration == null && desktopAppearance != null) desktopAppearance.update(startup);
         // Without a configuration the setting is its default, on; the look still decides (spec 10.9).
         if (configuration == null) themes.configureAnimations(LookMotion.of(presentation.projections()).allows(true));
         if (configuration != null) systemAppearanceListening = systemAppearance.subscribe(configuration::systemAppearanceChanged);
@@ -454,6 +470,8 @@ public final class JasperApplication {
         } catch (RuntimeException | Error failure) {
             systemAppearanceListening.run();
             systemAppearance.close();
+            if (desktopAppearance != null) desktopAppearance.close();
+            else if (desktopColors != null) desktopColors.close();
             throw failure;
         }
     }
@@ -588,6 +606,8 @@ public final class JasperApplication {
             content.anyWindowActive = () -> windows.windows().stream().anyMatch(open -> open.content().isActiveAndOpen());
             content.activity(event -> {
                 switch (event) {
+                    case WorkspaceActivity.Presentation value -> notifications.presentation(value.id(), value.groupId(),
+                        value.groupTitle(), value.title(), value.watched(), value.activate());
                     case WorkspaceActivity.Started value -> notifications.started(value.id(), value.command(),
                         value.elapsedNanos(), value.activate(), value.watched());
                     case WorkspaceActivity.Finished value -> notifications.finished(value.id(), value.command(),
@@ -599,7 +619,7 @@ public final class JasperApplication {
                             case OPENED -> notifications.opened(value.id());
                             case CLOSED -> notifications.closed(value.id());
                             case FOCUSED -> { }
-                            case BLURRED -> notifications.hidden(value.id());
+                            case BLURRED -> { }
                         }
                     }
                 }
@@ -1257,7 +1277,7 @@ public final class JasperApplication {
                 throw new IllegalStateException("A presentation provider needs the bootstrap's selection");
             selection = scanned;
         }
-        activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
+        activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal, buddy::pluginWorking);
         uiState = UiState.load(dirs.uiState(), presentation().projections().dockLayout().key());
         workspace(dirs.workspaceState());
         shells = new NativeShells(themes, uiState, this::nativeWindow, this::quit,
@@ -1402,7 +1422,7 @@ public final class JasperApplication {
                 : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder, () -> pluginThemes),
                     surface -> surface == null ? Optional.empty() : this.shells.chooseFile(surface, "Import Theme", ".json"),
                     this::confirmOver, this::informOver, configuration::save, configuration::reload));
-            var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library, imports);
+            var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library, imports, desktopAppearance);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(appearanceChoices, system, shells,
                     new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName, plugins == null ? Map.of() : plugins.pluginIcons())),
@@ -2273,6 +2293,7 @@ public final class JasperApplication {
         buddyAppearance.close();
         systemAppearanceListening.run();
         systemAppearance.close();
+        if (desktopAppearance != null) desktopAppearance.close();
         themes.close();
         buddy.close();
         incidentNotices.close();

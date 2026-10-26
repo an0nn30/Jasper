@@ -1,5 +1,61 @@
 # Jasper — Status and Handoff
 
+**Linux distribution packaging — 2026-10-26:** `packageDist` selects only RPM on recognized Fedora/RHEL and SUSE
+families from `os-release`; Debian/Ubuntu and unknown hosts retain both formats. Explicit DEB/RPM tasks and mandatory
+dependency validation are unchanged. Portable packaging fixtures, four documentation checks and independent review
+pass. A fresh Fedora `packageDist` build passes in 2m 56s; Ubuntu dry-run retains both package tasks. No GUI or AOT.
+
+**Qt / KDE Desktop colors — 2026-10-25:** The approved [native plan](superpowers/plans/2026-10-25-qt-kde-native-helpers.md) now stages all seven helpers and packages Qt/KDE as optional child-process capabilities. Pinned Qt5.15.2, Qt6.2.4, Qt6.5/KF6.0 and private Qt5.15.2/KF5.92 builds have aarch64 baseline fixture/ABI evidence; exact packaged helpers pass system-runtime samples and minimal DEB/RPM installation without Qt/KF. The [compatibility record](design/qt-kde-native-compatibility.md) distinguishes private SDK runtime smoke from separately installed system runtimes. The spec's deterministic headless native integration gate is satisfied in this aarch64 scope; application work can proceed without claiming complete release or desktop acceptance. x86_64, minimum separately installed KDE6, the unexecuted CI matrix, cold corrected-recipe rebuild and real Plasma/qt5ct/qt6ct desktop acceptance remain open. The full macOS headless check passes 13,041 tests with zero failures/errors and 30 skips; package verification omits Linux helpers. Source/UI policy stays GTK-only in this deliverable. No GUI, AOT, merge or push.
+
+Application Task 1 adds v1 Qt/KDE decoding, explicit helper identities and healthy current-only observations; process failures preserve actual polarity and prior colors. Its scoped deviation also updates DesktopProcess event admission with expected-source context and registers the new nonvisual test in the migration ledger. Fedora access is restored and the native aarch64 gate above permits headless application work; the broader release/desktop matrix remains open. Focused platform and migration-ledger checks pass 95 tests with zero failures/errors and one Linux-only skip; application architecture passes. Task 1 review approved without findings. A Linux run had one failure among 95 tests in the existing restart test; its unchanged single-test rerun passed. The test now awaits any nonblank failure diagnostic while retaining restart/generation checks; the updated macOS focused run passes the same 95 tests. Scoped follow-up review approved without findings; source/UI policy remains GTK-only.
+
+Application Task 2 adds one immutable desktop-hint context and shared KDE/Qt/GTK source ordering for resolution and preview demand. Construction and Reload capture the supplied context; worker tickets retain their original context and reload invalidates queued publications. Exhaustive capability labels retain actual source, implementation and version. The Qt selector remains for Task 3. The required policy-test migration row is the only file-scope adjustment. Local headless Desktop/Settings and migration coverage passes 234 tests with zero failures/errors and one existing Linux-only skip; application architecture passes. Task 2 review approved without findings; full check remains scheduled for Task 4. No source transfer, GUI, AOT, merge or push.
+
+Application Task 3 enables the single Qt / KDE source choice and retains requested availability separately from actual palette colours. Opposite/UNKNOWN replies complete preview sampling; compatible cached colours keep last-good status, while incompatible colours use the bundled fallback with truthful metadata. Existing native failure reasons remain bounded and intact. Local focused coverage passes 76 tests; affected Desktop/configuration/Settings/presentation coverage passes 684 tests with zero failures/errors and one Linux-only skip; application architecture passes. The Settings search-term list in `settingsui/Editors.java` is the only file-scope deviation. Task 3 independent review approved without findings; updated-source Linux coverage and real-helper-to-Java sampling remain pending; no VM source copy was attempted after the earlier automatic-review rejection. Full check remains Task 4; broader release/desktop cases above remain open. No GUI, AOT, merge or push.
+
+Application Task 4 extends the existing actual-paint and retained-owner fixtures to 42 GTK/Qt/KDE inputs in both kits. The 18 original GTK lines and frozen authored captures remain byte-identical; contrast thresholds are unchanged. Focused coverage passes 31 tests and application architecture. The full Mac headless check passes 13,111 JUnit tests with zero failures/errors and 30 skips, plus 72 theme-tool tests; the final changed matrix/conflict methods and headless install/package verification pass. Test-only fixture bridges now include KDE ordering, and the two extended Editor fixtures retire a delayed RSyntax occurrence timer in `finally`. Updated-source Linux/Windows, real helper-to-current-Java execution, complete Automatic/dual-preview resource measurement and user desktop acceptance remain open. No source transfer followed the earlier automatic-review rejection; no GUI, AOT, benchmark, merge or push.
+
+The combined application final-review fix uses the newest current-only observation across requested-polarity slots for preview colours/status and adds bounded context for observed higher-ranked fallback failures. Regression RED reproduced four failures among 48 tests; focused GREEN passes all 48, and affected Desktop/Settings coverage passes 439 tests with zero failures/errors and one Linux-only skip; application architecture passes. Completion bookkeeping and sampling are unchanged. Scoped re-review approved both findings with no new breakage; existing full-check, Linux/native and desktop acceptance limits remain as recorded.
+
+Linux verification — 2026-10-26, source `3bfde469f`: the authorized Fedora VM ran the full check in Ubuntu22 baseline userspace (JBR25.0.4.1 b635.75). It completed 13,114 JUnit tests with 34 failures, zero errors and 65 skips. Of those failures, 24 reproduce on refreshed base `9fa59a492`, nine pass with missing tools/root-permission conditions corrected, and one full-order Rehearsal callback remains unresolved despite passing isolated current/base runs. The new Qt/KDE owner, protocol, policy, paint and retention cases pass. Real current-Java/Fedora-system Qt5/Qt6/KDE5/KDE6 active/opposite-preview and failure/recovery checks pass; seven-helper Automatic retains stable PIDs across two 30-second refresh boundaries with no observed mapped windows/config writes, 332,480kB summed RSS (shared pages included) and 0.24 CPU seconds over 58.372 seconds. Current native compatibility, headless package verification and minimal DEB/minimal RPM/equipped Fedora RPM install/check/remove pass. Protocol/portal checks pass with corrected locale/private-bus conditions; modern Fedora GTK ABI checks and a process-reaping packaging check pass. The baseline launcher-cache expectation, old-header/default-bus harness limitations and unresolved rehearsal callback keep the full gate non-green. See the [compatibility record](design/qt-kde-native-compatibility.md#linux-application-verification--2026-10-26). Real desktop acceptance, Windows/CI, x86_64 and separately installed minimum KDE6 remain open; no GUI, AOT, merge or push.
+
+**Buddy plugin input — 2026-10-25.** `codex/buddy-plugin-input` adds SDK 0.22.0 activity input/resume phases,
+ordered phase delivery with coalesced phase-preserving detail, and matching runtime/testkit shutdown semantics.
+Buddy retains notice identity and dismissal across input/resume and combines running plugin work with terminal
+work. The Sample's optional UI demo includes a confirmation action. Targeted lifecycle, notifier, composition,
+Buddy and Sample tests, architecture checks and generated SDK reference pass. Task, whole-branch and scoped fix
+reviews passed. The first full run exposed six stale SDK-version fixture failures and two missing-method errors in
+File Server test doubles; the test-only fixes passed 22 focused tests. Final full headless check passed in 8m 5s:
+13,054 tests, zero failures/errors, 30 skips. External-plugin check/pluginZip passed against SDK 0.22.0 release jars. The [plan](superpowers/plans/2026-10-25-buddy-plugin-input.md)
+records the delegated implementation and RED evidence. No GUI, AOT, benchmark, merge or push.
+
+
+**Compact Buddy activity — 2026-10-25.** `codex/buddy-compact-activity` replaces floating stacks with one
+quiet visible-work summary and an all-activity drawer with stable expandable groups. Attention priority,
+task/connection counts, duplicate labels, suppression and activation remain explicit. Drawer opening owns
+focus and native-owner selection; passive refresh and drag cannot reopen it. The [plan](superpowers/plans/2026-10-25-buddy-compact-activity.md)
+records delegated implementation bodies. Buddy check and application architecture passed: 175 tests,
+zero failures/errors/skips. Inspected light/dark headless previews under `jasper-buddy/build/reports/buddy-groups/`.
+Task and whole-branch reviews passed with no findings. Full headless check with Python 3.13 passed in
+8m 13s: 13,038 tests, zero failures/errors, 30 skips. GUI focus/outside-click acceptance
+remains user-run; no GUI, AOT, benchmark, merge or push.
+
+
+**Buddy laptop opening — 2026-10-25.** `codex/buddy-open-laptop` adds the authorized reverse-pose opening: 500 ms from standing, seated idle starts at the lowered-laptop pose, and sleeping wakes first. Work changes reverse either transition from its current pose with a full pose duration; repeated intent retains deadlines. Existing sprites are unchanged. Focused animator tests pass (34); Buddy check passes 186 tests with zero failures/errors/skips. Headless normal/interrupted opening and stand-up previews are under `jasper-buddy/build/reports/buddy-open-laptop/` and `buddy-stand-up/`. The [plan](superpowers/plans/2026-10-25-buddy-open-laptop.md) records the implementation-body delegation deviation. Task and whole-branch reviews passed with no findings. Full headless check with Python 3.13 passed in 8m 37s: 13,049 tests, zero failures/errors, 30 skips. Native GUI acceptance remains user-run; unmerged and unpushed.
+
+**Linux default interface colors — 2026-10-25** (`codex/linux-default-colors`; not merged or pushed): fresh and reset core settings use Desktop colors for both appearances on Linux, with Automatic source and system appearance. Saved theme picks and look defaults retain precedence; Enterprise keeps Meadow. Other platforms and extraction fallback are unchanged. Native Linux RED confirmed the empty-config regression before implementation; the full macOS check passed (13,019 tests, zero failures/errors, 30 skips), followed by 594 final focused tests and application architecture. Native Linux passed 591 of 594 focused tests, with one skip and only the previously recorded PaintedContrast/SelectionRendering baseline failures. Independent task and whole-branch reviews found no issues. The [plan](superpowers/plans/2026-10-25-linux-default-colors.md) records the small scope adjustments: configuration guide/default comments, explicit authored-look test fixtures, and preserving the authored invalid-pick preview fallback after the platform default changed.
+
+**Linux Desktop colors — 2026-10-24.** Implemented on `codex/linux-desktop-colors`, refreshed from main `22a611145`, with all ten task reviews and the final fix review complete through `42e9c4dfe`. The optional interface theme offers Automatic, GTK 3 and GTK 4 / libadwaita sources, portal preferences, live previews and bounded fallback/recovery. Main’s Meadow defaults, independent Editor scheme and terminal choices are preserved. Linux distributions carry the three isolated executable helpers; other platforms retain saved Desktop choices as unavailable. See the approved [plan](superpowers/plans/2026-10-17-jasper-linux-desktop-colors.md) for the execution record.
+
+Execution adjustments: source metadata, appearance/platform declarations and helper lookup moved earlier to keep each integration valid. Preview demand carries source/polarity and follows retained Settings-page lifetime through disposal, including while another page is visible; the existing resampling boundary refreshes inactive variants. Generic optional halo and interface-selection overrides, a narrow read-only cross-kit validation exception, shared cache admission and corrected final-hover constraints meet contrast targets while preserving authored paints. The converter reserves the dynamic id separately from file-backed themes. Modern libadwaita uses modern variables; plain GTK4 may use paired named fallbacks. Deterministic initialization seams cover subscription races. Rendering evidence links 269 of 307 inventory entries to pixels, classifies 37 conservative constraints and one native-title entry separately, and preserves all 356 authored captures. Native evidence uses the authorized VM and older userspaces, with the limits below.
+
+Final plain verification (2026-10-24): `./gradlew check --continue --max-workers=2` with the verified Python 3.13.15 interpreter passed on macOS aarch64: **13,017 tests, 12,987 passed, zero failures/errors, 30 skips**. The default 512 MiB test heap is unchanged. The first full runs exposed a Task 9 fixture leak: 180 synthetic focus-gained events left 180 caret timers active. A failing teardown assertion and matching focus-lost callbacks in `finally` fixed it; the live timer count fell to one during later tests, with 180 fewer KitViews at nearby later-test sampling points. Refreshed main's 4,412-test app baseline passed before that fix. Task 10 also completes the deferred owner ledger and makes supervisor fixture paths absolute on Windows; Windows execution remains pending. Final Mac `:jasper-app:installDist :jasper-app:packageApp :jasper-app:verifyPackage` passed without application AOT training.
+
+The pre-final-fix native Ubuntu 26.04 aarch64 full check completed **13,013 tests, 11 failures, zero errors, 59 skips**, with no heap failure after the fixture repair. All 11 rendering/geometry assertions reproduce on refreshed main `22a611145` (PaintedContrast, SelectionRendering, EditorComposition, VaultSheetRender, ClassicWindowsTitle, CollapsibleNavigation, EditorKit, PanelSurfaces and SettingsShellFrame); their expectations remain intact. Its GTK task also encountered a reused daemon's missing private Xvfb path; the explicit fresh-JVM `:jasper-app:testDesktopProtocol :jasper-app:testDesktopPortal :jasper-app:testDesktopGtk :jasper-app:verifyDesktopHelpers` gate passed: 409 protocol checks, 12 portal tests/46 snapshot assertions and 33 GTK tests, with no skips. Final focused Java checks passed 50/50 on Linux and 49/50 on macOS (one Linux-only skip). The private Python 3.12.3 wrapper avoids the host's unsupported 3.14 converter runtime. Ubuntu 22.04 userspace builds and verifies the portable/native aarch64 images against glibc 2.35/GLib 2.72.4; PRoot needs the repository wrapper's Java entry and direct-loader linkage shim because its shell access predicate rejects valid executables. GTK 4.6.9 there reports clean unavailability. Ubuntu 24.04 userspace passes 25 native GTK tests (GTK 3.24.41, GTK 4.14.5, libadwaita 1.5.0); the 26 VM uses GTK 3.24.52, GTK 4.22.4 and libadwaita 1.9.1. Older userspaces share the 26 kernel. Hosted x86_64/Windows runners, the digest-pinned 26 container and Debian/Fedora/openSUSE package installations were not run locally. GNOME, GTK 3 desktops, KDE and Wayland/X11 native acceptance remain user-run.
+
+
+The final review fixes close the application owner’s initial subscription race, add bounded portal acquisition/resnapshot recovery, accept readable translucent foregrounds over opaque windows, and preserve implementation/version/failure status. Final focused verification passes 109 Java tests on each Mac/Linux host, architecture checks, 409 protocol checks, 19 portal tests/60 assertions, 35 modern GTK tests and 27 Ubuntu 24 GTK tests. Portal ASan/UBSan and Ubuntu 22 baseline/unsupported-GTK checks pass. An extra PRoot24 portal run fails credential emulation before observer startup and is not runtime evidence. The final plain Mac full check and package verification ran after these fixes, without diagnostic instrumentation or AOT. Work remains unmerged and unpushed; native desktop acceptance remains user-run.
+
 ## Current state — 2026-10-22
 
 Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core is the workspace (windows, tabs, panes
@@ -36,8 +92,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.21.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
-  `sdk = ">=0.21.0, <0.22"`.
+- **SDK** `0.22.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.22.0, <0.23"`.
 - **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
   either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
   Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.
@@ -200,6 +256,60 @@ and Docked, Move to and dragging its button or header out and back change it as 
 its stripe or hiding it changes nothing; restart with the Sample in a Float window: it opens with the own-window
 sentence. With the SFTP tool window in a Window behind a child window, its browse of a pane in that child window brings
 the SFTP window forward and leaves the main window where it is.
+
+Merged with `main` on 2026-10-26 (93 commits, among them SDK 0.22.0 for the Buddy plugin input): the placement members
+(`PanelMode`, `PanelPlacement`, `PanelHost.placement()`/`onPlacement`, `FakePluginHost.placePanel`) are `@since 0.22.0`.
+
+**Buddy integration — 2026-10-25:** merged tab-aware bubbles and the stand-up animation with current `main`,
+including Linux translucent rendering and Desktop colors. Resolved the status-log overlap by retaining both histories;
+production code merged cleanly. Full headless `check` with Python 3.13 passed in 8m 17s. No push.
+
+**Buddy stand-up — 2026-10-24** (`codex/buddy-stand-up`, base `c4dda9b0b`; not merged or pushed):
+Buddy finishes typing with a 500 ms hand-rest, laptop-close/lower and rise sequence. Renewed work interrupts
+immediately; repeated intent and attention keep the phase deadline, and idle timing starts at standing completion.
+Three appended poses preserve the original twenty cells; the 23-frame master/runtime strip verifies pixel-exactly.
+The [plan](superpowers/plans/2026-10-24-buddy-stand-up.md) records the implementation-body planning deviation.
+Task 1 (`b36aa2833`) passed review. Task 2 adds clock-explicit intent, timer rescheduling and arithmetic typing
+catch-up, with 29 animator tests and normal/interrupted production-sprite GIF/contact previews. Full check exposed
+the splash's exact old strip-width guard: it now validates complete cells and the pose columns it uses, a scoped
+integration deviation covered by 30 focused bootstrap/splash tests. First full run: 12,872 tests, three splash
+failures, zero errors, 29 skips; after the compatibility fix, the full headless rerun passed in 7m 39s:
+12,874 tests, zero failures/errors, 29 skips (173 Buddy tests). Task and whole-branch reviews passed; the final documentation-count correction was verified.
+User GUI acceptance remains pending: finish the last running command, watch standing, then begin new work mid-rise.
+No GUI, benchmark, AOT, push or merge.
+
+**Tab-aware Buddy — 2026-10-24** (`codex/buddy-tab-awareness`, base `f8aa4bca6`; not merged or pushed):
+terminal notices follow their current parent tab's strip title, pane title and membership. The selected tab of an
+active, showing, non-minimized workspace window suppresses all its terminal entries, retaining command lifetime,
+elapsed time and dismissal; hidden work appears immediately and qualified hidden work still drives typing.
+Multiple running panes form a stack with exact counts and at most two backing silhouettes; its filtered drawer
+activates individual panes and clears only displayed entries. Plugins keep their existing ungrouped SDK path.
+The [plan](superpowers/plans/2026-10-24-buddy-tab-awareness.md) reused the dedicated checkout and delegated detailed
+implementation bodies rather than providing complete code. Task 2's overlapping Gradle result writes invalidated
+its broad run; the serialized final check replaces it. Tasks 1–3 passed task review, including the shrinking-drawer
+scroll fix. `./gradlew check --continue` with the installed uv Python 3.13 passed in 7m 50s: 12,865 tests,
+zero failures/errors, 29 skips. Existing compiler and ByteBuddy 1.18.3 JDK Unsafe deprecation warnings remain.
+Whole-branch review found no actionable issues. User GUI acceptance remains pending: titled program, tab/window switching, split-tab expansion,
+pane activation and tab moves. Stand-up animation is a separate deliverable. No GUI, benchmark or AOT run.
+
+**Shared display scaling — 2026-10-24** (`codex/shared-display-scaling`; merged into `main` for Linux testing): terminal fonts,
+initial window geometry and pane padding follow FlatLaf's user scale while font settings and per-pane zoom stay in
+logical points (6–72, with rendered sizes allowed above 72). Scale changes refit the existing PTY and closing a pane
+releases its observer. Enterprise family-only UI font changes retain the desktop font size used for scale derivation.
+The [plan](superpowers/plans/2026-10-24-shared-display-scaling.md) left the precise control fix to investigation, a
+deviation from the complete-code planning convention. Independent task and whole-branch reviews found no issues;
+focused and fresh 1.25/1.5/2 scale checks passed. `./gradlew check --continue` with Python 3.13 passed: 12,847 tests,
+zero failures/errors, 29 skips. The first run found the corrected source-inventory omission for the two new app tests.
+Native GNOME Wayland and KDE acceptance remains pending. No GUI or AOT run.
+
+**Buddy translucent Linux rendering — 2026-10-24** (`codex/buddy-wayland-rendering`; Ubuntu fix verified by the user, approved for merge):
+all four Buddy windows compose complete frames in reusable device-resolution ARGB buffers, then replace native
+pixels in one clipped blit. This avoids X11 Swing's opaque backbuffer and the native background clear between
+frames. Headless pixel tests cover transparency, old-frame erasure, clipping, resize, disposal and 1×, 2× and
+1.25× scaling; `:jasper-buddy:test` passed (162 tests, zero failures, errors or skips). Full `check` passed with
+Python 3.12.14: **12,850 tests, zero failures/errors, 29 skipped**. Task and whole-branch reviews approved. The [plan](superpowers/plans/2026-10-24-buddy-wayland-rendering.md) records the implementation;
+its scope grew by one architecture-guide sentence. The user confirmed on Ubuntu GNOME Wayland that the black box
+and flickering are gone (2026-10-24). Dragging, repeated hide/show, menu/drawer and display scaling remain unrecorded.
 
 **Floating tool windows, plan 2: drag a tool window out — 2026-10-23** (`claude/floating-tool-windows`, worktree
 `.claude/worktrees/workspace-tabs`, `67a7a0c5a..12f936f60` and the final review's documentation commit, on plan 1's

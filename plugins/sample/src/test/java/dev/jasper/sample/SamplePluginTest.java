@@ -25,6 +25,24 @@ class SamplePluginTest {
     }
     private static final PluginInfo INFO = new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of());
 
+    @Test void inputDemoUsesItsActivationActionToResume() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.setSetting("dev.jasper.sample", "demo_ui", true);
+            start(host, INFO, Set.of(), Set.of(), new SamplePlugin());
+            UUID window = UUID.randomUUID();
+            assertThat(host.invoke("dev.jasper.sample.input", window, null)).isTrue();
+            host.flush();
+            var waiting = host.activityLog().getLast();
+            assertThat(waiting.state()).isEqualTo(ActivityEvent.State.NEEDS_INPUT);
+            assertThat(waiting.activateActionId()).contains("dev.jasper.sample.input");
+            assertThat(host.invoke(waiting.activateActionId().orElseThrow(), window, null)).isTrue();
+            host.runBackground(); host.flush();
+            assertThat(host.activityLog()).extracting(ActivityEvent::state).containsExactly(
+                ActivityEvent.State.STARTED, ActivityEvent.State.NEEDS_INPUT, ActivityEvent.State.RESUMED, ActivityEvent.State.SUCCEEDED);
+            assertThat(host.failures()).isEmpty();
+        }});
+    }
+
     @Test void isInertByDefault() {
         try (var host = new FakePluginHost()) {
             start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
@@ -178,7 +196,7 @@ class SamplePluginTest {
             assertThat(host.actions()).contains("dev.jasper.sample.demo|Run Sample Activity|true");
             assertThat(host.toolbar()).containsExactly("button:dev.jasper.sample.demo");
             assertThat(host.menu("top:dev.jasper.sample.menu")).containsExactly("item:dev.jasper.sample.demo");
-            assertThat(host.menu("TOOLS")).containsExactly("item:dev.jasper.sample.demo");
+            assertThat(host.menu("TOOLS")).containsExactly("item:dev.jasper.sample.input", "===", "item:dev.jasper.sample.demo");
             assertThat(host.menu("VIEW")).isEmpty();
             assertThat(host.menu("context")).containsExactly("item:dev.jasper.sample.demo");
             assertThat(host.status()).containsExactly("dev.jasper.sample.status|RIGHT|Sample: idle|Run the sample activity|dev.jasper.sample.demo");

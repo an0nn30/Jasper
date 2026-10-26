@@ -1,0 +1,4 @@
+{"v":1,"kind":"palette","generation":9007199254740993,"source":"qt5","appearance":"light","implementation":"Qt \"fixture\"","libraryVersion":"runtime","reason":"","window.bg":"1,1,1,1","window.fg":"0,0,0,1"}
+{"v":1,"kind":"palette","generation":9007199254740993,"source":"qt6","appearance":"light","implementation":"Qt \"fixture\"","libraryVersion":"runtime","reason":"","window.bg":"1,1,1,1","window.fg":"0,0,0,1"}
+{"v":1,"kind":"palette","generation":9007199254740993,"source":"kde5","appearance":"light","implementation":"Qt \"fixture\"","libraryVersion":"runtime","reason":"","window.bg":"1,1,1,1","window.fg":"0,0,0,1"}
+{"v":1,"kind":"palette","generation":9007199254740993,"source":"kde6","appearance":"light","implementation":"Qt \"fixture\"","libraryVersion":"runtime","reason":"","window.bg":"1,1,1,1","window.fg":"0,0,0,1"}

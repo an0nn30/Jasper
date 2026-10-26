@@ -862,6 +862,18 @@ class Writes(unittest.TestCase):
             self.assertEqual((pathlib.Path(out) / "gruvbox-dark.json").read_bytes(), good)
             self.assertEqual(listing(out), ["gruvbox-dark.json"])
 
+    def test_the_dynamic_desktop_colors_name_is_reserved(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            out = pathlib.Path(scratch) / "out"
+            theme = loose_file(scratch, "Desktop.theme.json", '{ "name": "Desktop colors", "dark": true }')
+            status, _, stderr = run(theme, "-o", out, "--force")
+            self.assertEqual(status, 1)
+            self.assertIn('"desktop-colors" is reserved for Desktop colors', stderr)
+            self.assertEqual(listing(out), [])
+            self.assertNotIn("desktop-colors", tool.BUILT_IN)
+            self.assertEqual(run(theme, "--name", "Desktop colors Two", "-o", out)[0], 0)
+            self.assertEqual(listing(out), ["desktop-colors-two.json"])
+
     def test_the_built_in_theme_name_is_refused(self):
         with tempfile.TemporaryDirectory() as scratch:
             out = pathlib.Path(scratch) / "out"

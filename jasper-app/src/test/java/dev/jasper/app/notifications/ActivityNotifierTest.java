@@ -17,6 +17,26 @@ class ActivityNotifierTest {
     private final BuddyTestSupport deck = new BuddyTestSupport();
     private final UUID id = UUID.randomUUID();
 
+    @Test void inputAndResumeKeepDismissalAndTrackAllRunningTasks() {
+        var changes = new java.util.ArrayList<Boolean>();
+        var notifier = new ActivityNotifier(deck.companion(), () -> {}, changes::add);
+        UUID other = UUID.randomUUID();
+        notifier.started("p", id, "first", "");
+        notifier.started("p", other, "second", "");
+        notifier.needsInput("p", id, "choose");
+        assertThat(deck.notices()).filteredOn(n -> n.id().key().equals(id)).singleElement()
+            .satisfies(n -> { assertThat(n.state()).isEqualTo(BuddyNotice.State.NEEDS_INPUT); assertThat(n.detail().get()).isEqualTo("choose"); });
+        notifier.needsInput("p", other, "choose too");
+        deck.companion().dismiss(new BuddyNoticeId("p", id));
+        notifier.resumed("p", id, "working"); notifier.resumed("p", id, "still working");
+        assertThat(deck.notices()).hasSize(1);
+        notifier.ended("p", id); notifier.resumed("p", id, "late");
+        notifier.connection("p", UUID.randomUUID(), "connected", ActivityNotifier.ConnectionState.UP, "", Optional.empty());
+        assertThat(changes).containsExactly(true, false, true, false);
+        notifier.resumed("p", other, "working"); notifier.close(); notifier.resumed("p", other, "late");
+        assertThat(changes).containsExactly(true, false, true, false, true, false);
+    }
+
     @Test void aRunningActivityIsOneCardWhoseDetailFollowsProgress() {
         var notifier = new ActivityNotifier(deck.companion(), () -> { });
         notifier.started("dev.jasper.sftp", id, "Upload\nsite.tar", "starting");

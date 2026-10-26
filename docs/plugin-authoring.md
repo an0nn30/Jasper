@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
-describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.21.0, task by task.
+describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.22.0, task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
   exported APIs.
@@ -64,7 +64,7 @@ id = "dev.example.tool"
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.21.0, <0.22"
+sdk = ">=0.22.0, <0.23"
 description = "Runs the tool from the command palette."
 vendor = "Example"
 homepage = "https://example.dev/tool"
@@ -90,7 +90,7 @@ summary = "Run the tool"
 | `name` | string | yes | Must show something: not only spaces, zero-width or bidi characters. It titles the plugin's row, Settings page and notification groups. |
 | `version` | string | yes | One to three numbers separated by dots, without leading zeros or a pre-release tag; missing numbers are 0, so `1.0` is `1.0.0`. |
 | `entry` | string | yes | The qualified name of the [entry class](#the-entry-point-and-lifecycle), which must be in a package. |
-| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.21.0 declares `sdk = ">=0.21.0, <0.22"`. |
+| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.22.0 declares `sdk = ">=0.22.0, <0.23"`. |
 | `description` | string | no | The Overview on the plugin's details in Settings › Plugins; searched there. |
 | `vendor` | string | no | Shown in the plugin list, its details and its review sheet. |
 | `homepage` | string | no | An absolute `http` or `https` address, linked as "Plugin homepage ↗" on the plugin's details. Anything else is ignored with a warning in the log. |
@@ -259,6 +259,7 @@ and handlers, never components.
 <!-- example:pluginui -->
 ```java
 private static void installUi(PluginContext context, long stepMillis) {
+    installInputDemo(context);
     PluginAction[] demo = new PluginAction[1];
     demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
             .withIcon("dev.jasper.sample:flask")
@@ -706,6 +707,10 @@ sync.error("Could not sync", "prod: connection refused", failure);
   `progress(fraction, detail)` (the card reads "*N*% · *detail*"), `detail(...)`, and exactly one of `succeed`, `fail`
   and `cancelled`; later calls are ignored, and progress between two deliveries is coalesced. An activity still open
   when the plugin stops ends as failed.
+- `needsInput(detail)` waits for user input; `resume(detail)` explicitly resumes work. Both retain the id, fraction
+  and activation action. Progress and detail keep the current phase; repeated phase calls coalesce detail. Phase
+  transitions arrive in order, while pending progress at a transition may be dropped. Running plugin activities and
+  qualifying terminal work jointly drive Buddy's working animation; waiting activities remain in its attention summary.
 - When an activity succeeds or fails, Jasper posts its outcome in the group `<plugin id>.activities`, titled after the
   activity with the final detail as content; post nothing for it yourself. A cancelled activity posts nothing.
 - `ActivitySpec`'s `activateActionId` naming one of the plugin's actions makes a click on the card, or on the outcome,
@@ -717,7 +722,32 @@ sync.error("Could not sync", "prod: connection refused", failure);
   matters. Every change of state is delivered; a change of detail alone is coalesced. Buddy shows a card per
   connection, and a click runs its `activateActionId` as for activities. Open connections close when the plugin stops.
 - Anyone may subscribe to `Activities.TOPIC` (`jasper.activity`) and `Activities.CONNECTIONS` (`jasper.connection`);
-  `activities().current()` returns the latest event of each running activity.
+  `activities().current()` returns the latest event of each running or waiting activity.
+  Subscribers handle `NEEDS_INPUT` (including detail updates while waiting) and `RESUMED` in addition to the existing states.
+
+The Sample's Tools action starts a confirmation task. Clicking its Buddy row runs the same action to confirm,
+resume and finish it:
+
+<!-- example:plugininput -->
+```java
+private static void installInputDemo(PluginContext context) {
+    String actionId = "dev.jasper.sample.input";
+    ActivityHandle[] waiting = new ActivityHandle[1]; // accessed only by the UI-thread action
+    context.actions().register(ActionSpec.of(actionId, "Run or Confirm Sample Input Activity"), invoked -> {
+        if (waiting[0] == null) {
+            waiting[0] = context.activities().begin(new ActivitySpec("Sample confirmation", "Preparing",
+                Optional.of(actionId), Optional.empty()));
+            waiting[0].needsInput("Activate this activity to confirm and continue");
+        } else {
+            ActivityHandle activity = waiting[0];
+            waiting[0] = null;
+            activity.resume("Confirmed; continuing");
+            context.background().execute(() -> activity.succeed("Confirmed"));
+        }
+    });
+    context.menus().standard(StandardMenu.TOOLS).add(actionId);
+}
+```
 
 ## Events
 
