@@ -322,9 +322,59 @@ with zero failures/errors and 30 skips, plus 72 theme-tool tests. A final single
 headless `installDist packageApp verifyPackage` pass; the Mac image omits Linux helpers. Logs are
 `/private/tmp/jasper-qt-app-task4-full-check.log` and `/private/tmp/jasper-qt-app-task4-final-package.log`.
 
-These synthetic Java protocol inputs and child doubles supplement the native evidence above. Updated-source Linux
-full/source verification, refreshed-base confirmation of historical Linux rendering failures, real-helper sampling
-through current Java, Windows/CI, complete Automatic-candidate/dual-preview CPU/RSS/process-churn measurement and
-actual desktop acceptance remain open. The earlier four-helper idle numbers retain their original native scope.
-The optional Fedora source copy remains pending explicit permission after automatic approval review rejected it;
-this application task transferred no source and launched no GUI, AOT training or benchmark.
+These synthetic Java inputs supplement the native evidence above and the current-Java Linux follow-up below.
+
+### Linux application verification — 2026-10-26
+
+Source `3bfde469fa57de9691da7186be707590059860c2` was transferred with explicit user authorization to the Fedora 44
+aarch64 VM. The archive SHA256 matched locally/remotely: `2fb728d216543abe356a953a2be6a16e3ccee1847049afc79c2261448c60a821`.
+The full check used Ubuntu 22.04.5 userspace, glibc 2.35 and Linux JBR 25.0.4.1+1-b635.75-jcef, with all five pinned SDK
+prefixes and Python 3.13.17. It exited 1 after 17m 11s: **13,114 JUnit tests, 34 failures, zero errors, 65 skips**.
+The original XML was archived before focused reruns. New Qt/KDE owner, policy, protocol, actual-paint and retention
+cases passed; four older authored-default cases in DesktopAppearanceTest failed and reproduce on the refreshed base.
+
+| Follow-up | Evidence |
+| --- | --- |
+| Refreshed base `9fa59a492` | 24 of 25 selected failures reproduce: authored-default assumptions and rendering/geometry expectations. |
+| Corrected environment | Nine failed tests pass after installing unzip and running permission-sensitive tests as a normal user. |
+| Rehearsal callback | One delayed RSyntax callback failed only in the full current run; isolated current/base cases pass. Full-order cause remains unresolved. |
+| Native checks | Protocol 450 checks pass after generating the decimal-comma locale; portal 19 tests / 60 assertions pass with a filesystem-backed private bus. GTK3/GTK4 ABI checks pass on Fedora GTK 3.24.52 / 4.22.5 with libadwaita 1.9.4. |
+| Other build tasks | Launcher poisoned-cache expectation reproduces on the base with this JBR. Packaging-support passes under a child-subreaper; initial non-reaping container PID1 left a killed test child as a zombie. |
+
+The tracked portal task's default bus can use an abstract socket on Ubuntu 22, and its GTK 4.6.9 headers predate the
+ABI fixture's gtk_widget_get_color signature. These harness limitations, the baseline failures and unresolved callback
+keep the full gate non-green. Focused passes do not replace its aggregate result.
+
+The exact current application jar (`5aaad18ae983ec88546fd99945230c93f3d1b2e422f1de5cd4cd4c6ecdabc96a`) passed through the
+real DesktopColors/DesktopAppearance owner with Qt 5.15.18 / KF 5.116 and Qt 6.11.2 / KF 6.31 system libraries in Fedora 44.
+Each Qt/KDE source passed active-Light/opposite-Dark preview/fallback checks. Real missing Qt6 library, platform plugin
+and display cases selected Qt5, then recovered to Qt6 without restarting Qt5. The private headless run opened no Jasper
+window; mapped-window observations belong to that private display, not desktop focus/flash acceptance.
+
+Automatic KDE6 with retained Light/Dark previews crossed two real 30-second refresh boundaries: all seven helper PIDs
+were stable, with no observed mapped windows or configuration-write events. Summed settled RSS was 332,480 kB (shared
+pages included), and CPU delta was 24 ticks at 100 Hz over 58.372 seconds. The Light selection remained KDE6; Dark used
+compatible GTK3 while the current-only Qt/KDE observations remained Light. No performance threshold is claimed.
+
+Current `checkDesktopQtNative installDist packageApp verifyPackage packageDeb packageRpm` passed in 4m. All 12 CTests
+pass (Qt: 27 extraction / 79 process checks per major; KDE: 39 / 110 per major), using system Qt 5.15.3 / private Qt 6.5
+runtimes rather than repeating every minimum-runtime cell. All seven staged helper hashes equal the
+system-runtime probe binaries. Current minimal Ubuntu 22 DEB, minimal Fedora 44 RPM and equipped Fedora 44 RPM
+install/check/remove checks pass; package metadata keeps Qt/KF optional. RPM removal retains the inherited nonfatal
+JBR preun transaction-lock diagnostic. These reused containers already contain desktop-directories, so the final
+checks do not repeat the missing-directory creation path. Artifact SHA256:
+
+- DEB: `e31040703c7e366ab54eb64ceaf7267ca56af0ff1f1c30321c2fe079eae95322`
+- RPM: `d9efeb3c4ef60b8da9fb6feb60c80575b8bead1072be9b26320aeed9a9ba4e0c`
+
+Evidence: `/private/tmp/jasper-qt-final-linux-check.log`, `jasper-qt-final-linux-full-xml.tar.gz`,
+`jasper-qt-final-linux-full-counts.json`, `jasper-qt-linux-baseline-failures-xml.tar.gz`,
+`jasper-linux-java-probe-evidence.tgz`, `jasper-qt-final-linux-package.log`, `jasper-qt-final-package-metadata.log`, and
+`jasper-qt-final-{minimal-deb,minimal-rpm,equipped-rpm}.log`, all under `/private/tmp`.
+Detailed commands, source hashes, case metrics and rerun classifications are retained in this worktree's
+`.superpowers/sdd/2026-10-25-qt-kde-application-integration/linux-{final,native-java,package}-report.md` and
+`linux-native-java-evidence/`. The probe evidence archive SHA256 is
+`cc60491c3c9872f116a3625674b046c048a0bcf1d73c5673347d4fd179601a3a`.
+
+Windows/CI, x86_64, separately installed minimum KDE6, the cold corrected SDK recipe and real Plasma5/6
+Wayland/X11/qt5ct/qt6ct desktop acceptance remain open. No GUI, AOT training, merge or push ran.
