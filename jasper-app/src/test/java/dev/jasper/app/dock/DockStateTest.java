@@ -102,13 +102,13 @@ class DockStateTest {
         assertThat(state.ids(Slot.RIGHT_TOP)).containsExactly("b", "a", "c");
         assertThat(state.active(Slot.RIGHT_TOP)).hasValue("a");
         assertThat(state.active(Slot.LEFT_TOP)).isEmpty();
-        assertThat(changes).containsExactly(new DockState.Change(true, true, List.of("b"), List.of()));
+        assertThat(changes).containsExactly(new DockState.Change(true, true, List.of("b"), List.of(), List.of("a")));
 
         changes.clear();
         state.move("c", Slot.BOTTOM_LEFT, 0);
         assertThat(state.visible("c")).as("a hidden window stays hidden").isFalse();
         assertThat(state.slot("c")).hasValue(Slot.BOTTOM_LEFT);
-        assertThat(changes).containsExactly(order());
+        assertThat(changes).containsExactly(new DockState.Change(false, true, List.of(), List.of(), List.of("c")));
     }
 
     @Test void moveWithinASlotReordersAndClampsTheIndex() {

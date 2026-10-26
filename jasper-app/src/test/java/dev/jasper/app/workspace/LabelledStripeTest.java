@@ -6,6 +6,7 @@ import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
@@ -88,7 +89,7 @@ class LabelledStripeTest {
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
-    @Test void aClickTogglesAndARightClickOffersMoveTo() throws Exception {
+    @Test void aClickTogglesAndARightClickOffersViewModeAndMoveTo() throws Exception {
         try {
             var stripe = stripe(Side.RIGHT);
             var toggled = new ArrayList<String>();
@@ -97,7 +98,28 @@ class LabelledStripeTest {
             stripe.buttons().getFirst().doClick(0);
             assertThat(toggled).containsExactly("sessions");
             var menu = stripe.buttons().getFirst().getComponentPopupMenu();
-            assertThat(((JMenu) menu.getComponent(0)).getText()).isEqualTo("Move to");
+            assertThat(((JMenu) menu.getComponent(0)).getText()).isEqualTo("View Mode");
+            assertThat(((JMenu) menu.getComponent(1)).getText()).isEqualTo("Move to");
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    @Test void aRightClickMenuChecksTheLabelsModeAndChoosingAnotherSetsIt() throws Exception {
+        try {
+            var stripe = stripe(Side.RIGHT);
+            var events = new ArrayList<String>();
+            stripe.onMode = (id, mode) -> events.add(id + ":" + mode);
+            stripe.render(List.of(new ToolStripe.Button("sessions", "Sessions", null, Slot.RIGHT_TOP, true, Optional.empty(), OptionalInt.empty(),
+                ToolWindowMode.FLOAT)), List.of());
+            var menu = stripe.buttons().getFirst().getComponentPopupMenu();
+            assertThat(((javax.swing.JCheckBoxMenuItem) ToolWindowHeaderTest.item(menu, "Float")).isSelected()).isTrue();
+            stripe.updateBadge("sessions", Optional.of(new PanelBadge(2, PanelBadge.Tone.ACCENT, "2 new")));
+            var window = ((StripeLabels.Label) stripe.buttons().getFirst()).window;
+            assertThat(window.badge()).as("the badge changed").isPresent();
+            assertThat(window.mode()).as("a badge change keeps the mode").isEqualTo(ToolWindowMode.FLOAT);
+            ToolWindowHeaderTest.item(menu, "Float").doClick();
+            assertThat(events).as("the current mode does nothing").isEmpty();
+            ToolWindowHeaderTest.item(menu, "Docked").doClick();
+            assertThat(events).containsExactly("sessions:DOCKED");
         } finally { EnterpriseLook.restoreDefault(); }
     }
 

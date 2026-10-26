@@ -70,6 +70,7 @@ class FakeContractTest extends PluginContractTest {
                 return action.isPresent();
             }
             @Override public void closePanel(String panelId) { host.closePanel(panelId); }
+            @Override public void placePanel(String panelId, dev.jasper.sdk.ui.PanelPlacement placement) { host.placePanel(panelId, placement); }
             @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((FakeKitView) view).route; }
             @Override public List<String> rail() { return host.rail(); }
             @Override public List<String> windows() { return host.windows(); }

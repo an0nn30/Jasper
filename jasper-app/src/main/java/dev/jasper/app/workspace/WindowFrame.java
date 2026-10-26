@@ -135,7 +135,7 @@ public final class WindowFrame {
     }
 
     /** Whether macOS shows this process's menus in the screen menu bar, as the look committed before AWT started. */
-    private static boolean screenMenuBar() {
+    static boolean screenMenuBar() {
         return SystemInfo.isMacOS && Boolean.getBoolean("apple.laf.useScreenMenuBar");
     }
 
@@ -151,14 +151,7 @@ public final class WindowFrame {
         placement = new WindowPlacement(saved.bounds(), saved.extendedState());
         this.report = java.util.Objects.requireNonNull(report, "report");
         updateMinimumSize();
-        var screens = new java.util.ArrayList<Rectangle>();
-        var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        screens.add(usableBounds(environment.getDefaultScreenDevice().getDefaultConfiguration()));
-        for (var device : environment.getScreenDevices()) {
-            Rectangle bounds = usableBounds(device.getDefaultConfiguration());
-            if (!screens.contains(bounds)) screens.add(bounds);
-        }
-        placement.restore(frame.getMinimumSize(), screens).ifPresent(frame::setBounds);
+        placement.restore(frame.getMinimumSize(), usableDisplays()).ifPresent(frame::setBounds);
         placement.observe(frame.getBounds(), java.awt.Frame.NORMAL);
         frame.setExtendedState(placement.extendedState());
         frame.addComponentListener(geometry);
@@ -227,6 +220,30 @@ public final class WindowFrame {
 
     private Rectangle usableBounds() {
         return usableBounds(frame.getGraphicsConfiguration());
+    }
+
+    /**
+     * The usable bounds of today's displays, less the menu bar, Dock or taskbar: the default display first, then the
+     * others; empty without a display (headless).
+     */
+    static java.util.List<Rectangle> usableDisplays() {
+        return displays().stream().map(WindowPlacement.Display::usable).distinct().toList();
+    }
+
+    /** Today's displays, whole and usable: the default display first, then the others; empty without a display (headless). */
+    static java.util.List<WindowPlacement.Display> displays() {
+        if (GraphicsEnvironment.isHeadless()) return java.util.List.of();
+        var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        var first = environment.getDefaultScreenDevice();
+        var displays = new java.util.ArrayList<WindowPlacement.Display>();
+        displays.add(display(first.getDefaultConfiguration()));
+        for (var device : environment.getScreenDevices())
+            if (!device.equals(first)) displays.add(display(device.getDefaultConfiguration()));
+        return displays;
+    }
+
+    private static WindowPlacement.Display display(java.awt.GraphicsConfiguration graphics) {
+        return new WindowPlacement.Display(graphics.getBounds(), usableBounds(graphics));
     }
 
     private static Rectangle usableBounds(java.awt.GraphicsConfiguration graphics) {

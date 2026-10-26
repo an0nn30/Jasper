@@ -10,6 +10,7 @@ import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import java.awt.AlphaComposite;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -19,6 +20,7 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Insets;
 import java.awt.LayoutManager;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -29,10 +31,13 @@ import java.awt.geom.Area;
 import java.awt.geom.RoundRectangle2D;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.JComponent;
@@ -51,7 +56,8 @@ import javax.swing.UIManager;
  * column has a rounded frame and exterior gutter while a stripe is visible, and is
  * borderless and square on the side of a hidden stripe; with neither stripe it fills its area edge to edge. The center frame is painted in the terminal palette's background, never
  * a theme's tool window colour. The area changes the state only when a divider drag ends; whoever changes the state
- * calls {@link #sync} afterwards. EDT only.
+ * calls {@link #sync} afterwards. A detached tool window (Float or Window) takes no space here: its frame, a header over
+ * the content, is built the same way but kept apart, never a child of this area, for whatever window shows it. EDT only.
  */
 final class ToolWindowArea extends JPanel {
     /** The window's kit's exterior gutter, in logical pixels. */
@@ -272,6 +278,8 @@ final class ToolWindowArea extends JPanel {
         @Override public Dimension getMinimumSize() { return getPreferredSize(); }
     };
     private final EnumMap<Slot, Host> hosts = new EnumMap<>(Slot.class);
+    /** The frames of the shown detached tool windows by id, in the order they were mounted; never children of this area. */
+    private final Map<String, Host> detached = new LinkedHashMap<>();
     private final Map<String, dev.jasper.app.contributions.PanelHeaderState> headers = new HashMap<>();
     private final Map<String, Content> contents = new HashMap<>();
     private final EnumMap<DockGeometry.Handle, DividerHandle> dividers = new EnumMap<>(DockGeometry.Handle.class);
@@ -280,7 +288,14 @@ final class ToolWindowArea extends JPanel {
     private boolean leftStripeVisible, rightStripeVisible, statusVisible, headerVisible;
     /** Runs after every sync, which may have changed which windows show and so the area's minimum size. */
     Runnable onMinimumSizeChanged = () -> { };
+    /**
+     * Runs after a sync that no dock change made: a kit view replaced its header, so a detached tool window's frame may be
+     * a new one, which its window must take.
+     */
+    Runnable onRemounted = () -> { };
     BiConsumer<String, Slot> onMove = (id, slot) -> { };
+    /** Docks a window or detaches it as a Float or a Window, from its header's Options menu. */
+    BiConsumer<String, ToolWindowMode> onMode = (id, mode) -> { };
     Consumer<String> onHide = id -> { };
     /** Shows a borrowed kit header's Options menu under its button; a header that is not showing opens nothing. */
     BiConsumer<JComponent, javax.swing.JPopupMenu> showOptions = (anchor, menu) -> {
@@ -363,14 +378,22 @@ final class ToolWindowArea extends JPanel {
     void setHeader(String id, dev.jasper.app.contributions.PanelHeaderState header) {
         headers.put(id, Objects.requireNonNull(header));
         for (Host host : hosts.values()) if (id.equals(host.id)) host.header.accept(header);
+        Host frame = detached.get(id);
+        if (frame != null) frame.header.accept(header);
     }
 
-    void removeContent(String id) { contents.remove(id); headers.remove(id); }
+    /** Forgets the window's content and header metadata; a docked frame goes with the next {@link #sync}, a detached one now. */
+    void removeContent(String id) {
+        contents.remove(id); headers.remove(id);
+        Host frame = detached.remove(id);
+        if (frame != null) release(frame);
+    }
 
     /** Window disposal releases borrowed kit headers even when the plugin closed its view first. */
     void close() {
         for (var host : hosts.values()) { host.releaseHeader.run(); host.removeAll(); remove(host); }
-        hosts.clear(); contents.clear(); headers.clear();
+        for (var frame : detached.values()) release(frame);
+        hosts.clear(); detached.clear(); contents.clear(); headers.clear();
     }
 
     /** The content showing in the slot, or null. */
@@ -385,62 +408,88 @@ final class ToolWindowArea extends JPanel {
         return host == null ? null : (ToolWindowHeader) ((BorderLayout) host.getLayout()).getLayoutComponent(BorderLayout.NORTH);
     }
 
+    /**
+     * The frame of a shown detached tool window with content: its header above its content, with no gutters and square
+     * corners, parentless for whatever window is to hold it. Null when the window is docked, hidden or has no content.
+     */
+    JComponent detachedFrame(String id) { return detached.get(id); }
+
+    /** The ids of the shown detached tool windows that have a frame, in {@link DockState#detachedVisible} order. */
+    List<String> detachedFrames() { return state.detachedVisible().stream().filter(detached::containsKey).toList(); }
+
+    /**
+     * Where a shown docked tool window's frame is on the screen: the framed surface, inside the gutters, so a window
+     * opened there holds the frame where it was. Empty when the window does not show docked here.
+     */
+    Optional<Rectangle> frameOnScreen(String id) {
+        for (Host host : hosts.values()) {
+            if (!id.equals(host.id)) continue;
+            Insets insets = host.getInsets();
+            Point origin = new Point(host.getX() + insets.left, host.getY() + insets.top);
+            SwingUtilities.convertPointToScreen(origin, this);
+            return Optional.of(new Rectangle(origin.x, origin.y, Math.max(0, host.getWidth() - insets.left - insets.right),
+                Math.max(0, host.getHeight() - insets.top - insets.bottom)));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The size the window would have docked in its slot, which is what {@link DockGeometry#landing} gives for this
+     * area's size; else the side's saved width and half the height, or half the width and the bottom's saved height. A
+     * window the dock does not hold gets the left side's.
+     */
+    Dimension landingSize(String id) {
+        Slot slot = state.slot(id).orElse(Slot.LEFT_TOP);
+        var metrics = metrics();
+        return DockGeometry.landing(new Rectangle(getSize()), state, id, slot, metrics).map(Rectangle::getSize)
+            .orElseGet(() -> slot.side() == Side.BOTTOM
+                ? new Dimension(getWidth() / 2, metrics.scaled(state.size(Side.BOTTOM)))
+                : new Dimension(metrics.scaled(state.size(slot.side())), getHeight() / 2));
+    }
+
     /** The divider for a handle; it has empty bounds while the layout has no such divider. */
     JComponent divider(DockGeometry.Handle handle) { return dividers.get(handle); }
 
     /**
      * Brings the frames in line with the state: a frame for each slot that shows a window with content, none for the
-     * others. Content leaves the component tree while its window is hidden. Every stale frame is released before any
-     * new one mounts: a window that moves keeps its content and a kit view's borrowed header, which its old frame's
-     * release would otherwise take back from the new frame.
+     * others, and a frame outside the area for each shown detached window with content. Content leaves the component
+     * tree while its window is hidden. Every stale frame, docked or detached, is released before any new one mounts: a
+     * window that moves, or detaches or docks, keeps its content and a kit view's borrowed header, which its old
+     * frame's release would otherwise take back from the new frame.
      */
     void sync() {
+        List<String> shown = state.detachedVisible();
         for (Slot slot : Slot.values()) {
-            Content wanted = wanted(slot);
             Host host = hosts.get(slot);
-            if (host != null && (wanted == null || host.content != wanted.component()
-                    || host.borrowedHeader != kitHeader(wanted.component()))) {
+            if (host != null && stale(host, wanted(slot))) {
                 remove(host);
-                host.releaseHeader.run();
-                host.removeAll();
+                release(host);
                 hosts.remove(slot);
             }
         }
+        for (String id : List.copyOf(detached.keySet())) {
+            Host frame = detached.get(id);
+            if (stale(frame, shown.contains(id) ? wanted(id) : null)) {
+                release(frame);
+                detached.remove(id);
+            }
+        }
         for (Slot slot : Slot.values()) {
-            String id = state.active(slot).orElse(null);
             Content wanted = wanted(slot);
-            Host host = hosts.get(slot);
-            if (wanted != null && host == null) {
-                host = new Host(true);
-                host.id = id;
-                host.content = wanted.component();
-                host.borrowedHeader = kitHeader(wanted.component());
-                if (wanted.component() instanceof dev.jasper.ui.swing.KitView view
-                        && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel panel) {
-                    host.releaseHeader = mountHeader(host, view, panel.id(), id);
-                } else {
-                    ToolWindowHeader header = header(id, wanted.title());
-                    host.add(header, BorderLayout.NORTH);
-                    var surfaces = header.dragSurfaces();
-                    for (JComponent surface : surfaces) dragSource.accept(surface, id);
-                    host.header = header::presentation;
-                    host.focusedHeader = header::setFocused;
-                    Host mounted = host;
-                    host.releaseHeader = () -> { mounted.header = state -> { }; mounted.focusedHeader = value -> { }; surfaces.forEach(releaseDragSource); };
-                }
-                if (wanted.component() instanceof dev.jasper.ui.swing.KitView view) {
-                    var release = host.releaseHeader;
-                    Host mounted = host;
-                    // Plugin views update often (progress, switches, chips). Only a different borrowed header, or a
-                    // closed view, changes the dock frame; content-only updates must not relayout the whole area.
-                    java.beans.PropertyChangeListener changed = event -> { if (mounted.borrowedHeader != kitHeader(view)) sync(); };
-                    view.addPropertyChangeListener("viewSpec", changed);
-                    host.releaseHeader = () -> { view.removePropertyChangeListener("viewSpec", changed); release.run(); };
-                }
-                host.add(wanted.component(), BorderLayout.CENTER);
-                ToolWindowSurface.apply(host);
+            if (wanted != null && !hosts.containsKey(slot)) {
+                Host host = mount(state.active(slot).orElseThrow(), wanted, true);
                 hosts.put(slot, host);
                 add(host);
+            }
+        }
+        for (String id : shown) {
+            Content wanted = wanted(id);
+            if (wanted != null && !detached.containsKey(id)) {
+                // Its window's own title bar moves it, so no part of its header starts a dock drag.
+                Host frame = mount(id, wanted, false);
+                frame.gutters(0, 0, 0, 0);
+                frame.rounded(false, false);
+                detached.put(id, frame);
             }
         }
         refreshGutters();
@@ -449,8 +498,59 @@ final class ToolWindowArea extends JPanel {
         if (flush) focusMoved(java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner());
     }
 
+    /** Whether the frame no longer matches what its window should show: nothing, other content or another borrowed header. */
+    private static boolean stale(Host host, Content wanted) {
+        return wanted == null || host.content != wanted.component() || host.borrowedHeader != kitHeader(wanted.component());
+    }
+
+    /** Lets go of the frame's header, which a kit view takes back, and of its content. */
+    private static void release(Host host) {
+        host.releaseHeader.run();
+        host.removeAll();
+    }
+
+    /**
+     * A frame for the tool window: its header above its content. A kit view's own panel header is borrowed, else a native
+     * header is built. The caller places it, with its gutters and corners.
+     *
+     * @param dragSources whether the header's surfaces start a dock drag (a docked frame's do, a detached one's do not)
+     */
+    private Host mount(String id, Content wanted, boolean dragSources) {
+        Host host = new Host(true);
+        host.id = id;
+        host.content = wanted.component();
+        host.borrowedHeader = kitHeader(wanted.component());
+        if (wanted.component() instanceof dev.jasper.ui.swing.KitView view
+                && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel panel) {
+            host.releaseHeader = mountHeader(host, view, panel.id(), id, dragSources);
+        } else {
+            ToolWindowHeader header = header(id, wanted.title());
+            host.add(header, BorderLayout.NORTH);
+            var surfaces = dragSources ? header.dragSurfaces() : List.<JComponent>of();
+            for (JComponent surface : surfaces) dragSource.accept(surface, id);
+            host.header = header::presentation;
+            host.focusedHeader = header::setFocused;
+            host.releaseHeader = () -> { host.header = state -> { }; host.focusedHeader = value -> { }; surfaces.forEach(releaseDragSource); };
+        }
+        if (wanted.component() instanceof dev.jasper.ui.swing.KitView view) {
+            var release = host.releaseHeader;
+            // Plugin views update often (progress, switches, chips). Only a different borrowed header, or a
+            // closed view, changes the dock frame; content-only updates must not relayout the whole area.
+            java.beans.PropertyChangeListener changed = event -> {
+                if (host.borrowedHeader != kitHeader(view)) { sync(); onRemounted.run(); }
+            };
+            view.addPropertyChangeListener("viewSpec", changed);
+            host.releaseHeader = () -> { view.removePropertyChangeListener("viewSpec", changed); release.run(); };
+        }
+        host.add(wanted.component(), BorderLayout.CENTER);
+        ToolWindowSurface.apply(host);
+        return host;
+    }
+
     /** The frame holding the permanent focus owner, under flush frames. */
     private Slot focused;
+    /** The detached tool window whose frame holds the permanent focus owner, under flush frames. */
+    private String focusedDetached;
     /** Follows the permanent focus owner while the area is showing, under flush frames. */
     private final java.beans.PropertyChangeListener focusListener = event -> focusMoved(event.getNewValue() instanceof Component owner ? owner : null);
     /** Hears every mouse press while the area is showing, under flush frames, and activates the frame it lands in. */
@@ -476,19 +576,30 @@ final class ToolWindowArea extends JPanel {
         super.removeNotify();
     }
 
-    /** Spec 10.7: the frame holding {@code owner} shows its header strip as focused, the others not; standard frames ignore it. */
+    /**
+     * Spec 10.7: the frame holding {@code owner}, docked or detached, shows its header strip as focused, the others not;
+     * standard frames ignore it.
+     */
     void focusMoved(Component owner) {
         if (!flush) return;
         Slot now = null;
+        String nowDetached = null;
         for (var entry : hosts.entrySet())
             if (owner != null && SwingUtilities.isDescendingFrom(owner, entry.getValue())) now = entry.getKey();
-        mark(now);
+        for (var entry : detached.entrySet())
+            if (owner != null && SwingUtilities.isDescendingFrom(owner, entry.getValue())) nowDetached = entry.getKey();
+        mark(now, nowDetached);
     }
 
     /** Shows {@code slot}'s frame, or none, as the focused one. */
-    private void mark(Slot slot) {
+    private void mark(Slot slot) { mark(slot, null); }
+
+    /** Shows {@code slot}'s frame, or the detached tool window {@code id}'s, or none, as the focused one. */
+    private void mark(Slot slot, String id) {
         focused = slot;
-        for (var entry : hosts.entrySet()) entry.getValue().focused(entry.getKey() == focused);
+        focusedDetached = id;
+        for (var entry : hosts.entrySet()) entry.getValue().focused(entry.getKey() == slot);
+        for (var entry : detached.entrySet()) entry.getValue().focused(entry.getKey().equals(id));
     }
 
     /**
@@ -503,8 +614,14 @@ final class ToolWindowArea extends JPanel {
             if (SwingUtilities.isDescendingFrom(target, entry.getValue())) { activate(entry.getKey()); return; }
     }
 
-    /** Activates the frame showing the tool window {@code id}, as a press inside it would; standard frames ignore it. */
+    /**
+     * Activates the frame showing the tool window {@code id}, as a press inside it would; a docked frame under standard
+     * frames ignores it. A detached tool window's frame takes the keyboard in every frame style, and a flush one shows
+     * its header strip as focused.
+     */
     void activate(String id) {
+        Host frame = detached.get(id);
+        if (frame != null) { activate(id, frame); return; }
         if (!flush) return;
         for (var entry : hosts.entrySet())
             if (entry.getValue().id != null && entry.getValue().id.equals(id)) { activate(entry.getKey()); return; }
@@ -513,10 +630,20 @@ final class ToolWindowArea extends JPanel {
     private void activate(Slot slot) {
         mark(slot);
         Host host = hosts.get(slot);
+        takeKeyboard(host, () -> focused == slot && hosts.get(slot) == host);
+    }
+
+    private void activate(String id, Host frame) {
+        if (flush) mark(null, id);
+        takeKeyboard(frame, () -> detached.get(id) == frame && (!flush || id.equals(focusedDetached)));
+    }
+
+    /** Once this EDT turn is dispatched, moves the keyboard into the frame unless it is there already or {@code current} no longer holds. */
+    private void takeKeyboard(Host host, BooleanSupplier current) {
         SwingUtilities.invokeLater(() -> {
             Component owner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner();
-            if (focused != slot || hosts.get(slot) != host || owner != null && SwingUtilities.isDescendingFrom(owner, host)) return;
-            Component target = focusTarget(slot);
+            if (!current.getAsBoolean() || owner != null && SwingUtilities.isDescendingFrom(owner, host)) return;
+            Component target = focusTarget(host);
             if (target == host) host.setFocusable(true);
             focuser.accept(target);
         });
@@ -530,7 +657,10 @@ final class ToolWindowArea extends JPanel {
      */
     Component focusTarget(Slot slot) {
         Host host = hosts.get(slot);
-        if (host == null) return null;
+        return host == null ? null : focusTarget(host);
+    }
+
+    private static Component focusTarget(Host host) {
         Component found = host.content == null ? null : keyed(host.content, false);
         if (found == null && host.content != null) found = keyed(host.content, true);
         return found != null ? found : host;
@@ -578,8 +708,11 @@ final class ToolWindowArea extends JPanel {
     }
 
     /** What the slot's frame should show: its active window's content, or null for none or a closed kit view. */
-    private Content wanted(Slot slot) {
-        Content wanted = state.active(slot).map(contents::get).orElse(null);
+    private Content wanted(Slot slot) { return state.active(slot).map(this::wanted).orElse(null); }
+
+    /** What a window's frame should show: its content, or null for none or a closed kit view. */
+    private Content wanted(String id) {
+        Content wanted = contents.get(id);
         return wanted != null && wanted.component() instanceof dev.jasper.ui.swing.KitView view && view.isClosed() ? null : wanted;
     }
 
@@ -591,24 +724,24 @@ final class ToolWindowArea extends JPanel {
     /**
      * Borrow only the kit header; the panel and its footer remain owned by the view. Header metadata appears in the
      * borrowed row as on a native header: detail and dot after the title, contributed actions before Options and Hide.
+     * The header's surfaces start a dock drag only for a docked frame ({@code dragSources}).
      */
-    private Runnable mountHeader(Host host, dev.jasper.ui.swing.KitView view, String panel, String id) {
+    private Runnable mountHeader(Host host, dev.jasper.ui.swing.KitView view, String panel, String id, boolean dragSources) {
         var header = view.panelHeader(panel);
         var sources = new java.util.ArrayList<JComponent>();
-        collectHeaderSources(header, sources);
+        if (dragSources) collectHeaderSources(header, sources);
         sources.forEach(component -> dragSource.accept(component, id));
         var ready = dev.jasper.ui.model.ControlState.READY;
         var ghost = dev.jasper.ui.model.Nodes.ButtonKind.GHOST;
         // The view lives only in this window's area, so the flag is never cleared on release.
         if (artwork == dev.jasper.ui.icons.ChromeArtwork.CLASSIC) view.classicChromeIcons(true);
         view.setPanelHostActions(panel, List.of(
-            new dev.jasper.ui.model.Nodes.Button("host.options", ready, "", "more", ghost, "host.options", "Options"),
+            new dev.jasper.ui.model.Nodes.Button("host.options", ready, "", "more.vertical", ghost, "host.options", "Options"),
             new dev.jasper.ui.model.Nodes.Button("host.hide", ready, "", flush ? "remove" : "collapse", ghost, "host.hide", "Hide")), event -> {
                 if (event instanceof dev.jasper.ui.model.UiEvent.Action action) {
                     if (action.id().equals("host.hide")) onHide.accept(id);
                     else if (action.id().equals("host.options"))
-                        showOptions.accept(optionsAnchor(header), ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
-                            slot -> onMove.accept(id, slot), () -> onHide.accept(id)));
+                        showOptions.accept(optionsAnchor(header), optionsMenu(id));
                 }
             });
         // A closed view, or one whose header was replaced (the dock then resyncs), takes no more metadata.
@@ -685,11 +818,15 @@ final class ToolWindowArea extends JPanel {
 
     private DockState layoutState() { return preview != null ? preview : state; }
 
+    /** The window's Options menu as it would open now: its slot, mode and visibility are read from the dock state. */
+    private javax.swing.JPopupMenu optionsMenu(String id) {
+        return ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.mode(id), state.visible(id),
+            slot -> onMove.accept(id, slot), mode -> onMode.accept(id, mode), () -> onHide.accept(id));
+    }
+
     private ToolWindowHeader header(String id, String title) {
         var header = new ToolWindowHeader(title,
-            () -> ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
-                slot -> onMove.accept(id, slot), () -> onHide.accept(id)),
-            () -> onHide.accept(id), kit, flush, artwork);
+            () -> optionsMenu(id), () -> onHide.accept(id), kit, flush, artwork);
         header.presentation(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
         return header;
     }
@@ -711,6 +848,7 @@ final class ToolWindowArea extends JPanel {
     void refreshTheme() {
         setBackground(ThemeZone.color(null, SemanticColor.SURFACE_APP));
         hosts.values().forEach(ToolWindowSurface::apply);
+        detached.values().forEach(ToolWindowSurface::apply);
     }
 
     /**

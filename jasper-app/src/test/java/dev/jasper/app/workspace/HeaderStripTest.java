@@ -67,7 +67,7 @@ class HeaderStripTest {
             assertThat(header.optionsButton().getPreferredSize()).isEqualTo(new java.awt.Dimension(side, side));
             assertThat(header.hideButton().getPreferredSize()).isEqualTo(new java.awt.Dimension(side, side));
             assertThat(AppIcons.kitName(header.hideButton().getIcon())).as("Hide is the minus").hasValue("remove");
-            assertThat(AppIcons.kitName(header.optionsButton().getIcon())).hasValue("more");
+            assertThat(AppIcons.kitName(header.optionsButton().getIcon())).hasValue("more.vertical");
             MockCrops.render(header, 300, header.getPreferredSize().height, 1);
             var add = SwingFind.button(header, "Add");
             assertThat(AppIcons.kitName(add.getIcon())).hasValue("add");

@@ -10,10 +10,14 @@ import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.palette.PaletteScope;
 import dev.jasper.app.persistence.UiState;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
+import java.awt.event.HierarchyEvent;
+import java.awt.event.HierarchyListener;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -34,8 +38,8 @@ import javax.swing.SwingUtilities;
  * This window's Swing side of the application-wide contributions model: one {@link Action} per
  * contributed action, registered as a palette command and bound to its shortcut, kept in step with the
  * model. Chrome and status rendering hang off the same change notifications. Panels dock in the window's
- * {@link DockState}; the one listener on it builds what starts showing, lays the area out, renders the
- * stripes, tells the panels and saves. EDT only.
+ * {@link DockState}; the one listener on it builds what starts showing, lays the area out, opens, moves and closes the
+ * detached tool windows' own windows, renders the stripes, tells the panels and saves. EDT only.
  */
 final class WindowContributions implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(WindowContributions.class.getName());
@@ -55,6 +59,8 @@ final class WindowContributions implements AutoCloseable {
         JComponent component;
         /** What the panel last heard: a nested change can overtake a notification, which then must not be sent. */
         boolean notified;
+        /** The place the panel was built in or last heard, as {@link #notified} is its visibility; null until it is built. */
+        PanelSite.Placement placed;
         PanelInstance(PanelEntry entry) { this.entry = entry; }
     }
 
@@ -67,6 +73,10 @@ final class WindowContributions implements AutoCloseable {
     private Subscription panelRequests;
     /** Whether this window docks panels and shows status entries: the main window does, a child window does not. */
     private final boolean docks;
+    /** The detached tool windows' own windows: the main window's; null in a child window. */
+    private final DetachedToolWindows detached;
+    /** Opens the detached windows that waited for the main window to show (restored at start-up). */
+    private final HierarchyListener showing = this::showingChanged;
 
     WindowContributions(WindowContent owner, Contributions model, UiState state) {
         this.owner = owner;
@@ -78,6 +88,7 @@ final class WindowContributions implements AutoCloseable {
         // A child window takes the actions, the menus and the palette scopes; panels and status entries are the main
         // window's (workspace tabs spec 6.3).
         docks = owner.isMain();
+        detached = docks ? new DetachedToolWindows(owner, this::title, this::hidePanel, owner::bindDetachedRoot) : null;
         syncActions();
         owner.chrome().connect(this);
         if (docks) {
@@ -86,13 +97,19 @@ final class WindowContributions implements AutoCloseable {
             for (DockStripe stripe : owner.stripes().all()) {
                 stripe.onToggle = this::toggleAndActivate;
                 stripe.onMove = this::movePanel;
+                stripe.onMode = this::setMode;
                 stripe.onHide = this::hidePanel;
             }
             owner.area().onMove = this::movePanel;
+            owner.area().onMode = this::setMode;
             owner.area().onHide = this::hidePanel;
+            owner.area().onRemounted = detached::sync;
+            owner.addHierarchyListener(showing);
             owner.dockDrag().onDrop = this::dropped;
+            owner.dockDrag().onDetach = this::detachDropped;
             owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
             owner.dockDrag().labels = this::stripeLabel;
+            owner.dockDrag().titles = id -> panels.containsKey(id) ? panels.get(id).entry.title() : "";
             dock.addListener(docked);
             panelRequests = model.onPanelRequest(this::requested);
         }
@@ -113,6 +130,23 @@ final class WindowContributions implements AutoCloseable {
     }
 
     Contributions model() { return model; }
+
+    /** The detached tool windows' own windows: the main window's; null in a child window. */
+    DetachedToolWindows detached() { return detached; }
+
+    /** A panel's title, which its own window shows. */
+    private String title(String id) {
+        PanelInstance panel = panels.get(id);
+        return panel == null ? id : panel.entry.title();
+    }
+
+    /**
+     * The main window showed or hid: the detached windows sync after this event, not inside the main window's own show,
+     * which dispatches it under the AWT tree lock before that show has finished.
+     */
+    private void showingChanged(HierarchyEvent event) {
+        if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0) SwingUtilities.invokeLater(detached::sync);
+    }
 
     /** The window's action for a contributed id, or null when the contributor removed it. */
     Action action(String id) { return actions.get(id); }
@@ -210,12 +244,19 @@ final class WindowContributions implements AutoCloseable {
 
     private void togglePanel(String id) { if (panels.containsKey(id)) dock.toggle(id); }
 
-    /** A toggle by a user gesture: a panel it shows becomes the active tool window under flush frames (plan 12 Rulings 18). */
+    /**
+     * A toggle by a user gesture, a stripe click: a panel it shows becomes the active tool window under flush frames (plan 12
+     * Rulings 18). A detached tool window toggles as a docked one does: shown, it hides; hidden, it shows and its own window
+     * comes forward. The click made the main window the active one, so no detached window's being the active one is asked
+     * (floating tool windows spec, Stripe buttons and requests).
+     */
     private void toggleAndActivate(String id) { changeAndActivate(id, () -> dock.toggle(id)); }
 
     /**
      * A show by the panel's own toggle action (plan 15b Rulings 1), or for a user gesture in another window, a child
-     * window's View toggle: the panel becomes the active tool window under flush frames.
+     * window's View toggle, or any child window's show or toggle of a detached tool window (which
+     * {@code WindowManager.routePanel} sends so): the panel becomes the active tool window under flush frames, and a
+     * detached one's own window comes forward, also when it already showed.
      */
     private void showAndActivate(String id) { changeAndActivate(id, () -> dock.show(id)); }
 
@@ -224,18 +265,31 @@ final class WindowContributions implements AutoCloseable {
         // Standard frames activate nothing, so a window replaced there still hands focus back to the terminal.
         activating = owner.area().flush() ? id : null;
         try { change.run(); } finally { activating = null; }
-        if (dock.visible(id)) owner.area().activate(id);
+        if (!dock.visible(id)) return;
+        if (dock.mode(id).detached()) detached.activate(id); else owner.area().activate(id);
+    }
+
+    /**
+     * Whether an activating toggle of the panel raises its own window instead of hiding it: it is detached and its window is
+     * open but is not the active window. In every frame style, whatever the docked frames do: a detached tool window is its
+     * own window.
+     */
+    private boolean raising(String id) {
+        return dock.mode(id).detached() && detached.showing(id) && !detached.active(id);
     }
 
     /**
      * A toggle by the user's View action or the panel's own toggle action, as IntelliJ's ActivateToolWindowAction: under
      * flush frames a visible tool window that is not the active one is activated, and only the active one hides; else a
-     * toggle that activates what it shows. A stripe click stays {@link #toggleAndActivate}.
+     * toggle that activates what it shows. A detached tool window follows that rule in every frame style, its own window
+     * being the one that is active or not: shown but not the active window, it is raised; shown and active, it hides; hidden,
+     * it shows and is raised. A stripe click stays {@link #toggleAndActivate}.
      */
     private void activatingToggle(String id) {
         if (!panels.containsKey(id)) return;
         var area = owner.area();
-        if (area.flush() && dock.visible(id) && !area.focusedSlot().equals(dock.slot(id))) { area.activate(id); return; }
+        if (raising(id)) { detached.activate(id); return; }
+        if (!dock.mode(id).detached() && area.flush() && dock.visible(id) && !area.focusedSlot().equals(dock.slot(id))) { area.activate(id); return; }
         toggleAndActivate(id);
     }
 
@@ -264,10 +318,41 @@ final class WindowContributions implements AutoCloseable {
         dock.moveAndShow(id, slot, dock.dropIndex(id, slot));
     }
 
-    /** From a Move to menu: the end of the target slot's group, keeping visibility. */
+    /**
+     * A dock drag released outside this window, or over another of Jasper's windows in front of it (floating tool windows
+     * spec, The drag out): the tool window detaches, Float unless it is detached already, keeping its slot, and its own
+     * window opens or moves with the point the press held under the pointer ({@link DetachedToolWindows#droppedBounds}).
+     * A user gesture, it activates the window as View Mode from a menu does: raised, with the keyboard in its frame.
+     */
+    private void detachDropped(String id, DockDrag.Detach drop) {
+        if (!panels.containsKey(id)) return;
+        Rectangle bounds = detached.droppedBounds(id, drop.screen(), drop.grab());
+        ToolWindowMode mode = dock.mode(id).detached() ? dock.mode(id) : ToolWindowMode.FLOAT;
+        changeAndActivate(id, () -> dock.detach(id, mode, bounds));
+    }
+
+    /**
+     * From a View Mode choice in a menu (the header's Options, a kit header's, a stripe button's): docks the window or
+     * detaches it, keeping its slot. Detached for the first time, its own window opens where its docked frame is, or
+     * centred on this window while it is hidden; detached before, where its window last was. A user gesture, it activates
+     * a tool window that shows, as IntelliJ keeps one active through a view-mode change: a detached one's window comes
+     * forward with the keyboard in its frame, and a docked one is activated as a stripe click activates it (under flush
+     * frames only). A restore or any other mode change leaves the focus alone.
+     */
+    private void setMode(String id, ToolWindowMode mode) {
+        if (!panels.containsKey(id)) return;
+        if (mode.detached() && dock.bounds(id).isEmpty()) dock.setBounds(id, detached.initialBounds(id));
+        changeAndActivate(id, () -> dock.setMode(id, mode));
+    }
+
+    /**
+     * From a Move to menu: the end of the target slot's group, keeping visibility. A detached window docks there and
+     * shows (floating tool windows spec, The Options menu), in its own place when the slot is its own.
+     */
     private void movePanel(String id, Slot slot) {
-        if (!panels.containsKey(id) || dock.slot(id).filter(slot::equals).isPresent()) return;
-        dock.move(id, slot, dock.ids(slot).size());
+        if (!panels.containsKey(id)) return;
+        if (dock.mode(id).detached()) { dock.moveAndShow(id, slot, dock.dropIndex(id, slot)); return; }
+        if (dock.slot(id).filter(slot::equals).isEmpty()) dock.move(id, slot, dock.ids(slot).size());
     }
 
     /** The window opens at the saved sizes and ratios; nothing listens yet, so this saves nothing. */
@@ -283,12 +368,14 @@ final class WindowContributions implements AutoCloseable {
 
     /**
      * Docks new panels where they were saved (a saved slot wins over the default) or at the end of their default
-     * slot's group, showing those that showed (in Zen, remembering them for when it ends); undocks the panels that left
-     * the model and discards their instances.
+     * slot's group, in the mode they were saved in with their own window's last bounds, showing those that showed (in
+     * Zen, remembering them for when it ends); undocks the panels that left the model and discards their instances.
      */
     private void syncPanels() {
         Map<String, PanelEntry> current = new LinkedHashMap<>();
         for (PanelEntry entry : model.panels()) current.put(entry.id(), entry);
+        // Panels leaving are saved first: a detached one's window may have moved since the last change, which saved nothing.
+        if (!current.keySet().containsAll(panels.keySet())) persist();
         for (String id : List.copyOf(panels.keySet())) {
             if (current.containsKey(id)) continue;
             PanelInstance gone = panels.remove(id);
@@ -305,6 +392,10 @@ final class WindowContributions implements AutoCloseable {
             // Remembered before docking: docking saves, and in Zen the saved visibility is the remembered one.
             if (showed && beforeZen != null) beforeZen.add(entry.id());
             dock.add(entry.id(), slot, insertionIndex(slot, saved.map(UiState.Panel::order).orElse(UiState.Panel.LAST)));
+            // Its own window's bounds, then its mode, before it shows: a detached panel that showed opens its window there.
+            saved.flatMap(UiState.Panel::window).ifPresent(window ->
+                dock.setBounds(entry.id(), new Rectangle(window.x(), window.y(), window.width(), window.height())));
+            saved.map(UiState.Panel::mode).filter(ToolWindowMode::detached).ifPresent(mode -> dock.setMode(entry.id(), mode));
             if (showed && beforeZen == null) dock.show(entry.id());
         }
     }
@@ -320,38 +411,50 @@ final class WindowContributions implements AutoCloseable {
     }
 
     /**
-     * The one place a dock change takes effect: build what now shows, lay out, render the stripes, tell the hidden
-     * panels, return focus to the terminal if something hid, tell the shown panels, save. Focus returns before the
-     * shown panels hear it, so a window that takes focus when it shows keeps it when it replaces another.
+     * The one place a dock change takes effect: build what now shows, lay out, match the detached windows' own windows,
+     * render the stripes, tell the hidden panels, return focus to the terminal if a docked window hid, tell the shown
+     * panels, tell the panels placed in another slot or mode, save. Focus returns before the shown panels hear it, so a
+     * window that takes focus when it shows keeps it when it replaces another; a placed panel hears once its component is
+     * in its new place.
      */
     private void docked(DockState.Change change) {
         // A dock change mid-drag (a plugin unloading, a panel showing itself) ends the drag: what it drew renders again.
         owner.dockDrag().cancel();
+        // Read before the area lets go of the frames: a detached window that hid (closed, hidden, its plugin stopped)
+        // leaves the focus where it is.
+        boolean dockedHid = change.hidden().stream().anyMatch(id -> !dock.mode(id).detached() && owner.area().detachedFrame(id) == null);
         for (String id : change.shown()) build(id);
         if (change.layout()) owner.area().sync();
+        detached.sync();
         if (change.stripes()) renderStripes();
         for (String id : change.hidden()) notifyVisibility(id, false);
-        // Hiding a window by any route returns focus to the terminal, unless a window being activated replaces it.
-        if (!change.hidden().isEmpty() && (activating == null || !change.shown().contains(activating))) owner.focusSelected();
+        // Hiding a docked window by any route returns focus to the terminal, unless a window being activated replaces it:
+        // one that starts showing, or a detached one docked back in its place (View Mode \u203a Docked).
+        if (dockedHid && (activating == null || !(change.shown().contains(activating) || change.placed().contains(activating))))
+            owner.focusSelected();
         for (String id : change.shown()) notifyVisibility(id, true);
+        for (String id : change.placed()) notifyPlacement(id);
         persist();
     }
 
     /**
-     * Entering Zen hides the panels that show and remembers them; any panel opened in Zen then shows in its slot as
-     * usual, without the rail. Leaving Zen hides those and shows the remembered panels again.
+     * Entering Zen hides the panels that show, docked or detached, and remembers them; any panel opened in Zen then shows
+     * in its slot, or in its own window, as usual, without the rail. Leaving Zen hides those and shows the remembered
+     * panels again.
      */
     void zenChanged() {
         if (owner.zenMode() == (beforeZen != null)) return;
         if (owner.zenMode()) {
             beforeZen = new LinkedHashSet<>();
             for (Slot slot : Slot.values()) dock.active(slot).ifPresent(beforeZen::add);
+            beforeZen.addAll(dock.detachedVisible());
             for (String id : List.copyOf(beforeZen)) dock.hide(id);
             return;
         }
         Set<String> restore = beforeZen;
         beforeZen = null;
         for (Slot slot : Slot.values()) dock.active(slot).filter(id -> !restore.contains(id)).ifPresent(dock::hide);
+        for (String id : dock.detachedVisible()) if (!restore.contains(id)) dock.hide(id);
         for (String id : restore) showPanel(id);
     }
 
@@ -362,18 +465,33 @@ final class WindowContributions implements AutoCloseable {
     private void build(String id) {
         PanelInstance panel = panels.get(id);
         if (panel == null || panel.component != null) return;
-        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id), header -> owner.area().setHeader(id, header));
+        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id),
+            header -> owner.area().setHeader(id, header), () -> placement(panel));
         JComponent built = null;
         try { built = panel.entry.factory().apply(panel.site); }
         catch (RuntimeException failure) {
             // A plugin's adapter turns its own failures into null, so an exception reaching here came from no adapter.
             LOG.log(System.Logger.Level.WARNING, "The panel " + id + " could not be built; showing a placeholder.", failure);
         }
+        // Its place once the factory returned is what it last read: the change that builds it has nothing more to tell it,
+        // and a move made while the factory ran leaves no stale baseline.
+        panel.placed = placement(panel);
         if (built == null) panel.site.setHeader(dev.jasper.app.contributions.PanelHeaderState.EMPTY);
         panel.component = built != null ? built : new JLabel("This panel could not be loaded.", SwingConstants.CENTER);
         if (built == null) dev.jasper.ui.swing.NativeStyles.installed().label((JLabel) panel.component, dev.jasper.ui.metrics.Typography.Role.LABEL,
             dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY, () -> dev.jasper.app.platform.ThemeZone.theme(panel.component));
         owner.area().setContent(id, panel.entry.title(), panel.component);
+    }
+
+    /**
+     * Where the panel is now: its slot and its mode. Once it has left the dock (its plugin removed it, which undocks it
+     * before its site closes), the place it was built in or last heard, so its close handlers read where it was.
+     */
+    private PanelSite.Placement placement(PanelInstance panel) {
+        String id = panel.entry.id();
+        Optional<Slot> slot = dock.slot(id);
+        if (slot.isPresent()) return new PanelSite.Placement(slot.get(), dock.mode(id));
+        return panel.placed != null ? panel.placed : new PanelSite.Placement(panel.entry.defaultSlot(), ToolWindowMode.DOCKED);
     }
 
     /** Tells the panel only what is still true and not yet told: a listener's own show or hide may have changed it. */
@@ -385,9 +503,22 @@ final class WindowContributions implements AutoCloseable {
     }
 
     /**
-     * Saves every panel's place and the dock's sizes. A slot's saved order also keeps a place for its panels that are
-     * not in this window right now (a plugin still loading, or turned off), so each goes back where it was; a panel
-     * that never had a place keeps none.
+     * Tells a built panel where it is now, if that is not where it was built or what it last heard: a listener's own move,
+     * told by the nested change, leaves nothing to tell.
+     */
+    private void notifyPlacement(String id) {
+        PanelInstance panel = panels.get(id);
+        if (panel == null || panel.component == null) return;
+        PanelSite.Placement now = placement(panel);
+        if (now.equals(panel.placed)) return;
+        panel.placed = now;
+        panel.site.notifyPlacement(now);
+    }
+
+    /**
+     * Saves every panel's place, mode and own window's bounds, and the dock's sizes. A slot's saved order also keeps a
+     * place for its panels that are not in this window right now (a plugin still loading, or turned off), so each goes
+     * back where it was with the rest of its record; a panel that never had a place keeps none.
      */
     private void persist() {
         for (Slot slot : Slot.values()) {
@@ -400,8 +531,12 @@ final class WindowContributions implements AutoCloseable {
                 .forEach(entry -> merged.add(Math.min(entry.getValue().order(), merged.size()), entry.getKey()));
             for (int i = 0; i < merged.size(); i++) {
                 String id = merged.get(i);
-                boolean visible = panels.containsKey(id) ? savedVisible(id) : state.panel(id).map(UiState.Panel::visible).orElse(false);
-                state.putPanel(id, new UiState.Panel(slot, Math.min(i, UiState.Panel.LAST), visible));
+                int order = Math.min(i, UiState.Panel.LAST);
+                if (panels.containsKey(id))
+                    state.putPanel(id, new UiState.Panel(slot, order, savedVisible(id), dock.mode(id),
+                        dock.bounds(id).map(bounds -> new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height))));
+                else state.panel(id).ifPresent(saved ->
+                    state.putPanel(id, new UiState.Panel(slot, order, saved.visible(), saved.mode(), saved.window())));
             }
         }
         state.setRailVisible(owner.railVisible());
@@ -419,7 +554,7 @@ final class WindowContributions implements AutoCloseable {
                 PanelInstance panel = panels.get(id);
                 if (panel == null) continue;
                 windows.add(new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
-                    panel.entry.badge(), number(panel)));
+                    panel.entry.badge(), number(panel), dock.mode(id)));
             }
         List<Action> railActions = new ArrayList<>();
         for (String id : model.railActions()) if (actions.get(id) != null) railActions.add(actions.get(id));
@@ -442,10 +577,19 @@ final class WindowContributions implements AutoCloseable {
         }
     }
 
-    /** Panel content that is not showing is outside the window's component tree and must be updated by hand. */
+    /**
+     * Panel content outside every window's component tree must be updated by hand: a hidden panel's, and a shown detached
+     * one's whose own window has not opened (no shells yet, or the main window not showing). A docked panel that shows is
+     * updated with this window, and a detached one in its own window with that window ({@link DetachedFrame}).
+     */
     void refreshTheme() {
-        for (PanelInstance panel : panels.values())
-            if (panel.component != null && !dock.visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
+        for (PanelInstance panel : panels.values()) {
+            JComponent component = panel.component;
+            if (component == null) continue;
+            boolean outside = !dock.visible(panel.entry.id())
+                || !SwingUtilities.isDescendingFrom(component, owner) && SwingUtilities.getWindowAncestor(component) == null;
+            if (outside) SwingUtilities.updateComponentTreeUI(component);
+        }
     }
 
     private void changed(Contributions.Kind kind) {
@@ -526,9 +670,17 @@ final class WindowContributions implements AutoCloseable {
         // Snapshot before teardown: the last window closed wins; disposal must not save panels as hidden.
         owner.dockDrag().cancel();
         owner.dockDrag().onDrop = (id, target) -> { };
+        owner.dockDrag().onDetach = (id, detach) -> { };
         owner.dockDrag().icons = id -> null;
         owner.dockDrag().labels = id -> "";
+        owner.dockDrag().titles = id -> "";
         dock.removeListener(docked);
+        if (detached != null) {
+            // The windows close before their panels hear that they close.
+            detached.close();
+            owner.removeHierarchyListener(showing);
+            owner.area().onRemounted = () -> { };
+        }
         commands.values().forEach(Subscription::close);
         commands.clear();
         scopes.values().forEach(Subscription::close);
@@ -541,10 +693,12 @@ final class WindowContributions implements AutoCloseable {
         for (DockStripe stripe : owner.stripes().all()) {
             stripe.onToggle = id -> { };
             stripe.onMove = (id, slot) -> { };
+            stripe.onMode = (id, mode) -> { };
             stripe.onHide = id -> { };
             stripe.render(List.of(), List.of());
         }
         owner.area().onMove = (id, slot) -> { };
+        owner.area().onMode = (id, mode) -> { };
         owner.area().onHide = id -> { };
         owner.syncRailVisibility();
         actions.clear();

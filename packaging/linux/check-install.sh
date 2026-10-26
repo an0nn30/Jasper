@@ -6,7 +6,18 @@ set -eu
 package=$1
 runtime=${2:-missing}
 case "$runtime" in missing|equipped) ;; *) echo "Expected missing or equipped runtime mode" >&2; exit 1 ;; esac
-root=/opt/jasper
+root=/opt/jasper-workstation
+identity=jasper-workstation
+distro_jasper=''
+check_distro_jasper() {
+    if [ -n "$distro_jasper" ]; then
+        current=$(rpm --query --queryformat '%{NAME} %{EPOCH}:%{VERSION}-%{RELEASE}.%{ARCH}\n' jasper-libs | LC_ALL=C sort)
+        if [ "$current" != "$distro_jasper" ]; then
+            echo "Installing or removing Jasper changed the distro jasper-libs identity" >&2
+            exit 1
+        fi
+    fi
+}
 
 # Minimal images lack the applications and desktop-directories directories that xdg-desktop-menu needs,
 # like headless systems do; the package's own install script must create them.
@@ -16,28 +27,36 @@ fi
 
 case "$package" in
     *.deb)
+        test "$(dpkg-deb --field "$package" Package)" = "$identity"
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -qq
         apt-get install -y -qq "$package"
-        remove() { apt-get remove -y -qq jasper >/dev/null; }
+        test "$(dpkg-query --show --showformat='${Package} ${Status}' "$identity")" = "$identity install ok installed"
+        remove() { apt-get remove -y -qq "$identity" >/dev/null; }
         ;;
     *.rpm)
+        test "$(rpm --query --package --queryformat '%{NAME}' "$package")" = "$identity"
+        if rpm --query jasper-libs >/dev/null 2>&1; then
+            distro_jasper=$(rpm --query --queryformat '%{NAME} %{EPOCH}:%{VERSION}-%{RELEASE}.%{ARCH}\n' jasper-libs | LC_ALL=C sort)
+        fi
         if command -v dnf >/dev/null; then
             dnf install -y -q findutils "$package"
-            remove() { dnf remove -y -q jasper; }
+            remove() { dnf remove -y -q "$identity"; }
         elif command -v zypper >/dev/null; then
             zypper --non-interactive --quiet install --allow-unsigned-rpm findutils "$package"
-            remove() { zypper --non-interactive --quiet remove jasper; }
+            remove() { zypper --non-interactive --quiet remove "$identity"; }
         else
             echo "No dnf or zypper in this image" >&2
             exit 1
         fi
+        test "$(rpm --query --queryformat '%{NAME}' "$identity")" = "$identity"
         ;;
     *)
         echo "Not a .deb or .rpm: $package" >&2
         exit 1
         ;;
 esac
+check_distro_jasper
 
 test -x "$root/bin/Jasper"
 test -x "$root/bin/jasper-watch"
@@ -129,6 +148,7 @@ if ! grep -qs "$root/bin/Jasper" /usr/local/share/applications/*.desktop /usr/sh
 fi
 
 remove
+check_distro_jasper
 if [ -e "$root/bin/Jasper" ]; then
     echo "Removing the package left $root/bin/Jasper behind" >&2
     exit 1

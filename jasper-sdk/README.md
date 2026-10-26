@@ -41,7 +41,7 @@ third-party plugin. The SDK depends only on the JDK.
 | --- | --- |
 | Actions and where they appear | `Actions`, `ActionSpec`, `ActionContext`, `PluginAction`, `ShortcutContext`, `Toolbar`, `ToolbarItem`, `ToolbarViewFactory`, `Menus`, `StandardMenu`, `PluginMenu`, `StatusBar`, `StatusItemSpec`, `Side`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Rail` |
 | Declarative views | `UiKit`, `ViewSpec`, `Nodes`, `UiView`, `UiEvent`, `ControlState`, `ListItem`, `TableRow`, `TreeItem`, `Column`, `Option`, `MenuItem`, `Crumb`, `CustomContent`, `IconAsset`, `UiAnchor` |
-| Tool windows | `Panels`, `PanelSpec`, `Anchor`, `PanelFactory`, `PanelHost`, `PanelHeader` |
+| Tool windows | `Panels`, `PanelSpec`, `Anchor`, `PanelFactory`, `PanelHost`, `PanelPlacement`, `PanelMode`, `PanelHeader` |
 | Dialogs, content tabs and split items | `Windows`, `WindowSurface`, `DialogSpec`, `PluginDialog`, `OverlaySpec`, `PluginPopover`, `ContentSpec`, `ContentTab`, `TabPlacement`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `SplitItemSpec`, `SplitChoice`, `TabChoice`, `TabRestorer`, `RestoreRequest` |
 | Colours for custom content and the look | `Appearance`, `SemanticColor`, `WorkspacePalette`, `EditorPalette`, `EditorScheme`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Presentation`, `TerminalTypography` |
 | Desktop integration | `Platform`, `FileEditor` |

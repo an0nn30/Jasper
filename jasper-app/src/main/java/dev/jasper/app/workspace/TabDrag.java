@@ -599,7 +599,7 @@ final class TabDrag {
         // The window of Jasper's on top under the cursor takes or refuses the drop (workspace plan 9a Rulings 21): one
         // the drag does not reach, above the one under the cursor or outside every one of them, takes nothing, and no
         // tab springs under it.
-        if (covered(window, at)) {
+        if (covers(window, at)) {
             stopSpring();
             showLanding();
             return;
@@ -628,18 +628,43 @@ final class TabDrag {
     }
 
     /**
-     * Whether one of Jasper's windows the drag does not reach ({@link #otherWindows}) is on top at {@code at}: one
+     * Whether one of Jasper's windows the drag does not reach ({@link #otherWindows}) is on top at {@code screen}: one
      * under the cursor that came to the front after {@code window}, the window the drag reaches under it, as native
      * drag and drop goes by the order windows stack in (workspace plan 9a Rulings 21), or that {@code window} owns,
-     * which macOS keeps above it whichever came to the front last (a plugin's modeless dialog); for {@code window}
-     * null, any under the cursor.
+     * which macOS keeps above it whichever came to the front last (a plugin's modeless dialog, a floating tool window);
+     * for {@code window} null, any under the cursor.
+     *
+     * @param window the window the drag reaches under the cursor, or null
+     * @param screen the cursor on screen
+     * @return whether another of Jasper's windows covers {@code window} there
      */
-    private boolean covered(WindowContent window, Point at) {
+    boolean covers(WindowContent window, Point screen) {
         long below = window == null ? -1 : fronts.getOrDefault(window, 0L);
         Component owner = window == null ? null : outermost(window);
         for (Auxiliary other : otherWindows.get())
-            if (other.frame().contains(at)
+            if (other.frame().contains(screen)
                 && (fronts.getOrDefault(other.window(), 0L) > below || other.owners().contains(owner))) return true;
+        return false;
+    }
+
+    /**
+     * Whether {@code window} is behind another of Jasper's windows at {@code screen}: one the drag does not reach that
+     * {@link #covers} it there, or another open window the drag reaches whose frame holds the point and that came to the
+     * front after it (a child window over the main window). A dock drag asks it of its own window, and over such a
+     * window its target is Detach (floating tool windows spec, The drag out); a tab drag takes the window on top under the
+     * cursor first, so {@link #covers} serves it.
+     *
+     * @param window the dock drag's window
+     * @param screen the cursor on screen
+     * @return whether another of Jasper's windows is in front of {@code window} there
+     */
+    boolean behind(WindowContent window, Point screen) {
+        if (covers(window, screen)) return true;
+        long below = fronts.getOrDefault(window, 0L);
+        GraphicsDevice home = device(window);
+        for (WindowContent other : windows.get())
+            if (other != window && !other.closed() && fronts.getOrDefault(other, 0L) > below
+                && onScreen(other, false, home).contains(screen)) return true;
         return false;
     }
 
@@ -1024,8 +1049,8 @@ final class TabDrag {
         return frames;
     }
 
-    /** Where the label's corner goes for the cursor at {@code at}. */
-    private static Point labelAt(Point at) {
+    /** Where the label's corner goes for the cursor at {@code at}; a dock drag's label goes there too. */
+    static Point labelAt(Point at) {
         int offset = UIScale.scale(LABEL_OFFSET);
         return new Point(at.x + offset, at.y + offset);
     }

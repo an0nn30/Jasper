@@ -12,7 +12,7 @@ them:
 | OS | Launcher |
 |---|---|
 | macOS | `Jasper.app/Contents/MacOS/Jasper`, for example `/Applications/Jasper.app/Contents/MacOS/Jasper --safe-mode` |
-| Linux | `/opt/jasper/bin/Jasper` |
+| Linux | `/opt/jasper-workstation/bin/Jasper` |
 | Windows | `Jasper.exe` in the folder Jasper is installed in |
 
 In a source checkout, pass them through Gradle: `./gradlew :jasper-app:run --args='--safe-mode'`. That run always
@@ -127,7 +127,7 @@ Jasper Editor is the default editor its shells' `EDITOR` names that missing comm
 | OS | Install | Hint after installing |
 |---|---|---|
 | macOS | Links `/usr/local/bin/jasper` to `Jasper.app/Contents/Resources/bin/jasper`. When that folder needs it, macOS asks for an administrator's password. | None |
-| Linux | Links `~/.local/bin/jasper` to `lib/bin/jasper` in the installation (`/opt/jasper/lib/bin/jasper` for the packages), creating `~/.local/bin` when it is missing. | "`<folder>` is not on your PATH; add it to use jasper in other terminals", naming the folder's full path, when the `PATH` Jasper runs with lacks it |
+| Linux | Links `~/.local/bin/jasper` to `lib/bin/jasper` in the installation (`/opt/jasper-workstation/lib/bin/jasper` for the packages), creating `~/.local/bin` when it is missing. | "`<folder>` is not on your PATH; add it to use jasper in other terminals", naming the folder's full path, when the `PATH` Jasper runs with lacks it |
 | Windows | Adds the installation's `bin` folder, which holds `jasper.exe`, to your own `Path` (`HKEY_CURRENT_USER\Environment`) and tells running programs. | "Open a new terminal, or quit Jasper completely for its own tabs, to use it" |
 
 The command finds its app from its own path, following links, so the link keeps working when Jasper is updated in

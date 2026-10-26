@@ -80,6 +80,27 @@ class ToolWindowKitPanelTest {
         }
     }
 
+    @Test void theBorrowedHeadersOptionsActionIsTheVerticalEllipsis() {
+        ThemeTestSupport.install(true);
+        var theme = ThemeTestSupport.generated(true);
+        try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
+             var view = new KitView(bindings.context(ThemeRoute.CHROME), spec(), event -> { throw new AssertionError("Host action leaked"); })) {
+            var area = new ToolWindowArea(new JPanel(), new DockState());
+            var options = new ArrayList<JPopupMenu>();
+            area.showOptions = (anchor, menu) -> options.add(menu);
+            DockTestSupport.show(area, Slot.LEFT_TOP, view, 250);
+            var button = button(view.panelHeader("panel"), "Options");
+            assertThat(button.getClientProperty("Jasper.button.icon")).as("host.options draws the vertical ellipsis").isEqualTo("more.vertical");
+            assertThat(button.getIcon()).isNotNull();
+            button.doClick();
+            assertThat(options).hasSize(1);
+            assertThat(((JMenu) options.getFirst().getComponent(0)).getText()).isEqualTo("View Mode");
+            assertThat(ToolWindowHeaderTest.item(options.getFirst(), "Docked")).isInstanceOf(JCheckBoxMenuItem.class);
+            assertThat(((JCheckBoxMenuItem) ToolWindowHeaderTest.item(options.getFirst(), "Docked")).isSelected()).isTrue();
+            area.close();
+        }
+    }
+
     /** The old frame lets go of the shared header before the new one borrows it, whichever slot comes first. */
     @Test void aShowingKitPanelKeepsItsHeaderWhenItMovesToAnEarlierSlot() {
         ThemeTestSupport.install(true);
