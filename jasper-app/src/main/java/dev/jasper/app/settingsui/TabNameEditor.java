@@ -18,7 +18,7 @@ import java.util.Set;
  */
 final class TabNameEditor implements ValueEditor<String> {
     /** What the preview names while no Terminal tab is open. */
-    static final TabNameChoices.Preview SAMPLE = sample(System.getProperty("os.name", ""));
+    static final TabNameChoices.Values SAMPLE = sample(System.getProperty("os.name", ""));
     private static final Map<String, String> BUILT_IN = Map.of("dir", "the current folder's name", "full", "its full path",
         "process", "the running program", "title", "the title the shell or a program set");
     private final String label;
@@ -32,9 +32,9 @@ final class TabNameEditor implements ValueEditor<String> {
             List.of("Preview", "{dir}", "{full}", "{process}", "{title}"));
     }
 
-    private static TabNameChoices.Preview sample(String os) {
+    private static TabNameChoices.Values sample(String os) {
         String shell = os.startsWith("Mac") ? "zsh" : os.startsWith("Windows") ? "powershell" : "bash";
-        return new TabNameChoices.Preview(Map.of("dir", "projects", "full", "~/projects", "process", shell), shell);
+        return new TabNameChoices.Values(Map.of("dir", "projects", "full", "~/projects", "process", shell), shell);
     }
 
     @Override public Nodes.Node node(String id, ControlState state) {

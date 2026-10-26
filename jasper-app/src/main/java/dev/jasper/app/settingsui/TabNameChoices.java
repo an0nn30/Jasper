@@ -11,7 +11,7 @@ import java.util.function.Supplier;
  *
  * @param preview the tab the preview uses now
  */
-public record TabNameChoices(Supplier<Optional<Preview>> preview) {
+public record TabNameChoices(Supplier<Optional<Values>> preview) {
     /** No Terminal tab, for pages built without an application: the preview uses sample values. */
     public static final TabNameChoices NONE = new TabNameChoices(Optional::empty);
 
@@ -23,8 +23,8 @@ public record TabNameChoices(Supplier<Optional<Preview>> preview) {
      * @param pieces each piece's value by name, without braces
      * @param fallback what a pattern that comes out empty names the tab: its shell's label
      */
-    public record Preview(Map<String, String> pieces, String fallback) {
-        public Preview {
+    public record Values(Map<String, String> pieces, String fallback) {
+        public Values {
             pieces = Map.copyOf(pieces);
             Objects.requireNonNull(fallback, "fallback");
         }

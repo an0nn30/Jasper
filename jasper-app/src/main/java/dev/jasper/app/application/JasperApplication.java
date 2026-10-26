@@ -1593,12 +1593,12 @@ public final class JasperApplication {
      * The Terminal tab Settings' Tab name row previews (tab names spec 5): the active window's shown tab when it is a
      * terminal, else that window's first terminal tab; empty when it has none.
      */
-    private Optional<dev.jasper.app.settingsui.TabNameChoices.Preview> tabNamePreview() {
+    private Optional<dev.jasper.app.settingsui.TabNameChoices.Values> tabNamePreview() {
         return terminals.activeWindow().flatMap(window -> window.selectedTab().get()
                 .filter(tab -> tab.kind() == TabEntry.Kind.TERMINAL)
                 .or(() -> window.tabs().get().stream().filter(tab -> tab.kind() == TabEntry.Kind.TERMINAL).findFirst()))
             .flatMap(tab -> tab.terminal().get().map(pane ->
-                new dev.jasper.app.settingsui.TabNameChoices.Preview(tab.namePieces().get(), pane.snapshot().get().shell())));
+                new dev.jasper.app.settingsui.TabNameChoices.Values(tab.namePieces().get(), pane.snapshot().get().shell())));
     }
 
     /** {@code window.memory_indicator}, live; the indicator shows only where the status bar does. */

@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 /** Tab names spec 5: the Tab name field, its live preview, unknown pieces and the piece list. */
 class TabNameEditorTest {
     private static final String ID = CoreSettings.TERMINAL_TAB_NAME.name();
-    private static final TabNameChoices CLAUDE = new TabNameChoices(() -> Optional.of(new TabNameChoices.Preview(
+    private static final TabNameChoices CLAUDE = new TabNameChoices(() -> Optional.of(new TabNameChoices.Values(
         Map.of("dir", "moray", "full", "~/projects/moray", "process", "claude", "title", "Fix tab names"), "zsh")));
 
     private static ValueEditor<String> editor(TabNameChoices choices, String value) {
@@ -44,7 +44,7 @@ class TabNameEditorTest {
     }
 
     @Test void anEmptyResultPreviewsTheShellsName() {
-        var tab = new TabNameChoices(() -> Optional.of(new TabNameChoices.Preview(Map.of("dir", "moray", "title", ""), "zsh")));
+        var tab = new TabNameChoices(() -> Optional.of(new TabNameChoices.Values(Map.of("dir", "moray", "title", ""), "zsh")));
         assertThat(texts(editor(tab, "{title}"))).contains("Preview: zsh");
     }
 
