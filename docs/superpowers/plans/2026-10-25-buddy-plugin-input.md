@@ -8,8 +8,8 @@ ActivityNotifier publishes plugin-running intent and BuddyIntegration combines i
 **Tech Stack:** JDK-only SDK/Buddy, Java25 JBR, shared JUnit contracts, generated SDK reference.
 **Spec:** docs/superpowers/specs/2026-10-25-buddy-plugin-input-design.md
 
-Status: authorized continuous execution; clean existing checkout reused on dedicated branch.
-Deviation: implementation bodies delegated; exact contracts below replace duplicate production code.
+Status: implementation and targeted verification complete on `codex/buddy-plugin-input`; parent task owns independent reviews, full headless check and external-plugin verification. Clean existing checkout reused on the dedicated branch.
+Deviation: implementation bodies delegated; exact contracts below replace duplicate production code. Initial lifecycle RED was missing-API compilation; the Sample activation example also has a behavioral RED. The compiled example adds a Tools confirmation action under the existing `demo_ui` setting.
 
 ## Global Constraints
 
@@ -37,17 +37,17 @@ ActivityHub, PluginRuntime; sdk-testkit FakePluginHost and PluginContractTest; a
 ActivityNotifier; application BuddyIntegration/JasperApplication; BuddyCompanion/BuddyDeck state
 update and tests; existing sample/docs and SDK reference sources/generated output as needed.
 
-- [ ] Add failing shared contract tests: STARTED -> progress(.4) -> NEEDS_INPUT -> detail still NEEDS_INPUT
+- [x] Add failing shared contract tests: STARTED -> progress(.4) -> NEEDS_INPUT -> detail still NEEDS_INPUT
   -> RESUMED -> PROGRESS -> SUCCEEDED; unchanged id/action/fraction and current snapshot; no wait/resume outcome.
-- [ ] Add rapid transition/coalescing and deterministic concurrency boundary tests; repeated phases update
+- [x] Add rapid transition/coalescing and deterministic concurrency boundary tests; repeated phases update
   detail only; stop waiting/running then call held handle methods and prove exactly one terminal event.
-- [ ] Implement needsInput/resume in runtime and fake with queue scheduling under per-handle ordering;
+- [x] Implement needsInput/resume in runtime and fake with queue scheduling under per-handle ordering;
   update exhaustive subscribers and metadata, preserving old lifecycle tests.
-- [ ] Add failing Buddy state-update and notifier tests for retained visibility/dismissal, waiting/resume,
+- [x] Add failing Buddy state-update and notifier tests for retained visibility/dismissal, waiting/resume,
   multiple live tasks, unknown/ended events, close and connections excluded from working.
-- [ ] Implement neutral notifier phase mapping and narrow retained state updates; aggregate terminal/plugin
+- [x] Implement neutral notifier phase mapping and narrow retained state updates; aggregate terminal/plugin
   booleans in BuddyIntegration; wire both producers. Test actual composition callbacks headlessly.
-- [ ] Update compiled example, version/release references and current docs; run sdkReference.
-- [ ] Run affected tests and architecture/doc checks GREEN, then commit with Co-Authored-By trailer.
+- [x] Update compiled example, version/release references and current docs; run sdkReference.
+- [x] Run affected tests and architecture/doc checks GREEN, then commit with Co-Authored-By trailer.
 - [ ] Fresh task and whole-branch reviews; fix findings. Parent runs full check and external-plugin check/pluginZip
   with -PjasperSdkDir="$PWD/build/sdk-release". Record verification and finish locally.

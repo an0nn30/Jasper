@@ -30,6 +30,7 @@ final class BuddyIntegration implements AutoCloseable {
     private Function<AWTEventListener, Runnable> registerActivity;
     private Runnable removeActivity;
     private boolean unavailable, closed;
+    private boolean terminalWorking, pluginWorking, working;
     private long lastPokeNanos;
 
     BuddyIntegration(Path stateFile, Font font, boolean dark, Runnable activateHost,
@@ -85,6 +86,14 @@ final class BuddyIntegration implements AutoCloseable {
         options = options.toBuilder().primaryFont(font).dark(dark).build();
         companion.applyOptions(options);
     }
+    void terminalWorking(boolean value) { if (closed) return; terminalWorking = value; syncWorking(); }
+    void pluginWorking(boolean value) { if (closed) return; pluginWorking = value; syncWorking(); }
+    private void syncWorking() {
+        boolean next = terminalWorking || pluginWorking;
+        if (next == working) return;
+        working = next;
+        companion.setWorking(next);
+    }
     void greet() { if (!closed) companion.greet(); }
     void activity() {
         if (closed || unavailable) return;
@@ -119,6 +128,7 @@ final class BuddyIntegration implements AutoCloseable {
     }
     @Override public void close() {
         if (closed) return; closed = true;
+        terminalWorking = false; pluginWorking = false; syncWorking();
         try { removeActivity(); }
         finally {
             options = null; show = () -> false; owns = component -> false; registerActivity = null;

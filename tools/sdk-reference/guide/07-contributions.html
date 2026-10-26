@@ -222,6 +222,13 @@ the user clicks the card. A connection ({@link Activities#connection(ConnectionS
 degraded or down, until the plugin closes it; Desk Buddy shows a card per connection. Both are published on
 {@link Activities#TOPIC} and {@link Activities#CONNECTIONS}, which any plugin may follow.</p>
 
+<p>{@link ActivityHandle#needsInput(String)} waits for input; {@link ActivityHandle#resume(String)} explicitly resumes
+work. Both retain the id, fraction and activation action. Progress and detail preserve the phase; repeated phase calls
+coalesce detail. Subscribers handle {@link ActivityEvent.State#NEEDS_INPUT} (including waiting detail updates) and
+{@link ActivityEvent.State#RESUMED}. Phase transitions arrive in order; pending progress may be dropped at a transition.
+{@link Activities#current()} includes waiting tasks. Running plugin tasks and qualifying terminal work jointly drive
+Buddy's working animation; waiting tasks remain available for activation without contributing running intent.</p>
+
 <h3 id="contributions-subcommands">Subcommands</h3>
 <p>A plugin declares each {@code jasper} subcommand in its manifest and answers it while it runs:</p>
 <pre><code class="language-toml">[[subcommands]]

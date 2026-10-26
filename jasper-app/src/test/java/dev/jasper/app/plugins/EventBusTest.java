@@ -21,6 +21,44 @@ class EventBusTest {
 
     private void drain() { while (!ui.isEmpty()) ui.poll().run(); }
 
+    @Test void phaseAndEndCannotOvertakeAReportStillBeingEnqueued() throws Exception {
+        var queued = new java.util.concurrent.ConcurrentLinkedQueue<Runnable>();
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var block = new java.util.concurrent.atomic.AtomicBoolean();
+        var ordered = new EventBus(callback -> {
+            if (block.compareAndSet(true, false)) {
+                entered.countDown();
+                try { assertThat(release.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); }
+                catch (InterruptedException failure) { throw new AssertionError(failure); }
+            }
+            queued.add(callback);
+        }, containment);
+        var seen = new ArrayList<ActivityEvent>();
+        ordered.subscribe(EventBus.APP, Activities.TOPIC, seen::add);
+        var hub = new ActivityHub(ordered);
+        var task = hub.begin("test.alpha", ActivitySpec.of("work"));
+        block.set(true);
+        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        var reporting = new Thread(() -> { try { task.progress(.4, "old"); } catch (Throwable t) { failure.set(t); } });
+        var ending = new Thread(() -> { task.needsInput("input"); task.resume("resume"); task.succeed("done"); });
+        reporting.start();
+        try {
+            assertThat(entered.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            ending.start();
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+            while (ending.getState() != Thread.State.BLOCKED && ending.isAlive() && System.nanoTime() < deadline) Thread.onSpinWait();
+            assertThat(ending.getState()).isEqualTo(Thread.State.BLOCKED);
+        } finally { release.countDown(); reporting.join(5000); ending.join(5000); }
+        assertThat(failure.get()).isNull();
+        assertThat(reporting.isAlive() || ending.isAlive()).isFalse();
+        while (!queued.isEmpty()) queued.remove().run();
+        assertThat(seen).extracting(ActivityEvent::state).containsExactly(ActivityEvent.State.STARTED,
+            ActivityEvent.State.NEEDS_INPUT, ActivityEvent.State.RESUMED, ActivityEvent.State.SUCCEEDED);
+        assertThat(seen.getLast().fraction()).hasValue(.4);
+        assertThat(hub.current()).isEmpty();
+    }
+
     @Test void pendingCountsQueuedDeliveriesUntilTheyRun() {
         bus.publish("test.alpha", PING, new Ping(1));
         bus.publish("test.alpha", PING, new Ping(2));

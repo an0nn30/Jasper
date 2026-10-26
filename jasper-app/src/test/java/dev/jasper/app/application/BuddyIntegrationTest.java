@@ -18,6 +18,32 @@ import static org.assertj.core.api.Assertions.*;
 class BuddyIntegrationTest {
     @TempDir Path temp;
     private final Font font = new Font("Dialog", Font.PLAIN, 13);
+    @Test void terminalAndPluginProducersShareWorkingIntentUntilBothStop() {
+        var fixture = new BuddyTestSupport();
+        var integration = new BuddyIntegration(BuddyOptions.builder(font).build(), fixture.companion(), new BuddyVisibility(),
+            () -> false, source -> true, listener -> () -> {});
+        var notifier = new dev.jasper.app.notifications.ActivityNotifier(fixture.companion(), () -> {}, integration::pluginWorking);
+        var id = java.util.UUID.randomUUID();
+        notifier.started("p", id, "work", "");
+        assertThat(fixture.working()).isTrue();
+        integration.terminalWorking(true);
+        notifier.needsInput("p", id, "choose");
+        assertThat(fixture.working()).isTrue();
+        integration.terminalWorking(false);
+        assertThat(fixture.working()).isFalse();
+        notifier.resumed("p", id, "continue"); integration.terminalWorking(true);
+        notifier.ended("p", id);
+        assertThat(fixture.working()).isTrue();
+        integration.terminalWorking(false);
+        assertThat(fixture.working()).isFalse();
+        notifier.started("p", java.util.UUID.randomUUID(), "other", "");
+        notifier.close();
+        assertThat(fixture.working()).isFalse();
+        integration.pluginWorking(true); integration.close();
+        integration.terminalWorking(true); integration.pluginWorking(true);
+        assertThat(fixture.working()).isFalse();
+    }
+
     @Test void unavailablePresentationIsAttemptedOnlyOnce() {
         var fixture = new BuddyTestSupport(); var attempts = new AtomicInteger();
         var options = BuddyOptions.builder(font).build();

@@ -15,6 +15,15 @@ public final class BuddyTestSupport {
         BuddyOptions.builder(new Font("Dialog", Font.PLAIN, 13)).build(), deck));
     public BuddyCompanion companion() { return companion; }
     public List<BuddyNotice> notices() { return edt(deck::notices); }
+    public boolean working() {
+        return edt(() -> {
+            try {
+                var field = BuddyCompanion.class.getDeclaredField("working");
+                field.setAccessible(true);
+                return field.getBoolean(companion);
+            } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        });
+    }
     public int generation() { return edt(deck::generation); }
     public int size() { return edt(deck::size); }
     public boolean isEmpty() { return edt(deck::isEmpty); }

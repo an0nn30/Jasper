@@ -1,5 +1,14 @@
 # Jasper — Status and Handoff
 
+**Buddy plugin input — 2026-10-25.** `codex/buddy-plugin-input` adds SDK 0.22.0 activity input/resume phases,
+ordered phase delivery with coalesced phase-preserving detail, and matching runtime/testkit shutdown semantics.
+Buddy retains notice identity and dismissal across input/resume and combines running plugin work with terminal
+work. The Sample's optional UI demo includes a confirmation action. Targeted lifecycle, notifier, composition,
+Buddy and Sample tests, architecture checks and generated SDK reference pass; independent reviews, full headless
+check and external-plugin verification remain with the parent task. The [plan](superpowers/plans/2026-10-25-buddy-plugin-input.md)
+records the delegated implementation and RED evidence. No GUI, AOT, benchmark, merge or push.
+
+
 **Compact Buddy activity — 2026-10-25.** `codex/buddy-compact-activity` replaces floating stacks with one
 quiet visible-work summary and an all-activity drawer with stable expandable groups. Attention priority,
 task/connection counts, duplicate labels, suppression and activation remain explicit. Drawer opening owns
@@ -62,8 +71,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.21.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
-  `sdk = ">=0.21.0, <0.22"`.
+- **SDK** `0.22.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.22.0, <0.23"`.
 - **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
   either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
   Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.

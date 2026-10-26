@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CapabilitiesTest {
     @Test void theSdkIsVersionTwentyOneWithThePresentationCapability() {
-        assertThat(JasperSdk.VERSION).isEqualTo("0.21.0");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.22.0");
         assertThat(Capabilities.NETWORK_LISTEN).isEqualTo("network.listen");
         assertThat(Capabilities.CLIPBOARD_READ).isEqualTo("clipboard.read");
         assertThat(Capabilities.TERMINAL_ENVIRONMENT).isEqualTo("terminal.environment");

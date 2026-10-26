@@ -384,7 +384,7 @@ public final class JasperApplication {
             themes.current().chrome().dark(), this::raiseTerminal, this::toggleBuddy, this::owns);
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
-            buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
+            buddy.companion(), notificationCenter, buddy::terminalWorking, JasperApplication::afterDelay);
         if (desktopColors != null) desktopAppearance = new DesktopAppearance(themes, desktopColors,
             System.getenv("XDG_CURRENT_DESKTOP"), java.util.concurrent.Executors.newSingleThreadExecutor(
                 Thread.ofPlatform().daemon().name("jasper-desktop-palette").factory()));
@@ -1269,7 +1269,7 @@ public final class JasperApplication {
                 throw new IllegalStateException("A presentation provider needs the bootstrap's selection");
             selection = scanned;
         }
-        activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
+        activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal, buddy::pluginWorking);
         uiState = UiState.load(dirs.uiState(), presentation().projections().dockLayout().key());
         workspace(dirs.workspaceState());
         shells = new NativeShells(themes, uiState, this::nativeWindow, this::quit,
