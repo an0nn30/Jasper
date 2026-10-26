@@ -6,6 +6,7 @@ helper, fixture, generic, source, fixtures = sys.argv[1:]
 fixtures = pathlib.Path(fixtures)
 checks = 0
 processes = []
+expected_config = None
 def cleanup():
     for proc in processes:
         if proc.poll() is None:
@@ -19,6 +20,8 @@ def read(proc, timeout=2):
     check(bool(select.select([proc.stdout], [], [], timeout)[0]), "reply deadline")
     line = proc.stdout.readline()
     check(bool(line) and len(line) <= 65536, "bounded complete reply")
+    if expected_config is not None:
+        check(contents(config) == expected_config and contents(system) == before_system, "helper never writes configuration during observation")
     return json.loads(line)
 def send(proc, generation, appearance="dark"):
     proc.stdin.write((json.dumps(dict(v=1, kind="sample", generation=generation, appearance=appearance))+"\n").encode())
@@ -54,6 +57,7 @@ with tempfile.TemporaryDirectory(prefix="jasper-kde-process-") as tmp:
     env = {**os.environ, "HOME":tmp, "XDG_CONFIG_HOME":str(config), "XDG_CONFIG_DIRS":str(system),
            "XDG_CACHE_HOME":str(root/"cache"), "XDG_DATA_HOME":str(root/"data"), "XDG_RUNTIME_DIR":str(runtime)}
     before_system = contents(system)
+    expected_config = contents(config)
     proc = start([fixture, str(control)], env)
     initial = read(proc)
     check(initial["source"] == source and initial["appearance"] == "dark", "source and actual initial polarity")
@@ -68,6 +72,7 @@ with tempfile.TemporaryDirectory(prefix="jasper-kde-process-") as tmp:
     # Event delivery triggers a genuine KConfig reparse in the shared helper loop.
     for generation, mode in enumerate(["event", "palette", "style"], 100):
         globals.write_text(f"[Colors:Window]\nBackgroundNormal=255,255,{generation}\nForegroundNormal=0,0,0\n")
+        expected_config["kdeglobals"] = globals.read_bytes()
         control.write_text(mode)
         reply = read(proc)
         check(reply["appearance"] == "light" and rgb(reply["window.bg"],255,255,generation), f"{mode} reparses live config")
@@ -82,16 +87,17 @@ with tempfile.TemporaryDirectory(prefix="jasper-kde-process-") as tmp:
     check(recovered["appearance"] == "light" and recovered["generation"] == 201, "same process recovers on event")
     # Explicit samples also reparse, with no synthetic event.
     globals.write_bytes((fixtures/"header.colors").read_bytes())
+    expected_config["kdeglobals"] = globals.read_bytes()
     send(proc, 202, "light"); explicit = read(proc)
     check(explicit["appearance"] == "dark" and rgb(explicit["window.bg"],61,62,63), "explicit request reparses config with actual polarity")
     # A real 30s timer boundary must refresh changed config without any request/event.
     globals.write_bytes((fixtures/"high-contrast.colors").read_bytes())
+    expected_config["kdeglobals"] = globals.read_bytes()
     periodic = read(proc, 32)
     check(periodic["generation"] == 202 and periodic["appearance"] == "light" and rgb(periodic["window.bg"],255,255,255), "periodic sample reparses config")
-    before = contents(config)
     proc.stdin.close(); check(proc.wait(timeout=2) == 0, "timely EOF")
     check(b"mapped-windows=0 activated-windows=0" in proc.stderr.read(), "no helper windows shown or activated")
-    check(contents(config) == before and contents(system) == before_system, "helper never writes configuration")
+    check(contents(config) == expected_config and contents(system) == before_system, "helper never writes configuration")
     # Production binary, rather than the fixture, obeys the same source isolation.
     real = start([helper], env); read(real); isolation(real)
     real.stdin.close(); check(real.wait(timeout=2) == 0, "production EOF")
@@ -106,6 +112,7 @@ with tempfile.TemporaryDirectory(prefix="jasper-kde-process-") as tmp:
     sibling = start([generic], env); qt = read(sibling); isolation(sibling, False)
     check(qt["source"] == "qt"+source[-1], "generic sibling remains available")
     globals.write_bytes((fixtures/"distinct.colors").read_bytes())
+    expected_config["kdeglobals"] = globals.read_bytes()
     send(sibling, 300); unchanged = read(sibling)
     check(unchanged["window.bg"] == qt["window.bg"] and unchanged["view.bg"] == qt["view.bg"], "generic Qt never imports changed KDE configuration")
     sibling.stdin.close(); check(sibling.wait(timeout=2) == 0, "generic sibling EOF")

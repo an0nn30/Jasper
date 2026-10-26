@@ -89,13 +89,46 @@ subprocess fault injection covers absent libraries and unsupported runtimes. Ubu
 a digest-pinned Ubuntu 26.04 container requires GTK 4.16+ and covers overridden variables. Linux `check` includes
 this gate; other hosts skip it without discovering native dependencies.
 
-`compileDesktopHelpers` builds all three production executables; `stageDesktopHelpers` places only those files in
+`compileDesktopHelpers` builds all seven production executables; `stageDesktopHelpers` places only those files in
 `jasper-app/build/desktop-helpers` with mode 0755. Linux installDist ships them in `lib/desktop-colors`; jpackage
 ships them in `lib/app/desktop-colors`. Other operating systems omit them. `run` supplies the absolute
 `jasper.desktopColors.helpers` development path. Installed resolution uses `CodeLocation` and the application jar's
 sibling directory; an invalid explicit path is unavailable. `verifyDesktopHelpers` checks the host ELF architecture,
 executable modes, `readelf` DT_NEEDED entries and `ldd` resolution. `verifyPackage` checks the packaged bytes, modes
-and architecture. Release packaging uses Ubuntu 22.04 on both x86_64 and aarch64; GTK and libadwaita remain optional
+and architecture. Release packaging uses Ubuntu 22.04 on both x86_64 and aarch64; GTK, libadwaita, Qt and KDE Frameworks remain optional
 runtime capabilities, while GLib/GIO are required. The install matrix exercises Debian 12, Ubuntu 24.04, Fedora and
 openSUSE, including headless helper responses. A portal-only directory still reports preferences while unavailable
 GTK probes retain the bundled theme fallback.
+
+
+`src/qt_probe.cpp` owns the shared Qt5/Qt6 event loop; `src/kde_probe.cpp` supplies KDE5/KDE6
+KColorScheme extraction. The four executables link only their matching Qt/KF major. Generic Qt needs
+Widgets 5.15 or 6.2; KDE needs KF5 5.92 with Qt5.15, or KF6 6.0 with Qt6.5. Qt/KF are external
+runtime capabilities. The app image contains the helper executables and no Qt/KF SDK or platform plugins.
+The Java source policy remains GTK-only until the application integration deliverable.
+
+`compileDesktopQtHelpers` configures each target separately. Select baseline SDKs with
+`jasper.qt5Prefix`, `jasper.qt6Prefix`, `jasper.kf5Prefix`, `jasper.kde6QtPrefix` and `jasper.kf6Prefix`;
+see the [compatibility record](../../docs/design/qt-kde-native-compatibility.md) for the pinned recipe.
+Missing SDKs fail with an actionable CMake diagnostic. Non-Linux tasks skip before native discovery.
+`testDesktopQt`, `testDesktopKde` and `verifyDesktopQtCompatibility` run deterministic fixtures with
+private Xvfb/D-Bus. `checkDesktopQtNative` includes those tests and equipped-runtime linkage verification.
+`compileDesktopQtNativeTests` builds matching fixtures for CI to run the exact baseline-built binaries
+on installed system runtimes. Fixture binaries never enter the production helper directory.
+
+`verify-qt-package.py` checks the exact seven-file set, 0755 modes, host ELF machine, matching Qt/KF
+NEEDED majors, absent RPATH/RUNPATH and Ubuntu22 direct symbol floors (GLIBC 2.35, GLIBCXX 3.4.30,
+CXXABI 1.3.13). Staging permits missing Qt/KF with an explicit isolated loader-failure check;
+`verifyDesktopQtLinkage` requires every library to resolve. Mandatory portal/GTK dependencies always
+resolve. Package verification compares every helper's bytes and mode with the verified stage.
+
+Linux dependency inference excludes only the four `lib/app/desktop-colors/jasper-desktop-{qt5,qt6,kde5,kde6}`
+paths. Every other ELF keeps its requirements, including a Qt-dependent mandatory binary. The selected
+JBR's control/spec templates retain their content while their dependency placeholders receive the mandatory
+scan plus `xdg-utils`; changed placeholders fail closed. Actual DEB Depends/Pre-Depends and RPM Requires
+must match that scan. Minimal-image install checks require missing optional runtimes to affect only their
+helpers, while all mandatory libraries resolve. Equipped-runtime install checks sample all four installed
+Qt/KDE helpers under private Xvfb/D-Bus. Baseline SDK caches are keyed by architecture, manifest,
+patches and build flags. CI runs exact baseline-built fixtures on Ubuntu22 and Fedora44 system runtimes;
+Ubuntu22's absent KDE6 capability is recorded separately. Minimum separately installed KDE6 and real desktop
+acceptance remain distinct matrix cases.

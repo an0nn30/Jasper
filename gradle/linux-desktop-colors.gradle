@@ -145,14 +145,14 @@ def testGtk = tasks.register('testDesktopGtk') {
     group = 'verification'
     description = 'Runs GTK extraction assertions on a private Xvfb display and private D-Bus session.'
     onlyIf { linux }
-    dependsOn(compileGtkShim, verifyGtkAbi, 'stageDesktopHelpers', gtkOutputs.values().collect { it.compileTests })
+    dependsOn(compileGtkShim, verifyGtkAbi, gtkOutputs.values().collect { it.compileTests })
     doLast {
         [3, 4].each { major ->
             providers.exec {
                 ignoreExitValue = true
                 environment('DC_GTK_FIXTURES', new File(fixtures, 'themes').absolutePath)
-                environment('DC_GTK3_HELPER', layout.buildDirectory.file('desktop-helpers/jasper-desktop-gtk3').get().asFile.absolutePath)
-                environment('DC_GTK4_HELPER', layout.buildDirectory.file('desktop-helpers/jasper-desktop-gtk4').get().asFile.absolutePath)
+                environment('DC_GTK3_HELPER', gtkOutputs[3].helper.get().asFile.absolutePath)
+                environment('DC_GTK4_HELPER', gtkOutputs[4].helper.get().asFile.absolutePath)
                 environment('DC_GTK_SHIM', gtkShim.get().asFile.absolutePath)
                 environment('GTK_USE_PORTAL', '0')
                 environment('GTK_A11Y', 'none')
@@ -173,18 +173,22 @@ def testGtk = tasks.register('testDesktopGtk') {
 if (linux) tasks.named('check') { dependsOn(testGtk) }
 
 // Stage only the production executables: fixtures and the fault-injection shim never ship.
-def helperNames = ['jasper-desktop-portal', 'jasper-desktop-gtk3', 'jasper-desktop-gtk4']
+def helperNames = ['jasper-desktop-portal', 'jasper-desktop-gtk3', 'jasper-desktop-gtk4',
+    'jasper-desktop-qt5', 'jasper-desktop-qt6', 'jasper-desktop-kde5', 'jasper-desktop-kde6']
 def compileHelpers = tasks.register('compileDesktopHelpers') {
     group = 'build'
     description = 'Builds the Linux portal and optional toolkit probes for the host architecture.'
     onlyIf { linux }
-    dependsOn(compilePortal, gtkOutputs.values().collect { it.compile })
+    dependsOn(compilePortal, gtkOutputs.values().collect { it.compile }, 'compileDesktopQtHelpers')
 }
 def stagedHelpers = layout.buildDirectory.dir('desktop-helpers')
 def stageHelpers = tasks.register('stageDesktopHelpers', Sync) {
     onlyIf { linux }
     dependsOn(compileHelpers)
     from(layout.buildDirectory.dir('desktop-colors')) { include(helperNames) }
+    ['qt5', 'qt6', 'kde5', 'kde6'].each { target ->
+        from(layout.buildDirectory.dir("desktop-colors/cmake/${target}/production")) { include("jasper-desktop-${target}") }
+    }
     into(stagedHelpers)
     filePermissions { unix('rwxr-xr-x') }
 }
@@ -195,20 +199,11 @@ def verifyHelpers = tasks.register('verifyDesktopHelpers') {
     dependsOn(stageHelpers)
     inputs.dir(stagedHelpers)
     doLast {
-        int expectedMachine = System.getProperty('os.arch') in ['aarch64', 'arm64'] ? 0xB7 : 0x3E
-        helperNames.each { name ->
-            File binary = new File(stagedHelpers.get().asFile, name)
-            if (!binary.isFile() || !binary.canExecute()) throw new GradleException("Missing executable helper: ${binary}")
-            byte[] header = binary.bytes
-            if (header.length < 20 || header[0] != 0x7F || header[1] != 69 || header[2] != 76 || header[3] != 70 ||
-                    header[4] != 2 || header[5] != 1 || ((header[18] & 255) | ((header[19] & 255) << 8)) != expectedMachine)
-                throw new GradleException("Helper is not a host-architecture ELF executable: ${binary}")
-            String dynamic = providers.exec { commandLine('readelf', '-d', binary.absolutePath) }.standardOutput.asText.get()
-            if (dynamic =~ /(?i)NEEDED.*(gtk|adwaita)/) throw new GradleException("Helper links an optional toolkit: ${name}")
-            String linkage = providers.exec { commandLine('ldd', binary.absolutePath) }.standardOutput.asText.get()
-            if (linkage.contains('not found')) throw new GradleException("Helper has unresolved runtime dependencies: ${name}\n${linkage}")
-            logger.lifecycle("${name}: host ELF; executable; no GTK/libadwaita DT_NEEDED entries\n${dynamic}${linkage}")
-        }
+        providers.exec {
+            commandLine(providers.gradleProperty('jasper.python').getOrElse('python3'),
+                new File(fixtures, 'verify-qt-package.py').absolutePath, stagedHelpers.get().asFile.absolutePath,
+                '--runtime', 'optional')
+        }.result.get().assertNormalExitValue()
     }
 }
 if (linux) {
@@ -234,90 +229,107 @@ def qtCompatibilityTargets = [
     kde5: [major: 5, kind: 'kde', prefixes: ['jasper.kf5Prefix', 'jasper.qt5Prefix']],
     kde6: [major: 6, kind: 'kde', prefixes: ['jasper.kf6Prefix', 'jasper.kde6QtPrefix']]
 ]
-tasks.register('verifyDesktopQtCompatibility') {
-    group = 'verification'
-    description = 'Builds/runs all four Qt/KDE API probes on a private Xvfb display and D-Bus session.'
-    onlyIf { linux }
-    doLast {
-        qtCompatibilityTargets.each { name, target ->
-            def prefixes = target.prefixes.collect { property ->
-                String value = providers.gradleProperty(property).orNull
-                if (value != null && (!new File(value).isAbsolute() || !new File(value).isDirectory()))
-                    throw new GradleException("${property} must name an existing absolute SDK prefix: ${value}")
-                value
-            }.findAll { it != null }
-            File build = layout.buildDirectory.dir("desktop-colors/cmake/${name}").get().asFile
-            def invoke = { List arguments ->
-                providers.exec {
-                    ignoreExitValue = true
-                    environment('CMAKE_PREFIX_PATH', '')
-                    environment('QT_PLUGIN_PATH', '')
-                    environment('QT_QPA_PLATFORM_PLUGIN_PATH', '')
-                    environment('LD_LIBRARY_PATH', '')
-                    commandLine(arguments)
-                }.with { execution ->
-                    logger.lifecycle(execution.standardOutput.asText.get())
-                    String errors = execution.standardError.asText.get()
-                    if (!errors.isBlank()) logger.lifecycle(errors)
-                    execution.result.get().assertNormalExitValue()
-                }
-            }
-            invoke(['cmake', '-S', source.parentFile.absolutePath, '-B', build.absolutePath,
-                '-UQt5*', '-UQt6*', '-UKF5*', '-UKF6*', '-UECM_DIR', '-UDC_HAVE_KCOLORSCHEME_HEADER',
-                '-DDC_QT_MAJOR=' + target.major, '-DDC_PROBE_KIND=' + target.kind,
-                '-DDC_BUILD_TESTS=ON', '-DCMAKE_BUILD_TYPE=Release',
-                '-DCMAKE_PREFIX_PATH=' + prefixes.join(';')])
-            invoke(['cmake', '--build', build.absolutePath, '--parallel', '2'])
-            invoke(['xvfb-run', '-a', '-s', '-screen 0 1024x768x24 -nolisten tcp',
-                'dbus-run-session', '--config-file=' + new File(fixtures, 'themes/private-bus.conf').absolutePath,
-                '--', 'ctest', '--test-dir', build.absolutePath, '--verbose', '--output-on-failure'])
-        }
+def invokeDesktopQt = { List arguments ->
+    providers.exec {
+        ignoreExitValue = true
+        environment('CMAKE_PREFIX_PATH', '')
+        environment('QT_PLUGIN_PATH', '')
+        environment('QT_QPA_PLATFORM_PLUGIN_PATH', '')
+        environment('LD_LIBRARY_PATH', '')
+        commandLine(arguments)
+    }.with { execution ->
+        logger.lifecycle(execution.standardOutput.asText.get())
+        String errors = execution.standardError.asText.get()
+        if (!errors.isBlank()) logger.lifecycle(errors)
+        execution.result.get().assertNormalExitValue()
     }
 }
-
-// Native Qt/KDE tests remain explicit gates until the minimum SDK/baseline proof is complete.
-// Build directories separate production executables from test-only palette drivers.
+def buildDesktopQt = { String name, boolean tests ->
+    def target = qtCompatibilityTargets[name]
+    def prefixes = target.prefixes.collect { property ->
+        String value = providers.gradleProperty(property).orNull
+        if (value != null && (!new File(value).isAbsolute() || !new File(value).isDirectory()))
+            throw new GradleException("${property} must name an existing absolute SDK prefix: ${value}")
+        value
+    }.findAll { it != null }
+    File build = layout.buildDirectory.dir("desktop-colors/cmake/${name}").get().asFile
+    invokeDesktopQt(['cmake', '-S', source.parentFile.absolutePath, '-B', build.absolutePath,
+        '-UQt5*', '-UQt6*', '-UKF5*', '-UKF6*', '-UECM_DIR', '-UDC_HAVE_KCOLORSCHEME_HEADER',
+        '-DDC_QT_MAJOR=' + target.major, '-DDC_PROBE_KIND=' + target.kind,
+        '-DDC_BUILD_TESTS=' + (tests ? 'ON' : 'OFF'), '-DCMAKE_BUILD_TYPE=Release',
+        '-DCMAKE_PREFIX_PATH=' + prefixes.join(';')] +
+        (providers.gradleProperty('jasper.python').present ?
+            ['-DPython3_EXECUTABLE=' + providers.gradleProperty('jasper.python').get()] : []))
+    invokeDesktopQt(['cmake', '--build', build.absolutePath, '--parallel', '2'])
+    Set names = new File(build, 'production').listFiles().collect { it.name } as Set
+    if (names != ["jasper-desktop-${name}".toString()] as Set)
+        throw new GradleException("Unexpected ${name} production files: ${names}")
+    build
+}
+def compileQt = tasks.register('compileDesktopQtHelpers') {
+    group = 'build'
+    description = 'Builds all four optional Qt/KDE helpers; SDK discovery failures are release failures.'
+    onlyIf { linux }
+    inputs.dir(source)
+    inputs.file(rootProject.file('packaging/desktop-colors/CMakeLists.txt'))
+    qtCompatibilityTargets.each { name, target ->
+        target.prefixes.each { property -> inputs.property(property, providers.gradleProperty(property).getOrElse('system')) }
+        outputs.file(layout.buildDirectory.file("desktop-colors/cmake/${name}/production/jasper-desktop-${name}"))
+    }
+    doLast { qtCompatibilityTargets.keySet().each { buildDesktopQt(it, false) } }
+}
 ['qt', 'kde'].each { kind ->
     tasks.register(kind == 'qt' ? 'testDesktopQt' : 'testDesktopKde') {
         group = 'verification'
         description = "Builds/tests ${kind}5 and ${kind}6 helpers under private Xvfb and D-Bus."
         onlyIf { linux }
+        dependsOn(compileQt)
         doLast {
             [5, 6].each { major ->
-                def prefixes = qtCompatibilityTargets["${kind}${major}".toString()].prefixes.collect { property ->
-                    String value = providers.gradleProperty(property).orNull
-                    if (value != null && (!new File(value).isAbsolute() || !new File(value).isDirectory()))
-                        throw new GradleException("${property} must name an existing absolute SDK prefix: ${value}")
-                    value
-                }.findAll { it != null }
-                File build = layout.buildDirectory.dir("desktop-colors/cmake/${kind}${major}").get().asFile
-                def invoke = { List arguments ->
-                    providers.exec {
-                        ignoreExitValue = true
-                        environment('CMAKE_PREFIX_PATH', '')
-                        environment('QT_PLUGIN_PATH', '')
-                        environment('QT_QPA_PLATFORM_PLUGIN_PATH', '')
-                        environment('LD_LIBRARY_PATH', '')
-                        commandLine(arguments)
-                    }.with { execution ->
-                        logger.lifecycle(execution.standardOutput.asText.get())
-                        String errors = execution.standardError.asText.get()
-                        if (!errors.isBlank()) logger.lifecycle(errors)
-                        execution.result.get().assertNormalExitValue()
-                    }
-                }
-                invoke(['cmake', '-S', source.parentFile.absolutePath, '-B', build.absolutePath,
-                    '-UQt5*', '-UQt6*', '-UKF5*', '-UKF6*', '-UECM_DIR', '-UDC_HAVE_KCOLORSCHEME_HEADER',
-                    '-DDC_QT_MAJOR=' + major, '-DDC_PROBE_KIND=' + kind, '-DDC_BUILD_TESTS=ON',
-                    '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_PREFIX_PATH=' + prefixes.join(';')])
-                invoke(['cmake', '--build', build.absolutePath, '--parallel', '2'])
-                invoke(['xvfb-run', '-a', '-s', '-screen 0 1024x768x24 -nolisten tcp',
+                File build = buildDesktopQt("${kind}${major}".toString(), true)
+                invokeDesktopQt(['xvfb-run', '-a', '-s', '-screen 0 1024x768x24 -nolisten tcp',
                     'dbus-run-session', '--config-file=' + new File(fixtures, 'themes/private-bus.conf').absolutePath,
                     '--', 'ctest', '--test-dir', build.absolutePath, '--verbose', '--output-on-failure'])
-                Set names = new File(build, 'production').listFiles().collect { it.name } as Set
-                if (names != ["jasper-desktop-${kind}${major}".toString()] as Set)
-                    throw new GradleException("Unexpected ${kind} production files: ${names}")
             }
         }
     }
+}
+tasks.register('verifyDesktopQtCompatibility') {
+    group = 'verification'
+    description = 'Runs Qt/KDE API and production-helper fixtures for all four independently configured SDKs.'
+    onlyIf { linux }
+    dependsOn('testDesktopQt', 'testDesktopKde')
+}
+tasks.register('verifyDesktopQtLinkage') {
+    group = 'verification'
+    description = 'Requires all seven staged helpers to resolve on an equipped runtime and meet release ELF floors.'
+    onlyIf { linux }
+    dependsOn(stageHelpers)
+    doLast {
+        invokeDesktopQt([providers.gradleProperty('jasper.python').getOrElse('python3'),
+            new File(fixtures, 'verify-qt-package.py').absolutePath, stagedHelpers.get().asFile.absolutePath])
+    }
+}
+tasks.register('checkDesktopQtNative') {
+    group = 'verification'
+    description = 'Mandatory native Qt/KDE release gate (private display/bus, all providers, release linkage floors).'
+    onlyIf { linux }
+    dependsOn('verifyDesktopQtCompatibility', 'verifyDesktopQtLinkage')
+}
+
+def testDesktopPackagePolicy = tasks.register('testDesktopPackagePolicy', Exec) {
+    group = 'verification'
+    description = 'Tests exact-path optional package dependency exemptions.'
+    commandLine(providers.gradleProperty('jasper.python').getOrElse('python3'),
+        new File(fixtures, 'package_dependencies_test.py').absolutePath)
+    inputs.files(rootProject.file('packaging/linux/dependencies.py'), new File(fixtures, 'package_dependencies_test.py'))
+}
+tasks.named('check') { dependsOn(testDesktopPackagePolicy) }
+
+tasks.register('compileDesktopQtNativeTests') {
+    group = 'verification'
+    description = 'Builds matching baseline native fixtures for exact-artifact system-runtime CI (never packaged).'
+    onlyIf { linux }
+    dependsOn(compileQt)
+    doLast { qtCompatibilityTargets.keySet().each { buildDesktopQt(it, true) } }
 }

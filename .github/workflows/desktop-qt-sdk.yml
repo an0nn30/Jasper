@@ -1,0 +1,58 @@
+name: desktop-qt-sdk
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      architecture:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sdk:
+    runs-on: ${{ inputs.runner }}
+    # Qt6.2 alone measured six minutes at -j2 on the aarch64 baseline VM.
+    # Allow a cold build of three Qt SDKs and both KF chains outside the 30-minute package job.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Baseline SDK prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config perl ca-certificates curl git patch gperf gettext libxml2-utils libdbus-1-dev libfontconfig1-dev libfreetype6-dev libssl-dev libglib2.0-dev libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev libxi-dev libxrender-dev libxcb1-dev libxcb-cursor-dev libxcb-glx0-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-render-util0-dev libxcb-render0-dev libxcb-shape0-dev libxcb-shm0-dev libxcb-sync-dev libxcb-util-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-xkb-dev libxkbcommon-dev libxkbcommon-x11-dev qttools5-dev
+      - uses: actions/cache@v5
+        id: sdk-cache
+        with:
+          path: .desktop-qt-sdk/prefixes
+          # Includes source/patch digests, configure flags and recipe; caches never contain helper executables.
+          key: desktop-sdk-ubuntu22-gcc11-${{ inputs.architecture }}-${{ hashFiles('packaging/desktop-colors/toolchains/**') }}
+      - name: Build pinned SDKs at the release ABI baseline
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        env:
+          DC_BUILD_JOBS: '2'
+        run: |
+          export DC_PYTHON="$(command -v python3)"
+          for target in qt6 qt5 kde5 kde6; do
+            bash packaging/desktop-colors/toolchains/build-baseline.sh --build "$target" "$PWD/.desktop-qt-sdk"
+          done
+      - name: Archive build-only SDKs
+        run: tar -czf desktop-qt-sdk.tar.gz .desktop-qt-sdk/prefixes
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-qt-sdk-${{ inputs.architecture }}
+          path: desktop-qt-sdk.tar.gz
+          if-no-files-found: error
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-qt-sdk-${{ inputs.architecture }}-logs
+          path: .desktop-qt-sdk/logs
+          if-no-files-found: ignore

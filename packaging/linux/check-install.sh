@@ -1,9 +1,11 @@
 #!/bin/sh
-# Installs a Jasper .deb or .rpm, checks that every shared library in it resolves, runs the bundled Java
+# Installs a Jasper .deb or .rpm, checks mandatory shared libraries, runs the bundled Java
 # and removes the package again. CI runs this as root inside a disposable distribution container
 # (see .github/workflows/linux-packages.yml); do not run it on a workstation.
 set -eu
 package=$1
+runtime=${2:-missing}
+case "$runtime" in missing|equipped) ;; *) echo "Expected missing or equipped runtime mode" >&2; exit 1 ;; esac
 root=/opt/jasper
 
 # Minimal images lack the applications and desktop-directories directories that xdg-desktop-menu needs,
@@ -42,7 +44,7 @@ test -x "$root/bin/jasper-watch"
 test -x "$root/lib/bin/jasper"
 "$root/lib/bin/jasper" --help | grep -q '^Usage: jasper'
 "$root/lib/runtime/bin/java" -version
-for name in portal gtk3 gtk4; do
+for name in portal gtk3 gtk4 qt5 qt6 kde5 kde6; do
     helper="$root/lib/app/desktop-colors/jasper-desktop-$name"
     test -x "$helper"
     if ldd "$helper" | grep -Ei 'libgtk|libadwaita'; then
@@ -50,12 +52,40 @@ for name in portal gtk3 gtk4; do
         exit 1
     fi
 done
+# Minimal install must not pull Qt/KF directly or through their optional-only dependency closure.
+# All four files still ship; missing ELF runtimes must fail just that child's startup.
+if [ "$runtime" = missing ]; then
+for name in qt5 qt6 kde5 kde6; do
+    helper="$root/lib/app/desktop-colors/jasper-desktop-$name"
+    if ! ldd "$helper" | grep -q 'not found'; then
+        echo "Minimal image unexpectedly supplies all optional runtimes: $helper" >&2
+        exit 1
+    fi
+    if timeout 3 "$helper" </dev/null > /tmp/jasper-optional.out 2>/tmp/jasper-optional.err; then
+        echo "Missing-runtime helper unexpectedly started: $helper" >&2
+        exit 1
+    fi
+    test ! -s /tmp/jasper-optional.out
+    grep -q 'shared libraries' /tmp/jasper-optional.err
+done
+rm -f /tmp/jasper-optional.out /tmp/jasper-optional.err
+else
+    for name in qt5 qt6 kde5 kde6; do
+        if ldd "$root/lib/app/desktop-colors/jasper-desktop-$name" | grep -q 'not found'; then
+            echo "Equipped runtime is missing optional libraries for $name" >&2
+            exit 1
+        fi
+    done
+fi
 # Keep stdin open until the response arrives: EOF cancels pending extraction.
 probe=$(mktemp -d)
 trap 'rm -rf "$probe"' EXIT HUP INT TERM
 mkfifo "$probe/input" "$probe/output"
-for name in gtk3 gtk4; do
-    response=$(timeout 10 env -u DISPLAY -u WAYLAND_DISPLAY sh -c '
+sources="gtk3 gtk4"
+if [ "$runtime" = equipped ]; then sources="$sources qt5 qt6 kde5 kde6"; fi
+for name in $sources; do
+    response=$(timeout 10 env HOME="$probe" XDG_CONFIG_HOME="$probe/config" XDG_CACHE_HOME="$probe/cache" sh -c '
+        case "$3" in gtk*) unset DISPLAY WAYLAND_DISPLAY ;; esac
         "$1" --protocol=1 <"$2/input" >"$2/output" &
         child=$!
         trap "kill $child 2>/dev/null || true" EXIT
@@ -69,7 +99,7 @@ for name in gtk3 gtk4; do
         exec 3>&-
         wait "$child"
         trap - EXIT
-    ' sh "$root/lib/app/desktop-colors/jasper-desktop-$name" "$probe")
+    ' sh "$root/lib/app/desktop-colors/jasper-desktop-$name" "$probe" "$name")
     printf '%s\n' "$response" | grep -q '"kind":"palette"'
     printf '%s\n' "$response" | grep -q '"generation":7'
 done
@@ -79,7 +109,12 @@ trap - EXIT HUP INT TERM
 # The JDK's own libraries find libjvm and each other at run time, so ldd may not resolve those;
 # anything else unresolved is a dependency the package forgot to declare.
 bundled=$(find "$root" -name '*.so*' -exec basename {} \; | sort -u)
-missing=$(find "$root" -type f \( -name '*.so*' -o -perm -u+x \) -exec ldd {} \; 2>/dev/null \
+missing=$(find "$root" -type f \
+    ! -path "$root/lib/app/desktop-colors/jasper-desktop-qt5" \
+    ! -path "$root/lib/app/desktop-colors/jasper-desktop-qt6" \
+    ! -path "$root/lib/app/desktop-colors/jasper-desktop-kde5" \
+    ! -path "$root/lib/app/desktop-colors/jasper-desktop-kde6" \
+    \( -name '*.so*' -o -perm -u+x \) -exec ldd {} \; 2>/dev/null \
     | awk '/not found/ { print $1 }' | sort -u | grep -vxF "$bundled" || true)
 if [ -n "$missing" ]; then
     echo "Unresolved shared libraries after installing $package:" >&2

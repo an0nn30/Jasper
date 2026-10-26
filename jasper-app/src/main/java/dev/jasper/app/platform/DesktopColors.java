@@ -34,7 +34,8 @@ public final class DesktopColors implements AutoCloseable {
 
     /** Fixed executable names in distribution order: portal, GTK 3, GTK 4. */
     public static List<String> helperNames() {
-        return List.of("jasper-desktop-portal", "jasper-desktop-gtk3", "jasper-desktop-gtk4");
+        return List.of("jasper-desktop-portal", "jasper-desktop-gtk3", "jasper-desktop-gtk4",
+            "jasper-desktop-qt5", "jasper-desktop-qt6", "jasper-desktop-kde5", "jasper-desktop-kde6");
     }
 
     /** Absolute development override or helpers beside the installed application jar; never searches PATH or cwd. */

@@ -9,7 +9,8 @@ class DesktopHelperDirectoryTest {
     @TempDir Path home;
     @Test void helperNamesAreFixedAndContainNoShellFragments() {
         assertThat(DesktopColors.helperNames()).containsExactly(
-            "jasper-desktop-portal", "jasper-desktop-gtk3", "jasper-desktop-gtk4");
+            "jasper-desktop-portal", "jasper-desktop-gtk3", "jasper-desktop-gtk4",
+            "jasper-desktop-qt5", "jasper-desktop-qt6", "jasper-desktop-kde5", "jasper-desktop-kde6");
         assertThat(DesktopColors.helperNames()).allMatch(name -> name.matches("[a-z0-9-]+"));
     }
     @Test void installedAndDevelopmentPathsPreserveSpaces() throws Exception {

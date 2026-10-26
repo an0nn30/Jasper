@@ -1,6 +1,7 @@
 # Qt / KDE compatibility investigation — 2026-10-25
 
-Status: preparation implemented; native compatibility gate **pending**. The user authorized
+Status: native helpers and optional packaging implemented; aarch64 headless integration gate proven.
+The complete release/desktop matrix remains pending. The user authorized
 local work while Fedora updates. SSH became available as `dustin@10.211.55.13` during
 preparation; the parent prepared a disposable rootless Fedora 44 aarch64 Podman container
 with the development prerequisites and ran all four probes. Ubuntu VM use is excluded. Ubuntu 22.04
@@ -175,10 +176,10 @@ evidence is visible in its captured output, as it is in these manually verbose r
 The disposable `jasper-qt-baseline` container on Fedora runs Ubuntu22 aarch64 userspace,
 GNU11.4, CMake3.22.1 and glibc2.35. Isolated CPython3.13.17 runs the preparation script.
 Pinned QtBase5.15.2/6.2.4/6.5.0 and both framework dependency chains built and installed
-after the documented corrections; the KF5 build used system Qt5.15.3. The final corrected
+after the documented corrections; the initial KF5 build used system Qt5.15.3. The final corrected
 script was checked against pristine archive members for every patch and all four
-preflights. It has not had a fresh end-to-end rebuild; KF5 against private Qt5.15.2 remains
-pending. Source/build/diagnostic logs are preserved in `/private/tmp/jasper-qt-baseline-sdk-logs.tgz`,
+preflights. Its exact KDE5 recipe subsequently completed against private Qt5.15.2 with
+all eight pinned KF5 components; a clean cold end-to-end rebuild remains pending. Source/build/diagnostic logs are preserved in `/private/tmp/jasper-qt-baseline-sdk-logs.tgz`,
 `/private/tmp/jasper-kf5-baseline-sdk-logs.tgz` and `/private/tmp/jasper-qt5-baseline-build-recheck.log`.
 
 | Probe build SDK | Runtime tested | Result |
@@ -198,9 +199,9 @@ Exact logs: `/private/tmp/jasper-task2-baseline-floor-tests.log`,
 `/private/tmp/jasper-final-recipe-patch-validation.log`, and
 `/private/tmp/jasper-baseline-artifacts-newer-system-runtimes.log`.
 
-The minimum KDE6 separately installed runtime, x86_64 matrix, production package/linkage
-gates and real theme-engine/desktop acceptance remain pending. Task 1 and the native
-release gate stay open; this container evidence does not activate source/UI choices.
+The minimum KDE6 separately installed runtime, x86_64 matrix and real theme-engine/desktop
+acceptance remain pending. The later packaging proof below completes the aarch64
+headless native integration gate; source/UI choices belong to the application deliverable.
 
 ## KDE helper extraction evidence — 2026-10-25
 
@@ -231,3 +232,82 @@ native execution. The container uses direct CMake/compiler verification because
 it has no JBR or complete checkout. This evidence retains the floor/ABI and real
 desktop acceptance gates above; KF metadata reports its built-against version and
 Qt's runtime version.
+
+
+## Seven-helper packaging and aarch64 integration gate — 2026-10-25
+
+The final Gradle gate `checkDesktopQtNative installDist packageApp verifyPackage packageDeb packageRpm`
+passes in Ubuntu22 aarch64 userspace with JBR25, GNU11.4 and the five pinned SDK prefixes.
+All four independently configured targets pass three CTests each: Qt5/Qt6 each 27 extraction
+and 79 process checks; KDE5/KDE6 each 39 extraction and 110 process checks. KDE process
+checks now compare configuration after every observation, including startup, against the
+latest harness-authored bytes. Existing no-Header evidence remains 39 passing extraction checks.
+
+The aggregate run registers private Qt6.5/KF6 SDK library paths with ldconfig only inside the
+disposable build container; it is explicitly a private-SDK runtime case. Separate minimum
+installed Qt5.15.3/KF5.92 and Qt6.2.4 fixture runs precede it. The exact package-build
+artifacts also pass all twelve CTests on Fedora44 system Qt5.15.18/Qt6.11.2 and
+KF5.116/KF6.31, with identical production/staged SHA256 values before and after tests.
+No private library or plugin override supplies the Fedora result. Every production helper meets the Ubuntu22
+ELF floor; the four new helpers require at most GLIBC2.34, GLIBCXX3.4.26 and CXXABI1.3.9,
+and have no RPATH/RUNPATH. `verify-qt-package.py` additionally rejects GLIBC_PRIVATE and
+GLIBC_ABI_DT_RELR requirements.
+
+Staging and both package formats contain exactly the seven executable helpers, with 0755
+modes and matching aarch64 ELF headers. JBR's automatic package scan includes executable
+helpers and appends custom dependencies. Packaging therefore overrides only its dependency
+placeholders with an independent mandatory ELF scan excluding the four exact optional helper
+paths. Every other ELF retains its dependencies, including a hypothetical mandatory binary
+with a Qt requirement. Actual DEB Depends/Pre-Depends and RPM Requires match that scan;
+Qt/KF and optional-only transitive dependencies are absent. Linux policy tests pass both the
+exact-path test and a real ELF regression retaining a Qt-named dependency on another binary.
+Strict scanning first caught missing build-container libXtst/libasound; CI now installs both.
+
+The generated arm64 DEB installs, checks CLI/Java and GTK fallback, and removes successfully
+in minimal Ubuntu22. The aarch64 RPM does the same in minimal Fedora44. Both retain four
+optional helper files whose missing libraries cause isolated loader failures; mandatory
+libraries resolve. No Qt/KF runtime is installed to satisfy Jasper. A runtime-equipped Fedora RPM install also
+checks all four installed Qt/KDE helpers with generation-matched samples on private
+Xvfb/D-Bus, then removes successfully. RPM removal emits an inherited nonfatal JBR
+transaction-lock diagnostic in both minimal and equipped cases; removal exits zero.
+Package SHA256 values:
+
+| Package | SHA256 |
+| --- | --- |
+| Jasper-1.0.0-linux-arm64.deb | `185f7253fcb3ea88b605f4053cf02bbd494bf1094ed93299fcd03c6dc6f50656` |
+| Jasper-1.0.0-linux-aarch64.rpm | `bed21bb1206b62c05086e8b9261903d3641a53be3024f11d4d3356a2bda6b25d` |
+
+The exact staged baseline helpers run concurrently on Fedora system runtimes across two
+real 30-second boundaries. Four stable PIDs, no children/repeated startups, zero CPU tick
+deltas in both intervals, unchanged configuration and timely EOF are observed. Resident
+memory is Qt5 29,272 kB, Qt6 29,744 kB, KDE5 30,788 kB and KDE6 31,864 kB.
+Headless macOS package verification passes and excludes the Linux helper directory;
+Windows execution remains unavailable. The full macOS headless check passes 13,041
+JUnit tests with zero failures/errors and 30 skips, plus 72 theme-tool tests. Its initial
+invocation supplied a nonexistent Python path; repeating with installed Python3.13.15
+passes. Existing JavaDoc/Unsafe diagnostics remain in the successful log.
+
+CI now separates the source-pinned SDK preparation/cache job (180-minute cold-build cap,
+two compiler workers) from the existing 30-minute package job. Cache keys include architecture
+and all recipe/manifest/patch hashes, which include build flags. x86_64/aarch64 packages and
+matching native fixtures are built on Ubuntu22. Runtime cells execute those exact artifacts
+on Ubuntu22 and Fedora44 installed system libraries rather than recompiling with a newer
+compiler. Ubuntu22's unsupported KDE6 case is an explicit capability skip; Fedora's all-four
+cell is mandatory. Existing GTK jobs, Gradle worker caps and package artifacts are retained.
+These workflow changes are prepared and syntax-checked, not dispatched from this branch.
+
+This evidence satisfies the spec's deterministic headless native gate before application
+integration. It does not establish a minimum separately installed Qt6.5/KF6.0 runtime,
+x86_64 execution, a complete cold recipe rebuild or Plasma5/Plasma6 Wayland/X11 and non-KDE
+qt5ct/qt6ct acceptance. Those release/desktop cases remain open; GUI checks require the user.
+The app source policy remains GTK-only here. No GUI, AOT training, benchmark, merge or push.
+
+Logs: `/private/tmp/jasper-final-baseline-helper-tests.log`,
+`/private/tmp/jasper-final-kde6-newer-system-tests.log`,
+`/private/tmp/jasper-task4-final-linux-gate.log`, `/private/tmp/jasper-task4-final-abi.log`,
+`/private/tmp/jasper-task4-linux-policy-tests.log`, `/private/tmp/jasper-task4-final-package-metadata.log`,
+`/private/tmp/jasper-task4-final-minimal-deb.log`, `/private/tmp/jasper-task4-final-minimal-rpm.log`,
+`/private/tmp/jasper-task4-idle-helpers.log`, `/private/tmp/jasper-task4-mac-package.log`,
+`/private/tmp/jasper-native4-package-runtime-tests.log`,
+`/private/tmp/jasper-native4-package-runtime-hashes.log`,
+`/private/tmp/jasper-task4-final-equipped-rpm.log`, `/private/tmp/jasper-task4-mac-check-final.log`.
