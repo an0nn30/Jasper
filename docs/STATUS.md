@@ -6,8 +6,11 @@ follow the new identity. Actual RPM/DEB builds exposed that JBR appends the pack
 its source confirms the old `/opt/jasper` root cannot be retained through supported options. The approved correction
 uses `--install-dir /opt` and verifies `/opt/jasper-workstation`, updating the live package/command guides and packaged
 README. Disposable install checks preserve existing distro `jasper-libs`, which the Fedora equipped-runtime check now
-installs first. Portable packaging fixtures, four documentation checks and shell syntax pass; actual corrected RPM/DEB
-and Fedora coexistence verification remain with the parent task. No SDK change, GUI, AOT, merge or push.
+installs first. Corrected DEB install/check/remove and equipped Fedora RPM coexistence pass. The real Gradle RPM
+extraction exposed writer SIGPIPE after cpio's successful early exit; conversion now finishes into a work-directory
+archive before separately verified extraction. Its unread-padding and both-stage failure fixtures pass, as do portable
+packaging fixtures, four documentation checks and shell syntax. Final RPM packageDist retry and independent review
+remain with the parent task. No SDK change, GUI, AOT, merge or push.
 
 **Linux distribution packaging — 2026-10-26:** `packageDist` selects only RPM on recognized Fedora/RHEL and SUSE
 families from `os-release`; Debian/Ubuntu and unknown hosts retain both formats. Explicit DEB/RPM tasks and mandatory

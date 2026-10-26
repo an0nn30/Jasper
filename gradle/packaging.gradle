@@ -1029,8 +1029,7 @@ if (normalizedHost().os == 'windows') {
                         }.join('\n'), '.deb')
                     } else {
                         identity = executeNative(['rpm', '--query', '--package', '--queryformat', '%{NAME} %{VERSION} %{ARCH}', generated.absolutePath], 'rpm --query').stdout.trim()
-                        executeNative(['bash', '-c', 'set -o pipefail; cd "$1" && rpm2cpio "$2" | cpio --extract --make-directories --preserve-modification-time --quiet',
-                            'bash', unpacked.absolutePath, generated.absolutePath], 'rpm2cpio | cpio (install rpm2cpio and cpio)')
+                        unpackRpmPackage(generated, unpacked, temporary, executeNative)
                         verifyInstallScripts(executeNative(['rpm', '--query', '--package', '--scripts', generated.absolutePath], 'rpm --scripts').stdout, '.rpm')
                     }
                     def expectedIdentity = ~/^${java.util.regex.Pattern.quote(linuxPackageName)} ${java.util.regex.Pattern.quote(context.version)}(-[0-9]+)? ${packageArchitecture}$/

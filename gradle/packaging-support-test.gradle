@@ -90,6 +90,60 @@ verifySupport.configure {
     }
 }
 
+// A CPIO reader may stop at its archive trailer while rpm2cpio still writes padding.
+// Stand-ins exercise the real shell/file boundary on hosts without RPM tools.
+verifySupport.configure {
+    doLast {
+        if (System.getProperty('os.name').startsWith('Windows')) return
+        File work = new File(temporaryDir, 'rpm extraction')
+        work.deleteDir()
+        File bin = new File(work, 'bin')
+        File unpacked = new File(work, 'unpacked')
+        bin.mkdirs()
+        unpacked.mkdirs()
+        File rpm = new File(work, 'Jasper package.rpm')
+        rpm.setText('image contents\n', 'UTF-8')
+        def tool = { String name, String body ->
+            File script = new File(bin, name)
+            script.setText('#!/bin/sh\nset -eu\n' + body, 'UTF-8')
+            assert script.setExecutable(true, false)
+        }
+        def run = { List<String> command, String purpose ->
+            def builder = new ProcessBuilder(command).redirectErrorStream(true)
+            builder.environment().put('PATH', bin.absolutePath + File.pathSeparator + System.getenv('PATH'))
+            def process = builder.start()
+            process.outputStream.close()
+            String output = process.inputStream.getText('UTF-8')
+            int status = process.waitFor()
+            if (status != 0) throw new GradleException("${purpose} failed with exit code ${status}: ${output}")
+        }
+        tool('rpm2cpio', 'test "$#" -eq 1\ncat "$1"\ndd if=/dev/zero bs=1048576 count=1 2>/dev/null\n')
+        tool('cpio', 'test "$*" = "--extract --make-directories --preserve-modification-time --quiet"\n' +
+            'IFS= read -r contents\nprintf "%s" "$contents" > image.txt\n')
+        // Reading only the image header represents cpio exiting at its trailer before trailing padding is consumed.
+        unpackRpmPackage(rpm, unpacked, work, run)
+        File image = new File(unpacked, 'image.txt')
+        assert image.getText('UTF-8') == 'image contents'
+        assert new File(work, 'payload.cpio').length() == 1048591L
+        assert image.delete()
+        def rejects = { int expected ->
+            try {
+                unpackRpmPackage(rpm, unpacked, work, run)
+                assert false : 'accepted a failed RPM extraction stage'
+            } catch (GradleException failure) {
+                assert failure.message.contains("exit code ${expected}") : failure.message
+            }
+            assert !image.exists() : 'ran the extractor after failed conversion'
+        }
+        tool('rpm2cpio', 'printf partial\nexit 9\n')
+        rejects(9)
+        tool('rpm2cpio', 'cat "$1"\n')
+        tool('cpio', 'exit 7\n')
+        rejects(7)
+        logger.lifecycle('Verified RPM extraction with unread padding and independent conversion/extraction failures')
+    }
+}
+
 // Inspect only resolved graph data, never another project's mutable state under --parallel.
 gradle.taskGraph.whenReady { graph ->
     if (graph.hasTask("${project.path}:installWindowsUser")) {
