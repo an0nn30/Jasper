@@ -96,13 +96,13 @@ advance in 125 ms steps.
 | Spawn on `show` | Two seconds: fades in over the first half-second while sparkle overlays cycle until just before the first second ends, then waves for a second and stands. |
 | Blink | Every 3 to 6 seconds for 120 ms; a quarter of standing blinks are winks. |
 | Idle postures | Sits 20 seconds after the last attention, tucks into his shell at 60 seconds (400 ms), then sleeps through three Z frames at 600 ms each. |
-| Greeting (`greet`, pointer entry) | One second of wave, hop and lean frames, then stands with the idle clock restarted; tucked or asleep, he first wakes over two 250 ms steps. Ignored during a spawn, greeting or wake, and while working or rising. |
-| `poke` | Restarts the idle clock: standing he keeps his pending blink, sitting he stands, tucked or asleep he wakes without a greeting. Ignored during a spawn, greeting or wake, and while working or rising. |
-| Working (`setWorking(true)`) | Sits behind the laptop and cycles type, type, type, type, rest at 250 ms per frame, never tucking or sleeping. Requested during a spawn, greeting or wake, it starts when that ends; cleared after typing, he rests his hands for 100 ms, closes the laptop for 125 ms, lowers it for 125 ms and rises for 150 ms, standing at 500 ms with the idle clock restarted. New work interrupts rising immediately. |
+| Greeting (`greet`, pointer entry) | One second of wave, hop and lean frames, then stands with the idle clock restarted; tucked or asleep, he first wakes over two 250 ms steps. Ignored during a spawn, greeting or wake, and while working, rising or lowering. |
+| `poke` | Restarts the idle clock: standing he keeps his pending blink, sitting he stands, tucked or asleep he wakes without a greeting. Ignored during a spawn, greeting or wake, and while working, rising or lowering. |
+| Working (`setWorking(true)`) | Lowers from standing through rise (150 ms), lowered laptop (125 ms), closed laptop (125 ms) and resting hands (100 ms), then cycles type, type, type, type, rest at 250 ms per frame, never tucking or sleeping. Requested during a spawn, greeting or wake, it starts when that ends; cleared after typing, he rests his hands for 100 ms, closes the laptop for 125 ms, lowers it for 125 ms and rises for 150 ms, standing at 500 ms with the idle clock restarted. Intent changes during either transition reverse from the current pose, holding it for its full duration. Seated idle starts at the lowered-laptop pose; tucked or sleeping wakes first. |
 
 Buddy does not know command thresholds or focus policy. Idle-posture catch-up resolves
 absolute deadlines in constant time; spawn, greeting and wake catch-up is bounded by
-their fixed step counts, as is rising; working catch-up resolves elapsed typing cycles arithmetically.
+their fixed step counts, as are rising and lowering; working catch-up resolves elapsed typing cycles arithmetically.
 
 [BubbleMotion](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/animation/BubbleMotion.java)
 controls capsule arrival (a 32-pixel damped-spring travel over 600 ms, at full size and

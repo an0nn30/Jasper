@@ -574,8 +574,8 @@ class BuddyAnimatorTest {
 
         animator.tick(BuddyAnimator.SPAWN_STEPS * BuddyAnimator.STEP_NANOS);
 
-        assertThat(animator.frame()).as("and he picks it up the moment the spawn ends")
-            .isIn(BuddyFrame.TYPE_A, BuddyFrame.TYPE_B, BuddyFrame.TYPE_REST);
+        assertThat(animator.frame()).as("he begins opening when the spawn ends")
+            .isEqualTo(BuddyFrame.RISE);
     }
 
     @Test void settingWorkingTwiceChangesNothing() {
@@ -621,18 +621,22 @@ class BuddyAnimatorTest {
         assertThat(firstSit(runUntil(animator, 24 * SECOND)).at()).isEqualTo(23_500 * MILLIS);
     }
 
-    @Test void renewedWorkInterruptsEveryRisingPhaseAndCanFinishAgain() {
-        for (long offset : new long[]{0, 100, 225, 350}) {
+    @Test void renewedWorkReversesEveryRisingPhaseAndCanFinishAgain() {
+        long[] offsets = {0, 100, 225, 350};
+        long[] durations = {100, 125, 125, 150};
+        BuddyFrame[] frames = {BuddyFrame.TYPE_REST, BuddyFrame.CLOSE_LAPTOP,
+            BuddyFrame.LOWER_LAPTOP, BuddyFrame.RISE};
+        for (int i = 0; i < offsets.length; i++) {
             var animator = workingAnimator();
             animator.setWorking(false);
-            animator.tick(3 * SECOND + offset * MILLIS);
-            animator.setWorking(true);
-            assertThat(animator.frame()).isEqualTo(BuddyFrame.TYPE_A);
-            assertThat(animator.nextDueNanos()).hasValue(3 * SECOND + (offset + 250) * MILLIS);
-            animator.setWorking(false);
-            assertThat(animator.frame()).isEqualTo(BuddyFrame.TYPE_REST);
-            assertThat(animator.nextDueNanos()).hasValue(3 * SECOND + (offset + 100) * MILLIS);
-            animator.tick(3 * SECOND + (offset + 500) * MILLIS);
+            long at = (3000 + offsets[i] + 37) * MILLIS;
+            animator.setWorking(true, at);
+            assertThat(animator.frame()).isEqualTo(frames[i]);
+            assertThat(animator.nextDueNanos()).hasValue(at + durations[i] * MILLIS);
+            animator.setWorking(false, at + 10 * MILLIS);
+            assertThat(animator.frame()).isEqualTo(frames[i]);
+            assertThat(animator.nextDueNanos()).hasValue(at + (10 + durations[i]) * MILLIS);
+            animator.tick(at + (10 + 500 - offsets[i]) * MILLIS);
             assertThat(animator.frame()).isEqualTo(BuddyFrame.IDLE);
         }
     }
@@ -661,8 +665,8 @@ class BuddyAnimatorTest {
         assertThat(animator.frame()).isEqualTo(BuddyFrame.CLOSE_LAPTOP);
         assertThat(animator.nextDueNanos()).hasValue(3_262 * MILLIS);
         animator.setWorking(true, 3_271 * MILLIS);
-        assertThat(animator.frame()).isEqualTo(BuddyFrame.TYPE_A);
-        assertThat(animator.nextDueNanos()).hasValue(3_521 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.LOWER_LAPTOP);
+        assertThat(animator.nextDueNanos()).hasValue(3_396 * MILLIS);
     }
 
     @Test void typingCatchupMatchesEveryScheduledStepAndHandlesYearsLate() {
@@ -678,9 +682,9 @@ class BuddyAnimatorTest {
         var animator = workingAnimator();
         long end = TimeUnit.DAYS.toNanos(3650) + 3_111 * MILLIS;
         animator.setWorking(true, end);
-        long steps = (end - 2 * SECOND) / BuddyAnimator.TYPE_STEP_NANOS;
+        long steps = (end - 2500 * MILLIS) / BuddyAnimator.TYPE_STEP_NANOS;
         assertThat(animator.frame()).isEqualTo(BuddyAnimator.TYPING.get((int) (steps % 5)));
-        assertThat(animator.nextDueNanos()).hasValue(2 * SECOND + (steps + 1) * BuddyAnimator.TYPE_STEP_NANOS);
+        assertThat(animator.nextDueNanos()).hasValue(2500 * MILLIS + (steps + 1) * BuddyAnimator.TYPE_STEP_NANOS);
         animator.setWorking(false, end);
         assertThat(animator.nextDueNanos()).hasValue(end + 100 * MILLIS);
     }
@@ -701,6 +705,101 @@ class BuddyAnimatorTest {
                 .doesNotContain(BuddyFrame.TYPE_REST, BuddyFrame.CLOSE_LAPTOP,
                     BuddyFrame.LOWER_LAPTOP, BuddyFrame.RISE);
         }
+    }
+
+    @Test void openingHasExactDeadlinesAndIgnoresRepeatedIntentAndAttention() {
+        var animator = new BuddyAnimator(new Random(7));
+        animator.shown(0);
+        spawned(animator, 0);
+        animator.setWorking(true, 2 * SECOND);
+        BuddyFrame[] frames = {BuddyFrame.RISE, BuddyFrame.LOWER_LAPTOP,
+            BuddyFrame.CLOSE_LAPTOP, BuddyFrame.TYPE_REST};
+        long[] boundaries = {2000, 2150, 2275, 2400, 2500};
+        for (int i = 0; i < frames.length; i++) {
+            animator.tick(boundaries[i] * MILLIS);
+            assertThat(animator.frame()).isEqualTo(frames[i]);
+            long due = boundaries[i + 1] * MILLIS;
+            assertThat(animator.nextDueNanos()).hasValue(due);
+            animator.setWorking(true, due - MILLIS);
+            animator.greet(due - MILLIS);
+            animator.poke(due - MILLIS);
+            assertThat(animator.frame()).isEqualTo(frames[i]);
+            assertThat(animator.nextDueNanos()).hasValue(due);
+        }
+        animator.tick(2500 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.TYPE_A);
+        assertThat(animator.nextDueNanos()).hasValue(2750 * MILLIS);
+    }
+
+    @Test void stoppingAndRestartingOpeningReversesEachCurrentPoseWithItsFullDuration() {
+        long[] offsets = {0, 150, 275, 400};
+        long[] durations = {150, 125, 125, 100};
+        BuddyFrame[] frames = {BuddyFrame.RISE, BuddyFrame.LOWER_LAPTOP,
+            BuddyFrame.CLOSE_LAPTOP, BuddyFrame.TYPE_REST};
+        for (int i = 0; i < offsets.length; i++) {
+            var animator = new BuddyAnimator(new Random(7));
+            animator.shown(0);
+            spawned(animator, 0);
+            animator.setWorking(true, 2000 * MILLIS);
+            long at = (2000 + offsets[i] + 37) * MILLIS;
+            animator.setWorking(false, at);
+            assertThat(animator.frame()).isEqualTo(frames[i]);
+            assertThat(animator.nextDueNanos()).hasValue(at + durations[i] * MILLIS);
+            animator.setWorking(true, at + 10 * MILLIS);
+            assertThat(animator.frame()).isEqualTo(frames[i]);
+            assertThat(animator.nextDueNanos()).hasValue(at + (10 + durations[i]) * MILLIS);
+            animator.tick(at + (10 + 500 - offsets[i]) * MILLIS);
+            assertThat(animator.frame()).isEqualTo(BuddyFrame.TYPE_A);
+            assertThat(animator.nextDueNanos()).hasValue(at + (260 + 500 - offsets[i]) * MILLIS);
+        }
+    }
+
+    @Test void seatedEntrySkipsRiseAndSleepingOrTuckedEntryWakesFirst() {
+        var seated = new BuddyAnimator(new Random(7));
+        seated.shown(0);
+        seated.setWorking(true, 30 * SECOND);
+        assertThat(seated.frame()).isEqualTo(BuddyFrame.LOWER_LAPTOP);
+        assertThat(seated.nextDueNanos()).hasValue(30125 * MILLIS);
+        seated.tick(30350 * MILLIS);
+        assertThat(seated.frame()).isEqualTo(BuddyFrame.TYPE_A);
+        for (long at : new long[]{62000, 63000}) {
+            var asleep = new BuddyAnimator(new Random(7));
+            asleep.shown(0);
+            asleep.setWorking(true, at * MILLIS);
+            assertThat(asleep.frame()).isEqualTo(BuddyFrame.TUCK);
+            assertThat(asleep.nextDueNanos()).hasValue((at + 250) * MILLIS);
+            asleep.tick((at + 250) * MILLIS);
+            assertThat(asleep.frame()).isEqualTo(BuddyFrame.IDLE);
+            asleep.tick((at + 500) * MILLIS);
+            assertThat(asleep.frame()).isEqualTo(BuddyFrame.RISE);
+            asleep.tick((at + 1000) * MILLIS);
+            assertThat(asleep.frame()).isEqualTo(BuddyFrame.TYPE_A);
+        }
+    }
+
+    @Test void hideDuringOpeningRetainsOnlyIntentAndShowSpawnsThenOpens() {
+        var animator = new BuddyAnimator(new Random(7));
+        animator.shown(0);
+        animator.setWorking(true, 2000 * MILLIS);
+        animator.tick(2200 * MILLIS);
+        animator.hidden();
+        assertThat(animator.nextDueNanos()).isEmpty();
+        animator.shown(3000 * MILLIS);
+        assertThat(animator.opacity()).isZero();
+        animator.tick(5000 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.RISE);
+        assertThat(animator.nextDueNanos()).hasValue(5150 * MILLIS);
+    }
+
+    @Test void lateWakeGreetingAndOpeningCatchUpThroughAllStages() {
+        var animator = new BuddyAnimator(new Random(7));
+        animator.shown(0);
+        animator.greet(63000 * MILLIS);
+        animator.setWorking(true, 63100 * MILLIS);
+        animator.tick(65501 * MILLIS);
+        // Wake ends at 63500, greeting at 64500, opening at 65000.
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.TYPE_A);
+        assertThat(animator.nextDueNanos()).hasValue(65750 * MILLIS);
     }
 
 }

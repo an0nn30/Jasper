@@ -84,7 +84,7 @@ buffer or wait for a worker from one of these callbacks.
 | `post`, `updateTitle`, `updateContext`, `dismiss`, `clear` | Update the model and refresh existing presentation; never create a native window. Posting while hidden is supported. |
 | `show` | Creates presentation on the first successful call, then shows Buddy with the two-second spawn animation; returns whether presentation is available. A call while visible changes nothing and returns true. |
 | `hide` | Stops presentation timers and pending drag frames, hides every Buddy window and resets the animation; retains notices, options and working intent. The next `show` plays the spawn again. |
-| `setWorking` | Sets host-supplied typing intent, including before first show; clearing it after typing plays a 500 ms laptop-close and stand-up transition, interrupted immediately by new work. No threshold policy lives in Buddy. |
+| `setWorking` | Sets host-supplied typing intent, including before first show; starting from standing plays a 500 ms sit-down and laptop-open transition, and clearing it after typing reverses that sequence. Intent changes during either transition reverse from the current pose. No threshold policy lives in Buddy. |
 | `greet` | On visible presentation, plays the one-second greeting, waking him first if he is tucked or asleep. Jasper calls it when one of its workspace windows becomes active. |
 | `poke` | On visible presentation, restarts the idle clock without a greeting. Jasper calls it on key presses in its workspace windows, at most once a second. |
 | `applyOptions` | Replaces appearance and future host callbacks; see [host appearance and position](#host-appearance-and-position). |

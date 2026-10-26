@@ -53,7 +53,7 @@ public final class BuddyAnimator {
         BuddyFrame.WAVE_B, BuddyFrame.WAVE_A, BuddyFrame.WAVE_B, BuddyFrame.WAVE_A, BuddyFrame.WAVE_B);
     static final int SPAWN_STEPS = WAVE_STEP + SPAWN_WAVE.size();
 
-    private enum Mode { HIDDEN, SPAWNING, RESTING, TUCKING, SLEEPING, WAKING, GREETING, WORKING, RISING }
+    private enum Mode { HIDDEN, SPAWNING, RESTING, TUCKING, SLEEPING, WAKING, GREETING, WORKING, RISING, LOWERING }
 
     private final Random random;
     private Mode mode = Mode.HIDDEN;
@@ -140,7 +140,7 @@ public final class BuddyAnimator {
     /** Applies transitions due at or before {@code now}. Idle posture resolves absolute deadlines; working animation resolves elapsed typing cycles arithmetically. */
     public void tick(long now) {
         lastTick = now;
-        // WAKING -> GREETING -> RESTING -> settled posture is the longest chain of mode changes.
+        // WAKING -> GREETING -> LOWERING -> WORKING is the longest chain of mode changes.
         for (int guard = 0; guard < 4 && mode != Mode.HIDDEN; guard++) {
             Mode before = mode;
             switch (mode) {
@@ -149,6 +149,7 @@ public final class BuddyAnimator {
                 case WAKING -> advanceWaking(now);
                 case WORKING -> advanceWorking(now);
                 case RISING -> advanceRising(now);
+                case LOWERING -> advanceLowering(now);
                 default -> advanceRest(now);
             }
             if (mode == before) return;
@@ -168,16 +169,35 @@ public final class BuddyAnimator {
         working = value;
         if (!value) {
             if (mode == Mode.WORKING) startRising(now);
-        } else if (mode == Mode.RESTING || mode == Mode.TUCKING || mode == Mode.SLEEPING
-                || mode == Mode.RISING) {
-            startWorking(now);
+            else if (mode == Mode.LOWERING) startTransition(Mode.RISING, step, now);
+        } else {
+            switch (mode) {
+                case RESTING -> startTransition(Mode.LOWERING, sitting ? 2 : 3, now);
+                case TUCKING, SLEEPING -> startWaking(now, false);
+                case RISING -> startTransition(Mode.LOWERING, step, now);
+                default -> { }
+            }
         }
         // Busy stages finish into the latest intent through standUp.
     }
 
     private void startRising(long now) {
-        mode = Mode.RISING; step = 0; frame = RISING_FRAMES.getFirst();
-        blinking = false; stepDue = now + RISING_DURATIONS[0];
+        startTransition(Mode.RISING, 0, now);
+    }
+
+    /** Both directions retain the current pose for its full duration when reversed. */
+    private void startTransition(Mode direction, int pose, long now) {
+        mode = direction; step = pose; frame = RISING_FRAMES.get(pose);
+        sitting = false; blinking = false; stepDue = now + RISING_DURATIONS[pose];
+    }
+
+    private void advanceLowering(long now) {
+        while (now >= stepDue) {
+            long at = stepDue;
+            if (--step < 0) { startWorking(at); return; }
+            frame = RISING_FRAMES.get(step);
+            stepDue = at + RISING_DURATIONS[step];
+        }
     }
 
     private void advanceRising(long now) {
@@ -278,7 +298,7 @@ public final class BuddyAnimator {
         scheduleBlink(now);
         // A command that started during the spawn or a greeting takes over as soon as it ends,
         // rather than being lost because setWorking arrived while the stage was busy.
-        if (working) startWorking(now);
+        if (working) startTransition(Mode.LOWERING, 3, now);
     }
 
     /** Pops him out of his shell over two {@link #WAKE_STEP_NANOS} steps, greeting afterwards only if asked. */

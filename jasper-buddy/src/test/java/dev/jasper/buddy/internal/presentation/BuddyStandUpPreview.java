@@ -18,22 +18,35 @@ public final class BuddyStandUpPreview {
     private record Shot(int at, BuddyFrame frame, BufferedImage image) { }
 
     public static void main(String[] args) throws Exception {
-        Path output = Path.of("build/reports/buddy-stand-up").toAbsolutePath();
+        generate(false);
+    }
+
+    static void generate(boolean opening) throws Exception {
+        Path output = Path.of("build/reports/" + (opening ? "buddy-open-laptop" : "buddy-stand-up")).toAbsolutePath();
         Files.createDirectories(output);
         var sprite = BuddySprite.load();
         for (boolean interrupted : new boolean[]{false, true}) {
             var animator = new BuddyAnimator(new Random(7));
             animator.shown(0);
             animator.tick(2_000_000_000L);
-            animator.setWorking(true, 2_000_000_000L);
+            if (!opening) animator.setWorking(true, 2_000_000_000L);
             var shots = new ArrayList<Shot>();
-            int[] times = interrupted ? new int[]{-250, 0, 100, 225, 300, 550, 800, 900, 1025, 1150, 1300}
-                : new int[]{-250, 0, 100, 225, 350, 500, 1000};
+            int[] times = opening
+                ? (interrupted ? new int[]{-250, 0, 150, 275, 350, 475, 525, 650, 775, 875, 1125, 1375}
+                    : new int[]{-250, 0, 150, 275, 400, 500, 750, 1000})
+                : (interrupted ? new int[]{-250, 0, 100, 225, 300, 425, 550, 650, 800, 900, 1025, 1150, 1300}
+                    : new int[]{-250, 0, 100, 225, 350, 500, 1000});
             for (int at : times) {
                 long now = 3_000_000_000L + at * 1_000_000L;
-                if (at == 0 || interrupted && at == 800) animator.setWorking(false, now);
-                else if (interrupted && at == 300) animator.setWorking(true, now);
-                else animator.tick(now);
+                if (opening) {
+                    if (at == 0 || interrupted && at == 525) animator.setWorking(true, now);
+                    else if (interrupted && at == 350) animator.setWorking(false, now);
+                    else animator.tick(now);
+                } else {
+                    if (at == 0 || interrupted && at == 800) animator.setWorking(false, now);
+                    else if (interrupted && at == 300) animator.setWorking(true, now);
+                    else animator.tick(now);
+                }
                 var image = new BufferedImage(400, 380, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics();
                 try {

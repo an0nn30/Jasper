@@ -5,6 +5,7 @@ for ((taskName, entryPoint) in listOf(
     "buddyGroupsPreview" to "BuddyGroupsPreview",
     "buddyNotificationPreview" to "BuddyNotificationPreview",
     "buddyStandUpPreview" to "BuddyStandUpPreview",
+    "buddyOpenLaptopPreview" to "BuddyOpenLaptopPreview",
     "buddyMotionPreview" to "BuddyMotionPreview",
     "buddyPerformanceMeasurement" to "BuddyPerformanceMeasurement"
 )) {

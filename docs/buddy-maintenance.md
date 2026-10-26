@@ -95,7 +95,7 @@ panels too when a model change affects what is displayed.
 3. Extend clock-driven tests for interrupted motion, long clock gaps, hiding, working
    transitions and retargeting. Verify the exact path being changed: idle postures
    resolve absolute deadlines in constant time, working resolves elapsed typing cycles
-   arithmetically, and rising traverses at most four deadlines.
+   arithmetically, and rising or lowering traverses at most four deadlines.
 
 [BuddyAnimatorTest](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/animation/BuddyAnimatorTest.java),
 [BubbleMotionTest](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/animation/BubbleMotionTest.java)
@@ -161,6 +161,8 @@ filtered drawer and group overflow under `jasper-buddy/build/reports/buddy-group
 under `jasper-buddy/build/reports/buddy-stand-up/`, using the production animator and runtime
 sprites at window scale 2.5 and enlarged scale 5. GIF centisecond timing rounds the 225 ms
 boundary to 230 ms while preserving the 500 ms total; contact labels show exact animator times.
+`buddyOpenLaptopPreview` writes matching normal and interrupted opening GIFs and contact sheets
+under `jasper-buddy/build/reports/buddy-open-laptop/`.
 
 The [performance measurement](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyPerformanceMeasurement.java)
 paints three running capsules at 2× density for 200 warm-up frames and 600 measured
