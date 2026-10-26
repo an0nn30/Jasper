@@ -235,6 +235,8 @@ Work in progress appears in one compact summary beside him:
   forward, selects the tab and focuses the pane. Finishing removes the entry, including while hidden.
 - **A plugin's background work**, such as a File Server transfer that takes longer than a second, shows its
   progress in the drawer until it ends; clicking its entry brings Jasper forward and runs the plugin's action for it.
+  A task waiting for input takes attention priority until the plugin resumes it. Buddy keeps typing while any plugin
+  task or qualifying terminal command is running; waiting tasks and connections do not contribute to that pose.
 - **A connection a plugin reports** shows its state: a dot while it has a problem, a cross while it is down.
 
 The summary counts visible tasks and connections; work needing input or a connection problem takes

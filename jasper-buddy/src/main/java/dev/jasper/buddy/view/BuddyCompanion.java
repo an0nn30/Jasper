@@ -47,6 +47,13 @@ public final class BuddyCompanion implements AutoCloseable {
     public void updateTitle(BuddyNoticeId id, String title) {
         requireEdt(); if (closed) return; deck.updateTitle(id, title); refresh();
     }
+    /** Changes retained state without reposting, promotion or revealing a hidden notice.
+     * @param id notice identity
+     * @param state compatible new state
+     */
+    public void updateState(BuddyNoticeId id, BuddyNotice.State state) {
+        requireEdt(); if (closed) return; deck.updateState(id, state); refresh();
+    }
     /** Removes an existing nonnull ID and its retained callbacks; a producer calls it when the work ends. */
     public void dismiss(BuddyNoticeId id) {
         requireEdt(); if (closed) return; deck.dismiss(id); refresh();

@@ -60,6 +60,20 @@ public final class BuddyDeck {
         return false;
     }
 
+    /** Updates a retained notice's state without promotion or changing visibility. */
+    public void updateState(BuddyNoticeId id, BuddyNotice.State state) {
+        Objects.requireNonNull(id, "id"); Objects.requireNonNull(state, "state");
+        for (int i = 0; i < notices.size(); i++) {
+            BuddyNotice notice = notices.get(i);
+            if (!notice.sameAs(id)) continue;
+            if (notice.state() == state) return;
+            notices.set(i, new BuddyNotice(notice.id(), notice.kind(), notice.title(), state,
+                notice.detail(), notice.activate(), notice.group()));
+            snapshot = null;
+            return;
+        }
+    }
+
     /** Updates retained context in place without promotion; missing IDs are harmless. */
     public void updateContext(BuddyNoticeId id, BuddyNotice.Group group, boolean visible) {
         Objects.requireNonNull(id, "id");

@@ -14,6 +14,17 @@ The combined application final-review fix uses the newest current-only observati
 
 Linux verification — 2026-10-26, source `3bfde469f`: the authorized Fedora VM ran the full check in Ubuntu22 baseline userspace (JBR25.0.4.1 b635.75). It completed 13,114 JUnit tests with 34 failures, zero errors and 65 skips. Of those failures, 24 reproduce on refreshed base `9fa59a492`, nine pass with missing tools/root-permission conditions corrected, and one full-order Rehearsal callback remains unresolved despite passing isolated current/base runs. The new Qt/KDE owner, protocol, policy, paint and retention cases pass. Real current-Java/Fedora-system Qt5/Qt6/KDE5/KDE6 active/opposite-preview and failure/recovery checks pass; seven-helper Automatic retains stable PIDs across two 30-second refresh boundaries with no observed mapped windows/config writes, 332,480kB summed RSS (shared pages included) and 0.24 CPU seconds over 58.372 seconds. Current native compatibility, headless package verification and minimal DEB/minimal RPM/equipped Fedora RPM install/check/remove pass. Protocol/portal checks pass with corrected locale/private-bus conditions; modern Fedora GTK ABI checks and a process-reaping packaging check pass. The baseline launcher-cache expectation, old-header/default-bus harness limitations and unresolved rehearsal callback keep the full gate non-green. See the [compatibility record](design/qt-kde-native-compatibility.md#linux-application-verification--2026-10-26). Real desktop acceptance, Windows/CI, x86_64 and separately installed minimum KDE6 remain open; no GUI, AOT, merge or push.
 
+**Buddy plugin input — 2026-10-25.** `codex/buddy-plugin-input` adds SDK 0.22.0 activity input/resume phases,
+ordered phase delivery with coalesced phase-preserving detail, and matching runtime/testkit shutdown semantics.
+Buddy retains notice identity and dismissal across input/resume and combines running plugin work with terminal
+work. The Sample's optional UI demo includes a confirmation action. Targeted lifecycle, notifier, composition,
+Buddy and Sample tests, architecture checks and generated SDK reference pass. Task, whole-branch and scoped fix
+reviews passed. The first full run exposed six stale SDK-version fixture failures and two missing-method errors in
+File Server test doubles; the test-only fixes passed 22 focused tests. Final full headless check passed in 8m 5s:
+13,054 tests, zero failures/errors, 30 skips. External-plugin check/pluginZip passed against SDK 0.22.0 release jars. The [plan](superpowers/plans/2026-10-25-buddy-plugin-input.md)
+records the delegated implementation and RED evidence. No GUI, AOT, benchmark, merge or push.
+
+
 **Compact Buddy activity — 2026-10-25.** `codex/buddy-compact-activity` replaces floating stacks with one
 quiet visible-work summary and an all-activity drawer with stable expandable groups. Attention priority,
 task/connection counts, duplicate labels, suppression and activation remain explicit. Drawer opening owns
@@ -76,8 +87,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.21.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
-  `sdk = ">=0.21.0, <0.22"`.
+- **SDK** `0.22.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.22.0, <0.23"`.
 - **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
   either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
   Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.

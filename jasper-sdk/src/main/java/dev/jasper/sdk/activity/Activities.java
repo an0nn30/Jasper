@@ -4,7 +4,7 @@ import dev.jasper.sdk.events.Topic;
 import java.util.List;
 
 /**
- * Begins activities, announces connections and lists the running activities. Anyone may subscribe to
+ * Begins activities, announces connections and lists the live activities. Anyone may subscribe to
  * {@link #TOPIC} and {@link #CONNECTIONS}; only handles returned by {@link #begin} and {@link #connection}
  * publish to them, so each lifecycle is well-formed and its source is verified.
  *
@@ -47,7 +47,7 @@ public interface Activities {
     ConnectionHandle connection(ConnectionSpec spec);
 
     /**
-     * The latest event of each running activity, the one deliberate exception to "no replay", so a
+     * The latest event of each running or waiting activity, the one deliberate exception to "no replay", so a
      * consumer that starts late can show work already under way.
      *
      * @return an immutable snapshot

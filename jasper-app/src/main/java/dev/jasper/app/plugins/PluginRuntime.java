@@ -1092,6 +1092,8 @@ public final class PluginRuntime {
         Optional<Runnable> action = activation(event.sourcePluginId(), event.activateActionId());
         switch (event.state()) {
             case STARTED -> notifier.started(event.sourcePluginId(), event.id(), event.title(), detail, action);
+            case NEEDS_INPUT -> notifier.needsInput(event.sourcePluginId(), event.id(), detail);
+            case RESUMED -> notifier.resumed(event.sourcePluginId(), event.id(), detail);
             case PROGRESS -> notifier.progress(event.sourcePluginId(), event.id(), detail);
             case SUCCEEDED, FAILED, CANCELLED -> notifier.ended(event.sourcePluginId(), event.id());
         }

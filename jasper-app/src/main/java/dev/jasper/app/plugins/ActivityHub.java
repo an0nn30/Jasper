@@ -11,7 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Owns activity lifecycles: one STARTED, coalesced PROGRESS, exactly one terminal event, the source
+ * Owns activity lifecycles: one STARTED, ordered phases, coalesced reports, exactly one terminal event, the source
  * stamped here rather than by the plugin. Handles are safe from any thread.
  */
 final class ActivityHub {
@@ -27,9 +27,11 @@ final class ActivityHub {
     ActivityHandle begin(String pluginId, ActivitySpec spec) {
         var handle = new Handle(pluginId, Objects.requireNonNull(spec, "spec"));
         ActivityEvent started = handle.event(ActivityEvent.State.STARTED, OptionalDouble.empty(), spec.detail());
-        running.put(handle.id, started);
-        handles.put(handle.id, handle);
-        bus.enqueue(() -> bus.deliver(Activities.TOPIC.id(), started));
+        synchronized (handle) {
+            running.put(handle.id, started);
+            handles.put(handle.id, handle);
+            bus.enqueue(() -> bus.deliver(Activities.TOPIC.id(), started));
+        }
         return handle;
     }
 
@@ -48,6 +50,8 @@ final class ActivityHub {
         private boolean ended;
         private OptionalDouble fraction = OptionalDouble.empty();
         private ActivityEvent waiting;
+        private boolean input;
+        private long deliveryToken;
 
         Handle(String pluginId, ActivitySpec spec) { this.pluginId = pluginId; this.spec = spec; }
 
@@ -57,47 +61,61 @@ final class ActivityHub {
 
         @Override public UUID id() { return id; }
 
-        @Override public void progress(double value, String detail) { report(OptionalDouble.of(value), detail); }
+        @Override public synchronized void progress(double value, String detail) { report(OptionalDouble.of(value), detail); }
 
-        @Override public void detail(String detail) {
-            OptionalDouble last;
-            synchronized (this) { last = fraction; }
-            report(last, detail);
-        }
+        @Override public synchronized void detail(String detail) { report(fraction, detail); }
 
         private void report(OptionalDouble value, String detail) {
-            ActivityEvent event = event(ActivityEvent.State.PROGRESS, value, Objects.requireNonNull(detail, "detail"));
-            boolean schedule;
-            synchronized (this) {
-                if (ended) return;
-                fraction = value;
-                running.put(id, event);
-                schedule = waiting == null;
-                waiting = event;
+            ActivityEvent next = event(input ? ActivityEvent.State.NEEDS_INPUT : ActivityEvent.State.PROGRESS,
+                value, Objects.requireNonNull(detail, "detail"));
+            if (ended) return;
+            fraction = value;
+            running.put(id, next);
+            boolean schedule = waiting == null;
+            waiting = next;
+            if (schedule) {
+                long token = ++deliveryToken;
+                bus.enqueue(() -> {
+                    ActivityEvent latest;
+                    synchronized (this) {
+                        if (token != deliveryToken) return;
+                        latest = waiting; waiting = null;
+                    }
+                    if (latest != null) bus.deliver(Activities.TOPIC.id(), latest);
+                });
             }
-            // One queued delivery carries whatever is latest when it runs.
-            if (schedule) bus.enqueue(() -> {
-                ActivityEvent latest;
-                synchronized (this) { latest = waiting; waiting = null; }
-                if (latest != null) bus.deliver(Activities.TOPIC.id(), latest);
-            });
+        }
+
+        @Override public void needsInput(String detail) { phase(true, detail); }
+        @Override public void resume(String detail) { phase(false, detail); }
+
+        private synchronized void phase(boolean needsInput, String detail) {
+            Objects.requireNonNull(detail, "detail");
+            if (ended) return;
+            if (input == needsInput) { report(fraction, detail); return; }
+            input = needsInput;
+            waiting = null;
+            deliveryToken++;
+            ActivityEvent next = event(input ? ActivityEvent.State.NEEDS_INPUT : ActivityEvent.State.RESUMED, fraction, detail);
+            running.put(id, next);
+            bus.enqueue(() -> bus.deliver(Activities.TOPIC.id(), next));
         }
 
         @Override public void succeed(String detail) { end(ActivityEvent.State.SUCCEEDED, detail); }
         @Override public void fail(String detail) { end(ActivityEvent.State.FAILED, detail); }
         @Override public void cancelled() { end(ActivityEvent.State.CANCELLED, ""); }
 
-        private void end(ActivityEvent.State state, String detail) {
-            ActivityEvent event;
-            synchronized (this) {
-                if (ended) return;
-                ended = true;
-                waiting = null;
-                event = event(state, fraction, Objects.requireNonNull(detail, "detail"));
-                running.remove(id);
-                handles.remove(id);
-            }
-            bus.enqueue(() -> bus.deliver(Activities.TOPIC.id(), event));
+        private synchronized void end(ActivityEvent.State state, String detail) {
+            Objects.requireNonNull(detail, "detail");
+            if (ended) return;
+            ended = true;
+            waiting = null;
+            deliveryToken++;
+            ActivityEvent next = event(state, fraction, detail);
+            running.remove(id);
+            handles.remove(id);
+            bus.enqueue(() -> bus.deliver(Activities.TOPIC.id(), next));
         }
+
     }
 }

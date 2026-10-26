@@ -15,6 +15,20 @@ class BuddyDeckTest {
             () -> "running", () -> { });
     }
 
+    @Test void stateChangesPreserveOrderVisibilityAndDismissal() {
+        var first = running("plugin", "a", "first");
+        deck.post(first, false); deck.post(running("plugin", "b", "second"));
+        int generation = deck.generation();
+        deck.updateState(first.id(), BuddyNotice.State.NEEDS_INPUT);
+        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("second");
+        assertThat(deck.retainedNotices()).extracting(BuddyNotice::state)
+            .containsExactly(BuddyNotice.State.RUNNING, BuddyNotice.State.NEEDS_INPUT);
+        assertThat(deck.generation()).isEqualTo(generation);
+        assertThatIllegalArgumentException().isThrownBy(() -> deck.updateState(first.id(), BuddyNotice.State.UP));
+        deck.dismiss(first.id()); deck.updateState(first.id(), BuddyNotice.State.RUNNING);
+        assertThat(deck.retainedNotices()).hasSize(1);
+    }
+
     @Test void noticesComeBackNewestFirst() {
         deck.post(running("terminal", "a", "first"));
         deck.post(running("terminal", "b", "second"));

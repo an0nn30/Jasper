@@ -55,7 +55,7 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | No | [The Enterprise look](enterprise.md) |
 | Sample | `dev.jasper.sample` | 0.5.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
 
-Every bundled plugin declares `sdk = ">=0.21.0, <0.22"`. A plugin uses another plugin it lists under "Uses, when
+Every bundled plugin declares `sdk = ">=0.22.0, <0.23"`. A plugin uses another plugin it lists under "Uses, when
 present" only while that plugin is running; without it, the features that need it are missing.
 
 ### Remote
@@ -275,7 +275,7 @@ badge when there is one, **Enabled** for a running plugin, and otherwise the sta
 | Active | Running |
 | Disabled | Off: "off by default", "disabled by the user", "marked for removal", "safe mode" or "safe mode uses the standard look" |
 | Needs review | Waiting for your review: "not reviewed yet" or "new capabilities: …" |
-| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.21.0", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
+| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.22.0", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
 | Failed | Its classes could not be loaded, or its start failed |
 | Not loaded yet | Not present when this launch began, such as a plugin installed since |
 
@@ -294,11 +294,11 @@ checks it before it asks you anything:
 - Jar names use only letters, digits, spaces and `.`, `_`, `+`, `-`; no name may appear twice.
 - At most 4096 entries, 256 jars and 512 MiB once unpacked.
 - Exactly one jar holds a valid `plugin.toml` at its root, and the plugin's SDK range includes this Jasper's SDK,
-  0.21.0.
+  0.22.0.
 
 A zip that fails is refused on the message line with the reason, for example "The zip holds no jar files", "The zip
 must hold the plugin's jars at its root or in one folder", "Not a Jasper plugin: no plugin.toml in any jar" or "Tool
-1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.21.0", and nothing is installed.
+1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.22.0", and nothing is installed.
 
 A zip that passes opens the **Install *name*** sheet: the plugin's name and version, "From *vendor*", what it
 [asks to do](#capabilities) and the warning that a plugin is not sandboxed. **Install** stages the plugin in
@@ -521,7 +521,7 @@ option applies only when Jasper starts, and a Jasper started with it is never re
 with a higher version of the same id is loaded instead. An id you disabled in Settings › Plugins stays off, from
 `--plugin-dir` too ("disabled by the user"); enable it there first.
 
-Plugins for this Jasper (SDK 0.21.0) declare a range such as `sdk = ">=0.21.0, <0.22"` in `plugin.toml`, raising the
+Plugins for this Jasper (SDK 0.22.0) declare a range such as `sdk = ">=0.22.0, <0.23"` in `plugin.toml`, raising the
 floor to the SDK version that added the newest API they use ([the manifest](plugin-authoring.md#the-manifest));
 [building the in-repo plugins](plugin-authoring.md#building-the-in-repo-plugins) and
 [running a plugin in Jasper](plugin-authoring.md#running-a-plugin-in-jasper) give the build tasks and the source

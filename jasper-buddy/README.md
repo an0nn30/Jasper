@@ -81,7 +81,7 @@ buffer or wait for a worker from one of these callbacks.
 | Operation | Model and resource effect |
 | --- | --- |
 | Construction | Allocates the model only: no native window, timer or worker. |
-| `post`, `updateTitle`, `updateContext`, `dismiss`, `clear` | Update the model and refresh existing presentation; never create a native window. Posting while hidden is supported. |
+| `post`, `updateTitle`, `updateState`, `updateContext`, `dismiss`, `clear` | Update the model and refresh existing presentation; never create a native window. Posting while hidden is supported. State updates retain order and visibility and do not restore dismissed notices. |
 | `show` | Creates presentation on the first successful call, then shows Buddy with the two-second spawn animation; returns whether presentation is available. A call while visible changes nothing and returns true. |
 | `hide` | Stops presentation timers and pending drag frames, hides every Buddy window and resets the animation; retains notices, options and working intent. The next `show` plays the spawn again. |
 | `setWorking` | Sets host-supplied typing intent, including before first show; starting from standing plays a 500 ms sit-down and laptop-open transition, and clearing it after typing reverses that sequence. Intent changes during either transition reverse from the current pose. No threshold policy lives in Buddy. |

@@ -21,6 +21,8 @@ class TransferActivitiesTest {
             @Override public UUID id() { return UUID.randomUUID(); }
             @Override public void progress(double fraction, String detail) { updates.add(Math.round(fraction * 100) + "% " + detail); }
             @Override public void detail(String detail) { updates.add(detail); }
+            @Override public void needsInput(String detail) { updates.add("needs input " + detail); }
+            @Override public void resume(String detail) { updates.add("resumed " + detail); }
             @Override public void succeed(String detail) { updates.add("done " + detail); }
             @Override public void fail(String detail) { updates.add("failed " + detail); }
             @Override public void cancelled() { updates.add("cancelled"); }
@@ -57,6 +59,8 @@ class TransferActivitiesTest {
                 @Override public UUID id() { return UUID.randomUUID(); }
                 @Override public void progress(double fraction, String detail) { mine.add("progress"); }
                 @Override public void detail(String detail) { mine.add("detail"); }
+                @Override public void needsInput(String detail) { mine.add("needs input"); }
+                @Override public void resume(String detail) { mine.add("resumed"); }
                 @Override public void succeed(String detail) { mine.add("done"); }
                 @Override public void fail(String detail) { mine.add("failed"); }
                 @Override public void cancelled() { mine.add("cancelled"); }
