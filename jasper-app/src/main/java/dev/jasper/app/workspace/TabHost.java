@@ -41,6 +41,7 @@ final class TabHost {
         terminal.lastInWindow = () -> owner.tabCount() == 1;
         terminal.configure = ready -> configure(tab, ready);
         terminal.tabName = owner::tabNamePattern;
+        terminal.pluginPieces = owner::pluginNamePieces;
         terminal.setBackground(owner.theme().surface());
         terminal.setBackgroundOpacity((float) owner.backgroundOpacity());
         pane.applyTheme(owner.theme());
@@ -60,6 +61,7 @@ final class TabHost {
         terminal.lastInWindow = () -> false;
         terminal.configure = ready -> { };
         terminal.tabName = () -> TabNames.DEFAULT_PATTERN;
+        terminal.pluginPieces = id -> java.util.Map.of();
         unwire(terminal.pane());
     }
 

@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Settings › Terminal › Tab name (tab names spec 5): the pattern's field, then a live preview of the name it gives the
@@ -38,6 +38,7 @@ final class TabNameEditor implements ValueEditor<String> {
     }
 
     @Override public Nodes.Node node(String id, ControlState state) {
+        var plugins = choices.plugins().get();
         var children = new ArrayList<Nodes.Node>();
         children.add(new Nodes.Field(id, state, Nodes.FieldKind.TEXT, text, "", label, "", Optional.empty(),
             Nodes.FieldPresentation.TECHNICAL));
@@ -46,19 +47,22 @@ final class TabNameEditor implements ValueEditor<String> {
             var tab = choices.preview().get().orElse(SAMPLE);
             children.add(new Nodes.Text(id + ":preview", ControlState.READY,
                 "Preview: " + TabNames.format(pattern, tab.pieces(), tab.fallback()), Nodes.TextRole.SUPPORTING));
-            for (String name : TabNames.unknown(pattern, Set.of()))
+            var provided = plugins.stream().map(TabNameChoices.Piece::name).collect(Collectors.toSet());
+            for (String name : TabNames.unknown(pattern, provided))
                 children.add(new Nodes.Text(id + ":unknown-" + name, ControlState.READY,
                     "Nothing provides {" + name + "} right now, so it shows nothing", Nodes.TextRole.SUPPORTING,
                     Optional.of(Nodes.Severity.WARNING), OptionalInt.empty()));
         }
-        children.add(new Nodes.Text(id + ":pieces", ControlState.READY, pieces(), Nodes.TextRole.SUPPORTING));
+        children.add(new Nodes.Text(id + ":pieces", ControlState.READY, pieces(plugins), Nodes.TextRole.SUPPORTING));
         return new Nodes.Stack(id + ":tab-name", ControlState.READY, Nodes.LayoutRole.VERTICAL, children);
     }
 
-    /** One line per piece: {@code {name}} and what it shows. */
-    private static String pieces() {
+    /** One line per piece: {@code {name}} and what it shows, a plugin's with the plugin that adds it. */
+    private static String pieces(List<TabNameChoices.Piece> plugins) {
         var lines = new ArrayList<String>();
         for (String name : TabNames.BUILT_IN) lines.add("{" + name + "} " + BUILT_IN.get(name));
+        for (TabNameChoices.Piece piece : plugins)
+            lines.add("{" + piece.name() + "} " + piece.description() + " (" + piece.owner() + ")");
         return String.join("\n", lines);
     }
 

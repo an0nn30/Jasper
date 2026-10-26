@@ -45,6 +45,7 @@ final class WindowContributions implements AutoCloseable {
     private final Map<String, Subscription> commands = new LinkedHashMap<>();
     private final Map<PaletteScope, Subscription> scopes = new LinkedHashMap<>();
     private Subscription listening;
+    private Subscription namePieces;
     private Subscription paletteRequests;
 
     /** One panel's instance in this window, built the first time it shows; where it docks lives in the dock state. */
@@ -102,6 +103,13 @@ final class WindowContributions implements AutoCloseable {
             renderStripes();
         }
         listening = model.onChanged(this::changed);
+        namePieces = model.tabNamePieces().onChanged(this::namePiecesChanged);
+    }
+
+    /** Re-presents the terminal tabs whose plugin pieces changed: one tab, or every one when a piece came or went. */
+    private void namePiecesChanged(java.util.Optional<java.util.UUID> tab) {
+        for (TerminalContent terminal : owner.terminalTabs())
+            if (tab.isEmpty() || terminal.id().value().equals(tab.get())) terminal.onChanged.run();
     }
 
     Contributions model() { return model; }
@@ -514,6 +522,7 @@ final class WindowContributions implements AutoCloseable {
         if (remember && docks) persist();
         listening.close();
         listening = null;
+        if (namePieces != null) { namePieces.close(); namePieces = null; }
         // Snapshot before teardown: the last window closed wins; disposal must not save panels as hidden.
         owner.dockDrag().cancel();
         owner.dockDrag().onDrop = (id, target) -> { };

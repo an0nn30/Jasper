@@ -76,8 +76,15 @@ public final class TerminalContent extends JPanel implements TabContent, AutoClo
     /** The tab's title: the name the user gave it, else its window's pattern filled from {@link #namePieces()}. */
     String title() { return state.renamed().orElseGet(() -> TabNames.format(tabName.get(), namePieces(), pane.shellLabel())); }
 
-    /** The pieces the tab's automatic name is made from (tab names spec 3). */
-    java.util.Map<String, String> namePieces() { return pane.namePieces(); }
+    /** Plugins' pieces for a tab, by its id (tab names spec 6); its {@code TabHost} sets it. */
+    java.util.function.Function<java.util.UUID, java.util.Map<String, String>> pluginPieces = tab -> java.util.Map.of();
+
+    /** The pieces the tab's automatic name is made from: plugins' pieces for it, then the pane's built-in ones. */
+    java.util.Map<String, String> namePieces() {
+        var merged = new java.util.HashMap<>(pluginPieces.apply(id.value()));
+        merged.putAll(pane.namePieces());
+        return java.util.Map.copyOf(merged);
+    }
     /** Names the tab; blank goes back to the automatic title. */
     void rename(String name) { state.rename(name); onChanged.run(); onRenamed.run(); }
     /** The name the user gave the tab, kept apart from the shell's title (workspace plan 6 saves it). */
@@ -128,5 +135,6 @@ public final class TerminalContent extends JPanel implements TabContent, AutoClo
         removeAll();
         onChanged = () -> { }; onRenamed = () -> { }; onEmpty = () -> { }; onError = (message, cause) -> { };
         lastInWindow = () -> false; configure = ready -> { }; tabName = () -> TabNames.DEFAULT_PATTERN;
+        pluginPieces = tab -> java.util.Map.of();
     }
 }

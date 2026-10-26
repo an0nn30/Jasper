@@ -1419,7 +1419,9 @@ public final class JasperApplication {
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(appearanceChoices, system, shells,
                     new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName, plugins == null ? Map.of() : plugins.pluginIcons())),
-                    new dev.jasper.app.settingsui.TabNameChoices(this::tabNamePreview),
+                    new dev.jasper.app.settingsui.TabNameChoices(this::tabNamePreview, () -> contributions.tabNamePieces().pieces().stream()
+                        .map(piece -> new dev.jasper.app.settingsui.TabNameChoices.Piece(piece.name(), piece.description(), pluginName(piece.ownerId())))
+                        .toList()),
                     new dev.jasper.app.settingsui.CorePages.Pages(
                         context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
                         context -> plugins.settingsPages(context))),

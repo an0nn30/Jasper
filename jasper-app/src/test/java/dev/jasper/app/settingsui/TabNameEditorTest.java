@@ -66,4 +66,12 @@ class TabNameEditorTest {
     @Test void thePieceListNamesEveryBuiltIn() {
         assertThat(String.join("\n", texts(editor(CLAUDE, "{dir}")))).contains("{dir}", "{full}", "{process}", "{title}");
     }
+
+    @Test void pluginPiecesAreListedWithTheirPluginAndAreKnown() {
+        var choices = new TabNameChoices(CLAUDE.preview(),
+            () -> List.of(new TabNameChoices.Piece("host", "the SSH host this tab is connected to", "Remote")));
+        var shown = texts(editor(choices, "{dir} {host}"));
+        assertThat(shown).noneMatch(text -> text.startsWith("Nothing provides"));
+        assertThat(String.join("\n", shown)).contains("{host} the SSH host this tab is connected to (Remote)");
+    }
 }
