@@ -3,9 +3,9 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 Status: **Not started; starts after plan A is done.** Deviations from the spec, decided while planning:
-- No SDK version bump. The spec asked for the next patch version, but SDK 0.21.0 is unreleased (`v1.0.0` shipped
-  0.18.1), and the latest SDK addition (the Editor's `Appearance.editorSchemes()`) joined 0.21.0 the same way. The new
-  members carry `@since 0.21.0`, and no `plugin.toml` range changes.
+- No SDK version bump. The spec asked for the next patch version, but SDK 0.22.0 (on `main` since 2026-10-25) is
+  unreleased (`v1.0.0` shipped 0.18.1), and recent SDK additions joined the unreleased version the same way. The new
+  members carry `@since 0.22.0`, and no `plugin.toml` range changes.
 - The app's registry of plugin pieces lives in `dev.jasper.app.contributions` (the model plugins write and windows
   render), not in `HostedTerminals`, because `workspace` and `settingsui` cannot see `plugins`.
 
@@ -28,7 +28,7 @@ the same rules, and contract tests hold both runtimes to them.
 - Everything in plan A's Global Constraints holds (worktree and branch, `./gradlew`, no GUI, commit trailer, package
   rules, source hygiene, MVP).
 - SDK additions are `TabNamePieceSpec`, `TabNamePiece`, `Terminals.addTabNamePiece` and `TabHandle.namePieces`, each
-  `@since 0.21.0`. `JasperSdk.VERSION` stays `0.21.0`.
+  `@since 0.22.0`. `JasperSdk.VERSION` stays `0.22.0`.
 - Both new calls need `terminal.observe` and are UI thread only; `TabNamePiece.set` may be called from any thread.
   No new capability.
 - Piece names: 1 to 32 lowercase letters, digits and `_`, starting with a letter; `dir`, `full`, `process` and
@@ -120,7 +120,7 @@ import java.util.regex.Pattern;
  * @param name what users type between the braces: 1 to 32 lowercase letters, digits and {@code _}, starting with a
  *     letter, and none of {@link #BUILT_IN}
  * @param description one line Settings lists beside the piece, such as "the SSH host this tab is connected to"
- * @since 0.21.0
+ * @since 0.22.0
  */
 public record TabNamePieceSpec(String name, String description) {
     /** Jasper's own pieces, {@code dir}, {@code full}, {@code process} and {@code title}, which no plugin can add. */
@@ -154,7 +154,7 @@ import dev.jasper.sdk.Subscription;
  * A plugin's piece of Terminal tab names, from {@link Terminals#addTabNamePiece}. Closing it removes the piece, and its
  * value in every tab; it closes with its plugin too.
  *
- * @since 0.21.0
+ * @since 0.22.0
  */
 public interface TabNamePiece extends Subscription {
     /**
@@ -553,7 +553,7 @@ Expected: FAIL to compile: `cannot find symbol method addTabNamePiece`, `namePie
      * @return the piece, which sets its value per tab
      * @throws dev.jasper.sdk.MissingCapabilityException without {@code terminal.observe}
      * @throws IllegalStateException when a piece of that name is already held
-     * @since 0.21.0
+     * @since 0.22.0
      */
     TabNamePiece addTabNamePiece(TabNamePieceSpec spec);
 ```
@@ -567,7 +567,7 @@ Expected: FAIL to compile: `cannot find symbol method addTabNamePiece`, `namePie
      * content tab and once the tab has closed. Needs {@code terminal.observe}. UI thread only.
      *
      * @return the values, each on one line
-     * @since 0.21.0
+     * @since 0.22.0
      */
     Map<String, String> namePieces();
 ```
@@ -716,7 +716,7 @@ in if that method builds the harness elsewhere).
      *
      * @param tabId a terminal tab
      * @param builtIns each built-in piece's value by name
-     * @since 0.21.0
+     * @since 0.22.0
      */
     public void setTabNamePieces(UUID tabId, Map<String, String> builtIns) {
         workspace.tab(tabId).ifPresent(tab -> tab.namePieces = Map.copyOf(builtIns));
@@ -727,7 +727,7 @@ in if that method builds the harness elsewhere).
      *
      * @param tabId a tab
      * @return each value by piece name
-     * @since 0.21.0
+     * @since 0.22.0
      */
     public Map<String, String> tabNamePieces(UUID tabId) { return Map.copyOf(namePieceValues.getOrDefault(tabId, Map.of())); }
 
@@ -735,7 +735,7 @@ in if that method builds the harness elsewhere).
      * Every plugin's tab name piece.
      *
      * @return the pieces, in name order
-     * @since 0.21.0
+     * @since 0.22.0
      */
     public List<dev.jasper.sdk.terminal.TabNamePieceSpec> tabNamePieceSpecs() {
         return namePieces.values().stream().map(NamePiece::spec).toList();
@@ -1106,7 +1106,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - `jasper-sdk-testkit/README.md`: where it lists `FakePluginHost`'s terminal scripting methods, add
   `setTabNamePieces`, `tabNamePieces` and `tabNamePieceSpecs`.
 - `docs/STATUS.md`: append to the plan A entry (or add a "plan B" entry beside it): "Plan B: plugins read a tab's pieces
-  (`TabHandle.namePieces()`) and add their own (`Terminals.addTabNamePiece`, SDK 0.21.0, unreleased, no bump); Remote
+  (`TabHandle.namePieces()`) and add their own (`Terminals.addTabNamePiece`, SDK 0.22.0, unreleased, no bump); Remote
   adds `{host}`; Settings lists plugin pieces. Plan: `docs/superpowers/plans/2026-10-23-terminal-tab-names-b-plugin-pieces.md`.
   GUI check pending: `{dir} {host}` on an SSH tab."
 

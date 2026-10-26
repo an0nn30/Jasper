@@ -374,7 +374,7 @@ class TabNamesTest {
 }
 ```
 
-In `CoreSettingsTest`, change `hasSize(44)` to `hasSize(45)` and add:
+In `CoreSettingsTest`, change `hasSize(45)` to `hasSize(46)` and add:
 
 ```java
     @Test void theTabNameIsALivePatternDefaultingToFolderProcessAndTitle() {
@@ -1116,7 +1116,7 @@ At the top of `docs/STATUS.md`'s `## Handoff log` (after "Newest first…"), add
 
 ```markdown
 **Terminal tab names, plan A — 2026-10-23** (`claude/terminal-tab-names`, worktree
-`.claude/worktrees/terminal-tab-names`, from `main` at `5db3524b4`; not merged or pushed): `terminal.tab_name`
+`.claude/worktrees/terminal-tab-names`, from `main` at `36fdeedc1`; not merged or pushed): `terminal.tab_name`
 (Settings › Terminal › Tab name, live) names Terminal tabs from a pattern of free text and `{dir}`, `{full}`,
 `{process}` and `{title}`, by default `{dir} {process} {title}`; Rename Tab still wins. `config.TitleTemplate` is
 shared with the look's window title. Settings previews the active terminal tab's name as you type. Spec:
