@@ -87,6 +87,7 @@ public final class PanelSurfaceFixture implements AutoCloseable {
                 (Function<Object, Optional<Object>>) c -> Optional.empty(), (BiFunction<java.time.Duration, Runnable, Runnable>) (delay, task) -> () -> { }, ssh);
             onEdt(() -> vault.host.start(new HostedPlugin(StagedRemoteHost.REMOTE, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"),
                 Set.of("dev.jasper.remote.api"), loader, () -> plugin)));
+            awaitTransferStore();
         }
         StagedVaultHost.settle();
         root = panel.equals(TUNNELS) ? "tunnels" : panel.equals(SFTP) ? "sftp" : panel.equals(SESSIONS) ? "sessions" : "fileserver.panel";
@@ -355,6 +356,17 @@ public final class PanelSurfaceFixture implements AutoCloseable {
             var image = new BufferedImage(view.getWidth() * scale, view.getHeight() * scale, BufferedImage.TYPE_INT_ARGB);
             var graphics = image.createGraphics(); try { graphics.scale(scale, scale); view.printAll(graphics); } finally { graphics.dispose(); } return image;
         });
+    }
+    /**
+     * Waits until Remote's transfer queue has opened its store, as {@code StagedRemoteHost} does: its first SQLite connection
+     * loads a fresh copy of sqlite-jdbc's native library for this class loader, which takes seconds on a loaded machine and
+     * which a stop cannot interrupt, so a close that came first outlasted the workers' cleanup deadline.
+     */
+    private void awaitTransferStore() throws Exception {
+        Object transfers = field(plugin, "transfers");
+        var snapshot = (CompletableFuture<?>) transfers.getClass().getMethod("snapshot", long.class, int.class).invoke(transfers, 0L, 1);
+        try { snapshot.get(60, java.util.concurrent.TimeUnit.SECONDS); }
+        catch (java.util.concurrent.TimeoutException slow) { throw new AssertionError("The Remote plugin's transfer store did not open", slow); }
     }
     static Object field(Object object, String name) {
         try { var f = object.getClass().getDeclaredField(name); f.setAccessible(true); return f.get(object); }
