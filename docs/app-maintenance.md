@@ -755,10 +755,10 @@ independent of workspace and terminal types. The field shows `user@path : comman
 for a remote one; home paths abbreviate to `~`, and remote paths never use local metadata. Under the default look the
 native window title shows the same text (the look's title template is `{context}`). An explicit OSC title replaces the
 complete automatic header. A tab's automatic name is `terminal.tab_name` filled by `TabNames.format` from
-`TerminalContent.namePieces()` (`TitleTemplate`, shared with `WindowTitle`); renamed tabs keep their names. Command
-text from shell integration takes precedence over the foreground-process fallback. Display overrides reset at command
-boundaries and reconnects without changing notification-title tracking. The full title stays in a literal-text
-tooltip.
+`TerminalContent.namePieces()` (`TitleTemplate`, shared with `WindowTitle`); renamed tabs keep their names. In the
+header, command text from shell integration takes precedence over the foreground-process fallback. Display overrides
+reset at command boundaries and reconnects without changing notification-title tracking. The full title stays in a
+literal-text tooltip.
 
 The field is 400 logical pixels wide where there is room (`TITLE_SEARCH_WIDTH`), shrinks around the window's centre,
 and collapses to its magnifier below 240 (`TITLE_SEARCH_MIN_WIDTH`), with a 12 px gap (`NATIVE_HEADER_GAP`) on each

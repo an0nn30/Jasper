@@ -364,7 +364,7 @@ the pane's working directory and where prompts and commands start and end.
 | OSC 133 A: `\e]133;A\a` | where the prompt starts | [prompt navigation](#prompt-navigation); the status bar's ● |
 | OSC 133 B: `\e]133;B\a` | where the prompt ends and typing starts | reading the command off the screen |
 | OSC 1341: `\e]1341;jasper;cmd;TEXT\a` | just before C; `TEXT` is the command line in UTF-8, base64-encoded, at most 16 KiB decoded | the exact command line |
-| OSC 133 C: `\e]133;C\a` | when the command starts running | the running command: tab title, the [Desk Buddy](notifications.md#desk-buddy), plugins |
+| OSC 133 C: `\e]133;C\a` | when the command starts running | the running command: the [Desk Buddy](notifications.md#desk-buddy), plugins |
 | OSC 133 D: `\e]133;D;STATUS\a` | when the command finishes, before the next prompt | the command's exit status and duration: [long-running command notifications](notifications.md#long-running-commands), [Shell History](history-and-snippets.md), plugins |
 
 `\e` is Escape and `\a` is BEL; ST (`\e\`) can end a sequence instead of BEL. Without the OSC 1341 text, Jasper reads
