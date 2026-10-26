@@ -162,3 +162,33 @@ Pinned private SDK preparation, minimum-version runtime tests, baseline ELF requ
 external mapped-window/config-write audit, real theme-engine events and x86_64 evidence
 remain pending. Task 1 and the native gate remain open; source/UI activation must wait
 for their evidence.
+
+## KDE helper extraction evidence — 2026-10-25
+
+Task 3's production helpers and deterministic fixtures ran in the same Fedora 44
+aarch64 container under private Xvfb/D-Bus. Qt5 5.15.18 / KF5 5.116.0 and Qt6
+6.11.2 / KF6 6.31.0 each pass all three compatibility/extraction/process CTests:
+39 KDE extraction assertions and 87 process assertions per major. Generic Qt5/Qt6
+regression suites each pass 27 extraction and 79 process assertions. A separate
+KDE5 build with the Header compile guard disabled passes 39 extraction assertions.
+All four targets also pass all three CTests with GCC AddressSanitizer and
+UndefinedBehaviorSanitizer (`detect_leaks=0`, `halt_on_error=1`); third-party toolkit
+leak detection is excluded. Native protocol verification passes 450 checks.
+
+The KDE tests cover configuration cascade/user overrides, paired Header evidence,
+translucent ink, native defaults for malformed/missing config, invalid-brush
+injection, three public event types, explicit and real 30-second reparses, healthy
+opposite/unknown observations and recovery, exact generations, prompt EOF, no
+top-level Show/activation events during the loop, and unchanged fixture config.
+`/proc/<pid>/maps` verifies one Qt major, matching KF and no GTK. An isolated
+executable copy with a missing KF SONAME fails startup while its generic Qt sibling
+remains usable, maps no KF, and ignores changed KDE configuration.
+
+Build with `DC_PROBE_KIND=kde` and `DC_QT_MAJOR=5|6`, `--parallel 2`, then run
+verbose CTest with `test/themes/private-bus.conf` as above. Task 3's source/builds
+and logs are under `/work/task3/` in `jasper-qt-tests`. macOS Gradle
+`testDesktopProtocol testDesktopQt testDesktopKde` configures successfully and skips
+native execution. The container uses direct CMake/compiler verification because
+it has no JBR or complete checkout. This evidence retains the floor/ABI and real
+desktop acceptance gates above; KF metadata reports its built-against version and
+Qt's runtime version.
