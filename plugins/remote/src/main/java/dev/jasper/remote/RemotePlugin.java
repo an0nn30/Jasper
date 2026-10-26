@@ -258,8 +258,13 @@ public class RemotePlugin implements Plugin {
             () -> distros, this::openDistro, this::splitDistro);
         context.palette().register(scope);
         // Tab names' {host}; registered before any session, a restored SSH tab's included, can attach.
-        hostPiece = context.terminals().addTabNamePiece(
-            new dev.jasper.sdk.terminal.TabNamePieceSpec("host", "the SSH host this tab is connected to"));
+        // Piece names are global: another plugin that started first may hold host, and that must not fail Remote.
+        try {
+            hostPiece = context.terminals().addTabNamePiece(
+                new dev.jasper.sdk.terminal.TabNamePieceSpec("host", "the SSH host this tab is connected to"));
+        } catch (IllegalStateException held) {
+            context.log().log(System.Logger.Level.WARNING, "Another plugin holds the {host} tab name piece; SSH tabs will not fill it: " + held.getMessage());
+        }
         // Workspace tabs spec 13: an SSH tab saved with the workspace comes back to its host and folder.
         context.windows().restorer(SSH_TAB, this::restoreHost);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 60));
@@ -672,7 +677,7 @@ public class RemotePlugin implements Plugin {
         }));
         pending.attach(shell.connection());
         // Tab names' {host}: the saved host's address, kept while the tab shows it (tab names spec 7).
-        hostPiece.set(pending.pane().tab(), shell.host().hostname());
+        if (hostPiece != null) hostPiece.set(pending.pane().tab(), shell.host().hostname());
         RemoteHost authenticatedHost = shell.host();
         connections.inspect(shell).thenAccept(info -> {
             if (stopped) return;

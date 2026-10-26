@@ -2249,7 +2249,7 @@ worker thread. <a href="#dev.jasper.sdk.terminal.TabHandle.title()"><code>TabHan
 <h3>Tab names</h3>
 <p>A terminal tab's automatic name comes from the user's Tab name pattern. <a href="#dev.jasper.sdk.terminal.TabHandle.namePieces()"><code>TabHandle.namePieces()</code></a> returns the
 pieces it is made from that have a value: Jasper's <code>dir</code>, <code>full</code>, <code>process</code> and <code>title</code>, and every
-plugin's. <a href="#dev.jasper.sdk.terminal.Terminals.addTabNamePiece(TabNamePieceSpec)"><code>Terminals.addTabNamePiece(TabNamePieceSpec)</code></a> adds a piece users can write as <code>&#123;host&#125;</code>; the
+plugin's. <a href="#dev.jasper.sdk.terminal.Terminals.addTabNamePiece(TabNamePieceSpec)"><code>Terminals.addTabNamePiece(TabNamePieceSpec)</code></a> adds a piece users can write as <code>&#123;branch&#125;</code>; the
 <a href="#dev.jasper.sdk.terminal.TabNamePiece"><code>TabNamePiece</code></a> it returns sets the piece's value per tab with <a href="#dev.jasper.sdk.terminal.TabNamePiece.set(TabHandle,String)"><code>TabNamePiece.set(TabHandle, String)</code></a>, from any
 thread. A name is held by one plugin at a time, Jasper's four are reserved, and the piece ends with its handle or its
 plugin. Both calls need <code>terminal.observe</code>.</p>

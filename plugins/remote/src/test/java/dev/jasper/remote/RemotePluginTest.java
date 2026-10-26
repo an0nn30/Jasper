@@ -230,6 +230,49 @@ class RemotePluginTest {
         }
     }
 
+    @Test void remoteStartsWhenAnotherPluginHoldsTheHostTabNamePiece(@TempDir Path dir) throws Exception {
+        var logged = new ArrayList<String>();
+        var logger = java.util.logging.Logger.getLogger("dev.jasper.plugins.dev.jasper.remote");
+        var capture = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { if (record.getLevel().intValue() >= java.util.logging.Level.WARNING.intValue()) logged.add(record.getMessage() + " " + java.util.Arrays.toString(record.getParameters())); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        logger.addHandler(capture);
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            // A third-party plugin that sorts before dev.jasper.remote starts first and holds {host}.
+            var other = new PluginInfo("dev.jasper.aaa", "Aaa", "1.0.0", Set.of(Capabilities.TERMINAL_OBSERVE));
+            host.start(other, Set.of(), Set.of(), context -> context.terminals().addTabNamePiece(
+                new dev.jasper.sdk.terminal.TabNamePieceSpec("host", "the other plugin's host")));
+            var vault = new FakeVault();
+            host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            RemotePlugin plugin = plugin(dir.resolve("ssh"));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            assertThat(host.failures()).as("Remote starts despite the clash").isEmpty();
+            assertThat(host.actionSpec("dev.jasper.remote.connect")).as("Remote's contributions are there").isPresent();
+            assertThat(host.tabNamePieceSpecs()).extracting(dev.jasper.sdk.terminal.TabNamePieceSpec::description).containsExactly("the other plugin's host");
+            assertThat(logged).as("the clash is logged once").hasSize(1).allMatch(line -> line.contains("{host}") && line.contains("dev.jasper.aaa"));
+
+            UUID credential = vault.password("deploy login", "deploy", "s3cret");
+            RemoteHost prod = RemoteHost.create("prod", "127.0.0.1", server.port(), "", new Auth.Vault(credential), "", Optional.empty()).withFollowDirectory(false);
+            plugin.store().put(prod);
+            settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            host.addTerminalTab(window, "zsh");
+            var handle = context.terminals().window(window).orElseThrow();
+            Kits.edt(() -> plugin.openHost(handle, prod)); settle(host);
+            UUID pane = host.terminalPanes().getLast();
+            UUID tab = Kits.value(() -> context.terminals().pane(pane).orElseThrow().tab().id());
+            assertThat(host.tabNamePieces(tab)).as("an SSH tab opens; Remote leaves the other plugin's piece alone").isEmpty();
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        } finally {
+            logger.removeHandler(capture);
+        }
+    }
+
     @Test void endingAPanesSessionClearsTheSftpView(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             Path files = java.nio.file.Files.createDirectories(dir.resolve("files"));

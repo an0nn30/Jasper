@@ -894,8 +894,8 @@ private static void installTerminalDemo(PluginContext context) {
 - **Tab names.** A terminal tab's automatic name comes from the user's Tab name pattern
   ([Tab names](configuration.md#tab-names)). `TabHandle.namePieces()` returns the pieces it is made from that have a
   value: Jasper's `dir`, `full`, `process` and `title`, and every plugin's.
-  `Terminals.addTabNamePiece(new TabNamePieceSpec("host", "the SSH host this tab is connected to"))` adds a piece users
-  can write as `{host}`; the `TabNamePiece` it returns sets the piece's value per tab with `set(tab, value)`, from any
+  `Terminals.addTabNamePiece(new TabNamePieceSpec("branch", "the Git branch of this tab's folder"))` adds a piece users
+  can write as `{branch}`; the `TabNamePiece` it returns sets the piece's value per tab with `set(tab, value)`, from any
   thread. A name is held by one plugin at a time, Jasper's four are reserved, and the piece ends with its handle or its
   plugin. Both need `terminal.observe`.
 - **A pane can close at any moment.** Commands to a closed pane are ignored, queries return the last value the handle
