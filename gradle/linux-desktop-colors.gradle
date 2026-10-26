@@ -270,6 +270,9 @@ def compileQt = tasks.register('compileDesktopQtHelpers') {
     group = 'build'
     description = 'Builds all four optional Qt/KDE helpers; SDK discovery failures are release failures.'
     onlyIf { linux }
+    // SDK contents may change at the same prefix, including installed system SDKs.
+    // Let CMake reconfigure and check its own incremental header/library dependencies.
+    outputs.upToDateWhen { false }
     inputs.dir(source)
     inputs.file(rootProject.file('packaging/desktop-colors/CMakeLists.txt'))
     qtCompatibilityTargets.each { name, target ->
