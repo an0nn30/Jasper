@@ -369,7 +369,7 @@ retrace the folders you visited in this pane; Option+Left, Option+Right and Opti
 and Alt+Up on Linux and Windows (Back, Forward, Parent Folder) work anywhere in the panel.
 
 The list shows Name and Size, folders first, then by name ignoring case, with each entry's modified time in its tooltip.
-In a window of its own or docked at the bottom it adds Modified (date and time) and Permissions (`rwxr-xr-x`) columns.
+In a window of its own or docked at the bottom it shows Name, Modified (date and time), Permissions (`rwxr-xr-x`) and Size.
 Select several rows for the file actions. A folder of more than 200 entries is shown 200 at a time ("1–200 of 950",
 **Previous page**, **Next page**). Names starting with a dot stay hidden until you press **Show hidden items**; the
 choice is remembered and applies to every browser opened afterwards. Enter or a double click opens a folder, opens a
@@ -528,8 +528,8 @@ The right-click menu offers **Start** or **Stop**, **Open in Browser** (a runnin
 marked "Host missing · Edit to choose a host".
 
 In a window of its own or docked at the bottom, the selected tunnel's details (the first tunnel's while none is
-selected) stand beside the list: its name and state, the route as the tunnel form draws it, Type and Via and, while it
-runs, Connections, Traffic and Uptime, with **Start** or **Stop**, **Edit…** (**Save as Tunnel…** for a quick
+selected) stand beside the list: its name and state, the route as the tunnel form draws it, Type and Via and,
+while it is up, Connections, Traffic and Uptime, with **Start** or **Stop**, **Edit…** (**Save as Tunnel…** for a quick
 forward), **Open in Browser** and **Copy Address**.
 
 The status bar shows "2 tunnels", "2 tunnels · 1 failing" or "1 tunnel failing" while any runs or failed, with the state
@@ -667,7 +667,7 @@ when it starts, so it follows a change of look at the next start of Jasper.
 - **Tunnels** starts on the right, under Sessions: a Type, Local, Remote and Via table. Enter or a double click starts
   or stops a row, the right-click menu holds the rest, and the line below reads "pg-prod — active. Click to toggle." In a
   window of its own or docked at the bottom, the selected tunnel's **Properties** (Type, Local, Remote, Via, State and,
-  while it runs, Connections, Traffic and Uptime) stand beside the table, with that line under them.
+  while it is up, Connections, Traffic and Uptime) stand beside the table, with that line under them.
 - **SFTP** starts on the left: Back, Forward, Refresh, **Hidden files** and **Upload** over the breadcrumbs, and a
   Name, Size and Modified ("Sep 28") table; in a window of its own or docked at the bottom, Modified is the date and time
   and a Permissions column follows. While nothing is connected, a **Choose Session…** dropdown lists your hosts.

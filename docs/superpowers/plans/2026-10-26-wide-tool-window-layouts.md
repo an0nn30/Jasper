@@ -1,6 +1,14 @@
 # Wide Tool Window Layouts Implementation Plan
 
-> **Status (2026-10-26):** Tasks 1–5 done as written. Deviation: the first full check found the theme migration ledger
+> **Status (2026-10-26):** Tasks 1–5 done, with these deviations from the plan text. Task 1: the list column's hint sits
+> in the docked layout's `FOOTER` stack, not as a bare `Text`. Task 2: the default look's wide SFTP table is Name,
+> Modified, Permissions, Size (Size last, at the trailing edge as docked; the design's SFTP row says Name, Size, Modified,
+> Permissions, but the default table face has no cell inset and the right-aligned Size touched Modified), while
+> Enterprise's keeps the design's order. Task 3: the default look's wide detail says "Host missing" in its state line
+> (ahead of an up tunnel's state) and in its Via field, as the docked row does, and the classic Properties' State row
+> uses the status line's words ("active", "inactive", "starting", "failed: …") instead of `TunnelRows.stateText`.
+> Task 4: `revealLatestActivity` skips the classic wide layout while no server is chosen (nothing is drawn to reveal), and
+> the `Selected` handler calls it, so a first choice shows the latest line. The first full check found the theme migration ledger
 > (`docs/design/theme-engine/migration.csv`) needs a row per new test file, and the staged-panel fixture
 > (`PanelSurfaceFixture`) turned out to reach a real `PanelSite` placement headlessly, so Task 6 (real-host renders of
 > the wide layouts, and the ledger rows) was added before the full check, which became Task 7.

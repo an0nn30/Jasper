@@ -318,11 +318,10 @@ resizing](#moving-and-resizing)); **Docked** puts it back at its place on the st
 **Float** is a window owned by the main window: it stays above it, minimises and closes with it and has no taskbar or
 Dock entry of its own. **Window** is an ordinary window: it has its own entry in the taskbar or the window switcher and
 can go behind the main window. Either one has the tool window's title and its header, with Options and Hide, above its
-content. Remote's Sessions, SFTP and Tunnels and File Server's File Servers take a wider layout in it, and docked at the
-bottom ([Sessions](remote.md#the-sessions-panel), [File Servers](file-server.md#the-file-servers-tool-window)). From a
-menu it opens where the tool window's frame was, or centred on the main window when the tool window was hidden, and
-afterwards where it last was; dragged out, it opens at the pointer. Either way it is fitted to the displays that are
-connected.
+content. From a menu it opens where the tool window's frame was, or centred on the main window when the tool window was
+hidden, and afterwards where it last was; dragged out, it opens at the pointer. Either way it is fitted to the displays
+that are connected. In it, and docked at the bottom, Remote's Sessions, SFTP and Tunnels and File Server's File Servers
+take a wider layout ([Sessions](remote.md#the-sessions-panel), [File Servers](file-server.md#the-file-servers-tool-window)).
 
 The tool window keeps its rail button or stripe button, in its slot, highlighted while its window shows.
 
