@@ -7,7 +7,7 @@
 **Tech Stack:** JBR25, JUnit/AssertJ, Gradle; the four Qt/KDE helpers from deliverable 1.
 **Spec:** [Approved design](../specs/2026-10-25-qt-kde-desktop-colors-design.md).
 **Prerequisite:** [Native helper plan](2026-10-25-qt-kde-native-helpers.md). Tasks 1–2 here can run headlessly once its protocol/native interfaces exist; Task 3 must not expose the UI until the native gate is recorded as passed.
-**Status:** Draft for implementation review, 2026-10-25. No implementation started. Small plan decisions: Qt hint lists use exact semicolon-separated keys with optional colon parameters; requested versus observed polarity is tracked separately in the application owner; protocol remains v1 because message fields do not change. Record later deviations in this banner and docs/STATUS.md.
+**Status:** Approved for execution, 2026-10-25. Implementation in progress. The user replaced Ubuntu VM testing with Fedora VM testing; SSH is temporarily unavailable during updates and the user authorized continuing local work. Native execution evidence remains pending until Fedora is accessible; no UI activation before the native gate. Small plan decisions: Qt hint lists use exact semicolon-separated keys with optional colon parameters; requested versus observed polarity is tracked separately in the application owner; protocol remains v1 because message fields do not change. Record later deviations in this banner and docs/STATUS.md.
 
 ## Global Constraints
 

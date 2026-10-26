@@ -1,6 +1,6 @@
 # Jasper — Status and Handoff
 
-**Qt / KDE Desktop colors — 2026-10-25:** The user approved the [design](superpowers/specs/2026-10-25-qt-kde-desktop-colors-design.md). Draft implementation plans cover [native helpers and compatibility](superpowers/plans/2026-10-25-qt-kde-native-helpers.md), then [application integration and release validation](superpowers/plans/2026-10-25-qt-kde-application-integration.md). They preserve the native gate before UI activation and distinguish healthy opposite-polarity observations from process failures. Plans await review; no implementation.
+**Qt / KDE Desktop colors — 2026-10-25:** The user approved the [design](superpowers/specs/2026-10-25-qt-kde-desktop-colors-design.md). Approved implementation plans cover [native helpers and compatibility](superpowers/plans/2026-10-25-qt-kde-native-helpers.md), then [application integration and release validation](superpowers/plans/2026-10-25-qt-kde-application-integration.md). They preserve the native gate before UI activation and distinguish healthy opposite-polarity observations from process failures. Implementation is in progress on `codex/qt-kde-desktop-design`, refreshed from main `9fa59a492`. The user requested Fedora instead of Ubuntu VM testing and authorized local work while Fedora updates; Linux evidence and UI activation remain gated on native verification.
 
 **Compact Buddy activity — 2026-10-25.** `codex/buddy-compact-activity` replaces floating stacks with one
 quiet visible-work summary and an all-activity drawer with stable expandable groups. Attention priority,
