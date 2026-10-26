@@ -159,6 +159,56 @@ class TunnelsWideTest {
             assertThat(state.text()).isEqualTo("Host missing · Edit to choose a host");
             assertThat(state.severity()).contains(Nodes.Severity.WARNING);
             assertThat(text(TunnelsPanel.DETAIL_ROUTE + ".via.where")).isEqualTo("Host missing");
+            assertThat(values()).as("the Via field says so too, as the docked row does").containsExactly("Local", "Host missing");
+            assertThat(node(panel.view(), TunnelsPanel.DETAIL_FIELDS + ".via", Nodes.Text.class).severity()).contains(Nodes.Severity.WARNING);
+            assertThat(node(panel.view(), TunnelsPanel.DETAIL_FIELDS + ".type", Nodes.Text.class).severity()).as("only Via warns").isEmpty();
+        });
+    }
+
+    /** The state line follows the docked row: a failure or a stage first, then a missing host, then what an up tunnel says. */
+    @Test void aMissingHostOutranksUpButNotFailedOrStarting() throws Exception {
+        edt(() -> {
+            states.put(db.id(), new TunnelState.Up(NOW.minusSeconds(300), 5432, new Counters()));
+            panel(Layout.ROWS, List.of(db), List.of());
+            panel.setTunnels(List.of(db), List.of(), Optional.empty(), id -> states.get(db.id()), id -> Optional.empty());
+            var state = node(panel.view(), TunnelsPanel.DETAIL_STATE, Nodes.Text.class);
+            assertThat(state.text()).as("up with no host").isEqualTo("Host missing · Edit to choose a host");
+            assertThat(state.severity()).contains(Nodes.Severity.WARNING);
+            assertThat(values()).startsWith("Local", "Host missing");
+            states.put(db.id(), new TunnelState.Starting("Connecting"));
+            panel.refresh();
+            assertThat(text(TunnelsPanel.DETAIL_STATE)).as("starting with no host").isEqualTo("Connecting");
+            states.put(db.id(), new TunnelState.Failed("Connection refused"));
+            panel.refresh();
+            var failed = node(panel.view(), TunnelsPanel.DETAIL_STATE, Nodes.Text.class);
+            assertThat(failed.text()).as("failed with no host").isEqualTo("Connection refused");
+            assertThat(failed.severity()).contains(Nodes.Severity.DANGER);
+        });
+    }
+
+    @Test void aRemoteTunnelsDetailRoutesFromTheHostThroughThisComputer() throws Exception {
+        edt(() -> {
+            var remote = Tunnel.create("api", PROD, TunnelKind.REMOTE, Tunnel.LOCALHOST, 9000, "localhost", 8080);
+            panel(Layout.ROWS, List.of(remote), List.of());
+            assertThat(text(TunnelsPanel.DETAIL_ROUTE + ".from.what")).isEqualTo("On prod");
+            assertThat(text(TunnelsPanel.DETAIL_ROUTE + ".from.where")).isEqualTo("localhost:9000");
+            assertThat(text(TunnelsPanel.DETAIL_ROUTE + ".via.where")).isEqualTo("this computer");
+            assertThat(text(TunnelsPanel.DETAIL_ROUTE + ".to.where")).isEqualTo("localhost:8080");
+            assertThat(captions()).containsExactly("Type", "Via");
+            assertThat(values()).containsExactly("Remote", "prod");
+        });
+    }
+
+    @Test void aDynamicTunnelsDetailIsASocksProxyThroughTheHost() throws Exception {
+        edt(() -> {
+            var socks = Tunnel.create("socks", PROD, TunnelKind.DYNAMIC, Tunnel.LOCALHOST, 1080, "", 0);
+            panel(Layout.ROWS, List.of(socks), List.of());
+            assertThat(text(TunnelsPanel.DETAIL_ROUTE + ".from.what")).isEqualTo("SOCKS5 proxy");
+            assertThat(text(TunnelsPanel.DETAIL_ROUTE + ".from.where")).isEqualTo("localhost:1080");
+            assertThat(text(TunnelsPanel.DETAIL_ROUTE + ".via.where")).isEqualTo("prod");
+            assertThat(text(TunnelsPanel.DETAIL_ROUTE + ".to.where")).isEqualTo("as each client asks");
+            assertThat(captions()).containsExactly("Type", "Via");
+            assertThat(values()).containsExactly("Dynamic", "prod");
         });
     }
 
@@ -268,7 +318,7 @@ class TunnelsWideTest {
             assertThat(properties.rows()).extracting(Nodes.PropertyRow::label, Nodes.PropertyRow::value)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple("Type", "Local"), org.assertj.core.groups.Tuple.tuple("Local", ":5432"),
                     org.assertj.core.groups.Tuple.tuple("Remote", "db.internal:5432"), org.assertj.core.groups.Tuple.tuple("Via", "prod"),
-                    org.assertj.core.groups.Tuple.tuple("State", "stopped"));
+                    org.assertj.core.groups.Tuple.tuple("State", "inactive"));
             assertThat(properties.rows()).extracting(Nodes.PropertyRow::technical).containsExactly(false, true, true, false, false);
             assertThat(find(list, TunnelsPanel.PROPERTIES)).as("Properties sit in the detail column only").isEmpty();
             assertThat(find(detail, TunnelsPanel.FOOTER)).isPresent();
@@ -289,7 +339,7 @@ class TunnelsWideTest {
             panel(Layout.CLASSIC, List.of(db), List.of());
             var properties = (Nodes.Properties) find(panel.view(), TunnelsPanel.PROPERTIES).orElseThrow();
             assertThat(properties.rows()).extracting(Nodes.PropertyRow::label).containsExactly("Type", "Local", "Remote", "Via", "State", "Connections", "Traffic", "Uptime");
-            assertThat(properties.rows()).extracting(Nodes.PropertyRow::value).containsExactly("Local", ":5432", "db.internal:5432", "prod", "up", "0", "↓0 B ↑0 B", "5 min");
+            assertThat(properties.rows()).extracting(Nodes.PropertyRow::value).containsExactly("Local", ":5432", "db.internal:5432", "prod", "active", "0", "↓0 B ↑0 B", "5 min");
             assertThat(text(TunnelsPanel.FOOTER)).isEqualTo("db — active. Click to toggle.");
         });
     }
@@ -330,7 +380,7 @@ class TunnelsWideTest {
         });
     }
 
-    @Test void theKitReusesTheControlsTheDockedLayoutHasWhenTheLayoutSwitches() throws Exception {
+    @Test void theWideLayoutKeepsTheIdsAndKindsOfTheDockedControls() throws Exception {
         edt(() -> {
             for (var layout : Layout.values()) {
                 panel(layout, List.of(db, web), List.of());

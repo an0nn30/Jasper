@@ -227,16 +227,20 @@ public final class TunnelsPanel implements AutoCloseable {
 
     private static String bracketed(String host) { return host.contains(":") ? "[" + host + "]" : host; }
 
-    /** The selected tunnel's, else the first one's, line: its name, its confirmed state and the gesture. */
-    private String footerText(Tunnel tunnel) {
-        TunnelState state = states.apply(tunnel.id());
-        String word = switch (state) {
+    /** The classic look's word for a confirmed state, as its status line and Properties both say it. */
+    private static String stateWord(TunnelState state) {
+        return switch (state) {
             case TunnelState.Up up -> "active";
             case TunnelState.Starting starting -> "starting";
             case TunnelState.Failed failed -> "failed: " + failed.reason();
             case TunnelState.Stopped stopped -> "inactive";
         };
-        return TunnelRows.title(tunnel, state) + " — " + word + ". Click to toggle.";
+    }
+
+    /** The selected tunnel's, else the first one's, line: its name, its confirmed state and the gesture. */
+    private String footerText(Tunnel tunnel) {
+        TunnelState state = states.apply(tunnel.id());
+        return TunnelRows.title(tunnel, state) + " — " + stateWord(state) + ". Click to toggle.";
     }
 
     private Nodes.Text statusLine(Tunnel tunnel) { return new Nodes.Text(FOOTER, ControlState.READY, footerText(tunnel), Nodes.TextRole.CAPTION); }
@@ -248,7 +252,7 @@ public final class TunnelsPanel implements AutoCloseable {
         var rows = new ArrayList<Nodes.PropertyRow>(List.of(new Nodes.PropertyRow("Type", kindWord(tunnel.kind()), false),
             new Nodes.PropertyRow("Local", ends.local(), true), new Nodes.PropertyRow("Remote", ends.remote(), true),
             new Nodes.PropertyRow("Via", hostNames.apply(tunnel.hostId()).orElse("—"), false),
-            new Nodes.PropertyRow("State", TunnelRows.stateText(state), false)));
+            new Nodes.PropertyRow("State", stateWord(state), false)));
         if (state instanceof TunnelState.Up up) counts(up).forEach(fact -> rows.add(new Nodes.PropertyRow(fact.caption(), fact.value(), false)));
         return new Nodes.Properties(PROPERTIES, ControlState.READY, "Properties — " + TunnelRows.title(tunnel, state), rows);
     }
@@ -458,7 +462,7 @@ public final class TunnelsPanel implements AutoCloseable {
         var route = TunnelEditor.route(DETAIL_ROUTE, tunnel.kind(), listen, hostName.orElse("Host missing"), target);
         var fields = new ArrayList<Nodes.Node>();
         fields.add(field("type", "Type", kindWord(tunnel.kind())));
-        fields.add(field("via", "Via", hostName.orElse("—")));
+        fields.add(hostName.map(name -> field("via", "Via", name)).orElseGet(() -> field("via", "Via", "Host missing", Optional.of(Nodes.Severity.WARNING))));
         if (state instanceof TunnelState.Up up) counts(up).forEach(fact -> fields.add(field(fact.key(), fact.caption(), fact.value())));
         return new Nodes.Stack(DETAIL_CONTENT, ControlState.READY, Nodes.LayoutRole.DETAIL, List.of(heading, route,
             new Nodes.Card(DETAIL_FIELDS, ControlState.READY, Nodes.CardKind.FORM, fields),
@@ -467,20 +471,21 @@ public final class TunnelsPanel implements AutoCloseable {
                 button(DETAIL_COPY, "Copy Address", Nodes.ButtonKind.SECONDARY, "copy", id, copyable(tunnel, state))))));
     }
 
-    /** What the tunnel is doing: Stopped, its stage, how long it has been up, a warning or its failure. */
+    /**
+     * What the tunnel is doing, as the docked row says it: its failure or its stage first, then a missing host, then an up
+     * tunnel's warning or how long it has been up, else Stopped.
+     */
     private Nodes.Text stateLine(TunnelState state, boolean hostMissing) {
-        return switch (state) {
-            case TunnelState.Stopped stopped -> hostMissing
-                ? new Nodes.Text(DETAIL_STATE, ControlState.READY, "Host missing · Edit to choose a host", Nodes.TextRole.DESCRIPTION, Optional.of(Nodes.Severity.WARNING), OptionalInt.empty())
-                : new Nodes.Text(DETAIL_STATE, ControlState.READY, "Stopped", Nodes.TextRole.DESCRIPTION);
-            case TunnelState.Starting starting -> new Nodes.Text(DETAIL_STATE, ControlState.READY, starting.stage(), Nodes.TextRole.DESCRIPTION);
-            case TunnelState.Up up -> up.counters().warning()
-                .map(warning -> new Nodes.Text(DETAIL_STATE, ControlState.READY, warning, Nodes.TextRole.DESCRIPTION, Optional.of(Nodes.Severity.WARNING), OptionalInt.empty()))
-                .orElseGet(() -> new Nodes.Text(DETAIL_STATE, ControlState.READY, "Up for " + TunnelRows.duration(Duration.between(up.since(), clock.get())),
-                    Nodes.TextRole.DESCRIPTION));
-            case TunnelState.Failed failed -> new Nodes.Text(DETAIL_STATE, ControlState.READY, failed.reason(), Nodes.TextRole.DESCRIPTION,
-                Optional.of(Nodes.Severity.DANGER), OptionalInt.empty());
-        };
+        if (state instanceof TunnelState.Failed failed) return new Nodes.Text(DETAIL_STATE, ControlState.READY, failed.reason(), Nodes.TextRole.DESCRIPTION,
+            Optional.of(Nodes.Severity.DANGER), OptionalInt.empty());
+        if (state instanceof TunnelState.Starting starting) return new Nodes.Text(DETAIL_STATE, ControlState.READY, starting.stage(), Nodes.TextRole.DESCRIPTION);
+        if (hostMissing) return new Nodes.Text(DETAIL_STATE, ControlState.READY, "Host missing · Edit to choose a host", Nodes.TextRole.DESCRIPTION,
+            Optional.of(Nodes.Severity.WARNING), OptionalInt.empty());
+        if (state instanceof TunnelState.Up up) return up.counters().warning()
+            .map(warning -> new Nodes.Text(DETAIL_STATE, ControlState.READY, warning, Nodes.TextRole.DESCRIPTION, Optional.of(Nodes.Severity.WARNING), OptionalInt.empty()))
+            .orElseGet(() -> new Nodes.Text(DETAIL_STATE, ControlState.READY, "Up for " + TunnelRows.duration(Duration.between(up.since(), clock.get())),
+                Nodes.TextRole.DESCRIPTION));
+        return new Nodes.Text(DETAIL_STATE, ControlState.READY, "Stopped", Nodes.TextRole.DESCRIPTION);
     }
 
     /** A button that does what the row's menu item of the same verb does, to this row. */
@@ -489,11 +494,13 @@ public final class TunnelsPanel implements AutoCloseable {
     }
 
     /** One captioned value of the detail card, as the Vault manager's detail rows. */
-    private static Nodes.Node field(String key, String caption, String value) {
+    private static Nodes.Node field(String key, String caption, String value) { return field(key, caption, value, Optional.empty()); }
+
+    private static Nodes.Node field(String key, String caption, String value, Optional<Nodes.Severity> severity) {
         String id = DETAIL_FIELDS + "." + key;
         return new Nodes.Stack(id + ".row", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
             new Nodes.Text(id + ".label", ControlState.READY, caption, Nodes.TextRole.CAPTION),
-            new Nodes.Text(id, ControlState.READY, value, Nodes.TextRole.BODY)));
+            new Nodes.Text(id, ControlState.READY, value, Nodes.TextRole.BODY, severity, OptionalInt.empty())));
     }
 
     private ListItem item(Row row) {

@@ -294,7 +294,7 @@ class SessionsWideTest {
         });
     }
 
-    @Test void theKitReusesTheControlsTheDockedLayoutHasWhenTheLayoutSwitches() throws Exception {
+    @Test void theWideLayoutKeepsTheIdsAndKindsOfTheDockedControls() throws Exception {
         edt(() -> {
             var panel = panel(Layout.ROWS);
             var docked = all(panel.view());
