@@ -116,7 +116,8 @@ final class DesktopAppearance implements AutoCloseable {
         boolean portalChanged = !observation.portal().equals(value.portal());
         observation = value;
         for (Palette palette : value.palettes().values()) {
-            if (palette.generation() == generation) capabilities.put(new Key(palette.source(), palette.appearance()), palette);
+            if (palette.generation() == generation && demand != null && demand.sources().contains(palette.source()))
+                capabilities.put(new Key(palette.source(), demand.dark() ? Polarity.DARK : Polarity.LIGHT), palette);
             if (palette.generation() == generation && DesktopPalette.usable(palette.appearance() == Polarity.DARK, palette)) {
                 Palette previous = cache.put(new Key(palette.source(), palette.appearance()), palette);
                 boolean changed = previous == null || !previous.colors().equals(palette.colors())
@@ -160,9 +161,16 @@ final class DesktopAppearance implements AutoCloseable {
             Palette latest = capabilities.get(new Key(source, polarity));
             if (latest != null && DesktopPalette.usable(dark, latest)) palettes.put(source, latest);
             else if (latest != null) {
-                if (cached == null) palettes.put(source, latest);
-                else palettes.put(source, new Palette(cached.generation(), source, polarity, cached.colors(), cached.implementation(),
-                    cached.version(), latest.reason().isBlank() ? "Desktop toolkit palette unavailable" : latest.reason()));
+                String reason = latest.reason();
+                if (reason.isBlank() && latest.appearance() != Polarity.UNKNOWN && latest.appearance() != polarity) {
+                    String mismatch = "desktop palette is " + (latest.appearance() == Polarity.DARK ? "Dark" : "Light")
+                        + "; Jasper requests " + (dark ? "Dark" : "Light");
+                    reason = mismatch;
+                }
+                if (reason.isBlank()) reason = "Desktop toolkit palette unavailable";
+                Palette retained = cached == null ? latest : cached;
+                palettes.put(source, new Palette(retained.generation(), source, retained.appearance(), retained.colors(),
+                    retained.implementation(), retained.version(), reason));
             }
         }
         return new DesktopObservation(observation.portal(), palettes);

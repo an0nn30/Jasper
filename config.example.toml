@@ -150,7 +150,7 @@ appearance = "system"
 # unless the look sets its own defaults (Enterprise uses Jasper Meadow). Uncomment to save an explicit choice.
 # dark = "jasper-meadow"
 # light = "jasper-meadow"
-# Desktop colors source on Linux: auto, gtk3 or gtk4; retained on every platform.
+# Desktop colors source on Linux: auto, qt (Qt / KDE), gtk3 or gtk4; retained on every platform.
 desktop_source = "auto"
 
 [ui.font]

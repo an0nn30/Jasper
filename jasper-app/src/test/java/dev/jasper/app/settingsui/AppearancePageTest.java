@@ -219,25 +219,25 @@ class AppearancePageTest {
                 dialog.open(null,"appearance");
                 var source = dev.jasper.app.testsupport.KitTestSupport.require(SettingsDialogTest.page(dialog),
                     "ui.appearance:desktop-source.input", JComboBox.class);
-                source.setSelectedIndex(2);
+                pick(source, "Qt / KDE");
                 dialog.select("other"); dialog.select("appearance");
                 assertThat(dev.jasper.app.testsupport.KitTestSupport.require(SettingsDialogTest.page(dialog),
                     "ui.appearance:desktop-source.input", JComboBox.class)).isSameAs(source);
-                assertThat(fixture.demands).containsExactly("gtk4:true");
+                assertThat(fixture.demands).containsExactly("qt:true");
                 dialog.apply();
                 var loop = java.awt.Toolkit.getDefaultToolkit().getSystemEventQueue().createSecondaryLoop();
                 javax.swing.SwingUtilities.invokeLater(loop::exit);
                 assertThat(loop.enter()).isTrue();
                 assertThat(writes).singleElement().satisfies(edit -> assertThat(edit.changes())
                     .containsOnlyKeys(CoreSettings.UI_THEME_DESKTOP_SOURCE));
-                assertThat(saved.get().snapshot().desktopSource()).isEqualTo("gtk4");
+                assertThat(saved.get().snapshot().desktopSource()).isEqualTo("qt");
                 assertThat(dialog.draft().modified()).isFalse();
-                source.setSelectedIndex(1);
+                pick(source, "GTK 3");
                 assertThat(dialog.draft().value(CoreSettings.UI_THEME_DESKTOP_SOURCE)).isEqualTo("gtk3");
                 dialog.cancel(); dialog.open(null,"appearance");
                 var reopened = dev.jasper.app.testsupport.KitTestSupport.require(SettingsDialogTest.page(dialog),
                     "ui.appearance:desktop-source.input", JComboBox.class);
-                assertThat(DesktopSourceSelectionTest.selected(reopened)).isEqualTo("gtk4");
+                assertThat(DesktopSourceSelectionTest.selected(reopened)).isEqualTo("qt");
                 assertThat(writes).hasSize(1);
             } finally { dialog.cancel(); }
             assertThat(fixture.demands).isEmpty();

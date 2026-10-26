@@ -86,7 +86,8 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         boolean desktop = desktop(dark) || desktop(light);
         var desktopState = new ControlState(desktop, state.enabled(), state.busy(), "");
         var sourcePick = new Nodes.Choice(id + ":desktop-source", desktopState, Nodes.ChoiceKind.DROPDOWN, List.of(
-            new Option("auto", "Automatic", Optional.empty()), new Option("gtk3", "GTK 3", Optional.empty()),
+            new Option("auto", "Automatic", Optional.empty()), new Option("qt", "Qt / KDE", Optional.empty()),
+            new Option("gtk3", "GTK 3", Optional.empty()),
             new Option("gtk4", "GTK 4 / libadwaita", Optional.empty())), source, UI_THEME_DESKTOP_SOURCE.label(), "");
         var sourceControls = new Nodes.Stack(id + ":desktop-controls", desktopState, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(sourcePick));
         return new Nodes.Stack(id + ":selection", plain, Nodes.LayoutRole.VERTICAL, List.of(tiles,
@@ -155,7 +156,7 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         if (!(event instanceof UiEvent.Selected selected)) return false;
         String picked = selected.ids().stream().findFirst().orElse("");
         if (selected.id().equals(id + ":desktop-source")) {
-            if (!(desktop(dark) || desktop(light)) || !List.of("auto", "gtk3", "gtk4").contains(picked) || source.equals(picked)) return false;
+            if (!(desktop(dark) || desktop(light)) || !List.of("auto", "qt", "gtk3", "gtk4").contains(picked) || source.equals(picked)) return false;
             source = picked; syncDemand(); return true;
         }
         if (selected.id().equals(id + ":dark-theme")) {
@@ -206,7 +207,7 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         String applied = choices.desktop().status().get();
         String saved = draft.saved(UI_THEME_DESKTOP_SOURCE).orElseGet(() -> draft.defaultValue(UI_THEME_DESKTOP_SOURCE));
         if (source.equals(saved)) return applied;
-        String label = switch (source) { case "gtk3" -> "GTK 3"; case "gtk4" -> "GTK 4 / libadwaita"; default -> "Automatic"; };
+        String label = switch (source) { case "qt" -> "Qt / KDE"; case "gtk3" -> "GTK 3"; case "gtk4" -> "GTK 4 / libadwaita"; default -> "Automatic"; };
         return "Pending Apply: " + label + ". Applied: " + applied;
     }
 

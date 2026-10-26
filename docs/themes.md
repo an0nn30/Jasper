@@ -62,7 +62,7 @@ scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
 | `ui.appearance` | `"system"` | `"system"` follows the operating system's light or dark setting, live; macOS reports it directly and Linux uses the desktop portal. If unavailable, `"system"` shows Dark. `"dark"` and `"light"` choose one. A change of the system's setting never writes `config.toml`. |
 | `ui.theme.dark` | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the active look's default | The id of a theme with a Dark variant: built in, from a plugin, or installed |
 | `ui.theme.light` | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the active look's default | The id of a theme with a Light variant |
-| `ui.theme.desktop_source` | `"auto"` | Desktop colors source: `"auto"`, `"gtk3"` or `"gtk4"` |
+| `ui.theme.desktop_source` | `"auto"` | Desktop colors source: `"auto"`, `"qt"`, `"gtk3"` or `"gtk4"` |
 | `terminal.scheme` | `"match"` | `"match"` uses the shown theme's own scheme, so it follows the appearance; a scheme id, `<theme id>/<scheme key>`, chooses one in either appearance |
 
 These settings apply live in every window.
@@ -88,12 +88,17 @@ Ctrl+Shift+P on Linux and Windows), **Themes…** opens it too, and **Terminal S
 so changes can't be saved until they're fixed."
 
 On Linux, **Desktop colors** (`desktop-colors`) is the default for both appearances unless the look sets its own
-defaults. It derives interface colours from GTK 3.24+ or GTK 4.10+ with optional libadwaita. **Desktop source** offers Automatic, GTK 3 and GTK 4 / libadwaita;
-Automatic prefers GTK 4 on GNOME and GTK 3 elsewhere, falling back to the other toolkit when necessary. An explicit
-source keeps that choice. The status beneath it identifies the source and library version, or explains unavailable
-helpers, toolkit/display support or the bundled fallback. The selector and status appear when a Desktop colors pick
+defaults. It derives interface colours from Qt 5/6, KDE Frameworks 5/6, GTK 3.24+ or GTK 4.10+ with optional
+libadwaita. **Desktop source** offers Automatic, Qt / KDE, GTK 3 and GTK 4 / libadwaita. Automatic prefers the session's
+KDE major on KDE, Qt on LXQt, GTK 4 on GNOME and GTK 3 elsewhere. qt5ct/qt6ct hints move Qt first on unknown desktops
+and select its major there or on LXQt. Unavailable candidates fall back within that order. Explicit Qt / KDE stays
+within the Qt family, including KDE sources in KDE sessions; explicit GTK sources keep their selected toolkit. The
+status beneath it identifies the source and library version, or explains unavailable helpers, toolkit/display support
+or the bundled fallback. The selector and status appear when a Desktop colors pick
 is active or staged. Match System follows the portal appearance; explicit Dark or Light takes precedence. Portal
-accent and high contrast influence Desktop colors.
+accent and high contrast influence Desktop colors. Qt / KDE observes the current desktop palette: an opposite
+appearance uses compatible last-good colours or the bundled fallback. **Reload Config** restarts helpers and refreshes
+desktop detection; use it when an integration does not report palette changes.
 
 Desktop colours affect the interface. The Editor keeps its selected colour scheme; terminal **Same as UI theme**
 uses Slate Cobalt's matching appearance, and an explicit terminal scheme stays selected. When extraction is

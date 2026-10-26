@@ -258,9 +258,9 @@ public final class CoreSettings {
             + "\"catppuccin-latte\", a theme a plugin ships, or an imported theme's id (its file name in the themes folder\n"
             + "without .json). A theme without a Light variant is reported and Jasper Meadow Light is used. Switches live.").build();
     public static final Setting<String> UI_THEME_DESKTOP_SOURCE = Setting.of("ui.theme.desktop_source", SettingKind.choice(List.of(
-            Map.entry("auto", "auto"), Map.entry("gtk3", "gtk3"), Map.entry("gtk4", "gtk4"))), "auto")
-        .label("Desktop color source").keywords("desktop", "theme", "gtk", "source")
-        .description("The source for Desktop colors on Linux: \"auto\" (the default), \"gtk3\" or \"gtk4\". Switches live.\n"
+            Map.entry("auto", "auto"), Map.entry("qt", "qt"), Map.entry("gtk3", "gtk3"), Map.entry("gtk4", "gtk4"))), "auto")
+        .label("Desktop color source").keywords("desktop", "theme", "qt", "kde", "gtk", "source")
+        .description("The source for Desktop colors on Linux: \"auto\" (the default), \"qt\", \"gtk3\" or \"gtk4\". Switches live.\n"
             + "The saved source is retained on every platform.").build();
     static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.";
     public static final Setting<String> TERMINAL_SCHEME = Setting.of("terminal.scheme",

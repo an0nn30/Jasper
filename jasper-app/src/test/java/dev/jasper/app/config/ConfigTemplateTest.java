@@ -194,15 +194,15 @@ class ConfigTemplateTest {
             var file = directory.resolve("saved-" + macOs + ".toml");
             Files.writeString(file, "[ui.theme]\ndark = 'desktop-colors'\nlight = 'desktop-colors'\ndesktop_source = 'gtk4'\n");
             try (var service = new ConfigService(file, macOs)) {
-                var saved = service.save(SettingsEdit.of(CoreSettings.UI_THEME_DESKTOP_SOURCE, "gtk3", loaded.values()))
+                var saved = service.save(SettingsEdit.of(CoreSettings.UI_THEME_DESKTOP_SOURCE, "qt", loaded.values()))
                     .get(5, TimeUnit.SECONDS);
-                assertThat(saved.snapshot().desktopSource()).isEqualTo("gtk3");
+                assertThat(saved.snapshot().desktopSource()).isEqualTo("qt");
                 assertThat(saved.snapshot().darkTheme()).isEqualTo("desktop-colors");
                 assertThat(saved.snapshot().lightTheme()).isEqualTo("desktop-colors");
             }
             var reread = ConfigLoader.parse(file, Files.readString(file), macOs);
             assertThat(reread.diagnostics()).isEmpty();
-            assertThat(reread.snapshot().desktopSource()).isEqualTo("gtk3");
+            assertThat(reread.snapshot().desktopSource()).isEqualTo("qt");
         }
     }
 

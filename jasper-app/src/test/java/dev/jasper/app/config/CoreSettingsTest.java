@@ -163,9 +163,9 @@ class CoreSettingsTest {
         assertThat(setting.label()).isEqualTo("Desktop color source");
         assertThat(setting.defaultValue()).isEqualTo("auto");
         assertThat(((SettingKind.Choice<String>) setting.kind()).tokens()).containsExactly(
-            Map.entry("auto", "auto"), Map.entry("gtk3", "gtk3"), Map.entry("gtk4", "gtk4"));
+            Map.entry("auto", "auto"), Map.entry("qt", "qt"), Map.entry("gtk3", "gtk3"), Map.entry("gtk4", "gtk4"));
         assertThat(ConfigSnapshot.defaults().desktopSource()).isEqualTo("auto");
-        for (String token : List.of("auto", "gtk3", "gtk4")) {
+        for (String token : List.of("auto", "qt", "gtk3", "gtk4")) {
             var values = SettingValues.builder(CoreSettings.SCHEMA).put(setting, token, setting.key()).build();
             var read = ConfigSnapshot.from(values, Map.of(), Map.of());
             assertThat(read.desktopSource()).isEqualTo(token);
@@ -180,12 +180,12 @@ class CoreSettingsTest {
     }
 
     @Test void aSnapshotBuilderRefusesAnInvalidDesktopSource() {
-        assertThatThrownBy(() -> ConfigSnapshot.builder().desktopSource("qt").build()).isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> ConfigSnapshot.builder().desktopSource("bogus").build()).isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("ui.theme.desktop_source");
     }
 
     @Test void invalidDesktopSourceFallsBackWithAnOrdinaryDiagnostic() {
-        var result = ConfigLoader.parse(java.nio.file.Path.of("config.toml"), "[ui.theme]\ndesktop_source = 'qt'\n", false);
+        var result = ConfigLoader.parse(java.nio.file.Path.of("config.toml"), "[ui.theme]\ndesktop_source = 'bogus'\n", false);
         assertThat(result.snapshot().desktopSource()).isEqualTo("auto");
         assertThat(result.diagnostics()).singleElement().satisfies(diagnostic ->
             assertThat(diagnostic.key()).isEqualTo("ui.theme.desktop_source"));

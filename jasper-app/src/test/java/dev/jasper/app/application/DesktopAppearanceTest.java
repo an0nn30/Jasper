@@ -367,6 +367,162 @@ class DesktopAppearanceTest {
         }
     }
 
+    @Test void currentOnlyQtRequestsFinishWithoutLoopsAndRetainCompatibleColorsOnLiveChange() throws Exception {
+        for (Source primary : List.of(Source.QT5, Source.QT6, Source.KDE5, Source.KDE6)) {
+            var hints = primary == Source.KDE5 || primary == Source.KDE6
+                ? Map.of("XDG_CURRENT_DESKTOP", "KDE", "KDE_SESSION_VERSION", primary == Source.KDE5 ? "5" : "6")
+                : Map.of("XDG_CURRENT_DESKTOP", "LXQt", "QT_QPA_PLATFORMTHEME", primary == Source.QT5 ? "qt5ct" : "qt6ct");
+            try (var f = new Fixture(() -> DesktopEnvironment.from(hints))) {
+                f.owner.update(config("qt", true)); f.drain();
+                f.nativeInput.portal(1, true, ""); f.drain();
+                var sources = DesktopPalette.preferredSources(DesktopPalette.SourceMode.QT, DesktopEnvironment.from(hints));
+                for (Source source : sources) f.nativeInput.palette(source, false, "0.95,0.95,0.95,1", "");
+                f.drain();
+                assertThat(f.owner.current().source()).isEmpty();
+                assertThat(f.owner.current().status()).contains("desktop palette is Light; Jasper requests Dark", "fixture", "1");
+                var bundled = f.owner.current().theme();
+                assertThat(bundled.semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(
+                    dev.jasper.ui.theme.JasperTheme.builtIn("slate-cobalt").orElseThrow().generated(true).semantic().color(SemanticColor.SURFACE_APP));
+                var light = new ArrayList<DesktopPalette.Result>();
+                var preview = f.owner.preview(DesktopPalette.SourceMode.QT, false, light::add); f.drain();
+                try {
+                    for (Source source : sources) {
+                        f.nativeInput.awaitRequested(source, false);
+                        f.nativeInput.palette(source, false, "0.95,0.95,0.95,1", "");
+                    }
+                    f.drain(); f.nativeInput.awaitRequested(primary, true);
+                    for (Source source : sources) {
+                        f.nativeInput.awaitSample(source, 3);
+                        f.nativeInput.palette(source, false, "0.95,0.95,0.95,1", "");
+                    }
+                    f.drain();
+                    long samples = f.nativeInput.sampleCount(primary);
+                    assertThat(samples).isEqualTo(3);
+                    assertThat(light.getLast().source()).contains(primary);
+                    assertThat(light.getLast().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(242,242,242));
+                    assertThat(f.owner.current().source()).isEmpty();
+                    // A live Dark observation changes active colors and schedules exactly one Light refresh.
+                    f.nativeInput.observation(primary, primary, 3, dev.jasper.app.platform.DesktopObservation.Polarity.DARK, "0.1,0.1,0.1,1", "");
+                    f.nativeInput.awaitPalette(primary, 3, dev.jasper.app.platform.DesktopObservation.Polarity.DARK, ""); f.drain();
+                    assertThat(f.owner.current().source()).contains(primary);
+                    assertThat(f.owner.current().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(26,26,26));
+                    f.nativeInput.awaitRequested(primary, false);
+                    for (Source source : sources) {
+                        f.nativeInput.awaitSample(source, 4);
+                        f.nativeInput.palette(source, true, "0.1,0.1,0.1,1", "");
+                    }
+                    f.drain(); f.nativeInput.awaitRequested(primary, true);
+                    for (Source source : sources) {
+                        f.nativeInput.awaitSample(source, 5);
+                        f.nativeInput.palette(source, true, "0.1,0.1,0.1,1", "");
+                    }
+                    f.drain();
+                    assertThat(light.getLast().source()).contains(primary);
+                    assertThat(light.getLast().status()).contains("last good", "desktop palette is Dark; Jasper requests Light");
+                    assertThat(light.getLast().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(242,242,242));
+                    f.drain();
+                    assertThat(f.nativeInput.sampleCount(primary)).isEqualTo(samples + 2);
+                    var before = f.owner.current().theme();
+                    f.nativeInput.portal(2, false, ",\"accent\":\"0.8,0.2,0.4,1\",\"highContrast\":true"); f.drain();
+                    assertThat(f.owner.current().theme().dark()).isTrue(); // Explicit Dark beats portal Light.
+                    assertThat(f.owner.current().theme().terminal()).isEqualTo(before.terminal());
+                    assertThat(f.owner.current().theme().editor()).isEqualTo(before.editor());
+                    assertThat(f.owner.current().theme().syntax()).isEqualTo(before.syntax());
+                    assertThat(DesktopPaintPairs.validate(f.owner.current().theme(), true)).isEmpty();
+                    assertThat(f.nativeInput.toolkitAlive(primary)).isTrue();
+                    for (Source source : sources) assertThat(f.nativeInput.launches().stream().filter(source.helperName()::equals).count()).isEqualTo(1);
+                } finally { preview.close(); }
+            }
+        }
+    }
+
+    @Test void missingQtRepliesCompletePreviewsAndClosedDraftsCannotPublishAcrossSourceChangesAndReload() throws Exception {
+        try (var f = new Fixture()) {
+            f.owner.update(config("qt", true).toBuilder().appearance(AppearanceMode.SYSTEM).build()); f.drain();
+            // No portal preference retains the existing Dark fallback.
+            assertThat(f.owner.current().theme().dark()).isTrue();
+            f.nativeInput.palette(Source.QT6, false, "0.95,0.95,0.95,1", ""); f.drain();
+            assertThat(f.owner.current().theme().dark()).isTrue();
+            assertThat(f.owner.current().source()).isEmpty();
+            assertThat(f.owner.current().status()).contains("desktop palette is Light; Jasper requests Dark");
+            f.nativeInput.portal(1, true, ""); f.drain();
+            for (Source source : List.of(Source.QT6, Source.QT5)) {
+                f.nativeInput.awaitRequested(source, true);
+                f.nativeInput.unavailable(source, "Qt palette", "1", "initial no Window pair");
+            }
+            f.drain();
+            var discarded = new ArrayList<DesktopPalette.Result>();
+            var preview = f.owner.preview(DesktopPalette.SourceMode.QT, false, discarded::add); f.drain();
+            for (Source source : List.of(Source.QT6, Source.QT5)) {
+                f.nativeInput.awaitRequested(source, false);
+                f.nativeInput.unavailable(source, "Qt palette", "1", "preview no Window pair");
+            }
+            f.drain();
+            for (Source source : List.of(Source.QT6, Source.QT5)) {
+                f.nativeInput.awaitRequested(source, true);
+                f.nativeInput.unavailable(source, "Qt palette", "1", "active no Window pair");
+            }
+            f.drain();
+            var gtk = new ArrayList<DesktopPalette.Result>();
+            var second = f.owner.preview(DesktopPalette.SourceMode.GTK3, false, gtk::add); f.drain();
+            try {
+                f.nativeInput.awaitRequested(Source.QT6, false); f.nativeInput.awaitRequested(Source.QT5, false);
+                f.nativeInput.unavailable(Source.QT6, "Qt palette", "6.2.4", "no Window pair");
+                f.nativeInput.unavailable(Source.QT5, "Qt palette", "5.15.2", "no Window pair");
+                f.nativeInput.palette(Source.GTK3, false, "0.95,0.95,0.95,1", ""); f.drain();
+                f.nativeInput.awaitRequested(Source.QT5, true); f.nativeInput.awaitRequested(Source.QT6, true);
+                f.nativeInput.unavailable(Source.QT6, "Qt palette", "6.2.4", "no Window pair");
+                f.nativeInput.unavailable(Source.QT5, "Qt palette", "5.15.2", "no Window pair"); f.drain();
+                assertThat(f.owner.current().source()).isEmpty();
+                assertThat(f.owner.current().status()).contains("Qt 5", "5.15.2", "no Window pair");
+                assertThat(gtk.getLast().source()).contains(Source.GTK3);
+                assertThat(gtk.getLast().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(242,242,242));
+                f.nativeInput.palette(Source.QT5, true, "0.1,0.1,0.1,1", ""); f.edt();
+                Runnable old = f.worker.removeLast();
+                preview.close(); discarded.clear();
+                f.owner.update(config("gtk4", false)); f.owner.update(config("qt", true)); f.owner.reload();
+                old.run(); f.edt();
+                assertThat(discarded).isEmpty();
+                f.drain(); assertThat(discarded).isEmpty();
+                assertThat(f.owner.current().theme().dark()).isTrue();
+                assertThat(f.owner.current().source()).contains(Source.QT5);
+                assertThat(f.owner.current().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(26,26,26));
+            } finally { preview.close(); second.close(); }
+        }
+    }
+
+    @Test void aQtDraftRetainsSavedGtkDemandAndCannotInstallItsPreview() throws Exception {
+        try (var f = new Fixture()) {
+            f.owner.update(config("gtk3", true)); f.drain();
+            f.nativeInput.palette(Source.GTK3, true, "0.1,0.1,0.1,1", ""); f.drain();
+            var saved = f.owner.current();
+            var previews = new ArrayList<DesktopPalette.Result>();
+            var demand = f.owner.preview(DesktopPalette.SourceMode.QT, true, previews::add); f.drain();
+            f.nativeInput.palette(Source.QT6, true, "0.2,0.2,0.2,1", "");
+            f.nativeInput.unavailable(Source.QT5, "Qt palette", "5.15.2", "unavailable"); f.drain();
+            assertThat(previews.getLast().source()).contains(Source.QT6);
+            assertThat(previews.getLast().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(51,51,51));
+            assertThat(f.owner.current()).isEqualTo(saved);
+            assertThat(f.nativeInput.toolkitAlive(Source.GTK3)).isTrue();
+            demand.close(); f.drain();
+            f.nativeInput.awaitToolkit(Source.QT6, false); f.nativeInput.awaitToolkit(Source.QT5, false);
+            assertThat(f.nativeInput.toolkitAlive(Source.GTK3)).isTrue();
+        }
+    }
+
+    @Test void mismatchedQtKeepsTheFullBoundedFailureReasonAndCompatibleLastGoodColors() {
+        try (var f = new Fixture()) {
+            f.owner.update(config("qt", true)); f.drain();
+            f.nativeInput.palette(Source.QT6, true, "0.1,0.1,0.1,1", ""); f.drain();
+            var before = f.owner.current().theme();
+            String reason = "native failure ".repeat(80).substring(0, 1024);
+            f.nativeInput.palette(Source.QT6, false, "0.95,0.95,0.95,1", reason); f.drain();
+            assertThat(f.owner.current().source()).contains(Source.QT6);
+            assertThat(f.owner.current().theme()).isEqualTo(before);
+            assertThat(f.owner.current().status()).contains("last good", reason);
+        }
+    }
+
     static ConfigSnapshot config(String source, boolean dark) {
         return ConfigSnapshot.defaults().toBuilder().darkTheme("desktop-colors").lightTheme("desktop-colors")
             .desktopSource(source).appearance(dark ? AppearanceMode.DARK : AppearanceMode.LIGHT).build();

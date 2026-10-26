@@ -193,7 +193,7 @@ public final class Editors {
     public static Factory<AppearanceMode> appearance(AppearanceChoices choices) {
         return new Factory<>((setting, context) -> new AppearanceSelection(choices, context),
             List.of("Dark", "Light", "Match System", "Theme", "Dark theme", "Light theme", "Slate Cobalt", "Import theme", "Remove theme",
-                "Desktop colors", "Desktop color source", "Automatic", "GTK 3", "GTK 4 / libadwaita"));
+                "Desktop colors", "Desktop color source", "Automatic", "Qt / KDE", "GTK 3", "GTK 4 / libadwaita"));
     }
 
     /** A path field with Browse…, for a program path. */

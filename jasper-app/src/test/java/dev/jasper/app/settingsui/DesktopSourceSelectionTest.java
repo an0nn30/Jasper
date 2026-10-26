@@ -26,7 +26,7 @@ class DesktopSourceSelectionTest {
             f.pick("dark-theme", "desktop-colors");
             assertThat(node(f.page,"ui.appearance:desktop-source").state().visible()).isTrue();
             assertThat(f.source()).isSameAs(f.originalSource);
-            assertThat(options(f.source())).containsExactly("Automatic", "GTK 3", "GTK 4 / libadwaita");
+            assertThat(options(f.source())).containsExactly("Automatic", "Qt / KDE", "GTK 3", "GTK 4 / libadwaita");
             assertThat(selected(f.source())).isEqualTo("auto");
             f.pick("desktop-source", "gtk4");
             f.pick("dark-theme", "jasper-meadow");
@@ -54,18 +54,18 @@ class DesktopSourceSelectionTest {
     @Test void passiveUpdatesKeepControlsAndDraftAndSeparatePendingFromAppliedStatus() {
         try (var f = new Fixture("[ui.theme]\ndark='desktop-colors'\n", true)) {
             var dark = f.box("dark-theme");
-            f.pick("desktop-source", "gtk4");
+            f.pick("desktop-source", "qt");
             f.status = "GTK 3 · partial palette";
             List.copyOf(f.changed).forEach(Runnable::run);
             assertThat(f.box("dark-theme")).isSameAs(dark);
             assertThat(f.source()).isSameAs(f.originalSource);
             assertThat(((Nodes.Text) node(f.page, "ui.appearance:desktop-status")).text())
-                .contains("Pending Apply", "GTK 4 / libadwaita", "Applied: GTK 3 · partial palette");
+                .contains("Pending Apply", "Qt / KDE", "Applied: GTK 3 · partial palette");
             assertThat(f.draft.edit().changes()).containsOnlyKeys(CoreSettings.UI_THEME_DESKTOP_SOURCE);
         }
     }
     @Test void resetReturnsAllFourFieldsToDefaultsEvenWhenTheSourceIsHidden() {
-        try (var f = new Fixture("[ui]\nappearance='light'\n[ui.theme]\ndark='desktop-colors'\nlight='slate-cobalt'\ndesktop_source='gtk4'\n", true)) {
+        try (var f = new Fixture("[ui]\nappearance='light'\n[ui.theme]\ndark='desktop-colors'\nlight='slate-cobalt'\ndesktop_source='qt'\n", true)) {
             f.pick("dark-theme", "jasper-meadow");
             kit(f.page, "ui.appearance:reset", JButton.class).doClick(0);
             assertThat(f.draft.value(CoreSettings.UI_APPEARANCE)).isEqualTo(AppearanceMode.SYSTEM);
@@ -92,11 +92,11 @@ class DesktopSourceSelectionTest {
         }
     }
     @Test void nonLinuxRetainsOnlySelectedDesktopPicksAndSourceWithoutAcquiringHelpers() {
-        try (var f = new Fixture("[ui.theme]\ndark='jasper-meadow'\nlight='desktop-colors'\ndesktop_source='gtk4'\n", false)) {
+        try (var f = new Fixture("[ui.theme]\ndark='jasper-meadow'\nlight='desktop-colors'\ndesktop_source='qt'\n", false)) {
             assertThat(options(f.box("dark-theme"))).doesNotContain("Desktop colors", "Desktop colors (unavailable on this platform)");
             assertThat(options(f.box("light-theme"))).endsWith("Desktop colors (unavailable on this platform)");
             assertThat(selected(f.box("light-theme"))).isEqualTo("desktop-colors");
-            assertThat(selected(f.source())).isEqualTo("gtk4");
+            assertThat(selected(f.source())).isEqualTo("qt");
             assertThat(((Nodes.Text)node(f.page,"ui.appearance:desktop-status")).text()).contains("unavailable on this platform");
             assertThat(f.demands).isEmpty(); assertThat(f.draft.modified()).isFalse();
         }
@@ -104,7 +104,7 @@ class DesktopSourceSelectionTest {
     @Test void searchRevealsSourceWithBothDefaultAndEnterpriseCompositionsAndKeepsControls() {
         for (boolean enterprise : List.of(false, true)) {
             try (var f = new Fixture("[ui.theme]\ndark='desktop-colors'\n", true, enterprise)) {
-                assertThat(f.page.searchTerms()).contains("Desktop color source", "Automatic", "GTK 3", "GTK 4 / libadwaita");
+                assertThat(f.page.searchTerms()).contains("Desktop color source", "Automatic", "Qt / KDE", "GTK 3", "GTK 4 / libadwaita");
                 var source = f.source();
                 f.page.highlight("desktop color source");
                 assertThat(kit(f.page,"row:ui.appearance:desktop", JComponent.class).getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
