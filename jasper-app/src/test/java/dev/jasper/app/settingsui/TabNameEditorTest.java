@@ -53,6 +53,13 @@ class TabNameEditorTest {
         assertThat(texts(editor(TabNameChoices.NONE, "{dir} {process} {title}"))).contains("Preview: projects " + shell);
     }
 
+    @Test void theSampleShellIsTheDefaultProfilesName() {
+        assertThat(TabNameEditor.sample("Mac OS X").fallback()).isEqualTo("zsh");
+        assertThat(TabNameEditor.sample("Linux").fallback()).isEqualTo("bash");
+        assertThat(TabNameEditor.sample("Windows 11").fallback()).as("the default Windows profile's name").isEqualTo("PowerShell");
+        assertThat(TabNameEditor.sample("Windows 11").pieces().get("process")).isEqualTo("PowerShell");
+    }
+
     @Test void anUnknownPieceIsNotedButTheValueStaysValid() {
         assertThat(texts(editor(CLAUDE, "{dir} {branch}")))
             .contains("Preview: moray", "Nothing provides {branch} right now, so it shows nothing");

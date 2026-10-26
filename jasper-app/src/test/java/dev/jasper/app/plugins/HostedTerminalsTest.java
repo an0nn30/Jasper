@@ -358,4 +358,8 @@ class HostedTerminalsTest {
         taken.set(handle, "db2");
         assertThat(pieces.values(tab)).isEqualTo(java.util.Map.of("host", "db2"));
     }
+
+    @Test void theSdksReservedPieceNamesAreTheAppsBuiltInPieces() {
+        assertThat(dev.jasper.sdk.terminal.TabNamePieceSpec.BUILT_IN).isEqualTo(Set.copyOf(dev.jasper.app.config.TabNames.BUILT_IN));
+    }
 }

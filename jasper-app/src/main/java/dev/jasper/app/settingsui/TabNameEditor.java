@@ -32,8 +32,9 @@ final class TabNameEditor implements ValueEditor<String> {
             List.of("Preview", "{dir}", "{full}", "{process}", "{title}"));
     }
 
-    private static TabNameChoices.Values sample(String os) {
-        String shell = os.startsWith("Mac") ? "zsh" : os.startsWith("Windows") ? "powershell" : "bash";
+    /** The sample for an operating system: its default shell, named as the tab shows it (Windows' default profile is PowerShell). */
+    static TabNameChoices.Values sample(String os) {
+        String shell = os.startsWith("Mac") ? "zsh" : os.startsWith("Windows") ? "PowerShell" : "bash";
         return new TabNameChoices.Values(Map.of("dir", "projects", "full", "~/projects", "process", shell), shell);
     }
 
