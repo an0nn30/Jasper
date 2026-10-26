@@ -103,8 +103,8 @@ titles, each named after its active pane.
 | Rename a tab | **Rename Tab** (Tab menu or the tab's right-click menu, Cmd+I; Ctrl+Shift+I) asks "Tab name (leave blank for automatic):" and names the terminal in the tab's active pane. |
 
 Closing a terminal tab stops its shells immediately. A tab is named after its active pane: a name you gave that pane's
-terminal with Rename Tab, otherwise the title a program set, the running command, the foreground program or the
-shell's name ([Titles](terminal.md#titles)). A name you give stays until you rename the terminal with a blank name.
+terminal with Rename Tab, otherwise the [Tab name](configuration.md#tab-names) pattern filled in from that pane
+([Titles](terminal.md#titles)). A name you give stays until you rename the terminal with a blank name.
 While `ui.animations.enabled` is on, tabs slide open in 475 ms and closed in 425 ms, unless the look has no motion
 ([Animations](configuration.md#animations)); a tab that moves in or out lands at once. A terminal tab's tooltip shows
 its title (a plugin tab's shows its location), followed by its **Select Tab** shortcut when it has one.

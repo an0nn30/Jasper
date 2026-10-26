@@ -2,11 +2,22 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: **Not started.** Deviations from the spec, decided while planning:
+Status: **Done 2026-10-23.** Deviations from the spec, decided while planning:
 - The preview's sample `{process}`, used while no Terminal tab is open, is `zsh` on macOS, `powershell` on Windows and
   `bash` elsewhere, not "the configured shell's label": Settings cannot learn the label without launching a shell.
 - "The most recently focused Terminal tab" for the preview is the active window's shown tab when it is a terminal, else
   that window's first terminal tab (the terminal registry tracks the active window, not focus history).
+
+Deviations while executing:
+- `TitleTemplate`'s Javadoc writes the brace escapes as `<code>{{</code>` and `<code>}}</code>`, because nested
+  `{@code}` tags render the wrong text.
+- A child window's native title follows its active tab's name (spec 2 lists it among the places the name shows); the
+  main window's title, the look's `window_title` template, is unchanged.
+- Buddy's running cards follow the tab's title, as main's design has it, so they show the tab's pattern name, not the
+  command text; finished-command notifications still name the command.
+- `migration.csv` gained the ledger row `TitleTemplate` needs, and `TerminalTitleTest`, which tested the old naming
+  order, is deleted and dropped from the ledger rows that named it.
+- The plan's own Markdown snippets are fenced, so `AppDocumentationTest`'s link check skips them.
 
 **Goal:** Terminal tabs are named by a `terminal.tab_name` pattern such as `{dir} {process} {title}`, which Settings
 edits with a live preview.

@@ -507,21 +507,20 @@ starts. A pane that is not WSL asked to start on a `\\wsl.localhost` share start
 
 ## Titles
 
-A tab is named after its active pane, first match winning:
+A tab is named after its active pane:
 
 1. the name you gave the pane's terminal with **Rename Tab** (Cmd+I on macOS, Ctrl+Shift+I on Linux and Windows); an
    empty name returns to automatic naming;
-2. the title a program set with OSC 0, 1 or 2; with shell integration it lasts until the next command starts or
-   finishes;
-3. the running command, with shell integration;
-4. the foreground program, checked every half second on macOS and Linux (a login shell shows without its leading `-`);
-5. the shell's name, such as `zsh`, `PowerShell` or a distribution's name, or a plugin session's own title.
+2. otherwise the [Tab name](configuration.md#tab-names) pattern, by default `{dir} {process} {title}`: the folder's
+   name, the foreground program, checked every half second on macOS and Linux (a login shell shows without its
+   leading `-`; on Windows and in a plugin's session, the shell's or session's name), and the title a program set
+   with OSC 0, 1 or 2, which with shell integration lasts until the next command starts or finishes.
 
 Under the default look, the search field in the window's header shows `user@~/path` for the focused pane, or
-`host:path` for a remote one, followed by ` : ` and the name from steps 3 to 5 (`Shell` for a plugin session with no
-running command, whose title is already shown as the host); a program-set title replaces all of it. Inside tmux,
-titles that programs set reach Jasper only when tmux forwards them, for example with `set -g set-titles on` and
-`set -g set-titles-string '#{pane_title}'`.
+`host:path` for a remote one, followed by ` : ` and the running command with shell integration, else the foreground
+program, else the shell's name (`Shell` for a plugin session with no running command, whose title is already shown as
+the host); a program-set title replaces all of it. Inside tmux, titles that programs set reach Jasper only when tmux
+forwards them, for example with `set -g set-titles on` and `set -g set-titles-string '#{pane_title}'`.
 
 ## When the shell exits
 

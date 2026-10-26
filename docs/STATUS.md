@@ -165,6 +165,15 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Terminal tab names, plan A — 2026-10-23** (`claude/terminal-tab-names`, worktree
+`.claude/worktrees/terminal-tab-names`, from `main` at `36fdeedc1`; not merged or pushed): `terminal.tab_name`
+(Settings › Terminal › Tab name, live) names Terminal tabs from a pattern of free text and `{dir}`, `{full}`,
+`{process}` and `{title}`, by default `{dir} {process} {title}`; Rename Tab still wins. `config.TitleTemplate` is
+shared with the look's window title. Settings previews the active terminal tab's name as you type. Spec:
+`docs/superpowers/specs/2026-10-23-jasper-terminal-tab-names-design.md`; plan:
+`docs/superpowers/plans/2026-10-23-terminal-tab-names-a-pattern.md` (deviations in its status banner). GUI check
+pending: the Tab name row's layout and preview, and tab names on macOS, Linux and Windows.
+
 **Buddy integration — 2026-10-25:** merged tab-aware bubbles and the stand-up animation with current `main`,
 including Linux translucent rendering and Desktop colors. Resolved the status-log overlap by retaining both histories;
 production code merged cleanly. Full headless `check` with Python 3.13 passed in 8m 17s. No push.
