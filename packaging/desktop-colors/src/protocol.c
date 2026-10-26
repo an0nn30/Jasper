@@ -171,9 +171,10 @@ static void color(struct writer *w, const char *pair, const char *half, struct d
     append(w, ",\"%s.%s\":\"%.17g,%.17g,%.17g,%.17g\"", pair, half, value.red, value.green, value.blue, value.alpha);
 }
 int dc_write_palette(FILE *stream, const struct dc_palette *palette) {
+    static const char *const sources[] = {"gtk3", "gtk4", "qt5", "qt6", "kde5", "kde6"};
     static const char *const pairs[] = {"window", "view", "header", "sidebar", "dialog", "popover", "selection"};
     static const char *const appearances[] = {"dark", "light", "unknown"};
-    if (!stream || !palette || palette->generation < 0 || (palette->source != DC_GTK3 && palette->source != DC_GTK4)
+    if (!stream || !palette || palette->generation < 0 || (palette->source < DC_GTK3 || palette->source > DC_KDE6)
         || palette->appearance < DC_DARK || palette->appearance > DC_UNKNOWN
         || !valid_text(palette->implementation, DC_MAX_MESSAGE) || !valid_text(palette->version, DC_MAX_MESSAGE)
         || !valid_text(palette->reason, DC_MAX_REASON)) return -1;
@@ -183,7 +184,7 @@ int dc_write_palette(FILE *stream, const struct dc_palette *palette) {
     if (!previous) { freelocale(decimal); return -1; }
     struct writer writer = { .length = 0, .failed = 0 };
     append(&writer, "{\"v\":1,\"kind\":\"palette\",\"generation\":%" PRId64 ",\"source\":\"%s\",\"appearance\":\"%s\",\"implementation\":",
-        palette->generation, palette->source == DC_GTK3 ? "gtk3" : "gtk4", appearances[palette->appearance]);
+        palette->generation, sources[palette->source], appearances[palette->appearance]);
     quoted(&writer, palette->implementation);
     append(&writer, ",\"libraryVersion\":"); quoted(&writer, palette->version);
     append(&writer, ",\"reason\":"); quoted(&writer, palette->reason);

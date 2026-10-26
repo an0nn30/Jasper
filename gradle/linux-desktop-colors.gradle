@@ -19,9 +19,9 @@ def testProtocol = tasks.register('testDesktopProtocol', Exec) {
     description = 'Tests Linux desktop helper commands, palette serialization and shared protocol vectors.'
     onlyIf { linux }
     dependsOn(compileProtocol)
-    inputs.files(new File(fixtures, 'vectors.jsonl'), new File(fixtures, 'vectors.tsv'))
+    inputs.files(new File(fixtures, 'vectors.jsonl'), new File(fixtures, 'vectors.tsv'), new File(fixtures, 'qt-vectors.jsonl'))
     commandLine(executable.get().asFile.absolutePath, new File(fixtures, 'vectors.jsonl').absolutePath,
-        new File(fixtures, 'vectors.tsv').absolutePath)
+        new File(fixtures, 'vectors.tsv').absolutePath, new File(fixtures, 'qt-vectors.jsonl').absolutePath)
 }
 if (linux) tasks.named('check') { dependsOn(testProtocol) }
 
@@ -271,6 +271,48 @@ tasks.register('verifyDesktopQtCompatibility') {
             invoke(['xvfb-run', '-a', '-s', '-screen 0 1024x768x24 -nolisten tcp',
                 'dbus-run-session', '--config-file=' + new File(fixtures, 'themes/private-bus.conf').absolutePath,
                 '--', 'ctest', '--test-dir', build.absolutePath, '--verbose', '--output-on-failure'])
+        }
+    }
+}
+
+// Native Qt tests remain an explicit gate until the minimum SDK/baseline proof is complete.
+// Build directories separate production executables from test-only palette drivers.
+tasks.register('testDesktopQt') {
+    group = 'verification'
+    description = 'Builds/tests generic Qt5 and Qt6 helpers under private Xvfb and D-Bus.'
+    onlyIf { linux }
+    doLast {
+        [5, 6].each { major ->
+            String prefix = providers.gradleProperty("jasper.qt${major}Prefix").orNull
+            if (prefix != null && (!new File(prefix).isAbsolute() || !new File(prefix).isDirectory()))
+                throw new GradleException("jasper.qt${major}Prefix must name an existing absolute SDK prefix: ${prefix}")
+            File build = layout.buildDirectory.dir("desktop-colors/cmake/qt${major}").get().asFile
+            def invoke = { List arguments ->
+                providers.exec {
+                    ignoreExitValue = true
+                    environment('CMAKE_PREFIX_PATH', '')
+                    environment('QT_PLUGIN_PATH', '')
+                    environment('QT_QPA_PLATFORM_PLUGIN_PATH', '')
+                    environment('LD_LIBRARY_PATH', '')
+                    commandLine(arguments)
+                }.with { execution ->
+                    logger.lifecycle(execution.standardOutput.asText.get())
+                    String errors = execution.standardError.asText.get()
+                    if (!errors.isBlank()) logger.lifecycle(errors)
+                    execution.result.get().assertNormalExitValue()
+                }
+            }
+            invoke(['cmake', '-S', source.parentFile.absolutePath, '-B', build.absolutePath,
+                '-UQt5*', '-UQt6*', '-UKF5*', '-UKF6*', '-UECM_DIR', '-UDC_HAVE_KCOLORSCHEME_HEADER',
+                '-DDC_QT_MAJOR=' + major, '-DDC_PROBE_KIND=qt', '-DDC_BUILD_TESTS=ON',
+                '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_PREFIX_PATH=' + (prefix ?: '')])
+            invoke(['cmake', '--build', build.absolutePath, '--parallel', '2'])
+            invoke(['xvfb-run', '-a', '-s', '-screen 0 1024x768x24 -nolisten tcp',
+                'dbus-run-session', '--config-file=' + new File(fixtures, 'themes/private-bus.conf').absolutePath,
+                '--', 'ctest', '--test-dir', build.absolutePath, '--verbose', '--output-on-failure'])
+            Set names = new File(build, 'production').listFiles().collect { it.name } as Set
+            if (names != ["jasper-desktop-qt${major}".toString()] as Set)
+                throw new GradleException("Unexpected Qt production files: ${names}")
         }
     }
 }

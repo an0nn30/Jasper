@@ -93,6 +93,25 @@ static void output(void) {
     fclose(stream);
 }
 
+static void qt_output(void) {
+    const char *names[] = {"qt5", "qt6", "kde5", "kde6"};
+    for (int i=0;i<4;i++) {
+        struct dc_palette p = {.generation=9007199254740993LL, .source=(enum dc_source)(DC_QT5+i),
+            .appearance=DC_LIGHT,.implementation="Qt \"style\"",.version="5.15",.reason=""};
+        char *text=write_palette(&p); char expected[40];
+        snprintf(expected,sizeof expected,"\"source\":\"%s\"",names[i]);
+        check(text && strstr(text,expected),"new source identity serialized"); free(text);
+    }
+    struct dc_palette p = {.source=(enum dc_source)99,.appearance=DC_LIGHT,.implementation="",.version="",.reason=""};
+    FILE *stream=tmpfile();
+    check(dc_write_palette(stream,&p)==-1 && ftell(stream)==0,"unknown source rejected atomically"); fclose(stream);
+    char *reason=malloc(DC_MAX_REASON+2); memset(reason,'x',DC_MAX_REASON+1); reason[DC_MAX_REASON+1]=0;
+    p.source=DC_QT5; p.reason=reason; stream=tmpfile();
+    check(dc_write_palette(stream,&p)==-1 && ftell(stream)==0,"oversized reason rejected atomically");
+    reason[DC_MAX_REASON]=0;
+    check(dc_write_palette(stream,&p)==0,"maximum reason accepted"); fclose(stream); free(reason);
+}
+
 static void portal_output(void) {
     struct dc_portal portal = { .owner = INT64_MAX, .appearance = DC_LIGHT,
         .accent_present = 1, .accent = {.25, .5, .75, 1}, .contrast_present = 1,
@@ -153,9 +172,22 @@ static void vectors(const char *json_path, const char *manifest_path) {
     free(line); free(entry); fclose(json); fclose(manifest);
 }
 
+static void qt_vectors(const char *path) {
+    FILE *file=fopen(path,"r"); check(file!=NULL,"Qt palette vectors open"); if(!file) return;
+    char *line=NULL; size_t capacity=0;
+    for(int i=0;i<4;++i) {
+        check(getline(&line,&capacity,file)>0,"Qt palette vector exists");
+        struct dc_palette p={.generation=9007199254740993LL,.source=(enum dc_source)(DC_QT5+i),
+            .appearance=DC_LIGHT,.implementation="Qt \"fixture\"",.version="runtime",.reason=""};
+        p.colors[DC_WINDOW]=(struct dc_colors){.present=1,.background={1,1,1,1},.foreground={0,0,0,1}};
+        char *actual=write_palette(&p); check(actual && !strcmp(actual,line),"complete Qt palette envelope matches vector"); free(actual);
+    }
+    check(getline(&line,&capacity,file)==-1,"no extra Qt vectors");free(line);fclose(file);
+}
+
 int main(int argc, char **argv) {
-    if (argc != 3) { fprintf(stderr, "usage: protocol-test vectors.jsonl vectors.tsv\n"); return 2; }
-    commands(); output(); portal_output(); vectors(argv[1], argv[2]);
+    if (argc != 3 && argc != 4) { fprintf(stderr, "usage: protocol-test vectors.jsonl vectors.tsv\n"); return 2; }
+    commands(); output(); qt_output(); portal_output(); vectors(argv[1], argv[2]); if(argc==4) qt_vectors(argv[3]);
     printf("desktop protocol: %d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;
 }
