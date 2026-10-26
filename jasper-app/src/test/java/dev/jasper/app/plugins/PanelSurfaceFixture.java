@@ -3,6 +3,8 @@ package dev.jasper.app.plugins;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.contributions.PanelHeaderState;
 import dev.jasper.app.contributions.PanelSite;
+import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.ui.model.ControlState;
 import dev.jasper.ui.model.Nodes;
@@ -41,6 +43,8 @@ public final class PanelSurfaceFixture implements AutoCloseable {
     private final String root;
     private final Path home;
     private PanelHeaderState header = PanelHeaderState.EMPTY;
+    /** Where the panel's site reports it: the no-dock default (left, top, docked) until {@link #place} moves it. */
+    private volatile PanelSite.Placement placement = new PanelSite.Placement(Slot.LEFT_TOP, ToolWindowMode.DOCKED);
 
     public PanelSurfaceFixture(Path home, ResolvedTheme theme, String panel) throws Exception { this(home, theme, panel, false); }
 
@@ -88,7 +92,8 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         root = panel.equals(TUNNELS) ? "tunnels" : panel.equals(SFTP) ? "sftp" : panel.equals(SESSIONS) ? "sessions" : "fileserver.panel";
         headerId = panel.equals(FILE_SERVERS) ? "fileserver.header" : root + ".header";
         var holder = new KitView[1];
-        site = onEdtValue(() -> new PanelSite(vault.window, () -> { }, () -> { }, () -> true, state -> { header = state; if (holder[0] != null) hostHeader(holder[0]); }));
+        site = onEdtValue(() -> new PanelSite(vault.window, () -> { }, () -> { }, () -> true, state -> { header = state; if (holder[0] != null) hostHeader(holder[0]); },
+            () -> placement));
         view = onEdtValue(() -> (KitView) vault.contributions.panels().stream().filter(p -> p.id().equals(panel)).findFirst().orElseThrow().factory().apply(site));
         holder[0] = view;
         onEdt(() -> {
@@ -110,6 +115,16 @@ public final class PanelSurfaceFixture implements AutoCloseable {
     }
 
     public KitView view() { return view; }
+
+    /**
+     * Moves the panel to {@code value} as the dock does: the site reports it from then on and tells the panel's placement
+     * listeners (on the EDT), and the fixture settles.
+     */
+    public void place(PanelSite.Placement value) throws InterruptedException {
+        placement = value;
+        onEdt(() -> site.notifyPlacement(value));
+        StagedVaultHost.settle();
+    }
 
     /** The plugin's {@code layout()} as a name: CLASSIC under Enterprise, ROWS otherwise (plan 10a Task 1). */
     public String layout() {
@@ -228,12 +243,17 @@ public final class PanelSurfaceFixture implements AutoCloseable {
      * selection, so the panel's selection listeners (the window's shared session choice) hear it (plan 10a).
      */
     public void selectSession(UUID host) throws InterruptedException {
+        onEdt(() -> { if (field(plugin, "sessionsPanel") == null) throw new AssertionError("no Sessions panel"); });
+        select("sessions.rows", "host:" + host);
+    }
+
+    /** Selects the row {@code rowId} of the view's list or table {@code id}, as a click does, and settles. */
+    public void select(String id, String rowId) throws InterruptedException {
         onEdt(() -> {
             try {
-                if (field(plugin, "sessionsPanel") == null) throw new AssertionError("no Sessions panel");
                 var dispatch = KitView.class.getDeclaredMethod("dispatch", dev.jasper.ui.model.UiEvent.class);
                 dispatch.setAccessible(true);
-                dispatch.invoke(view, new dev.jasper.ui.model.UiEvent.Selected("sessions.rows", Set.of("host:" + host)));
+                dispatch.invoke(view, new dev.jasper.ui.model.UiEvent.Selected(id, Set.of(rowId)));
             } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
         });
         StagedVaultHost.settle();
@@ -302,12 +322,15 @@ public final class PanelSurfaceFixture implements AutoCloseable {
     }
 
     /** A Remote {@code FileEntry}: {@code kind} is FILE, DIRECTORY or LINK. */
-    public Object fileEntry(String name, String kind, long size) {
+    public Object fileEntry(String name, String kind, long size) { return fileEntry(name, kind, size, 1_000L); }
+
+    /** As above, modified at {@code modified} (epoch milliseconds). */
+    public Object fileEntry(String name, String kind, long size, long modified) {
         try {
             Class<?> entry = loader.loadClass("dev.jasper.remote.sftp.FileEntry");
             @SuppressWarnings({"unchecked", "rawtypes"}) Object value = Enum.valueOf((Class) loader.loadClass("dev.jasper.remote.sftp.FileEntry$Kind"), kind);
             return entry.getConstructor(String.class, value.getClass(), long.class, long.class, int.class, String.class)
-                .newInstance(name, value, size, 1_000L, kind.equals("DIRECTORY") ? 0755 : 0644, "");
+                .newInstance(name, value, size, modified, kind.equals("DIRECTORY") ? 0755 : 0644, "");
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
