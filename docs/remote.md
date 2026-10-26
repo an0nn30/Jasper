@@ -88,6 +88,12 @@ Under the list, the selected host's card shows its name, `user@host:port` and ho
 running pane the card reads "Connected" and its button **Open Shell** goes to that pane; otherwise the button is
 **Connect**. The pencil edits the host.
 
+In a window of its own ([Float and Window](workspace.md#float-and-window)) or docked at the bottom, the card gives way
+to a column beside the list with the selected row's details: its name and address, **Edit…** and **Connect** (**Open
+Shell** while a pane runs), and the host's Host, User, Port, Credentials, Jump host (when set), Group, System (when
+learned) and Sessions, with **Connect in Split** and **Browse Files**. A distribution shows its Distribution, Version,
+Command and Sessions, with **Open** and **Open in Split**.
+
 ### The toolbar's Sessions menu
 
 The toolbar's **Sessions** menu lists the WSL distributions ("Ubuntu (WSL 2)"), then your hosts alphabetically
@@ -363,6 +369,7 @@ retrace the folders you visited in this pane; Option+Left, Option+Right and Opti
 and Alt+Up on Linux and Windows (Back, Forward, Parent Folder) work anywhere in the panel.
 
 The list shows Name and Size, folders first, then by name ignoring case, with each entry's modified time in its tooltip.
+In a window of its own or docked at the bottom it adds Modified (date and time) and Permissions (`rwxr-xr-x`) columns.
 Select several rows for the file actions. A folder of more than 200 entries is shown 200 at a time ("1–200 of 950",
 **Previous page**, **Next page**). Names starting with a dot stay hidden until you press **Show hidden items**; the
 choice is remembered and applies to every browser opened afterwards. Enter or a double click opens a folder, opens a
@@ -520,6 +527,11 @@ The right-click menu offers **Start** or **Stop**, **Open in Browser** (a runnin
 **Save as Tunnel…** for a quick forward. Deleting a running tunnel stops it. A tunnel whose host was deleted stays,
 marked "Host missing · Edit to choose a host".
 
+In a window of its own or docked at the bottom, the selected tunnel's details (the first tunnel's while none is
+selected) stand beside the list: its name and state, the route as the tunnel form draws it, Type and Via and, while it
+runs, Connections, Traffic and Uptime, with **Start** or **Stop**, **Edit…** (**Save as Tunnel…** for a quick
+forward), **Open in Browser** and **Copy Address**.
+
 The status bar shows "2 tunnels", "2 tunnels · 1 failing" or "1 tunnel failing" while any runs or failed, with the state
 of each running, starting or failed tunnel in its tooltip; clicking it toggles the panel. **Stop All Tunnels** stops
 them all.
@@ -650,11 +662,15 @@ when it starts, so it follows a change of look at the next start of Jasper.
 - **Sessions** starts on the right, with its count beside the title: **Filter sessions** over a Name, Host and Port tree
   (favourites marked ★, groups opened and closed with their disclosure triangle, Enter or a double click), and below
   it the selected host's **Properties** (Host, User, Port, Credentials) with **Edit…** and **Connect** (**Open Shell**
-  while it runs), or a distribution's Distribution, Version and Command with **Open**.
+  while it runs), or a distribution's Distribution, Version and Command with **Open**. In a window of its own or docked
+  at the bottom, the Properties stand beside the tree instead of below it.
 - **Tunnels** starts on the right, under Sessions: a Type, Local, Remote and Via table. Enter or a double click starts
-  or stops a row, the right-click menu holds the rest, and the line below reads "pg-prod — active. Click to toggle."
+  or stops a row, the right-click menu holds the rest, and the line below reads "pg-prod — active. Click to toggle." In a
+  window of its own or docked at the bottom, the selected tunnel's **Properties** (Type, Local, Remote, Via, State and,
+  while it runs, Connections, Traffic and Uptime) stand beside the table, with that line under them.
 - **SFTP** starts on the left: Back, Forward, Refresh, **Hidden files** and **Upload** over the breadcrumbs, and a
-  Name, Size and Modified ("Sep 28") table. While nothing is connected, a **Choose Session…** dropdown lists your hosts.
+  Name, Size and Modified ("Sep 28") table; in a window of its own or docked at the bottom, Modified is the date and time
+  and a Permissions column follows. While nothing is connected, a **Choose Session…** dropdown lists your hosts.
 - **Transfers** is a bottom tool window ("No Transfers" when the queue is empty), listed with the other toggles in the
   Window menu; **Transfers** (Cmd+Option+3, Alt+3) shows it.
 

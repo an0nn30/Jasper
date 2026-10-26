@@ -1,5 +1,7 @@
 # Jasper — Status and Handoff
 
+**Wide tool window layouts — 2026-10-26** (`claude/elastic-keller-d0d603`; [plan](superpowers/plans/2026-10-26-wide-tool-window-layouts.md), [spec](superpowers/specs/2026-10-26-jasper-wide-tool-window-layouts-design.md); executed with per-task subagents and reviews). Remote's Sessions, SFTP and Tunnels tool windows and File Server's File Servers tool window take a wide layout in a window of their own (Float or Window) and docked at the bottom, through SDK 0.22.0's `PanelHost.placement()` and `onPlacement`, in both looks: Sessions, Tunnels and File Servers put the selected row's details beside the list, and SFTP adds Modified and Permissions columns. Remote is 0.17.0 and File Server 0.7.0 (SDK range unchanged), and the guides, the plugin version tables and `docs/sdk-reference.html` say so. `:jasper-plugin-remote:check` and `:jasper-plugin-fileserver:check` pass: Remote 623 tests, File Server 296, zero failures, errors and skips. GUI checks for the user: Sessions, SFTP, Tunnels and File Servers each floated, in Window mode and docked at the bottom, under both the default and the Enterprise look. Not pushed; full check pending.
+
 **Linux distribution packaging — 2026-10-26:** `packageDist` selects only RPM on recognized Fedora/RHEL and SUSE
 families from `os-release`; Debian/Ubuntu and unknown hosts retain both formats. Explicit DEB/RPM tasks and mandatory
 dependency validation are unchanged. Portable packaging fixtures, four documentation checks and independent review
@@ -118,9 +120,9 @@ Bundled plugins, all enabled by default except Enterprise:
 | Credential Vault | `dev.jasper.vault` | 0.7.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
 | Editor | `dev.jasper.editor` | 0.15.0 | `dev.jasper.editor.api` | Local and remote text files in panes, several views of one file, Markdown preview; `jasper editor` |
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | — | The Enterprise look and theme, as descriptor data |
-| File Server | `dev.jasper.fileserver` | 0.6.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
+| File Server | `dev.jasper.fileserver` | 0.7.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
-| Remote | `dev.jasper.remote` | 0.16.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
+| Remote | `dev.jasper.remote` | 0.17.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
 | Sample | `dev.jasper.sample` | 0.5.0 | — | Exercises the plugin runtime; inert unless a `demo_*` setting is set |
 | Shell History | `dev.jasper.history` | 0.3.0 | — | Searching every shell's history from the palette |
 | Snippets | `dev.jasper.snippets` | 0.3.0 | `dev.jasper.snippets.api` | Saved commands in the palette |
