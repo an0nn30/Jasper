@@ -8,7 +8,7 @@ import java.nio.file.*;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 
-/** Headless grouped column and filtered drawer contact sheets at 2x density. */
+/** Production summary and grouped drawer at 2x density, without native windows. */
 public final class BuddyGroupsPreview {
     private BuddyGroupsPreview() { }
     public static void main(String[] args) throws Exception {
@@ -22,28 +22,38 @@ public final class BuddyGroupsPreview {
                     var g = image.createGraphics();
                     g.setColor(dark ? new Color(72, 74, 78) : new Color(232, 233, 235));
                     g.fillRect(0, 0, image.getWidth(), image.getHeight()); g.scale(2, 2);
-                    for (int scene = 0; scene < 4; scene++) {
+                    for (int scene = 0; scene < 5; scene++) {
                         var deck = new BuddyDeck();
-                        int groups = scene == 3 ? 5 : scene == 1 ? 3 : 1;
-                        for (int group = groups - 1; group >= 0; group--)
-                            for (int pane = (scene == 0 ? 0 : group == 0 ? 3 : 1); pane >= 0; pane--)
-                                deck.post(new BuddyNotice(new BuddyNoticeId("preview", group + "/" + pane),
-                                    BuddyNotice.Kind.TASK, pane < 2 ? "Claude CLI" : "Build release " + pane,
-                                    BuddyNotice.State.RUNNING, () -> "Running · 2m 12s", () -> {},
-                                    new BuddyNotice.Group(new BuddyNoticeId("tabs", "tab" + group), "Release workspace " + (group + 1))));
+                        var drawer = new BuddyDeckPanel(options, deck, () -> {});
+                        int tasks = scene == 0 ? 1 : 3;
+                        for (int pane = 0; pane < tasks; pane++) {
+                            deck.post(new BuddyNotice(new BuddyNoticeId("preview", "pane" + pane), BuddyNotice.Kind.TASK,
+                                pane < 2 ? "Claude CLI" : "Build release", BuddyNotice.State.RUNNING,
+                                () -> "Running · 2m 12s", () -> {}, new BuddyNotice.Group(new BuddyNoticeId("tabs", "release"), "Release workspace")));
+                            drawer.refresh();
+                        }
+                        if (scene > 0) {
+                            deck.post(new BuddyNotice(new BuddyNoticeId("preview", "ssh"), BuddyNotice.Kind.CONNECTION,
+                                "Production tunnel", BuddyNotice.State.UP, () -> "Connected · staging:5432", () -> {}));
+                            drawer.refresh();
+                        }
+                        if (scene == 2) deck.post(new BuddyNotice(new BuddyNoticeId("preview", "input"), BuddyNotice.Kind.TASK,
+                            "Deploy production", BuddyNotice.State.NEEDS_INPUT, () -> "Confirm deployment", () -> {}));
                         JComponent panel;
-                        if (scene == 2) {
-                            var drawer = new BuddyDeckPanel(options, deck, () -> {});
-                            drawer.setGroupFilter(new BuddyNoticeId("tabs", "tab0")); panel = drawer;
+                        if (scene >= 3) {
+                            panel = drawer;
+                            if (scene == 4) {
+                                drawer.setSize(drawer.getPreferredSize()); drawer.handleClick(new Point(60, 45));
+                            }
                         } else {
-                            var column = new BuddyColumnPanel(options, deck, () -> {}, () -> {});
-                            column.setClock(() -> 0); column.refresh(); column.setClock(() -> 1_000_000_000L); panel = column;
+                            var summary = new BuddyColumnPanel(options, deck, () -> {}, () -> {});
+                            summary.refresh(); panel = summary;
                         }
                         panel.setSize(panel.getPreferredSize());
                         var child = (Graphics2D) g.create();
-                        child.translate(30 + (scene % 2) * 440, 20 + (scene / 2) * 350);
+                        child.translate(scene < 3 ? 30 : 470, scene < 3 ? 20 + scene * 160 : 20 + (scene - 3) * 420);
                         child.setColor(dark ? Color.WHITE : Color.DARK_GRAY);
-                        child.drawString(new String[]{"Single pane", "Three tab stacks", "Filtered tab drawer", "Five groups: column overflow"}[scene], 32, 12);
+                        child.drawString(new String[]{"One task", "Mixed activity", "Needs input", "Grouped activity", "Collapsed group"}[scene], 32, 12);
                         child.translate(0, 15); panel.paint(child); child.dispose();
                     }
                     g.dispose();

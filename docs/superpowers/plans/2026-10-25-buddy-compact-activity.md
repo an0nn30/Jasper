@@ -7,7 +7,8 @@
 **Tech Stack:** Java 25 JBR, Swing, headless JUnit and Java2D previews.
 **Spec:** docs/superpowers/specs/2026-10-25-buddy-compact-activity-design.md
 
-Status: authorized continuous execution. Existing clean checkout reused on dedicated branch.
+Status: implemented; Buddy check (175 tests), application architecture and headless preview inspection passed.
+Task/whole-branch review and full headless check pending. Existing checkout reused on dedicated branch.
 Deviation: detailed implementation bodies delegated to implementer; exact behaviors and verification
 below replace duplicating the production implementation in this plan.
 
@@ -38,18 +39,18 @@ Keep unrelated bubble menu behavior intact. Remove obsolete stack-specific inter
 Interfaces: public BuddyNotice/BuddyDeck inputs unchanged; internal pure projection/geometry and
 production-used lifecycle seams may be introduced with concrete responsibilities.
 
-- [ ] RED: add behavior tests for empty/single/multiple/mixed summary counts, priority and stable ties;
+- [x] RED: add behavior tests for empty/single/multiple/mixed summary counts, priority and stable ties;
   singleton and multiple capsule clicks both open drawer without invoking notice activation.
-- [ ] RED: add grouped-header expand/collapse tests, stable update ordering, title/group changes,
+- [x] RED: add grouped-header expand/collapse tests, stable update ordering, title/group changes,
   duplicate labels, visibility, dismiss all with collapsed and suppressed notices, row activation,
   viewport-clipped hit tests and externally shrinking scroll.
-- [ ] RED: cover persistent drawer lifetime and explicit-open-only focus behavior through production
+- [x] RED: cover persistent drawer lifetime and explicit-open-only focus behavior through production
   methods, plus no continuous summary/drawer animation demand while ordinary work runs.
-- [ ] Implement projections and presentation. Prefer concrete internal types over new interfaces.
+- [x] Implement projections and presentation. Prefer concrete internal types over new interfaces.
   Bind geometry to displayed rows; preserve state by identity; clamp against actual viewport.
-- [ ] GREEN: run targeted affected tests, then :jasper-buddy:check and relevant architecture checks.
+- [x] GREEN: run targeted affected tests, then :jasper-buddy:check and relevant architecture checks.
   Adapt old stack/arrival assumptions deliberately; remove dead tests with removed internals only.
-- [ ] Generate headless light/dark previews of one summary, mixed/attention summary and grouped drawer
+- [x] Generate headless light/dark previews of one summary, mixed/attention summary and grouped drawer
   including collapsed group. Inspect at rendered size. Update current docs and STATUS minimally.
 - [ ] Commit with Co-Authored-By trailer; task review and final whole-branch review, fix findings.
 - [ ] Run ./gradlew check --continue with Python 3.13; record results and finish locally.

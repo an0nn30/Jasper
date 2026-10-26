@@ -11,44 +11,11 @@ import java.awt.Rectangle;
  */
 final class BuddyDeckLayout {
     static final int ROW_GAP = 6;
-    /** Preserve the existing multi-notice order, with air between the rounded capsules. */
-    static final int COLUMN_GAP = 6;
-    static final int MAX_IN_COLUMN = 3;
     static final int DISMISS_SIZE = 32;
     static final int DISMISS_INSET = 12;
     static final int CLEAR_ROW_HEIGHT = 26;
 
     private BuddyDeckLayout() { }
-
-    static int visibleInColumn(int count) { return Math.min(Math.max(count, 0), MAX_IN_COLUMN); }
-
-    /** The capsules and the gaps between them. */
-    static int columnHeight(int count, int cardHeight) {
-        int visible = visibleInColumn(count);
-        if (visible == 0) return 0;
-        return visible * cardHeight + (visible - 1) * COLUMN_GAP;
-    }
-
-    /**
-     * Bubble {@code index} counting from the newest. The newest is always the one nearest his head:
-     * lowest when the column is above him, highest when it has been flipped below.
-     */
-    static Rectangle column(int index, int count, int width, int cardHeight, boolean below) {
-        int visible = visibleInColumn(count);
-        int pitch = cardHeight + COLUMN_GAP;
-        int y = below ? index * pitch : (visible - 1 - index) * pitch;
-        return new Rectangle(0, y, width, cardHeight);
-    }
-
-    /** The bubble at {@code y} in the column, or -1 in a gap. */
-    static int columnAt(int y, int count, int cardHeight, boolean below) {
-        int visible = visibleInColumn(count);
-        for (int index = 0; index < visible; index++) {
-            Rectangle card = column(index, count, 1, cardHeight, below);
-            if (y >= card.y && y < card.y + card.height) return index;
-        }
-        return -1;
-    }
 
     /** Row {@code index} in the expanded list, already shifted by the scroll offset. */
     static Rectangle expanded(int index, int width, int cardHeight, int scroll) {

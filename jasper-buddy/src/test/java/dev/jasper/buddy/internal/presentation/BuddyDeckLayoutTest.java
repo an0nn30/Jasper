@@ -68,25 +68,4 @@ class BuddyDeckLayoutTest {
         assertThat(target.y).isEqualTo(card.y + BuddyDeckLayout.DISMISS_INSET);
     }
 
-    @Test void capsulesHaveAGapAndNoThoughtTail() {
-        assertThat(BuddyDeckLayout.columnHeight(0, CARD)).isZero();
-        assertThat(BuddyDeckLayout.columnHeight(1, CARD)).isEqualTo(CARD);
-        assertThat(BuddyDeckLayout.columnHeight(3, CARD)).isEqualTo(3 * CARD + 2 * BuddyDeckLayout.COLUMN_GAP);
-        assertThat(BuddyDeckLayout.columnHeight(20, CARD)).isEqualTo(BuddyDeckLayout.columnHeight(3, CARD));
-        Rectangle newest = BuddyDeckLayout.column(0, 3, WIDTH, CARD, false);
-        Rectangle middle = BuddyDeckLayout.column(1, 3, WIDTH, CARD, false);
-        assertThat(newest.y - middle.y - middle.height).isEqualTo(BuddyDeckLayout.COLUMN_GAP).isPositive();
-    }
-
-    @Test void flippingKeepsNewestNearestTheBuddy() {
-        assertThat(BuddyDeckLayout.column(0, 3, WIDTH, CARD, false).y).isEqualTo(2 * (CARD + BuddyDeckLayout.COLUMN_GAP));
-        assertThat(BuddyDeckLayout.column(0, 3, WIDTH, CARD, true).y).isZero();
-        for (boolean below : new boolean[] {false, true}) {
-            for (int i = 0; i < 3; i++) {
-                Rectangle card = BuddyDeckLayout.column(i, 3, WIDTH, CARD, below);
-                assertThat(BuddyDeckLayout.columnAt(card.y + 4, 3, CARD, below)).isEqualTo(i);
-                assertThat(card.y + card.height).isLessThanOrEqualTo(BuddyDeckLayout.columnHeight(3, CARD));
-            }
-        }
-    }
 }

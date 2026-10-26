@@ -1,5 +1,15 @@
 # Jasper — Status and Handoff
 
+**Compact Buddy activity — 2026-10-25.** `codex/buddy-compact-activity` replaces floating stacks with one
+quiet visible-work summary and an all-activity drawer with stable expandable groups. Attention priority,
+task/connection counts, duplicate labels, suppression and activation remain explicit. Drawer opening owns
+focus and native-owner selection; passive refresh and drag cannot reopen it. The [plan](superpowers/plans/2026-10-25-buddy-compact-activity.md)
+records delegated implementation bodies. Buddy check and application architecture passed: 175 tests,
+zero failures/errors/skips. Inspected light/dark headless previews under `jasper-buddy/build/reports/buddy-groups/`.
+Task review, whole-branch review and full headless check are pending. GUI focus/outside-click acceptance
+remains user-run; no GUI, AOT, benchmark, merge or push.
+
+
 **Buddy laptop opening — 2026-10-25.** `codex/buddy-open-laptop` adds the authorized reverse-pose opening: 500 ms from standing, seated idle starts at the lowered-laptop pose, and sleeping wakes first. Work changes reverse either transition from its current pose with a full pose duration; repeated intent retains deadlines. Existing sprites are unchanged. Focused animator tests pass (34); Buddy check passes 186 tests with zero failures/errors/skips. Headless normal/interrupted opening and stand-up previews are under `jasper-buddy/build/reports/buddy-open-laptop/` and `buddy-stand-up/`. The [plan](superpowers/plans/2026-10-25-buddy-open-laptop.md) records the implementation-body delegation deviation. Task and whole-branch reviews passed with no findings. Full headless check with Python 3.13 passed in 8m 37s: 13,049 tests, zero failures/errors, 30 skips. Native GUI acceptance remains user-run; unmerged and unpushed.
 
 **Linux Desktop colors — 2026-10-24.** Implemented on `codex/linux-desktop-colors`, refreshed from main `22a611145`, with all ten task reviews and the final fix review complete through `42e9c4dfe`. The optional interface theme offers Automatic, GTK 3 and GTK 4 / libadwaita sources, portal preferences, live previews and bounded fallback/recovery. Main’s Meadow defaults, independent Editor scheme and terminal choices are preserved. Linux distributions carry the three isolated executable helpers; other platforms retain saved Desktop choices as unavailable. See the approved [plan](superpowers/plans/2026-10-17-jasper-linux-desktop-colors.md) for the execution record.

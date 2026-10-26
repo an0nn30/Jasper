@@ -23,31 +23,14 @@ class BuddyColumnPlacementTest {
         assertThat(motion.moving(20_000_000)).isFalse();
     }
 
-    @Test void midpointFlipStartsContinuouslyAndSettlesOnTheOtherSide() {
-        Rectangle anchor = new Rectangle(500, 480, 84, 96);
-        motion.update(anchor, size, screen, 0, true);
-        Point before = motion.at(0);
-        anchor.translate(0, -80);
-        assertThat(motion.update(anchor, size, screen, 10_000_000, false)).isTrue();
-        before.translate(0, -80);
-        assertThat(motion.at(10_000_000)).isEqualTo(before);
-        assertThat(motion.at(160_000_000).y).isGreaterThan(before.y);
-        assertThat(motion.at(810_000_000)).isEqualTo(BuddyColumnWindow.place(anchor, size, screen, true));
-        assertThat(motion.moving(810_000_000)).isFalse();
-    }
-
-    @Test void interruptedFlipKeepsItsPositionAndReshowSettlesImmediately() {
+    @Test void midpointFlipAndReversalAreImmediate() {
         Rectangle anchor = new Rectangle(500, 700, 84, 96);
         motion.update(anchor, size, screen, 0, true);
         anchor.y = 300; motion.update(anchor, size, screen, 20_000_000, false);
-        Point before = motion.at(120_000_000);
-        anchor.y += 300;
-        motion.update(anchor, size, screen, 120_000_000, false);
-        before.y += 300;
-        assertThat(motion.at(120_000_000)).isEqualTo(before);
-        motion.update(anchor, size, screen, 140_000_000, true);
-        assertThat(motion.at(140_000_000)).isEqualTo(BuddyColumnWindow.place(anchor, size, screen, false));
-        assertThat(motion.moving(140_000_000)).isFalse();
+        assertThat(motion.at(20_000_000)).isEqualTo(BuddyColumnWindow.place(anchor, size, screen, true));
+        anchor.y = 700; motion.update(anchor, size, screen, 40_000_000, false);
+        assertThat(motion.at(40_000_000)).isEqualTo(BuddyColumnWindow.place(anchor, size, screen, false));
+        assertThat(motion.moving(40_000_000)).isFalse();
     }
 
     @Test void everyFrameStaysInsideOffsetMonitorBoundsEvenDuringOvershoot() {

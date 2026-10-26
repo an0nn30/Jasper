@@ -1,10 +1,9 @@
 package dev.jasper.buddy.internal.presentation;
 
-import dev.jasper.buddy.internal.model.BuddyDeck;
-import dev.jasper.buddy.internal.model.BuddyGroups;
+import dev.jasper.buddy.internal.model.*;
 import dev.jasper.buddy.notice.*;
-import java.awt.Point;
-import java.util.*;
+import java.awt.*;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -12,103 +11,66 @@ class BuddyGroupsPresentationTest {
     BuddyNotice notice(String key, String title, String group) {
         return new BuddyNotice(new BuddyNoticeId("test", key), BuddyNotice.Kind.TASK, title,
             BuddyNotice.State.RUNNING, () -> "Running · 2m", () -> {},
-            group == null ? null : new BuddyNotice.Group(new BuddyNoticeId("test", group), "Tab"));
+            group == null ? null : new BuddyNotice.Group(new BuddyNoticeId("test", group), "Group " + group));
     }
-    @Test void groupsUseIdentityAndNewestMemberOrderWithSeparateNoticeNamespace() {
-        var entries = BuddyGroups.project(List.of(notice("1", "one", "a"), notice("a", "plugin", null),
-            notice("2", "two", "b"), notice("3", "three", "a")));
-        assertThat(entries).hasSize(3);
-        assertThat(entries.getFirst().members()).extracting(BuddyNotice::title).containsExactly("one", "three");
-        assertThat(entries.getFirst().collapsed().title()).isEqualTo("Tab");
-        assertThat(entries.getFirst().collapsed().detail().get()).isEqualTo("2 running");
-        assertThat(entries.get(0).identity()).isNotEqualTo(entries.get(1).identity());
+    @Test void groupsAndMembersRetainOrderAcrossUpdatesReparentingAndSuppression() {
+        var deck = new BuddyDeck(); var groups = new BuddyGroups();
+        var one = notice("1", "one", "a"); var two = notice("2", "two", "b"); var three = notice("3", "three", "a");
+        for (var n : List.of(one, two, three)) { deck.post(n); groups.reconcile(deck); }
+        var entries = groups.reconcile(deck);
+        assertThat(entries).extracting(e -> e.group().title()).containsExactly("Group a", "Group b");
+        groups.toggle(entries.getFirst().identity());
+        deck.post(one); deck.updateTitle(three.id(), "new title");
+        assertThat(groups.reconcile(deck).getFirst().members()).extracting(BuddyNotice::title).containsExactly("one", "new title");
+        deck.updateContext(one.id(), two.group(), true);
+        assertThat(groups.reconcile(deck).get(1).members()).extracting(BuddyNotice::title).containsExactly("one", "two");
+        deck.updateContext(three.id(), three.group(), false);
+        assertThat(groups.reconcile(deck)).hasSize(1);
+        deck.updateContext(three.id(), new BuddyNotice.Group(three.group().id(), "Renamed"), true);
+        assertThat(groups.reconcile(deck).getFirst().group().title()).isEqualTo("Renamed");
+        assertThat(groups.expanded(entries.getFirst().identity())).isFalse();
+        deck.dismiss(three.id()); groups.reconcile(deck); deck.post(three);
+        assertThat(groups.reconcile(deck).getLast().group()).isEqualTo(three.group());
+        assertThat(groups.expanded(entries.getFirst().identity())).isTrue();
     }
-    @Test void stackClickExpandsWithoutActivationAndSingletonActivates() {
-        var deck = new BuddyDeck();
-        var requests = new ArrayList<BuddyNoticeId>();
-        int[] activated = {0};
-        var group = new BuddyNotice.Group(new BuddyNoticeId("test", "a"), "Tab");
-        for (int i = 0; i < 4; i++) deck.post(new BuddyNotice(new BuddyNoticeId("test", "pane" + i),
-            BuddyNotice.Kind.TASK, "Pane " + i, BuddyNotice.State.RUNNING, () -> "detail", () -> activated[0]++, group));
-        var panel = new BuddyColumnPanel(BuddyTestAppearance.options(), deck, () -> {}, requests::add);
-        panel.setClock(() -> 0); panel.refresh(); panel.setClock(() -> 1_000_000_000L);
-        panel.setSize(panel.getPreferredSize());
-        var bounds = panel.cardBounds(0);
-        panel.handleClick(new Point(bounds.x + 1, bounds.y + 1));
-        assertThat(requests).containsExactly(group.id());
-        assertThat(activated[0]).isZero();
-        panel.handleClick(new Point(bounds.x + bounds.width + 4, bounds.y + bounds.height / 2));
-        assertThat(requests).containsExactly(group.id(), group.id());
-        assertThat(BuddyGroups.project(deck.notices()).getFirst().backingLayers()).isEqualTo(2);
-        assertThat(panel.getPreferredSize().height).isEqualTo(BuddyCard.HEIGHT + 8 + 2 * BuddyColumnPanel.MARGIN + BuddyColumnPanel.ARRIVAL_ROOM);
-        for (int i = 1; i < 4; i++) deck.dismiss(new BuddyNoticeId("test", "pane" + i));
-        panel.refresh(); bounds = panel.cardBounds(0);
-        panel.handleClick(new Point(bounds.x + 20, bounds.y + 20));
-        assertThat(activated[0]).isEqualTo(1);
-        assertThat(BuddyGroups.project(deck.notices()).getFirst().collapsed().title()).isEqualTo("Tab");
-    }
-    @Test void suppressionRestorationKeepsTheStackMotionIdentity() {
-        var deck = new BuddyDeck(); var n = notice("one", "pane", "a"); deck.post(n);
-        long[] now = {0};
-        var panel = new BuddyColumnPanel(BuddyTestAppearance.options(), deck, () -> {}, () -> {});
-        panel.setClock(() -> now[0]); panel.refresh(); now[0] = 1_000_000_000L;
-        var settled = panel.cardBounds(0);
-        deck.updateContext(n.id(), n.group(), false); panel.refresh();
-        assertThat(panel.getPreferredSize().height).isZero();
-        deck.updateContext(n.id(), n.group(), true); panel.refresh();
-        assertThat(panel.cardBounds(0)).isEqualTo(settled);
-        assertThat(panel.animating()).isFalse();
-    }
-    @Test void filteredDrawerTracksSuppressionAndRetainsStableDuplicateLabels() {
+    @Test void duplicateTitlesRemainDistinctAcrossVisibilityAndRename() {
         var deck = new BuddyDeck(); var first = notice("1", "same", "a"); var second = notice("2", "same", "a");
-        deck.post(first); deck.post(second); deck.post(notice("other", "other", "b"));
+        deck.post(first); deck.post(second);
         var panel = new BuddyDeckPanel(BuddyTestAppearance.options(), deck, () -> {});
-        panel.setGroupFilter(first.group().id());
-        String label = panel.displayed().getFirst().title();
+        var before = panel.displayed();
+        assertThat(before).extracting(BuddyNotice::title).doesNotHaveDuplicates();
+        String secondTitle = before.stream().filter(n -> n.id().equals(second.id())).findFirst().orElseThrow().title();
         deck.updateContext(first.id(), first.group(), false);
-        assertThat(panel.displayed()).hasSize(1);
-        assertThat(panel.displayed().getFirst().title()).isEqualTo(label);
-        deck.updateContext(second.id(), second.group(), false);
-        assertThat(panel.getPreferredSize()).isEqualTo(new java.awt.Dimension(0, 0));
-        panel.setGroupFilter(null);
-        assertThat(panel.displayed()).hasSize(1);
+        assertThat(panel.displayed().getFirst().title()).isEqualTo(secondTitle);
+        deck.updateTitle(second.id(), "changed");
+        assertThat(panel.displayed().getFirst().title()).startsWith("changed · ");
     }
-    @Test void ownerLayoutReconcilesScrolledFilteredDrawerAfterExternalShrink() {
+    @Test void collapsedRowsStayOutOfHitGeometryAndExternalShrinkClampsScroll() {
         var deck = new BuddyDeck();
-        for (int i = 0; i < 8; i++) deck.post(notice("pane" + i, "pane " + i, "a"));
-        deck.post(notice("unrelated", "other", "b"));
         var panel = new BuddyDeckPanel(BuddyTestAppearance.options(), deck, () -> {});
-        panel.setGroupFilter(new BuddyNoticeId("test", "a"));
-        panel.setMaxListHeight(() -> 160);
-        panel.setSize(panel.getPreferredSize());
-        panel.handleWheel(100);
-        assertThat(panel.scroll()).isPositive();
-        for (int i = 0; i < 7; i++) deck.dismiss(new BuddyNoticeId("test", "pane" + i));
-        // Same headless seam used by the window for showBeside and model refresh layout.
+        for (int i = 0; i < 8; i++) { deck.post(notice("p" + i, "pane " + i, "a")); panel.refresh(); }
+        panel.setMaxListHeight(() -> 160); panel.setSize(panel.getPreferredSize());
+        panel.handleWheel(100); assertThat(panel.scroll()).isPositive();
+        for (int i = 0; i < 7; i++) deck.dismiss(new BuddyNoticeId("test", "p" + i));
         panel.setSize(BuddyDeckWindow.reconcilePanel(panel));
         assertThat(panel.scroll()).isZero();
-        assertThat(panel.displayed()).hasSize(1);
-        panel.handleMove(new Point(BuddyDeckPanel.MOTION_MARGIN + 40,
-            BuddyDeckPanel.MOTION_MARGIN + panel.headerHeight() + 20));
-        assertThat(panel.hovered()).isZero();
+        assertThat(panel.rows()).hasSize(2);
+        panel.handleClick(new Point(60, 45)); panel.setSize(panel.getPreferredSize());
+        assertThat(panel.rows()).hasSize(1);
+        panel.handleClick(new Point(60, 45)); panel.setSize(panel.getPreferredSize());
+        assertThat(panel.rows()).hasSize(2);
     }
-    @Test void filteredDrawerClearDismissesOnlyVisibleMembersAndKeepsHiddenWork() {
-        var deck = new BuddyDeck();
-        deck.post(notice("1", "same", "a")); deck.post(notice("2", "same", "a"));
-        deck.post(notice("3", "other", "b"));
-        var hidden = notice("hidden", "hidden", "a"); deck.post(hidden, false);
+    @Test void viewportClipPreventsOffscreenRowAndDismissAllHits() {
+        var deck = new BuddyDeck(); int[] activations = {0};
+        for (int i = 0; i < 4; i++) deck.post(new BuddyNotice(new BuddyNoticeId("test", "p" + i),
+            BuddyNotice.Kind.TASK, "Task", BuddyNotice.State.RUNNING, () -> "detail", () -> activations[0]++));
         var panel = new BuddyDeckPanel(BuddyTestAppearance.options(), deck, () -> {});
-        panel.setGroupFilter(new BuddyNoticeId("test", "a"));
-        assertThat(panel.header()).isEqualTo("Tab");
-        assertThat(panel.displayed()).hasSize(2);
-        assertThat(panel.displayed()).extracting(BuddyNotice::title).doesNotHaveDuplicates();
-        panel.setSize(panel.getPreferredSize());
-        var clear = BuddyDeckLayout.clearRow(2, BuddyCard.WIDTH, panel.cardHeight(), 0);
-        assertThat(panel.handleClick(new Point(clear.x + 30 + BuddyDeckPanel.MOTION_MARGIN,
-            clear.y + 5 + BuddyDeckPanel.MOTION_MARGIN + panel.headerHeight()))).isFalse();
-        assertThat(deck.notices()).extracting(n -> n.id().key()).containsExactly("3");
-        assertThat(panel.displayed()).isEmpty();
-        deck.updateContext(hidden.id(), hidden.group(), true);
-        assertThat(deck.notices()).extracting(n -> n.id().key()).contains("hidden");
+        panel.setMaxListHeight(() -> 80); panel.setSize(panel.getPreferredSize());
+        var clear = panel.rows().getLast().bounds();
+        panel.handleClick(new Point(60, clear.y + 40));
+        panel.handleClick(new Point(60, panel.getHeight() - 5));
+        assertThat(deck.size()).isEqualTo(4); assertThat(activations[0]).isZero();
+        panel.handleWheel(100); panel.handleClick(new Point(60, 30));
+        assertThat(deck.size()).isEqualTo(4);
     }
 }
