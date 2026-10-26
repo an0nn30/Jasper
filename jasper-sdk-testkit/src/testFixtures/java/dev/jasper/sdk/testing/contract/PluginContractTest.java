@@ -3706,7 +3706,10 @@ public abstract class PluginContractTest {
             piece.get().set(closing.get(), "  ");
         });
         assertThat(h.tabNamePieces(tab)).as("blank clears").isEmpty();
+        h.ui(() -> piece.get().set(closing.get(), "db1"));
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("host", "db1"));
         h.closeTerminalPane(pane);
+        assertThat(h.tabNamePieces(tab)).as("a closed tab's values go").isEmpty();
         h.ui(() -> assertThatCode(() -> piece.get().set(closing.get(), "late")).doesNotThrowAnyException());
         assertThat(h.tabNamePieces(tab)).as("a closed tab takes no value").isEmpty();
     }
