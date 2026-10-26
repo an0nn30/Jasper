@@ -171,7 +171,7 @@ public final class FileServersPanel implements AutoCloseable {
         if (closed) return;
         switch (event) {
             case UiEvent.Selected selection when selection.id().equals(ROWS) -> {
-                selection.ids().stream().findFirst().flatMap(FileServersPanel::rowUuid).ifPresent(id -> { selected = id; chosen = id; refreshActivity(); render(); });
+                selection.ids().stream().findFirst().flatMap(FileServersPanel::rowUuid).ifPresent(id -> { selected = id; chosen = id; refreshActivity(); render(); revealLatestActivity(); });
             }
             case UiEvent.Toggled toggle when toggle.id().startsWith("switch:") ->
                 rowUuid(toggle.id().substring("switch:".length())).ifPresent(id -> server(id)

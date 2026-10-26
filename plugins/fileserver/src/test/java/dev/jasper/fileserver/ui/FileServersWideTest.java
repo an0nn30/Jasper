@@ -124,6 +124,24 @@ class FileServersWideTest {
         assertThat(revealed.get()).contains("fileserver.activity.text.1");
     }
 
+    @Test void classicWideRevealsTheLatestActivityLineOnTheFirstChoice() {
+        var entries = new ArrayList<ActivityLog.Entry>();
+        for (int i = 0; i < 9; i++) entries.add(new ActivityLog.Entry(Instant.parse("2026-10-26T10:00:00Z").plusSeconds(i), "line " + i));
+        logs.put(test.definition().id(), entries);
+        var panel = panel(Layout.CLASSIC, true, List.of(test));
+        assertThat(find(panel, "fileserver.activity.log")).as("nothing is chosen yet, so no activity is shown").isEmpty();
+        assertThat(revealed(panel)).as("and nothing scrolled").isEmpty();
+        emit(panel, new UiEvent.Selected(FileServersPanel.ROWS, Set.of(row(test))));
+        assertThat(((Nodes.ItemList) node(panel, "fileserver.activity.log")).items()).hasSize(9);
+        assertThat(revealed(panel)).as("the first choice of the already-fallback server shows its latest line").contains("fileserver.activity.text.8");
+    }
+
+    private static Optional<String> revealed(FileServersPanel panel) {
+        var revealed = new AtomicReference<Optional<String>>();
+        UiTestAccess.edt(() -> revealed.set(view(panel).revealed()));
+        return revealed.get();
+    }
+
     @Test void wideTheRowMenuHasNoShowDetails() {
         var panel = panel(Layout.ROWS, true, List.of(test, docs));
         var labels = labels(menu(panel, test));
