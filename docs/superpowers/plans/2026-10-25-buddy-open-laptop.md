@@ -7,7 +7,7 @@
 **Tech Stack:** Java 25 JBR, headless JUnit and production-sprite GIF previews.
 **Spec:** docs/superpowers/specs/2026-10-25-buddy-open-laptop-design.md
 
-Status: authorized for continuous execution. Existing clean checkout reused on a dedicated branch.
+Status: complete; implementation 6b45d7726, task and whole-branch reviews clean. Full headless check passed (13,049 tests, zero failures/errors, 30 skips). Existing clean checkout reused on a dedicated branch.
 Plan deviation: implementation bodies delegated to the implementer, with exact behavior below;
 this keeps the single small deliverable proportionate instead of duplicating production code.
 
@@ -34,17 +34,17 @@ BuddyStandUpPreview.java plus opening preview in test presentation package; jasp
 current Buddy README, architecture and maintenance guides; docs/STATUS.md.
 Interfaces: existing setWorking(boolean,long), tick(long), frame(), nextDueNanos(); no public additions.
 
-- [ ] Add failing boundary tests: after spawn at 2000 ms, true gives RISE/due2150;
+- [x] Add failing boundary tests: after spawn at 2000 ms, true gives RISE/due2150;
   tick2150 gives LOWER_LAPTOP/due2275; tick2275 CLOSE_LAPTOP/due2400;
   tick2400 TYPE_REST/due2500; tick2500 TYPE_A/due2750.
-- [ ] Test each pose reversing in both directions, preserving frame and assigning its full duration;
+- [x] Test each pose reversing in both directions, preserving frame and assigning its full duration;
   repeated value and greet/poke retain deadline. Test seated entry, sleep wake, busy-stage cancellation,
   hide/show, late ticks, and arithmetic typing cadence after the new 500 ms entry.
-- [ ] Run focused animator tests, capture meaningful RED failures.
-- [ ] Implement LOWERING and finite advancement; wire all starts and reversals through current pose.
+- [x] Run focused animator tests, capture meaningful RED failures.
+- [x] Implement LOWERING and finite advancement; wire all starts and reversals through current pose.
   Reuse rising frame/duration tables where clear; no general animation framework.
-- [ ] Run focused tests GREEN, then Buddy check. Fix affected old assumptions in integration tests.
-- [ ] Add production-sprite normal/reversal opening GIFs and contact sheets; refresh stand-up preview.
+- [x] Run focused tests GREEN, then Buddy check. Fix affected old assumptions in integration tests.
+- [x] Add production-sprite normal/reversal opening GIFs and contact sheets; refresh stand-up preview.
   Inspect generated images and minimally update guides and STATUS.
-- [ ] Commit with Co-Authored-By trailer; fresh task review, fix findings, final whole-branch review.
-- [ ] Run full ./gradlew check --continue with Python 3.13; record results and finish locally.
+- [x] Commit with Co-Authored-By trailer; fresh task review, fix findings, final whole-branch review.
+- [x] Run full ./gradlew check --continue with Python 3.13; record results and finish locally.
