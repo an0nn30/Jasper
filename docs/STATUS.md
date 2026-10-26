@@ -2,8 +2,8 @@
 
 **Linux distribution packaging — 2026-10-26:** `packageDist` selects only RPM on recognized Fedora/RHEL and SUSE
 families from `os-release`; Debian/Ubuntu and unknown hosts retain both formats. Explicit DEB/RPM tasks and mandatory
-dependency validation are unchanged. Portable packaging fixtures and documentation checks pass; Fedora packaging
-and Ubuntu task-graph integration remain pending independent verification. No GUI, AOT, merge or push.
+dependency validation are unchanged. Portable packaging fixtures, four documentation checks and independent review
+pass. A fresh Fedora `packageDist` build passes in 2m 56s; Ubuntu dry-run retains both package tasks. No GUI or AOT.
 
 **Qt / KDE Desktop colors — 2026-10-25:** The approved [native plan](superpowers/plans/2026-10-25-qt-kde-native-helpers.md) now stages all seven helpers and packages Qt/KDE as optional child-process capabilities. Pinned Qt5.15.2, Qt6.2.4, Qt6.5/KF6.0 and private Qt5.15.2/KF5.92 builds have aarch64 baseline fixture/ABI evidence; exact packaged helpers pass system-runtime samples and minimal DEB/RPM installation without Qt/KF. The [compatibility record](design/qt-kde-native-compatibility.md) distinguishes private SDK runtime smoke from separately installed system runtimes. The spec's deterministic headless native integration gate is satisfied in this aarch64 scope; application work can proceed without claiming complete release or desktop acceptance. x86_64, minimum separately installed KDE6, the unexecuted CI matrix, cold corrected-recipe rebuild and real Plasma/qt5ct/qt6ct desktop acceptance remain open. The full macOS headless check passes 13,041 tests with zero failures/errors and 30 skips; package verification omits Linux helpers. Source/UI policy stays GTK-only in this deliverable. No GUI, AOT, merge or push.
 
