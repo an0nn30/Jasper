@@ -254,7 +254,7 @@ def buildDesktopQt = { String name, boolean tests ->
     }.findAll { it != null }
     File build = layout.buildDirectory.dir("desktop-colors/cmake/${name}").get().asFile
     invokeDesktopQt(['cmake', '-S', source.parentFile.absolutePath, '-B', build.absolutePath,
-        '-UQt5*', '-UQt6*', '-UKF5*', '-UKF6*', '-UECM_DIR', '-UDC_HAVE_KCOLORSCHEME_HEADER',
+        '-UQt5*', '-UQt6*', '-UQT_FEATURE_*', '-UKF5*', '-UKF6*', '-UECM_DIR', '-UDC_HAVE_KCOLORSCHEME_HEADER',
         '-DDC_QT_MAJOR=' + target.major, '-DDC_PROBE_KIND=' + target.kind,
         '-DDC_BUILD_TESTS=' + (tests ? 'ON' : 'OFF'), '-DCMAKE_BUILD_TYPE=Release',
         '-DCMAKE_PREFIX_PATH=' + prefixes.join(';')] +
