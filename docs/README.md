@@ -105,6 +105,7 @@ paths, commands and counts may no longer match, and the guides above take preced
   [original terminal design](superpowers/specs/2026-09-10-jasper-phase-1-terminal-design.md).
 - [Design records](design/) and [benchmark results](benchmarks/): screenshots, references and measurements from their
   recorded revisions.
+- [Qt / KDE compatibility](design/qt-kde-native-compatibility.md): pinned native-toolchain preparation and pending runtime evidence.
 - Verification reports: [terminal refactor](terminal-refactor-verification.md),
   [app and Buddy refactor](app-refactor-verification.md), [Editor](editor-verification.md),
   [Remote SSH](remote-7a-verification.md), [Remote SFTP](remote-7c-verification.md),

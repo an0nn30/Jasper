@@ -1,0 +1,115 @@
+# Qt / KDE compatibility investigation — 2026-10-25
+
+Status: preparation implemented; native compatibility gate **pending**. The user authorized
+local work while Fedora updates. SSH became available as `dustin@10.211.55.13` during
+preparation; the parent confirmed Fedora 44 KDE aarch64 with g++ but without the Qt
+development/CMake/Ninja prerequisites. Ubuntu VM use is excluded. Ubuntu 22.04
+remains the packaged ELF userspace baseline; containers/PRoot on Fedora are baseline
+userspaces, not booted desktop acceptance.
+
+## Prepared targets
+
+| CMake build | Public SDK minimum | Gradle prefix properties |
+| --- | --- | --- |
+| `qt5` | Qt Widgets 5.15 | `jasper.qt5Prefix` |
+| `qt6` | Qt Widgets 6.2 | `jasper.qt6Prefix` |
+| `kde5` | Qt Widgets 5.15, KF5 ConfigWidgets/Config 5.92 | `jasper.qt5Prefix`, `jasper.kf5Prefix` |
+| `kde6` | Qt Widgets 6.5, KF6 ColorScheme/Config 6.0 | `jasper.kde6QtPrefix`, `jasper.kf6Prefix` |
+
+Build directories are `jasper-app/build/desktop-colors/cmake/<target>`. Each configuration
+gets only its target's prefixes, clears cached Qt/KF discovery, ignores CMake package
+registries/environment search paths, and disables RPATH. Omitted prefixes permit installed
+development packages; they do not prove a floor when those packages are newer.
+
+The probe prints compiled/runtime Qt versions, compiled KF version, configured pairs,
+public palette-event counts, Header availability, visible-window count and Linux Qt/KF
+runtime mapping paths. KDE public generated version headers describe the build SDK;
+no public runtime framework version query was found. `kf.runtime` therefore explicitly
+reports unknown. Runtime paths must accompany the built-against version in evidence.
+
+The temporary `kdeglobals` fixture supplies distinctive Window/View/Selection/Tooltip
+background/foreground values and changes Window before a KConfig reparse. HOME and XDG
+config/cache/data locations point into the temporary root before QApplication starts;
+FullConfig keeps KConfig's global cascade enabled inside that isolated root. The probe
+never shows or activates a widget. Public QApplication palette mutation checks event
+delivery in the test process; real KDE/qt5ct/qt6ct theme change delivery remains untested.
+
+Header detection compiles `KColorScheme(QPalette::Active, KColorScheme::Header)` with the
+selected imported libraries and defines `DC_HAVE_KCOLORSCHEME_HEADER=0|1`. The pinned
+[KF5 header](https://invent.kde.org/frameworks/kconfigwidgets/-/blob/v5.92.0/src/kcolorscheme.h)
+and [KF6 header](https://invent.kde.org/frameworks/kcolorscheme/-/blob/v6.0.0/src/kcolorscheme.h)
+contain this enum. A successful compile is still pending; theme support separately needs
+`Colors:Header` evidence. No Header color is inferred from a Window fallback.
+
+## Source preparation
+
+[`manifest.toml`](../../packaging/desktop-colors/toolchains/manifest.toml) pins QtBase
+5.15.2, 6.2.4 and 6.5.0, KF5 5.92.0 and KF6 6.0.0. Its 16 SHA256 values were read from
+the official Qt/KDE `.sha256` URLs recorded per source on 2026-10-25; no archive download,
+source compilation or artifact digest is claimed. KF5's required Qt build version is
+5.15.2. KF6 ColorScheme requires Qt 6.5.0.
+
+The opt-in recipe builds QtBase only, KF5's ConfigWidgets dependency chain, and KF6's
+Config/GuiAddons/I18n/ColorScheme chain. It disables KAuth, designer/documentation/QML
+and GuiAddons Wayland/X11 features that these extraction APIs do not need. Qt's XCB
+platform and DBus remain enabled. This dependency reduction and the full system header
+prerequisite list need Linux configure/build confirmation. Source license files are
+identified in the manifest; per-component license review and shipped notices remain
+pending extraction and packaging. No dependency is shipped by this preparation change.
+
+On an authorized baseline Linux userspace, choose a dedicated private area:
+
+```sh
+bash packaging/desktop-colors/toolchains/build-baseline.sh --plan qt6 /absolute/qt-compat
+bash packaging/desktop-colors/toolchains/build-baseline.sh --build qt6 /absolute/qt-compat
+bash packaging/desktop-colors/toolchains/build-baseline.sh --build qt5 /absolute/qt-compat
+bash packaging/desktop-colors/toolchains/build-baseline.sh --build kde5 /absolute/qt-compat
+bash packaging/desktop-colors/toolchains/build-baseline.sh --build kde6 /absolute/qt-compat
+./gradlew :jasper-app:verifyDesktopQtCompatibility --no-daemon --console=plain \
+  -Pjasper.qt5Prefix=/absolute/qt-compat/prefixes/qt5 \
+  -Pjasper.qt6Prefix=/absolute/qt-compat/prefixes/qt6 \
+  -Pjasper.kf5Prefix=/absolute/qt-compat/prefixes/kf5 \
+  -Pjasper.kde6QtPrefix=/absolute/qt-compat/prefixes/kde6-qt \
+  -Pjasper.kf6Prefix=/absolute/qt-compat/prefixes/kf6
+```
+
+`--plan` writes nothing. `--build` is Linux-only, downloads and verifies sources before
+safe extraction, installs only into that area, and records configure/build/toolchain
+commands in `logs/`. It requires Python >=3.11.8 and the existing build prerequisites;
+normal Gradle tasks never call it. Run generic Qt6 first. Runtime verification clears
+`LD_LIBRARY_PATH` and Qt plugin overrides so installed system runtimes/plugins supply
+the integration; private SDKs must not substitute for minimum/newer runtime tests.
+
+For each built target, retain these commands' full output with compiler version,
+architecture, userspace identity, source manifest and probe output:
+
+```sh
+readelf -d jasper-app/build/desktop-colors/cmake/qt6/qt-compatibility
+readelf --version-info jasper-app/build/desktop-colors/cmake/qt6/qt-compatibility
+ldd jasper-app/build/desktop-colors/cmake/qt6/qt-compatibility
+```
+
+Repeat for `qt5`, `kde5`, `kde6` on x86_64/aarch64 and minimum/newer system runtimes.
+Inspect NEEDED, RPATH/RUNPATH, GLIBC/GLIBCXX requirements and actual mapped paths;
+unresolved optional Qt/KF in minimal userspaces is distinct from a baseline ABI failure.
+
+## Local evidence and remaining gate
+
+On the macOS development host with AppleClang 21, CMake and Python 3.14.7:
+
+- `python3 packaging/desktop-colors/test/toolchains_test.py`: 5 tests passed, including
+  independent Qt6/KDE6 plans, KDE5 dependency order, invalid argument handling, corrupt
+  archive rejection, and all three Qt floor diagnostics. Initial runs failed against
+  absent preparer/CMake files; these are tooling contract failures, not native assertion RED.
+- `bash -n packaging/desktop-colors/toolchains/build-baseline.sh`: passed.
+- `./gradlew :jasper-app:verifyDesktopQtCompatibility --no-daemon --console=plain`:
+  successful build-script configuration, task SKIPPED on non-Linux as designed. The initial
+  sandboxed attempt failed opening Gradle's cache lock; the authorized retry produced this skip.
+- `cmake -S packaging/desktop-colors -B /private/tmp/jasper-qt-compatibility-missing-qt5
+  -DDC_QT_MAJOR=5 -DDC_PROBE_KIND=qt -DDC_BUILD_TESTS=ON`: exit 1, named
+  `Missing desktop-colors SDK: Qt5 Widgets >= 5.15`. This is missing infrastructure.
+
+The four probes have not compiled or run. Linux dependency preparation, baseline ELF
+requirements, system runtime/plugin loading, fixture reparse, palette events, Header
+guards, no-window behavior, config-write audit and both architectures remain pending.
+Task 1 and the native gate remain open; source/UI activation must wait for their evidence.

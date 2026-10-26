@@ -225,3 +225,52 @@ tasks.named('test', Test) {
     if (linux) inputs.files(stageHelpers).withPropertyName('desktopHelpers').withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty('jasper.stagedDesktopHelpers', stagedHelpers.get().asFile.absolutePath)
 }
+
+// Each compatibility target owns its CMake cache and SDK search path. In particular,
+// generic Qt6 (6.2) must never inherit the KDE6 Qt SDK (6.5).
+def qtCompatibilityTargets = [
+    qt5: [major: 5, kind: 'qt', prefixes: ['jasper.qt5Prefix']],
+    qt6: [major: 6, kind: 'qt', prefixes: ['jasper.qt6Prefix']],
+    kde5: [major: 5, kind: 'kde', prefixes: ['jasper.kf5Prefix', 'jasper.qt5Prefix']],
+    kde6: [major: 6, kind: 'kde', prefixes: ['jasper.kf6Prefix', 'jasper.kde6QtPrefix']]
+]
+tasks.register('verifyDesktopQtCompatibility') {
+    group = 'verification'
+    description = 'Builds/runs all four Qt/KDE API probes on a private Xvfb display and D-Bus session.'
+    onlyIf { linux }
+    doLast {
+        qtCompatibilityTargets.each { name, target ->
+            def prefixes = target.prefixes.collect { property ->
+                String value = providers.gradleProperty(property).orNull
+                if (value != null && (!new File(value).isAbsolute() || !new File(value).isDirectory()))
+                    throw new GradleException("${property} must name an existing absolute SDK prefix: ${value}")
+                value
+            }.findAll { it != null }
+            File build = layout.buildDirectory.dir("desktop-colors/cmake/${name}").get().asFile
+            def invoke = { List arguments ->
+                providers.exec {
+                    ignoreExitValue = true
+                    environment('CMAKE_PREFIX_PATH', '')
+                    environment('QT_PLUGIN_PATH', '')
+                    environment('QT_QPA_PLATFORM_PLUGIN_PATH', '')
+                    environment('LD_LIBRARY_PATH', '')
+                    commandLine(arguments)
+                }.with { execution ->
+                    logger.lifecycle(execution.standardOutput.asText.get())
+                    String errors = execution.standardError.asText.get()
+                    if (!errors.isBlank()) logger.lifecycle(errors)
+                    execution.result.get().assertNormalExitValue()
+                }
+            }
+            invoke(['cmake', '-S', source.parentFile.absolutePath, '-B', build.absolutePath,
+                '-UQt5*', '-UQt6*', '-UKF5*', '-UKF6*', '-UECM_DIR', '-UDC_HAVE_KCOLORSCHEME_HEADER',
+                '-DDC_QT_MAJOR=' + target.major, '-DDC_PROBE_KIND=' + target.kind,
+                '-DDC_BUILD_TESTS=ON', '-DCMAKE_BUILD_TYPE=Release',
+                '-DCMAKE_PREFIX_PATH=' + prefixes.join(';')])
+            invoke(['cmake', '--build', build.absolutePath, '--parallel', '2'])
+            invoke(['xvfb-run', '-a', '-s', '-screen 0 1024x768x24 -nolisten tcp',
+                'dbus-run-session', '--config-file=' + new File(fixtures, 'themes/private-bus.conf').absolutePath,
+                '--', 'ctest', '--test-dir', build.absolutePath, '--output-on-failure'])
+        }
+    }
+}

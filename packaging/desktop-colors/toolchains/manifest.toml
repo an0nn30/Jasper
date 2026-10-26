@@ -1,0 +1,172 @@
+# Official upstream .sha256 files checked 2026-10-25; native builds remain pending.
+format = 1
+evidence_status = "pending-linux-native-validation"
+baseline = "Ubuntu 22.04 userspace (glibc 2.35), x86_64 and aarch64"
+python = ">=3.11.8 (tomllib, safe tar extraction filter)"
+build_dependencies = ["C/C++17 compiler", "CMake >=3.21", "Ninja", "make", "Perl", "pkg-config", "Python", "gettext", "DBus development headers", "fontconfig", "FreeType", "X11/XCB and xkbcommon development headers"]
+license_review = "Inspect source LICENSES/ and COPYING* after extraction; final shipped notices remain pending"
+
+[groups]
+kf5 = ["kf5-extra-cmake-modules","kf5-kcoreaddons","kf5-kcodecs","kf5-kconfig","kf5-kguiaddons","kf5-ki18n","kf5-kwidgetsaddons","kf5-kconfigwidgets"]
+kf6 = ["kf6-extra-cmake-modules","kf6-kconfig","kf6-kguiaddons","kf6-ki18n","kf6-kcolorscheme"]
+
+[sources."qt5"]
+name = "qtbase"
+version = "5.15.2"
+source_dir = "qtbase-everywhere-src-5.15.2"
+url = "https://download.qt.io/archive/qt/5.15/5.15.2/submodules/qtbase-everywhere-src-5.15.2.tar.xz"
+sha256 = "909fad2591ee367993a75d7e2ea50ad4db332f05e1c38dd7a5a274e156a4e0f8"
+checksum_url = "https://download.qt.io/archive/qt/5.15/5.15.2/submodules/qtbase-everywhere-src-5.15.2.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."qt6"]
+name = "qtbase"
+version = "6.2.4"
+source_dir = "qtbase-everywhere-src-6.2.4"
+url = "https://download.qt.io/archive/qt/6.2/6.2.4/submodules/qtbase-everywhere-src-6.2.4.tar.xz"
+sha256 = "d9924d6fd4fa5f8e24458c87f73ef3dfc1e7c9b877a5407c040d89e6736e2634"
+checksum_url = "https://download.qt.io/archive/qt/6.2/6.2.4/submodules/qtbase-everywhere-src-6.2.4.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kde6-qt"]
+name = "qtbase"
+version = "6.5.0"
+source_dir = "qtbase-everywhere-src-6.5.0"
+url = "https://download.qt.io/archive/qt/6.5/6.5.0/submodules/qtbase-everywhere-src-6.5.0.tar.xz"
+sha256 = "fde1aa7b4fbe64ec1b4fc576a57f4688ad1453d2fab59cbadd948a10a6eaf5ef"
+checksum_url = "https://download.qt.io/archive/qt/6.5/6.5.0/submodules/qtbase-everywhere-src-6.5.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-extra-cmake-modules"]
+name = "extra-cmake-modules"
+version = "5.92.0"
+source_dir = "extra-cmake-modules-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/extra-cmake-modules-5.92.0.tar.xz"
+sha256 = "f89a238bc5f28738db25e29296b75b4f795e3e9bfe3a8f1f9390648749d303ef"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/extra-cmake-modules-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-kcoreaddons"]
+name = "kcoreaddons"
+version = "5.92.0"
+source_dir = "kcoreaddons-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kcoreaddons-5.92.0.tar.xz"
+sha256 = "df5f718f324aa2b58191438c8aa5f7498a7997eff990d16ffbc9f19efd1a6667"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kcoreaddons-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-kcodecs"]
+name = "kcodecs"
+version = "5.92.0"
+source_dir = "kcodecs-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kcodecs-5.92.0.tar.xz"
+sha256 = "d6e5b7a453948d5fa0482715eaf4a0c9abe5b902a0aca15540a04b1a1b60d275"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kcodecs-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-kconfig"]
+name = "kconfig"
+version = "5.92.0"
+source_dir = "kconfig-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kconfig-5.92.0.tar.xz"
+sha256 = "7801b641b88368a0c021272073c692337b42ee28f0025d106942c8ce873b0523"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kconfig-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-kguiaddons"]
+name = "kguiaddons"
+version = "5.92.0"
+source_dir = "kguiaddons-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kguiaddons-5.92.0.tar.xz"
+sha256 = "0f6775a565f22900b0de53daa5fe73f7d7e592663e0bb442a8e26ffab27fdf5f"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kguiaddons-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DWITH_WAYLAND=OFF","-DWITH_X11=OFF"]
+
+[sources."kf5-ki18n"]
+name = "ki18n"
+version = "5.92.0"
+source_dir = "ki18n-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/ki18n-5.92.0.tar.xz"
+sha256 = "058032e8e9556f1dadcf0c2bd633da6cfc9673e966dd113388e2b8aee2395777"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/ki18n-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-kwidgetsaddons"]
+name = "kwidgetsaddons"
+version = "5.92.0"
+source_dir = "kwidgetsaddons-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kwidgetsaddons-5.92.0.tar.xz"
+sha256 = "d0e3558d6a7ed550f31d319e6b52d6ed61d693a1aa50e6dd4f430a1324111f2c"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kwidgetsaddons-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-kconfigwidgets"]
+name = "kconfigwidgets"
+version = "5.92.0"
+source_dir = "kconfigwidgets-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kconfigwidgets-5.92.0.tar.xz"
+sha256 = "4259eed35d9ac307ecc30e64833bad7a89ef58fc7125054eb39716d27a4a274a"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kconfigwidgets-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DWITH_KAUTH=OFF","-DBUILD_DESIGNERPLUGIN=OFF","-DCMAKE_DISABLE_FIND_PACKAGE_KF5DocTools=ON"]
+
+[sources."kf6-extra-cmake-modules"]
+name = "extra-cmake-modules"
+version = "6.0.0"
+source_dir = "extra-cmake-modules-6.0.0"
+url = "https://download.kde.org/stable/frameworks/6.0/extra-cmake-modules-6.0.0.tar.xz"
+sha256 = "23992bf19db717156b7d6dd13118caa79fd57f090beb062e8308db3c09f70d0c"
+checksum_url = "https://download.kde.org/stable/frameworks/6.0/extra-cmake-modules-6.0.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf6-kconfig"]
+name = "kconfig"
+version = "6.0.0"
+source_dir = "kconfig-6.0.0"
+url = "https://download.kde.org/stable/frameworks/6.0/kconfig-6.0.0.tar.xz"
+sha256 = "3f7c1e6b048df4ab3d67fbef01a5ad1dd0289c9b158644668fba0225c050c050"
+checksum_url = "https://download.kde.org/stable/frameworks/6.0/kconfig-6.0.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DKCONFIG_USE_QML=OFF"]
+
+[sources."kf6-kguiaddons"]
+name = "kguiaddons"
+version = "6.0.0"
+source_dir = "kguiaddons-6.0.0"
+url = "https://download.kde.org/stable/frameworks/6.0/kguiaddons-6.0.0.tar.xz"
+sha256 = "20af58ab639ea99df09acbd74af0c867f22f1d9f91595623ab44fba5834eaa62"
+checksum_url = "https://download.kde.org/stable/frameworks/6.0/kguiaddons-6.0.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DWITH_WAYLAND=OFF","-DWITH_X11=OFF","-DBUILD_GEO_SCHEME_HANDLER=OFF"]
+
+[sources."kf6-ki18n"]
+name = "ki18n"
+version = "6.0.0"
+source_dir = "ki18n-6.0.0"
+url = "https://download.kde.org/stable/frameworks/6.0/ki18n-6.0.0.tar.xz"
+sha256 = "15cbfb73ef1d3954d6206755b6e6a9c86ea27be4b4db0c843d38494851bcc354"
+checksum_url = "https://download.kde.org/stable/frameworks/6.0/ki18n-6.0.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DBUILD_WITH_QML=OFF"]
+
+[sources."kf6-kcolorscheme"]
+name = "kcolorscheme"
+version = "6.0.0"
+source_dir = "kcolorscheme-6.0.0"
+url = "https://download.kde.org/stable/frameworks/6.0/kcolorscheme-6.0.0.tar.xz"
+sha256 = "de45822431755be39ab7aebfcb7cb6ff90b4924579c2a4d66ae28f91d70a260e"
+checksum_url = "https://download.kde.org/stable/frameworks/6.0/kcolorscheme-6.0.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
