@@ -62,10 +62,7 @@ class FakePanelsAndWindowsTest {
                 return KitFixtures.view(context);
             });
             var moved = new dev.jasper.sdk.ui.PanelPlacement(Anchor.LEFT, true, dev.jasper.sdk.ui.PanelMode.WINDOW);
-            host.placePanel(id, moved);
             host.addTerminalWindow();
-            host.placePanel(id, moved);
-            assertThat(heard).as("a panel that is not open is not moved").isEmpty();
             host.openPanel(id);
             host.placePanel(id, moved);
             assertThat(heard).containsExactly(moved);
@@ -73,6 +70,83 @@ class FakePanelsAndWindowsTest {
             host.placePanel(id, moved);
             assertThat(heard).hasSize(1);
             assertThat(host.failures()).as("the same placement is silent").hasSize(1);
+        }
+    }); }
+
+    /**
+     * The app contains a handler's {@code Exception} or {@code LinkageError} (a plugin's missing optional dependency):
+     * the fake records a {@code LinkageError} from a placement, visibility or close handler, and the others still run.
+     */
+    @Test void aPanelHandlerThatThrowsALinkageErrorIsRecordedAndTheOthersStillRun() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            var heard = new ArrayList<String>();
+            String id = "dev.x.tool.linked";
+            context.panels().register(new PanelSpec(id, "Linked", "file", Anchor.BOTTOM), panel -> {
+                panel.onPlacement(placement -> { throw new NoClassDefFoundError("placement dependency"); });
+                panel.onPlacement(placement -> heard.add("placement " + placement.mode()));
+                panel.onVisibility(visible -> { throw new NoClassDefFoundError("visibility dependency"); });
+                panel.onVisibility(visible -> heard.add("visible " + visible));
+                panel.onClosed(() -> { throw new NoClassDefFoundError("closed dependency"); });
+                panel.onClosed(() -> heard.add("closed"));
+                return KitFixtures.view(context);
+            });
+            host.addTerminalWindow();
+            host.openPanel(id);
+            host.placePanel(id, new dev.jasper.sdk.ui.PanelPlacement(Anchor.BOTTOM, false, dev.jasper.sdk.ui.PanelMode.FLOAT));
+            context.panels().toggle(id, context.terminals().windows().getFirst());
+            host.closePanel(id);
+            assertThat(heard).containsExactly("placement FLOAT", "visible false", "closed");
+            assertThat(host.failures()).hasSize(3).anySatisfy(line -> assertThat(line).contains("panel placement", "placement dependency"))
+                .anySatisfy(line -> assertThat(line).contains("panel visibility", "visibility dependency"))
+                .anySatisfy(line -> assertThat(line).contains("panel closed", "closed dependency"));
+        }
+    }); }
+
+    /** As the app's site: a placement handler that removes the panel ends the round, and the handlers after it hear nothing. */
+    @Test void aPanelClosedByAPlacementHandlerTellsTheHandlersAfterItNothing() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            var heard = new ArrayList<String>();
+            String id = "dev.x.tool.removed";
+            dev.jasper.sdk.Subscription[] registration = {null};
+            registration[0] = context.panels().register(new PanelSpec(id, "Removed", "file", Anchor.BOTTOM), panel -> {
+                panel.onPlacement(placement -> { heard.add("first"); registration[0].close(); });
+                panel.onPlacement(placement -> heard.add("second"));
+                panel.onClosed(() -> heard.add("closed " + panel.placement().mode()));
+                return KitFixtures.view(context);
+            });
+            host.addTerminalWindow();
+            host.openPanel(id);
+            host.placePanel(id, new dev.jasper.sdk.ui.PanelPlacement(Anchor.LEFT, false, dev.jasper.sdk.ui.PanelMode.WINDOW));
+            assertThat(heard).containsExactly("first", "closed WINDOW");
+            assertThat(host.failures()).isEmpty();
+        }
+    }); }
+
+    /**
+     * Floating tool windows plan 3's final review: a child window's toggle of a panel with a window of its own raises that
+     * window, which the fake has not, so it records no request to bring the main window forward.
+     */
+    @Test void aChildWindowsToggleOfAPanelWithAWindowOfItsOwnRaisesNoMainWindow() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            List<PanelHost> instances = new ArrayList<>();
+            String id = "dev.x.tool.floating";
+            context.panels().register(new PanelSpec(id, "Floating", "file", Anchor.LEFT), panel -> { instances.add(panel); return KitFixtures.view(context); });
+            UUID main = host.addTerminalWindow(), child = host.addTerminalWindow();
+            var childWindow = context.terminals().window(child).orElseThrow();
+            host.placePanel(id, new dev.jasper.sdk.ui.PanelPlacement(Anchor.LEFT, false, dev.jasper.sdk.ui.PanelMode.FLOAT));
+            context.panels().toggle(id, childWindow);
+            context.panels().toggle(id, childWindow);
+            assertThat(instances).singleElement().satisfies(panel -> {
+                assertThat(panel.visible()).isTrue();
+                assertThat(panel.placement().ownWindow()).isTrue();
+            });
+            assertThat(host.openRequests()).as("its own window comes forward, not the main window").isEmpty();
+            host.placePanel(id, new dev.jasper.sdk.ui.PanelPlacement(Anchor.LEFT, false, dev.jasper.sdk.ui.PanelMode.DOCKED));
+            context.panels().toggle(id, childWindow);
+            assertThat(host.openRequests()).as("docked again, the main window comes forward").containsExactly("front|" + main);
         }
     }); }
 

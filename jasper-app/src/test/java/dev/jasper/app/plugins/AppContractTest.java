@@ -349,8 +349,16 @@ class AppContractTest extends PluginContractTest {
             final java.util.Map<String, dev.jasper.app.contributions.PanelSite> sites = new java.util.HashMap<>();
             final java.util.Map<String, javax.swing.JComponent> components = new java.util.HashMap<>();
             final java.util.Map<String, dev.jasper.app.contributions.PanelHeaderState> headers = new java.util.HashMap<>();
-            /** Each open panel's current place, one cell per panel as the main window's dock keeps it; the site reads it, {@code placePanel} moves it. */
+            /**
+             * Each registered panel's place, one cell per panel id as the main window's dock keeps it, built or not and across
+             * {@code closePanel}; the site reads it, {@code placePanel} moves it.
+             */
             final java.util.Map<String, dev.jasper.app.contributions.PanelSite.Placement[]> placements = new java.util.HashMap<>();
+            /** The registered panel's place cell, its default slot, docked, until it is moved. */
+            dev.jasper.app.contributions.PanelSite.Placement[] placementOf(dev.jasper.app.contributions.PanelEntry panel) {
+                return placements.computeIfAbsent(panel.id(), id -> new dev.jasper.app.contributions.PanelSite.Placement[] {
+                    new dev.jasper.app.contributions.PanelSite.Placement(panel.defaultSlot(), dev.jasper.app.dock.ToolWindowMode.DOCKED) });
+            }
             @Override public javax.swing.JComponent openPanel(String panelId) {
                 return onEdtValue(() -> {
                     UUID window = main[0];
@@ -358,12 +366,11 @@ class AppContractTest extends PluginContractTest {
                     if (components.containsKey(panelId)) return components.get(panelId);
                     return contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
                         .map(panel -> {
-                            var current = new dev.jasper.app.contributions.PanelSite.Placement[] {
-                                new dev.jasper.app.contributions.PanelSite.Placement(panel.defaultSlot(), dev.jasper.app.dock.ToolWindowMode.DOCKED) };
+                            var current = placementOf(panel);
                             var site = new dev.jasper.app.contributions.PanelSite(window, () -> { }, () -> { }, () -> true, header -> headers.put(panelId, header),
                                 () -> current[0]);
                             var built = panel.factory().apply(site);
-                            if (built != null) { sites.put(panelId, site); components.put(panelId, built); placements.put(panelId, current); }
+                            if (built != null) { sites.put(panelId, site); components.put(panelId, built); }
                             return built;
                         })
                         .orElse(null);
@@ -386,19 +393,21 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((HostedKitView) view).component().route().name(); }
             @Override public void closePanel(String panelId) {
-                onEdt(() -> { components.remove(panelId); placements.remove(panelId); var site = sites.remove(panelId); if (site != null) site.notifyClosed(); });
+                onEdt(() -> { components.remove(panelId); var site = sites.remove(panelId); if (site != null) site.notifyClosed(); });
             }
             @Override public void placePanel(String panelId, dev.jasper.sdk.ui.PanelPlacement placement) {
                 onEdt(() -> {
-                    var site = sites.get(panelId);
-                    var current = placements.get(panelId);
-                    if (site == null || current == null) return;
+                    var panel = contributions.panels().stream().filter(entry -> entry.id().equals(panelId)).findFirst();
+                    if (panel.isEmpty()) return;
+                    var current = placementOf(panel.get());
                     var value = new dev.jasper.app.contributions.PanelSite.Placement(
                         dev.jasper.app.dock.Slot.of(dev.jasper.app.dock.Side.valueOf(placement.anchor().name()), placement.split()),
                         dev.jasper.app.dock.ToolWindowMode.valueOf(placement.mode().name()));
                     if (value.equals(current[0])) return;
                     current[0] = value;
-                    site.notifyPlacement(value);
+                    // A panel that is not open is built there and hears nothing, as the dock's.
+                    var site = sites.get(panelId);
+                    if (site != null) site.notifyPlacement(value);
                 });
             }
             /** Each toolbar view's instance per window, built once as a window builds it when it opens; empty when it failed. */

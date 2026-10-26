@@ -1018,10 +1018,17 @@ public abstract class PluginContractTest {
         }));
     }
 
+    /**
+     * A panel reads its placement in its factory and hears each change once. Its place is the dock's, built or not: a
+     * panel moved while it is not open is built there and hears nothing, and one closed and opened again is built where
+     * it last was, as the main window's dock keeps it across the window's reopening. A closed instance reads the place it
+     * closed in.
+     */
     @Test void aPanelReadsItsPlacementAndHearsItChange() throws Exception {
         List<PanelHost> hosts = Collections.synchronizedList(new ArrayList<>());
         List<PanelPlacement> inFactory = Collections.synchronizedList(new ArrayList<>());
         List<PanelPlacement> heard = Collections.synchronizedList(new ArrayList<>());
+        List<PanelPlacement> atClose = Collections.synchronizedList(new ArrayList<>());
         List<PanelPlacement> afterThrower = Collections.synchronizedList(new ArrayList<>());
         List<PanelPlacement> late = Collections.synchronizedList(new ArrayList<>());
         List<PanelPlacement> cancelled = Collections.synchronizedList(new ArrayList<>());
@@ -1032,6 +1039,7 @@ public abstract class PluginContractTest {
                 hosts.add(host);
                 inFactory.add(host.placement());
                 host.onPlacement(heard::add);
+                host.onClosed(() -> atClose.add(host.placement()));
                 var C = dev.jasper.sdk.ui.ControlState.READY;
                 return context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Panel("hosts", C,
                     new dev.jasper.sdk.ui.Nodes.Header("hosts-header", C, "Hosts", java.util.OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
@@ -1041,9 +1049,6 @@ public abstract class PluginContractTest {
             var floating = new PanelPlacement(Anchor.RIGHT, true, PanelMode.FLOAT);
             var left = new PanelPlacement(Anchor.LEFT, false, PanelMode.DOCKED);
             var window = new PanelPlacement(Anchor.BOTTOM, false, PanelMode.WINDOW);
-
-            h.placePanel("test.alpha.hosts", floating);
-            assertThat(heard).as("a panel that is not open is not moved").isEmpty();
 
             assertThat(h.openPanel("test.alpha.hosts")).isNotNull();
             var host = hosts.get(0);
@@ -1079,9 +1084,26 @@ public abstract class PluginContractTest {
             assertThat(cancelled).as("a closed registration hears no more").containsExactly(left);
 
             h.closePanel("test.alpha.hosts");
-            h.placePanel("test.alpha.hosts", docked);
-            assertThat(heard).as("a closed panel hears nothing").containsExactly(floating, left, window);
+            assertThat(atClose).as("a panel that closes reads where it was").containsExactly(window);
+            assertThat(h.openPanel("test.alpha.hosts")).isNotNull();
+            assertThat(inFactory).as("opened again, it is built where it last was").containsExactly(docked, window);
+            assertThat(hosts.get(1).placement()).isEqualTo(window);
+            assertThat(heard).as("and hears nothing for it").containsExactly(floating, left, window);
+
+            h.closePanel("test.alpha.hosts");
+            h.placePanel("test.alpha.hosts", floating);
+            assertThat(heard).as("a panel that is not open hears nothing").containsExactly(floating, left, window);
             assertThat(late).containsExactly(window);
+            assertThat(host.placement()).as("a closed instance reads the place it closed in").isEqualTo(window);
+            assertThat(h.openPanel("test.alpha.hosts")).isNotNull();
+            assertThat(inFactory).as("moved while it was not open, it is built there").containsExactly(docked, window, floating);
+            assertThat(hosts.get(2).placement()).isEqualTo(floating);
+            assertThat(hosts.get(2).placement().ownWindow()).isTrue();
+            assertThat(heard).as("and no handler hears the move").containsExactly(floating, left, window);
+            h.placePanel("test.alpha.hosts", floating);
+            assertThat(heard).as("the same placement is silent").containsExactly(floating, left, window);
+            h.closePanel("test.alpha.hosts");
+            assertThat(atClose).containsExactly(window, window, floating);
         }));
     }
 

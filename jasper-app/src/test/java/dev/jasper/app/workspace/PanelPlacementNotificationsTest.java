@@ -277,4 +277,37 @@ class PanelPlacementNotificationsTest {
             assertThat(other.take()).as("its window closed").isEmpty();
         });
     }
+
+    /**
+     * Plan 3's final review: a panel that closes reads where it last was, in its close handlers and after, whether its
+     * plugin removed it (which undocks it first) or its window closed; never its default slot, docked.
+     */
+    @Test void aClosedPanelReadsWhereItLastWas() throws Exception {
+        edt(() -> {
+            var fixture = new Fixture();
+            fixture.toggle(A);
+            fixture.owner.dock().move(A, Slot.RIGHT_TOP, 0);
+            fixture.owner.dock().setMode(A, ToolWindowMode.FLOAT);
+            var site = fixture.sites.get(A);
+            var removedFrom = new PanelSite.Placement(Slot.RIGHT_TOP, ToolWindowMode.FLOAT);
+            var atClose = new ArrayList<PanelSite.Placement>();
+            site.onClosed(() -> atClose.add(site.placement()));
+            fixture.model.panels().getFirst().close();
+            assertThat(fixture.owner.dock().slot(A)).as("undocked").isEmpty();
+            assertThat(atClose).as("its plugin removed it").containsExactly(removedFrom);
+            assertThat(site.placement()).isEqualTo(removedFrom);
+
+            var other = new Fixture();
+            other.toggle(A);
+            other.owner.dock().setMode(A, ToolWindowMode.WINDOW);
+            var closing = other.sites.get(A);
+            var closedIn = new PanelSite.Placement(Slot.LEFT_TOP, ToolWindowMode.WINDOW);
+            closing.onClosed(() -> atClose.add(closing.placement()));
+            var dock = other.owner.dock();
+            other.owner.close();
+            dock.move(A, Slot.BOTTOM_RIGHT, 0);
+            assertThat(atClose).as("its window closed").containsExactly(removedFrom, closedIn);
+            assertThat(closing.placement()).as("whatever the dock does after").isEqualTo(closedIn);
+        });
+    }
 }

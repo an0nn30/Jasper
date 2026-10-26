@@ -316,8 +316,18 @@ final class FakeUi {
         return item;
     }
 
-    /** A registered panel and its instance in the main window, while one is built. */
-    static final class Panel { final PanelSpec spec; final PanelFactory factory; PanelInstance instance; Panel(PanelSpec spec, PanelFactory factory) { this.spec = spec; this.factory = factory; } }
+    /**
+     * A registered panel and its instance in the main window, while one is built. Its placement is the dock's, built or
+     * not: its spec's anchor and half, docked, until a placement is driven, and kept across a {@code closePanel}, as the
+     * dock keeps a panel's place while the main window closes and opens anew.
+     */
+    static final class Panel {
+        final PanelSpec spec; final PanelFactory factory; PanelInstance instance; dev.jasper.sdk.ui.PanelPlacement placement;
+        Panel(PanelSpec spec, PanelFactory factory) {
+            this.spec = spec; this.factory = factory;
+            placement = new dev.jasper.sdk.ui.PanelPlacement(spec.defaultAnchor(), spec.split(), dev.jasper.sdk.ui.PanelMode.DOCKED);
+        }
+    }
 
     record SurfaceMount(FakeWindow surface) { }
 
@@ -394,14 +404,17 @@ final class FakeUi {
         boolean visible = true;
         boolean done;
         dev.jasper.sdk.ui.PanelHeader header = dev.jasper.sdk.ui.PanelHeader.EMPTY;
-        /** Where the panel is: its spec's anchor and half, docked, until a placement is driven. */
+        /**
+         * Where the panel is: its registration's placement when it was built, then each one driven since; once closed,
+         * where it closed.
+         */
         dev.jasper.sdk.ui.PanelPlacement placement;
         final List<Consumer<Boolean>> visibility = new ArrayList<>();
         final List<Consumer<dev.jasper.sdk.ui.PanelPlacement>> placements = new ArrayList<>();
         final List<Runnable> closed = new ArrayList<>();
-        PanelInstance(UUID windowId, PanelSpec spec) {
+        PanelInstance(UUID windowId, dev.jasper.sdk.ui.PanelPlacement placement) {
             this.windowId = windowId;
-            placement = new dev.jasper.sdk.ui.PanelPlacement(spec.defaultAnchor(), spec.split(), dev.jasper.sdk.ui.PanelMode.DOCKED);
+            this.placement = placement;
         }
         @Override public WindowHandle window() { return context.terminals.windowHandle(windowId); }
         @Override public void setHeader(dev.jasper.sdk.ui.PanelHeader value) {
@@ -421,7 +434,7 @@ final class FakeUi {
             if (done || visible == value) return;
             visible = value;
             for (var listener : List.copyOf(visibility)) {
-                try { listener.accept(value); } catch (RuntimeException failure) { host.recordFailure(pluginId() + " panel visibility: " + failure); }
+                try { listener.accept(value); } catch (RuntimeException | LinkageError failure) { host.recordFailure(pluginId() + " panel visibility: " + failure); }
             }
         }
         @Override public boolean visible() { return !done && visible; }
@@ -432,12 +445,16 @@ final class FakeUi {
             placements.add(handler);
             return () -> placements.remove(handler);
         }
-        /** Moves the panel: a different placement is the one {@code placement()} returns and reaches each handler once. */
+        /**
+         * Moves the panel: a different placement is the one {@code placement()} returns and reaches each handler once. A
+         * handler that closes the panel ends the round, as the app's site does: the handlers after it hear nothing.
+         */
         void place(dev.jasper.sdk.ui.PanelPlacement value) {
             if (done || placement.equals(value)) return;
             placement = value;
             for (var handler : List.copyOf(placements)) {
-                try { handler.accept(value); } catch (RuntimeException failure) { host.recordFailure(pluginId() + " panel placement: " + failure); }
+                if (done) return;
+                try { handler.accept(value); } catch (RuntimeException | LinkageError failure) { host.recordFailure(pluginId() + " panel placement: " + failure); }
             }
         }
         @Override public Subscription onClosed(Runnable handler) { closed.add(handler); return () -> closed.remove(handler); }
@@ -446,7 +463,7 @@ final class FakeUi {
             done = true;
             header = dev.jasper.sdk.ui.PanelHeader.EMPTY;
             for (var handler : List.copyOf(closed)) {
-                try { handler.run(); } catch (RuntimeException failure) { host.recordFailure(pluginId() + " panel closed: " + failure); }
+                try { handler.run(); } catch (RuntimeException | LinkageError failure) { host.recordFailure(pluginId() + " panel closed: " + failure); }
             }
             closed.clear(); visibility.clear(); placements.clear();
         }
@@ -471,10 +488,11 @@ final class FakeUi {
             Panel panel = panels.stream().filter(p -> p.spec.id().equals(panelId)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Panel not registered: " + panelId));
             if (!window.isOpen()) return;
-            // Panels live in the main window (workspace tabs spec 14): a child window's toggle raises the main window and
-            // shows the panel there, as the application's does (workspace plan 4a's final review); the main window's
-            // toggles it.
-            if (!window.isMain()) host.workspace.main().ifPresent(main -> host.workspace.openRequests.add("front|" + main.id));
+            // Panels live in the main window's dock (workspace tabs spec 14): a child window's toggle shows the panel and
+            // raises the main window, as the application's does (workspace plan 4a's final review), or the panel's own
+            // window when it has one, which the fake has not, so it records nothing then; the main window's toggles it.
+            if (!window.isMain() && !panel.placement.ownWindow())
+                host.workspace.main().ifPresent(main -> host.workspace.openRequests.add("front|" + main.id));
             if (panel.instance == null) openPanel(panelId);
             else if (!window.isMain()) panel.instance.show();
             else panel.instance.setVisible(!panel.instance.visible());
@@ -482,7 +500,7 @@ final class FakeUi {
         };
     }
 
-    /** Builds the panel in the main window, or shows it there; null without a main window or when the factory fails. */
+    /** Builds the panel in the main window at its placement, or shows it there; null without a main window or when the factory fails. */
     JComponent openPanel(String panelId) {
         var main = host.workspace.main().orElse(null);
         if (main == null) return null;
@@ -491,7 +509,7 @@ final class FakeUi {
             var existing = panel.instance;
             if (existing != null) { existing.show(); return existing.content; }
             try {
-                var instance = new PanelInstance(main.id, panel.spec);
+                var instance = new PanelInstance(main.id, panel.placement);
                 var view=context.kit().requireOwned(panel.factory.create(instance));view.mount(instance);instance.onClosed(view::close);instance.content = view.component;
                 if (instance.content != null) panel.instance = instance;
                 return instance.content;

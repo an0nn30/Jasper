@@ -246,8 +246,9 @@ final class WindowContributions implements AutoCloseable {
 
     /**
      * A show by the panel's own toggle action (plan 15b Rulings 1), or for a user gesture in another window, a child
-     * window's View toggle: the panel becomes the active tool window under flush frames, and a detached one's own window
-     * comes forward.
+     * window's View toggle, or any child window's show or toggle of a detached tool window (which
+     * {@code WindowManager.routePanel} sends so): the panel becomes the active tool window under flush frames, and a
+     * detached one's own window comes forward, also when it already showed.
      */
     private void showAndActivate(String id) { changeAndActivate(id, () -> dock.show(id)); }
 
@@ -474,10 +475,15 @@ final class WindowContributions implements AutoCloseable {
         owner.area().setContent(id, panel.entry.title(), panel.component);
     }
 
-    /** Where the panel is now: its slot, or its default one while it has none, and its mode. */
+    /**
+     * Where the panel is now: its slot and its mode. Once it has left the dock (its plugin removed it, which undocks it
+     * before its site closes), the place it was built in or last heard, so its close handlers read where it was.
+     */
     private PanelSite.Placement placement(PanelInstance panel) {
         String id = panel.entry.id();
-        return new PanelSite.Placement(dock.slot(id).orElse(panel.entry.defaultSlot()), dock.mode(id));
+        Optional<Slot> slot = dock.slot(id);
+        if (slot.isPresent()) return new PanelSite.Placement(slot.get(), dock.mode(id));
+        return panel.placed != null ? panel.placed : new PanelSite.Placement(panel.entry.defaultSlot(), ToolWindowMode.DOCKED);
     }
 
     /** Tells the panel only what is still true and not yet told: a listener's own show or hide may have changed it. */

@@ -497,6 +497,51 @@ class WindowManagerTest {
         launch();
     }
 
+    /**
+     * Floating tool windows plan 3's final review: a child window's plain toggle or show of a tool window whose own window
+     * is open raises that window, as its activating toggle does, and leaves the main window where it is.
+     */
+    @Test void aChildWindowsPlainToggleOfAnOpenDetachedPanelRaisesItsWindow() throws Exception {
+        edt(() -> {
+            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
+            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
+            MainWindow main = manager.main().orElseThrow();
+            var windows = main.content().detachedWindows();
+            windows.ready = () -> true;
+            var screen = new Rectangle(0, 0, 1920, 1080);
+            windows.displays = () -> List.of(new WindowPlacement.Display(screen, screen));
+            main.content().detachedShells((opening, heard) -> new DetachedToolWindows.Shell(() -> events.add("show panel window"),
+                () -> events.add("front panel window"), () -> events.add("dispose panel window"), () -> false, bounds -> { }, frame -> { }));
+            main.content().dock().setBounds("test.panel", new Rectangle(100, 100, 400, 300));
+            main.content().dock().setMode("test.panel", ToolWindowMode.WINDOW);
+            model.requestPanel(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
+            assertThat(events).as("its own window is open").contains("show panel window");
+            List<Contributions.PanelRequest> heard = new ArrayList<>();
+            var probe = model.onPanelRequest(heard::add);
+            try {
+                events.clear();
+                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
+                assertThat(heard).as("routed as an activating show")
+                    .containsExactly(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+                assertThat(main.content().dock().visible("test.panel")).as("a routed toggle never hides").isTrue();
+                assertThat(events).as("its own window comes forward; the main window does not").containsExactly("front panel window");
+
+                events.clear();
+                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
+                assertThat(events).as("a plain show raises it too").containsExactly("front panel window");
+
+                events.clear();
+                heard.clear();
+                main.content().dock().setMode("test.panel", ToolWindowMode.DOCKED);
+                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
+                assertThat(heard).as("docked, a plain toggle stays a plain show")
+                    .containsExactly(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
+                assertThat(events).containsExactly("dispose panel window", "front main");
+            } finally { probe.close(); }
+        });
+        launch();
+    }
+
     /** Workspace tabs spec 6.1: while the main window closes, a request for it opens no second one beside it. */
     @Test void aRequestWhileTheMainWindowClosesOpensNoSecondOne() throws Exception {
         List<Optional<MainWindow>> asked = new ArrayList<>();

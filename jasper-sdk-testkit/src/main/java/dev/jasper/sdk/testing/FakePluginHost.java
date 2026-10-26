@@ -1150,12 +1150,13 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * Discards the open panel as the main window would when it closes: its header clears, retained header callbacks
-     * become inert and its close handlers run. Nothing happens when the panel is not open.
+     * become inert and its close handlers run. Its placement stays, as the dock keeps it, so {@link #openPanel} builds it
+     * there again. Nothing happens when the panel is not open.
      *
      * @param panelId panel identifier
      */
     public void closePanel(String panelId) {
-        for (var context : contexts.values()) for (var panel : context.ui.panels) {
+        for (var context : contexts.values()) for (var panel : List.copyOf(context.ui.panels)) {
             if (!panel.spec.id().equals(panelId)) continue;
             var instance = panel.instance;
             panel.instance = null;
@@ -1164,25 +1165,31 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Moves the open panel as the main window would when the user drags it: a placement that differs from its current
-     * one is what {@code PanelHost.placement()} returns from then on and reaches each {@code onPlacement} handler once,
-     * a handler that throws being recorded in {@link #failures()} while the others still run. The same placement is
-     * silent, and nothing happens when the panel is not open.
+     * Moves the panel as the main window would when the user drags it or gives it a View Mode, open or not: the
+     * placement is where {@link #openPanel} builds it from then on, also after {@link #closePanel}, as the dock keeps a
+     * panel's place while the main window closes and opens anew. For the open panel a placement that differs from its
+     * current one is what {@code PanelHost.placement()} returns from then on and reaches each {@code onPlacement} handler
+     * once, a handler that throws being recorded in {@link #failures()} while the others still run, and one that closes
+     * the panel ending the round. The same placement is silent, and so is a panel that is not open: its factory reads
+     * the placement when it is built.
      *
      * @param panelId panel identifier
      * @param placement where the panel is now
+     * @since 0.21.0
      */
     public void placePanel(String panelId, dev.jasper.sdk.ui.PanelPlacement placement) {
         java.util.Objects.requireNonNull(placement, "placement");
-        for (var context : contexts.values()) for (var panel : context.ui.panels) {
+        for (var context : contexts.values()) for (var panel : List.copyOf(context.ui.panels)) {
             if (!panel.spec.id().equals(panelId)) continue;
+            panel.placement = placement;
             if (panel.instance != null) panel.instance.place(placement);
         }
     }
 
     /**
-     * Invokes a panel's factory as the main window showing it would, or shows the panel built there: panels live in the
-     * main window. A factory failure is recorded.
+     * Invokes a panel's factory as the main window showing it would, at the panel's placement (its spec's anchor and
+     * half, docked, until {@link #placePanel} moves it), or shows the panel built there: panels live in the main window's
+     * dock. A factory failure is recorded.
      *
      * @param panelId the panel to build
      * @return the component, or null when no main window is open, there is no such panel or its factory failed
@@ -1535,7 +1542,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * What plugins asked to open or raise, in order.
      *
-     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program), {@code session-tab|<window id>|<session title>}, {@code session-split|<pane id>|<RIGHT or DOWN>|<session title>}, {@code beside|<content tab id>|<RIGHT or DOWN>} (a content tab's Terminal Right or Terminal Down) or {@code front|<window id>} (a window's {@code toFront()}, or the main window that a child window's panel toggle raises)
+     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program), {@code session-tab|<window id>|<session title>}, {@code session-split|<pane id>|<RIGHT or DOWN>|<session title>}, {@code beside|<content tab id>|<RIGHT or DOWN>} (a content tab's Terminal Right or Terminal Down) or {@code front|<window id>} (a window's {@code toFront()}, or the main window that a child window's toggle of a docked panel raises)
      */
     public List<String> openRequests() { return List.copyOf(workspace.openRequests); }
 

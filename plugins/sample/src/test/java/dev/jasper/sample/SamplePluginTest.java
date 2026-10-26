@@ -235,6 +235,26 @@ class SamplePluginTest {
         } });
     }
 
+    /**
+     * Floating tool windows plan 3's final review: a panel built while it has a window of its own, as one moved while it
+     * was not open or restored there at start-up is, starts with the own-window body.
+     */
+    @Test void thePanelBuiltWhileItHasAWindowOfItsOwnStartsWithThatBody() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.setSetting("dev.jasper.sample", "demo_ui", true);
+            start(host, INFO, Set.of(), Set.of(), new SamplePlugin());
+            host.addTerminalWindow();
+            var anchor = dev.jasper.sdk.ui.Anchor.LEFT;
+            host.placePanel(PANEL, new dev.jasper.sdk.ui.PanelPlacement(anchor, false, dev.jasper.sdk.ui.PanelMode.WINDOW));
+            assertThat(host.openPanel(PANEL)).isNotNull();
+            var view = host.panelView(PANEL).orElseThrow();
+            assertThat(panelBody(view).description()).contains("window of its own");
+            host.placePanel(PANEL, new dev.jasper.sdk.ui.PanelPlacement(anchor, false, dev.jasper.sdk.ui.PanelMode.DOCKED));
+            assertThat(panelBody(view).description()).as("docked, it describes the docked body").doesNotContain("window of its own");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
     /** Workspace tabs spec 13: the About tab gives its restore state and comes back through the sample's restorer. */
     @Test void theAboutTabComesBackThroughItsRestorer() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {

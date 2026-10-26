@@ -36,6 +36,8 @@ public final class PanelSite {
     private final List<Consumer<Placement>> placements = new ArrayList<>();
     /** Counts placement notifications: one a listener's own move overtook stops reaching the listeners after it. */
     private int placementRound;
+    /** Where the panel was when its instance was discarded: a closed site reports it, whatever its window does next. */
+    private Placement closedIn;
     private boolean done;
 
     /** A site outside a dock, as tests and fixtures build: its panel reports {@link Slot#LEFT_TOP}, docked. */
@@ -72,7 +74,7 @@ public final class PanelSite {
     public void show() { if (!done) show.run(); }
     public void hide() { if (!done) hide.run(); }
     public boolean visible() { return !done && visible.getAsBoolean(); }
-    public Placement placement() { return placement.get(); }
+    public Placement placement() { return done ? closedIn : placement.get(); }
 
     public Subscription onVisibility(Consumer<Boolean> listener) {
         visibility.add(Objects.requireNonNull(listener));
@@ -114,9 +116,10 @@ public final class PanelSite {
         }
     }
 
-    /** Called by the owning window, once, when the instance is discarded. */
+    /** Called by the owning window, once, when the instance is discarded; the place it reads now is the one it keeps. */
     public void notifyClosed() {
         if (done) return;
+        closedIn = placement.get();
         done = true;
         headerChanged.accept(PanelHeaderState.EMPTY);
         for (Runnable listener : List.copyOf(closed)) {
