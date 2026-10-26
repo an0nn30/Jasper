@@ -67,7 +67,9 @@ class ThemeMenuTest {
 
     /** The page over {@code config}, with hooks that run at once (unless {@link #holdWork}) and answer questions with {@link #agree}. */
     SchemaPage page(String config) {
-        draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values());
+        draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values(),
+        new dev.jasper.app.config.DefaultSource(java.util.Map.of(CoreSettings.UI_THEME_DARK, "jasper-meadow",
+            CoreSettings.UI_THEME_LIGHT, "jasper-meadow")));
         library = read();
         var imports = new ThemeImports(new ThemeFolder(folder()), surface -> Optional.ofNullable(chosen.poll()),
             (surface, question) -> { asked.add(question); if (agree) question.onYes().run(); },

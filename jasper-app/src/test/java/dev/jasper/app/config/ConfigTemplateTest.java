@@ -57,7 +57,8 @@ class ConfigTemplateTest {
         expected.add(List.of("version"));
         for (Setting<?> setting : CoreSettings.SCHEMA.settings())
             if (!(setting.kind() instanceof SettingKind.StringMap) && setting != CoreSettings.UI_FONT_SIZE
-                && setting != CoreSettings.SYSTEM_RUN_IN_BACKGROUND && setting != CoreSettings.UI_WORKSPACE_OPACITY)
+                && setting != CoreSettings.SYSTEM_RUN_IN_BACKGROUND && setting != CoreSettings.UI_WORKSPACE_OPACITY
+                && setting != CoreSettings.UI_THEME_DARK && setting != CoreSettings.UI_THEME_LIGHT)
                 expected.add(setting.key());
         // Its default depends on the platform, so the example shows it commented out, like the platform-sized UI font.
         assertThat(text).contains("\n# run_in_background = true\n");

@@ -120,7 +120,7 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     private Option.Palette preview(boolean dark, String picked) {
         if (desktop(picked)) return choices.desktop().preview().apply(source, dark);
         var installed = dark ? themes.dark() : themes.light();
-        String defaultId = dark ? UI_THEME_DARK.defaultValue() : UI_THEME_LIGHT.defaultValue();
+        String defaultId = dark ? dev.jasper.ui.theme.JasperTheme.DARK_DEFAULT_ID : dev.jasper.ui.theme.JasperTheme.LIGHT_DEFAULT_ID;
         return installed.stream().filter(theme -> theme.id().equals(picked)).findFirst()
             .orElseGet(() -> installed.stream().filter(theme -> theme.id().equals(defaultId)).findFirst()
                 .orElse(installed.getFirst())).preview();

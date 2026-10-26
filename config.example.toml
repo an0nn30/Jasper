@@ -137,8 +137,8 @@ blink = true
 # MY_VARIABLE = "a value with spaces"
 
 [ui]
-# The UI appearance, live across windows: "system" follows the macOS light or dark setting (Linux and Windows
-# report none, so it shows Dark there); "dark" or "light" chooses one. [ui.theme] names the theme each shows.
+# The UI appearance, live across windows: "system" follows macOS or the Linux desktop portal; when unavailable,
+# it shows Dark. "dark" or "light" chooses one. [ui.theme] names the theme each shows.
 appearance = "system"
 
 [ui.theme]
@@ -146,10 +146,10 @@ appearance = "system"
 # "ubuntu-yaru" for either, "catppuccin-latte" for Light, "catppuccin-frappe", "catppuccin-macchiato" or
 # "catppuccin-mocha" for Dark), a plugin's theme such as "enterprise", or an imported theme's id (its file name in the
 # themes folder without .json). A theme without that variant is reported and the appearance's default is used:
-# Jasper Meadow for Dark and Light. The standard and Enterprise looks both default to Jasper Meadow; these lines
-# save an explicit choice.
-dark = "jasper-meadow"
-light = "jasper-meadow"
+# Jasper Meadow for Dark and Light. Omitted picks use Desktop colors on Linux and Jasper Meadow elsewhere,
+# unless the look sets its own defaults (Enterprise uses Jasper Meadow). Uncomment to save an explicit choice.
+# dark = "jasper-meadow"
+# light = "jasper-meadow"
 # Desktop colors source on Linux: auto, gtk3 or gtk4; retained on every platform.
 desktop_source = "auto"
 
