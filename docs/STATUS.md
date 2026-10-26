@@ -4,8 +4,10 @@
 ordered phase delivery with coalesced phase-preserving detail, and matching runtime/testkit shutdown semantics.
 Buddy retains notice identity and dismissal across input/resume and combines running plugin work with terminal
 work. The Sample's optional UI demo includes a confirmation action. Targeted lifecycle, notifier, composition,
-Buddy and Sample tests, architecture checks and generated SDK reference pass; independent reviews, full headless
-check and external-plugin verification remain with the parent task. The [plan](superpowers/plans/2026-10-25-buddy-plugin-input.md)
+Buddy and Sample tests, architecture checks and generated SDK reference pass. Task, whole-branch and scoped fix
+reviews passed. The first full run exposed six stale SDK-version fixture failures and two missing-method errors in
+File Server test doubles; the test-only fixes passed 22 focused tests. Final full headless check passed in 8m 5s:
+13,054 tests, zero failures/errors, 30 skips. External-plugin check/pluginZip passed against SDK 0.22.0 release jars. The [plan](superpowers/plans/2026-10-25-buddy-plugin-input.md)
 records the delegated implementation and RED evidence. No GUI, AOT, benchmark, merge or push.
 
 

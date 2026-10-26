@@ -8,7 +8,7 @@ ActivityNotifier publishes plugin-running intent and BuddyIntegration combines i
 **Tech Stack:** JDK-only SDK/Buddy, Java25 JBR, shared JUnit contracts, generated SDK reference.
 **Spec:** docs/superpowers/specs/2026-10-25-buddy-plugin-input-design.md
 
-Status: implementation and targeted verification complete on `codex/buddy-plugin-input`; parent task owns independent reviews, full headless check and external-plugin verification. Clean existing checkout reused on the dedicated branch.
+Status: complete on `codex/buddy-plugin-input`; task, whole-branch and scoped fix reviews passed. Full check passed in 8m 5s (13,054 tests, zero failures/errors, 30 skips); external-plugin check/pluginZip passed. Test-only SDK-version fixtures and File Server handle doubles were corrected after the first full run. Clean existing checkout reused on the dedicated branch.
 Deviation: implementation bodies delegated; exact contracts below replace duplicate production code. Initial lifecycle RED was missing-API compilation; the Sample activation example also has a behavioral RED. The compiled example adds a Tools confirmation action under the existing `demo_ui` setting.
 
 ## Global Constraints
@@ -49,5 +49,5 @@ update and tests; existing sample/docs and SDK reference sources/generated outpu
   booleans in BuddyIntegration; wire both producers. Test actual composition callbacks headlessly.
 - [x] Update compiled example, version/release references and current docs; run sdkReference.
 - [x] Run affected tests and architecture/doc checks GREEN, then commit with Co-Authored-By trailer.
-- [ ] Fresh task and whole-branch reviews; fix findings. Parent runs full check and external-plugin check/pluginZip
+- [x] Fresh task and whole-branch reviews; fix findings. Parent runs full check and external-plugin check/pluginZip
   with -PjasperSdkDir="$PWD/build/sdk-release". Record verification and finish locally.
