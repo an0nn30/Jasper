@@ -93,6 +93,10 @@ public final class SftpUi implements AutoCloseable {
     private UiView create(PanelHost host) {
         var panel=new SftpPanel(context.kit(),layout);var window=host.window();
         panel.onHeaderChanged(host::setHeader);
+        // In a window of its own or docked at the bottom the table adds Modified and Permissions; the panel is right from the
+        // start and follows each move.
+        panel.wide(dev.jasper.remote.workstation.Layout.wide(host.placement()));
+        host.onPlacement(placement->panel.wide(dev.jasper.remote.workstation.Layout.wide(placement)));
         panel.onChooseSession(chosen-> { if(!closed && window.isOpen()) browse(window,chosen); });
         panel.sessions(hosts.get());
         if(layout==dev.jasper.remote.workstation.Layout.ROWS) panel.transfers(transferStrip.apply(window));

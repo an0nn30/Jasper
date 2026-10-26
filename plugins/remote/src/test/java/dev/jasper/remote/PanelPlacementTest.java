@@ -5,13 +5,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
+import dev.jasper.remote.sftp.FileEntry;
 import dev.jasper.remote.testsupport.Kits;
 import dev.jasper.remote.ui.HostsPanel;
+import dev.jasper.remote.ui.sftp.SftpPanel;
+import dev.jasper.remote.ui.sftp.SftpTestAccess;
+import dev.jasper.remote.ui.sftp.SftpUi;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.Anchor;
+import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PanelMode;
 import dev.jasper.sdk.ui.PanelPlacement;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -75,6 +81,28 @@ class PanelPlacementTest {
             place(host, RemotePlugin.PANEL, own(PanelMode.WINDOW));
             Kits.edt(() -> host.openPanel(RemotePlugin.PANEL));
             assertThat(has(host, RemotePlugin.PANEL, HostsPanel.COLUMNS)).isTrue();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** The SFTP table's column count, read from the open panel's view. */
+    static int sftpColumns(FakePluginHost host) throws Exception {
+        return Kits.value(() -> Kits.node(host.panelView(SftpUi.PANEL).orElseThrow(), SftpPanel.FILES, Nodes.Table.class).columns().size());
+    }
+
+    @Test void theSftpTableWidensInAWindowOfItsOwnAndAtTheBottom() throws Exception {
+        try (var host = new FakePluginHost(root.resolve("home"))) {
+            var plugin = started(host);
+            Kits.edt(() -> host.openPanel(SftpUi.PANEL));
+            var panel = SftpTestAccess.panel(plugin.sftp());
+            Kits.edt(() -> panel.showPage("prod", "/srv", List.of(new FileEntry("a.txt", FileEntry.Kind.FILE, 1200, 0, 0644, "")), 0, 1, false));
+            assertThat(sftpColumns(host)).as("docked on the left").isEqualTo(2);
+            place(host, SftpUi.PANEL, own(PanelMode.FLOAT));
+            assertThat(sftpColumns(host)).as("floating").isEqualTo(4);
+            place(host, SftpUi.PANEL, docked(Anchor.LEFT));
+            assertThat(sftpColumns(host)).as("docked again").isEqualTo(2);
+            place(host, SftpUi.PANEL, docked(Anchor.BOTTOM));
+            assertThat(sftpColumns(host)).as("docked at the bottom").isEqualTo(4);
             assertThat(host.failures()).isEmpty();
         }
     }

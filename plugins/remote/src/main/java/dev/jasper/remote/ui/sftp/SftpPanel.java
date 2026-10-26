@@ -44,6 +44,9 @@ import java.util.function.Consumer;
  * column; while nothing is connected a Choose Session… dropdown and the root as disabled breadcrumbs sit above the kept
  * headers and a "Not Connected" empty state, and the window's transfers live in the Transfers panel instead of the footer.
  *
+ * <p>In a window of its own or docked at the bottom ({@link #wide(boolean)}) the table of either look adds Modified (date
+ * and time) and Permissions columns; the tools, breadcrumbs and footer stay as they are.
+ *
  * <p>Rows are keyed by entry name. A new listing or page selects its first row. Enter or a double click on one entry
  * opens a folder (or a link, without the Editor) or hands a file or link to the Editor. Each row's own context menu acts
  * on the selection when the row is selected and on that row alone otherwise; outside every row (an empty folder too) a
@@ -76,6 +79,8 @@ public final class SftpPanel implements AutoCloseable {
     private final boolean destination;
     /** Which composition the sidebar takes, fixed at construction (spec 3.6); an embedded browser keeps the rows. */
     private final Layout layout;
+    /** Whether the table takes its wide columns (a window of its own, or docked at the bottom); never in an embedded browser. */
+    private boolean wide;
     private Actions actions;
     private Editing editing;
     private Runnable back=()->{},forward=()->{},onLoaded=()->{};
@@ -110,6 +115,18 @@ public final class SftpPanel implements AutoCloseable {
      * {@link #handle} takes its events, {@code changed} renders the owner again and {@code focus} focuses a node there.
      */
     static SftpPanel destination(Runnable changed,Consumer<String> focus) { return new SftpPanel(changed,focus); }
+
+    /**
+     * Asks for the wide table, which adds Modified and Permissions columns, or the docked one. Nothing changes while the
+     * value is the same, after {@link #close()} or in an embedded browser.
+     */
+    public void wide(boolean value) {
+        if(closed || destination || value==wide) return;
+        wide=value;render();
+    }
+
+    /** Whether the wide table is asked for, as {@link #wide(boolean)} last set it. */
+    public boolean wide() { return wide; }
 
     /** The sidebar's kit view. */
     public UiView view() { if(view==null) throw new IllegalStateException("An embedded browser has no view of its own");return view; }
@@ -187,6 +204,11 @@ public final class SftpPanel implements AutoCloseable {
     static final List<Column> CLASSIC_COLUMNS = List.of(new Column("name", "Name", Nodes.TextRole.BODY, false, 136, Optional.empty()),
         new Column("size", "Size", Nodes.TextRole.DESCRIPTION, true, 77, Optional.empty()),
         new Column("modified", "Modified", Nodes.TextRole.MONO_SMALL, false, 87, Optional.empty()));
+    /** The classic table's columns when wide: the full modified time and the permissions after the size. */
+    static final List<Column> CLASSIC_WIDE_COLUMNS = List.of(new Column("name", "Name", Nodes.TextRole.BODY, false, 136, Optional.empty()),
+        new Column("size", "Size", Nodes.TextRole.DESCRIPTION, true, 77, Optional.empty()),
+        new Column("modified", "Modified", Nodes.TextRole.MONO_SMALL, false, 120, Optional.empty()),
+        new Column("permissions", "Permissions", Nodes.TextRole.MONO_SMALL, false, 90, Optional.empty()));
 
     private Nodes.Panel classicPanel() {
         var header = new Nodes.Header(HEADER, ControlState.READY, "SFTP", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
@@ -231,14 +253,16 @@ public final class SftpPanel implements AutoCloseable {
         var rows = new ArrayList<TableRow>();
         if (loaded) for (var entry : entries) {
             String id = rowId(entry);
-            rows.add(new TableRow(id, Map.of("name", entry.name(), "size", formatSize(entry), "modified", shortModified(entry)), Optional.of(glyph(entry)), false,
+            var cells = wide ? Map.of("name", entry.name(), "size", formatSize(entry), "modified", modified(entry), "permissions", permissions(entry))
+                : Map.of("name", entry.name(), "size", formatSize(entry), "modified", shortModified(entry));
+            rows.add(new TableRow(id, cells, Optional.of(glyph(entry)), false,
                 Optional.of(menu(ROW_MENU, ":" + id, selected.contains(id) ? selection() : List.of(entry))),
                 entry.name() + " — " + formatSize(entry) + " — " + modified(entry)));
         }
         Optional<Nodes.Empty> empty = loaded ? Optional.empty() : Optional.of(new Nodes.Empty(EMPTY, ControlState.READY,
             new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "folder", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "SFTP"), "Not Connected",
             "Connect to an SSH session to browse its files.", List.of()));
-        return new Nodes.Table(FILES, state(true, !working), CLASSIC_COLUMNS, rows, loaded ? selected : Set.of(), OPEN, loaded ? menu(MENU, "", selection()) : List.of(),
+        return new Nodes.Table(FILES, state(true, !working), wide ? CLASSIC_WIDE_COLUMNS : CLASSIC_COLUMNS, rows, loaded ? selected : Set.of(), OPEN, loaded ? menu(MENU, "", selection()) : List.of(),
             Nodes.SelectionMode.MULTIPLE, Nodes.ScrollPolicy.STANDARD, empty, "");
     }
 
@@ -445,17 +469,28 @@ public final class SftpPanel implements AutoCloseable {
         return result;
     }
 
+    /** The table's columns: name and size docked, with the modified time and the permissions when wide. */
+    static final List<Column> COLUMNS=List.of(
+        new Column("name","Name",Nodes.TextRole.BODY,false,2.4,Optional.empty()),
+        new Column("size","Size",Nodes.TextRole.DESCRIPTION,true,1,Optional.empty()));
+    static final List<Column> WIDE_COLUMNS=List.of(
+        new Column("name","Name",Nodes.TextRole.BODY,false,2.4,Optional.empty()),
+        new Column("size","Size",Nodes.TextRole.DESCRIPTION,true,1,Optional.empty()),
+        new Column("modified","Modified",Nodes.TextRole.DESCRIPTION,false,1.6,Optional.empty()),
+        new Column("permissions","Permissions",Nodes.TextRole.MONO_SMALL,false,1.2,Optional.empty()));
+
     private Nodes.Table table() {
+        boolean columns=wide && !destination;
         var rows=new ArrayList<TableRow>();
         for(var entry:entries) {
             String id=rowId(entry);
-            rows.add(new TableRow(id,Map.of("name",entry.name(),"size",formatSize(entry)),Optional.of(glyph(entry)),false,
+            var cells=columns?Map.of("name",entry.name(),"size",formatSize(entry),"modified",modified(entry),"permissions",permissions(entry))
+                :Map.of("name",entry.name(),"size",formatSize(entry));
+            rows.add(new TableRow(id,cells,Optional.of(glyph(entry)),false,
                 Optional.of(destination?List.<MenuItem>of():menu(ROW_MENU,":"+id,selected.contains(id)?selection():List.of(entry))),
                 entry.name()+" — "+formatSize(entry)+" — "+modified(entry)));
         }
-        return new Nodes.Table(FILES,state(true,!working),List.of(
-                new Column("name","Name",Nodes.TextRole.BODY,false,2.4,Optional.empty()),
-                new Column("size","Size",Nodes.TextRole.DESCRIPTION,true,1,Optional.empty())),
+        return new Nodes.Table(FILES,state(true,!working),columns?WIDE_COLUMNS:COLUMNS,
             // The shared menu (on the selection) opens on a context press outside every row, empty folders included, as the
             // old table's component popup did; each row's own menu takes precedence on the row.
             rows,selected,OPEN,destination?List.of():menu(MENU,"",selection()),destination?Nodes.SelectionMode.SINGLE:Nodes.SelectionMode.MULTIPLE,Nodes.ScrollPolicy.STANDARD);
@@ -506,5 +541,13 @@ public final class SftpPanel implements AutoCloseable {
     private Nodes.Node resultLine() { return new Nodes.Text(RESULT,state(!result.isEmpty(),true),result,Nodes.TextRole.DESCRIPTION); }
 
     static String formatSize(FileEntry entry) { if(entry.kind()==FileEntry.Kind.DIRECTORY) return "—";long value=entry.size();if(value<0) return "—";if(value<1000) return value+" B";if(value<1000*1000) return String.format(Locale.ROOT,"%.1f KB",value/1000.0);if(value<1000L*1000*1000) return String.format(Locale.ROOT,"%.1f MB",value/(1000.0*1000));return String.format(Locale.ROOT,"%.1f GB",value/(1000.0*1000*1000)); }
+    /** The mode as {@code ls -l} writes it, "rwxr-xr-x"; "—" when the server reported none. */
+    static String permissions(FileEntry entry) {
+        int mode=entry.permissions();
+        if(mode<0) return "—";
+        var text=new StringBuilder(9);
+        for(int shift=6;shift>=0;shift-=3) text.append((mode>>shift&4)!=0?'r':'-').append((mode>>shift&2)!=0?'w':'-').append((mode>>shift&1)!=0?'x':'-');
+        return text.toString();
+    }
     static String modified(FileEntry entry) { return entry.modifiedMillis()<0?"":DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(entry.modifiedMillis())); }
 }
