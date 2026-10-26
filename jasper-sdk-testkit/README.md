@@ -105,6 +105,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `moveTab(tabId, windowId)`, `closeTab(tabId)`, `windowTabs(windowId)`, `holdPane(paneId)` | Moves a tab the test added to another window, or closes it, as the user would (the last tab of a child window takes the window); a window's tabs, each its items pane by pane; holds a local pane `NOT_STARTED` until its tab is shown, as Jasper holds a restored one |
 | `activateTerminalWindow(id)`, `focusTerminalPane(id)`, `closeTerminalPane(id)` | The user turns to a window, focuses a pane or closes one (the last pane takes its tab, the last tab a child window) |
 | `setPaneInfo(id, info)`, `setSelection(id, text)`, `setForegroundJob(id, name)` | Changes what a pane reports, without an event |
+| `setTabNamePieces(tabId, builtIns)`, `tabNamePieces(tabId)`, `tabNamePieceSpecs()` | Scripts the built-in pieces (`dir`, `full`, `process`, `title`) a terminal tab reports through `TabHandle.namePieces()`; the values plugins' pieces hold for a tab; every plugin's piece |
 | `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` | Publish terminal events for a pane |
 | `terminalPanes()` | Every open pane, in creation order |
 | `sent(paneId)` | What plugins sent to a pane, as `write:<text>` and `paste:<text>` |

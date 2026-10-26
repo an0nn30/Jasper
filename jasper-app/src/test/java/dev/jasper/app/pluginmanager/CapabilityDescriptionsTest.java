@@ -10,6 +10,11 @@ class CapabilityDescriptionsTest {
         assertThat(Capabilities.describe("made.up")).isEqualTo("made.up");
     }
 
+    @Test void terminalObserveSaysItAddsToTabNames() {
+        assertThat(Capabilities.describe("terminal.observe"))
+            .isEqualTo("See your terminals: titles, folders, the commands you run and how they end; add to tab names (terminal.observe)");
+    }
+
     @Test void clipboardReadIsDescribed() {
         assertThat(Capabilities.describe("clipboard.read")).isEqualTo("Read text you copied to the clipboard (clipboard.read)");
     }

@@ -165,14 +165,17 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
-**Terminal tab names, plan A — 2026-10-23** (`claude/terminal-tab-names`, worktree
+**Terminal tab names, plans A and B — 2026-10-26** (`claude/terminal-tab-names`, worktree
 `.claude/worktrees/terminal-tab-names`, from `main` at `36fdeedc1`; not merged or pushed): `terminal.tab_name`
 (Settings › Terminal › Tab name, live) names Terminal tabs from a pattern of free text and `{dir}`, `{full}`,
 `{process}` and `{title}`, by default `{dir} {process} {title}`; Rename Tab still wins. `config.TitleTemplate` is
 shared with the look's window title. Settings previews the active terminal tab's name as you type. Spec:
 `docs/superpowers/specs/2026-10-23-jasper-terminal-tab-names-design.md`; plan:
-`docs/superpowers/plans/2026-10-23-terminal-tab-names-a-pattern.md` (deviations in its status banner). GUI check
-pending: the Tab name row's layout and preview, and tab names on macOS, Linux and Windows.
+`docs/superpowers/plans/2026-10-23-terminal-tab-names-a-pattern.md` (deviations in its status banner). Plan B: plugins
+read a tab's pieces (`TabHandle.namePieces()`) and add their own (`Terminals.addTabNamePiece`, SDK 0.22.0, unreleased,
+no bump); Remote adds `{host}`; Settings lists plugin pieces; the `terminal.observe` consent line adds "add to tab
+names". Plan: `docs/superpowers/plans/2026-10-23-terminal-tab-names-b-plugin-pieces.md`. GUI check pending: the Tab
+name row's layout and preview, tab names on macOS, Linux and Windows, and `{dir} {host}` on an SSH tab.
 
 **Buddy integration — 2026-10-25:** merged tab-aware bubbles and the stand-up animation with current `main`,
 including Linux translucent rendering and Desktop colors. Resolved the status-log overlap by retaining both histories;

@@ -361,6 +361,9 @@ the Custom shell settings may not be reported. Both need `terminal.open`. The ca
 list logs a warning and opens nothing. An empty profile starts what Jasper's own New
 Tab would; a plugin's split with an empty profile starts the default profile.
 
+Tab name pieces (`TabNamePieceSpec`, `TabNamePiece`, `Terminals.addTabNamePiece`, `TabHandle.namePieces`) feed the Tab
+name pattern; the app keeps plugin pieces in `contributions.TabNamePieces`, which windows and Settings read.
+
 ## Provided sessions
 
 `OpenRequest.session` needs `session.provide`. `HostedSessions` turns the `SessionSpec` into the app-native

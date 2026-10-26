@@ -223,7 +223,7 @@ window (actions, menus, tool windows, content tabs, dialogs, notifications, sett
 
 | Capability | Lets the plugin | The review sheet says |
 | --- | --- | --- |
-| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()` and other tabs' titles in `ContentTab.tabChoices()` (which does not throw without it: its other tabs read "Tab N"), and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end |
+| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()` and other tabs' titles in `ContentTab.tabChoices()` (which does not throw without it: its other tabs read "Tab N"), read a tab's name pieces and add your own, and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end; add to tab names |
 | `terminal.selection` | read `PaneHandle.selection()` | Read the text you select in a terminal |
 | `terminal.inject` | call `PaneHandle.sendText`, `sendBytes` and `paste` | Type into your terminals |
 | `terminal.open` | open tabs and splits with a local request (the shell, a profile or a program), open a terminal beside a content tab with `ContentTab.split(SplitChoice.TERMINAL, …)`, and read `Terminals.profiles()` and `onProfilesChanged` | Open terminal tabs, splits and windows, and run programs in them |
@@ -891,6 +891,13 @@ private static void installTerminalDemo(PluginContext context) {
   `window()`, `title()`, `select()`.
   [`PaneHandle`](sdk-reference.html#dev.jasper.sdk.terminal.PaneHandle): `info()`, `foregroundJob()`, `selection()`,
   `sendText`, `sendBytes`, `paste` and `focus()`.
+- **Tab names.** A terminal tab's automatic name comes from the user's Tab name pattern
+  ([Tab names](configuration.md#tab-names)). `TabHandle.namePieces()` returns the pieces it is made from that have a
+  value: Jasper's `dir`, `full`, `process` and `title`, and every plugin's.
+  `Terminals.addTabNamePiece(new TabNamePieceSpec("host", "the SSH host this tab is connected to"))` adds a piece users
+  can write as `{host}`; the `TabNamePiece` it returns sets the piece's value per tab with `set(tab, value)`, from any
+  thread. A name is held by one plugin at a time, Jasper's four are reserved, and the piece ends with its handle or its
+  plugin. Both need `terminal.observe`.
 - **A pane can close at any moment.** Commands to a closed pane are ignored, queries return the last value the handle
   saw, and `isOpen()` tells. Do not treat that as an error. A tab Jasper closed with its windows comes back under the
   same id when they are restored; drop a handle on `TAB_CLOSED`. After the plugin stops, handle queries throw

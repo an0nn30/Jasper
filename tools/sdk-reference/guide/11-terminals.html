@@ -42,6 +42,14 @@ shows, and an item Jasper closed with its windows comes back under the same id, 
 worker thread. {@link TabHandle#title()} is the tab's title as its header shows it. Both need {@code terminal.observe};
 {@link PaneHandle#selection()}, the selected text, needs {@code terminal.selection}.</p>
 
+<h3>Tab names</h3>
+<p>A terminal tab's automatic name comes from the user's Tab name pattern. {@link TabHandle#namePieces()} returns the
+pieces it is made from that have a value: Jasper's {@code dir}, {@code full}, {@code process} and {@code title}, and every
+plugin's. {@link Terminals#addTabNamePiece(TabNamePieceSpec)} adds a piece users can write as <code>&#123;host&#125;</code>; the
+{@link TabNamePiece} it returns sets the piece's value per tab with {@link TabNamePiece#set(TabHandle,String)}, from any
+thread. A name is held by one plugin at a time, Jasper's four are reserved, and the piece ends with its handle or its
+plugin. Both calls need {@code terminal.observe}.</p>
+
 <h3>Typing and pasting</h3>
 <p>With {@code terminal.inject}, {@link PaneHandle#sendText(String)} types text as UTF-8 and adds nothing: end a command
 with {@code "\r"} to run it, or leave it at the prompt for the user. {@link PaneHandle#sendBytes(byte[])} writes raw bytes,

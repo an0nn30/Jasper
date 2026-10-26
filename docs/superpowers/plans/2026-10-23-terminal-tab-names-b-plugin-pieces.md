@@ -2,12 +2,24 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: **Not started; starts after plan A is done.** Deviations from the spec, decided while planning:
+Status: **Done 2026-10-26.** Deviations from the spec, decided while planning:
 - No SDK version bump. The spec asked for the next patch version, but SDK 0.22.0 (on `main` since 2026-10-25) is
   unreleased (`v1.0.0` shipped 0.18.1), and recent SDK additions joined the unreleased version the same way. The new
   members carry `@since 0.22.0`, and no `plugin.toml` range changes.
 - The app's registry of plugin pieces lives in `dev.jasper.app.contributions` (the model plugins write and windows
   render), not in `HostedTerminals`, because `workspace` and `settingsui` cannot see `plugins`.
+
+Deviations while executing:
+- `TabNamePieces`' two ledger rows went into `docs/design/theme-engine/migration.csv` with the registry's commit, which
+  `ThemeMigrationCoverageTest` needs.
+- `HostedTerminals`' `TabNamePiece.set` also ignores a call once its plugin has stopped, because closing a plugin's
+  registrations does not flip the piece's own flag; the testkit's `FakeWorkspace.close` drops a closed tab's values as
+  the application does, and the contract test proves both.
+- `TabHost.detach`'s lambda parameter is named `id`, as `tab` clashes with the method's own parameter.
+- The `terminal.observe` consent line reads "See your terminals: titles, folders, the commands you run and how they end;
+  add to tab names", because `Terminals.addTabNamePiece` needs that capability and the user grants it there. The
+  capability tables of the guides and the SDK reference, `Capabilities.TERMINAL_OBSERVE`'s Javadoc and the audit-log
+  column follow it, and the reference's Terminals and Testing guides gained the new members.
 
 **Goal:** Plugins read a terminal tab's name pieces and add their own; Remote adds `{host}`.
 
