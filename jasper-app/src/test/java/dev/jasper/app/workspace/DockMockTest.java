@@ -474,7 +474,12 @@ class DockMockTest {
                 firstIcon = Math.min(firstIcon, mockRun.start());
                 assertThat((run.start() + run.end()) / 2.0).as(where + " icon " + i + " centre")
                     .isBetween((mockRun.start() + mockRun.end()) / 2.0 - 2, (mockRun.start() + mockRun.end()) / 2.0 + 2);
-                assertThat(run.length()).as(where + " icon " + i + " extent")
+                // Options is the vertical ellipsis, where the mocks draw the horizontal one (the floating tool windows spec, the
+                // glyph in every header): the same glyph box, so the centre holds, and as wide as one of its dots.
+                boolean options = icons == actions.size();
+                int dot = (int) Math.round(2 * 2.0 * EnterpriseLook.kit().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH) / 16);
+                if (options) assertThat(run.length()).as(where + " icon " + i + " extent: Options is a column of dots").isBetween(dot - 1, dot + 1);
+                else assertThat(run.length()).as(where + " icon " + i + " extent")
                     .isBetween(mockRun.length() - GLYPH_EXTENT, mockRun.length() + GLYPH_EXTENT);
                 // The user's 2026-10-19 direction: a classic name (the panels' add) draws IntelliJ's classic art, authored,
                 // where the mocks set a glyph in the strip's ink; the other actions keep the strip's ink.

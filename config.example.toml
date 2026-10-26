@@ -102,6 +102,11 @@ on_exit = "keep_open"
 # fish before config.fish, and into a zsh or fish $SHELL inside tmux; "manual" only exports JASPER_SHELL_INTEGRATION
 # for you to source; "off" does neither.
 shell_integration = "auto"
+# Live. How Terminal tabs are named: free text with pieces in braces. {dir} is the current folder's name, {full} its
+# whole path, {process} the running program and {title} the title the shell or a program set; plugins add their own,
+# such as Remote's {host}. A piece without a value shows nothing and takes the text before it along, or the text after
+# it when no piece before it shows; {{ and }} write a brace.
+tab_name = "{dir} {process} {title}"
 # Colours for terminal panes, live: "match" uses the shown theme's own scheme; or a scheme id, <theme id>/<scheme key>,
 # such as "slate-cobalt/dark", "slate-cobalt/light" or "slate-cobalt/high-contrast".
 scheme = "match"
@@ -137,8 +142,8 @@ blink = true
 # MY_VARIABLE = "a value with spaces"
 
 [ui]
-# The UI appearance, live across windows: "system" follows the macOS light or dark setting (Linux and Windows
-# report none, so it shows Dark there); "dark" or "light" chooses one. [ui.theme] names the theme each shows.
+# The UI appearance, live across windows: "system" follows macOS or the Linux desktop portal; when unavailable,
+# it shows Dark. "dark" or "light" chooses one. [ui.theme] names the theme each shows.
 appearance = "system"
 
 [ui.theme]
@@ -146,10 +151,12 @@ appearance = "system"
 # "ubuntu-yaru" for either, "catppuccin-latte" for Light, "catppuccin-frappe", "catppuccin-macchiato" or
 # "catppuccin-mocha" for Dark), a plugin's theme such as "enterprise", or an imported theme's id (its file name in the
 # themes folder without .json). A theme without that variant is reported and the appearance's default is used:
-# Jasper Meadow for Dark and Light. The standard and Enterprise looks both default to Jasper Meadow; these lines
-# save an explicit choice.
-dark = "jasper-meadow"
-light = "jasper-meadow"
+# Jasper Meadow for Dark and Light. Omitted picks use Desktop colors on Linux and Jasper Meadow elsewhere,
+# unless the look sets its own defaults (Enterprise uses Jasper Meadow). Uncomment to save an explicit choice.
+# dark = "jasper-meadow"
+# light = "jasper-meadow"
+# Desktop colors source on Linux: auto, qt (Qt / KDE), gtk3 or gtk4; retained on every platform.
+desktop_source = "auto"
 
 [ui.font]
 # Live UI font for app chrome and plugin controls, independent of [terminal.font].

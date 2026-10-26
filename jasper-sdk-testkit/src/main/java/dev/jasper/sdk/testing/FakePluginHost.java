@@ -66,6 +66,7 @@ public final class FakePluginHost implements AutoCloseable {
     private final Map<String, Class<?>> topicTypes = new ConcurrentHashMap<>();
     private final Map<String, CopyOnWriteArrayList<Entry>> subscribers = new ConcurrentHashMap<>();
     private final Map<UUID, ActivityEvent> running = new ConcurrentHashMap<>();
+    private final Map<UUID, FakeActivity> activityHandles = new ConcurrentHashMap<>();
     private final List<ActivityEvent> activityLog = new CopyOnWriteArrayList<>();
     private final Map<UUID, FakeConnection> connections = new ConcurrentHashMap<>();
     private final List<ConnectionEvent> connectionLog = new CopyOnWriteArrayList<>();
@@ -502,7 +503,7 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param pluginId the plugin
      * @return the count while it runs; 0 when it is not running
-     * @since 0.21.0
+     * @since 0.22.0
      */
     public int settingsShown(String pluginId) {
         FakePluginContext context = contexts.get(pluginId);
@@ -919,12 +920,8 @@ public final class FakePluginHost implements AutoCloseable {
         clipboard.ownerStopped(context.plugin().id());
         String id = context.plugin().id();
         for (var list : subscribers.values()) list.removeIf(entry -> entry.pluginId().equals(id));
-        for (ActivityEvent open : List.copyOf(running.values())) {
-            if (!open.sourcePluginId().equals(id)) continue;
-            running.remove(open.id());
-            enqueue(new ActivityEvent(open.id(), id, open.title(), ActivityEvent.State.FAILED,
-                open.fraction(), reason, open.activateActionId()));
-        }
+        for (FakeActivity open : List.copyOf(activityHandles.values()))
+            if (open.pluginId.equals(id)) open.fail(reason);
         for (FakeConnection open : List.copyOf(connections.values()))
             if (open.pluginId.equals(id)) open.close();
     }
@@ -1009,8 +1006,11 @@ public final class FakePluginHost implements AutoCloseable {
     ActivityHandle begin(String pluginId, ActivitySpec spec) {
         var activity = new FakeActivity(pluginId, spec);
         var started = activity.event(ActivityEvent.State.STARTED, OptionalDouble.empty(), spec.detail());
-        running.put(activity.id, started);
-        enqueue(started);
+        synchronized (activity) {
+            running.put(activity.id, started);
+            activityHandles.put(activity.id, activity);
+            enqueue(started);
+        }
         return activity;
     }
 
@@ -1021,6 +1021,8 @@ public final class FakePluginHost implements AutoCloseable {
         private boolean ended;
         private OptionalDouble fraction = OptionalDouble.empty();
         private ActivityEvent waiting;
+        private boolean input;
+        private long deliveryToken;
 
         FakeActivity(String pluginId, ActivitySpec spec) { this.pluginId = pluginId; this.spec = spec; }
 
@@ -1030,47 +1032,62 @@ public final class FakePluginHost implements AutoCloseable {
 
         @Override public UUID id() { return id; }
 
-        @Override public void progress(double value, String detail) {
-            report(OptionalDouble.of(value), detail);
-        }
+        @Override public synchronized void progress(double value, String detail) { report(OptionalDouble.of(value), detail); }
 
-        @Override public void detail(String detail) {
-            OptionalDouble last;
-            synchronized (this) { last = fraction; }
-            report(last, detail);
-        }
+        @Override public synchronized void detail(String detail) { report(fraction, detail); }
 
         private void report(OptionalDouble value, String detail) {
-            ActivityEvent event = event(ActivityEvent.State.PROGRESS, value, Objects.requireNonNull(detail, "detail"));
-            boolean schedule;
-            synchronized (this) {
-                if (ended || !running.containsKey(id)) return;
-                fraction = value;
-                running.put(id, event);
-                schedule = waiting == null;
-                waiting = event;
+            ActivityEvent next = event(input ? ActivityEvent.State.NEEDS_INPUT : ActivityEvent.State.PROGRESS,
+                value, Objects.requireNonNull(detail, "detail"));
+            if (ended) return;
+            fraction = value;
+            running.put(id, next);
+            boolean schedule = waiting == null;
+            waiting = next;
+            if (schedule) {
+                long token = ++deliveryToken;
+                events.add(() -> {
+                    ActivityEvent latest;
+                    synchronized (this) {
+                        if (token != deliveryToken) return;
+                        latest = waiting; waiting = null;
+                    }
+                    if (latest != null) deliver(Activities.TOPIC.id(), latest);
+                });
             }
-            if (schedule) events.add(() -> {
-                ActivityEvent latest;
-                synchronized (this) { latest = waiting; waiting = null; }
-                if (latest != null) deliver(Activities.TOPIC.id(), latest);
-            });
+        }
+
+        @Override public void needsInput(String detail) { phase(true, detail); }
+        @Override public void resume(String detail) { phase(false, detail); }
+
+        private synchronized void phase(boolean needsInput, String detail) {
+            Objects.requireNonNull(detail, "detail");
+            if (ended) return;
+            if (input == needsInput) { report(fraction, detail); return; }
+            input = needsInput;
+            waiting = null;
+            deliveryToken++;
+            ActivityEvent next = event(input ? ActivityEvent.State.NEEDS_INPUT : ActivityEvent.State.RESUMED, fraction, detail);
+            running.put(id, next);
+            events.add(() -> deliver(Activities.TOPIC.id(), next));
         }
 
         @Override public void succeed(String detail) { end(ActivityEvent.State.SUCCEEDED, detail); }
         @Override public void fail(String detail) { end(ActivityEvent.State.FAILED, detail); }
         @Override public void cancelled() { end(ActivityEvent.State.CANCELLED, ""); }
 
-        private void end(ActivityEvent.State state, String detail) {
-            OptionalDouble last;
-            synchronized (this) {
-                if (ended || running.remove(id) == null) { ended = true; return; }
-                ended = true;
-                waiting = null;
-                last = fraction;
-            }
-            enqueue(event(state, last, Objects.requireNonNull(detail, "detail")));
+        private synchronized void end(ActivityEvent.State state, String detail) {
+            Objects.requireNonNull(detail, "detail");
+            if (ended) return;
+            ended = true;
+            waiting = null;
+            deliveryToken++;
+            ActivityEvent next = event(state, fraction, detail);
+            running.remove(id);
+            activityHandles.remove(id);
+            events.add(() -> deliver(Activities.TOPIC.id(), next));
         }
+
     }
 
     ConnectionHandle connection(String pluginId, ConnectionSpec spec) {
@@ -1162,12 +1179,13 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * Discards the open panel as the main window would when it closes: its header clears, retained header callbacks
-     * become inert and its close handlers run. Nothing happens when the panel is not open.
+     * become inert and its close handlers run. Its placement stays, as the dock keeps it, so {@link #openPanel} builds it
+     * there again. Nothing happens when the panel is not open.
      *
      * @param panelId panel identifier
      */
     public void closePanel(String panelId) {
-        for (var context : contexts.values()) for (var panel : context.ui.panels) {
+        for (var context : contexts.values()) for (var panel : List.copyOf(context.ui.panels)) {
             if (!panel.spec.id().equals(panelId)) continue;
             var instance = panel.instance;
             panel.instance = null;
@@ -1176,8 +1194,31 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Invokes a panel's factory as the main window showing it would, or shows the panel built there: panels live in the
-     * main window. A factory failure is recorded.
+     * Moves the panel as the main window would when the user drags it or gives it a View Mode, open or not: the
+     * placement is where {@link #openPanel} builds it from then on, also after {@link #closePanel}, as the dock keeps a
+     * panel's place while the main window closes and opens anew. For the open panel a placement that differs from its
+     * current one is what {@code PanelHost.placement()} returns from then on and reaches each {@code onPlacement} handler
+     * once, a handler that throws being recorded in {@link #failures()} while the others still run, and one that closes
+     * the panel ending the round. The same placement is silent, and so is a panel that is not open: its factory reads
+     * the placement when it is built.
+     *
+     * @param panelId panel identifier
+     * @param placement where the panel is now
+     * @since 0.22.0
+     */
+    public void placePanel(String panelId, dev.jasper.sdk.ui.PanelPlacement placement) {
+        java.util.Objects.requireNonNull(placement, "placement");
+        for (var context : contexts.values()) for (var panel : List.copyOf(context.ui.panels)) {
+            if (!panel.spec.id().equals(panelId)) continue;
+            panel.placement = placement;
+            if (panel.instance != null) panel.instance.place(placement);
+        }
+    }
+
+    /**
+     * Invokes a panel's factory as the main window showing it would, at the panel's placement (its spec's anchor and
+     * half, docked, until {@link #placePanel} moves it), or shows the panel built there: panels live in the main window's
+     * dock. A factory failure is recorded.
      *
      * @param panelId the panel to build
      * @return the component, or null when no main window is open, there is no such panel or its factory failed
@@ -1530,7 +1571,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * What plugins asked to open or raise, in order.
      *
-     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program), {@code session-tab|<window id>|<session title>}, {@code session-split|<pane id>|<RIGHT or DOWN>|<session title>}, {@code beside|<content tab id>|<RIGHT or DOWN>} (a content tab's Terminal Right or Terminal Down) or {@code front|<window id>} (a window's {@code toFront()}, or the main window that a child window's panel toggle raises)
+     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program), {@code session-tab|<window id>|<session title>}, {@code session-split|<pane id>|<RIGHT or DOWN>|<session title>}, {@code beside|<content tab id>|<RIGHT or DOWN>} (a content tab's Terminal Right or Terminal Down) or {@code front|<window id>} (a window's {@code toFront()}, or the main window that a child window's toggle of a docked panel raises)
      */
     public List<String> openRequests() { return List.copyOf(workspace.openRequests); }
 
@@ -2135,6 +2176,77 @@ public final class FakePluginHost implements AutoCloseable {
     private static boolean keptShellVariable(String name, String value) {
         return name != null && SHELL_NAME.matcher(name).matches() && !RESERVED_SHELL_NAMES.contains(name) && !name.startsWith("JASPER_")
             && value != null && value.indexOf('\0') < 0;
+    }
+
+    /** A {@code Terminals.addTabNamePiece} piece and the plugin that added it. */
+    record NamePiece(FakePluginContext context, dev.jasper.sdk.terminal.TabNamePieceSpec spec) { }
+    final Map<String, NamePiece> namePieces = new java.util.concurrent.ConcurrentSkipListMap<>();
+    final Map<UUID, Map<String, String>> namePieceValues = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Adds a piece as the application does: one holder per name, values for open terminal tabs only, cleaned. */
+    dev.jasper.sdk.terminal.TabNamePiece addTabNamePiece(FakePluginContext context, dev.jasper.sdk.terminal.TabNamePieceSpec spec) {
+        var piece = new NamePiece(context, spec);
+        NamePiece held = namePieces.putIfAbsent(spec.name(), piece);
+        if (held != null) throw new IllegalStateException("{" + spec.name() + "} is already a tab name piece of " + held.context().plugin().id());
+        var closed = new java.util.concurrent.atomic.AtomicBoolean();
+        var handle = new dev.jasper.sdk.terminal.TabNamePiece() {
+            @Override public String name() { return spec.name(); }
+            @Override public void set(dev.jasper.sdk.terminal.TabHandle tab, String value) {
+                Objects.requireNonNull(tab, "tab");
+                Objects.requireNonNull(value, "value");
+                if (closed.get() || workspace.tab(tab.id()).filter(model -> model.open && model.kind == dev.jasper.sdk.terminal.TabHandle.Kind.TERMINAL).isEmpty()) return;
+                String cleaned = cleanPiece(value);
+                var values = namePieceValues.computeIfAbsent(tab.id(), id -> new java.util.concurrent.ConcurrentHashMap<>());
+                if (cleaned.isEmpty()) values.remove(spec.name()); else values.put(spec.name(), cleaned);
+            }
+            @Override public void close() {
+                if (!closed.compareAndSet(false, true)) return;
+                namePieces.remove(spec.name(), piece);
+                namePieceValues.values().forEach(values -> values.remove(spec.name()));
+            }
+        };
+        context.own(handle);
+        return handle;
+    }
+
+    private static String cleanPiece(String value) {
+        var result = new StringBuilder(value.length());
+        value.codePoints().forEach(point -> {
+            boolean bidirectional = point >= 0x202A && point <= 0x202E || point >= 0x2066 && point <= 0x2069;
+            if (!bidirectional) result.appendCodePoint(Character.isISOControl(point) || point == 0x2028 || point == 0x2029 ? ' ' : point);
+        });
+        return result.toString().strip();
+    }
+
+    /**
+     * Scripts the built-in pieces a terminal tab reports through {@code TabHandle.namePieces()}, as Jasper fills them
+     * from the tab's pane: {@code dir}, {@code full}, {@code process} and {@code title}.
+     *
+     * @param tabId a terminal tab
+     * @param builtIns each built-in piece's value by name
+     * @since 0.22.0
+     */
+    public void setTabNamePieces(UUID tabId, Map<String, String> builtIns) {
+        workspace.tab(tabId).ifPresent(tab -> tab.namePieces = Map.copyOf(builtIns));
+    }
+
+    /**
+     * The values plugins' tab name pieces hold for a tab.
+     *
+     * @param tabId a tab
+     * @return each value by piece name
+     * @since 0.22.0
+     */
+    public Map<String, String> tabNamePieces(UUID tabId) { return Map.copyOf(namePieceValues.getOrDefault(tabId, Map.of())); }
+
+    /**
+     * Every plugin's tab name piece.
+     *
+     * @return the pieces, in name order
+     * @since 0.22.0
+     */
+    public List<dev.jasper.sdk.terminal.TabNamePieceSpec> tabNamePieceSpecs() {
+        return namePieces.values().stream().map(NamePiece::spec).toList();
     }
 
     /** The editor a plugin provides ({@code Platform.editor}) and the plugin that registered it. */

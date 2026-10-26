@@ -22,7 +22,8 @@ import java.util.function.Supplier;
 
 /**
  * The terminal's producer for long commands (spec section 7, producer 3). A command that runs long enough, or runs out
- * of sight, gets a live Buddy card and starts Buddy typing; when it ends the card goes. If it ran at least the threshold
+ * of sight, qualifies as live work and starts Buddy typing; its card shows while its parent tab is out of sight.
+ * When it ends the card goes. If it ran at least the threshold
  * and did not finish in the pane you were typing in, its outcome is posted in {@link #GROUP}: the command as the
  * title, "Finished in 2m 03s" (INFO) or "Exited 1 · 2m 03s" (WARNING) as the content, a click that focuses the pane, and
  * a card in the pane's window. A pane closing expires its notifications, since there is no pane left to focus.
@@ -42,6 +43,8 @@ public final class CommandNotifier implements AutoCloseable {
 
     private final Set<Object> activeProducers = new HashSet<>();
     private final Map<Object, InFlight> inFlight = new HashMap<>();
+    private final Map<Object, Context> contexts = new HashMap<>();
+    private record Context(BuddyNotice.Group group, String title, boolean watched, Runnable activate) {}
     /** The notifications each pane's commands posted, expired when the pane closes. */
     private final Map<Object, Set<UUID>> outcomes = new HashMap<>();
     private boolean disposed;
@@ -57,6 +60,8 @@ public final class CommandNotifier implements AutoCloseable {
     private static final class InFlight {
         Runnable cancel = () -> {};
         boolean passed;
+        boolean watched;
+        BuddyNotice.Group group;
         String title = "";
         Supplier<String> detail = () -> "";
         Runnable activate = () -> {};
@@ -87,8 +92,8 @@ public final class CommandNotifier implements AutoCloseable {
     private boolean accepts(Object key) { return !disposed && activeProducers.contains(key); }
 
     /**
-     * A command began. Nothing is shown yet: after {@code threshold} it becomes a running card, so Buddy does not twitch
-     * for every {@code ls}, unless it started out of sight. {@code elapsedNanos} lets the card tick without being
+     * A command began. Watched work qualifies after {@code threshold}; hidden work qualifies immediately.
+     * Qualified work counts for typing even while suppressed. {@code elapsedNanos} lets the card tick without being
      * re-posted every second.
      */
     public void started(Object key, String command, LongSupplier elapsedNanos, Runnable activate, boolean watched) {
@@ -97,13 +102,16 @@ public final class CommandNotifier implements AutoCloseable {
         cancel(key);
         if (wait.isZero()) return;
         InFlight flight = new InFlight();
-        flight.title = title(command);
+        Context context = contexts.get(key);
+        flight.title = context == null ? title(command) : context.title();
+        flight.watched = context == null ? watched : context.watched();
+        flight.group = context == null ? null : context.group();
         flight.detail = () -> "Running · " + humanize(Duration.ofNanos(elapsedNanos.getAsLong()));
-        flight.activate = activate;
+        flight.activate = context == null ? activate : context.activate();
         inFlight.put(key, flight);
         // Out of sight is the whole reason a card exists, so there is nothing to wait for. The threshold stays as the
-        // fallback for a command running in the pane you are still watching.
-        if (!watched) { promote(key, flight); return; }
+        // fallback for a command running in the parent tab you are still watching.
+        if (!flight.watched) { promote(key, flight); return; }
         flight.cancel = schedule.apply(wait, () -> promote(key, flight));
     }
 
@@ -111,10 +119,37 @@ public final class CommandNotifier implements AutoCloseable {
     public void hidden(Object key) {
         if (!accepts(key)) return;
         InFlight flight = inFlight.get(key);
-        if (flight != null && !flight.passed) promote(key, flight);
+        if (flight == null) return;
+        flight.watched = false;
+        if (!flight.passed) promote(key, flight);
+        else deck.updateContext(new BuddyNoticeId(SOURCE, key), flight.group, true);
     }
 
-    /** Turns an in-flight command into a running card, once. */
+    /** Current workspace presentation, retained even when the pane is idle. */
+    public void presentation(Object key, Object groupKey, String groupTitle, String paneTitle,
+                             boolean watched, Runnable activate) {
+        if (!accepts(key)) return;
+        var context = new Context(new BuddyNotice.Group(new BuddyNoticeId("terminal-tab", groupKey), title(groupTitle)),
+            title(paneTitle), watched, Objects.requireNonNull(activate));
+        contexts.put(key, context);
+        InFlight flight = inFlight.get(key);
+        if (flight == null) return;
+        boolean titleChanged = !flight.title.equals(context.title());
+        boolean contextChanged = !Objects.equals(flight.group, context.group()) || flight.watched != watched;
+        flight.title = context.title();
+        flight.activate = context.activate();
+        flight.group = context.group();
+        flight.watched = watched;
+        if (!flight.passed) {
+            if (!watched) promote(key, flight);
+            return;
+        }
+        var id = new BuddyNoticeId(SOURCE, key);
+        if (titleChanged) deck.updateTitle(id, flight.title);
+        if (contextChanged) deck.updateContext(id, flight.group, !watched);
+    }
+
+    /** Qualifies an in-flight command once, retaining it even while its card is suppressed. */
     private void promote(Object key, InFlight flight) {
         if (!accepts(key)) return;
         if (inFlight.get(key) != flight || flight.passed) return;
@@ -123,7 +158,7 @@ public final class CommandNotifier implements AutoCloseable {
         flight.cancel = () -> {};
         if (running++ == 0) onWorkingChanged.accept(true);
         deck.post(new BuddyNotice(new BuddyNoticeId(SOURCE, key), BuddyNotice.Kind.TASK, flight.title,
-            BuddyNotice.State.RUNNING, flight.detail, flight.activate));
+            BuddyNotice.State.RUNNING, flight.detail, () -> flight.activate.run(), flight.group), !flight.watched);
     }
 
     /** Refreshes a running card's wording without promoting it or replaying its arrival. */
@@ -180,6 +215,7 @@ public final class CommandNotifier implements AutoCloseable {
     public void closed(Object key) {
         if (disposed || !activeProducers.remove(key)) return;
         cancel(key);
+        contexts.remove(key);
         Set<UUID> posted = outcomes.remove(key);
         if (posted != null) for (UUID id : posted) center.expire(id);
     }
@@ -212,6 +248,7 @@ public final class CommandNotifier implements AutoCloseable {
         for (Object key : List.copyOf(inFlight.keySet())) cancel(key);
         disposed = true;
         activeProducers.clear();
+        contexts.clear();
         outcomes.clear();
         threshold = () -> Duration.ZERO;
         deck = null;

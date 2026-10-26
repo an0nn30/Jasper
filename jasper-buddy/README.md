@@ -20,7 +20,8 @@ Only these top-level types and their nested values/builders are supported:
   over the notice model and lazy presentation, closed by the host. Its one public
   constructor takes `BuddyOptions`; every public method returns `void` except `show()`.
 - [BuddyNotice](src/main/java/dev/jasper/buddy/notice/BuddyNotice.java): validated kind/state,
-  title, nonblocking detail supplier and activation callback; `wantsAttention()`,
+  title, nonblocking detail supplier, activation callback and optional
+  `Group(BuddyNoticeId id, String title)`; `wantsAttention()`,
   `sameAs(BuddyNoticeId)` and `State.fits(Kind)`.
 - [BuddyNoticeId](src/main/java/dev/jasper/buddy/notice/BuddyNoticeId.java): source plus
   stable opaque key. A source does not have to be a terminal.
@@ -80,10 +81,10 @@ buffer or wait for a worker from one of these callbacks.
 | Operation | Model and resource effect |
 | --- | --- |
 | Construction | Allocates the model only: no native window, timer or worker. |
-| `post`, `updateTitle`, `dismiss`, `clear` | Update the model and refresh existing presentation; never create a native window. Posting while hidden is supported. |
+| `post`, `updateTitle`, `updateState`, `updateContext`, `dismiss`, `clear` | Update the model and refresh existing presentation; never create a native window. Posting while hidden is supported. State updates retain order and visibility and do not restore dismissed notices. |
 | `show` | Creates presentation on the first successful call, then shows Buddy with the two-second spawn animation; returns whether presentation is available. A call while visible changes nothing and returns true. |
 | `hide` | Stops presentation timers and pending drag frames, hides every Buddy window and resets the animation; retains notices, options and working intent. The next `show` plays the spawn again. |
-| `setWorking` | Sets host-supplied typing intent, including before first show; no threshold policy lives in Buddy. |
+| `setWorking` | Sets host-supplied typing intent, including before first show; starting from standing plays a 500 ms sit-down and laptop-open transition, and clearing it after typing reverses that sequence. Intent changes during either transition reverse from the current pose. No threshold policy lives in Buddy. |
 | `greet` | On visible presentation, plays the one-second greeting, waking him first if he is tucked or asleep. Jasper calls it when one of its workspace windows becomes active. |
 | `poke` | On visible presentation, restarts the idle clock without a greeting. Jasper calls it on key presses in its workspace windows, at most once a second. |
 | `applyOptions` | Replaces appearance and future host callbacks; see [host appearance and position](#host-appearance-and-position). |
@@ -110,17 +111,28 @@ also compares callbacks and is not notice identity.
 | `TASK` | `RUNNING`, `NEEDS_INPUT` | `NEEDS_INPUT` | `RUNNING`: a highlight sweeps the detail text; `NEEDS_INPUT`: a dot |
 | `CONNECTION` | `UP`, `DEGRADED`, `DOWN` | `DEGRADED`, `DOWN` | `DEGRADED`: a dot; `DOWN`: a cross |
 
-Buddy shows live work only. A post promotes its ID to newest; updating a title does not.
-The model holds at most 50 notices, dropping the oldest beyond that limit. The column
-above or below Buddy shows the newest three, the newest carrying the total count when there are
-more; a single click on Buddy opens the drawer, which lists them all. A click on a capsule
-in the column or the drawer runs that notice's `activate` callback, which is required.
-A producer dismisses its notice when the work ends. The user may also dismiss one with
-its × in the drawer, or all of them with **Clear all** (shown when the drawer holds more
-than one); that removes them from the model without notifying the host, and the
-producer's next post of the same ID shows it again. Buddy keeps no outcomes: a host that
-wants to report how work ended does so elsewhere (Jasper posts a notification). Cancel
-producer work first, then dismiss. Hiding the companion does not stop producers.
+Buddy shows live work only. `post(BuddyNotice)` promotes its ID to newest and makes it
+visible; `post(BuddyNotice, boolean visible)` can retain it suppressed. The six-argument
+notice constructor remains ungrouped; its seven-argument form takes an optional `Group`.
+`updateContext(BuddyNoticeId, BuddyNotice.Group, boolean visible)` changes grouping and
+visibility in place; a null group makes the notice ungrouped. Context and title updates
+preserve arrival order and never recreate a dismissed ID. The model holds at most 50
+notices, including suppressed notices, dropping the oldest beyond that limit.
+
+One compact summary counts visible tasks and connections. A single notice uses its group
+or notice title; attention takes priority and names the notice needing input or help.
+Clicking the summary or Buddy opens all visible work. The drawer groups members under
+expandable headers, keeps first-observed order and expansion while identities remain,
+and shows each member's title and live detail. Duplicate titles gain stable discriminators.
+Clicking a drawer entry runs its activation.
+
+A producer dismisses its notice when work ends. The drawer's × dismisses one entry;
+**Dismiss all**, shown for multiple entries, includes collapsed sections and preserves
+suppressed notices. Dismissal removes the model entry without notifying the host; another
+post of the same ID shows it again. Escape, focus loss, activation, an empty visible deck
+or hiding Buddy closes the drawer. It stays open across pointer exit. Buddy keeps no
+outcomes: hosts report those elsewhere (Jasper posts a notification). Cancel producer
+work first, then dismiss. Hiding the companion does not stop producers.
 
 ## Host appearance and position
 

@@ -59,6 +59,7 @@ class TerminalTitleIntegrationTest {
         Fixture[] fixture = new Fixture[1];
         edt(() -> {
             WindowContent window = content(launcher);
+            window.setActive(false);
             BuddyTestSupport deck = new BuddyTestSupport();
             // In the background, as when a command finishes out of sight.
             var center = new NotificationCenter(Runnable::run, Clock.systemUTC(), () -> Delivery.Presence.BACKGROUND);
@@ -66,6 +67,8 @@ class TerminalTitleIntegrationTest {
                 working -> {}, (delay, run) -> () -> {});
             window.activity(event -> {
             switch (event) {
+                case WorkspaceActivity.Presentation value -> notifier.presentation(value.id(), value.groupId(),
+                    value.groupTitle(), value.title(), value.watched(), value.activate());
                 case WorkspaceActivity.Started value -> notifier.started(value.id(), value.command(),
                     value.elapsedNanos(), value.activate(), false);
                 case WorkspaceActivity.Finished value -> notifier.finished(value.id(), value.command(),
@@ -77,7 +80,7 @@ class TerminalTitleIntegrationTest {
                         case OPENED -> notifier.opened(value.id());
                         case CLOSED -> notifier.closed(value.id());
                         case FOCUSED -> { }
-                        case BLURRED -> notifier.hidden(value.id());
+                        case BLURRED -> { }
                     }
                 }
             }
@@ -93,15 +96,15 @@ class TerminalTitleIntegrationTest {
 
     @Test void tabsAndNativeTitlesFollowForegroundJobsWithoutShellIntegration() throws Exception {
         Fixture f = open(List.of("/bin/bash", "--noprofile", "--norc", "-l", "-i"), "bash");
-        until(() -> f.content.currentTerminal().title().equals("bash"));
+        until(() -> f.content.currentTerminal().title().equals("~ bash"));
         edt(() -> f.content.currentPane().session().write("sleep 30\r"));
-        until(() -> f.content.currentTerminal().title().equals("sleep"));
+        until(() -> f.content.currentTerminal().title().equals("~ sleep"));
         edt(() -> {
-            assertThat(f.nativeTitles.getLast()).isEqualTo("sleep");
+            assertThat(f.nativeTitles.getLast()).isEqualTo("~ sleep");
             assertThat(f.content.currentPane().shellIntegrationDetected()).isFalse();
             f.content.currentPane().session().write(new byte[]{3});
         });
-        until(() -> f.content.currentTerminal().title().equals("bash"));
+        until(() -> f.content.currentTerminal().title().equals("~ bash"));
     }
 
     @Test void tmuxForwardsPaneTitlesToTheOuterTab(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
@@ -118,9 +121,9 @@ class TerminalTitleIntegrationTest {
             Fixture f = open(List.of(tmux.get().toString(), "-L", socket, "-f", config.toString(),
                 "new-session", "/bin/sh", script.toString()), "tmux");
             edt(() -> f.content.currentPane().session().write("Reviewing files\r"));
-            until(() -> f.content.currentTerminal().title().equals("Reviewing files"));
+            until(() -> f.content.currentTerminal().title().equals("~ tmux Reviewing files"));
             edt(() -> {
-                assertThat(f.nativeTitles.getLast()).isEqualTo("Reviewing files");
+                assertThat(f.nativeTitles.getLast()).isEqualTo("~ tmux Reviewing files");
                 assertThat(f.content.currentPane().title()).isEqualTo("Reviewing files");
             });
         } finally {
@@ -130,28 +133,37 @@ class TerminalTitleIntegrationTest {
     }
 
     @Test void oscTitlesUpdateTheTabWindowAndBubbleWhileACommandRuns() throws Exception {
-        Fixture f = open("read step; printf '" + start("worker") + "'; "
+        Fixture f = open("printf '\\033]2;Prompt directory\\007'; read step; printf '" + start("worker") + "'; "
             + "while read title; do printf '\\033]2;%s\\007' \"$title\"; done");
         edt(() -> f.content.currentPane().session().write("start\n"));
         until(() -> !f.deck.isEmpty());
         edt(() -> {
-            assertThat(f.content.tabs().get(0).title()).isEqualTo("worker");
-            assertThat(f.deck.notices().getFirst().title()).isEqualTo("worker");
+            assertThat(f.content.tabs().get(0).title()).isEqualTo("~ bash");
+            assertThat(f.deck.notices().getFirst().title()).isEqualTo("~ bash");
             f.content.currentPane().session().write("Reviewing files\n");
         });
-        until(() -> f.deck.notices().getFirst().title().equals("Reviewing files"));
+        until(() -> f.deck.notices().getFirst().title().equals("~ bash Reviewing files"));
         edt(() -> {
-            assertThat(f.content.tabs().get(0).title()).isEqualTo("Reviewing files");
-            assertThat(f.nativeTitles.getLast()).isEqualTo("Reviewing files");
+            assertThat(f.content.tabs().get(0).title()).isEqualTo("~ bash Reviewing files");
+            assertThat(f.nativeTitles.getLast()).isEqualTo("~ bash Reviewing files");
             f.content.currentPane().session().write("Writing tests\n");
         });
-        until(() -> f.deck.notices().getFirst().title().equals("Writing tests"));
+        until(() -> f.deck.notices().getFirst().title().equals("~ bash Writing tests"));
         edt(() -> {
-            assertThat(f.content.tabs().get(0).title()).isEqualTo("Writing tests");
+            assertThat(f.content.tabs().get(0).title()).isEqualTo("~ bash Writing tests");
             f.content.currentPane().session().write("\n");
         });
-        until(() -> f.deck.notices().getFirst().title().equals("worker"));
-        edt(() -> assertThat(f.content.tabs().get(0).title()).isEqualTo("worker"));
+        until(() -> f.deck.notices().getFirst().title().equals("~ bash"));
+        edt(() -> {
+            assertThat(f.content.tabs().get(0).title()).isEqualTo("~ bash");
+            int generation = f.deck.generation();
+            f.content.currentTerminal().rename("Pinned worker");
+            assertThat(f.deck.notices().getFirst().title()).isEqualTo("Pinned worker");
+            assertThat(f.deck.notices().getFirst().group().title()).isEqualTo("Pinned worker");
+            assertThat(f.deck.generation()).isEqualTo(generation);
+            f.content.currentTerminal().rename("");
+            assertThat(f.deck.notices().getFirst().title()).isEqualTo("~ bash");
+        });
     }
 
     @Test void aBurstEndingWithAPromptTitleCannotOverwriteTheCompletedNotice() throws Exception {
@@ -172,19 +184,19 @@ class TerminalTitleIntegrationTest {
             try { assertThat(parsed.await(5, TimeUnit.SECONDS)).isTrue(); }
             catch (InterruptedException failure) { throw new AssertionError(failure); }
         });
-        until(() -> f.content.tabs().get(0).title().equals("Prompt directory"));
+        until(() -> f.content.tabs().get(0).title().equals("~ bash Prompt directory"));
         edt(() -> {
             assertThat(f.center.history()).singleElement()
                 .satisfies(entry -> assertThat(entry.request().title()).isEqualTo("sleep 12"));
             assertThat(f.deck.notices()).as("Buddy keeps live work only").isEmpty();
-            assertThat(f.nativeTitles.getLast()).isEqualTo("Prompt directory");
+            assertThat(f.nativeTitles.getLast()).isEqualTo("~ bash Prompt directory");
         });
     }
 
     @Test void programTitlesWorkWithoutShellIntegrationAndManualTabNamesStillWin() throws Exception {
         Fixture f = open("while read title; do printf '\\033]1;%s\\007' \"$title\"; done");
         edt(() -> f.content.currentPane().session().write("Editor document\n"));
-        until(() -> f.content.tabs().get(0).title().equals("Editor document"));
+        until(() -> f.content.tabs().get(0).title().equals("~ bash Editor document"));
         edt(() -> {
             f.content.currentTerminal().rename("Pinned name");
             f.content.currentPane().session().write("Another document\n");
@@ -194,7 +206,23 @@ class TerminalTitleIntegrationTest {
             assertThat(f.content.tabs().get(0).title()).isEqualTo("Pinned name");
             assertThat(f.deck.notices()).isEmpty();
             f.content.currentTerminal().rename("");
-            assertThat(f.content.tabs().get(0).title()).isEqualTo("Another document");
+            assertThat(f.content.tabs().get(0).title()).isEqualTo("~ bash Another document");
+        });
+    }
+
+    @Test void aChangedPatternRenamesOpenTabsAtOnceAndARenameStillWins() throws Exception {
+        Fixture f = open("while read title; do printf '\\033]2;%s\\007' \"$title\"; done");
+        edt(() -> f.content.currentPane().session().write("Fix tab names\n"));
+        until(() -> f.content.tabs().get(0).title().equals("~ bash Fix tab names"));
+        var defaults = dev.jasper.app.config.ConfigSnapshot.defaults();
+        edt(() -> {
+            f.content.applyConfiguration(defaults.toBuilder().terminal(defaults.terminal().withTabName("{title} | {full}")).build(), false);
+            assertThat(f.content.tabs().get(0).title()).isEqualTo("Fix tab names | ~");
+            f.content.currentTerminal().rename("Pinned");
+            f.content.applyConfiguration(defaults.toBuilder().terminal(defaults.terminal().withTabName("{process}")).build(), false);
+            assertThat(f.content.tabs().get(0).title()).isEqualTo("Pinned");
+            f.content.currentTerminal().rename("");
+            assertThat(f.content.tabs().get(0).title()).isEqualTo("bash");
         });
     }
 }

@@ -17,6 +17,45 @@ import java.util.zip.ZipOutputStream
 // (verifyPackagingSupport, part of check). The imports serve helpers further down: Groovy accepts imports only before
 // the first statement.
 
+// Fedora's JasPer image library owns the generic jasper package identity. jpackage appends the package name
+// beneath --install-dir, so pass its parent and verify the resulting root separately.
+ext.linuxPackageName = 'jasper-workstation'
+ext.linuxInstallRoot = "/opt/${linuxPackageName}".toString()
+ext.linuxPackageOptions = {
+    ['--linux-package-name', linuxPackageName, '--install-dir', '/opt']
+}
+
+// cpio can exit at the archive trailer while rpm2cpio still writes padding, causing SIGPIPE in a pipeline.
+// Finish conversion into the existing package work directory, then require extraction to succeed independently.
+ext.unpackRpmPackage = { File rpm, File unpacked, File work, Closure run ->
+    File payload = new File(work, 'payload.cpio')
+    run(['bash', '-c', 'rpm2cpio "$1" > "$2"', 'bash', rpm.absolutePath, payload.absolutePath],
+        'rpm2cpio (install rpm2cpio)')
+    run(['bash', '-c', 'cd "$1" && cpio --extract --make-directories --preserve-modification-time --quiet < "$2"',
+        'bash', unpacked.absolutePath, payload.absolutePath], 'cpio extraction (install cpio)')
+}
+
+// os-release is data, never a shell script; only exact distro IDs select the RPM-only aggregate.
+// Other hosts retain both formats, including Debian/Ubuntu's RPM cross-packaging support.
+ext.linuxPackageTasks = { String osRelease ->
+    Map<String, String> identity = [:]
+    (osRelease ?: '').readLines().each { String line ->
+        def entry = line.trim() =~ /^(ID|ID_LIKE)=(.*)$/
+        if (entry.matches()) {
+            String value = entry.group(2).trim()
+            if (value.size() >= 2 && ((value.startsWith('"') && value.endsWith('"')) ||
+                    (value.startsWith("'") && value.endsWith("'")))) {
+                value = value.substring(1, value.length() - 1)
+            }
+            identity[entry.group(1)] = value.toLowerCase(Locale.ROOT)
+        }
+    }
+    List<String> ids = [identity.ID] + (identity.ID_LIKE ?: '').tokenize()
+    Set<String> rpmIds = ['fedora', 'rhel', 'centos', 'rocky', 'almalinux', 'ol', 'amzn',
+        'suse', 'opensuse', 'opensuse-leap', 'opensuse-tumbleweed', 'sles', 'sled'] as Set
+    ids.any { it in rpmIds } ? ['packageRpm'] : ['packageDeb', 'packageRpm']
+}
+
 // The Java runtime packaged Jasper ships; docs/plugin-authoring.md ("The Java runtime") lists it for plugin authors.
 // jpackage's default for a class-path application is every module, and --bind-services then also bound javac,
 // jshell, jlink, jpackage and the JetBrains Runtime's JCEF and JOGL (192 MB). These roots keep all of Java SE for

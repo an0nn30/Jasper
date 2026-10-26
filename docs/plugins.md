@@ -27,8 +27,8 @@ Shortcuts below are given as macOS / Linux and Windows.
   item beside themselves, can be offered in the Split menus, and can come back when Jasper restores its windows.
 - Background activities, shown on [Desk Buddy](notifications.md#desk-buddy) while they run and posted in the plugin's
   "*name* activities" notification group when they succeed or fail.
-- Tool windows in the main window, each with a toggle in View › Tool Windows (in the Window menu under the Enterprise
-  look).
+- Tool windows, docked in the main window or in a window of their own, each with a toggle in View › Tool Windows (in
+  the Window menu under the Enterprise look).
 - Command palette scopes, and places in Jasper's file chooser.
 - Terminal sessions of its own, such as SSH, which can come back when Jasper restores its windows, and variables in
   the environment of new shells.
@@ -55,7 +55,7 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | No | [The Enterprise look](enterprise.md) |
 | Sample | `dev.jasper.sample` | 0.5.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
 
-Every bundled plugin declares `sdk = ">=0.21.0, <0.22"`. A plugin uses another plugin it lists under "Uses, when
+Every bundled plugin declares `sdk = ">=0.22.0, <0.23"`. A plugin uses another plugin it lists under "Uses, when
 present" only while that plugin is running; without it, the features that need it are missing.
 
 ### Remote
@@ -275,7 +275,7 @@ badge when there is one, **Enabled** for a running plugin, and otherwise the sta
 | Active | Running |
 | Disabled | Off: "off by default", "disabled by the user", "marked for removal", "safe mode" or "safe mode uses the standard look" |
 | Needs review | Waiting for your review: "not reviewed yet" or "new capabilities: …" |
-| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.21.0", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
+| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.22.0", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
 | Failed | Its classes could not be loaded, or its start failed |
 | Not loaded yet | Not present when this launch began, such as a plugin installed since |
 
@@ -294,11 +294,11 @@ checks it before it asks you anything:
 - Jar names use only letters, digits, spaces and `.`, `_`, `+`, `-`; no name may appear twice.
 - At most 4096 entries, 256 jars and 512 MiB once unpacked.
 - Exactly one jar holds a valid `plugin.toml` at its root, and the plugin's SDK range includes this Jasper's SDK,
-  0.21.0.
+  0.22.0.
 
 A zip that fails is refused on the message line with the reason, for example "The zip holds no jar files", "The zip
 must hold the plugin's jars at its root or in one folder", "Not a Jasper plugin: no plugin.toml in any jar" or "Tool
-1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.21.0", and nothing is installed.
+1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.22.0", and nothing is installed.
 
 A zip that passes opens the **Install *name*** sheet: the plugin's name and version, "From *vendor*", what it
 [asks to do](#capabilities) and the warning that a plugin is not sandboxed. **Install** stages the plugin in
@@ -360,12 +360,12 @@ call from a plugin that did not declare its capability.
 Jasper's log ([diagnostics](diagnostics.md)) records capability use under the logger `dev.jasper.app.plugins.audit`, as
 "Plugin *id* used *capability*: …", with amounts and never content: each write or paste into a pane (in bytes), each
 read of a selection or the clipboard (in characters), each tab or split opened (with the file name of the program it
-runs, if any), the shell-variable and editor registrations, and the first palette use, file-chooser registration,
+runs, if any), the shell-variable, editor and tab name piece registrations, and the first palette use, file-chooser registration,
 terminal-event subscription and list of other tabs' titles for a plugin's Move Pane to Tab menu.
 
 | Capability | The sheet says | Notes |
 |---|---|---|
-| `terminal.observe` | See your terminals: titles, folders, the commands you run and how they end | Also every terminal event a plugin can subscribe to. Without it a plugin's Move Pane to Tab menu still works, listing a tab as "Tab 2" instead of by title unless the tab shows one of the plugin's own items |
+| `terminal.observe` | See your terminals: titles, folders, the commands you run and how they end; add to tab names | Also every terminal event a plugin can subscribe to. Without it a plugin's Move Pane to Tab menu still works, listing a tab as "Tab 2" instead of by title unless the tab shows one of the plugin's own items |
 | `terminal.selection` | Read the text you select in a terminal | |
 | `terminal.inject` | Type into your terminals | Typing and pasting into a pane |
 | `terminal.open` | Open terminal tabs, splits and windows, and run programs in them | |
@@ -521,7 +521,7 @@ option applies only when Jasper starts, and a Jasper started with it is never re
 with a higher version of the same id is loaded instead. An id you disabled in Settings › Plugins stays off, from
 `--plugin-dir` too ("disabled by the user"); enable it there first.
 
-Plugins for this Jasper (SDK 0.21.0) declare a range such as `sdk = ">=0.21.0, <0.22"` in `plugin.toml`, raising the
+Plugins for this Jasper (SDK 0.22.0) declare a range such as `sdk = ">=0.22.0, <0.23"` in `plugin.toml`, raising the
 floor to the SDK version that added the newest API they use ([the manifest](plugin-authoring.md#the-manifest));
 [building the in-repo plugins](plugin-authoring.md#building-the-in-repo-plugins) and
 [running a plugin in Jasper](plugin-authoring.md#running-a-plugin-in-jasper) give the build tasks and the source

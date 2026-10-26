@@ -472,7 +472,7 @@ class ConfigLoaderTest {
         assertThat(chosen.snapshot().darkTheme()).isEqualTo("ocean");
         assertThat(chosen.snapshot().lightTheme()).isEqualTo("ocean-dawn");
         var bad = parse("[ui.theme]\ndark = \"Ocean Theme\"\n");
-        assertThat(bad.snapshot().darkTheme()).isEqualTo("jasper-meadow");
+        assertThat(bad.snapshot().darkTheme()).isEqualTo(CoreSettings.UI_THEME_DARK.defaultValue());
         assertDiagnostic(bad, "ui.theme.dark", 2, 1, ConfigDiagnostic.Severity.ERROR);
         assertThat(bad.diagnostics().getFirst().message()).isEqualTo("Use a theme id such as \"slate-cobalt\"; using the default.");
     }
@@ -482,6 +482,16 @@ class ConfigLoaderTest {
         assertThat(result.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.MATCH);
         assertThat(result.diagnostics().getFirst().message())
             .isEqualTo("Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.");
+    }
+
+    @Test void aMalformedSavedPatternFallsBackToTheDefault() {
+        var good = parse("[terminal]\ntab_name = '{full} | {process}'");
+        assertThat(good.diagnostics()).isEmpty();
+        assertThat(good.snapshot().terminal().tabName()).isEqualTo("{full} | {process}");
+        var bad = parse("[terminal]\ntab_name = '{dir'");
+        assertThat(bad.diagnostics()).hasSize(1);
+        assertThat(bad.snapshot().terminal().tabName()).isEqualTo("{dir} {process} {title}");
+        assertThat(parse("[terminal]\ntab_name = '{dir} {host}'").diagnostics()).as("an unknown piece is not an error").isEmpty();
     }
 
     @Test void anUnknownAppearanceOrSchemeUsesTheDefaultAndSaysSo() {

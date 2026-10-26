@@ -122,9 +122,9 @@ public final class ThemeLibrary {
         for (Path file : files) {
             String fileName = file.getFileName().toString();
             String id = fileName.substring(0, fileName.length() - ".json".length());
-            var builtIn = JasperTheme.builtIn(id);
-            if (builtIn.isPresent()) {
-                problems.add(new Problem(file, 0, builtIn.get().name() + " is built in; this file is ignored."));
+            var reserved = BUNDLED.reservedLabel(id);
+            if (reserved.isPresent()) {
+                problems.add(new Problem(file, 0, reserved.get() + (desktopId(id) ? " is reserved" : " is built in") + "; this file is ignored."));
                 continue;
             }
             String provider = plugins.reserved().get(id);
@@ -205,6 +205,17 @@ public final class ThemeLibrary {
 
     /** The name of the plugin that provides the theme {@code id}; empty for a built-in or folder theme. */
     public Optional<String> provider(String id) { return plugins.provided(id).map(PluginThemes.Provided::pluginName); }
+
+    /** Whether this id names the runtime Desktop colors source. */
+    public static boolean desktopId(String id) { return "desktop-colors".equals(id); }
+
+    /** The label owning a fixed id: Desktop colors, a built-in theme, or a discovered plugin's theme. */
+    public Optional<String> reservedLabel(String id) {
+        if (desktopId(id)) return Optional.of("Desktop colors");
+        var builtIn = JasperTheme.builtIn(id);
+        if (builtIn.isPresent()) return Optional.of(builtIn.get().name());
+        return reservedBy(id).map(provider -> plugins.provided(id).map(provided -> provided.theme().name()).orElse(id));
+    }
 
     /** The name of the discovered plugin whose theme ids include {@code id}, which no folder file may take. */
     public Optional<String> reservedBy(String id) { return Optional.ofNullable(plugins.reserved().get(id)); }

@@ -3,6 +3,7 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Font;
@@ -84,8 +85,11 @@ class ToolWindowHeaderTest {
 
     private final List<String> events = new ArrayList<>();
 
-    private JPopupMenu menu(Slot current, boolean visible) {
-        return ToolWindowMenu.create(current, visible, slot -> events.add("move:" + slot), () -> events.add("hide"));
+    private JPopupMenu menu(Slot current, boolean visible) { return menu(current, ToolWindowMode.DOCKED, visible); }
+
+    private JPopupMenu menu(Slot current, ToolWindowMode mode, boolean visible) {
+        return ToolWindowMenu.create(current, mode, visible, slot -> events.add("move:" + slot),
+            chosen -> events.add("mode:" + chosen), () -> events.add("hide"));
     }
 
     static JMenuItem item(JPopupMenu menu, String text) {
@@ -100,7 +104,7 @@ class ToolWindowHeaderTest {
     @Test void theMenuMovesToAnyOfTheSixSlotsAndHides() {
         JPopupMenu menu = menu(Slot.LEFT_BOTTOM, true);
         assertThat(item(menu, "Hide").getFont()).as("the kit menu's type").isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.BODY));
-        var moveTo = (JMenu) menu.getComponent(0);
+        var moveTo = (JMenu) menu.getComponent(1);
         assertThat(moveTo.getText()).isEqualTo("Move to");
         assertThat(Arrays.stream(moveTo.getMenuComponents()).map(item -> ((JMenuItem) item).getText()))
             .containsExactly("Left Top", "Left Bottom", "Bottom Left", "Right Top", "Right Bottom", "Bottom Right");
@@ -112,6 +116,21 @@ class ToolWindowHeaderTest {
         item(menu, "Hide").doClick();
         assertThat(events).as("choosing the current slot does nothing").containsExactly("move:BOTTOM_RIGHT", "hide");
         assertThat(item(menu(Slot.RIGHT_TOP, false), "Hide").isEnabled()).as("nothing to hide").isFalse();
+    }
+
+    /** A detached window's slot is only where its stripe button sits: choosing it docks the window there, so it is not inert. */
+    @Test void theCurrentSlotMovesADetachedWindowButNotADockedOne() {
+        for (ToolWindowMode mode : new ToolWindowMode[] {ToolWindowMode.FLOAT, ToolWindowMode.WINDOW}) {
+            events.clear();
+            JPopupMenu menu = menu(Slot.LEFT_BOTTOM, mode, true);
+            assertThat(((JCheckBoxMenuItem) item(menu, "Left Bottom")).isSelected()).as("still checked").isTrue();
+            item(menu, "Left Bottom").doClick();
+            item(menu, "Bottom Right").doClick();
+            assertThat(events).as(mode + " docks it in its own slot too").containsExactly("move:LEFT_BOTTOM", "move:BOTTOM_RIGHT");
+        }
+        events.clear();
+        item(menu(Slot.LEFT_BOTTOM, ToolWindowMode.DOCKED, true), "Left Bottom").doClick();
+        assertThat(events).as("a docked window is already there").isEmpty();
     }
 
     @Test void theHeaderShowsThePlainTitleAndHidesOrOpensItsMenu() {
@@ -132,7 +151,40 @@ class ToolWindowHeaderTest {
         header.hideButton().doClick();
         header.optionsButton().doClick();
         assertThat(events).as("a header that is not showing opens no popup").containsExactly("hidden");
-        assertThat(header.menu().getComponentCount()).isEqualTo(2);
+        assertThat(header.menu().getComponentCount()).as("View Mode, Move to and Hide").isEqualTo(3);
+    }
+
+    @Test void theMenuOffersViewModeWithTheCurrentModeChecked() {
+        JPopupMenu menu = menu(Slot.LEFT_TOP, ToolWindowMode.DOCKED, true);
+        var viewMode = (JMenu) menu.getComponent(0);
+        assertThat(viewMode.getText()).as("View Mode comes first").isEqualTo("View Mode");
+        assertThat(Arrays.stream(viewMode.getMenuComponents()).map(item -> ((JMenuItem) item).getText()))
+            .containsExactly("Docked", "Float", "Window");
+        assertThat(Arrays.stream(viewMode.getMenuComponents()).allMatch(JCheckBoxMenuItem.class::isInstance)).isTrue();
+        assertThat(Arrays.stream(viewMode.getMenuComponents()).filter(item -> ((JCheckBoxMenuItem) item).isSelected())
+            .map(item -> ((JMenuItem) item).getText())).as("the current mode is checked").containsExactly("Docked");
+        item(menu, "Float").doClick();
+        item(menu, "Docked").doClick();
+        assertThat(events).as("choosing the current mode does nothing").containsExactly("mode:FLOAT");
+        assertThat(((JCheckBoxMenuItem) item(menu, "Docked")).isSelected()).as("clicking the current mode keeps it checked").isTrue();
+        events.clear();
+
+        JPopupMenu window = menu(Slot.RIGHT_TOP, ToolWindowMode.WINDOW, true);
+        assertThat(Arrays.stream(((JMenu) window.getComponent(0)).getMenuComponents()).filter(item -> ((JCheckBoxMenuItem) item).isSelected())
+            .map(item -> ((JMenuItem) item).getText())).containsExactly("Window");
+        item(window, "Window").doClick();
+        item(window, "Docked").doClick();
+        assertThat(events).containsExactly("mode:DOCKED");
+    }
+
+    @Test void theOptionsButtonDrawsTheVerticalEllipsis() {
+        var standard = new ToolWindowHeader("Sessions", JPopupMenu::new, () -> { });
+        assertThat(standard.optionsButton().getIcon()).isSameAs(dev.jasper.app.platform.AppIcons.semantic("more.vertical"));
+        underEnterprise(() -> {
+            var flush = new ToolWindowHeader("Sessions", JPopupMenu::new, () -> { }, dev.jasper.app.testsupport.EnterpriseLook.kit(), true);
+            assertThat(dev.jasper.app.platform.AppIcons.kitName(flush.optionsButton().getIcon())).as("a header strip's glyph")
+                .hasValue("more.vertical");
+        });
     }
 
     @Test void theButtonsSitAtTheRightAndAreCenteredVertically() {

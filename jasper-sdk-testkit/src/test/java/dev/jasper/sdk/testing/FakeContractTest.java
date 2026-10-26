@@ -70,6 +70,7 @@ class FakeContractTest extends PluginContractTest {
                 return action.isPresent();
             }
             @Override public void closePanel(String panelId) { host.closePanel(panelId); }
+            @Override public void placePanel(String panelId, dev.jasper.sdk.ui.PanelPlacement placement) { host.placePanel(panelId, placement); }
             @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((FakeKitView) view).route; }
             @Override public List<String> rail() { return host.rail(); }
             @Override public List<String> windows() { return host.windows(); }
@@ -148,6 +149,7 @@ class FakeContractTest extends PluginContractTest {
             @Override public java.util.Map<String, String> shellVariables(java.util.Map<String, String> jasperEnvironment) {
                 return host.shellEnvironment(jasperEnvironment);
             }
+            @Override public java.util.Map<String, String> tabNamePieces(java.util.UUID tabId) { return host.tabNamePieces(tabId); }
             @Override public void declareBundled(String pluginId) { host.declareBundled(pluginId); }
             @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId) {
                 return host.edit(file, line, windowId);

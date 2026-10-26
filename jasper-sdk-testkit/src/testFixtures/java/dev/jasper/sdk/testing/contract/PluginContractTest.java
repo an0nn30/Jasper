@@ -24,6 +24,8 @@ import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.PanelHost;
+import dev.jasper.sdk.ui.PanelMode;
+import dev.jasper.sdk.ui.PanelPlacement;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
@@ -63,6 +65,8 @@ import dev.jasper.sdk.terminal.OpenRequest;
 import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.SessionState;
 import dev.jasper.sdk.terminal.TabHandle;
+import dev.jasper.sdk.terminal.TabNamePiece;
+import dev.jasper.sdk.terminal.TabNamePieceSpec;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import java.nio.file.Path;
 import dev.jasper.sdk.terminal.ExitPolicy;
@@ -455,11 +459,86 @@ public abstract class PluginContractTest {
         assertThat(alpha.activities().current()).isEmpty();
     }
 
+    @Test void activityInputPhasesRetainIdentityFractionAndAction() {
+        PluginContext alpha = started("test.alpha", Set.of());
+        var task = alpha.activities().begin(new ActivitySpec("Upload", "start", Optional.of("test.alpha.open"), Optional.empty()));
+        h.flush();
+        task.progress(.4, "uploaded"); h.flush();
+        task.needsInput("choose destination"); h.flush();
+        task.detail("still waiting"); h.flush();
+        assertThat(alpha.activities().current()).singleElement().satisfies(event -> {
+            assertThat(event.state()).isEqualTo(ActivityEvent.State.NEEDS_INPUT);
+            assertThat(event.fraction()).hasValue(.4);
+            assertThat(event.activateActionId()).contains("test.alpha.open");
+        });
+        task.resume("continuing"); h.flush();
+        assertThat(h.notifications()).as("waiting and resuming are live work, not outcomes").isEmpty();
+        task.progress(.8, "nearly"); h.flush();
+        task.succeed("done"); h.flush();
+        assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED, PROGRESS,
+            ActivityEvent.State.NEEDS_INPUT, ActivityEvent.State.NEEDS_INPUT, ActivityEvent.State.RESUMED, PROGRESS, SUCCEEDED);
+        assertThat(h.activityLog()).allSatisfy(event -> assertThat(event.id()).isEqualTo(task.id()));
+    }
+
+    @Test void pendingCallbacksCannotConsumeReportsAcrossPhaseBoundaries() {
+        PluginContext alpha = started("test.alpha", Set.of());
+        h.ui(() -> {
+            var task = alpha.activities().begin(ActivitySpec.of("Upload"));
+            task.progress(.1, "old running");
+            task.needsInput("first wait");
+            task.detail("old waiting");
+            task.resume("first resume");
+            task.progress(.4, "old resumed");
+            task.needsInput("second wait");
+            task.needsInput("latest waiting");
+            task.progress(.5, "latest fraction");
+        });
+        h.flush();
+        assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED,
+            ActivityEvent.State.NEEDS_INPUT, ActivityEvent.State.RESUMED, ActivityEvent.State.NEEDS_INPUT,
+            ActivityEvent.State.NEEDS_INPUT);
+        assertThat(h.activityLog()).extracting(ActivityEvent::detail).containsExactly("", "first wait", "first resume", "second wait", "latest fraction");
+        assertThat(alpha.activities().current()).singleElement().satisfies(event -> assertThat(event.fraction()).hasValue(.5));
+    }
+
+    @Test void repeatingRunningPhaseCoalescesDetailWithoutAnotherTransition() {
+        PluginContext alpha = started("test.alpha", Set.of());
+        h.ui(() -> {
+            var task = alpha.activities().begin(ActivitySpec.of("Upload"));
+            task.needsInput("choose");
+            task.resume("continue");
+            task.resume("first detail");
+            task.resume("last detail");
+        });
+        h.flush();
+        assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED,
+            ActivityEvent.State.NEEDS_INPUT, ActivityEvent.State.RESUMED, PROGRESS);
+        assertThat(h.activityLog().getLast().detail()).isEqualTo("last detail");
+    }
+
+    @Test void stoppedWaitingHandleCannotDeliverPendingReportsOrResurrect() {
+        PluginContext alpha = started("test.alpha", Set.of());
+        var task = alpha.activities().begin(ActivitySpec.of("Upload"));
+        h.flush();
+        h.ui(() -> {
+            task.needsInput("input");
+            task.progress(.4, "pending");
+            h.stopAll();
+            task.resume("late"); task.needsInput("late"); task.detail("late");
+            task.progress(.9, "late"); task.succeed("late"); task.fail("late"); task.cancelled();
+        });
+        h.flush();
+        assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED, ActivityEvent.State.NEEDS_INPUT, FAILED);
+        assertThat(alpha.activities().current()).isEmpty();
+    }
+
     @Test void activitiesLeftOpenFailWhenTheirPluginStops() {
         PluginContext alpha = started("test.alpha", Set.of());
-        alpha.activities().begin(ActivitySpec.of("Sync"));
+        var handle = alpha.activities().begin(ActivitySpec.of("Sync"));
         h.flush();
         h.stopAll();
+        handle.detail("late"); handle.needsInput("late"); handle.resume("late");
+        handle.succeed("late"); handle.fail("late"); handle.cancelled();
         h.flush();
         assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED, FAILED);
         assertThat(h.active("test.alpha")).isFalse();
@@ -1013,6 +1092,95 @@ public abstract class PluginContractTest {
             assertThat(h.panelHeader("test.alpha.hosts")).as("a closed panel publishes nothing").isEqualTo("|false|-");
             assertThat(h.runPanelHeaderAction("test.alpha.hosts", "Import")).isFalse();
             assertThat(calls).containsExactly("new", "import");
+        }));
+    }
+
+    /**
+     * A panel reads its placement in its factory and hears each change once. Its place is the dock's, built or not: a
+     * panel moved while it is not open is built there and hears nothing, and one closed and opened again is built where
+     * it last was, as the main window's dock keeps it across the window's reopening. A closed instance reads the place it
+     * closed in.
+     */
+    @Test void aPanelReadsItsPlacementAndHearsItChange() throws Exception {
+        List<PanelHost> hosts = Collections.synchronizedList(new ArrayList<>());
+        List<PanelPlacement> inFactory = Collections.synchronizedList(new ArrayList<>());
+        List<PanelPlacement> heard = Collections.synchronizedList(new ArrayList<>());
+        List<PanelPlacement> atClose = Collections.synchronizedList(new ArrayList<>());
+        List<PanelPlacement> afterThrower = Collections.synchronizedList(new ArrayList<>());
+        List<PanelPlacement> late = Collections.synchronizedList(new ArrayList<>());
+        List<PanelPlacement> cancelled = Collections.synchronizedList(new ArrayList<>());
+        var context = started("test.alpha", Set.of());
+        h.addTerminalWindow();
+        javax.swing.SwingUtilities.invokeAndWait(() -> h.ui(() -> {
+            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", "folder", Anchor.RIGHT).withSplit(), host -> {
+                hosts.add(host);
+                inFactory.add(host.placement());
+                host.onPlacement(heard::add);
+                host.onClosed(() -> atClose.add(host.placement()));
+                var C = dev.jasper.sdk.ui.ControlState.READY;
+                return context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Panel("hosts", C,
+                    new dev.jasper.sdk.ui.Nodes.Header("hosts-header", C, "Hosts", java.util.OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+                    Optional.empty(), new dev.jasper.sdk.ui.Nodes.Text("body", C, "Body", dev.jasper.sdk.ui.Nodes.TextRole.BODY), Optional.empty())), e -> { });
+            });
+            var docked = new PanelPlacement(Anchor.RIGHT, true, PanelMode.DOCKED);
+            var floating = new PanelPlacement(Anchor.RIGHT, true, PanelMode.FLOAT);
+            var left = new PanelPlacement(Anchor.LEFT, false, PanelMode.DOCKED);
+            var window = new PanelPlacement(Anchor.BOTTOM, false, PanelMode.WINDOW);
+
+            assertThat(h.openPanel("test.alpha.hosts")).isNotNull();
+            var host = hosts.get(0);
+            assertThat(inFactory).as("the spec's side and half, docked, in the factory").containsExactly(docked);
+            assertThat(host.placement()).isEqualTo(docked);
+            assertThat(host.placement().ownWindow()).isFalse();
+
+            h.placePanel("test.alpha.hosts", floating);
+            assertThat(heard).containsExactly(floating);
+            assertThat(host.placement()).isEqualTo(floating);
+            assertThat(host.placement().ownWindow()).isTrue();
+            h.placePanel("test.alpha.hosts", floating);
+            assertThat(heard).as("the same placement is silent").containsExactly(floating);
+
+            host.onPlacement(placement -> { throw new IllegalStateException("placement failed"); });
+            host.onPlacement(afterThrower::add);
+            var unsubscribed = host.onPlacement(cancelled::add);
+            h.placePanel("test.alpha.hosts", left);
+            assertThat(host.placement()).isEqualTo(left);
+            assertThat(host.placement().ownWindow()).isFalse();
+            assertThat(heard).as("a failing handler is contained and the first still hears").containsExactly(floating, left);
+            assertThat(afterThrower).as("and the ones after it").containsExactly(left);
+            assertThat(cancelled).containsExactly(left);
+
+            unsubscribed.close();
+            host.onPlacement(late::add);
+            assertThat(late).as("a handler added late hears nothing yet").isEmpty();
+            h.placePanel("test.alpha.hosts", window);
+            assertThat(host.placement()).isEqualTo(window);
+            assertThat(host.placement().ownWindow()).isTrue();
+            assertThat(late).containsExactly(window);
+            assertThat(heard).containsExactly(floating, left, window);
+            assertThat(cancelled).as("a closed registration hears no more").containsExactly(left);
+
+            h.closePanel("test.alpha.hosts");
+            assertThat(atClose).as("a panel that closes reads where it was").containsExactly(window);
+            assertThat(h.openPanel("test.alpha.hosts")).isNotNull();
+            assertThat(inFactory).as("opened again, it is built where it last was").containsExactly(docked, window);
+            assertThat(hosts.get(1).placement()).isEqualTo(window);
+            assertThat(heard).as("and hears nothing for it").containsExactly(floating, left, window);
+
+            h.closePanel("test.alpha.hosts");
+            h.placePanel("test.alpha.hosts", floating);
+            assertThat(heard).as("a panel that is not open hears nothing").containsExactly(floating, left, window);
+            assertThat(late).containsExactly(window);
+            assertThat(host.placement()).as("a closed instance reads the place it closed in").isEqualTo(window);
+            assertThat(h.openPanel("test.alpha.hosts")).isNotNull();
+            assertThat(inFactory).as("moved while it was not open, it is built there").containsExactly(docked, window, floating);
+            assertThat(hosts.get(2).placement()).isEqualTo(floating);
+            assertThat(hosts.get(2).placement().ownWindow()).isTrue();
+            assertThat(heard).as("and no handler hears the move").containsExactly(floating, left, window);
+            h.placePanel("test.alpha.hosts", floating);
+            assertThat(heard).as("the same placement is silent").containsExactly(floating, left, window);
+            h.closePanel("test.alpha.hosts");
+            assertThat(atClose).containsExactly(window, window, floating);
         }));
     }
 
@@ -3597,6 +3765,115 @@ public abstract class PluginContractTest {
         assertThat(h.shellVariables(Map.of())).isEqualTo(Map.of("B", "2"));
         h.stopAll();
         assertThat(h.shellVariables(Map.of())).as("the registration ends with its plugin").isEmpty();
+    }
+
+    private static final TabNamePieceSpec HOST = new TabNamePieceSpec("host", "the SSH host this tab is connected to");
+
+    @Test void tabNamePiecesNeedTerminalObserve() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build");
+        h.addTerminalPane(tab, "make", Path.of("/src"));
+        var bare = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        h.ui(() -> {
+            assertThatThrownBy(() -> bare.get().terminals().addTabNamePiece(HOST))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("terminal.observe"));
+            assertThatThrownBy(() -> bare.get().terminals().tab(tab).orElseThrow().namePieces())
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("terminal.observe"));
+        });
+    }
+
+    @Test void aPluginPieceHoldsAValuePerTerminalTab() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "ssh");
+        UUID pane = h.addTerminalPane(tab, "ssh", Path.of("/"));
+        UUID notes = h.addContentTab(window, "notes");
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.beta", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), beta::set);
+        var piece = new AtomicReference<TabNamePiece>();
+        h.ui(() -> {
+            piece.set(alpha.get().terminals().addTabNamePiece(HOST));
+            assertThat(piece.get().name()).isEqualTo("host");
+            piece.get().set(alpha.get().terminals().tab(tab).orElseThrow(), " db1\n.example ");
+            piece.get().set(alpha.get().terminals().tab(notes).orElseThrow(), "ignored");
+            assertThat(beta.get().terminals().tab(tab).orElseThrow().namePieces()).as("another plugin reads it")
+                .containsEntry("host", "db1 .example");
+            assertThat(beta.get().terminals().tab(notes).orElseThrow().namePieces()).as("a content tab has none").isEmpty();
+        });
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("host", "db1 .example"));
+        assertThat(h.tabNamePieces(notes)).isEmpty();
+        var closing = new AtomicReference<TabHandle>();
+        h.ui(() -> {
+            closing.set(alpha.get().terminals().tab(tab).orElseThrow());
+            piece.get().set(closing.get(), "  ");
+        });
+        assertThat(h.tabNamePieces(tab)).as("blank clears").isEmpty();
+        h.ui(() -> piece.get().set(closing.get(), "db1"));
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("host", "db1"));
+        h.closeTerminalPane(pane);
+        assertThat(h.tabNamePieces(tab)).as("a closed tab's values go").isEmpty();
+        h.ui(() -> assertThatCode(() -> piece.get().set(closing.get(), "late")).doesNotThrowAnyException());
+        assertThat(h.tabNamePieces(tab)).as("a closed tab takes no value").isEmpty();
+    }
+
+    @Test void aPieceValueLosesLineSeparatorsAndBidirectionalControls() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "ssh");
+        h.addTerminalPane(tab, "ssh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            terminals.addTabNamePiece(HOST).set(terminals.tab(tab).orElseThrow(), "\u202Edb1\u2028.example\u2029\u2066x\u2069");
+            assertThat(terminals.tab(tab).orElseThrow().namePieces()).containsEntry("host", "db1 .example x");
+        });
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("host", "db1 .example x"));
+    }
+
+    @Test void aPieceNameIsHeldByOnePluginAtATime() {
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.beta", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), beta::set);
+        h.ui(() -> {
+            TabNamePiece held = alpha.get().terminals().addTabNamePiece(HOST);
+            assertThatIllegalStateException().isThrownBy(() -> beta.get().terminals().addTabNamePiece(HOST));
+            assertThatIllegalStateException().isThrownBy(() -> alpha.get().terminals().addTabNamePiece(HOST));
+            held.close();
+            held.close();
+            assertThat(beta.get().terminals().addTabNamePiece(HOST).name()).isEqualTo("host");
+        });
+    }
+
+    @Test void aPieceEndsWithItsHandleAndWithItsPlugin() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "ssh");
+        h.addTerminalPane(tab, "ssh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            TabNamePiece host = terminals.addTabNamePiece(HOST);
+            host.set(terminals.tab(tab).orElseThrow(), "db1");
+            host.close();
+            host.set(terminals.tab(tab).orElseThrow(), "db2");
+            terminals.addTabNamePiece(new TabNamePieceSpec("branch", "the branch")).set(terminals.tab(tab).orElseThrow(), "main");
+        });
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("branch", "main"));
+        h.stopAll();
+        assertThat(h.tabNamePieces(tab)).as("the piece ends with its plugin").isEmpty();
+    }
+
+    @Test void setMayBeCalledFromAnyThread() throws Exception {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "ssh");
+        h.addTerminalPane(tab, "ssh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        var piece = new AtomicReference<TabNamePiece>();
+        var handle = new AtomicReference<TabHandle>();
+        h.ui(() -> { piece.set(alpha.get().terminals().addTabNamePiece(HOST)); handle.set(alpha.get().terminals().tab(tab).orElseThrow()); });
+        Thread worker = Thread.ofVirtual().start(() -> piece.get().set(handle.get(), "db1"));
+        worker.join();
+        h.ui(() -> { });
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("host", "db1"));
     }
 
     @Test void aTabOrASplitMayRunAProgramAndThatNeedsTerminalOpen() {

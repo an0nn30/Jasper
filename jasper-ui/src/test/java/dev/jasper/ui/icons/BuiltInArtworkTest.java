@@ -125,6 +125,22 @@ class BuiltInArtworkTest {
                     .as(name).isEqualTo(pixels(registry.themedIcon(name,16).icon(KitFixtures.dark(),SemanticColor.TEXT_PRIMARY),2));
         }
     }
+    /** A header strip draws every action in one ink (spec 16.1.2): the vertical ellipsis is its vector there, the authored art elsewhere. */
+    @Test void theVerticalEllipsisIsItsVectorInAStripsInkAndItsAuthoredArtInEveryOtherPanelContext() throws Exception {
+        try (var registry = new IconRegistry()) {
+            for (var theme : List.of(KitFixtures.light(), KitFixtures.dark())) {
+                var ink = new java.awt.Color(0x12, 0x34, 0x56);
+                int[] inked = pixels(registry.panel("more.vertical", theme.semantic(), ink, 16), 4);
+                for (int y : new int[] {12, 32, 52}) assertThat(inked[y * 64 + 32]).as("a dot at row %s", y).isEqualTo(ink.getRGB());
+                for (int y : new int[] {22, 42}) assertThat(inked[y * 64 + 32] >>> 24).as("nothing between the dots at row %s", y).isZero();
+                assertThat(inked[32 * 64 + 12] >>> 24).as("nothing beside the column").isZero();
+                var authored = direct("general/moreVertical" + (theme.dark() ? "_dark.svg" : ".svg"), 16, 2);
+                assertThat(pixels(registry.panel("more.vertical", theme.semantic(), SemanticColor.TEXT_PRIMARY, 16), 2)).as("a panel tint").isEqualTo(authored);
+                assertThat(pixels(registry.icon("more.vertical", theme, SemanticColor.TEXT_PRIMARY, 16), 2)).as("an ordinary context").isEqualTo(authored);
+            }
+        }
+    }
+
     /** Rulings 3: the classic chrome set, its six meanings, and only CLASSIC receivers get it; others fall back to New UI. */
     @Test void theClassicChromeSetIsTheVendoredArtworkForItsSixMeanings() throws Exception {
         var files = Map.of("add", "classic/general/add", "split", "classic/actions/splitVertically", "zoom", "classic/general/expandComponent",

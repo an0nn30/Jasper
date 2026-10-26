@@ -88,7 +88,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `status()`, `progress()` | Visible status items as `id\|side\|text\|tooltip\|actionId`; visible progress states by id |
 | `rail()` | Rail buttons' action ids |
 | `panels()` | Registered panels as `id\|title\|ANCHOR`, with `+split` for a panel that starts in the second half and `\|<action id>` for one that names its own toggle |
-| `openPanel(id)`, `panelView(id)`, `panelHeader(id)`, `closePanel(id)` | Builds a panel as the main window showing it would; its mounted view; its published header; discards it as the main window would |
+| `openPanel(id)`, `panelView(id)`, `panelHeader(id)`, `placePanel(id, placement)`, `closePanel(id)` | Builds a panel as the main window showing it would, at its placement; its mounted view; its published header; moves the panel as a drag or View Mode would, open or not: an open panel's `PanelHost.placement()` becomes the `PanelPlacement` and a different one reaches each `onPlacement` handler once (a throwing one is recorded in `failures()`), and a panel that is not open is built there, also after `closePanel`; discards it as the main window would |
 | `windows()`, `windowView(pluginId, title)`, `windowContent(pluginId, title)` | Open dialogs and overlays as `id\|title\|shown` (a dialog's id is `dialog`, an overlay's `overlay`); the view or component mounted on one |
 | `dialogPresentation(pluginId, title)`, `dialogSwatch(pluginId, title)`, `popoverViews(pluginId)` | How an open dialog is presented and the hue of its title square; shown popovers' views |
 | `requestClose(windowId)` | Closes a dialog through its closing guards |
@@ -105,6 +105,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `moveTab(tabId, windowId)`, `closeTab(tabId)`, `windowTabs(windowId)`, `holdPane(paneId)` | Moves a tab the test added to another window, or closes it, as the user would (the last tab of a child window takes the window); a window's tabs, each its items pane by pane; holds a local pane `NOT_STARTED` until its tab is shown, as Jasper holds a restored one |
 | `activateTerminalWindow(id)`, `focusTerminalPane(id)`, `closeTerminalPane(id)` | The user turns to a window, focuses a pane or closes one (the last pane takes its tab, the last tab a child window) |
 | `setPaneInfo(id, info)`, `setSelection(id, text)`, `setForegroundJob(id, name)` | Changes what a pane reports, without an event |
+| `setTabNamePieces(tabId, builtIns)`, `tabNamePieces(tabId)`, `tabNamePieceSpecs()` | Scripts the built-in pieces (`dir`, `full`, `process`, `title`) a terminal tab reports through `TabHandle.namePieces()`; the values plugins' pieces hold for a tab; every plugin's piece |
 | `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` | Publish terminal events for a pane |
 | `terminalPanes()` | Every open pane, in creation order |
 | `sent(paneId)` | What plugins sent to a pane, as `write:<text>` and `paste:<text>` |
@@ -187,6 +188,8 @@ Jasper's is `<home>/plugins/<id>/data`.
 - The fake has no active tool window: `Panels.toggle` and `PanelHost.show()` from a panel's own toggle action only
   toggle or show it, also under `FakePresentations.CLASSIC`, where Jasper activates a showing panel that is not the
   active tool window instead of hiding it.
+- A panel's window of its own exists only as its placement: a child window's `Panels.toggle` of a panel placed in one
+  shows it and records no `front|` request, where Jasper brings that window to the front.
 - Custom content's font is set only when it is registered and by `FakeKit.contentFont`; Jasper also sets it at every
   update of the view and every theme change, so a font a plugin sets on its registered component lasts in the fake but
   not in Jasper.

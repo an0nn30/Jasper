@@ -47,6 +47,9 @@ class DerivedColorTest {
         inputs.put(TAG_BORDER_AMBER, Set.of(SemanticColor.HUE_AMBER, SemanticColor.SURFACE_CARD));
         inputs.put(TAG_BORDER_PURPLE, Set.of(SemanticColor.HUE_PURPLE, SemanticColor.SURFACE_CARD));
         inputs.put(TAG_BORDER_NEUTRAL, Set.of(SemanticColor.HUE_NEUTRAL, SemanticColor.SURFACE_CARD));
+        inputs.put(FOCUS_HALO, Set.of(SemanticColor.BORDER_FOCUS, SemanticColor.SURFACE_APP));
+        inputs.put(ERROR_HALO, Set.of(SemanticColor.BORDER_ERROR, SemanticColor.SURFACE_APP));
+        inputs.put(SURFACE_TEXT_SELECTION, Set.of(SemanticColor.SELECTION_BG, SemanticColor.SURFACE_APP));
         return inputs;
     }
 
@@ -55,10 +58,10 @@ class DerivedColorTest {
             "surface.header.active", "surface.stripe", "surface.tableHeader", "surface.zebra", "surface.rowHover", "warning.ground",
             "warning.border", "danger.ground", "danger.border", "info.ground", "info.border", "surface.footer", "border.divider",
             "border.row", "border.hover", "accent.edge", "button.end", "tag.border.blue", "tag.border.green", "tag.border.amber",
-            "tag.border.purple", "tag.border.neutral");
+            "tag.border.purple", "tag.border.neutral", "focus.halo", "error.halo", "surface.textSelection");
         assertThat(Arrays.stream(DerivedColor.values()).filter(DerivedColor::overridable).map(DerivedColor::key)).containsExactly(
             "surface.header", "surface.header.active", "surface.stripe", "surface.tableHeader", "surface.zebra", "surface.rowHover",
-            "warning.ground", "warning.border", "border.divider");
+            "warning.ground", "warning.border", "border.divider", "focus.halo", "error.halo", "surface.textSelection");
         for (var role : DerivedColor.values())
             assertThat(SemanticColor.of(role.key())).as("%s is not a semantic role", role.key()).isEmpty();
     }

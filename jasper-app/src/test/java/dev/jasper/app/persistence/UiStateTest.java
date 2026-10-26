@@ -2,9 +2,11 @@ package dev.jasper.app.persistence;
 
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
@@ -350,6 +352,177 @@ class UiStateTest {
         assertThat(state.window("dev.x.manager")).hasValue(new UiState.Bounds(-30, 40, 800, 600));
         assertThat(state.window("dev.x.flat")).isEmpty();
         assertThat(state.window("dev.x.lost")).isEmpty();
+    }
+
+    /** Floating tool windows spec: a detached panel keeps its slot and saves its mode and its own window's bounds with it. */
+    @Test void aDetachedPanelsModeAndWindowRoundTrip() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        UiState state = UiState.load(file);
+        var floating = new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.FLOAT, Optional.of(new UiState.Bounds(-1200, 40, 420, 610)));
+        var window = new UiState.Panel(Slot.BOTTOM_LEFT, 1, false, ToolWindowMode.WINDOW, Optional.of(new UiState.Bounds(30, 50, 700, 300)));
+        state.putPanel("dev.x.floating", floating);
+        state.putPanel("dev.x.window", window);
+        state.save();
+        assertThat(Files.readString(file)).contains("""
+
+            [panels."dev.x.floating"]
+            slot = "LEFT_TOP"
+            order = 0
+            visible = true
+            mode = "float"
+            window = { x = -1200, y = 40, width = 420, height = 610 }
+            """).contains("mode = \"window\"\nwindow = { x = 30, y = 50, width = 700, height = 300 }\n");
+        UiState again = UiState.load(file);
+        assertThat(again.panel("dev.x.floating")).hasValue(floating);
+        assertThat(again.panel("dev.x.window")).hasValue(window);
+    }
+
+    @Test void aDetachedPanelWithoutWindowBoundsWritesOnlyItsMode() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        UiState state = UiState.load(file);
+        var floating = new UiState.Panel(Slot.RIGHT_TOP, 2, true, ToolWindowMode.FLOAT, Optional.empty());
+        state.putPanel("dev.x.floating", floating);
+        state.save();
+        assertThat(Files.readString(file)).contains("mode = \"float\"\n").doesNotContain("window =");
+        assertThat(UiState.load(file).panel("dev.x.floating")).hasValue(floating);
+    }
+
+    /** The bounds are the panel's own window's last place: they outlast docking it back. */
+    @Test void aDockedPanelKeepsItsWindowBounds() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        UiState state = UiState.load(file);
+        var docked = new UiState.Panel(Slot.RIGHT_BOTTOM, 0, true, ToolWindowMode.DOCKED, Optional.of(new UiState.Bounds(10, 20, 300, 400)));
+        state.putPanel("dev.x.docked", docked);
+        state.save();
+        assertThat(Files.readString(file)).doesNotContain("\nmode = ").contains("window = { x = 10, y = 20, width = 300, height = 400 }\n");
+        assertThat(UiState.load(file).panel("dev.x.docked")).hasValue(docked);
+    }
+
+    @Test void aPanelWithNoModeOrWindowIsDockedWithNoBounds() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        UiState state = UiState.load(file);
+        state.putPanel("dev.x.plain", new UiState.Panel(Slot.LEFT_TOP, 0, true));
+        state.save();
+        assertThat(Files.readString(file)).doesNotContain("\nmode = ").doesNotContain("window");
+        var plain = UiState.load(file).panel("dev.x.plain").orElseThrow();
+        assertThat(plain.mode()).isEqualTo(ToolWindowMode.DOCKED);
+        assertThat(plain.window()).isEmpty();
+        assertThat(plain).isEqualTo(new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.DOCKED, Optional.empty()));
+    }
+
+    @Test void anUnknownModeReadsAsDocked() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, """
+            version = 2
+
+            [panels."dev.x.unknown"]
+            slot = "LEFT_BOTTOM"
+            order = 3
+            visible = true
+            mode = "fullscreen"
+
+            [panels."dev.x.typed"]
+            slot = "RIGHT_TOP"
+            order = 1
+            visible = false
+            mode = 2
+
+            [panels."dev.x.upper"]
+            slot = "BOTTOM_LEFT"
+            order = 0
+            visible = true
+            mode = "FLOAT"
+
+            [panels."dev.x.docked"]
+            slot = "BOTTOM_RIGHT"
+            order = 2
+            visible = true
+            mode = "docked"
+
+            [panels."dev.x.float"]
+            slot = "RIGHT_BOTTOM"
+            order = 4
+            visible = true
+            mode = "float"
+            """);
+        UiState state = UiState.load(file);
+        assertThat(state.panel("dev.x.unknown")).hasValue(new UiState.Panel(Slot.LEFT_BOTTOM, 3, true));
+        assertThat(state.panel("dev.x.typed")).hasValue(new UiState.Panel(Slot.RIGHT_TOP, 1, false));
+        assertThat(state.panel("dev.x.upper")).as("the names are the lower-case ones the file writes").hasValue(new UiState.Panel(Slot.BOTTOM_LEFT, 0, true));
+        assertThat(state.panel("dev.x.docked")).hasValue(new UiState.Panel(Slot.BOTTOM_RIGHT, 2, true));
+        assertThat(state.panel("dev.x.float").orElseThrow().mode()).isEqualTo(ToolWindowMode.FLOAT);
+    }
+
+    @Test void aBadWindowTableIsDroppedAndThePanelStillLoads() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, """
+            version = 2
+
+            [panels."dev.x.flat"]
+            slot = "LEFT_TOP"
+            order = 0
+            visible = true
+            mode = "float"
+            window = { x = 10, y = 20, width = 0, height = 480 }
+
+            [panels."dev.x.missing"]
+            slot = "LEFT_BOTTOM"
+            order = 1
+            visible = false
+            mode = "window"
+            window = { x = 10, y = 20, width = 640 }
+
+            [panels."dev.x.typed"]
+            slot = "RIGHT_TOP"
+            order = 2
+            visible = true
+            window = { x = "left", y = 20, width = 640, height = 480 }
+
+            [panels."dev.x.scalar"]
+            slot = "RIGHT_BOTTOM"
+            order = 3
+            visible = true
+            mode = "float"
+            window = 5
+
+            [panels."dev.x.good"]
+            slot = "BOTTOM_LEFT"
+            order = 4
+            visible = true
+            mode = "float"
+            window = { x = -5, y = 6, width = 7, height = 8 }
+            """);
+        UiState state = UiState.load(file);
+        assertThat(state.panel("dev.x.flat")).hasValue(new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.FLOAT, Optional.empty()));
+        assertThat(state.panel("dev.x.missing")).hasValue(new UiState.Panel(Slot.LEFT_BOTTOM, 1, false, ToolWindowMode.WINDOW, Optional.empty()));
+        assertThat(state.panel("dev.x.typed")).hasValue(new UiState.Panel(Slot.RIGHT_TOP, 2, true));
+        assertThat(state.panel("dev.x.scalar")).hasValue(new UiState.Panel(Slot.RIGHT_BOTTOM, 3, true, ToolWindowMode.FLOAT, Optional.empty()));
+        assertThat(state.panel("dev.x.good")).hasValue(
+            new UiState.Panel(Slot.BOTTOM_LEFT, 4, true, ToolWindowMode.FLOAT, Optional.of(new UiState.Bounds(-5, 6, 7, 8))));
+    }
+
+    @Test void anotherLooksPanelsKeepTheirModes() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        String enterprise = "dev.jasper.enterprise";
+        var floating = new UiState.Panel(Slot.RIGHT_TOP, 0, true, ToolWindowMode.FLOAT, Optional.of(new UiState.Bounds(-1200, 40, 420, 610)));
+        var window = new UiState.Panel(Slot.LEFT_TOP, 1, true, ToolWindowMode.WINDOW, Optional.empty());
+        UiState state = UiState.load(file, enterprise);
+        state.putPanel("dev.x.floating", floating);
+        state.putPanel("dev.x.window", window);
+        state.save();
+        assertThat(Files.readString(file)).contains("""
+
+            [look."dev.jasper.enterprise".panels."dev.x.floating"]
+            slot = "RIGHT_TOP"
+            order = 0
+            visible = true
+            mode = "float"
+            window = { x = -1200, y = 40, width = 420, height = 610 }
+            """).contains("[look.\"dev.jasper.enterprise\".panels.\"dev.x.window\"]\nslot = \"LEFT_TOP\"\norder = 1\nvisible = true\nmode = \"window\"\n");
+        UiState again = UiState.load(file, enterprise);
+        assertThat(again.panel("dev.x.floating")).hasValue(floating);
+        assertThat(again.panel("dev.x.window")).hasValue(window);
+        assertThat(UiState.load(file).panel("dev.x.floating")).as("the default look is untouched").isEmpty();
     }
 
     /** A window-sized plugin dialog remembers its bounds under its plugin id and title, which TOML quotes. */

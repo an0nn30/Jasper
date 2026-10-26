@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
-describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.21.0, task by task.
+describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.22.0, task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
   exported APIs.
@@ -64,7 +64,7 @@ id = "dev.example.tool"
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.21.0, <0.22"
+sdk = ">=0.22.0, <0.23"
 description = "Runs the tool from the command palette."
 vendor = "Example"
 homepage = "https://example.dev/tool"
@@ -90,7 +90,7 @@ summary = "Run the tool"
 | `name` | string | yes | Must show something: not only spaces, zero-width or bidi characters. It titles the plugin's row, Settings page and notification groups. |
 | `version` | string | yes | One to three numbers separated by dots, without leading zeros or a pre-release tag; missing numbers are 0, so `1.0` is `1.0.0`. |
 | `entry` | string | yes | The qualified name of the [entry class](#the-entry-point-and-lifecycle), which must be in a package. |
-| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.21.0 declares `sdk = ">=0.21.0, <0.22"`. |
+| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.22.0 declares `sdk = ">=0.22.0, <0.23"`. |
 | `description` | string | no | The Overview on the plugin's details in Settings › Plugins; searched there. |
 | `vendor` | string | no | Shown in the plugin list, its details and its review sheet. |
 | `homepage` | string | no | An absolute `http` or `https` address, linked as "Plugin homepage ↗" on the plugin's details. Anything else is ignored with a warning in the log. |
@@ -223,7 +223,7 @@ window (actions, menus, tool windows, content tabs, dialogs, notifications, sett
 
 | Capability | Lets the plugin | The review sheet says |
 | --- | --- | --- |
-| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()` and other tabs' titles in `ContentTab.tabChoices()` (which does not throw without it: its other tabs read "Tab N"), and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end |
+| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()` and other tabs' titles in `ContentTab.tabChoices()` (which does not throw without it: its other tabs read "Tab N"), read a tab's name pieces and add your own, and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end; add to tab names |
 | `terminal.selection` | read `PaneHandle.selection()` | Read the text you select in a terminal |
 | `terminal.inject` | call `PaneHandle.sendText`, `sendBytes` and `paste` | Type into your terminals |
 | `terminal.open` | open tabs and splits with a local request (the shell, a profile or a program), open a terminal beside a content tab with `ContentTab.split(SplitChoice.TERMINAL, …)`, and read `Terminals.profiles()` and `onProfilesChanged` | Open terminal tabs, splits and windows, and run programs in them |
@@ -259,6 +259,7 @@ and handlers, never components.
 <!-- example:pluginui -->
 ```java
 private static void installUi(PluginContext context, long stepMillis) {
+    installInputDemo(context);
     PluginAction[] demo = new PluginAction[1];
     demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
             .withIcon("dev.jasper.sample:flask")
@@ -388,14 +389,16 @@ built-in names and the artwork rules.
 
 ## Tool windows
 
-A tool window is a view of the plugin's docked in the main window, the only window with tool windows, as in IntelliJ.
-Register it once with `context.panels().register(new PanelSpec(id, title, icon, Anchor.LEFT), factory)`. Jasper asks
-the factory for it on the UI thread the first time the tool window is shown (a toggle from a child window shows it in
-the main window), and again after the main window closed and opened anew; the factory returns a view made
+A tool window is a view of the plugin's in the main window's dock or, when the user gives it one (View Mode › Float or
+Window), in a window of its own, as in IntelliJ; a child window has none. Register it once with
+`context.panels().register(new PanelSpec(id, title, icon, Anchor.LEFT), factory)`. Jasper asks
+the factory for it on the UI thread the first time the tool window is shown (a toggle from a child window shows it),
+and again after the main window closed and opened anew; the factory returns a view made
 with the plugin's kit, and one that throws shows "This panel could not be loaded." Jasper adds:
 
 - a stripe button, the spec's icon (under the Enterprise look a label that starts with the icon and reads the title),
-  and a header with the title, an **Options** menu (**Move to** one of six places, **Hide**) and a **Hide** button;
+  and a header with the title, an **Options** menu (**View Mode**: Docked, Float or Window; **Move to** one of six
+  places; **Hide**) and a **Hide** button;
 - the action `<panel id>.toggle`, "Toggle *title*", with no default shortcut, listed in View › Tool Windows (the Window
   menu under the Enterprise look) and the palette. To give the toggle a shortcut, register an action of your own that
   calls `context.panels().toggle(id, invoked.window())`, register it before the tool window, and name it with
@@ -421,19 +424,16 @@ keyboard does not move into it.
 <!-- example:pluginpanels -->
 ```java
 private static void installPanelAndAboutTab(PluginContext context, long stepMillis) {
-    // Built the first time the panel shows in the main window, the only window with tool windows. Its body is the kit's empty state:
-    // a tile, a title, one sentence and one secondary action, centered in the panel.
-    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host ->
-        context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
-            new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
-            Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
-                new Nodes.Icon("sample.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"),
-                "Sample Activity", "Runs a short demo activity in the background.",
-                List.of(new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run Sample Activity", "", Nodes.ButtonKind.SECONDARY, RUN_BUTTON, ""))),
-            Optional.empty())), event -> {
-                if (event instanceof UiEvent.Action action && action.id().equals(RUN_BUTTON))
-                    context.background().execute(() -> demo(context, stepMillis));
-            }));
+    // Built the first time the panel shows, docked in the main window or in a window of its own, as the user chooses.
+    // The view starts with the body for where the panel is now; a move to or from a window of its own describes the other.
+    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host -> {
+        UiView view = context.kit().create(panelBody(host.placement().ownWindow()), event -> {
+            if (event instanceof UiEvent.Action action && action.id().equals(RUN_BUTTON))
+                context.background().execute(() -> demo(context, stepMillis));
+        });
+        host.onPlacement(placement -> view.update(panelBody(placement.ownWindow())));
+        return view;
+    });
 
     ContentTab[] about = {null};
     // A tab in the given window, which Jasper draws with its strip; an open About is selected again.
@@ -470,21 +470,40 @@ private static void installPanelAndAboutTab(PluginContext context, long stepMill
     });
     context.rail().add("dev.jasper.sample.about");
 }
+
+/** The kit's empty state: a tile, a title, one sentence and one secondary action, centered in the panel. */
+private static ViewSpec panelBody(boolean ownWindow) {
+    String sentence = ownWindow ? "This tool window has a window of its own. It runs a short demo activity in the background."
+        : "Runs a short demo activity in the background.";
+    return new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
+        new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+        Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
+            new Nodes.Icon("sample.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"),
+            "Sample Activity", sentence,
+            List.of(new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run Sample Activity", "", Nodes.ButtonKind.SECONDARY, RUN_BUTTON, ""))),
+        Optional.empty()));
+}
 ```
 
 - Share your own model between instances; never share views or components.
-- [`PanelHost`](sdk-reference.html#dev.jasper.sdk.ui.PanelHost) is the tool window's place in the main window: `window()`,
-  `show()`, `hide()`, `visible()`, `onVisibility(...)`, the moment to start or stop refreshing, and `onClosed(...)`,
-  when the window closes or the tool window is removed. A drag reaches `onVisibility` only when it shows a hidden tool
-  window or hides one to make room in its new place.
+- [`PanelHost`](sdk-reference.html#dev.jasper.sdk.ui.PanelHost) is the tool window's place: `window()`, the main window
+  even while the tool window has a window of its own, `show()`, `hide()`, `visible()`, `onVisibility(...)`, the moment to
+  start or stop refreshing, and `onClosed(...)`, when the window closes or the tool window is removed.
+- `host.placement()` is a [`PanelPlacement`](sdk-reference.html#dev.jasper.sdk.ui.PanelPlacement): the side and half
+  (`anchor`, `split`; its stripe button's while it has a window of its own) and the
+  [`PanelMode`](sdk-reference.html#dev.jasper.sdk.ui.PanelMode), `DOCKED`, `FLOAT` or `WINDOW`; `ownWindow()` is true
+  for the last two. A factory reads it, since one restored in a window of its own is built there. `host.onPlacement(...)`
+  runs after each move to another side or half or to another mode, once the content is in its new place, and not for
+  visibility alone or a move within its half. A tool window that lays itself out another way in a window of its own
+  describes the other `ViewSpec` and passes it to `UiView.update`, as the Sample does: the kit keeps each control by id.
 - `host.setHeader(new PanelHeader(detail, active, actions))`, from the factory or when the model changes, adds a detail
   (a count, passed as digits, or a connection name), a status dot while `active`, and icon-only
   [`PanelHeader.Action`](sdk-reference.html#dev.jasper.sdk.ui.PanelHeader.Action)s, each with a label for its tooltip
   and accessible name, before Options and Hide. The header survives hiding and moving; callbacks stop when the
   instance closes; `PanelHeader.EMPTY` clears it. A kit `Panel` view's own header row joins the tool window's header;
   do not add a second action row inside the tool window.
-- `context.panels().toggle(id, window)` opens or hides one of the plugin's tool windows in the main window, creating
-  it the first time; a child window's toggle opens it and brings the main window to the front.
+- `context.panels().toggle(id, window)` opens or hides one of the plugin's tool windows, creating it the first time; a
+  child window's toggle opens it and brings its window to the front, the main window or the tool window's own.
 - `panelAnchor(context)` picks the Sample's starting side from the look Jasper runs with
   ([adapting to the look](#adapting-to-the-look)).
 
@@ -691,6 +710,10 @@ sync.error("Could not sync", "prod: connection refused", failure);
   `progress(fraction, detail)` (the card reads "*N*% · *detail*"), `detail(...)`, and exactly one of `succeed`, `fail`
   and `cancelled`; later calls are ignored, and progress between two deliveries is coalesced. An activity still open
   when the plugin stops ends as failed.
+- `needsInput(detail)` waits for user input; `resume(detail)` explicitly resumes work. Both retain the id, fraction
+  and activation action. Progress and detail keep the current phase; repeated phase calls coalesce detail. Phase
+  transitions arrive in order, while pending progress at a transition may be dropped. Running plugin activities and
+  qualifying terminal work jointly drive Buddy's working animation; waiting activities remain in its attention summary.
 - When an activity succeeds or fails, Jasper posts its outcome in the group `<plugin id>.activities`, titled after the
   activity with the final detail as content; post nothing for it yourself. A cancelled activity posts nothing.
 - `ActivitySpec`'s `activateActionId` naming one of the plugin's actions makes a click on the card, or on the outcome,
@@ -702,7 +725,32 @@ sync.error("Could not sync", "prod: connection refused", failure);
   matters. Every change of state is delivered; a change of detail alone is coalesced. Buddy shows a card per
   connection, and a click runs its `activateActionId` as for activities. Open connections close when the plugin stops.
 - Anyone may subscribe to `Activities.TOPIC` (`jasper.activity`) and `Activities.CONNECTIONS` (`jasper.connection`);
-  `activities().current()` returns the latest event of each running activity.
+  `activities().current()` returns the latest event of each running or waiting activity.
+  Subscribers handle `NEEDS_INPUT` (including detail updates while waiting) and `RESUMED` in addition to the existing states.
+
+The Sample's Tools action starts a confirmation task. Clicking its Buddy row runs the same action to confirm,
+resume and finish it:
+
+<!-- example:plugininput -->
+```java
+private static void installInputDemo(PluginContext context) {
+    String actionId = "dev.jasper.sample.input";
+    ActivityHandle[] waiting = new ActivityHandle[1]; // accessed only by the UI-thread action
+    context.actions().register(ActionSpec.of(actionId, "Run or Confirm Sample Input Activity"), invoked -> {
+        if (waiting[0] == null) {
+            waiting[0] = context.activities().begin(new ActivitySpec("Sample confirmation", "Preparing",
+                Optional.of(actionId), Optional.empty()));
+            waiting[0].needsInput("Activate this activity to confirm and continue");
+        } else {
+            ActivityHandle activity = waiting[0];
+            waiting[0] = null;
+            activity.resume("Confirmed; continuing");
+            context.background().execute(() -> activity.succeed("Confirmed"));
+        }
+    });
+    context.menus().standard(StandardMenu.TOOLS).add(actionId);
+}
+```
 
 ## Events
 
@@ -864,12 +912,19 @@ private static void installTerminalDemo(PluginContext context) {
   `window()`, `title()`, `select()`.
   [`PaneHandle`](sdk-reference.html#dev.jasper.sdk.terminal.PaneHandle): `info()`, `foregroundJob()`, `selection()`,
   `sendText`, `sendBytes`, `paste` and `focus()`.
+- **Tab names.** A terminal tab's automatic name comes from the user's Tab name pattern
+  ([Tab names](configuration.md#tab-names)). `TabHandle.namePieces()` returns the pieces it is made from that have a
+  value: Jasper's `dir`, `full`, `process` and `title`, and every plugin's.
+  `Terminals.addTabNamePiece(new TabNamePieceSpec("branch", "the Git branch of this tab's folder"))` adds a piece users
+  can write as `{branch}`; the `TabNamePiece` it returns sets the piece's value per tab with `set(tab, value)`, from any
+  thread. A name is held by one plugin at a time, Jasper's four are reserved, and the piece ends with its handle or its
+  plugin. Both need `terminal.observe`.
 - **A pane can close at any moment.** Commands to a closed pane are ignored, queries return the last value the handle
   saw, and `isOpen()` tells. Do not treat that as an error. A tab Jasper closed with its windows comes back under the
   same id when they are restored; drop a handle on `TAB_CLOSED`. After the plugin stops, handle queries throw
   `IllegalStateException`; the send methods are ignored.
-- **Threads.** Everything here is UI-thread only except `sendText`, `sendBytes` and `paste`, which work from any
-  thread; calls from one thread keep their order. `foregroundJob()` completes on a worker thread.
+- **Threads.** Everything here is UI-thread only except `sendText`, `sendBytes`, `paste` and `TabNamePiece.set`, which
+  work from any thread; calls from one thread keep their order. `foregroundJob()` completes on a worker thread.
 - **`sendText` adds nothing.** End a command with `"\n"` to run it; leaving it out lets the user look first. `paste`
   behaves like the user's paste, bracketed when the program asked for it. Input to a pane whose session is not running
   (not started yet, still connecting, or ended) is dropped.
@@ -1309,7 +1364,7 @@ catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
 | Runs on, or may be called from | What |
 | --- | --- |
 | The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, content tabs, split items, restorers, dialogs, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
-| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
+| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; `TabNamePiece.set`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
 
 - **Slow work** goes to `context.background()`, whose tasks can run at the same time. UI-thread code does no I/O and
   returns promptly.
@@ -1351,7 +1406,7 @@ try (var host = new FakePluginHost()) {
 | Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView` (an event a standard row handles there calls `pendingChanged()`), `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel`; `setKitDefault(id, key, value)` (a look's default, before any plugin starts) and `lookDefaultProblems(id)` |
 | The look and the terminal font | `setPresentation(presentation)` before any plugin starts, with `FakePresentations.STANDARD` (what the fake reports until told otherwise) or `CLASSIC`; `presentation()`; `setTerminalTypography(value)`, delivered by `flush()` |
 | Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `status()`, `progress()`, `rail()` |
-| Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the main window), `panelView`, `panelHeader`, `closePanel`; `windows()` (the open dialogs and overlays), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
+| Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the main window), `panelView`, `panelHeader`, `placePanel` (moves the tool window as a drag would, to a `PanelPlacement`; one that is not open is built there), `closePanel`; `windows()` (the open dialogs and overlays), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
 | Terminals | `addTerminalWindow()` (the first one added while no main window is open is the main window), `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`, `moveTab`, `closeTab`, `windowTabs(windowId)` (a window's tabs, each its items pane by pane), `focusTerminalPane`, `closeTerminalPane`, `holdPane` (a local pane that waits, `NOT_STARTED`, until its tab is shown), `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |

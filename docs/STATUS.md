@@ -1,5 +1,76 @@
 # Jasper — Status and Handoff
 
+**Linux package identity — 2026-10-26:** Linux packages use `jasper-workstation`, preserving the Jasper display name,
+`jasper` command and published filenames. Package options invalidate cached artifacts; RPM resources and desktop checks
+follow the new identity. Actual RPM/DEB builds exposed that JBR appends the package name beneath `--install-dir`;
+its source confirms the old `/opt/jasper` root cannot be retained through supported options. The approved correction
+uses `--install-dir /opt` and verifies `/opt/jasper-workstation`, updating the live package/command guides and packaged
+README. Disposable install checks preserve existing distro `jasper-libs`, which the Fedora equipped-runtime check now
+installs first. Corrected DEB install/check/remove and equipped Fedora RPM coexistence pass. The real Gradle RPM
+extraction exposed writer SIGPIPE after cpio's successful early exit; conversion now finishes into a work-directory
+archive before separately verified extraction. Its unread-padding and both-stage failure fixtures pass, as do portable
+packaging fixtures, four documentation checks and shell syntax. Actual Fedora `packageDist` passes after the extraction
+fix; DEB metadata and installation pass in the Ubuntu baseline/minimal containers. Both formats provide only
+`jasper-workstation`; Fedora coexistence preserves `jasper-libs-4.2.8-2.fc44.aarch64`. Independent review approves the
+final fixes. Latest main (`84cb18f25`) merges cleanly; packaging fixtures and documentation checks pass on the combined
+code. No GUI or AOT.
+
+**Linux distribution packaging — 2026-10-26:** `packageDist` selects only RPM on recognized Fedora/RHEL and SUSE
+families from `os-release`; Debian/Ubuntu and unknown hosts retain both formats. Explicit DEB/RPM tasks and mandatory
+dependency validation are unchanged. Portable packaging fixtures, four documentation checks and independent review
+pass. A fresh Fedora `packageDist` build passes in 2m 56s; Ubuntu dry-run retains both package tasks. No GUI or AOT.
+
+**Qt / KDE Desktop colors — 2026-10-25:** The approved [native plan](superpowers/plans/2026-10-25-qt-kde-native-helpers.md) now stages all seven helpers and packages Qt/KDE as optional child-process capabilities. Pinned Qt5.15.2, Qt6.2.4, Qt6.5/KF6.0 and private Qt5.15.2/KF5.92 builds have aarch64 baseline fixture/ABI evidence; exact packaged helpers pass system-runtime samples and minimal DEB/RPM installation without Qt/KF. The [compatibility record](design/qt-kde-native-compatibility.md) distinguishes private SDK runtime smoke from separately installed system runtimes. The spec's deterministic headless native integration gate is satisfied in this aarch64 scope; application work can proceed without claiming complete release or desktop acceptance. x86_64, minimum separately installed KDE6, the unexecuted CI matrix, cold corrected-recipe rebuild and real Plasma/qt5ct/qt6ct desktop acceptance remain open. The full macOS headless check passes 13,041 tests with zero failures/errors and 30 skips; package verification omits Linux helpers. Source/UI policy stays GTK-only in this deliverable. No GUI, AOT, merge or push.
+
+Application Task 1 adds v1 Qt/KDE decoding, explicit helper identities and healthy current-only observations; process failures preserve actual polarity and prior colors. Its scoped deviation also updates DesktopProcess event admission with expected-source context and registers the new nonvisual test in the migration ledger. Fedora access is restored and the native aarch64 gate above permits headless application work; the broader release/desktop matrix remains open. Focused platform and migration-ledger checks pass 95 tests with zero failures/errors and one Linux-only skip; application architecture passes. Task 1 review approved without findings. A Linux run had one failure among 95 tests in the existing restart test; its unchanged single-test rerun passed. The test now awaits any nonblank failure diagnostic while retaining restart/generation checks; the updated macOS focused run passes the same 95 tests. Scoped follow-up review approved without findings; source/UI policy remains GTK-only.
+
+Application Task 2 adds one immutable desktop-hint context and shared KDE/Qt/GTK source ordering for resolution and preview demand. Construction and Reload capture the supplied context; worker tickets retain their original context and reload invalidates queued publications. Exhaustive capability labels retain actual source, implementation and version. The Qt selector remains for Task 3. The required policy-test migration row is the only file-scope adjustment. Local headless Desktop/Settings and migration coverage passes 234 tests with zero failures/errors and one existing Linux-only skip; application architecture passes. Task 2 review approved without findings; full check remains scheduled for Task 4. No source transfer, GUI, AOT, merge or push.
+
+Application Task 3 enables the single Qt / KDE source choice and retains requested availability separately from actual palette colours. Opposite/UNKNOWN replies complete preview sampling; compatible cached colours keep last-good status, while incompatible colours use the bundled fallback with truthful metadata. Existing native failure reasons remain bounded and intact. Local focused coverage passes 76 tests; affected Desktop/configuration/Settings/presentation coverage passes 684 tests with zero failures/errors and one Linux-only skip; application architecture passes. The Settings search-term list in `settingsui/Editors.java` is the only file-scope deviation. Task 3 independent review approved without findings; updated-source Linux coverage and real-helper-to-Java sampling remain pending; no VM source copy was attempted after the earlier automatic-review rejection. Full check remains Task 4; broader release/desktop cases above remain open. No GUI, AOT, merge or push.
+
+Application Task 4 extends the existing actual-paint and retained-owner fixtures to 42 GTK/Qt/KDE inputs in both kits. The 18 original GTK lines and frozen authored captures remain byte-identical; contrast thresholds are unchanged. Focused coverage passes 31 tests and application architecture. The full Mac headless check passes 13,111 JUnit tests with zero failures/errors and 30 skips, plus 72 theme-tool tests; the final changed matrix/conflict methods and headless install/package verification pass. Test-only fixture bridges now include KDE ordering, and the two extended Editor fixtures retire a delayed RSyntax occurrence timer in `finally`. Updated-source Linux/Windows, real helper-to-current-Java execution, complete Automatic/dual-preview resource measurement and user desktop acceptance remain open. No source transfer followed the earlier automatic-review rejection; no GUI, AOT, benchmark, merge or push.
+
+The combined application final-review fix uses the newest current-only observation across requested-polarity slots for preview colours/status and adds bounded context for observed higher-ranked fallback failures. Regression RED reproduced four failures among 48 tests; focused GREEN passes all 48, and affected Desktop/Settings coverage passes 439 tests with zero failures/errors and one Linux-only skip; application architecture passes. Completion bookkeeping and sampling are unchanged. Scoped re-review approved both findings with no new breakage; existing full-check, Linux/native and desktop acceptance limits remain as recorded.
+
+Linux verification — 2026-10-26, source `3bfde469f`: the authorized Fedora VM ran the full check in Ubuntu22 baseline userspace (JBR25.0.4.1 b635.75). It completed 13,114 JUnit tests with 34 failures, zero errors and 65 skips. Of those failures, 24 reproduce on refreshed base `9fa59a492`, nine pass with missing tools/root-permission conditions corrected, and one full-order Rehearsal callback remains unresolved despite passing isolated current/base runs. The new Qt/KDE owner, protocol, policy, paint and retention cases pass. Real current-Java/Fedora-system Qt5/Qt6/KDE5/KDE6 active/opposite-preview and failure/recovery checks pass; seven-helper Automatic retains stable PIDs across two 30-second refresh boundaries with no observed mapped windows/config writes, 332,480kB summed RSS (shared pages included) and 0.24 CPU seconds over 58.372 seconds. Current native compatibility, headless package verification and minimal DEB/minimal RPM/equipped Fedora RPM install/check/remove pass. Protocol/portal checks pass with corrected locale/private-bus conditions; modern Fedora GTK ABI checks and a process-reaping packaging check pass. The baseline launcher-cache expectation, old-header/default-bus harness limitations and unresolved rehearsal callback keep the full gate non-green. See the [compatibility record](design/qt-kde-native-compatibility.md#linux-application-verification--2026-10-26). Real desktop acceptance, Windows/CI, x86_64 and separately installed minimum KDE6 remain open; no GUI, AOT, merge or push.
+
+**Buddy plugin input — 2026-10-25.** `codex/buddy-plugin-input` adds SDK 0.22.0 activity input/resume phases,
+ordered phase delivery with coalesced phase-preserving detail, and matching runtime/testkit shutdown semantics.
+Buddy retains notice identity and dismissal across input/resume and combines running plugin work with terminal
+work. The Sample's optional UI demo includes a confirmation action. Targeted lifecycle, notifier, composition,
+Buddy and Sample tests, architecture checks and generated SDK reference pass. Task, whole-branch and scoped fix
+reviews passed. The first full run exposed six stale SDK-version fixture failures and two missing-method errors in
+File Server test doubles; the test-only fixes passed 22 focused tests. Final full headless check passed in 8m 5s:
+13,054 tests, zero failures/errors, 30 skips. External-plugin check/pluginZip passed against SDK 0.22.0 release jars. The [plan](superpowers/plans/2026-10-25-buddy-plugin-input.md)
+records the delegated implementation and RED evidence. No GUI, AOT, benchmark, merge or push.
+
+
+**Compact Buddy activity — 2026-10-25.** `codex/buddy-compact-activity` replaces floating stacks with one
+quiet visible-work summary and an all-activity drawer with stable expandable groups. Attention priority,
+task/connection counts, duplicate labels, suppression and activation remain explicit. Drawer opening owns
+focus and native-owner selection; passive refresh and drag cannot reopen it. The [plan](superpowers/plans/2026-10-25-buddy-compact-activity.md)
+records delegated implementation bodies. Buddy check and application architecture passed: 175 tests,
+zero failures/errors/skips. Inspected light/dark headless previews under `jasper-buddy/build/reports/buddy-groups/`.
+Task and whole-branch reviews passed with no findings. Full headless check with Python 3.13 passed in
+8m 13s: 13,038 tests, zero failures/errors, 30 skips. GUI focus/outside-click acceptance
+remains user-run; no GUI, AOT, benchmark, merge or push.
+
+
+**Buddy laptop opening — 2026-10-25.** `codex/buddy-open-laptop` adds the authorized reverse-pose opening: 500 ms from standing, seated idle starts at the lowered-laptop pose, and sleeping wakes first. Work changes reverse either transition from its current pose with a full pose duration; repeated intent retains deadlines. Existing sprites are unchanged. Focused animator tests pass (34); Buddy check passes 186 tests with zero failures/errors/skips. Headless normal/interrupted opening and stand-up previews are under `jasper-buddy/build/reports/buddy-open-laptop/` and `buddy-stand-up/`. The [plan](superpowers/plans/2026-10-25-buddy-open-laptop.md) records the implementation-body delegation deviation. Task and whole-branch reviews passed with no findings. Full headless check with Python 3.13 passed in 8m 37s: 13,049 tests, zero failures/errors, 30 skips. Native GUI acceptance remains user-run; unmerged and unpushed.
+
+**Linux default interface colors — 2026-10-25** (`codex/linux-default-colors`; not merged or pushed): fresh and reset core settings use Desktop colors for both appearances on Linux, with Automatic source and system appearance. Saved theme picks and look defaults retain precedence; Enterprise keeps Meadow. Other platforms and extraction fallback are unchanged. Native Linux RED confirmed the empty-config regression before implementation; the full macOS check passed (13,019 tests, zero failures/errors, 30 skips), followed by 594 final focused tests and application architecture. Native Linux passed 591 of 594 focused tests, with one skip and only the previously recorded PaintedContrast/SelectionRendering baseline failures. Independent task and whole-branch reviews found no issues. The [plan](superpowers/plans/2026-10-25-linux-default-colors.md) records the small scope adjustments: configuration guide/default comments, explicit authored-look test fixtures, and preserving the authored invalid-pick preview fallback after the platform default changed.
+
+**Linux Desktop colors — 2026-10-24.** Implemented on `codex/linux-desktop-colors`, refreshed from main `22a611145`, with all ten task reviews and the final fix review complete through `42e9c4dfe`. The optional interface theme offers Automatic, GTK 3 and GTK 4 / libadwaita sources, portal preferences, live previews and bounded fallback/recovery. Main’s Meadow defaults, independent Editor scheme and terminal choices are preserved. Linux distributions carry the three isolated executable helpers; other platforms retain saved Desktop choices as unavailable. See the approved [plan](superpowers/plans/2026-10-17-jasper-linux-desktop-colors.md) for the execution record.
+
+Execution adjustments: source metadata, appearance/platform declarations and helper lookup moved earlier to keep each integration valid. Preview demand carries source/polarity and follows retained Settings-page lifetime through disposal, including while another page is visible; the existing resampling boundary refreshes inactive variants. Generic optional halo and interface-selection overrides, a narrow read-only cross-kit validation exception, shared cache admission and corrected final-hover constraints meet contrast targets while preserving authored paints. The converter reserves the dynamic id separately from file-backed themes. Modern libadwaita uses modern variables; plain GTK4 may use paired named fallbacks. Deterministic initialization seams cover subscription races. Rendering evidence links 269 of 307 inventory entries to pixels, classifies 37 conservative constraints and one native-title entry separately, and preserves all 356 authored captures. Native evidence uses the authorized VM and older userspaces, with the limits below.
+
+Final plain verification (2026-10-24): `./gradlew check --continue --max-workers=2` with the verified Python 3.13.15 interpreter passed on macOS aarch64: **13,017 tests, 12,987 passed, zero failures/errors, 30 skips**. The default 512 MiB test heap is unchanged. The first full runs exposed a Task 9 fixture leak: 180 synthetic focus-gained events left 180 caret timers active. A failing teardown assertion and matching focus-lost callbacks in `finally` fixed it; the live timer count fell to one during later tests, with 180 fewer KitViews at nearby later-test sampling points. Refreshed main's 4,412-test app baseline passed before that fix. Task 10 also completes the deferred owner ledger and makes supervisor fixture paths absolute on Windows; Windows execution remains pending. Final Mac `:jasper-app:installDist :jasper-app:packageApp :jasper-app:verifyPackage` passed without application AOT training.
+
+The pre-final-fix native Ubuntu 26.04 aarch64 full check completed **13,013 tests, 11 failures, zero errors, 59 skips**, with no heap failure after the fixture repair. All 11 rendering/geometry assertions reproduce on refreshed main `22a611145` (PaintedContrast, SelectionRendering, EditorComposition, VaultSheetRender, ClassicWindowsTitle, CollapsibleNavigation, EditorKit, PanelSurfaces and SettingsShellFrame); their expectations remain intact. Its GTK task also encountered a reused daemon's missing private Xvfb path; the explicit fresh-JVM `:jasper-app:testDesktopProtocol :jasper-app:testDesktopPortal :jasper-app:testDesktopGtk :jasper-app:verifyDesktopHelpers` gate passed: 409 protocol checks, 12 portal tests/46 snapshot assertions and 33 GTK tests, with no skips. Final focused Java checks passed 50/50 on Linux and 49/50 on macOS (one Linux-only skip). The private Python 3.12.3 wrapper avoids the host's unsupported 3.14 converter runtime. Ubuntu 22.04 userspace builds and verifies the portable/native aarch64 images against glibc 2.35/GLib 2.72.4; PRoot needs the repository wrapper's Java entry and direct-loader linkage shim because its shell access predicate rejects valid executables. GTK 4.6.9 there reports clean unavailability. Ubuntu 24.04 userspace passes 25 native GTK tests (GTK 3.24.41, GTK 4.14.5, libadwaita 1.5.0); the 26 VM uses GTK 3.24.52, GTK 4.22.4 and libadwaita 1.9.1. Older userspaces share the 26 kernel. Hosted x86_64/Windows runners, the digest-pinned 26 container and Debian/Fedora/openSUSE package installations were not run locally. GNOME, GTK 3 desktops, KDE and Wayland/X11 native acceptance remain user-run.
+
+
+The final review fixes close the application owner’s initial subscription race, add bounded portal acquisition/resnapshot recovery, accept readable translucent foregrounds over opaque windows, and preserve implementation/version/failure status. Final focused verification passes 109 Java tests on each Mac/Linux host, architecture checks, 409 protocol checks, 19 portal tests/60 assertions, 35 modern GTK tests and 27 Ubuntu 24 GTK tests. Portal ASan/UBSan and Ubuntu 22 baseline/unsupported-GTK checks pass. An extra PRoot24 portal run fails credential emulation before observer startup and is not runtime evidence. The final plain Mac full check and package verification ran after these fixes, without diagnostic instrumentation or AOT. Work remains unmerged and unpushed; native desktop acceptance remains user-run.
+
 ## Current state — 2026-10-22
 
 Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core is the workspace (windows, tabs, panes
@@ -36,8 +107,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.21.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
-  `sdk = ">=0.21.0, <0.22"`.
+- **SDK** `0.22.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.22.0, <0.23"`.
 - **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
   either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
   Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.
@@ -79,7 +150,8 @@ Open items, as the entries below record them:
   theirs. The workspace tabs series awaits the checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only
   tab, plans 7a to 8c, 6a, 6b, 9a and 9b; plan 2 had none), and so do its merge entries ("local main merged in",
   2026-10-19, the second sync, 2026-10-21, and the side branches with the third sync, 2026-10-22). One AOT training run
-  should confirm the seeded `workspace.toml` (2026-10-21).
+  should confirm the seeded `workspace.toml` (2026-10-21). Floating tool windows plans 1 to 3 await the checks their
+  entries list (2026-10-23, 2026-10-26).
 - **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
   one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
   fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
@@ -110,20 +182,388 @@ Open items, as the entries below record them:
 Newest first. Each entry describes its change as it stood when the entry was written.
 
 **Vim mode mirrors IdeaVim — 2026-10-23** (`claude/vim-ideavim-keys`, worktree `.claude/worktrees/vim-ideavim-keys`,
-from local `main` at `5db3524b4`; not merged or pushed): in Visual mode Copy, Cut, Paste, Delete and Paste from a list
+from local `main` at `5db3524b4`; `main` at `d771ee10c` merged in, then merged into `main` and pushed 2026-10-26): in Visual mode Copy, Cut, Paste, Delete and Paste from a list
 act on the Visual area through the system clipboard (registers untouched; the Find bar's Replace still replaces
 matches). Ctrl+Shift+letter is its own key, `<C-S-v>`, so Ctrl+Shift+V pastes from the list in Normal, Visual and Insert
 mode and the window's Ctrl+Shift shortcuts reach the window even in Insert mode. A Vim key that is also an Editor or
 window shortcut posts a one-time conflict notification (Use as Editor shortcut appends `sethandler <key> a:ide` to the
 vimrc and reloads it; Configure… opens the vimrc; the answer is remembered in `data/shortcut-conflicts`; RSTA
 text-navigation bindings and plain keys do not count). A Vim status widget (a V icon and the mode, dimmed when Vim is
-off; menu Enabled, Open vimrc, Reload vimrc, Settings…) replaces `Vim: On/Off`. SDK 0.21.0 (unreleased) gives
+off; menu Enabled, Open vimrc, Reload vimrc, Settings…) replaces `Vim: On/Off`. SDK 0.22.0 (unreleased) gives
 `ContentStatus` an icon, a dimmed state and a menu (`ContentStatus.MenuEntry`) and adds `PluginSettings.show()`. Known
 limits: a blockwise Paste on a short top line does not pad with spaces; Visual Cut and Paste are not `.`-repeatable; the
 Editor tests dispose the window before closing the fake host because the testkit closes the kit before tabs. Plan:
 `docs/superpowers/plans/2026-10-23-vim-ideavim-keys.md` (subagent-driven). GUI checks pending on macOS, Windows and
 Linux: Cmd/Ctrl+C/X/V in Visual mode; the conflict notification and both actions; Ctrl+Shift+V paste list in Normal
 mode; Ctrl+Shift+W in Insert mode; the widget's look, dimmed state and menu placement in light and dark themes.
+
+**Terminal tab names, plans A and B — 2026-10-26** (`claude/terminal-tab-names`, worktree
+`.claude/worktrees/terminal-tab-names`, from `main` at `36fdeedc1`; not merged or pushed): `terminal.tab_name`
+(Settings › Terminal › Tab name, live) names Terminal tabs from a pattern of free text and `{dir}`, `{full}`,
+`{process}` and `{title}`, by default `{dir} {process} {title}`; Rename Tab still wins. `config.TitleTemplate` is
+shared with the look's window title. Settings previews the active terminal tab's name as you type. Spec:
+`docs/superpowers/specs/2026-10-23-jasper-terminal-tab-names-design.md`; plan:
+`docs/superpowers/plans/2026-10-23-terminal-tab-names-a-pattern.md` (deviations in its status banner). Plan B: plugins
+read a tab's pieces (`TabHandle.namePieces()`) and add their own (`Terminals.addTabNamePiece`, SDK 0.22.0, unreleased,
+no bump); Remote adds `{host}`; Settings lists plugin pieces; the `terminal.observe` consent line adds "add to tab
+names". Plan: `docs/superpowers/plans/2026-10-23-terminal-tab-names-b-plugin-pieces.md`. GUI check pending: the Tab
+name row's layout and preview, tab names on macOS, Linux and Windows, and `{dir} {host}` on an SSH tab.
+
+**Floating tool windows, plan 3: SDK panel placement — 2026-10-26** (`claude/floating-tool-windows`, worktree
+`.claude/worktrees/workspace-tabs`, `8ec218383..5d3e0071b` and the final review's documentation commit, on plan 2's
+branch; not merged or pushed; [plan](superpowers/plans/2026-10-23-floating-3-sdk-placement.md),
+[spec](superpowers/specs/2026-10-23-jasper-floating-tool-windows-design.md), "SDK"; executed with per-task subagents and
+reviews). A plugin's tool window can read where it is and hear when that changes, so it can lay itself out another way
+in a window of its own (SDK 0.21.0, unreleased: no version bump). What landed, in task order:
+1. `dev.jasper.sdk.ui.PanelMode` (`DOCKED`, `FLOAT`, `WINDOW`), `PanelPlacement(anchor, split, mode)` with `ownWindow()`,
+   and `PanelHost.placement()` and `onPlacement(Consumer<PanelPlacement>)`, all `@since 0.21.0`. In the app `PanelSite`
+   takes a `Supplier<PanelSite.Placement>` (a new constructor; the older ones report Left Top, docked) and has
+   `notifyPlacement` (contained, inert after close; a listener whose own move started a newer notification ends the
+   round, so the listeners after it never hear the place it overtook); `HostedUi.host` adapts it, guarded to the UI
+   thread and with the handler run in containment; `WindowContributions` keeps the place each panel was built in or last
+   heard and tells a built panel whose id is in `DockState.Change.placed` once its component is in its new place
+   (`ecb632dd8`). Review fixes: `window()`'s Javadoc no longer says the host owns the main window (a Window is
+   unowned), the class Javadoc names the place, the baseline is recorded after the factory returns, and `migration.csv`
+   rows (`bd2f01e92`).
+2. The testkit: `FakePluginHost.placePanel(panelId, placement)` moves an open panel as a drag would (a different
+   placement becomes `placement()` and reaches each handler once, a throwing handler is recorded in `failures()` and the
+   others still run; the same placement and a closed panel are silent), `ContractHarness.placePanel` with
+   `FakeContractTest`'s and `AppContractTest`'s implementations, and `PluginContractTest`'s
+   `aPanelReadsItsPlacementAndHearsItChange` states it once for both runtimes (`a8f542f78`).
+3. The Sample plugin's panel reads `placement().ownWindow()` in its factory and from an `onPlacement` handler that calls
+   `view.update`: in a window of its own its empty state's sentence says so, and docked it reads as before. It is the
+   compiled `pluginpanels` example of plugin authoring.
+4. Final review fixes: the fake keeps a panel's placement on its registration, as the dock keeps it, so `placePanel` on
+   a panel that is not open records it silently, `openPanel` builds the panel there and `closePanel` keeps it;
+   `AppContractTest`'s harness keeps one place per registered panel the same way, and the contract test pins both, with
+   the place a closed instance reads; the Sample's test builds its panel in a Window. A child window's plain toggle or
+   show of a detached tool window is routed as an activating show (`WindowManager.routePanel`), which raises its own
+   window even when it already shows, and the fake records no `front|` request for the main window then. `PanelSite`
+   keeps the place it closed in, and `WindowContributions` reads a removed panel's last place, so a panel its plugin
+   removed reads where it was, not its default slot, docked. The fake contains a `LinkageError` from placement,
+   visibility and close handlers, and a placement round stops when a handler closes the panel. `PanelHost`'s
+   `window()`, `show()` and `onPlacement` Javadoc and `placePanel`'s `@since 0.21.0` (`5d3e0071b`).
+Documentation: plugin authoring's Tool windows (the example, the `PanelHost` bullets with `placement()`, `onPlacement` and
+`window()` staying the main window, the testkit table's `placePanel`), the SDK README's Tool windows row, guide
+`07-contributions` (View Mode, own windows, placement), `08-ui` and `13-testing`, the "Panels, the rail and plugin
+dialogs" section of the [SDK architecture](sdk-architecture.md), the `Panels` and `PanelFactory` Javadoc, the regenerated
+`docs/sdk-reference.html`, plan 2's entry below (item 1 and 2's grab) and the plan's status banner; the final review's:
+the dock listener's detached windows, the Detach target, routed requests and `UiState`'s mode and bounds in the SDK
+architecture, [plugins](plugins.md)' tool windows line, the testkit README, guide `13-testing`, plugin authoring's
+testkit table, and plan 2's entry reflowed.
+
+Rulings (each costs what its last words say if wrong):
+- The statements that tool windows live only in the main window (`Panels`' Javadoc, `PanelFactory`'s, guide 07 and 08,
+  plugin authoring's code comment and the Sample's, which plan 1's final review found stale) are corrected here, and so are
+  the ones about a toggle from a child window: `WindowManager.routePanel` brings a detached tool window's own window
+  forward, not the main window, so they say "its window" (a few more doc lines; `Toolbar` and `ToolbarViewFactory` say
+  the main window is the only window with a toolbar, which stays true).
+- `PanelHost.window()` is the main window while a panel has a window of its own, as the tool window's owner, and says so
+  (a plugin that wants the tool window's own window has no handle to it).
+- Fix round 1 took three reviewer minors along with the missing `migration.csv` rows: the false "which it owns", the class
+  Javadoc's "place in the main window" and the baseline recorded after the factory (public Javadoc must be true; the
+  baseline is one line).
+  A factory that moves its own panel is not told after it returns; `placement()` already shows the new place.
+- The Sample describes its body from `panelBody(boolean ownWindow)`, not the plan's `spec(placement)`: the body depends
+  only on `ownWindow()`.
+- The final review's minor about a child window's plain toggle raising nothing is fixed in the code, not by weakening
+  the docs, which describe the better behaviour (a `routePanel` change).
+
+Deferred, worth knowing:
+- The app's "same placement is silent" is enforced by `AppContractTest`'s harness (production is covered by
+  `PanelPlacementNotificationsTest`); the fake has a duplicated kit panel-view block; the testkit README's panel row is long.
+- A factory that registers `onPlacement` and then throws still hears placements in the app while its tool window shows
+  the placeholder, but not in the fake, as with `onVisibility`.
+- `PanelPlacementNotificationsTest.floatingAndDockingNotify` does not pin the native shell kind at notification time;
+  `HostedUi`'s static `placement(...)` shares a name with the instance method; the first assertion message of
+  `aMoveWhileTheFactoryRunsLeavesNoStaleBaseline` overclaims.
+- The external THD plugin still needs its rebuild against SDK 0.21.0 (open since plan 6b).
+
+Check: `./gradlew check --continue` (BUILD SUCCESSFUL in 16m 19s; the Buddy, SDK, testkit and Sample plugin tests were
+up to date): **12,988 tests, 0 failures, 0 errors, 29 skipped** (this run's XML holds 12,460; the up-to-date tasks'
+results are the other 528). The plan's new tests are `PanelPlacementTest` (2) and `PanelPlacementNotificationsTest` (7),
+the contract test `aPanelReadsItsPlacementAndHearsItChange` (once on each runtime), and cases in `HostedUiTest`,
+`FakePanelsAndWindowsTest` and `SamplePluginTest`. The external example (`-p docs/examples/external-plugin
+-PjasperSdkDir="$PWD/build/sdk-release" check pluginZip`): BUILD SUCCESSFUL, 1 test, 0 failures. Task 1's fix round ran
+`ClassicCompositionRenderTest` at a load average of about 365 (macOS's temp-folder cleanup) and it failed on the plugin
+shutdown wait ("Plugin workers did not finish resource cleanup after stop"); this check ran under a load of about 5 to
+30 and it passed. The final review's fixes ran `./gradlew :jasper-sdk:check :jasper-sdk-testkit:test
+:jasper-plugin-sample:test :jasper-app:test --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.workspace.*'
+--tests '*AppDocumentationTest' --tests '*ThemeMigrationCoverageTest'` (BUILD SUCCESSFUL): SDK 108, testkit 251, Sample
+19 and app 2,023 tests, 0 failures, 0 errors, 11 skipped; and the external example again, 1 test, 0 failures; the full
+`check` was not run again. GUI checks for the user, none run (no window was launched), on each platform in the default
+look: with `demo_ui = true` (Settings › Plugins › Sample), open the Sample tool window: its empty state reads "Runs a
+short demo activity in the background."; View Mode › Float and then Window change the sentence to "This tool window has
+a window of its own. It runs a short demo activity in the background." in the same view (the button keeps its place),
+and Docked, Move to and dragging its button or header out and back change it as they move the tool window; a move within
+its stripe or hiding it changes nothing; restart with the Sample in a Float window: it opens with the own-window
+sentence. With the SFTP tool window in a Window behind a child window, its browse of a pane in that child window brings
+the SFTP window forward and leaves the main window where it is.
+
+Merged with `main` on 2026-10-26 (93 commits, among them SDK 0.22.0 for the Buddy plugin input): the placement members
+(`PanelMode`, `PanelPlacement`, `PanelHost.placement()`/`onPlacement`, `FakePluginHost.placePanel`) are `@since 0.22.0`.
+
+**Buddy integration — 2026-10-25:** merged tab-aware bubbles and the stand-up animation with current `main`,
+including Linux translucent rendering and Desktop colors. Resolved the status-log overlap by retaining both histories;
+production code merged cleanly. Full headless `check` with Python 3.13 passed in 8m 17s. No push.
+
+**Buddy stand-up — 2026-10-24** (`codex/buddy-stand-up`, base `c4dda9b0b`; not merged or pushed):
+Buddy finishes typing with a 500 ms hand-rest, laptop-close/lower and rise sequence. Renewed work interrupts
+immediately; repeated intent and attention keep the phase deadline, and idle timing starts at standing completion.
+Three appended poses preserve the original twenty cells; the 23-frame master/runtime strip verifies pixel-exactly.
+The [plan](superpowers/plans/2026-10-24-buddy-stand-up.md) records the implementation-body planning deviation.
+Task 1 (`b36aa2833`) passed review. Task 2 adds clock-explicit intent, timer rescheduling and arithmetic typing
+catch-up, with 29 animator tests and normal/interrupted production-sprite GIF/contact previews. Full check exposed
+the splash's exact old strip-width guard: it now validates complete cells and the pose columns it uses, a scoped
+integration deviation covered by 30 focused bootstrap/splash tests. First full run: 12,872 tests, three splash
+failures, zero errors, 29 skips; after the compatibility fix, the full headless rerun passed in 7m 39s:
+12,874 tests, zero failures/errors, 29 skips (173 Buddy tests). Task and whole-branch reviews passed; the final documentation-count correction was verified.
+User GUI acceptance remains pending: finish the last running command, watch standing, then begin new work mid-rise.
+No GUI, benchmark, AOT, push or merge.
+
+**Tab-aware Buddy — 2026-10-24** (`codex/buddy-tab-awareness`, base `f8aa4bca6`; not merged or pushed):
+terminal notices follow their current parent tab's strip title, pane title and membership. The selected tab of an
+active, showing, non-minimized workspace window suppresses all its terminal entries, retaining command lifetime,
+elapsed time and dismissal; hidden work appears immediately and qualified hidden work still drives typing.
+Multiple running panes form a stack with exact counts and at most two backing silhouettes; its filtered drawer
+activates individual panes and clears only displayed entries. Plugins keep their existing ungrouped SDK path.
+The [plan](superpowers/plans/2026-10-24-buddy-tab-awareness.md) reused the dedicated checkout and delegated detailed
+implementation bodies rather than providing complete code. Task 2's overlapping Gradle result writes invalidated
+its broad run; the serialized final check replaces it. Tasks 1–3 passed task review, including the shrinking-drawer
+scroll fix. `./gradlew check --continue` with the installed uv Python 3.13 passed in 7m 50s: 12,865 tests,
+zero failures/errors, 29 skips. Existing compiler and ByteBuddy 1.18.3 JDK Unsafe deprecation warnings remain.
+Whole-branch review found no actionable issues. User GUI acceptance remains pending: titled program, tab/window switching, split-tab expansion,
+pane activation and tab moves. Stand-up animation is a separate deliverable. No GUI, benchmark or AOT run.
+
+**Shared display scaling — 2026-10-24** (`codex/shared-display-scaling`; merged into `main` for Linux testing): terminal fonts,
+initial window geometry and pane padding follow FlatLaf's user scale while font settings and per-pane zoom stay in
+logical points (6–72, with rendered sizes allowed above 72). Scale changes refit the existing PTY and closing a pane
+releases its observer. Enterprise family-only UI font changes retain the desktop font size used for scale derivation.
+The [plan](superpowers/plans/2026-10-24-shared-display-scaling.md) left the precise control fix to investigation, a
+deviation from the complete-code planning convention. Independent task and whole-branch reviews found no issues;
+focused and fresh 1.25/1.5/2 scale checks passed. `./gradlew check --continue` with Python 3.13 passed: 12,847 tests,
+zero failures/errors, 29 skips. The first run found the corrected source-inventory omission for the two new app tests.
+Native GNOME Wayland and KDE acceptance remains pending. No GUI or AOT run.
+
+**Buddy translucent Linux rendering — 2026-10-24** (`codex/buddy-wayland-rendering`; Ubuntu fix verified by the user, approved for merge):
+all four Buddy windows compose complete frames in reusable device-resolution ARGB buffers, then replace native
+pixels in one clipped blit. This avoids X11 Swing's opaque backbuffer and the native background clear between
+frames. Headless pixel tests cover transparency, old-frame erasure, clipping, resize, disposal and 1×, 2× and
+1.25× scaling; `:jasper-buddy:test` passed (162 tests, zero failures, errors or skips). Full `check` passed with
+Python 3.12.14: **12,850 tests, zero failures/errors, 29 skipped**. Task and whole-branch reviews approved. The [plan](superpowers/plans/2026-10-24-buddy-wayland-rendering.md) records the implementation;
+its scope grew by one architecture-guide sentence. The user confirmed on Ubuntu GNOME Wayland that the black box
+and flickering are gone (2026-10-24). Dragging, repeated hide/show, menu/drawer and display scaling remain unrecorded.
+
+**Floating tool windows, plan 2: drag a tool window out — 2026-10-23** (`claude/floating-tool-windows`, worktree
+`.claude/worktrees/workspace-tabs`, `67a7a0c5a..12f936f60` and the final review's documentation commit, on plan 1's
+branch; not merged or pushed; [plan](superpowers/plans/2026-10-23-floating-2-drag-out.md),
+[spec](superpowers/specs/2026-10-23-jasper-floating-tool-windows-design.md), "The drag out"; executed with per-task
+subagents and reviews). Releasing a dragged rail button, labelled stripe tab, bottom strip tab or docked header outside
+the main window, or over another of Jasper's windows in front of it, opens the tool window in a Float window there. What
+landed, in task order:
+1. `DockDrag` tracks the pointer on screen. Outside the window's frame (its title bar included), or where `covered` says
+   another window is in front, the target is Detach (`detaching()`): no stripe gap, guide or ghost, and a `TabDragLabel`
+   with the tool window's title and icon follows the pointer; moving back resolves a target and hides the label. A
+   release there calls `onDetach(id, Detach(screen, grab))`, where the grab is the press point in the dragged surface
+   (the header, for a press anywhere in a header); Esc, another press, the window deactivating and `cancel()` end the
+   drag without it, outside too; a release inside on no target still drops nothing. A stripe drop of a detached window
+   previews no frame, as a hidden one's (`f26c98276`).
+2. `WindowContributions.detachDropped` detaches the tool window as Float, or in the mode it has, at
+   `DetachedToolWindows.droppedBounds` and activates it: the size is `initialBounds`'s rule (the bounds it last had,
+   else its docked frame's, else its landing size, at least 240 by 160 scaled), the grab, clamped into the window, puts
+   the window's corner that far from the pointer (its native title bar not counted), and the window is fitted to the
+   display under the pointer. A hidden tool window shows; one dragged out again moves its window and keeps its mode;
+   dropped on a stripe it stays detached and its button moves; dropped on the workspace it docks (`c98ef7e9d`).
+3. Over a child window or another main window that came to the front after the dragged one, the target is Detach too:
+   `TabDrag.behind` (beside `covers`, which the tab drag keeps as it was) is what `DockDrag.covered` asks (`f74ac4b49`).
+4. Review fix: the display is the one whose whole bounds hold the pointer, then the window is fitted to its usable part,
+   so a release over a menu bar, Dock or taskbar lands on that display, not the default one (`WindowPlacement.Display`,
+   `WindowFrame.displays()`, shared with plan 1's `initialBounds`) (`7e5abb606`).
+5. Final review fixes: a plain move or a press anywhere while a dock drag runs is a lost release, as `TabDrag` reads
+   one, and ends the drag and its label (an `AWTEventListener` added in `start`, removed in `finish`); a press on a
+   header's title, detail or labels holds the header (`surface`, the outermost of the id's drag surfaces), so the grab
+   no longer depends on which took the press; a release whose handling fails still ends the drag (`finish` in a
+   `finally`), and `start` puts the Esc dispatcher and the listener in place before anything shows. `WindowDragTest`'s
+   badge test drags in one window at a time, since a press in the other window now ends the first drag (`12f936f60`).
+Documentation: [Float and Window](workspace.md#float-and-window) and
+[Moving and resizing](workspace.md#moving-and-resizing), the `workspace` row of the [architecture](app-architecture.md),
+the dock recipes in [app maintenance](app-maintenance.md) (the Detach paragraph and the focused test command), and the
+plan's status banner; the `migration.csv` row for `DockDragDetachTest` came with Task 1.
+
+Rulings (each costs what its last words say if wrong):
+- A detach drop activates the new window (raised, the keyboard in its frame), as View Mode from a menu does: a drop is a
+  user gesture, which plan 1's entry left to this plan (a focus change if the user wanted the main window to keep it).
+- Over another of Jasper's workspace windows in front, not only the outside, is Detach, as the spec says; the tab drag's
+  activation order decides "in front" (a small `TabDrag` extension).
+- `DockDrag.frameOnScreen` walks up to the native `Window` (a stand-in's outermost component for a headless test) instead
+  of `SwingUtilities.getRoot`, which returns null for the stand-in in JDK 25, as `TabDrag` does (a second copy of
+  `TabDrag.outermost`'s walk).
+- The label shows the tool window's title, from a new `DockDrag.titles` wired in `WindowContributions`, not the stripe
+  label, which carries "N: " under labelled stripes; its icon is the drag's ghost, the stripe-sized one (one more hook).
+- The display is picked by whole bounds, then fitted to the usable part (the review's Important finding; the first cut
+  used usable bounds, so a drop over a menu bar landed on the default display) (`WindowPlacement.Display`, a record of
+  both bounds, through `WindowFrame`, `DetachedToolWindows` and their tests).
+- Final review: the dock drag ends on a lost release as the tab drag does (a plain move or a press anywhere), so its
+  always-on-top label cannot stay on screen (a drag ended by a stray plain move, which Swing does not send while the
+  button is held).
+- Final review: the grab is the header's wherever in it the press landed, and the window's outer corner is placed by it,
+  so its title bar is not counted; the guide says the window opens near the pointer (a window that opens a title bar's
+  height off the press point).
+
+Deferred, worth knowing:
+- The dock drag's own label window is not excluded from `TabDrag`'s other-windows list; its 8 px offset keeps it from
+  ever covering the pointer.
+- `frameOnScreen` repeats `TabDrag.outermost`; `released` runs `update` again, which can create and dispose the label
+  window in one turn, and the label window is recreated on each edge crossing; `icons`, `labels` and `titles` are three
+  parallel `Function` hooks.
+- Not tested: returning to the home square after leaving the window, `cancel()` or the window closing with the label
+  showing, `behind` over a minimised or hidden window or on another display, `droppedBounds` with no display known, and
+  `initialBounds`'s new display pick on its own. `behind`'s second clause is tested for ordering only; in a real drag the
+  pressed window was just activated, so it rarely fires.
+- Not built: the SDK's `PanelHost.placement()` and `onPlacement`, the testkit and the Sample plugin
+  ([SDK placement](superpowers/plans/2026-10-23-floating-3-sdk-placement.md)); `docs/sdk-architecture.md` waits for it.
+
+Check: `./gradlew check --continue` (BUILD SUCCESSFUL in 10m 20s; the Buddy, SDK, testkit and plugin tests and
+`checkThemeTool` were up to date): **12,968 tests, 0 failures, 0 errors, 29 skipped** (this run's XML holds 5,941, from
+`:jasper-app`, `:jasper-terminal` and `:jasper-ui`; the up-to-date tasks' results are the other 7,027). The plan's new
+test class is `DockDragDetachTest` (16 cases); `DetachedToolWindowsTest`, `DetachedShortcutsTest` and `WindowManagerTest`
+only took the new display record. After the final review's fixes, `./gradlew verifyApplicationArchitecture
+:jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests '*AppDocumentationTest' --tests
+'*ThemeMigrationCoverageTest'` (BUILD SUCCESSFUL): **1,373 tests in 161 classes, 0 failures, 0 errors, 11 skipped**,
+`DockDragDetachTest` now 22 cases; no full check was run. GUI checks for the user, none run (no window was launched), on
+each platform in the default look, and for the labelled stripes and the bottom strip in the Enterprise look:
+- All: drag a rail button, a labelled stripe tab (Enterprise), the bottom strip's tab (Enterprise) and a docked tool
+  window's header (shown) out of the main window and release: a Float window opens at the pointer, the point you
+  pressed about its title bar's height below it, focused and above the main window; a hidden tool window shows in it;
+  its button stays on its stripe, highlighted.
+- All: while the pointer is outside, the stripes' gap and the outline are gone and a label with the tool window's title and
+  icon follows the pointer; moving back over the window brings the gap and the outline back and the label goes; Escape,
+  a right click, or another application coming to the front while outside cancels with nothing opened.
+- All: drag out a button whose tool window already has a window: it moves there and Window stays Window; released on a
+  rail it stays detached and its button moves; released over the workspace near an edge it docks there.
+- All, two displays: release on the second display, near its corner (the window lies wholly on that display) and over its
+  menu bar (macOS) or taskbar (Windows, Linux), which should open it on that display, not the first.
+- All: a release over Settings, over a Float tool window and over a child window that overlap the main window detaches
+  (the child activated after the main window; with the main window activated last the same point drops as before).
+- macOS (in the packaged Jasper.app): the label over the Dock and the menu bar, and a release there; the Float above the
+  main window after the drop. Windows: the label over the taskbar and a release there. Linux (x64 and aarch64): the label
+  (an override-redirect window on X11) and the window manager's placement of the Float.
+- macOS full screen: on a single display a full-screen main window has no outside, so only a release over another of
+  Jasper's windows in front of it (Settings, a Float tool window) detaches; with two displays, a release on the second
+  opens the Float, owned by the full-screen main window, on that display (where it shows and whether it stays above).
+
+**Floating tool windows, plan 1: Float and Window — 2026-10-23** (`claude/floating-tool-windows`, worktree
+`.claude/worktrees/workspace-tabs`, `6cef314c3..2a5f0d62e` and the documentation commit, from `main` at `5db3524b4`; not
+merged or pushed; [plan](superpowers/plans/2026-10-23-floating-1-detached-tool-windows.md),
+[spec](superpowers/specs/2026-10-23-jasper-floating-tool-windows-design.md), written without a question round at the
+user's request, "it should behave like IntelliJ"; executed with per-task subagents and reviews). A tool window can have a
+window of its own, in IntelliJ's two modes: **Float** (a modeless dialog owned by the main window) and **Window** (an
+ordinary frame). The Options button is the vertical ellipsis ⋮ in every header (native, flush strip and borrowed kit
+header), and its menu, like the stripe button's right-click menu, is **View Mode** › Docked, Float, Window, **Move to** ›
+the six places, **Hide**. What landed, in task order:
+1. `dev.jasper.app.dock.ToolWindowMode` and `DockState`'s mode and window bounds per id (`detach`, `setMode`,
+   `setBounds`; a detached id keeps its slot and is never its slot's active window; `Change.placed` names the ids whose
+   slot or mode changed) (`f9b5d4758`); `UiState` keeps `mode` (written only when detached) and `window = { x, y, width,
+   height }` per panel, per look (`a6ab38e5c`).
+2. The menu and the glyph (`20d020b50`, `1fd7b238a`); `ToolWindowArea` mounts a detached tool window's frame outside
+   itself, releasing every stale frame before any new one mounts (`0e277bdf4`).
+3. `DetachedToolWindows` keeps one window per shown detached tool window in line with the dock through `Shell`s, at the
+   bounds the dock holds (first bounds: where the docked frame was, or centred on the main window when it was hidden),
+   kept on today's displays by `WindowPlacement.restore`'s rule at every opening; a restored one opens after the main
+   window shows (`491878164`). The stripe button stays and a click toggles it; Zen hides detached windows with the docked
+   ones and brings them back; a child window's request raises the detached window instead of the main window
+   (`1e1ef5af1`, `af1b90e6e`). Jasper's shortcuts work in a detached window, the panel's own included; Close Pane, Close
+   Tab and Close Window there hide the tool window and close nothing of the main window; other window-level actions
+   bring the main window forward (`0c8776856`).
+4. `DetachedFrame`, the native window (never built headless): Float's `JDialog` and Window's `JFrame`, with the
+   auxiliary windows' title bars (`MacTitleBar` or `MacTitleBand`, FlatLaf's title pane), the theme, and on macOS with
+   the screen menu bar a Window's File › Close Window (`2e223733a`); a show never takes the focus, and View Mode › Float
+   or Window from a menu does (`d1d8db2f3`, `2a5f0d62e`).
+Documentation: [Float and Window](workspace.md#float-and-window), the menus and header, the keys in
+[configuration](configuration.md#ui-statetoml), the `dock` and `workspace` rows of the
+[architecture](app-architecture.md), plugin authoring's Options menu line, and the plan's status banner; the
+`migration.csv` rows came with their tasks.
+
+Rulings (the spec's own, such as Move to on a detached window docking it, opaque windows and Zen hiding them, stand;
+each below costs what its last words say if wrong):
+- Stripe click: a click toggles (shown hides, hidden shows, raises and focuses), as for a docked one. The spec's "hide
+  only when its window is active" could never hide from the stripe, because a click makes the main window the active
+  one; the cost is a second click to raise a buried window from the stripe (View › Tool Windows and `<id>.toggle`
+  still raise a shown window that is not the active one, and hide the one that is). Spec amended (`df1625825`).
+- Focus: a show never takes the focus (`setAutoRequestFocus(false)` around `setVisible`), so a restore, Zen's return or a
+  plugin's plain `show` leaves the terminal focused, as IntelliJ activates a tool window only when it is activated; only
+  an activating request focuses (one more click for a window opened by a non-activating path). View Mode › Float or
+  Window from a menu activates the window, as IntelliJ keeps a tool window active through a view-mode change (a focus
+  change the user may not have wanted). Spec amended (`acaac9e7c`).
+- Move to on a detached tool window's own, checked slot docks it there too (a menu item that behaves differently for a
+  detached window).
+- Close keys: in a detached window they hide the tool window only when the stroke resolves to that close action from the
+  focus owner; a panel's own action on the same keys runs instead, as when docked (a panel can shadow ⌘W in its window).
+  While the main window's modal overlay is open a detached window swallows every key but Close.
+- The ⋮ glyph is drawn as a vector in the strip's ink in `IconRegistry` (a flush strip paints every action in one ink,
+  and the authored grey would break `HeaderStripTest`; other contexts keep authored art; a jasper-ui revert if the grey
+  is preferred).
+- `frameOnScreen` is the framed surface inside the gutters (what the user sees), not the host's outer bounds, so a window
+  opened there matches the frame.
+- `Shell` has a sixth component, `content`, and `ToolWindowArea` an `onRemounted`, so an open window takes a kit view's
+  remounted frame (a replaced borrowed header).
+- `initialBounds` lives on `DetachedToolWindows`; `WindowFrame.usableDisplays()` is extracted for it; `syncPanels` saves
+  once before it removes the panels whose plugin left, because a window's moves fire no dock change and its last bounds
+  must survive; `DetachedToolWindows.sync` is hardened against a nested sync.
+- `DetachedFrame.shells(ThemeController, WindowLook)` is a public static factory, because a lambda over the
+  package-private records does not compile across packages; it copies the few `NativeShells` lines it needs instead of
+  importing `dev.jasper.app.windows`, so the package graph is unchanged.
+- Task 9 also updates `configuration.md` (the reviewer found its `[panels."<id>"]` key list would go stale) and
+  `plugin-authoring.md`'s Options menu line.
+
+Deferred, worth knowing:
+- Not built: dragging a tool window out of the window (plan 2,
+  [drag out](superpowers/plans/2026-10-23-floating-2-drag-out.md)) and the SDK's `PanelHost.placement()` and `onPlacement`, the testkit and the Sample plugin
+  ([SDK placement](superpowers/plans/2026-10-23-floating-3-sdk-placement.md)); until then a detached window comes from
+  the menus alone and no plugin hears of it. `docs/sdk-architecture.md` waits for them.
+- A press inside a detached flush frame does not reach `ToolWindowArea.pressed`; focus marking follows the real focus
+  owner. A drop that detaches (plan 2) is a user gesture and must activate the window, as the menu does.
+- A focused scroll pane or table in a detached window can take Ctrl+PageUp/Down (and Ctrl+Tab on Linux and Windows)
+  before the root binding; a disabled panel action on a Close stroke lets the key through, which on macOS could reach the
+  owner's Close Pane.
+- A detached tool window saved as showing whose window has not opened yet toggles to hidden on a click instead of
+  raising; a plain `SHOW` or `TOGGLE` routed from a child window raises nothing for an open detached window.
+- A window's title is fixed when it opens; a maximised Window reopens at its normal bounds; under Enterprise's classic
+  title bar a Float on macOS gets IntelliJ Classic's band, not the system bar auxiliary dialogs keep; the unified bar's
+  controls follow the chrome's darkness (`NativeShells`' rule) where `mountChild` uses `TitleBarTheme`; ⌘W resolves to
+  Close Pane, which hides the tool window before File › Close Window's item can fire.
+- `ToolWindowArea` is 930 lines and `DetachedToolWindowsTest` 1,020.
+
+Check: `./gradlew check --continue` (BUILD SUCCESSFUL in 18m 59s; `:jasper-buddy:test` and `checkThemeTool` were up to
+date): **12,946 tests, 0 failures, 0 errors, 29 skipped** (this run's XML holds 12,792; the up-to-date Buddy tests are
+the other 154). The branch's new test classes: `DockStateDetachTest` 25, `ToolWindowAreaDetachedTest` 16,
+`DetachedToolWindowsTest` 34 and `DetachedShortcutsTest` 10, with added cases in `UiStateTest`, the header, stripe and
+menu tests and `WindowManagerTest`. GUI checks for the user, none run (no window was launched), on
+each platform in the default and the Enterprise look:
+- All: View Mode › Float and Window from the header's ⋮, the rail button's right-click and an Enterprise stripe's; the ⋮
+  in every header (native, flush strip, a kit panel's borrowed header); the window opens where the frame was, with the
+  tool window's title and its header; Docked returns it to its place on the stripe, showing there if it was showing.
+- All: Float stays above the main window, has no taskbar entry and minimises, restores and closes with it; Window can go
+  behind the main window and has its own entry; neither shrinks below about 240 by 160.
+- All: the close button hides it and a stripe click brings it back where it was, and a second click hides it; with the
+  window behind the main one, View › Tool Windows and the toggle shortcut raise it, and pressed in it hide it; Move to
+  on it docks it; the main window minimised, a stripe click shows a Float with its owner restored.
+- All: restart restores mode, bounds and visibility, and the terminal keeps the focus when a detached window comes back
+  at start-up, after leaving Zen or from a plugin's plain `show`; a window saved on a display that is gone opens on a
+  connected one, with two displays; a maximised Window reopens at its normal size.
+- All: in the window, the palette and New Tab act on the main window and bring it forward, the Close Pane key hides the
+  window, and the tool window's own shortcuts run; Zen hides detached windows and brings them back; a theme switch
+  (dark and light, and a theme with its own title bar colours) reaches the window, its header and its panel.
+- Enterprise: the header strip shows the focus in the window; View Mode › Docked over another docked window keeps the
+  focus in the docked frame; classic title bar (the 28 px bar on Windows and Linux, the band on macOS).
+- macOS (in the packaged Jasper.app): a unified bar, Float on the dialog row and Window on the window row, with the
+  traffic lights placed and the bar's light or dark following the theme, active and inactive; Window mode's screen menu
+  bar shows File › Close Window and a Float keeps the main window's menus; ⌘W hides the tool window; full screen of a
+  Window.
+- Windows: FlatLaf's title pane in the theme's colours, Enterprise's 28 px bar with the title dimmed while inactive;
+  snap and Aero in Window mode; Ctrl+W hides the tool window.
+- Linux (x64 and aarch64): FlatLaf's title pane where it decorates the window, else the system's; the window manager's
+  placement of the Float (transient for the main window); a restored Float takes no focus at start-up (X11).
 
 **Editor Color scheme setting — 2026-10-23** (`claude/editor-color-scheme`, worktree
 `.claude/worktrees/editor-color-scheme`, from local `main` at `f30067a2d`; not merged or pushed): the Editor's

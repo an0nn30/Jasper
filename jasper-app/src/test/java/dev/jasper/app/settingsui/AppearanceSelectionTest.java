@@ -24,7 +24,9 @@ class AppearanceSelectionTest {
             new InstalledThemes.ThemeOption("jasper-meadow", "Jasper Meadow", MEADOW)),
         InstalledThemes.slateCobalt(DARK, LIGHT).schemes(), java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "jasper-meadow", "Jasper Meadow"));
 
-    static SettingsDraft draft(String config) { return new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values()); }
+    static SettingsDraft draft(String config) { return new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values(),
+        new dev.jasper.app.config.DefaultSource(java.util.Map.of(CoreSettings.UI_THEME_DARK, "jasper-meadow",
+            CoreSettings.UI_THEME_LIGHT, "jasper-meadow"))); }
     static AppearanceSelection editor(SettingsDraft draft) {
         return new AppearanceSelection(new AppearanceChoices(100f, false, () -> Optional.of(false),
             ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> THEMES, Optional.empty()), PageKit.context(draft, id -> { }, () -> { }));
@@ -71,7 +73,7 @@ class AppearanceSelectionTest {
             .as("Ocean has no Light variant").isFalse();
         var reset = (Nodes.Button) ((Nodes.Stack) ((Nodes.SettingRow) parts(editor).get(1)).control()).children().get(1);
         assertThat(reset.state().visible()).isTrue();
-        assertThat(editor.relatedSettings()).containsExactly(CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT);
+        assertThat(editor.relatedSettings()).containsExactly(CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT, CoreSettings.UI_THEME_DESKTOP_SOURCE);
     }
 
     @Test void aSavedPickIsKeptAsSavedAndOneThatIsNotInstalledIsShownAsSuch() {
@@ -120,7 +122,7 @@ class AppearanceSelectionTest {
         var specs = CorePages.specs(AppearanceChoices.of(DARK, LIGHT), system, ShellChoices.NONE, ignored -> { }, false);
         var appearance = specs.getFirst();
         assertThat(appearance.settings()).startsWith(CoreSettings.UI_APPEARANCE, CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT,
-            CoreSettings.TERMINAL_SCHEME);
+            CoreSettings.UI_THEME_DESKTOP_SOURCE, CoreSettings.TERMINAL_SCHEME);
     }
 
     /** Spec 5.8: under a kit default, the untouched pick is the kit's; picking the core default saves it explicitly. */

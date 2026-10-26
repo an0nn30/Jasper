@@ -12,11 +12,13 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.testsupport.IdleTerminalSession;
+import java.awt.Rectangle;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -66,6 +68,28 @@ class WindowManagerTest {
                 if (failClosing) throw new IllegalStateException("closing failed");
             },
             () -> closings.add("closing all"))));
+    }
+
+    @Test void buddyWatchesOnlyShowingNonIconifiedWindowsEvenBeforeDeactivation() throws Exception {
+        edt(() -> {
+            var window = manager.ensureMain("cold", null).orElseThrow();
+            var presentations = new ArrayList<WorkspaceActivity.Presentation>();
+            window.content().activity(event -> {
+                if (event instanceof WorkspaceActivity.Presentation value) presentations.add(value);
+            });
+            window.events().activated().accept(true);
+            window.events().state().accept(true, false);
+            assertThat(presentations.getLast().watched()).isTrue();
+            window.events().state().accept(true, true);
+            assertThat(window.content().isActiveAndOpen()).isTrue();
+            assertThat(presentations.getLast().watched()).isFalse();
+            window.events().state().accept(true, false);
+            assertThat(presentations.getLast().watched()).isTrue();
+            window.events().state().accept(false, false);
+            assertThat(presentations.getLast().watched()).isFalse();
+            window.events().state().accept(true, false);
+            assertThat(presentations.getLast().watched()).isTrue();
+        });
     }
 
     @AfterEach void cleanup() throws Exception {
@@ -448,6 +472,94 @@ class WindowManagerTest {
             assertThat(main.content().dock().visible("test.panel")).as("a routed toggle never hides").isTrue();
             assertThat(main.content().area().focusedSlot()).hasValue(Slot.LEFT_TOP);
             assertThat(events).containsExactly("front main");
+        });
+        launch();
+    }
+
+    /**
+     * A child window's request for a tool window detached into a window of its own raises that window, not the main window:
+     * the request reaches the main window as an activating show, which the window's own shell raises.
+     */
+    @Test void aChildWindowsRequestForADetachedPanelRaisesItsWindowNotTheMainWindow() throws Exception {
+        edt(() -> {
+            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
+            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
+            MainWindow main = manager.main().orElseThrow();
+            var windows = main.content().detachedWindows();
+            windows.ready = () -> true;
+            var screen = new Rectangle(0, 0, 1920, 1080);
+            windows.displays = () -> List.of(new WindowPlacement.Display(screen, screen));
+            main.content().detachedShells((opening, heard) -> new DetachedToolWindows.Shell(() -> events.add("show panel window"),
+                () -> events.add("front panel window"), () -> events.add("dispose panel window"), () -> false, bounds -> { }, frame -> { }));
+            main.content().dock().setBounds("test.panel", new Rectangle(100, 100, 400, 300));
+            main.content().dock().setMode("test.panel", ToolWindowMode.FLOAT);
+            assertThat(main.content().panelDetached("test.panel")).as("detached while it is hidden").isTrue();
+            List<Contributions.PanelRequest> heard = new ArrayList<>();
+            var probe = model.onPanelRequest(heard::add);
+            try {
+                events.clear();
+                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
+                assertThat(heard).containsExactly(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+                assertThat(main.content().dock().visible("test.panel")).isTrue();
+                assertThat(events).as("its own window opens and comes forward; the main window does not").containsExactly("show panel window", "front panel window");
+
+                events.clear();
+                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
+                assertThat(main.content().dock().visible("test.panel")).as("a routed toggle never hides").isTrue();
+                assertThat(events).as("raised again").containsExactly("front panel window");
+
+                events.clear();
+                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.HIDE));
+                assertThat(events).containsExactly("dispose panel window");
+                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
+                assertThat(main.content().dock().visible("test.panel")).isTrue();
+                assertThat(events).as("a plain toggle shows its window and fronts no main window").doesNotContain("front main");
+            } finally { probe.close(); }
+        });
+        launch();
+    }
+
+    /**
+     * Floating tool windows plan 3's final review: a child window's plain toggle or show of a tool window whose own window
+     * is open raises that window, as its activating toggle does, and leaves the main window where it is.
+     */
+    @Test void aChildWindowsPlainToggleOfAnOpenDetachedPanelRaisesItsWindow() throws Exception {
+        edt(() -> {
+            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
+            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
+            MainWindow main = manager.main().orElseThrow();
+            var windows = main.content().detachedWindows();
+            windows.ready = () -> true;
+            var screen = new Rectangle(0, 0, 1920, 1080);
+            windows.displays = () -> List.of(new WindowPlacement.Display(screen, screen));
+            main.content().detachedShells((opening, heard) -> new DetachedToolWindows.Shell(() -> events.add("show panel window"),
+                () -> events.add("front panel window"), () -> events.add("dispose panel window"), () -> false, bounds -> { }, frame -> { }));
+            main.content().dock().setBounds("test.panel", new Rectangle(100, 100, 400, 300));
+            main.content().dock().setMode("test.panel", ToolWindowMode.WINDOW);
+            model.requestPanel(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
+            assertThat(events).as("its own window is open").contains("show panel window");
+            List<Contributions.PanelRequest> heard = new ArrayList<>();
+            var probe = model.onPanelRequest(heard::add);
+            try {
+                events.clear();
+                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
+                assertThat(heard).as("routed as an activating show")
+                    .containsExactly(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_SHOW));
+                assertThat(main.content().dock().visible("test.panel")).as("a routed toggle never hides").isTrue();
+                assertThat(events).as("its own window comes forward; the main window does not").containsExactly("front panel window");
+
+                events.clear();
+                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
+                assertThat(events).as("a plain show raises it too").containsExactly("front panel window");
+
+                events.clear();
+                heard.clear();
+                main.content().dock().setMode("test.panel", ToolWindowMode.DOCKED);
+                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
+                assertThat(heard).as("docked, a plain toggle stays a plain show")
+                    .containsExactly(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
+                assertThat(events).containsExactly("dispose panel window", "front main");
+            } finally { probe.close(); }
         });
         launch();
     }

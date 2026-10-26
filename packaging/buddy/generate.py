@@ -15,7 +15,8 @@ ASE = HERE / "jasper-buddy.ase"
 W, H = 84, 96
 FRAMES = ["idle", "blink", "wink", "wave_a", "wave_b", "hop", "lean_left", "lean_right",
           "sit", "sit_blink", "tuck", "sleep_a", "sleep_b", "sleep_c",
-          "sparkle_a", "sparkle_b", "sparkle_c", "type_a", "type_b", "type_rest"]
+          "sparkle_a", "sparkle_b", "sparkle_c", "type_a", "type_b", "type_rest",
+          "close_laptop", "lower_laptop", "rise"]
 
 def string(text):
     raw = text.encode("utf-8")

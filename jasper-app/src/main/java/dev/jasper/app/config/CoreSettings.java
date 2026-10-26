@@ -157,6 +157,15 @@ public final class CoreSettings {
         .label("Shell integration").keywords("integration", "prompt marks", "osc 133", "zsh", "bash", "fish").applies(Applies.NEW_PANES)
         .description("Shell integration: \"auto\" loads Jasper's zsh/bash/fish script after your own startup files (new panes only),\n"
             + "\"manual\" only exports JASPER_SHELL_INTEGRATION so you can source it yourself, \"off\" does neither.").build();
+    public static final Setting<String> TERMINAL_TAB_NAME = Setting.of("terminal.tab_name",
+            SettingKind.string(TabNames::valid,
+                "Use 1 to 200 characters, with pieces such as {dir}, {full}, {process} and {title}, and {{ or }} for a brace; using the default."),
+            TabNames.DEFAULT)
+        .label("Tab name").keywords("tab", "title", "name", "format", "pattern", "folder", "directory", "process")
+        .description("Live. How Terminal tabs are named: free text with pieces in braces. {dir} is the current folder's name,\n"
+            + "{full} its whole path, {process} the running program and {title} the title the shell or a program set;\n"
+            + "plugins add their own, such as Remote's {host}. A piece without a value shows nothing and takes the text\n"
+            + "before it along, or the text after it when no piece before it shows. A tab named with Rename Tab keeps its name.").build();
     public static final Setting<String> TERMINAL_FONT_FAMILY = Setting.of("terminal.font.family",
             SettingKind.string(CoreSettings::fontName, FONT_NAME), FontConfig.defaults().family())
         .alias("font.family").label("Font").keywords("font", "typeface", "family")
@@ -233,24 +242,35 @@ public final class CoreSettings {
             Map.entry("system", AppearanceMode.SYSTEM), Map.entry("dark", AppearanceMode.DARK), Map.entry("light", AppearanceMode.LIGHT))),
             AppearanceMode.SYSTEM)
         .label("Appearance").keywords("appearance", "theme", "dark", "light", "system", "slate cobalt", "look")
-        .description("The UI appearance: \"system\" (the default) follows the macOS light or dark setting (Linux and Windows\n"
-            + "report none, so it shows Dark there); \"dark\" or \"light\" chooses one. [ui.theme] names the theme each shows.\n"
+        .description("The UI appearance: \"system\" (the default) follows macOS or the Linux desktop portal;\n"
+            + "when unavailable, it shows Dark. \"dark\" or \"light\" chooses one. [ui.theme] names the theme each shows.\n"
             + "Switches live across windows.").build();
+    static String interfaceThemeByDefault(String osName, String authoredDefault) {
+        return "Linux".equalsIgnoreCase(osName) ? "desktop-colors" : authoredDefault;
+    }
+
     static final String THEME_ID = "Use a theme id such as \"slate-cobalt\"; using the default.";
     public static final Setting<String> UI_THEME_DARK = Setting.of("ui.theme.dark",
-            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.DARK_DEFAULT_ID)
+            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID),
+            interfaceThemeByDefault(System.getProperty("os.name"), dev.jasper.ui.theme.JasperTheme.DARK_DEFAULT_ID))
         .label("Dark theme").keywords("theme", "dark", "appearance", "jasper meadow", "slate cobalt", "imported")
-        .description("The theme the Dark appearance shows: \"jasper-meadow\" (the default unless the look sets its own), the\n"
-            + "built-in \"ubuntu-yaru\" or a Catppuccin flavour such as \"catppuccin-mocha\", a theme a plugin ships, or an\n"
-            + "imported theme's id, its file name in the themes folder without .json. A theme without a Dark variant is\n"
-            + "reported and Jasper Meadow Dark is used. Switches live.").build();
+        .description("The theme the Dark appearance shows: \"desktop-colors\" by default on Linux, \"jasper-meadow\" elsewhere,\n"
+            + "unless the look sets its own default. Other choices include \"ubuntu-yaru\", a Catppuccin flavour,\n"
+            + "a theme a plugin ships, or an imported theme's id (its file name in the themes folder without .json).\n"
+            + "A theme without a Dark variant is reported and Jasper Meadow Dark is used. Switches live.").build();
     public static final Setting<String> UI_THEME_LIGHT = Setting.of("ui.theme.light",
-            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.LIGHT_DEFAULT_ID)
+            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID),
+            interfaceThemeByDefault(System.getProperty("os.name"), dev.jasper.ui.theme.JasperTheme.LIGHT_DEFAULT_ID))
         .label("Light theme").keywords("theme", "light", "appearance", "jasper meadow", "slate cobalt", "imported")
-        .description("The theme the Light appearance shows: \"jasper-meadow\" (the default unless the look sets its own), the\n"
-            + "built-in \"slate-cobalt\", \"ubuntu-yaru\" or \"catppuccin-latte\", a theme a plugin ships, or an imported\n"
-            + "theme's id, its file name in the themes folder without .json. A theme without a Light variant is\n"
-            + "reported and Jasper Meadow Light is used. Switches live.").build();
+        .description("The theme the Light appearance shows: \"desktop-colors\" by default on Linux, \"jasper-meadow\" elsewhere,\n"
+            + "unless the look sets its own default. Other choices include \"slate-cobalt\", \"ubuntu-yaru\",\n"
+            + "\"catppuccin-latte\", a theme a plugin ships, or an imported theme's id (its file name in the themes folder\n"
+            + "without .json). A theme without a Light variant is reported and Jasper Meadow Light is used. Switches live.").build();
+    public static final Setting<String> UI_THEME_DESKTOP_SOURCE = Setting.of("ui.theme.desktop_source", SettingKind.choice(List.of(
+            Map.entry("auto", "auto"), Map.entry("qt", "qt"), Map.entry("gtk3", "gtk3"), Map.entry("gtk4", "gtk4"))), "auto")
+        .label("Desktop color source").keywords("desktop", "theme", "qt", "kde", "gtk", "source")
+        .description("The source for Desktop colors on Linux: \"auto\" (the default), \"qt\", \"gtk3\" or \"gtk4\". Switches live.\n"
+            + "The saved source is retained on every platform.").build();
     static final String SCHEME_ID = "Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.";
     public static final Setting<String> TERMINAL_SCHEME = Setting.of("terminal.scheme",
             SettingKind.string(text -> TerminalSchemeChoice.parse(text).isPresent(), SCHEME_ID), TerminalSchemeChoice.MATCH.key())
@@ -274,9 +294,9 @@ public final class CoreSettings {
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT, WINDOW_MEMORY_INDICATOR,
             WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, NOTIFICATIONS_GROUPS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
-            TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
+            TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_TAB_NAME, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
-            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_THEME_DARK, UI_THEME_LIGHT, UI_FONT_FAMILY, UI_FONT_SIZE,
+            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_THEME_DARK, UI_THEME_LIGHT, UI_THEME_DESKTOP_SOURCE, UI_FONT_FAMILY, UI_FONT_SIZE,
             UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR, UI_ANIMATIONS_ENABLED),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(

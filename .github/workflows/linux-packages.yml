@@ -10,14 +10,20 @@ on:
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
+      - gradle/linux-desktop-colors.gradle
+      - jasper-app/build.gradle.kts
       - packaging/**
       - .github/workflows/linux-packages.yml
+      - .github/workflows/desktop-qt-sdk.yml
   pull_request:
     paths:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
+      - gradle/linux-desktop-colors.gradle
+      - jasper-app/build.gradle.kts
       - packaging/**
       - .github/workflows/linux-packages.yml
+      - .github/workflows/desktop-qt-sdk.yml
 
 permissions:
   contents: read
@@ -27,7 +33,22 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  desktop-sdk:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+    uses: ./.github/workflows/desktop-qt-sdk.yml
+    with:
+      runner: ${{ matrix.runner }}
+      architecture: ${{ matrix.arch }}
+
   package:
+    needs: desktop-sdk
     strategy:
       fail-fast: false
       matrix:
@@ -46,14 +67,28 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils g++
+          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils build-essential cmake pkg-config libglib2.0-dev libxtst6 libasound2
       - uses: actions/setup-java@v6
         with:
           distribution: jetbrains
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v6
-      - name: Package
-        run: ./gradlew :jasper-app:packageDist --stacktrace
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-qt-sdk-${{ matrix.arch }}
+      - name: Select baseline SDKs
+        run: |
+          tar -xzf desktop-qt-sdk.tar.gz
+          printf '\njasper.qt5Prefix=%s/.desktop-qt-sdk/prefixes/qt5\njasper.qt6Prefix=%s/.desktop-qt-sdk/prefixes/qt6\njasper.kf5Prefix=%s/.desktop-qt-sdk/prefixes/kf5\njasper.kde6QtPrefix=%s/.desktop-qt-sdk/prefixes/kde6-qt\njasper.kf6Prefix=%s/.desktop-qt-sdk/prefixes/kf6\n' "$PWD" "$PWD" "$PWD" "$PWD" "$PWD" >> gradle.properties
+      - name: Package and build native fixtures at baseline
+        run: ./gradlew :jasper-app:packageDist :jasper-app:compileDesktopQtNativeTests -Pjasper.python=/usr/bin/python3 --max-workers=2 --stacktrace
+      - name: Archive exact release helpers and matching native fixtures
+        run: tar -czf desktop-native-tests.tar.gz jasper-app/build/desktop-colors/cmake jasper-app/build/desktop-helpers
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-native-tests-${{ matrix.arch }}
+          path: desktop-native-tests.tar.gz
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
           name: jasper-linux-${{ matrix.arch }}
@@ -92,3 +127,28 @@ jobs:
           case "$DISTRO" in debian*|ubuntu*) type=deb ;; *) type=rpm ;; esac
           package=$(cd dist && ls ./*."$type")
           docker run --rm -v "$PWD:/work:ro" "$DISTRO" sh /work/packaging/linux/check-install.sh "/work/dist/${package#./}"
+
+  desktop-native-runtime:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, aarch64]
+        runtime: ['ubuntu:22.04', 'fedora:44']
+    runs-on: ${{ matrix.arch == 'x64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-native-tests-${{ matrix.arch }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: jasper-linux-${{ matrix.arch }}
+          path: jasper-dist
+      - name: Run exact baseline-built fixtures on installed system runtimes
+        env:
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          tar -xzf desktop-native-tests.tar.gz
+          docker run --rm -v "$PWD:$PWD" -w "$PWD" "$RUNTIME" sh packaging/desktop-colors/test/check-runtime.sh

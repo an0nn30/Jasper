@@ -73,6 +73,7 @@ EDITOR_REFERENCES = {
     "attribute": "terminal.ansi.yellow", "regex": "terminal.ansi.cyan", "error": "terminal.ansi.red",
 }
 # Import refuses a theme file with a built-in theme's id
+DESKTOP_COLORS_ID = "desktop-colors"
 BUILT_IN = ("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "jasper-meadow")
 KEY = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 HEX = re.compile(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?")
@@ -1165,6 +1166,11 @@ def write_results(results: list[tuple[str, Result]], args) -> int:
         file_name = slug(name)
         if not file_name:
             print(f"error: {name}: the name has no letters or digits for a file name; use --name", file=sys.stderr)
+            status = 1
+            continue
+        if file_name == DESKTOP_COLORS_ID:
+            print(f'error: {input_name}: "{file_name}" is reserved for Desktop colors; choose another name with --name',
+                  file=sys.stderr)
             status = 1
             continue
         if file_name in BUILT_IN:

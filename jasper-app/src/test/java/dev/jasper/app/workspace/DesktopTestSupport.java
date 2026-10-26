@@ -103,6 +103,11 @@ public final class DesktopTestSupport {
         OWNERS.add(owner);
         return owner;
     }
+    /** Whether {@code owner}'s detached tool windows have been given their native windows' shells; a child window has none. */
+    public static boolean detachedShells(WindowContent owner) {
+        DetachedToolWindows windows = owner.detachedWindows();
+        return windows != null && windows.shells != null;
+    }
     /** Closes the test windows now, on the EDT: before a test closes the theme controller its windows are bound to. */
     public static void closeOwnersNow() { OWNERS.forEach(WindowContent::close); OWNERS.clear(); }
     /** Closes {@code owner} with the other test windows. */

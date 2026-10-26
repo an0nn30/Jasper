@@ -25,6 +25,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import dev.jasper.app.terminals.PaneEntry;
+import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 
 /**
@@ -119,6 +120,7 @@ final class PluginHost {
     /** Runs cancellation handlers and connection closes off the EDT; outlives every plugin's own executor. */
     final CleanupWorker cleanup = new CleanupWorker();
     private final dev.jasper.app.lifecycle.Subscription terminalBridge;
+    private final dev.jasper.app.lifecycle.Subscription tabNameCleanup;
     private final dev.jasper.sdk.Subscription outcomes;
     final Containment containment;
     final PluginCommands commands;
@@ -148,6 +150,10 @@ final class PluginHost {
         this.activities = new ActivityHub(bus);
         this.connections = new ConnectionHub(bus);
         this.terminalBridge = TerminalBridge.connect(environment.terminals(), bus);
+        // A closed tab's plugin pieces go with it (tab names spec 6); a tab moving windows keeps them.
+        this.tabNameCleanup = environment.terminals().onEvent(event -> {
+            if (event instanceof TerminalEvent.TabClosed closed) environment.contributions().tabNamePieces().forget(closed.tabId());
+        });
         this.outcomes = bus.subscribe(EventBus.APP, Activities.TOPIC, this::outcome);
     }
 
@@ -227,6 +233,7 @@ final class PluginHost {
     List<CompletableFuture<?>> stop() {
         requireUi();
         terminalBridge.close();
+        tabNameCleanup.close();
         outcomes.close();
         List<CompletableFuture<?>> pending = new ArrayList<>();
         List<HostedContext> order = new ArrayList<>(contexts.values());

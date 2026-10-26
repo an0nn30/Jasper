@@ -18,6 +18,7 @@ import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.terminals.TerminalEvent;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import javax.swing.JPanel;
@@ -57,7 +58,26 @@ class MoveTabsTest {
             int[] focused = {0};
             active.focusTarget(() -> focused[0]++);
             windows.facts.clear();
+            var activity = new ArrayList<WorkspaceActivity.Event>();
+            content.activity(activity::add);
+            var oldActivation = activity.stream().filter(WorkspaceActivity.Presentation.class::isInstance)
+                .map(WorkspaceActivity.Presentation.class::cast)
+                .filter(value -> value.id().equals(((TerminalContent) active.content()).pane().id()))
+                .findFirst().orElseThrow().activate();
+            activity.clear();
             ChildWindow full = windows.manager.moveTabToNewWindow(content, first).orElseThrow();
+            var arrived = new ArrayList<WorkspaceActivity.Presentation>();
+            full.content().activity(event -> {
+                if (event instanceof WorkspaceActivity.Presentation value) arrived.add(value);
+            });
+            assertThat(arrived).hasSize(2).allSatisfy(value -> {
+                assertThat(value.groupId()).isEqualTo(first.value());
+                assertThat(value.groupTitle()).isEqualTo(full.content().tabTitle(active));
+            });
+            assertThat(activity).noneMatch(event -> event instanceof WorkspaceActivity.PaneState state
+                && state.state() == WorkspaceActivity.State.CLOSED);
+            oldActivation.run();
+            assertThat(full.content().selectedTab()).isSameAs(active);
             assertThat(full.content().windowLayout()).isEqualTo(ParentTabs.of(new ParentTab(first, before)));
             assertThat(full.content().selectedTab()).as("the tab's active item, shown").isSameAs(active);
             assertThat(focused[0]).as("the item has the focus in its new window").isPositive();

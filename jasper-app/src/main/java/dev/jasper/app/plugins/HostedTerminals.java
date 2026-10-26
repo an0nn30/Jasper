@@ -17,6 +17,8 @@ import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionState;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.TabHandle;
+import dev.jasper.sdk.terminal.TabNamePiece;
+import dev.jasper.sdk.terminal.TabNamePieceSpec;
 import dev.jasper.sdk.terminal.Terminals;
 import dev.jasper.sdk.terminal.WindowHandle;
 import java.nio.charset.StandardCharsets;
@@ -58,6 +60,9 @@ final class HostedTerminals implements Terminals {
     private final ShellContributions shellContributions;
     /** Live {@link #environment} registrations, closed with the plugin. UI thread. */
     private final List<dev.jasper.app.lifecycle.Subscription> environmentRegistrations = new ArrayList<>();
+    private final dev.jasper.app.contributions.TabNamePieces tabNamePieces;
+    /** Live {@link #addTabNamePiece} registrations, closed with the plugin. UI thread. */
+    private final List<dev.jasper.app.lifecycle.Subscription> namePieceRegistrations = new ArrayList<>();
 
     /** A view that lists no shell profiles, for tests that do not need them. */
     HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
@@ -74,9 +79,17 @@ final class HostedTerminals implements Terminals {
     HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
                     BooleanSupplier open, HostedSessions sessions, PluginRuntime.ShellProfiles shellProfiles, Containment containment,
                     ShellContributions shellContributions) {
+        this(pluginId, gate, registry, ui, onUi, open, sessions, shellProfiles, containment, shellContributions,
+            new dev.jasper.app.contributions.TabNamePieces());
+    }
+
+    /** As above; {@link #addTabNamePiece} registers into {@code tabNamePieces}, the host's. */
+    HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
+                    BooleanSupplier open, HostedSessions sessions, PluginRuntime.ShellProfiles shellProfiles, Containment containment,
+                    ShellContributions shellContributions, dev.jasper.app.contributions.TabNamePieces tabNamePieces) {
         this.pluginId = pluginId; this.gate = gate; this.registry = registry; this.ui = ui; this.onUi = onUi; this.open = open;
         this.sessions = sessions; this.shellProfiles = shellProfiles; this.containment = containment;
-        this.shellContributions = shellContributions;
+        this.shellContributions = shellContributions; this.tabNamePieces = tabNamePieces;
     }
 
     private void requireUi(String what) {
@@ -146,6 +159,16 @@ final class HostedTerminals implements Terminals {
             requireUi("title");
             entry().ifPresent(entry -> title = entry.title().get());
             return title;
+        }
+        @Override public Map<String, String> namePieces() {
+            gate.require(Capabilities.TERMINAL_OBSERVE);
+            requireUi("namePieces");
+            return entry().filter(entry -> entry.kind() == TabEntry.Kind.TERMINAL).map(entry -> {
+                var merged = new java.util.HashMap<>(tabNamePieces.values(id));
+                merged.putAll(entry.namePieces().get());
+                merged.values().removeIf(String::isBlank);
+                return Map.copyOf(merged);
+            }).orElse(Map.of());
         }
         @Override public void select() { requireUi("select"); entry().ifPresent(entry -> entry.select().run()); }
         @Override public boolean isOpen() { requireUi("isOpen"); return entry().isPresent(); }
@@ -356,6 +379,44 @@ final class HostedTerminals implements Terminals {
         };
     }
 
+    @Override public TabNamePiece addTabNamePiece(TabNamePieceSpec spec) {
+        Objects.requireNonNull(spec, "spec");
+        gate.require(Capabilities.TERMINAL_OBSERVE);
+        requireUi("addTabNamePiece");
+        dev.jasper.app.lifecycle.Subscription registration = tabNamePieces.add(spec.name(), spec.description(), pluginId);
+        namePieceRegistrations.add(registration);
+        gate.audit(Capabilities.TERMINAL_OBSERVE, "added {" + spec.name() + "} to tab names");
+        return new NamePiece(spec.name(), registration);
+    }
+
+    /** A plugin's tab name piece: values reach the registry on the UI thread, for terminal tabs only. */
+    private final class NamePiece implements TabNamePiece {
+        private final String name;
+        private final dev.jasper.app.lifecycle.Subscription registration;
+        private final AtomicBoolean closed = new AtomicBoolean();
+
+        NamePiece(String name, dev.jasper.app.lifecycle.Subscription registration) { this.name = name; this.registration = registration; }
+
+        @Override public String name() { return name; }
+
+        @Override public void set(TabHandle tab, String value) {
+            Objects.requireNonNull(tab, "tab");
+            Objects.requireNonNull(value, "value");
+            UUID id = tab.id();
+            Runnable apply = () -> {
+                if (closed.get() || !open.getAsBoolean() || registry.tab(id).filter(entry -> entry.kind() == TabEntry.Kind.TERMINAL).isEmpty()) return;
+                tabNamePieces.set(name, id, value);
+            };
+            if (onUi.getAsBoolean()) apply.run(); else ui.accept(apply);
+        }
+
+        @Override public void close() {
+            if (!closed.compareAndSet(false, true)) return;
+            Runnable removal = () -> { namePieceRegistrations.remove(registration); registration.close(); };
+            if (onUi.getAsBoolean()) removal.run(); else ui.accept(removal);
+        }
+    }
+
     /** A named profile must be one the catalog lists; otherwise nothing opens and the plugin's mistake is logged. */
     private boolean knownProfile(OpenSpec spec) {
         if (!(spec instanceof OpenSpec.Local local) || local.profile().isEmpty()) return true;
@@ -373,8 +434,10 @@ final class HostedTerminals implements Terminals {
         sessions.cancelAll();
         var registrations = new ArrayList<>(profileRegistrations);
         registrations.addAll(environmentRegistrations);
+        registrations.addAll(namePieceRegistrations);
         profileRegistrations.clear();
         environmentRegistrations.clear();
+        namePieceRegistrations.clear();
         registrations.forEach(dev.jasper.app.lifecycle.Subscription::close);
     }
 }

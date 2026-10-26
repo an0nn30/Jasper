@@ -50,7 +50,7 @@ All tasks belong to `:jasper-app`. Only those marked in the last column start Ja
 | `verifyCygwinDistribution` | all | Checks the staged Cygwin seed and the native acceptance recorded for it and the host architecture ([bundled Cygwin](#bundled-cygwin)) | no |
 | `cygwinSourcesZip` | all | Archives the Cygwin seed's sources and notices | no |
 | `packageDeb`, `packageRpm` | Linux | Verifies the image and builds one package | no |
-| `packageDist` | Linux | Both `packageDeb` and `packageRpm` | no |
+| `packageDist` | Linux | `packageRpm` on recognized RPM-family hosts; both `packageDeb` and `packageRpm` otherwise | no |
 | `installDist`, `distZip`, `distTar` | all | A portable distribution without jpackage or a bundled runtime | no |
 
 `-Pjasper.aot=true` makes `packageApp` train the cache too on macOS (and `verifyPackage` then depends on the
@@ -104,7 +104,7 @@ or `rpm-work/` under `jasper-app/build/packaging/`) for diagnosis and publishes 
 
 ## Image layout
 
-| Item | macOS (`Jasper.app`) | Windows (`Jasper`) | Linux (`Jasper`, installed as `/opt/jasper`) |
+| Item | macOS (`Jasper.app`) | Windows (`Jasper`) | Linux (`Jasper`, installed as `/opt/jasper-workstation`) |
 |---|---|---|---|
 | Launcher | `Contents/MacOS/Jasper` | `Jasper.exe` | `bin/Jasper`, with `lib/libapplauncher.so` |
 | `jasper-watch` | `Contents/MacOS/jasper-watch` | `jasper-watch.exe` | `bin/jasper-watch` |
@@ -442,9 +442,11 @@ and its refresh, the relay, the native probes and the acceptance harnesses.
 
 ## Linux packages
 
-`packageDist` on Linux runs `packageDeb` and `packageRpm`, which build the `.deb` and `.rpm` from the verified image.
+`packageDist` on recognized RPM-family hosts (Fedora, RHEL and SUSE families) runs `packageRpm`; other Linux hosts,
+including Debian/Ubuntu, run both `packageDeb` and `packageRpm`. Both tasks remain individually callable and build
+their format from the verified image.
 Each format names the architecture its own way: Debian's `amd64` and `arm64` are RPM's `x86_64` and `aarch64`. An x64
-machine builds the x64 pair and an aarch64 machine the aarch64 pair; JetBrains ships no 32-bit Linux runtime.
+machine builds x64 packages and an aarch64 machine aarch64 packages; JetBrains ships no 32-bit Linux runtime.
 
 ```bash
 sudo apt-get install fakeroot rpm cpio binutils g++
@@ -452,22 +454,24 @@ sudo apt-get install fakeroot rpm cpio binutils g++
 ./gradlew :jasper-app:packageDeb    # or packageRpm, for one format only
 ```
 
-Both packages are named `jasper` and install the image to `/opt/jasper`, with the launcher at `/opt/jasper/bin/Jasper`
-and a desktop menu entry (`/opt/jasper/lib/jasper-Jasper.desktop`, categories
-`System;TerminalEmulator;Network;RemoteAccess;`, icon `/opt/jasper/lib/Jasper.png`) registered through
+Both packages are named `jasper-workstation` and install the image to `/opt/jasper-workstation`, with the launcher at `/opt/jasper-workstation/bin/Jasper`
+and a desktop menu entry (`/opt/jasper-workstation/lib/jasper-workstation-Jasper.desktop`, categories
+`System;TerminalEmulator;Network;RemoteAccess;`, icon `/opt/jasper-workstation/lib/Jasper.png`) registered through
 `xdg-desktop-menu`. The package description, which is also the menu entry's comment, is "Jasper DevOps workstation" and
-the home page `https://github.com/an0nn30/Jasper`. The `.deb` depends on the Debian packages that jpackage finds for
-the runtime's shared libraries on the build machine. The `.rpm` requires, by soname, every shared library the image
-needs but does not bundle (for example `libX11.so.6()(64bit)`), which every RPM distribution resolves: jpackage's own
+the home page `https://github.com/an0nn30/Jasper`. DEB builds require `fakeroot`, `dpkg-deb` and a Debian-family host
+whose package database resolves the runtime's mandatory shared libraries to Debian packages. The `.rpm` requires,
+by soname, every shared library the image needs but does not bundle (for example `libX11.so.6()(64bit)`), which every
+RPM distribution resolves: jpackage's own
 RPM lookup asks the build machine's RPM database, which is empty on a Debian-family host. Before publishing either package,
 the task checks its name, version and architecture, unpacks it without installing it, compares every file with the
 verified image byte for byte (jpackage rewrites only `lib/app/.jpackage.xml`), checks the executable bits and the
 desktop entry, and checks the install scripts.
+jpackage appends the package name beneath `--install-dir /opt` to form the installation root.
 
 jpackage's install scripts register the menu entry under `set -e`, and `xdg-desktop-menu` fails unless
 `/usr/share/applications` (or `/usr/local/share/applications`) and `/usr/share/desktop-directories` exist, which would
 leave a minimal or headless system (a bare container, WSL without desktop packages) with an unconfigured package. The
-package tasks therefore generate the `postinst` and `prerm` (`.deb`) and `jasper.spec` (`.rpm`) overrides from the
+package tasks therefore generate the `postinst` and `prerm` (`.deb`) and `jasper-workstation.spec` (`.rpm`) overrides from the
 selected JBR's own templates: the menu commands run inside a function, the install creates both folders first, and a
 menu failure only prints "jasper: the desktop menu entry was not registered" (or "…removed"). Every other line is
 jpackage's, and a JBR whose templates lack the expected placeholder fails the build.
@@ -508,7 +512,7 @@ Windows job fails while [`validation.json`](#bundled-cygwin) lacks native and in
 architecture. The publish job refuses to continue if the tag moved during the build, requires exactly the nine packages,
 the two Cygwin source archives (`amd64` and `aarch64`) and the five SDK jars (`jasper-sdk-<v>.jar`,
 `jasper-sdk-<v>-sources.jar`, `jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and
-`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.21.0), and writes `SHA256SUMS`. It
+`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.22.0), and writes `SHA256SUMS`. It
 creates a draft prerelease titled `Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds
 exactly those files, and publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which
 a rerun finishes; a published release for the tag is never overwritten.
@@ -526,7 +530,8 @@ names that Debian 12 has and newer releases still provide, and uploads them as t
 [`packaging/linux/check-install.sh`](../packaging/linux/check-install.sh), which checks that the launcher,
 `jasper-watch` and the `jasper` command are executable, that `jasper --help` and the bundled `java -version` run,
 that every shared library resolves, and that the menu entry exists, then removes the package and checks that the
-program and the menu entry are gone. It never opens a window.
+program and the menu entry are gone. When distro `jasper-libs` is already installed, its package identity must survive
+both installation and removal; the Fedora equipped-runtime check installs it first. It never opens a window.
 
 **ci** ([`ci.yml`](../.github/workflows/ci.yml)) runs `./gradlew check --parallel --continue` on `macos-latest`,
 `ubuntu-24.04` and `windows-latest` with JBR 25 and Python 3.12, for pushes to `main` and pull requests, unless every
@@ -656,4 +661,4 @@ cannot mask a packaging problem.
 - [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off; a Remote SSH connection works.
 - [ ] Install the `jasper` command from Settings: `~/.local/bin/jasper --help` lists the plugin commands.
 - [ ] Upgrade to a package with a higher version: settings, Vault data and plugins are kept. Remove the package:
-  `/opt/jasper` and the menu entry are gone, and `~/.config/jasper` remains.
+  `/opt/jasper-workstation` and the menu entry are gone, and `~/.config/jasper` remains.

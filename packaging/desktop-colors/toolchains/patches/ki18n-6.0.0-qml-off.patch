@@ -1,0 +1,6 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -26 +25,0 @@
+-include(ECMQmlModule)
+@@ -44,0 +44 @@
++    include(ECMQmlModule)

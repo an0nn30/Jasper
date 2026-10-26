@@ -24,6 +24,14 @@ public record ActivityEvent(UUID id, String sourcePluginId, String title, State 
         STARTED,
         /** Progress or detail changed. */
         PROGRESS,
+        /** Waiting for input, including detail/progress updates while waiting.
+         * @since 0.22.0
+         */
+        NEEDS_INPUT,
+        /** Work resumed after waiting for input.
+         * @since 0.22.0
+         */
+        RESUMED,
         /** Ended successfully. */
         SUCCEEDED,
         /** Ended in failure, or its plugin stopped while it was open. */

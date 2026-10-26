@@ -6,7 +6,7 @@ final class Capabilities {
 
     static String describe(String capability) {
         String meaning = switch (capability) {
-            case "terminal.observe" -> "See your terminals: titles, folders, the commands you run and how they end";
+            case "terminal.observe" -> "See your terminals: titles, folders, the commands you run and how they end; add to tab names";
             case "terminal.selection" -> "Read the text you select in a terminal";
             case "terminal.inject" -> "Type into your terminals";
             case "terminal.open" -> "Open terminal tabs, splits and windows, and run programs in them";

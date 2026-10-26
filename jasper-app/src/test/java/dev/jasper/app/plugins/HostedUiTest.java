@@ -520,6 +520,48 @@ class HostedUiTest {
         assertThat(containment.failures("dev.x.tool")).isEqualTo(2);
     }
 
+    /**
+     * Floating tool windows plan 3 Task 1: the host reads the site's slot as an anchor and half and its mode as the SDK's,
+     * and runs placement handlers under containment, a throwing one taking nothing from the others, none after the
+     * instance closed or the handler's registration did.
+     */
+    @Test void aPanelsPlacementIsItsSlotAndModeAndItsHandlersAreContained() {
+        var hosts = new ArrayList<dev.jasper.sdk.ui.PanelHost>();
+        ui.panels().register(new PanelSpec("dev.x.tool.place", "Place", "file", Anchor.LEFT), host -> { hosts.add(host); return view(); });
+        dev.jasper.app.contributions.PanelSite.Placement[] current = {
+            new dev.jasper.app.contributions.PanelSite.Placement(Slot.LEFT_TOP, dev.jasper.app.dock.ToolWindowMode.DOCKED)};
+        var site = new dev.jasper.app.contributions.PanelSite(UUID.randomUUID(), () -> { }, () -> { }, () -> true, header -> { },
+            () -> current[0]);
+        assertThat(model.panels().getFirst().factory().apply(site)).isNotNull();
+        var host = hosts.getFirst();
+        record Case(Slot slot, Anchor anchor, boolean split) { }
+        for (Case each : List.of(new Case(Slot.LEFT_TOP, Anchor.LEFT, false), new Case(Slot.LEFT_BOTTOM, Anchor.LEFT, true),
+                new Case(Slot.RIGHT_TOP, Anchor.RIGHT, false), new Case(Slot.RIGHT_BOTTOM, Anchor.RIGHT, true),
+                new Case(Slot.BOTTOM_LEFT, Anchor.BOTTOM, false), new Case(Slot.BOTTOM_RIGHT, Anchor.BOTTOM, true)))
+            for (var mode : dev.jasper.app.dock.ToolWindowMode.values()) {
+                current[0] = new dev.jasper.app.contributions.PanelSite.Placement(each.slot(), mode);
+                assertThat(host.placement()).as("%s %s", each.slot(), mode).isEqualTo(
+                    new dev.jasper.sdk.ui.PanelPlacement(each.anchor(), each.split(), dev.jasper.sdk.ui.PanelMode.valueOf(mode.name())));
+            }
+
+        var heard = new ArrayList<dev.jasper.sdk.ui.PanelPlacement>();
+        host.onPlacement(placement -> { throw new IllegalStateException("placement failed"); });
+        Subscription later = host.onPlacement(heard::add);
+        site.notifyPlacement(new dev.jasper.app.contributions.PanelSite.Placement(Slot.RIGHT_BOTTOM, dev.jasper.app.dock.ToolWindowMode.FLOAT));
+        assertThat(heard).containsExactly(new dev.jasper.sdk.ui.PanelPlacement(Anchor.RIGHT, true, dev.jasper.sdk.ui.PanelMode.FLOAT));
+        assertThat(containment.failures("dev.x.tool")).isEqualTo(1);
+        later.close();
+        site.notifyPlacement(new dev.jasper.app.contributions.PanelSite.Placement(Slot.BOTTOM_LEFT, dev.jasper.app.dock.ToolWindowMode.WINDOW));
+        assertThat(heard).as("a closed registration hears nothing").hasSize(1);
+        assertThat(containment.failures("dev.x.tool")).isEqualTo(2);
+
+        host.onPlacement(heard::add);
+        site.notifyClosed();
+        site.notifyPlacement(new dev.jasper.app.contributions.PanelSite.Placement(Slot.LEFT_TOP, dev.jasper.app.dock.ToolWindowMode.DOCKED));
+        assertThat(heard).as("nothing after the instance closed").hasSize(1);
+        assertThat(containment.failures("dev.x.tool")).isEqualTo(2);
+    }
+
     @Test void everyAnchorAndSplitCombinationMapsToItsOwnSlot() {
         record Case(String id, Anchor anchor, boolean split, Slot slot) { }
         var cases = List.of(

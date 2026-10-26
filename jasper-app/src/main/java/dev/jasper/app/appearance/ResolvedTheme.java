@@ -14,7 +14,12 @@ public record ResolvedTheme(GeneratedTheme chrome, GeneratedTheme workspace, Pal
 
     /** The theme {@code selection} shows with the Dark or Light appearance, for chrome and workspace, and its terminal scheme's palette. */
     public static ResolvedTheme of(boolean dark, ThemeSelection selection) {
-        var theme = selection.theme(dark).generated(dark);
+        return of(dark, selection, JasperTheme.bundled().generated(dark));
+    }
+
+    /** Resolves a dynamic pick against the complete generated desktop palette for this appearance. */
+    public static ResolvedTheme of(boolean dark, ThemeSelection selection, GeneratedTheme desktop) {
+        var theme = selection.theme(dark).generated(dark, desktop);
         return new ResolvedTheme(theme, theme, TerminalPaletteAdapter.toTerminal(selection.terminal(dark)));
     }
 

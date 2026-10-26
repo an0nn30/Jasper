@@ -16,7 +16,7 @@ file and how to make one.
 | Catppuccin Macchiato | `catppuccin-macchiato` | Dark | Catppuccin Macchiato (`catppuccin-macchiato/dark`) |
 | Catppuccin Mocha | `catppuccin-mocha` | Dark | Catppuccin Mocha (`catppuccin-mocha/dark`) |
 | Ubuntu Yaru | `ubuntu-yaru` | Dark, Light | Ubuntu Yaru Dark (`ubuntu-yaru/dark`), Ubuntu Yaru Light (`ubuntu-yaru/light`) |
-| Jasper Meadow (the default theme) | `jasper-meadow` | Dark, Light | Jasper Meadow Dark (`jasper-meadow/dark`), Jasper Meadow Light (`jasper-meadow/light`) |
+| Jasper Meadow | `jasper-meadow` | Dark, Light | Jasper Meadow Dark (`jasper-meadow/dark`), Jasper Meadow Light (`jasper-meadow/light`) |
 
 - **Slate Cobalt**'s colours are defined in [the Slate Cobalt colour reference](design/theme-engine/slate-cobalt.md).
   High Contrast is a terminal scheme only, white on black, and can be used with any theme.
@@ -59,12 +59,13 @@ scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
 
 | Setting | Default | Values |
 |---|---|---|
-| `ui.appearance` | `"system"` | `"system"` follows the operating system's light or dark setting, live; only macOS reports it, so on Linux and Windows `"system"` shows Dark. `"dark"` and `"light"` choose one. A change of the system's setting never writes `config.toml`. |
-| `ui.theme.dark` | `"jasper-meadow"`, or the active look's default | The id of a theme with a Dark variant: built in, from a plugin, or installed |
-| `ui.theme.light` | `"jasper-meadow"`, or the active look's default | The id of a theme with a Light variant |
+| `ui.appearance` | `"system"` | `"system"` follows the operating system's light or dark setting, live; macOS reports it directly and Linux uses the desktop portal. If unavailable, `"system"` shows Dark. `"dark"` and `"light"` choose one. A change of the system's setting never writes `config.toml`. |
+| `ui.theme.dark` | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the active look's default | The id of a theme with a Dark variant: built in, from a plugin, or installed |
+| `ui.theme.light` | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the active look's default | The id of a theme with a Light variant |
+| `ui.theme.desktop_source` | `"auto"` | Desktop colors source: `"auto"`, `"qt"`, `"gtk3"` or `"gtk4"` |
 | `terminal.scheme` | `"match"` | `"match"` uses the shown theme's own scheme, so it follows the appearance; a scheme id, `<theme id>/<scheme key>`, chooses one in either appearance |
 
-All four apply live in every window.
+These settings apply live in every window.
 
 **Settings › Appearance & Behavior › Appearance** holds them:
 
@@ -85,6 +86,24 @@ Ctrl+Shift+P on Linux and Windows), **Themes…** opens it too, and **Terminal S
 **Terminal Scheme: *scheme name*** command per installed scheme, such as **Terminal Scheme: High Contrast**, save
 `terminal.scheme` at once for every window. While `config.toml` has errors they are refused: "config.toml has errors,
 so changes can't be saved until they're fixed."
+
+On Linux, **Desktop colors** (`desktop-colors`) is the default for both appearances unless the look sets its own
+defaults. It derives interface colours from Qt 5/6, KDE Frameworks 5/6, GTK 3.24+ or GTK 4.10+ with optional
+libadwaita. **Desktop source** offers Automatic, Qt / KDE, GTK 3 and GTK 4 / libadwaita. Automatic prefers the session's
+KDE major on KDE, Qt on LXQt, GTK 4 on GNOME and GTK 3 elsewhere. qt5ct/qt6ct hints move Qt first on unknown desktops
+and select its major there or on LXQt. Unavailable candidates fall back within that order. Explicit Qt / KDE stays
+within the Qt family, including KDE sources in KDE sessions; explicit GTK sources keep their selected toolkit. The
+status beneath it identifies the source and library version, or explains unavailable helpers, toolkit/display support
+or the bundled fallback. The selector and status appear when a Desktop colors pick
+is active or staged. Match System follows the portal appearance; explicit Dark or Light takes precedence. Portal
+accent and high contrast influence Desktop colors. Qt / KDE observes the current desktop palette: an opposite
+appearance uses compatible last-good colours or the bundled fallback. **Reload Config** restarts helpers and refreshes
+desktop detection; use it when an integration does not report palette changes.
+
+Desktop colours affect the interface. The Editor keeps its selected colour scheme; terminal **Same as UI theme**
+uses Slate Cobalt's matching appearance, and an explicit terminal scheme stays selected. When extraction is
+unavailable Jasper uses the bundled Slate Cobalt interface for that appearance and preserves the Desktop colors
+pick. A saved pick moved to another operating system remains saved and shows the fallback and unavailable status.
 
 ## What the terminal scheme colours
 
@@ -136,7 +155,7 @@ is shown in a sheet.
 - **Remove *theme*** removes the theme the dropdown shows; for the Terminal scheme gear, the theme the scheme belongs
   to. It is unavailable for a built-in theme, a plugin's theme and Same as UI theme. It asks first and says what will
   change: the file is deleted, and every setting that names the theme or one of its schemes, saved or staged, returns
-  to its default (Jasper Meadow for Dark and Light, or the look's default under a look that sets one; Same as UI theme
+  to its default (Desktop colors on Linux, Jasper Meadow elsewhere, or the look's default; Same as UI theme
   for the scheme). Saved settings are written at once, and other staged changes stay
   staged. If the file cannot be deleted, nothing changes and the sheet says why.
 

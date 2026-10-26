@@ -3,12 +3,14 @@ package dev.jasper.app.persistence;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -36,15 +38,22 @@ public final class UiState {
      * @param slot where it docks
      * @param order its position in the slot's stripe group; {@link #LAST} when it has none yet
      * @param visible whether it showed
+     * @param mode whether it was docked in {@code slot} or detached into a window of its own (which keeps the slot)
+     * @param window where its own window last was, in screen coordinates, whatever the mode; empty until it has had one
      */
-    public record Panel(Slot slot, int order, boolean visible) {
+    public record Panel(Slot slot, int order, boolean visible, ToolWindowMode mode, Optional<Bounds> window) {
         /** The order of a panel without a remembered position: it goes after the others, in registration order. */
         public static final int LAST = 9999;
 
         public Panel {
             Objects.requireNonNull(slot, "slot");
+            Objects.requireNonNull(mode, "mode");
+            Objects.requireNonNull(window, "window");
             if (order < 0 || order > LAST) throw new IllegalArgumentException("Panel order must be 0 to " + LAST + ": " + order);
         }
+
+        /** A docked panel that has never had a window of its own. */
+        public Panel(Slot slot, int order, boolean visible) { this(slot, order, visible, ToolWindowMode.DOCKED, Optional.empty()); }
     }
 
     /** The dock's remembered sizes, in unscaled pixels, and split ratios. */
@@ -214,8 +223,15 @@ public final class UiState {
             if (slot.isEmpty()) continue;
             int order = entry.get(List.of("order")) instanceof Long value && value >= 0 && value <= Panel.LAST
                 ? value.intValue() : Panel.LAST;
-            into.panels.put(id, new Panel(slot.get(), order, Boolean.TRUE.equals(entry.get(List.of("visible")))));
+            Optional<Bounds> window = entry.get(List.of("window")) instanceof TomlTable own ? bounds(own) : Optional.empty();
+            into.panels.put(id, new Panel(slot.get(), order, Boolean.TRUE.equals(entry.get(List.of("visible"))), mode(entry.get(List.of("mode"))), window));
         }
+    }
+
+    /** The detached mode a file's {@code mode} names (lower case, as saved); anything else, or none, is docked. */
+    private static ToolWindowMode mode(Object value) {
+        for (ToolWindowMode detached : ToolWindowMode.values()) if (detached.detached() && detached.name().toLowerCase(Locale.ROOT).equals(value)) return detached;
+        return ToolWindowMode.DOCKED;
     }
 
     /**
@@ -339,8 +355,13 @@ public final class UiState {
         text.append("\n[").append(prefix).append("dock]\nleft_width = ").append(dock.leftWidth()).append("\nright_width = ").append(dock.rightWidth())
             .append("\nbottom_height = ").append(dock.bottomHeight()).append("\nleft_ratio = ").append(dock.leftRatio())
             .append("\nright_ratio = ").append(dock.rightRatio()).append("\nbottom_ratio = ").append(dock.bottomRatio()).append('\n');
-        layout.panels.forEach((id, panel) -> text.append("\n[").append(prefix).append("panels.\"").append(id).append("\"]\nslot = \"")
-            .append(panel.slot().name()).append("\"\norder = ").append(panel.order()).append("\nvisible = ").append(panel.visible()).append('\n'));
+        layout.panels.forEach((id, panel) -> {
+            text.append("\n[").append(prefix).append("panels.\"").append(id).append("\"]\nslot = \"")
+                .append(panel.slot().name()).append("\"\norder = ").append(panel.order()).append("\nvisible = ").append(panel.visible()).append('\n');
+            if (panel.mode().detached()) text.append("mode = \"").append(panel.mode().name().toLowerCase(Locale.ROOT)).append("\"\n");
+            panel.window().ifPresent(bounds -> text.append("window = { x = ").append(bounds.x()).append(", y = ").append(bounds.y())
+                .append(", width = ").append(bounds.width()).append(", height = ").append(bounds.height()).append(" }\n"));
+        });
     }
 
     private static String array(List<String> values) {

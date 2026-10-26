@@ -69,6 +69,11 @@ public record PluginThemes(List<Provided> provided, Map<String, String> reserved
         var sorted = new ArrayList<>(declared);
         sorted.sort(Comparator.comparingInt(Declared::rank).thenComparing(Declared::pluginId));
         for (Declared file : sorted) {
+            if (ThemeLibrary.desktopId(file.themeId())) {
+                problems.add(new ThemeLibrary.Problem(file.directory(), 0, ThemeLibrary.bundledOnly().reservedLabel(file.themeId()).orElseThrow()
+                    + " is reserved; the " + file.pluginName() + " plugin's file is ignored."));
+                continue;
+            }
             var builtIn = JasperTheme.builtIn(file.themeId());
             if (builtIn.isEmpty()) reserved.putIfAbsent(file.themeId(), file.pluginName());
             if (!file.loadable()) continue;
@@ -102,7 +107,7 @@ public record PluginThemes(List<Provided> provided, Map<String, String> reserved
         // A provided id is reserved for the plugin that provides it, not a higher-ranked one that does not load.
         winners.forEach((id, winner) -> reserved.put(id, winner.pluginName()));
         var dormant = new LinkedHashSet<String>();
-        for (Declared file : declared) if (!file.loadable() && !winners.containsKey(file.themeId()) && JasperTheme.builtIn(file.themeId()).isEmpty())
+        for (Declared file : declared) if (!file.loadable() && !winners.containsKey(file.themeId()) && ThemeLibrary.bundledOnly().reservedLabel(file.themeId()).isEmpty())
             dormant.add(file.themeId());
         var provided = new ArrayList<>(winners.values());
         provided.sort(Comparator.comparing((Provided item) -> item.theme().name().toLowerCase(Locale.ROOT)).thenComparing(item -> item.theme().id()));

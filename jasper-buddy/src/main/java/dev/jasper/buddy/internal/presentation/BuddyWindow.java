@@ -32,7 +32,7 @@ public final class BuddyWindow {
     private static final double SCALE = 2.5;
     private static final int DRAG_THRESHOLD = 3;
 
-    private final JWindow window = new JWindow();
+    private final JWindow window = new BuddySurfaceWindow();
     private final BuddySprite sprite;
     private final BuddyAnimator animator = new BuddyAnimator(new Random());
     private BuddyOptions options;
@@ -130,7 +130,7 @@ public final class BuddyWindow {
         if (!location.equals(window.getLocation())) window.setLocation(location);
         Rectangle bounds = new Rectangle(location, window.getSize());
         if (column != null) column.moveBeside(bounds);
-        if (drawer != null && drawer.isShowing()) drawer.showBeside(bounds);
+        if (drawer != null && drawer.isShowing()) drawer.moveBeside(bounds);
     }
 
     private void endDrag() {
@@ -172,9 +172,10 @@ public final class BuddyWindow {
     /** A notice was posted, dismissed or cleared: re-place both surfaces around him. */
     public void refreshDeck() {
         if (column == null) return;
+        drawer.refresh();
         if (window.isVisible()) {
             column.showBeside(window.getBounds());
-            if (drawer.isShowing()) drawer.showBeside(window.getBounds());
+            if (drawer.isShowing()) drawer.moveBeside(window.getBounds());
         } else {
             column.hide();
             drawer.hide();
@@ -189,8 +190,8 @@ public final class BuddyWindow {
 
     /** Applies host working intent to the animator without acquiring presentation or deciding policy. */
     public void setWorking(boolean working) {
-        animator.setWorking(working);
-        window.repaint();
+        animator.setWorking(working, System.nanoTime());
+        paintAndSchedule();
     }
 
     public void show() {

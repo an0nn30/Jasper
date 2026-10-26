@@ -155,7 +155,9 @@ public abstract sealed class JasperWindow permits MainWindow, ChildWindow {
     }
 
     private void stateChanged(boolean showing, boolean iconified) {
-        if (!closed) manager.stateChanged(this, showing, iconified);
+        if (closed) return;
+        content.buddyWindowState(showing, iconified);
+        manager.stateChanged(this, showing, iconified);
     }
 
     /**

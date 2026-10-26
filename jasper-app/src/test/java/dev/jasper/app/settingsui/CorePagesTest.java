@@ -314,7 +314,7 @@ class CorePagesTest {
     @Test void theNotificationsPageListsEveryGroupInItsOwnSection() {
         var groups = new NotificationGroupChoices(() -> List.of(
             new NotificationGroupChoices.Group("jasper.commands", "Long-running commands", "Jasper", "card")));
-        var spec = CorePages.specs(APPEARANCE, system(), ShellChoices.NONE, id -> { }, false, groups).stream()
+        var spec = CorePages.specs(APPEARANCE, system(), ShellChoices.NONE, id -> { }, false, groups, TabNameChoices.NONE).stream()
             .filter(page -> page.settings().contains(CoreSettings.NOTIFICATIONS_GROUPS)).findFirst().orElseThrow();
         var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
         var page = spec.build(PageKit.context(draft, id -> { }, () -> { }));
@@ -333,7 +333,7 @@ class CorePagesTest {
     @Test void aGroupBackAtItsDefaultIsNoChangeInAFileMadeFromTheTemplate() {
         var groups = new NotificationGroupChoices(() -> List.of(
             new NotificationGroupChoices.Group("jasper.commands", "Long-running commands", "Jasper", "card")));
-        var spec = CorePages.specs(APPEARANCE, system(), ShellChoices.NONE, id -> { }, false, groups).stream()
+        var spec = CorePages.specs(APPEARANCE, system(), ShellChoices.NONE, id -> { }, false, groups, TabNameChoices.NONE).stream()
             .filter(page -> page.settings().contains(CoreSettings.NOTIFICATIONS_GROUPS)).findFirst().orElseThrow();
         var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), dev.jasper.app.config.ConfigTemplate.text(true), true).values());
         var page = spec.build(PageKit.context(draft, id -> { }, () -> { }));

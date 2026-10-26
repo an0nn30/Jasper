@@ -1,0 +1,221 @@
+# Official upstream .sha256 files checked 2026-10-25; native builds remain pending.
+format = 1
+evidence_status = "aarch64-baseline-evidence-recorded-release-matrix-pending"
+baseline = "Ubuntu 22.04 userspace (glibc 2.35), x86_64 and aarch64"
+python = ">=3.11.8 (tomllib, safe tar extraction filter)"
+build_dependencies = ["C/C++17 compiler", "CMake >=3.21", "Ninja", "make", "Perl", "patch", "gperf (KF5 Codecs)", "pkg-config", "Python", "gettext", "Qt5 Linguist tools and their CMake package (KF5)", "Qt Core private headers (KI18n build)", "DBus development headers", "fontconfig", "FreeType", "X11/XCB and xkbcommon development headers", "xcb-util >=0.3.9 (Qt5)"]
+license_review = "Extracted source license files inventoried during aarch64 baseline validation; final shipped notices remain pending"
+
+[groups]
+kf5 = ["kf5-extra-cmake-modules","kf5-kcoreaddons","kf5-kcodecs","kf5-kconfig","kf5-kguiaddons","kf5-ki18n","kf5-kwidgetsaddons","kf5-kconfigwidgets"]
+kf6 = ["kf6-extra-cmake-modules","kf6-kconfig","kf6-kguiaddons","kf6-ki18n","kf6-kcolorscheme"]
+
+[sources."qt5"]
+name = "qtbase"
+version = "5.15.2"
+source_dir = "qtbase-everywhere-src-5.15.2"
+url = "https://download.qt.io/archive/qt/5.15/5.15.2/submodules/qtbase-everywhere-src-5.15.2.tar.xz"
+sha256 = "909fad2591ee367993a75d7e2ea50ad4db332f05e1c38dd7a5a274e156a4e0f8"
+checksum_url = "https://download.qt.io/archive/qt/5.15/5.15.2/submodules/qtbase-everywhere-src-5.15.2.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+configure_options = ["-recheck-all"]
+pkg_config = ["xcb-util >= 0.3.9"]
+patches = ["qtbase-5.15.2-gcc11-limits"]
+
+[sources."qt6"]
+name = "qtbase"
+version = "6.2.4"
+source_dir = "qtbase-everywhere-src-6.2.4"
+url = "https://download.qt.io/archive/qt/6.2/6.2.4/submodules/qtbase-everywhere-src-6.2.4.tar.xz"
+sha256 = "d9924d6fd4fa5f8e24458c87f73ef3dfc1e7c9b877a5407c040d89e6736e2634"
+checksum_url = "https://download.qt.io/archive/qt/6.2/6.2.4/submodules/qtbase-everywhere-src-6.2.4.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kde6-qt"]
+name = "qtbase"
+version = "6.5.0"
+source_dir = "qtbase-everywhere-src-6.5.0"
+url = "https://download.qt.io/archive/qt/6.5/6.5.0/submodules/qtbase-everywhere-src-6.5.0.tar.xz"
+sha256 = "fde1aa7b4fbe64ec1b4fc576a57f4688ad1453d2fab59cbadd948a10a6eaf5ef"
+checksum_url = "https://download.qt.io/archive/qt/6.5/6.5.0/submodules/qtbase-everywhere-src-6.5.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-extra-cmake-modules"]
+name = "extra-cmake-modules"
+version = "5.92.0"
+source_dir = "extra-cmake-modules-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/extra-cmake-modules-5.92.0.tar.xz"
+sha256 = "f89a238bc5f28738db25e29296b75b4f795e3e9bfe3a8f1f9390648749d303ef"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/extra-cmake-modules-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-kcoreaddons"]
+name = "kcoreaddons"
+version = "5.92.0"
+source_dir = "kcoreaddons-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kcoreaddons-5.92.0.tar.xz"
+sha256 = "df5f718f324aa2b58191438c8aa5f7498a7997eff990d16ffbc9f19efd1a6667"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kcoreaddons-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+build_tools = ["lrelease", "lconvert"]
+
+[sources."kf5-kcodecs"]
+name = "kcodecs"
+version = "5.92.0"
+source_dir = "kcodecs-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kcodecs-5.92.0.tar.xz"
+sha256 = "d6e5b7a453948d5fa0482715eaf4a0c9abe5b902a0aca15540a04b1a1b60d275"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kcodecs-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+build_tools = ["gperf"]
+
+[sources."kf5-kconfig"]
+name = "kconfig"
+version = "5.92.0"
+source_dir = "kconfig-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kconfig-5.92.0.tar.xz"
+sha256 = "7801b641b88368a0c021272073c692337b42ee28f0025d106942c8ce873b0523"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kconfig-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-kguiaddons"]
+name = "kguiaddons"
+version = "5.92.0"
+source_dir = "kguiaddons-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kguiaddons-5.92.0.tar.xz"
+sha256 = "0f6775a565f22900b0de53daa5fe73f7d7e592663e0bb442a8e26ffab27fdf5f"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kguiaddons-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DWITH_WAYLAND=OFF","-DWITH_X11=OFF"]
+
+[sources."kf5-ki18n"]
+name = "ki18n"
+version = "5.92.0"
+source_dir = "ki18n-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/ki18n-5.92.0.tar.xz"
+sha256 = "058032e8e9556f1dadcf0c2bd633da6cfc9673e966dd113388e2b8aee2395777"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/ki18n-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DBUILD_WITH_QML=OFF"]
+
+[sources."kf5-kwidgetsaddons"]
+name = "kwidgetsaddons"
+version = "5.92.0"
+source_dir = "kwidgetsaddons-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kwidgetsaddons-5.92.0.tar.xz"
+sha256 = "d0e3558d6a7ed550f31d319e6b52d6ed61d693a1aa50e6dd4f430a1324111f2c"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kwidgetsaddons-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf5-kconfigwidgets"]
+name = "kconfigwidgets"
+version = "5.92.0"
+source_dir = "kconfigwidgets-5.92.0"
+url = "https://download.kde.org/stable/frameworks/5.92/kconfigwidgets-5.92.0.tar.xz"
+sha256 = "4259eed35d9ac307ecc30e64833bad7a89ef58fc7125054eb39716d27a4a274a"
+checksum_url = "https://download.kde.org/stable/frameworks/5.92/kconfigwidgets-5.92.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DWITH_KAUTH=OFF","-DBUILD_DESIGNERPLUGIN=OFF","-DCMAKE_DISABLE_FIND_PACKAGE_KF5DocTools=ON"]
+
+[sources."kf6-extra-cmake-modules"]
+name = "extra-cmake-modules"
+version = "6.0.0"
+source_dir = "extra-cmake-modules-6.0.0"
+url = "https://download.kde.org/stable/frameworks/6.0/extra-cmake-modules-6.0.0.tar.xz"
+sha256 = "23992bf19db717156b7d6dd13118caa79fd57f090beb062e8308db3c09f70d0c"
+checksum_url = "https://download.kde.org/stable/frameworks/6.0/extra-cmake-modules-6.0.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = []
+
+[sources."kf6-kconfig"]
+name = "kconfig"
+version = "6.0.0"
+source_dir = "kconfig-6.0.0"
+url = "https://download.kde.org/stable/frameworks/6.0/kconfig-6.0.0.tar.xz"
+sha256 = "3f7c1e6b048df4ab3d67fbef01a5ad1dd0289c9b158644668fba0225c050c050"
+checksum_url = "https://download.kde.org/stable/frameworks/6.0/kconfig-6.0.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DKCONFIG_USE_QML=OFF", "-DKF_SKIP_PO_PROCESSING=ON"]
+patches = ["kconfig-6.0.0-qml-off"]
+
+[sources."kf6-kguiaddons"]
+name = "kguiaddons"
+version = "6.0.0"
+source_dir = "kguiaddons-6.0.0"
+url = "https://download.kde.org/stable/frameworks/6.0/kguiaddons-6.0.0.tar.xz"
+sha256 = "20af58ab639ea99df09acbd74af0c867f22f1d9f91595623ab44fba5834eaa62"
+checksum_url = "https://download.kde.org/stable/frameworks/6.0/kguiaddons-6.0.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DWITH_WAYLAND=OFF","-DWITH_X11=OFF","-DBUILD_GEO_SCHEME_HANDLER=OFF", "-DKF_SKIP_PO_PROCESSING=ON"]
+
+[sources."kf6-ki18n"]
+name = "ki18n"
+version = "6.0.0"
+source_dir = "ki18n-6.0.0"
+url = "https://download.kde.org/stable/frameworks/6.0/ki18n-6.0.0.tar.xz"
+sha256 = "15cbfb73ef1d3954d6206755b6e6a9c86ea27be4b4db0c843d38494851bcc354"
+checksum_url = "https://download.kde.org/stable/frameworks/6.0/ki18n-6.0.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DBUILD_WITH_QML=OFF", "-DKF_SKIP_PO_PROCESSING=ON"]
+patches = ["ki18n-6.0.0-qml-off"]
+
+[sources."kf6-kcolorscheme"]
+name = "kcolorscheme"
+version = "6.0.0"
+source_dir = "kcolorscheme-6.0.0"
+url = "https://download.kde.org/stable/frameworks/6.0/kcolorscheme-6.0.0.tar.xz"
+sha256 = "de45822431755be39ab7aebfcb7cb6ff90b4924579c2a4d66ae28f91d70a260e"
+checksum_url = "https://download.kde.org/stable/frameworks/6.0/kcolorscheme-6.0.0.tar.xz.sha256"
+license_files = ["COPYING*", "LICENSE*", "LICENSES/*"]
+cmake_options = ["-DKF_SKIP_PO_PROCESSING=ON"]
+
+# Build-only patches; source tarball hashes above remain unchanged.
+
+[patches."kconfig-6.0.0-qml-off"]
+file = "patches/kconfig-6.0.0-qml-off.patch"
+sha256 = "35aa658d9e5abe066976edbddda096c4965c3f7fca0eacf11d36c64067caf041"
+origin = "https://invent.kde.org/frameworks/kconfig/-/commit/e372f1ddbab0a39373da5025d2866dfeba217bdf"
+
+[[patches."kconfig-6.0.0-qml-off".files]]
+path = "CMakeLists.txt"
+before = "c2d4360e6e21b2823e73337040651e6e093f82fe64334629fcd089daf63f56bb"
+after = "084750c53ffa1689e74257f73747458a3075acc35433afa8c277795737a2058b"
+
+[patches."ki18n-6.0.0-qml-off"]
+file = "patches/ki18n-6.0.0-qml-off.patch"
+sha256 = "506b2dd73f3d33d2ec8e459ecc66757e51ada0384caa0d783f3e04dce30960e7"
+origin = "Local build-only guard matching BUILD_WITH_QML; no upstream backport claim"
+
+[[patches."ki18n-6.0.0-qml-off".files]]
+path = "CMakeLists.txt"
+before = "7a857469b522e55fdde37a059cbbff08ef47b38b92fd47b14aae846c2b0f2b86"
+after = "fca8125de5a830b767cd7c47fb7c9b393220e40b692d88d3d76a6cca2686142d"
+
+[patches."qtbase-5.15.2-gcc11-limits"]
+file = "patches/qtbase-5.15.2-gcc11-limits.patch"
+sha256 = "e9ecfacbf521ba11cca2a9a611876f48cc3d694feaac6ce1e0385940b38f23a9"
+origin = "https://code.qt.io/cgit/qt/qtbase.git/commit/?id=0afad46bb71b106780dd641de768a81d9f6c6a51 ; include-only QByteArrayMatcher hunk from https://code.qt.io/cgit/qt/qtbase.git/commit/?id=813a928c7c3cf98670b6043149880ed5c955efb9"
+
+[[patches."qtbase-5.15.2-gcc11-limits".files]]
+path = "src/corelib/global/qfloat16.h"
+before = "136f545d4a24c5027d09d1d54340f26ebccc29db97d7dd021ff8196266bcc5c6"
+after = "108f95f3f1288ca9b660f0304ef51da8869ba8c15d8cd2d6130f1330bcd8b38b"
+
+[[patches."qtbase-5.15.2-gcc11-limits".files]]
+path = "src/corelib/global/qendian.h"
+before = "5f08e326c19129cead56261c84f5cd5dd59bd6107913b5c98478bc90efcc463f"
+after = "63a69b9680c296b519d4258899792ecc94f83df119d44f4e610a280ffc6f45db"
+
+[[patches."qtbase-5.15.2-gcc11-limits".files]]
+path = "src/corelib/text/qbytearraymatcher.h"
+before = "b54f994fc166103adefc3076277470d41a6663628e6263c5e667a58b0700dd88"
+after = "f385850a35ad5f720be25e1aca5b20bffafa010e51a0a4792336dc03853bc068"
+

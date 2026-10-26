@@ -15,8 +15,8 @@ import java.util.UUID;
  * outcome is a notification the plugin host posts (spec section 7, producer 4), not a card. A connection is one
  * connection card: a new state posts it again, which is new news, and closing the connection removes it. Progress, and a
  * report that keeps a connection's state, only change the detail the card already reads, so nothing is re-posted. A
- * click raises the application, then runs the producer's action when it named one. This producer never drives Buddy's
- * working animation, which the command notifier owns. EDT only; holds no Swing state.
+ * click raises the application, then runs the producer's action when it named one. Running task intent is combined
+ * with terminal work by the application. EDT only; holds no Swing state.
  */
 public final class ActivityNotifier implements AutoCloseable {
     /** What a connection card can say. */
@@ -31,6 +31,9 @@ public final class ActivityNotifier implements AutoCloseable {
 
     private final Map<BuddyNoticeId, String> details = new HashMap<>();
     private final Map<BuddyNoticeId, ConnectionState> connections = new HashMap<>();
+    private final Map<BuddyNoticeId, Boolean> tasks = new HashMap<>();
+    private java.util.function.Consumer<Boolean> working;
+    private boolean workingNow;
     private BuddyCompanion deck;
     private Runnable activate;
 
@@ -42,6 +45,16 @@ public final class ActivityNotifier implements AutoCloseable {
      *                 raises itself
      */
     public ActivityNotifier(BuddyCompanion deck, Runnable activate) {
+        this(deck, activate, value -> {});
+    }
+
+    /** Binds activity intent to the application's combined working state.
+     * @param deck companion
+     * @param activate host activation
+     * @param working receives changes in whether any plugin task is running
+     */
+    public ActivityNotifier(BuddyCompanion deck, Runnable activate, java.util.function.Consumer<Boolean> working) {
+        this.working = Objects.requireNonNull(working, "working");
         this.deck = Objects.requireNonNull(deck, "deck");
         this.activate = Objects.requireNonNull(activate, "activate");
     }
@@ -70,7 +83,9 @@ public final class ActivityNotifier implements AutoCloseable {
     public void started(String source, UUID id, String title, String detail, Optional<Runnable> action) {
         if (deck == null) return;
         var key = new BuddyNoticeId(source, id);
+        if (tasks.putIfAbsent(key, true) != null) return;
         details.put(key, detail);
+        publishWorking();
         deck.post(new BuddyNotice(key, BuddyNotice.Kind.TASK, singleLine(title), BuddyNotice.State.RUNNING,
             () -> details.getOrDefault(key, ""), activation(action)));
     }
@@ -87,6 +102,37 @@ public final class ActivityNotifier implements AutoCloseable {
         details.computeIfPresent(new BuddyNoticeId(source, id), (key, previous) -> detail);
     }
 
+    /** Marks a live task as waiting, retaining its notice and activation.
+     * @param source producer namespace
+     * @param id task identity
+     * @param detail current detail
+     */
+    public void needsInput(String source, UUID id, String detail) { phase(source, id, detail, false); }
+
+    /** Marks a live task as running again.
+     * @param source producer namespace
+     * @param id task identity
+     * @param detail current detail
+     */
+    public void resumed(String source, UUID id, String detail) { phase(source, id, detail, true); }
+
+    private void phase(String source, UUID id, String detail, boolean running) {
+        if (deck == null) return;
+        var key = new BuddyNoticeId(source, id);
+        if (!tasks.containsKey(key)) return;
+        details.put(key, detail);
+        tasks.put(key, running);
+        deck.updateState(key, running ? BuddyNotice.State.RUNNING : BuddyNotice.State.NEEDS_INPUT);
+        publishWorking();
+    }
+
+    private void publishWorking() {
+        boolean next = tasks.containsValue(true);
+        if (next == workingNow) return;
+        workingNow = next;
+        working.accept(next);
+    }
+
     /**
      * Removes the card of work that ended, however it ended; its outcome, if any, is a notification.
      *
@@ -96,8 +142,10 @@ public final class ActivityNotifier implements AutoCloseable {
     public void ended(String source, UUID id) {
         if (deck == null) return;
         var key = new BuddyNoticeId(source, id);
+        if (tasks.remove(key) == null) return;
         details.remove(key);
         deck.dismiss(key);
+        publishWorking();
     }
 
     /**
@@ -158,5 +206,8 @@ public final class ActivityNotifier implements AutoCloseable {
         activate = () -> { };
         details.clear();
         connections.clear();
+        tasks.clear();
+        publishWorking();
+        working = value -> {};
     }
 }

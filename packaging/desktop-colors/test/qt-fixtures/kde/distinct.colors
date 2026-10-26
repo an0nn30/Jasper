@@ -1,0 +1,12 @@
+[Colors:Window]
+BackgroundNormal=11,12,13
+ForegroundNormal=211,212,213
+[Colors:View]
+BackgroundNormal=21,22,23
+ForegroundNormal=221,222,223
+[Colors:Selection]
+BackgroundNormal=31,32,33
+ForegroundNormal=231,232,233
+[Colors:Tooltip]
+BackgroundNormal=41,42,43
+ForegroundNormal=241,242,243

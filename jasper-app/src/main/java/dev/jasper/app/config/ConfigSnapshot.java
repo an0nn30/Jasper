@@ -17,7 +17,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                       Map<String, Map<String, Object>> plugins, UiFontConfig uiFont,
                       int railWidth, int toolbarHeight, int statusBarHeight, boolean nativeDecorations,
                       ViewMode viewMode, GlassSettings glass, AnimationSettings animations,
-                      AppearanceMode appearance, TerminalSchemeChoice terminalScheme, String darkTheme, String lightTheme) {
+                      AppearanceMode appearance, TerminalSchemeChoice terminalScheme, String darkTheme, String lightTheme, String desktopSource) {
     /** The rail's width in logical pixels without {@code window.rail_width}, and its limits. */
     public static final int DEFAULT_RAIL_WIDTH = 28, MIN_RAIL_WIDTH = 28, MAX_RAIL_WIDTH = 64;
     /** The toolbar (and unified macOS title bar) height in logical pixels without {@code window.toolbar_height}, and its limits. */
@@ -49,6 +49,10 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         Objects.requireNonNull(terminalScheme, "terminalScheme");
         Objects.requireNonNull(darkTheme, "darkTheme");
         Objects.requireNonNull(lightTheme, "lightTheme");
+        Objects.requireNonNull(desktopSource, "desktopSource");
+        CoreSettings.UI_THEME_DESKTOP_SOURCE.kind().check(desktopSource).ifPresent(problem -> {
+            throw new IllegalArgumentException("ui.theme.desktop_source: " + problem);
+        });
         keybindings = Map.copyOf(keybindings);
         // Plugin tables arrive deeply immutable from the loader; only the outer map is copied here.
         plugins = Map.copyOf(plugins);
@@ -80,7 +84,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             false, PaletteSettings.DEFAULT_VISIBLE_ROWS, 10, CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue(), Map.of(),
             UiFontConfig.defaults(), DEFAULT_RAIL_WIDTH, DEFAULT_TOOLBAR_HEIGHT, DEFAULT_STATUS_BAR_HEIGHT, false, ViewMode.NORMAL,
             GlassSettings.UNSET, AnimationSettings.defaults(), AppearanceMode.SYSTEM, TerminalSchemeChoice.MATCH,
-            CoreSettings.UI_THEME_DARK.defaultValue(), CoreSettings.UI_THEME_LIGHT.defaultValue());
+            CoreSettings.UI_THEME_DARK.defaultValue(), CoreSettings.UI_THEME_LIGHT.defaultValue(), CoreSettings.UI_THEME_DESKTOP_SOURCE.defaultValue());
     }
 
     /** The defaults under {@code source}: the core defaults with the look's defaults of its allowlisted keys (spec 5.8). */
@@ -114,7 +118,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                 values.get(CoreSettings.TERMINAL_ENV), values.get(CoreSettings.TERMINAL_SCROLLBACK), values.get(CoreSettings.TERMINAL_OPTION_AS_META),
                 values.get(CoreSettings.TERMINAL_CURSOR_SHAPE), values.get(CoreSettings.TERMINAL_CURSOR_BLINK),
                 values.get(CoreSettings.TERMINAL_DIM_INACTIVE_PANES), values.get(CoreSettings.TERMINAL_COPY_ON_SELECT),
-                values.get(CoreSettings.TERMINAL_BELL), values.get(CoreSettings.TERMINAL_ON_EXIT), values.get(CoreSettings.TERMINAL_SHELL_INTEGRATION)),
+                values.get(CoreSettings.TERMINAL_BELL), values.get(CoreSettings.TERMINAL_ON_EXIT), values.get(CoreSettings.TERMINAL_SHELL_INTEGRATION),
+                values.get(CoreSettings.TERMINAL_TAB_NAME)),
             values.get(CoreSettings.BUDDY_ENABLED), values.get(CoreSettings.PALETTE_VISIBLE_ROWS),
             values.get(CoreSettings.NOTIFICATIONS_LONG_COMMAND_SECONDS), values.get(CoreSettings.SYSTEM_RUN_IN_BACKGROUND), plugins,
             new UiFontConfig(values.get(CoreSettings.UI_FONT_FAMILY), values.get(CoreSettings.UI_FONT_SIZE)),
@@ -126,7 +131,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                 AnimationSettings.DEFAULT_CLOSE_MILLIS, AnimationSettings.DEFAULT_SWITCH_MILLIS),
             values.get(CoreSettings.UI_APPEARANCE),
             TerminalSchemeChoice.parse(values.get(CoreSettings.TERMINAL_SCHEME)).orElse(TerminalSchemeChoice.MATCH),
-            values.get(CoreSettings.UI_THEME_DARK), values.get(CoreSettings.UI_THEME_LIGHT));
+            values.get(CoreSettings.UI_THEME_DARK), values.get(CoreSettings.UI_THEME_LIGHT), values.get(CoreSettings.UI_THEME_DESKTOP_SOURCE));
     }
 
     public KeyBindings bindings(boolean macOs) {
@@ -158,6 +163,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private TerminalSchemeChoice terminalScheme;
         private String darkTheme;
         private String lightTheme;
+        private String desktopSource;
         private int railWidth;
         private int toolbarHeight;
         private int statusBarHeight;
@@ -184,6 +190,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             terminalScheme = source.terminalScheme();
             darkTheme = source.darkTheme();
             lightTheme = source.lightTheme();
+            desktopSource = source.desktopSource();
             railWidth = source.railWidth();
             toolbarHeight = source.toolbarHeight();
             statusBarHeight = source.statusBarHeight();
@@ -204,6 +211,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder terminalScheme(TerminalSchemeChoice value) { terminalScheme = value; return this; }
         public Builder darkTheme(String value) { darkTheme = value; return this; }
         public Builder lightTheme(String value) { lightTheme = value; return this; }
+        public Builder desktopSource(String value) { desktopSource = value; return this; }
         public Builder keybindings(Map<String, String> value) { keybindings = Map.copyOf(value); return this; }
         public Builder columns(int value) { columns = value; return this; }
         public Builder lines(int value) { lines = value; return this; }
@@ -218,7 +226,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public ConfigSnapshot build() {
             return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, keybindings, columns, lines, terminal, buddyEnabled,
                 visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, railWidth, toolbarHeight, statusBarHeight,
-                nativeDecorations, viewMode, glass, animations, appearance, terminalScheme, darkTheme, lightTheme);
+                nativeDecorations, viewMode, glass, animations, appearance, terminalScheme, darkTheme, lightTheme, desktopSource);
         }
     }
 }

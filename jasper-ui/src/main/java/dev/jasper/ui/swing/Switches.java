@@ -95,7 +95,7 @@ final class Switches {
                 int knob = ThemePainting.metric(context, compact ? DesignMetrics.Role.COMPACT_SWITCH_KNOB : DesignMetrics.Role.SWITCH_KNOB);
                 int x = (getWidth()-w)/2, y = (getHeight()-h)/2;
                 if (error || focus.visible()) {
-                    g.setColor(ColorMath.opacity(ThemePainting.color(context, error ? SemanticColor.BORDER_ERROR : SemanticColor.BORDER_FOCUS), ThemePainting.focusHaloShare(context, error)));
+                    g.setColor(ThemePainting.focusHaloColor(context, error));
                     g.fillRoundRect(x-ring, y-ring, w+2*ring, h+2*ring, h+2*ring, h+2*ring);
                 }
                 Color on = ThemePainting.color(context, SemanticColor.ACCENT), off = ThemePainting.color(context, SemanticColor.TOGGLE_TRACK_OFF),

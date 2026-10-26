@@ -13,7 +13,8 @@ public enum BuddyFrame {
     IDLE, BLINK, WINK, WAVE_A, WAVE_B, HOP, LEAN_LEFT, LEAN_RIGHT,
     SIT, SIT_BLINK, TUCK, SLEEP_A, SLEEP_B, SLEEP_C,
     SPARKLE_A, SPARKLE_B, SPARKLE_C,
-    TYPE_A, TYPE_B, TYPE_REST;
+    TYPE_A, TYPE_B, TYPE_REST,
+    CLOSE_LAPTOP, LOWER_LAPTOP, RISE;
 
     public int column() { return ordinal(); }
 }

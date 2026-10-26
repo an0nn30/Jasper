@@ -44,7 +44,7 @@ public final class BuddyNotificationPreview {
                         g.scale(2, 2);
                         sprite.paint(g, BuddyFrame.TYPE_A, 2, 249, 108);
                         g.translate(79 - BuddyColumnPanel.MARGIN,
-                            22 - BuddyColumnPanel.MARGIN - BuddyColumnPanel.ARRIVAL_ROOM);
+                            22 - BuddyColumnPanel.MARGIN);
                         panel.paint(g);
                     } finally { g.dispose(); }
                     try {

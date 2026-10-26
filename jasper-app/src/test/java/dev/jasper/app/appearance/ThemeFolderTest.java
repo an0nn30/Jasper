@@ -98,4 +98,18 @@ class ThemeFolderTest {
         assertThatThrownBy(() -> folder.remove("catppuccin-latte")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> folder.remove("../config")).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void desktopColorsCannotBeImportedOrRemoved() throws Exception {
+        var folder = new ThemeFolder(home.resolve("themes"));
+        assertThatThrownBy(() -> folder.prepare(source("desktop.json", ThemeTestSupport.uiThemeJson("Desktop colors"))))
+            .isInstanceOf(ThemeFolder.ImportFailure.class).hasMessageContaining("Desktop colors");
+        assertThat(folder.fixed("desktop-colors")).isTrue();
+        Files.createDirectories(folder.folder());
+        var collision = Files.writeString(folder.folder().resolve("desktop-colors.json"), "kept");
+        assertThatThrownBy(() -> folder.remove("desktop-colors")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(collision).hasContent("kept");
+        var candidate = new ThemeFolder.Candidate("desktop-colors", "Desktop colors", true, "replacement".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThatThrownBy(() -> folder.install(candidate)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(collision).hasContent("kept");
+    }
+
 }

@@ -1,0 +1,14 @@
+--- a/src/corelib/global/qfloat16.h
++++ b/src/corelib/global/qfloat16.h
+@@ -45,0 +46 @@
++#include <limits>
+--- a/src/corelib/global/qendian.h
++++ b/src/corelib/global/qendian.h
+@@ -45,0 +46,2 @@
++
++#include <limits>
+--- a/src/corelib/text/qbytearraymatcher.h
++++ b/src/corelib/text/qbytearraymatcher.h
+@@ -43,0 +44,2 @@
++
++#include <limits>

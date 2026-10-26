@@ -539,11 +539,23 @@ final class HostedUi {
                 requireUi("onVisibility");
                 return wrap(site.onVisibility(value -> containment.run(pluginId, "panel visibility", () -> handler.accept(value))));
             }
+            @Override public dev.jasper.sdk.ui.PanelPlacement placement() { requireUi("placement"); return HostedUi.placement(site.placement()); }
+            @Override public Subscription onPlacement(Consumer<dev.jasper.sdk.ui.PanelPlacement> handler) {
+                requireUi("onPlacement");
+                java.util.Objects.requireNonNull(handler, "handler");
+                return wrap(site.onPlacement(value -> containment.run(pluginId, "panel placement", () -> handler.accept(HostedUi.placement(value)))));
+            }
             @Override public Subscription onClosed(Runnable handler) {
                 requireUi("onClosed");
                 return wrap(site.onClosed(() -> containment.run(pluginId, "panel closed", handler)));
             }
         };
+    }
+
+    /** A slot is the SDK's anchor plus split, as {@link #panels()} reads a spec's; the dock's own Side is not the SDK's. */
+    private static dev.jasper.sdk.ui.PanelPlacement placement(PanelSite.Placement value) {
+        return new dev.jasper.sdk.ui.PanelPlacement(dev.jasper.sdk.ui.Anchor.valueOf(value.slot().side().name()),
+            value.slot().split(), dev.jasper.sdk.ui.PanelMode.valueOf(value.mode().name()));
     }
 
     Rail rail() {

@@ -313,7 +313,7 @@ class SettingsPagesMockTest {
             var context = PageKit.context(draft, ignored -> { }, () -> { });
             for (boolean glass : new boolean[] {false, true}) {
                 assertWorkspace(CorePages.pages(AppearanceFixtures.CHOICES, system, ShellChoices.NONE,
-                    NotificationGroupChoices.NONE, supplied, glass).apply(context), glass);
+                    NotificationGroupChoices.NONE, TabNameChoices.NONE, supplied, glass).apply(context), glass);
             }
             assertWorkspace(CorePages.pages(AppearanceFixtures.CHOICES, system, ShellChoices.NONE,
                 NotificationGroupChoices.NONE, supplied).apply(context), com.formdev.flatlaf.util.SystemInfo.isMacOS);

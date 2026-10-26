@@ -83,8 +83,8 @@ final class BottomStrip extends DockStripe {
             var label = new StripeLabels.Label(window, labels.icon(window.icon()), this::paintLabel);
             label.setSelected(window.selected());
             label.addActionListener(event -> onToggle.accept(window.id()));
-            label.setComponentPopupMenu(ToolWindowMenu.create(window.slot(), window.selected(),
-                slot -> onMove.accept(window.id(), slot), () -> onHide.accept(window.id())));
+            label.setComponentPopupMenu(ToolWindowMenu.create(window.slot(), window.mode(), window.selected(),
+                slot -> onMove.accept(window.id(), slot), mode -> onMode.accept(window.id(), mode), () -> onHide.accept(window.id())));
             LabelledStripe.describe(label);
             groups.get(window.slot()).add(label);
             byId.put(window.id(), label);
@@ -99,7 +99,7 @@ final class BottomStrip extends DockStripe {
         StripeLabels.Label label = byId.get(id);
         if (label == null) return;
         var window = label.window;
-        label.window = new ToolStripe.Button(window.id(), window.title(), window.icon(), window.slot(), window.selected(), badge, window.number());
+        label.window = new ToolStripe.Button(window.id(), window.title(), window.icon(), window.slot(), window.selected(), badge, window.number(), window.mode());
         LabelledStripe.describe(label);
         revalidate();
         doLayout();

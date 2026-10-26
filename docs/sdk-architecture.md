@@ -126,7 +126,7 @@ fails to load is posted as "*name* could not be loaded".
 | --- | --- |
 | `Plugin.start` and `stop`, registrations, event delivery, settings listeners, view events, action handlers, palette scopes, file source methods, subcommand handlers | The UI thread (the event dispatch thread) |
 | `background()` tasks | One virtual thread per task, `jasper-plugin-<id>-<n>`; tasks may run at the same time; each runs contained |
-| `Events.publish`, activity and connection handles, notification posts, `Setting.get` and `set`, `PaneHandle.sendText`, `sendBytes` and `paste`, `Services.find` and `require`, closing a `Subscription` | Any thread |
+| `Events.publish`, activity and connection handles, notification posts, `Setting.get` and `set`, `PaneHandle.sendText`, `sendBytes` and `paste`, `TabNamePiece.set`, `Services.find` and `require`, closing a `Subscription` | Any thread |
 | Saving a setting | A virtual thread, `jasper-plugin-settings-save`; a successful save completes the returned stage on the UI thread, a failed write completes it exceptionally on the save thread, and an invalid value or a save after the plugin stopped fails it at once |
 | Reading changed plugin settings files | The daemon `jasper-plugin-settings` polls every second; listeners run on the UI thread |
 | `PaneHandle.foregroundJob()` | Completes on a virtual thread, `jasper-foreground-job` |
@@ -183,7 +183,8 @@ lazily built instance per panel and docks the panels in the window's `DockState`
 showing window; per-side sizes and ratios). One listener on that state builds what starts showing, lays out
 `ToolWindowArea` (the terminal column, the tab strip over the deck, and a frame with a `ToolWindowHeader` for each
 showing slot, placed by the pure `DockGeometry`: the bottom area spans the full width, the sides and the terminal
-column run from the toolbar to it), renders the window's stripes (the two `ToolStripe` rails, or under the Enterprise
+column run from the toolbar to it), opens, moves and closes the native windows of the tool windows detached as Float or
+Window (`DetachedToolWindows`), renders the window's stripes (the two `ToolStripe` rails, or under the Enterprise
 look the labelled `LabelledStripe`s and the `BottomStrip`, all `DockStripe`s of its `StripeSet`), tells the panels and
 saves.
 
@@ -193,11 +194,15 @@ left, right and bottom edges, a side split at half the side panels' visible heig
 the stripes open a gap, and `DockDropOverlay` on the layered pane's `DRAG_LAYER` previews the landing with
 `DockGeometry.landing`, the layout's function on a copy of the state, except that the guide for a second slot (Left
 Bottom, Right Bottom, Bottom Right) is always that slot's half. A stripe drop moves the window and keeps its
-visibility; a workspace drop moves and shows it.
+visibility; a workspace drop moves and shows it. A release outside the window, or over another of Jasper's windows in
+front of it, is the Detach target: the tool window opens in a Float window where it is released, or a detached one's
+window moves there.
 
 Requests to show, hide or toggle a panel travel through the model tagged with a window id, and
-`Contributions.panelRoute` sends a child window's to the main window. Every panel's toggle action is listed under View › Tool Windows (in the
-Enterprise look, the Window menu): the application-registered `<panel id>.toggle`, or the plugin's own action named by
+`Contributions.panelRoute` sends a child window's to the main window, where a toggle only shows: the main window comes
+forward, or for a detached tool window its own window (an activating show raises it even when it already shows). Every
+panel's toggle action is listed under View › Tool Windows (in the Enterprise look, the Window menu): the
+application-registered `<panel id>.toggle`, or the plugin's own action named by
 `PanelSpec.toggleActionId`, which must already be registered, so a plugin action that toggles a panel appears once in
 the menu and the palette. The application-registered toggle requests an activating toggle
 (`PanelRequest.Op.ACTIVATING_TOGGLE`), and a stripe press toggles the same way: under flush frames
@@ -215,10 +220,20 @@ hidden and updates a live header without rebuilding the content, and closing the
 is a kit `Panel` view shows the same metadata in its own header row, which the tool window borrows
 (`KitView.setPanelHostHeader`), so there is never a second header.
 
-`persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order and visibility, the dock's sizes
-and ratios (the default look's, and each other look's under `[look."<id>"]`), Zen mode, stripe visibility, auxiliary
-window bounds and the dragged command palette's place; `workspace.toml` holds the windows themselves. It is application state, not configuration: a bad
-panel, window or dock entry falls back alone, an unreadable file falls back to defaults, and writes are atomic.
+A panel hears where it is through `PanelHost.placement()` and `onPlacement`, which `HostedUi.host` adapts from `PanelSite`'s
+`Placement` (the panel's `dock.Slot`, its stripe button's while it has a window of its own, and its `ToolWindowMode`) to the
+SDK's `PanelPlacement` (anchor, split and `PanelMode`); `window()` stays the main window while the panel is detached. The
+`WindowContributions` listener tells each built panel whose id is in the dock change's `placed` (its slot or mode changed)
+after its component is in its new place, once per effective change of the place it was built in or last heard, never for
+visibility alone or a move within its half. A listener that moves the panel again ends the round, so the listeners after it
+never hear the place it overtook; a failing handler is contained, and nothing runs after the panel closes. A plugin that lays
+a panel out another way describes another `ViewSpec` and calls `UiView.update`, as the Sample plugin's does.
+
+`persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order, visibility, mode and own window's
+bounds, the dock's sizes and ratios (the default look's, and each other look's under `[look."<id>"]`), Zen mode, stripe
+visibility, auxiliary window bounds and the dragged command palette's place; `workspace.toml` holds the windows
+themselves. It is application state, not configuration: a bad panel, window or dock entry falls back alone, an
+unreadable file falls back to defaults, and writes are atomic.
 
 Plugin dialogs and the application's auxiliary windows follow the `WindowFrame`/`WindowContent` split.
 `AuxiliarySurface` holds the content, title, closing guards and lifetime and is tested headlessly; `NativeShells` is
@@ -360,6 +375,9 @@ the Custom shell settings may not be reported. Both need `terminal.open`. The ca
 `PluginRuntime.ShellProfiles`. `HostedTerminals` checks a `LocalSpec` profile against the catalog: an id it does not
 list logs a warning and opens nothing. An empty profile starts what Jasper's own New
 Tab would; a plugin's split with an empty profile starts the default profile.
+
+Tab name pieces (`TabNamePieceSpec`, `TabNamePiece`, `Terminals.addTabNamePiece`, `TabHandle.namePieces`) feed the Tab
+name pattern; the app keeps plugin pieces in `contributions.TabNamePieces`, which windows and Settings read.
 
 ## Provided sessions
 

@@ -25,6 +25,7 @@ import dev.jasper.sdk.ui.ToolbarItem;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiView;
 import dev.jasper.sdk.ui.ViewSpec;
 import java.util.List;
 import java.util.Optional;
@@ -80,6 +81,7 @@ public final class SamplePlugin implements Plugin {
 
     // example:pluginui:start
     private static void installUi(PluginContext context, long stepMillis) {
+        installInputDemo(context);
         PluginAction[] demo = new PluginAction[1];
         demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
                 .withIcon("dev.jasper.sample:flask")
@@ -110,19 +112,16 @@ public final class SamplePlugin implements Plugin {
 
     // example:pluginpanels:start
     private static void installPanelAndAboutTab(PluginContext context, long stepMillis) {
-        // Built the first time the panel shows in the main window, the only window with tool windows. Its body is the kit's empty state:
-        // a tile, a title, one sentence and one secondary action, centered in the panel.
-        context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host ->
-            context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
-                new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
-                Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
-                    new Nodes.Icon("sample.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"),
-                    "Sample Activity", "Runs a short demo activity in the background.",
-                    List.of(new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run Sample Activity", "", Nodes.ButtonKind.SECONDARY, RUN_BUTTON, ""))),
-                Optional.empty())), event -> {
-                    if (event instanceof UiEvent.Action action && action.id().equals(RUN_BUTTON))
-                        context.background().execute(() -> demo(context, stepMillis));
-                }));
+        // Built the first time the panel shows, docked in the main window or in a window of its own, as the user chooses.
+        // The view starts with the body for where the panel is now; a move to or from a window of its own describes the other.
+        context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host -> {
+            UiView view = context.kit().create(panelBody(host.placement().ownWindow()), event -> {
+                if (event instanceof UiEvent.Action action && action.id().equals(RUN_BUTTON))
+                    context.background().execute(() -> demo(context, stepMillis));
+            });
+            host.onPlacement(placement -> view.update(panelBody(placement.ownWindow())));
+            return view;
+        });
 
         ContentTab[] about = {null};
         // A tab in the given window, which Jasper draws with its strip; an open About is selected again.
@@ -158,6 +157,19 @@ public final class SamplePlugin implements Plugin {
             return java.util.Optional.empty();
         });
         context.rail().add("dev.jasper.sample.about");
+    }
+
+    /** The kit's empty state: a tile, a title, one sentence and one secondary action, centered in the panel. */
+    private static ViewSpec panelBody(boolean ownWindow) {
+        String sentence = ownWindow ? "This tool window has a window of its own. It runs a short demo activity in the background."
+            : "Runs a short demo activity in the background.";
+        return new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,
+            new Nodes.Header("sample.header", ControlState.READY, "Sample", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+            Optional.empty(), new Nodes.Empty("sample.body", ControlState.READY,
+                new Nodes.Icon("sample.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"),
+                "Sample Activity", sentence,
+                List.of(new Nodes.Button(RUN_BUTTON, ControlState.READY, "Run Sample Activity", "", Nodes.ButtonKind.SECONDARY, RUN_BUTTON, ""))),
+            Optional.empty()));
     }
     // example:pluginpanels:end
 
@@ -258,6 +270,26 @@ public final class SamplePlugin implements Plugin {
         });
     }
     // example:pluginpalette:end
+
+    // example:plugininput:start
+    private static void installInputDemo(PluginContext context) {
+        String actionId = "dev.jasper.sample.input";
+        ActivityHandle[] waiting = new ActivityHandle[1]; // accessed only by the UI-thread action
+        context.actions().register(ActionSpec.of(actionId, "Run or Confirm Sample Input Activity"), invoked -> {
+            if (waiting[0] == null) {
+                waiting[0] = context.activities().begin(new ActivitySpec("Sample confirmation", "Preparing",
+                    Optional.of(actionId), Optional.empty()));
+                waiting[0].needsInput("Activate this activity to confirm and continue");
+            } else {
+                ActivityHandle activity = waiting[0];
+                waiting[0] = null;
+                activity.resume("Confirmed; continuing");
+                context.background().execute(() -> activity.succeed("Confirmed"));
+            }
+        });
+        context.menus().standard(StandardMenu.TOOLS).add(actionId);
+    }
+    // example:plugininput:end
 
     private static void demo(PluginContext context, long stepMillis) {
         ActivityHandle activity = context.activities().begin(

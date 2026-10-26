@@ -23,6 +23,7 @@ listed per type in the API reference; the main ones:</p>
 <tr><td>{@link Setting#get()}, {@link Setting#set(Object)}</td><td>A successful save completes its future on the UI thread; a failed one may complete it on another thread, so hop to the UI thread before touching the UI.</td></tr>
 <tr><td>{@link Services#find(Class)}, {@link Services#require(Class)}</td><td>Cache reads that run no provider code.</td></tr>
 <tr><td>{@link PaneHandle#sendText(String)}, {@link PaneHandle#sendBytes(byte[])}, {@link PaneHandle#paste(String)}</td><td>Calls from one thread keep their order.</td></tr>
+<tr><td>{@link TabNamePiece#set(TabHandle,String)}</td><td>Jasper applies the value on the UI thread.</td></tr>
 <tr><td>{@link PendingSession}</td><td>Every method, also after the plugin stopped.</td></tr>
 <tr><td>{@link CommandCall#out(String)}, {@link CommandCall#err(String)}</td><td>Write to the caller's terminal while the call runs.</td></tr>
 <tr><td>{@link Platform#openInEditor(Path)}, {@link Platform#browse(URI)}</td><td>They do their work in the background.</td></tr>

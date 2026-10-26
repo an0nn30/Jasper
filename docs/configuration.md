@@ -148,7 +148,7 @@ the reason in the footer.
 | System Settings | Appearance & Behavior | **General**: Run in background; **Java Virtual Machine**; **Command line**; **Configuration file**: Location (**Open in Editor**, **Reveal**), Reload from disk (**Reload**), Migrate old settings (**Migrate…**) | [Background residency](#background-residency) |
 | Keymap | | Every shortcut | [Shortcuts](#shortcuts) |
 | Plugins | | Installed plugins ([Plugins](plugins.md)) | [Plugins](#plugins) |
-| Terminal | | Scrollback lines, Bell, When the shell exits, Copy on select, Option key as Meta (macOS), Dim inactive panes | [Supported settings](#supported-settings) |
+| Terminal | | Tab name, Scrollback lines, Bell, When the shell exits, Copy on select, Option key as Meta (macOS), Dim inactive panes | [Supported settings](#supported-settings) |
 | Font & Colors | Terminal | **Font**: Font, Font size, Fallback fonts, Ligatures, Line height; **Colors**: Terminal colors (**Choose Scheme…** opens Appearance) | [Terminal colors](#terminal-colors) |
 | Cursor | Terminal | Cursor shape, Blinking cursor | [Supported settings](#supported-settings) |
 | Shell | Terminal | Shell profile, Shell program, Shell arguments, Environment variables, Shell integration | [Shell, environment and history](#shell-environment-and-history) |
@@ -184,6 +184,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `terminal.scrollback` | integer | `10000` | 0–1000000 lines; `0` keeps no scrollback | New panes | Terminal › Scrollback lines |
 | `terminal.option_as_meta` | string | `"left"` | `"left"`, `"right"`, `"both"`, `"none"`: which Option key sends Meta, on macOS only | Live | Terminal › Option key as Meta (Left Option, Right Option, Both, Neither); hidden on Linux and Windows |
 | `terminal.dim_inactive_panes` | number | `0.3` | 0–1: `0` does not dim panes without focus, `1` dims them fully | Live | Terminal › Dim inactive panes |
+| `terminal.tab_name` | string | `"{dir} {process} {title}"` | 1–200 characters: free text with pieces in braces ([Tab names](#tab-names)) | Live | Terminal › Tab name |
 | `terminal.copy_on_select` | boolean | `false` | Copies a finished selection to the clipboard | Live | Terminal › Copy on select |
 | `terminal.bell` | string | `"visual"` | `"visual"` (a short flash), `"sound"` (the system beep), `"none"` | Live | Terminal › Bell |
 | `terminal.on_exit` | string | `"keep_open"` | When a pane's shell exits: `"keep_open"` keeps the pane and its output, `"close_on_success"` closes it after exit code 0, `"close"` closes it after any exit | Live, for later exits | Terminal › When the shell exits (Keep the pane open, Close when it succeeds, Close) |
@@ -201,8 +202,9 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `terminal.cursor.blink` | boolean | `true` | | Live | Cursor › Blinking cursor |
 | `terminal.env` | table | `{}` | Environment variables for new shells ([Shell](#shell-environment-and-history)) | New panes | Shell › Environment variables |
 | `ui.appearance` | string | `"system"` | `"system"`, `"dark"`, `"light"` ([Theme](#theme)) | Live | Appearance › Dark, Light, Match System |
-| `ui.theme.dark` | string | `"jasper-meadow"`, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Dark theme |
-| `ui.theme.light` | string | `"jasper-meadow"`, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Light theme |
+| `ui.theme.dark` | string | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Dark theme |
+| `ui.theme.desktop_source` | string | `"auto"` | `"auto"`, `"qt"`, `"gtk3"`, `"gtk4"` | Live | Desktop color source |
+| `ui.theme.light` | string | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Light theme |
 | `ui.font.family` | string | `"system"` | `"system"` or a font family name ([Interface font](#interface-font)) | Live | Appearance › Font |
 | `ui.font.size` | number | Not set: the look's size | 8–32 points | Live | Appearance › Use platform font size, Font size |
 | `ui.workspace.opacity` | number | Not set: opaque | 10–100 percent: the opacity of terminal and editor backgrounds, the Editor's Markdown preview included; macOS only | Live | Appearance › Enable opacity, Opacity (macOS) |
@@ -398,6 +400,25 @@ that runs a program, such as an editor, closes after exit code 0 and keeps its o
 
 On macOS, `terminal.option_as_meta` decides which Option key sends Meta (Escape and the key) to the terminal; `"none"`
 leaves both for typing special characters. On Linux and Windows, Alt always sends Meta, except together with Ctrl.
+
+### Tab names
+
+`terminal.tab_name` names every Terminal tab: free text with pieces in braces, applied as you save. A tab you named
+with **Rename Tab** keeps that name. The default, `{dir} {process} {title}`, shows `moray claude Fix tab names` while
+Claude runs and has set a title, and `moray zsh` at the prompt.
+
+| Piece | Shows |
+| --- | --- |
+| `{dir}` | The name of the pane's [working directory](terminal.md#working-directory), `~` for your home folder: the folder its shell last reported, else the one the pane started in (PowerShell and Command Prompt report one only with [setup of your own](terminal.md#wsl-powershell-and-other-shells)); on another host, the last name of the path its shell reports |
+| `{full}` | The whole path of that directory, with your home folder as `~`; on another host, the path its shell reports |
+| `{process}` | The running program, such as `zsh`, `vim` or `claude`; on Windows and in a plugin's session, the shell's or session's name |
+| `{title}` | The title the shell or a program set (OSC 0, 1 or 2) |
+
+Plugins add pieces of their own, such as Remote's `{host}`; a piece that nothing provides shows nothing. A piece without a
+value takes the text before it with it, or the text after it when no piece before it shows, so
+`{dir} | {process} | {title}` without a title reads `moray | zsh`. Text before the first piece and after the last always
+shows. `{{` and `}}` write a brace. A pattern that comes out empty names the tab after its shell. Settings › Terminal ›
+Tab name previews the name the pattern gives the tab you are using.
 
 ### Terminal font
 
@@ -609,6 +630,7 @@ next one's, a resident Jasper's included. The windows themselves are in [`worksp
 | `[dock]` `left_width`, `right_width`, `bottom_height` | The dock areas' sizes, in unscaled pixels |
 | `[dock]` `left_ratio`, `right_ratio`, `bottom_ratio` | How each area divides between its two slots |
 | `[panels."<id>"]` `slot`, `order`, `visible` | A tool window's slot (`LEFT_TOP`, `LEFT_BOTTOM`, `BOTTOM_LEFT`, `RIGHT_TOP`, `RIGHT_BOTTOM` or `BOTTOM_RIGHT`), its place on the stripe, and whether it showed |
+| `[panels."<id>"]` `mode`, `window` | `"float"` or `"window"` for a tool window with a window of its own (a docked one has no `mode`; the `slot` of one with a window is where its button sits and where it docks back), and that window's bounds, `{ x, y, width, height }` in screen coordinates, kept after the tool window docks again ([Float and Window](workspace.md#float-and-window)) |
 | `[look."<plugin id>".dock]`, `[look."<plugin id>".panels."<id>"]` | The same for a plugin's look, such as Enterprise, which keeps a layout of its own |
 | `[windows."<id>"]` `x`, `y`, `width`, `height` | Where Settings (`app.settings`), the file chooser (`file-chooser`), About (`jasper.about`), Licenses (`jasper.licenses`) and a plugin's window-sized dialog, under its plugin id and title, such as the Credential Vault manager (`dev.jasper.vault\|Credential Vault`), were |
 | `[palette]` `center_x`, `top` | Where the palette card was dragged, as fractions of the window |

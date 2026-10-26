@@ -1,15 +1,20 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.TabNames;
 import dev.jasper.app.config.TerminalConfig;
+import dev.jasper.app.config.TitleTemplate;
 /** Applies saved values on the EDT: window chrome always takes them; a pane's own font size survives reloads that keep the saved size. */
 final class WorkspaceConfiguration {
     private final WindowContent owner;
     private ConfigSnapshot configured;
     private float configuredFontSize = TerminalPane.DEFAULT_FONT_SIZE;
+    private TitleTemplate tabName = TabNames.DEFAULT_PATTERN;
     WorkspaceConfiguration(WindowContent owner) { this.owner = owner; }
     ConfigSnapshot snapshot() { return configured; }
     float configuredFontSize() { return configuredFontSize; }
+    /** The saved tab name pattern, parsed (tab names spec 3). */
+    TitleTemplate tabName() { return tabName; }
 
     void apply(ConfigSnapshot next, boolean macOs) {
         if (owner.closed()) return;
@@ -45,6 +50,10 @@ final class WorkspaceConfiguration {
                 if (dimChanged) pane.setConfiguredDim(next.terminal().dimInactivePanes());
                 if (exitChanged) pane.setShellExitBehavior(next.terminal().onExit());
             }
+        }
+        if (previous == null || !previous.terminal().tabName().equals(next.terminal().tabName())) {
+            tabName = TitleTemplate.parse(next.terminal().tabName());
+            for (TerminalContent terminal : owner.terminalTabs()) terminal.onChanged.run();
         }
         // A plugin's view in a pane dims under an overlay of the configured amount too (workspace plan 8a Rulings 12).
         if (dimChanged) owner.dimPanes();

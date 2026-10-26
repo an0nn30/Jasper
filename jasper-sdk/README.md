@@ -29,7 +29,7 @@ third-party plugin. The SDK depends only on the JDK.
 | [`dev.jasper.sdk.services`](../docs/sdk-reference.html#package-dev.jasper.sdk.services) | `Services`, plugin-to-plugin services, and `ServiceUnavailableException` |
 | [`dev.jasper.sdk.settings`](../docs/sdk-reference.html#package-dev.jasper.sdk.settings) | Declared settings (`PluginSettings`, `SettingSpec`, `SettingKind`, `Choice`, `EditorHint`, `Applies`, `Setting`) and a plugin's own Settings page (`SettingsPanel`, `SettingsPanelHost`) |
 | [`dev.jasper.sdk.notifications`](../docs/sdk-reference.html#package-dev.jasper.sdk.notifications) | `Notifications`, `NotificationGroup`, `GroupSpec`, `DisplayMode`, `NotificationSpec`, `NotificationAction`, `NotificationHandle`, `Severity` |
-| [`dev.jasper.sdk.terminal`](../docs/sdk-reference.html#package-dev.jasper.sdk.terminal) | Windows, tabs and panes (`Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `RemoteDirectory`, `TerminalEvents`); local terminals (`OpenRequest`, `LocalSpec`, `Direction`, `ShellProfileInfo`); sessions a plugin provides (`SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy`, `SessionKind`, `SessionState`) |
+| [`dev.jasper.sdk.terminal`](../docs/sdk-reference.html#package-dev.jasper.sdk.terminal) | Windows, tabs and panes (`Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `RemoteDirectory`, `TerminalEvents`, `TabNamePieceSpec`, `TabNamePiece`); local terminals (`OpenRequest`, `LocalSpec`, `Direction`, `ShellProfileInfo`); sessions a plugin provides (`SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy`, `SessionKind`, `SessionState`) |
 | [`dev.jasper.sdk.palette`](../docs/sdk-reference.html#package-dev.jasper.sdk.palette) | Command palette scopes: `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteQuery`, `PaletteRow`, `PaletteResults`, `PaletteStep` |
 | [`dev.jasper.sdk.files`](../docs/sdk-reference.html#package-dev.jasper.sdk.files) | Places in Jasper's file chooser (`FileSources`, `FileSource`, `FileSourceSpec`, `FileRoot`, `FileBrowser`, `FileEntry`) and what `Windows.choose` asks for and returns (`FileChoice`, `FileLocation`) |
 | [`dev.jasper.sdk.cli`](../docs/sdk-reference.html#package-dev.jasper.sdk.cli) | Subcommands of the `jasper` command: `CommandLine`, `CommandHandler`, `CommandCall` |
@@ -41,7 +41,7 @@ third-party plugin. The SDK depends only on the JDK.
 | --- | --- |
 | Actions and where they appear | `Actions`, `ActionSpec`, `ActionContext`, `PluginAction`, `ShortcutContext`, `Toolbar`, `ToolbarItem`, `ToolbarViewFactory`, `Menus`, `StandardMenu`, `PluginMenu`, `StatusBar`, `StatusItemSpec`, `Side`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Rail` |
 | Declarative views | `UiKit`, `ViewSpec`, `Nodes`, `UiView`, `UiEvent`, `ControlState`, `ListItem`, `TableRow`, `TreeItem`, `Column`, `Option`, `MenuItem`, `Crumb`, `CustomContent`, `IconAsset`, `UiAnchor` |
-| Tool windows | `Panels`, `PanelSpec`, `Anchor`, `PanelFactory`, `PanelHost`, `PanelHeader` |
+| Tool windows | `Panels`, `PanelSpec`, `Anchor`, `PanelFactory`, `PanelHost`, `PanelPlacement`, `PanelMode`, `PanelHeader` |
 | Dialogs, content tabs and split items | `Windows`, `WindowSurface`, `DialogSpec`, `PluginDialog`, `OverlaySpec`, `PluginPopover`, `ContentSpec`, `ContentTab`, `TabPlacement`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `SplitItemSpec`, `SplitChoice`, `TabChoice`, `TabRestorer`, `RestoreRequest` |
 | Colours for custom content and the look | `Appearance`, `SemanticColor`, `WorkspacePalette`, `EditorPalette`, `EditorScheme`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Presentation`, `TerminalTypography` |
 | Desktop integration | `Platform`, `FileEditor` |
@@ -54,17 +54,17 @@ Jasper and the testkit implement the other service interfaces; `FileLocation`, `
 
 ## Versioning
 
-[`JasperSdk.VERSION`](../docs/sdk-reference.html#dev.jasper.sdk.JasperSdk.VERSION) is `0.21.0`. A plugin's
+[`JasperSdk.VERSION`](../docs/sdk-reference.html#dev.jasper.sdk.JasperSdk.VERSION) is `0.22.0`. A plugin's
 `plugin.toml` names the SDK versions it runs on as comma-separated comparators (`>=`, `>`, `<=`, `<`, `=`), all of
 which must hold. 0.x carries no compatibility promise, so a plugin admits the one minor version it was built against,
 as the bundled plugins do:
 
 ```toml
-sdk = ">=0.21.0, <0.22"
+sdk = ">=0.22.0, <0.23"
 ```
 
-A plugin that uses something only a later 0.21 version has starts its range there. Every bundled plugin declares
-`sdk = ">=0.21.0, <0.22"`.
+A plugin that uses something only a later 0.22 version has starts its range there. Every bundled plugin declares
+`sdk = ">=0.22.0, <0.23"`.
 
 Jasper checks the range at launch: a plugin whose range does not contain the running SDK is skipped, and Settings ›
 Plugins shows it as Skipped with the reason "needs SDK *range*; this is SDK *version*". Install from Zip… refuses such a

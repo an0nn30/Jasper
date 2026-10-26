@@ -33,11 +33,26 @@ public final class BuddyCompanion implements AutoCloseable {
     private void refresh() { if (window != null) window.refreshDeck(); }
     /** Posts or replaces a nonnull validated notice and promotes it to newest. The oldest notice is dropped beyond 50. */
     public void post(BuddyNotice notice) {
-        requireEdt(); if (closed) return; deck.post(java.util.Objects.requireNonNull(notice)); refresh();
+        post(notice, true);
+    }
+    /** Retains a notice, promotes it to newest, and sets its visibility; the retained limit includes hidden notices. */
+    public void post(BuddyNotice notice, boolean visible) {
+        requireEdt(); if (closed) return; deck.post(java.util.Objects.requireNonNull(notice), visible); refresh();
+    }
+    /** Updates nullable grouping and visibility for a nonnull existing ID without promotion or new attention. */
+    public void updateContext(BuddyNoticeId id, BuddyNotice.Group group, boolean visible) {
+        requireEdt(); if (closed) return; deck.updateContext(id, group, visible); refresh();
     }
     /** Changes the title of an existing ID without promotion or new attention. ID must be nonnull and title nonblank. */
     public void updateTitle(BuddyNoticeId id, String title) {
         requireEdt(); if (closed) return; deck.updateTitle(id, title); refresh();
+    }
+    /** Changes retained state without reposting, promotion or revealing a hidden notice.
+     * @param id notice identity
+     * @param state compatible new state
+     */
+    public void updateState(BuddyNoticeId id, BuddyNotice.State state) {
+        requireEdt(); if (closed) return; deck.updateState(id, state); refresh();
     }
     /** Removes an existing nonnull ID and its retained callbacks; a producer calls it when the work ends. */
     public void dismiss(BuddyNoticeId id) {

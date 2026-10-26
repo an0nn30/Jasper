@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.TabNames;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.terminal.view.FileLink;
@@ -39,6 +40,8 @@ final class TabHost {
         terminal.onError = (message, cause) -> owner.onLaunchFailure.accept(message, cause);
         terminal.lastInWindow = () -> owner.tabCount() == 1;
         terminal.configure = ready -> configure(tab, ready);
+        terminal.tabName = owner::tabNamePattern;
+        terminal.pluginPieces = owner::pluginNamePieces;
         terminal.setBackground(owner.theme().surface());
         terminal.setBackgroundOpacity((float) owner.backgroundOpacity());
         pane.applyTheme(owner.theme());
@@ -57,6 +60,8 @@ final class TabHost {
         terminal.onError = (message, cause) -> { };
         terminal.lastInWindow = () -> false;
         terminal.configure = ready -> { };
+        terminal.tabName = () -> TabNames.DEFAULT_PATTERN;
+        terminal.pluginPieces = id -> java.util.Map.of();
         unwire(terminal.pane());
     }
 
@@ -80,13 +85,16 @@ final class TabHost {
         // Focus going into the pane makes its tab the window's active tab, focus staying put (Rulings 26).
         pane.onFocused = () -> owner.tabFocused(tab);
         pane.onCommandStarted = command -> {
+            present(tab, (TerminalContent) tab.content());
+            owner.publishPresentation();
             long startedAt = System.nanoTime();
             owner.emit(new WorkspaceActivity.Started(pane.id(), command, () -> System.nanoTime() - startedAt,
-                () -> goTo(tab, pane), pane.watched() && owner.isActiveAndOpen() && tab == owner.selectedTab()));
+                () -> goTo(tab, pane), owner.buddyWatched(tab)));
             owner.report(new TerminalEvent.CommandStarted(pane.id(), command));
         };
         pane.onTitleChanged = title -> {
-            owner.emit(new WorkspaceActivity.TitleChanged(pane.id(), title));
+            present(tab, (TerminalContent) tab.content());
+            owner.publishPresentation();
             owner.report(new TerminalEvent.TitleChanged(pane.id(), title));
         };
         pane.onClosed = () -> {

@@ -51,7 +51,7 @@ public interface PluginSettings {
      * Opens Settings at this plugin's page over the active window. UI thread.
      *
      * @throws IllegalStateException off the UI thread, or after the plugin's context closed
-     * @since 0.21.0
+     * @since 0.22.0
      */
     void show();
 }

@@ -39,6 +39,7 @@ import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.MacTitleBand;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.config.TitleTemplate;
 import dev.jasper.app.config.ToolbarMode;
 import dev.jasper.app.config.ViewMode;
 
@@ -147,7 +148,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private KeyBindings baseBindings;
     // One root binding per stroke; dispatch picks the action for where focus is.
     private final java.util.Map<KeyStroke, String> rootKeys = new java.util.HashMap<>();
+    /** The detached tool windows' root bindings, rebound with this window's root ({@link #bindDetachedRoot}). */
+    private final java.util.List<DetachedKeys> detachedKeys = new ArrayList<>();
     private WindowContributions contributed;
+    /** Makes a detached tool window's native window; null until given (headless), and detached windows wait. */
+    private java.util.function.BiFunction<DetachedToolWindows.Opening, DetachedToolWindows.Events, DetachedToolWindows.Shell> detachedShells;
     /** Where this window's tool windows dock: its contributions change it, its area lays it out. */
     private final DockState dock = new DockState();
     private final ToolWindowArea area;
@@ -208,6 +213,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** The tab the palette last heard was active: a layout change that keeps it, such as a maximize, leaves the palette open. */
     private Tab paletteTab;
     private boolean active = true;
+    /** Native showing/non-iconified state used only for Buddy attention. */
+    private boolean buddyWindowVisible;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
     public Runnable onManageCygwinPackages;
     private Runnable openSettings, reloadConfiguration, migrateConfiguration;
@@ -269,6 +276,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         try {
             for (TerminalContent terminal : terminalTabs())
                 listener.accept(new WorkspaceActivity.PaneState(terminal.pane().id(), WorkspaceActivity.State.OPENED));
+            publishPresentation(listener);
         } catch (RuntimeException | Error failure) { activityListeners.remove(listener); throw failure; }
         return new Subscription(() -> activityListeners.remove(listener));
     }
@@ -388,6 +396,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         stripes.bottom().ifPresent(strip -> body.add(strip, BorderLayout.SOUTH));
         dockDrag = new DockDrag(this, dock, area, stripes);
         dockDrag.railsEnabled = this::railsEnabled;
+        // Over another of Jasper's windows in front of this one a dock drag detaches, as outside it. The window manager
+        // gives this window its shared tab drag later, so the query asks the tab drag of the moment.
+        dockDrag.covered = screen -> tabDrag().behind(this, screen);
         for (DockStripe stripe : stripes.all()) stripe.dragSource = dockDrag::install;
         area.dragSource = dockDrag::install;
         area.releaseDragSource = dockDrag::uninstall;
@@ -737,6 +748,101 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     private static Component focusOwner() { return KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner(); }
 
+    /** The actions whose keys hide a detached tool window instead (floating tool windows spec, The detached window). */
+    private static final Set<String> CLOSE_KEYS = Set.of(ActionId.CLOSE_PANE.id(), ActionId.CLOSE_TAB.id(), ActionId.CLOSE_WINDOW.id());
+
+    /**
+     * Binds every keymap stroke on the root pane of one of this main window's detached tool windows (floating tool
+     * windows spec, The detached window), each resolved from the focus owner as on this window's root: a stroke that
+     * resolves to Close Pane, Close Tab or Close Window runs {@code hide} unless the window is recording shortcuts, and
+     * closes nothing of this window; while this window's modal overlay is open it holds every other key; otherwise a
+     * Panel-context action of the panel holding the focus runs in place and any other action raises this window and
+     * runs in it. The bindings follow keymap changes until the returned handle closes, which removes exactly them; this
+     * window's close does too. EDT.
+     */
+    AutoCloseable bindDetachedRoot(JRootPane root, Runnable hide) {
+        if (closed) return () -> { };
+        var keys = new DetachedKeys(Objects.requireNonNull(root, "root"), Objects.requireNonNull(hide, "hide"));
+        detachedKeys.add(keys);
+        keys.bind();
+        return keys;
+    }
+
+    /** One detached root's bindings ({@link #bindDetachedRoot}): one per stroke, as on this window's root. */
+    private final class DetachedKeys implements AutoCloseable {
+        private final JRootPane root;
+        private final Runnable hide;
+        private final Map<KeyStroke, DetachedShortcut> bound = new HashMap<>();
+
+        DetachedKeys(JRootPane root, Runnable hide) { this.root = root; this.hide = hide; }
+
+        /** Binds the keymap's strokes as they are now, in place of those bound before. */
+        void bind() {
+            unbind();
+            bindings.strokes().forEach((actionId, stroke) -> {
+                if (bound.containsKey(stroke)) return;
+                var action = new DetachedShortcut(actionId, stroke, root, hide);
+                bound.put(stroke, action);
+                root.getInputMap(WHEN_IN_FOCUSED_WINDOW).put(stroke, actionId);
+                root.getActionMap().put(actionId, action);
+            });
+        }
+
+        /** Removes each binding still its own, leaving any the root's window made since. */
+        void unbind() {
+            InputMap input = root.getInputMap(WHEN_IN_FOCUSED_WINDOW);
+            bound.forEach((stroke, action) -> {
+                if (action.key.equals(input.get(stroke))) input.remove(stroke);
+                if (root.getActionMap().get(action.key) == action) root.getActionMap().remove(action.key);
+            });
+            bound.clear();
+        }
+
+        @Override public void close() { if (detachedKeys.remove(this)) unbind(); }
+    }
+
+    /** A detached root's action for one stroke: it takes the key only when it hides the tool window or dispatch would use it. */
+    private final class DetachedShortcut extends AbstractAction {
+        private final String key;
+        private final KeyStroke stroke;
+        private final JRootPane root;
+        private final Runnable hide;
+
+        DetachedShortcut(String key, KeyStroke stroke, JRootPane root, Runnable hide) {
+            this.key = key; this.stroke = stroke; this.root = root; this.hide = hide;
+        }
+
+        @Override public boolean accept(Object sender) {
+            if (!isEnabled()) return false;
+            Component focus = focusOwner();
+            return closesDetached(stroke, focus) || dev.jasper.app.platform.WindowInput.blocked(WindowContent.this)
+                || claimsShortcut(stroke, focus);
+        }
+
+        @Override public void actionPerformed(ActionEvent event) {
+            Component focus = focusOwner();
+            if (closesDetached(stroke, focus)) {
+                if (!dev.jasper.app.platform.WindowInput.captureShortcut(root, stroke)) hide.run();
+                return;
+            }
+            // This window's modal overlay holds every other key, as it holds the key of a contributed action run from anywhere.
+            if (dev.jasper.app.platform.WindowInput.blocked(WindowContent.this)) return;
+            if (!panelShortcut(stroke, focus)) bringToFront.run();
+            dispatchShortcut(stroke, focus);
+        }
+    }
+
+    /** Whether a stroke from a detached window's {@code focus} resolves to Close Pane, Close Tab or Close Window. */
+    private boolean closesDetached(KeyStroke stroke, Component focus) {
+        return bindings.resolve(stroke, context -> applies(context, focus)).filter(CLOSE_KEYS::contains).isPresent();
+    }
+
+    /** Whether a stroke from {@code focus} resolves to a Panel-context action, of the panel holding the focus. */
+    private boolean panelShortcut(KeyStroke stroke, Component focus) {
+        return bindings.resolve(stroke, context -> applies(context, focus))
+            .filter(id -> bindings.contextFor(id).kind() == KeyContext.Kind.PANEL).isPresent();
+    }
+
     private boolean paletteKeysDispatch(KeyEvent event) {
         if (dev.jasper.app.platform.WindowInput.blocked(event.getComponent())) return false;
         boolean tail = false;
@@ -925,6 +1031,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             action(id).putValue(Action.ACCELERATOR_KEY, bindings.strokeFor(id).orElse(null));
         if (contributed != null) contributed.applyAccelerators();
         if (root != null) installRootBindings(root);
+        for (DetachedKeys keys : detachedKeys) keys.bind();
         toolbar().revalidate(); toolbar().repaint();
         refreshTabs();
     }
@@ -1223,6 +1330,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             host = registry.addHost(workspaceHost());
         }
         rebind();
+        if (detachedShells != null) detachedShells(detachedShells);
     }
 
     /**
@@ -1914,6 +2022,25 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     ToolWindowArea area() { return area; }
     DockState dock() { return dock; }
+
+    /**
+     * Gives the main window's detached tool windows (Float and Window) their native windows, and opens those that wait;
+     * a child window has none. Given before contributions connect, they are used once they do. EDT.
+     */
+    public void detachedShells(java.util.function.BiFunction<DetachedToolWindows.Opening, DetachedToolWindows.Events,
+                                   DetachedToolWindows.Shell> shells) {
+        detachedShells = shells;
+        DetachedToolWindows windows = detachedWindows();
+        if (windows == null) return;
+        windows.shells = shells;
+        windows.sync();
+    }
+
+    /** The main window's detached tool windows' own windows; null in a child window, or before contributions connect. */
+    DetachedToolWindows detachedWindows() { return contributed == null ? null : contributed.detached(); }
+
+    /** Whether the panel is one of this window's tool windows detached into a window of its own, showing or not. */
+    boolean panelDetached(String panelId) { return dock.mode(panelId).detached(); }
     DockStripe leftStripe() { return leftStripe; }
     DockStripe rightStripe() { return rightStripe; }
     /** The bottom strip of labelled stripes; empty under the icon rails. */
@@ -2169,6 +2296,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** This window's configuration, or null before the first one arrives. */
     ConfigSnapshot configured() { return workspaceConfiguration.snapshot(); }
 
+    /** The saved tab name pattern its Terminal tabs follow (tab names spec 3). */
+    TitleTemplate tabNamePattern() { return workspaceConfiguration.tabName(); }
+
+    /** Plugins' tab name pieces for a tab; none before the window is connected to the contributions model. */
+    java.util.Map<String, String> pluginNamePieces(java.util.UUID tabId) {
+        return contributed == null ? java.util.Map.of() : contributed.model().tabNamePieces().values(tabId);
+    }
+
     /** How much an inactive pane dims: the configured {@code terminal.dim_inactive_panes} (workspace plan 8a Rulings 12). */
     float paneDim() {
         ConfigSnapshot configured = configured();
@@ -2312,6 +2447,41 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void invoke(ActionId id) { workspaceActions.invoke(id); }
     public void updateActions() { workspaceActions.update(); }
 
+    /** Native visibility affects Buddy independently of activation event ordering. */
+    void buddyWindowState(boolean showing, boolean iconified) {
+        boolean visible = showing && !iconified;
+        if (buddyWindowVisible == visible) return;
+        buddyWindowVisible = visible;
+        publishPresentation();
+    }
+
+    boolean buddyWatched(Tab tab) {
+        return buddyWindowVisible && isActiveAndOpen()
+            && parentTabOf(tab).filter(activeParentTab()::equals).isPresent();
+    }
+
+    /** Publishes only committed layout membership; held moves publish when they settle. */
+    void publishPresentation() { publishPresentation(this::emit); }
+
+    private void publishPresentation(Consumer<WorkspaceActivity.Event> listener) {
+        if (closed || holding > 0) return;
+        for (WorkspaceView view : parentTabs.views()) {
+            Tab selected = view.selected();
+            if (selected == null) continue;
+            String groupTitle = tabTitle(selected);
+            boolean watched = view == parentTabs.active() && isActiveAndOpen() && buddyWindowVisible;
+            for (Tab tab : view.tabs()) {
+                if (tab.content() instanceof TerminalContent terminal) {
+                    listener.accept(new WorkspaceActivity.Presentation(terminal.pane().id(), view.id().value(),
+                        groupTitle, tabTitle(tab), watched, () -> {
+                            tab.select();
+                            terminal.pane().focusTerminal();
+                        }));
+                }
+            }
+        }
+    }
+
     void update() {
         // A held move's items hear where it ends, once (workspace plan 8c Rulings 17).
         if (closed || holding > 0) return;
@@ -2330,6 +2500,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         syncContentBindings();
         updateActions(); refreshTabs(); onMinimumSizeChanged.run();
         if (terminals != null) terminals.refresh();
+        publishPresentation();
     }
 
     ResolvedTheme theme() { return themes.current(); }
@@ -2630,6 +2801,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         catch (RuntimeException | Error failure) { leaving = failure; }
         for (Tab tab : held) WorkspaceTheme.clear(tab.component());
         parentTabs.close(); removeRootBindings();
+        for (DetachedKeys keys : java.util.List.copyOf(detachedKeys)) keys.close();
         if (terminals != null) { terminals.close(); terminals = null; }
         workspaceActions.disable();
         refreshTabs();

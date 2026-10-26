@@ -12,6 +12,56 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class CoreSettingsTest {
+    @Test void linuxUsesDesktopColorsAndOtherPlatformsKeepTheirAuthoredDefault() {
+        for (String linux : List.of("Linux", "linux", "LINUX"))
+            assertThat(CoreSettings.interfaceThemeByDefault(linux, "authored")).isEqualTo("desktop-colors");
+        for (String other : new String[]{"Mac OS X", "Windows 11", "FreeBSD", "", null})
+            assertThat(CoreSettings.interfaceThemeByDefault(other, "authored")).isEqualTo("authored");
+    }
+
+    @Test void absentThemePicksAndResetUseTheHostDefaults() {
+        String expected = System.getProperty("os.name", "").equalsIgnoreCase("Linux")
+            ? "desktop-colors" : "jasper-meadow";
+        for (String text : List.of("", "[ui.theme]\n")) {
+            var loaded = ConfigLoader.parse(java.nio.file.Path.of("config.toml"), text, false);
+            assertThat(loaded.snapshot().darkTheme()).isEqualTo(expected);
+            assertThat(loaded.snapshot().lightTheme()).isEqualTo(expected);
+            assertThat(loaded.snapshot().desktopSource()).isEqualTo("auto");
+            assertThat(loaded.snapshot().appearance()).isEqualTo(AppearanceMode.SYSTEM);
+            assertThat(loaded.snapshot().terminalScheme()).isEqualTo(TerminalSchemeChoice.MATCH);
+        }
+        var saved = ConfigLoader.parse(java.nio.file.Path.of("config.toml"),
+            "[ui.theme]\ndark = 'jasper-meadow'\nlight = 'slate-cobalt'\n", false);
+        assertThat(saved.snapshot().darkTheme()).isEqualTo("jasper-meadow");
+        assertThat(saved.snapshot().lightTheme()).isEqualTo("slate-cobalt");
+        var draft = new dev.jasper.app.settingsui.SettingsDraft(saved.values());
+        for (var setting : List.of(CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT)) {
+            draft.stage(setting, java.util.Optional.empty());
+            assertThat(draft.value(setting)).isEqualTo(expected);
+        }
+        var look = new DefaultSource(Map.of(CoreSettings.UI_THEME_DARK, "catppuccin-mocha",
+            CoreSettings.UI_THEME_LIGHT, "catppuccin-latte"));
+        var lookDraft = new dev.jasper.app.settingsui.SettingsDraft(saved.values(), look);
+        assertThat(lookDraft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("jasper-meadow");
+        assertThat(lookDraft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("slate-cobalt");
+        lookDraft.stage(CoreSettings.UI_THEME_DARK, java.util.Optional.empty());
+        lookDraft.stage(CoreSettings.UI_THEME_LIGHT, java.util.Optional.empty());
+        assertThat(lookDraft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("catppuccin-mocha");
+        assertThat(lookDraft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("catppuccin-latte");
+    }
+
+    @Test void savedAuthoredPicksSurviveReload(@org.junit.jupiter.api.io.TempDir java.nio.file.Path home) throws Exception {
+        var file = home.resolve("config.toml");
+        java.nio.file.Files.writeString(file, "[ui.theme]\ndark = 'jasper-meadow'\nlight = 'slate-cobalt'\n");
+        try (var service = new ConfigService(file, false)) {
+            assertThat(service.initialState().snapshot().darkTheme()).isEqualTo("jasper-meadow");
+            assertThat(service.initialState().snapshot().lightTheme()).isEqualTo("slate-cobalt");
+            var reloaded = service.reload().get(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(reloaded.snapshot().darkTheme()).isEqualTo("jasper-meadow");
+            assertThat(reloaded.snapshot().lightTheme()).isEqualTo("slate-cobalt");
+        }
+    }
+
     @Test void viewModeIsARestartOnlyChoiceWithNormalAsItsDefault() {
         var setting = CoreSettings.WINDOW_VIEW_MODE;
         assertThat(setting.name()).isEqualTo("window.view_mode");
@@ -28,7 +78,7 @@ class CoreSettingsTest {
     }
 
     @Test void everySettingIsDescribedAndItsTemplateValueRoundTrips() {
-        assertThat(CoreSettings.SCHEMA.settings()).hasSize(44);
+        assertThat(CoreSettings.SCHEMA.settings()).hasSize(46);
         for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
             assertThat(setting.label()).as(setting.name()).isNotBlank();
             assertThat(setting.description()).as(setting.name()).isNotBlank();
@@ -41,6 +91,17 @@ class CoreSettingsTest {
         var reading = setting.kind().read(TomlLiterals.parseValue(setting.kind().literal(value)), setting.defaultValue());
         assertThat(reading.issues()).as(setting.name()).isEmpty();
         assertThat(reading.value()).as(setting.name()).isEqualTo(value);
+    }
+
+    @Test void theTabNameIsALivePatternDefaultingToFolderProcessAndTitle() {
+        var setting = CoreSettings.TERMINAL_TAB_NAME;
+        assertThat(setting.name()).isEqualTo("terminal.tab_name");
+        assertThat(setting.label()).isEqualTo("Tab name");
+        assertThat(setting.defaultValue()).isEqualTo("{dir} {process} {title}");
+        assertThat(setting.applies()).isEqualTo(Applies.LIVE);
+        assertThat(setting.kind().check("{dir} | {host}")).isEmpty();
+        assertThat(setting.kind().check("{dir")).isPresent();
+        assertThat(setting.kind().check(" ")).isPresent();
     }
 
     @Test void theVersionTwoLayoutKeepsOldKeysAsAliases() {
@@ -76,7 +137,7 @@ class CoreSettingsTest {
         assertThat(snapshot.appearance()).isEqualTo(AppearanceMode.LIGHT);
         assertThat(snapshot.terminalScheme()).isEqualTo(TerminalSchemeChoice.parse("slate-cobalt/high-contrast").orElseThrow());
         assertThat(snapshot.darkTheme()).isEqualTo("ocean");
-        assertThat(snapshot.lightTheme()).isEqualTo("jasper-meadow");
+        assertThat(snapshot.lightTheme()).isEqualTo(CoreSettings.UI_THEME_LIGHT.defaultValue());
         assertThat(snapshot.terminal().env()).containsExactly(Map.entry("A", "1"));
         assertThat(snapshot.statusBarHeight()).isEqualTo(30);
         assertThat(snapshot.keybindings()).containsExactly(Map.entry("copy", "none"));
@@ -107,4 +168,38 @@ class CoreSettingsTest {
         assertThat(CoreSettings.WINDOW_MEMORY_INDICATOR.defaultValue()).isFalse();
         assertThat(CoreSettings.WINDOW_MEMORY_INDICATOR.label()).isEqualTo("Show memory indicator");
     }
+    @Test void desktopSourceIsAnIndependentChoiceAndRoundTripsEverySnapshotPath() {
+        var setting = CoreSettings.UI_THEME_DESKTOP_SOURCE;
+        assertThat(setting.name()).isEqualTo("ui.theme.desktop_source");
+        assertThat(setting.label()).isEqualTo("Desktop color source");
+        assertThat(setting.defaultValue()).isEqualTo("auto");
+        assertThat(((SettingKind.Choice<String>) setting.kind()).tokens()).containsExactly(
+            Map.entry("auto", "auto"), Map.entry("qt", "qt"), Map.entry("gtk3", "gtk3"), Map.entry("gtk4", "gtk4"));
+        assertThat(ConfigSnapshot.defaults().desktopSource()).isEqualTo("auto");
+        for (String token : List.of("auto", "qt", "gtk3", "gtk4")) {
+            var values = SettingValues.builder(CoreSettings.SCHEMA).put(setting, token, setting.key()).build();
+            var read = ConfigSnapshot.from(values, Map.of(), Map.of());
+            assertThat(read.desktopSource()).isEqualTo(token);
+            assertThat(read.toBuilder().build()).isEqualTo(read);
+            assertThat(ConfigSnapshot.builder().desktopSource(token).build()).isEqualTo(read);
+            assertThat(read.appearance()).isEqualTo(AppearanceMode.SYSTEM);
+            assertThat(read.darkTheme()).isEqualTo(CoreSettings.UI_THEME_DARK.defaultValue());
+            var look = new DefaultSource(Map.of(CoreSettings.UI_THEME_DARK, "slate-cobalt"));
+            assertThat(ConfigSnapshot.from(values, look, Map.of(), Map.of()).desktopSource()).isEqualTo(token);
+            assertThat(ConfigSnapshot.defaults(look).desktopSource()).isEqualTo("auto");
+        }
+    }
+
+    @Test void aSnapshotBuilderRefusesAnInvalidDesktopSource() {
+        assertThatThrownBy(() -> ConfigSnapshot.builder().desktopSource("bogus").build()).isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("ui.theme.desktop_source");
+    }
+
+    @Test void invalidDesktopSourceFallsBackWithAnOrdinaryDiagnostic() {
+        var result = ConfigLoader.parse(java.nio.file.Path.of("config.toml"), "[ui.theme]\ndesktop_source = 'bogus'\n", false);
+        assertThat(result.snapshot().desktopSource()).isEqualTo("auto");
+        assertThat(result.diagnostics()).singleElement().satisfies(diagnostic ->
+            assertThat(diagnostic.key()).isEqualTo("ui.theme.desktop_source"));
+    }
+
 }
