@@ -1,13 +1,11 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.config.TitleTemplate;
 import dev.jasper.app.presentation.TitleFormat;
 import dev.jasper.app.terminals.PaneSnapshot;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * The frame title from the look's template (Enterprise presentation spec 10.4). The text between two tokens separates
@@ -16,46 +14,13 @@ import java.util.regex.Pattern;
  * tokens is the title as it is.
  */
 final class WindowTitle {
-    private static final Pattern TOKEN = Pattern.compile("\\{(context|session|directory)\\}");
-    /** Spaces and the separators a template may end its leading text with. */
-    private static final Pattern TRAILING = Pattern.compile("[\\s—–·:|-]+$");
-    /** Spaces and the separators a template may start its trailing text with. */
-    private static final Pattern LEADING = Pattern.compile("^[\\s—–·:|-]+");
-
     private WindowTitle() { }
 
     /** {@code format} with its tokens filled in; {@code {context}} is used as it is, the others stripped. */
     static String format(TitleFormat format, String context, String session, String directory) {
-        var values = Map.of("context", Objects.requireNonNull(context), "session", Objects.requireNonNull(session),
-            "directory", Objects.requireNonNull(directory));
-        String template = format.template();
-        var literals = new ArrayList<String>();
-        var tokens = new ArrayList<String>();
-        Matcher matcher = TOKEN.matcher(template);
-        int at = 0;
-        while (matcher.find()) {
-            literals.add(template.substring(at, matcher.start()));
-            String value = values.get(matcher.group(1));
-            tokens.add(value.isBlank() ? "" : matcher.group(1).equals("context") ? value : value.strip());
-            at = matcher.end();
-        }
-        literals.add(template.substring(at));
-        if (tokens.isEmpty()) return template;
-        // literals: the leading text, then the separator before each later token, then the trailing text.
-        var out = new StringBuilder(literals.getFirst());
-        boolean any = false;
-        for (int i = 0; i < tokens.size(); i++) {
-            if (tokens.get(i).isEmpty()) continue;
-            if (any) out.append(literals.get(i));
-            out.append(tokens.get(i));
-            any = true;
-        }
-        if (!any) {
-            String head = TRAILING.matcher(literals.getFirst()).replaceAll("");
-            String tail = head.isBlank() ? LEADING.matcher(literals.getLast()).replaceAll("") : literals.getLast();
-            return (head + tail).strip();
-        }
-        return out.append(literals.getLast()).toString();
+        var values = Map.of("context", Objects.requireNonNull(context), "session", Objects.requireNonNull(session).strip(),
+            "directory", Objects.requireNonNull(directory).strip());
+        return TitleTemplate.parse(format.template()).fill(values::get);
     }
 
     /**
@@ -86,10 +51,15 @@ final class WindowTitle {
         if (pane == null) return "";
         if (pane.providerId().isPresent() || pane.remoteDirectory().isPresent())
             return pane.remoteDirectory().map(location -> clean(location.path())).orElse("");
-        Path directory = pane.workingDirectory().orElse(home).toAbsolutePath().normalize();
+        return homeRelative(pane.workingDirectory().orElse(home), home);
+    }
+
+    /** A local directory as titles write it: the home folder as {@code ~}, and {@code /} after it. */
+    static String homeRelative(Path directory, Path home) {
+        Path absolute = directory.toAbsolutePath().normalize();
         Path absoluteHome = home.toAbsolutePath().normalize();
-        String path = directory.equals(absoluteHome) ? "~" : directory.startsWith(absoluteHome)
-            ? "~/" + absoluteHome.relativize(directory).toString().replace('\\', '/') : directory.toString();
+        String path = absolute.equals(absoluteHome) ? "~" : absolute.startsWith(absoluteHome)
+            ? "~/" + absoluteHome.relativize(absolute).toString().replace('\\', '/') : absolute.toString();
         return clean(path);
     }
 
