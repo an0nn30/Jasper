@@ -9,6 +9,8 @@ import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.PaneInfo;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.TabHandle;
+import dev.jasper.sdk.terminal.TabNamePiece;
+import dev.jasper.sdk.terminal.TabNamePieceSpec;
 import dev.jasper.sdk.terminal.Terminals;
 import dev.jasper.sdk.terminal.WindowHandle;
 import java.nio.charset.StandardCharsets;
@@ -79,6 +81,16 @@ final class FakeTerminals implements Terminals {
             context.requireOpen();
             model().ifPresent(tab -> title = tab.title);
             return title;
+        }
+        @Override public Map<String, String> namePieces() {
+            require(Capabilities.TERMINAL_OBSERVE);
+            context.requireOpen();
+            return model().filter(tab -> tab.open && tab.kind == TabHandle.Kind.TERMINAL).map(tab -> {
+                var merged = new java.util.HashMap<>(context.host().tabNamePieces(id));
+                merged.putAll(tab.namePieces);
+                merged.values().removeIf(String::isBlank);
+                return Map.copyOf(merged);
+            }).orElse(Map.of());
         }
         @Override public void select() { context.requireOpen(); model().ifPresent(workspace::select); }
         @Override public boolean isOpen() { context.requireOpen(); return model().isPresent(); }
@@ -256,6 +268,13 @@ final class FakeTerminals implements Terminals {
         require(Capabilities.TERMINAL_ENVIRONMENT);
         context.requireOpen();
         return context.host().contributeShell(context, contributor);
+    }
+
+    @Override public TabNamePiece addTabNamePiece(TabNamePieceSpec spec) {
+        Objects.requireNonNull(spec, "spec");
+        require(Capabilities.TERMINAL_OBSERVE);
+        context.requireOpen();
+        return context.host().addTabNamePiece(context, spec);
     }
 
     /** The default shell, or a profile the test listed; anything else opens nothing, as in the application. */

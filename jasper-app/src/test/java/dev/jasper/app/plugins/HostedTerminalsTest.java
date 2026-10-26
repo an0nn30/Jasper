@@ -322,4 +322,40 @@ class HostedTerminalsTest {
         terminals.closeAll();
         assertThat(contributions.variables(java.util.Map.of())).as("the plugin stopped").isEmpty();
     }
+
+    private HostedTerminals piecing(String id, AtomicBoolean pluginOpen, dev.jasper.app.contributions.TabNamePieces pieces) {
+        return new HostedTerminals(id, new CapabilityGate(id, Set.of(Capabilities.TERMINAL_OBSERVE)), fixture.registry, posted::add, onUi::get,
+            pluginOpen::get, new HostedSessions(id, new Containment(() -> true), Runnable::run, id2 -> null, name -> new javax.swing.ImageIcon()),
+            PluginRuntime.ShellProfiles.NONE, new Containment(() -> true), new ShellContributions(new Containment(() -> true)), pieces);
+    }
+
+    @Test void aPieceValueSetOffTheUiThreadIsAppliedOnItAndNeverAfterThePluginStopped() {
+        var pieces = new dev.jasper.app.contributions.TabNamePieces();
+        var alphaOpen = new AtomicBoolean(true);
+        HostedTerminals alpha = piecing("dev.x.alpha", alphaOpen, pieces), beta = piecing("dev.x.beta", new AtomicBoolean(true), pieces);
+        UUID window = fixture.addWindow(), tab = fixture.addTab(window, "ssh");
+        fixture.addPane(tab, "ssh", Path.of("/"));
+        TabHandle handle = alpha.tab(tab).orElseThrow();
+        var host = new dev.jasper.sdk.terminal.TabNamePieceSpec("host", "the SSH host");
+        var piece = alpha.addTabNamePiece(host);
+        onUi.set(false);
+        piece.set(handle, "db1");
+        assertThat(pieces.values(tab)).as("posted to the UI thread, not applied here").isEmpty();
+        onUi.set(true);
+        List.copyOf(posted).forEach(Runnable::run);
+        posted.clear();
+        assertThat(pieces.values(tab)).isEqualTo(java.util.Map.of("host", "db1"));
+        alphaOpen.set(false);
+        alpha.closeAll();
+        assertThat(pieces.pieces()).as("the piece ends with its plugin").isEmpty();
+        var taken = beta.addTabNamePiece(host);
+        onUi.set(false);
+        piece.set(handle, "late");
+        onUi.set(true);
+        List.copyOf(posted).forEach(Runnable::run);
+        posted.clear();
+        assertThat(pieces.values(tab)).as("a stopped plugin's late value never reaches the next holder of the name").isEmpty();
+        taken.set(handle, "db2");
+        assertThat(pieces.values(tab)).isEqualTo(java.util.Map.of("host", "db2"));
+    }
 }

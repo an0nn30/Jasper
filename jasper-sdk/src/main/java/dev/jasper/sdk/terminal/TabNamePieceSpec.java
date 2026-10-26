@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 /**
  * A piece a plugin adds to Terminal tab names. Users write it as {@code {name}} in Settings › Terminal › Tab name
  * ({@code terminal.tab_name}), and each terminal tab shows the value the plugin set for it through the
- * {@link TabNamePiece} that {@code Terminals#addTabNamePiece} returns; a tab without a value shows nothing for it.
+ * {@link TabNamePiece} that {@link Terminals#addTabNamePiece} returns; a tab without a value shows nothing for it.
  *
  * @param name what users type between the braces: 1 to 32 lowercase letters, digits and {@code _}, starting with a
  *     letter, and none of {@link #BUILT_IN}

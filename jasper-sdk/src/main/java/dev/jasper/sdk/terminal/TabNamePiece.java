@@ -3,7 +3,7 @@ package dev.jasper.sdk.terminal;
 import dev.jasper.sdk.Subscription;
 
 /**
- * A plugin's piece of Terminal tab names, from {@code Terminals#addTabNamePiece}. Closing it removes the piece, and its
+ * A plugin's piece of Terminal tab names, from {@link Terminals#addTabNamePiece}. Closing it removes the piece, and its
  * value in every tab; it closes with its plugin too.
  *
  * @since 0.22.0
