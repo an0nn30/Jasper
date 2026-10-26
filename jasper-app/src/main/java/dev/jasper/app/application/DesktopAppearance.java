@@ -159,6 +159,11 @@ final class DesktopAppearance implements AutoCloseable {
             Palette cached = cache.get(new Key(source, polarity));
             if (cached != null) palettes.put(source, cached);
             Palette latest = capabilities.get(new Key(source, polarity));
+            if (source.currentPaletteOnly()) {
+                // Qt exposes one actual palette to both requests. An older request slot must not hide a live observation.
+                Palette other = capabilities.get(new Key(source, dark ? Polarity.LIGHT : Polarity.DARK));
+                if (other != null && (latest == null || other.generation() > latest.generation())) latest = other;
+            }
             if (latest != null && DesktopPalette.usable(dark, latest)) palettes.put(source, latest);
             else if (latest != null) {
                 String reason = latest.reason();

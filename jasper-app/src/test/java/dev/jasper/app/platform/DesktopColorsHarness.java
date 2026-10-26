@@ -107,6 +107,14 @@ public final class DesktopColorsHarness implements AutoCloseable {
         });
         publish();
     }
+    public void awaitWindowBackground(Source source, long generation, Rgba background) {
+        fixture.await(() -> {
+            Palette value = service.current().palettes().get(source);
+            return value != null && value.generation() == generation && value.colors().containsKey(Pair.WINDOW)
+                && value.colors().get(Pair.WINDOW).background().equals(background);
+        });
+        publish();
+    }
     public void awaitFailure(Source source, String reason) {
         fixture.await(() -> service.current().palettes().containsKey(source)
             && service.current().palettes().get(source).reason().contains(reason));

@@ -401,6 +401,14 @@ class DesktopAppearanceTest {
                     assertThat(light.getLast().source()).contains(primary);
                     assertThat(light.getLast().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(242,242,242));
                     assertThat(f.owner.current().source()).isEmpty();
+                    // Light-to-Light events belong to the active Dark generation, but refresh Light immediately.
+                    f.nativeInput.observation(primary, primary, 3, dev.jasper.app.platform.DesktopObservation.Polarity.LIGHT, "0.85,0.85,0.85,1", "");
+                    f.nativeInput.awaitWindowBackground(primary, 3, new dev.jasper.app.platform.DesktopObservation.Rgba(.85,.85,.85,1)); f.drain();
+                    assertThat(light.getLast().source()).contains(primary);
+                    assertThat(light.getLast().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(217,217,217));
+                    assertThat(light.getLast().status()).doesNotContain("last good", "Jasper requests Light");
+                    assertThat(f.owner.current().source()).isEmpty();
+                    for (Source source : sources) assertThat(f.nativeInput.sampleCount(source)).isEqualTo(samples);
                     // A live Dark observation changes active colors and schedules exactly one Light refresh.
                     f.nativeInput.observation(primary, primary, 3, dev.jasper.app.platform.DesktopObservation.Polarity.DARK, "0.1,0.1,0.1,1", "");
                     f.nativeInput.awaitPalette(primary, 3, dev.jasper.app.platform.DesktopObservation.Polarity.DARK, ""); f.drain();
@@ -419,7 +427,7 @@ class DesktopAppearanceTest {
                     f.drain();
                     assertThat(light.getLast().source()).contains(primary);
                     assertThat(light.getLast().status()).contains("last good", "desktop palette is Dark; Jasper requests Light");
-                    assertThat(light.getLast().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(242,242,242));
+                    assertThat(light.getLast().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(217,217,217));
                     f.drain();
                     assertThat(f.nativeInput.sampleCount(primary)).isEqualTo(samples + 2);
                     var before = f.owner.current().theme();
@@ -433,6 +441,45 @@ class DesktopAppearanceTest {
                     for (Source source : sources) assertThat(f.nativeInput.launches().stream().filter(source.helperName()::equals).count()).isEqualTo(1);
                 } finally { preview.close(); }
             }
+        }
+    }
+
+    @Test void liveCompatibleQtObservationClearsAnOlderRequestedPreviewMismatchWithoutResampling() throws Exception {
+        try (var f = new Fixture()) {
+            f.owner.update(config("qt", true)); f.drain();
+            f.nativeInput.portal(1, true, ""); f.drain();
+            for (Source source : List.of(Source.QT6, Source.QT5))
+                f.nativeInput.palette(source, false, "0.95,0.95,0.95,1", "");
+            f.drain();
+            var light = new ArrayList<DesktopPalette.Result>();
+            var preview = f.owner.preview(DesktopPalette.SourceMode.QT, false, light::add); f.drain();
+            try {
+                for (Source source : List.of(Source.QT6, Source.QT5)) {
+                    f.nativeInput.awaitSample(source, 2);
+                    f.nativeInput.palette(source, true, "0.1,0.1,0.1,1", "");
+                }
+                f.drain();
+                for (Source source : List.of(Source.QT6, Source.QT5)) {
+                    f.nativeInput.awaitSample(source, 3);
+                    f.nativeInput.palette(source, true, "0.1,0.1,0.1,1", "");
+                }
+                f.drain();
+                assertThat(light.getLast().status()).contains("last good", "desktop palette is Dark; Jasper requests Light");
+                var active = f.owner.current().theme();
+                f.nativeInput.observation(Source.QT6, Source.QT6, 3, dev.jasper.app.platform.DesktopObservation.Polarity.LIGHT, "0.9,0.9,0.9,1", "");
+                f.nativeInput.awaitWindowBackground(Source.QT6, 3, new dev.jasper.app.platform.DesktopObservation.Rgba(.9,.9,.9,1)); f.drain();
+                assertThat(light.getLast().source()).contains(Source.QT6);
+                assertThat(light.getLast().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(230,230,230));
+                assertThat(light.getLast().status()).doesNotContain("last good", "Jasper requests Light");
+                assertThat(f.owner.current().source()).contains(Source.QT6);
+                assertThat(f.owner.current().theme()).isEqualTo(active);
+                assertThat(f.owner.current().status()).contains("last good", "desktop palette is Light; Jasper requests Dark");
+                for (Source source : List.of(Source.QT6, Source.QT5)) {
+                    assertThat(f.nativeInput.sampleCount(source)).isEqualTo(3);
+                    assertThat(f.nativeInput.toolkitAlive(source)).isTrue();
+                    assertThat(f.nativeInput.launches().stream().filter(source.helperName()::equals).count()).isEqualTo(1);
+                }
+            } finally { preview.close(); }
         }
     }
 

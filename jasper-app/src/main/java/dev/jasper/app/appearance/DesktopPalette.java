@@ -88,10 +88,14 @@ public final class DesktopPalette {
         boolean repaired = repair(base, colors, overrides, high);
         String status = selected == null ? "Desktop palette unavailable; using Slate Cobalt" : capability(selected) + " desktop palette";
         if (selected != null && !selected.reason().isBlank()) status += "; using last good palette; " + selected.reason();
-        if (selected == null) for (Source source : preferredSources(mode, environment)) {
+        for (Source source : preferredSources(mode, environment)) {
+            if (selected != null && source == selected.source()) break;
             Palette candidate = input.palettes().get(source);
-            if (candidate != null) status += "; " + capability(candidate) + " unavailable"
-                + (candidate.reason().isBlank() ? "" : ": " + candidate.reason());
+            if (candidate != null) {
+                String detail = capability(candidate) + " unavailable"
+                    + (candidate.reason().isBlank() ? "" : ": " + candidate.reason());
+                status += "; " + (selected == null ? detail : fallbackDetail(detail));
+            }
         }
         if (!repaired) {
             // A native family that cannot share Jasper's inks is replaced together, never mixed with another toolkit.
@@ -118,6 +122,11 @@ public final class DesktopPalette {
         var failures = DesktopPaintPairs.validate(theme, high);
         if (!failures.isEmpty()) throw new IllegalStateException("Unrepresentable desktop paint pairs: " + failures);
         return new Result(theme, Optional.ofNullable(selected).map(Palette::source), status);
+    }
+
+    private static String fallbackDetail(String detail) {
+        return detail.codePointCount(0, detail.length()) <= 160 ? detail
+            : detail.substring(0, detail.offsetByCodePoints(0, 157)) + "...";
     }
 
     private static String capability(Palette palette) {

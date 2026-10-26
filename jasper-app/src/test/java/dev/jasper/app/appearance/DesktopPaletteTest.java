@@ -59,6 +59,35 @@ class DesktopPaletteTest {
         assertThat(result.status()).contains("Slate Cobalt", "Qt 6").doesNotContain("GTK");
     }
 
+    @Test void successfulKdeToGtkFallbackExplainsOnlyObservedHigherRankedFailures() {
+        var palettes = new EnumMap<Source, Palette>(Source.class);
+        for (Source source : List.of(Source.KDE6, Source.QT6, Source.KDE5, Source.QT5))
+            palettes.put(source, new Palette(1, source, Polarity.UNKNOWN, Map.of(), "native", "1", "missing " + source));
+        palettes.put(Source.GTK3, palette(Source.GTK3, false, Map.of(Pair.WINDOW, colors(0xfafafa, 0))));
+        palettes.put(Source.GTK4, new Palette(1, Source.GTK4, Polarity.UNKNOWN, Map.of(), "gtk4", "4", "lower-ranked failure"));
+        var result = DesktopPalette.resolve(false, DesktopPalette.SourceMode.AUTO,
+            DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "KDE")), input(false, palettes, Optional.empty()));
+        assertThat(result.source()).contains(Source.GTK3);
+        assertThat(result.theme().semantic().color(SURFACE_APP)).isEqualTo(new Color(0xfafafa));
+        assertThat(result.status()).contains("GTK 3", "KDE 6", "Qt 6", "KDE 5", "Qt 5", "unavailable",
+            "missing KDE6", "missing QT6", "missing KDE5", "missing QT5").doesNotContain("lower-ranked failure", "GTK 4");
+        preservesContent(false, result.theme());
+    }
+
+    @Test void successfulQtMajorFallbackExplainsItsObservedFailureAndBoundsItsContext() {
+        var qt5 = palette(Source.QT5, false, Map.of(Pair.WINDOW, colors(0xfafafa, 0)));
+        var qt6 = new Palette(1, Source.QT6, Polarity.UNKNOWN, Map.of(), "QFusionStyle", "6.2.4", "missing plugin " + "x".repeat(1000));
+        var result = DesktopPalette.resolve(false, DesktopPalette.SourceMode.QT, DesktopEnvironment.from(Map.of()),
+            input(false, Map.of(Source.QT6, qt6, Source.QT5, qt5), Optional.empty()));
+        assertThat(result.source()).contains(Source.QT5);
+        assertThat(result.theme().semantic().color(SURFACE_APP)).isEqualTo(new Color(0xfafafa));
+        assertThat(result.status()).contains("Qt 5", "Qt 6", "QFusionStyle", "6.2.4", "unavailable", "missing plugin");
+        assertThat(result.status().length()).isLessThan(400);
+        var pending = DesktopPalette.resolve(false, DesktopPalette.SourceMode.QT, DesktopEnvironment.from(Map.of()),
+            input(false, Map.of(Source.QT5, qt5), Optional.empty()));
+        assertThat(pending.status()).doesNotContain("Qt 6", "unavailable", "missing plugin");
+    }
+
     @Test void statusIdentifiesTheActualImplementationAndItsVersion() {
         for (var implementation : List.of("gtk4", "libadwaita")) {
             String version = implementation.equals("gtk4") ? "4.22.4" : "1.9.1 (GTK 4.22.4)";
