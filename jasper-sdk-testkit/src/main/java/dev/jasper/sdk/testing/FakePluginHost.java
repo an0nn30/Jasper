@@ -1164,6 +1164,23 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
+     * Moves the open panel as the main window would when the user drags it: a placement that differs from its current
+     * one is what {@code PanelHost.placement()} returns from then on and reaches each {@code onPlacement} handler once,
+     * a handler that throws being recorded in {@link #failures()} while the others still run. The same placement is
+     * silent, and nothing happens when the panel is not open.
+     *
+     * @param panelId panel identifier
+     * @param placement where the panel is now
+     */
+    public void placePanel(String panelId, dev.jasper.sdk.ui.PanelPlacement placement) {
+        java.util.Objects.requireNonNull(placement, "placement");
+        for (var context : contexts.values()) for (var panel : context.ui.panels) {
+            if (!panel.spec.id().equals(panelId)) continue;
+            if (panel.instance != null) panel.instance.place(placement);
+        }
+    }
+
+    /**
      * Invokes a panel's factory as the main window showing it would, or shows the panel built there: panels live in the
      * main window. A factory failure is recorded.
      *

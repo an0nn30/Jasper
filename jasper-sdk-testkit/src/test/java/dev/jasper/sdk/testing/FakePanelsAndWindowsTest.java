@@ -51,6 +51,31 @@ class FakePanelsAndWindowsTest {
         }
     }); }
 
+    @Test void aPlacementHandlerThatThrowsIsRecordedAndTheOthersStillHearTheMove() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            var heard = new ArrayList<dev.jasper.sdk.ui.PanelPlacement>();
+            String id = "dev.x.tool.placed";
+            context.panels().register(new PanelSpec(id, "Placed", "file", Anchor.BOTTOM), panel -> {
+                panel.onPlacement(placement -> { throw new IllegalStateException("placement failed"); });
+                panel.onPlacement(heard::add);
+                return KitFixtures.view(context);
+            });
+            var moved = new dev.jasper.sdk.ui.PanelPlacement(Anchor.LEFT, true, dev.jasper.sdk.ui.PanelMode.WINDOW);
+            host.placePanel(id, moved);
+            host.addTerminalWindow();
+            host.placePanel(id, moved);
+            assertThat(heard).as("a panel that is not open is not moved").isEmpty();
+            host.openPanel(id);
+            host.placePanel(id, moved);
+            assertThat(heard).containsExactly(moved);
+            assertThat(host.failures()).singleElement().asString().contains("dev.x.tool", "panel placement", "placement failed");
+            host.placePanel(id, moved);
+            assertThat(heard).hasSize(1);
+            assertThat(host.failures()).as("the same placement is silent").hasSize(1);
+        }
+    }); }
+
     @Test void fileSelectionWorksForDialogsAndRequiresALiveShownOwner(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });

@@ -88,7 +88,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `status()`, `progress()` | Visible status items as `id\|side\|text\|tooltip\|actionId`; visible progress states by id |
 | `rail()` | Rail buttons' action ids |
 | `panels()` | Registered panels as `id\|title\|ANCHOR`, with `+split` for a panel that starts in the second half and `\|<action id>` for one that names its own toggle |
-| `openPanel(id)`, `panelView(id)`, `panelHeader(id)`, `closePanel(id)` | Builds a panel as the main window showing it would; its mounted view; its published header; discards it as the main window would |
+| `openPanel(id)`, `panelView(id)`, `panelHeader(id)`, `placePanel(id, placement)`, `closePanel(id)` | Builds a panel as the main window showing it would; its mounted view; its published header; moves the open panel as the user dragging it would: a different `PanelPlacement` is what `PanelHost.placement()` returns from then on and reaches each `onPlacement` handler once (a throwing handler is recorded in `failures()`, the others still run), the same one is silent, and a panel that is not open is not moved; discards it as the main window would |
 | `windows()`, `windowView(pluginId, title)`, `windowContent(pluginId, title)` | Open dialogs and overlays as `id\|title\|shown` (a dialog's id is `dialog`, an overlay's `overlay`); the view or component mounted on one |
 | `dialogPresentation(pluginId, title)`, `dialogSwatch(pluginId, title)`, `popoverViews(pluginId)` | How an open dialog is presented and the hue of its title square; shown popovers' views |
 | `requestClose(windowId)` | Closes a dialog through its closing guards |

@@ -94,6 +94,13 @@ public interface ContractHarness extends AutoCloseable {
 
     /** UI thread: discards the open panel as the main window would when it closes or the registration goes away. */
     void closePanel(String panelId);
+
+    /**
+     * UI thread: moves the open panel as the main window would, to the side, half and mode the placement names. A
+     * different placement is the panel's {@code PanelHost.placement()} from then on and reaches each
+     * {@code onPlacement} handler once; the same placement, and a panel that is not open, change nothing.
+     */
+    void placePanel(String panelId, dev.jasper.sdk.ui.PanelPlacement placement);
     /**
      * UI thread: the theme slot the host paints a kit view of this runtime from, {@code CHROME} or {@code WORKSPACE}. A view
      * mounted as a workspace content tab ({@code Windows.openTab}) takes {@code WORKSPACE}, as terminals and editors do;

@@ -432,6 +432,14 @@ final class FakeUi {
             placements.add(handler);
             return () -> placements.remove(handler);
         }
+        /** Moves the panel: a different placement is the one {@code placement()} returns and reaches each handler once. */
+        void place(dev.jasper.sdk.ui.PanelPlacement value) {
+            if (done || placement.equals(value)) return;
+            placement = value;
+            for (var handler : List.copyOf(placements)) {
+                try { handler.accept(value); } catch (RuntimeException failure) { host.recordFailure(pluginId() + " panel placement: " + failure); }
+            }
+        }
         @Override public Subscription onClosed(Runnable handler) { closed.add(handler); return () -> closed.remove(handler); }
         void close() {
             if (done) return;
