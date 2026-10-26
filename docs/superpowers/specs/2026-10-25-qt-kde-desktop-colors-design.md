@@ -1,6 +1,6 @@
 # Qt / KDE sources for Desktop colors
 
-Status: **Draft for approval, 2026-10-25.** Builder review completed; its lifecycle question is resolved below. Design only; implementation has not started.
+Status: **Approved for implementation planning, 2026-10-25.** The user approved this design. Builder review resolved the lifecycle question below. Implementation has not started. Plans: [native helpers](../plans/2026-10-25-qt-kde-native-helpers.md), then [application integration](../plans/2026-10-25-qt-kde-application-integration.md).
 
 Extends [Linux Desktop colors](2026-10-17-jasper-linux-desktop-colors-design.md) and the
 [Linux default change](../plans/2026-10-25-linux-default-colors.md). Current guides take precedence over
@@ -16,9 +16,9 @@ preferences, contrast repair, and existing Settings Apply/OK/Cancel semantics.
 Import colors, not Qt widget styling, fonts, metrics, icons, window decorations, or animations. Custom
 styles can paint outside QPalette; matching their complete appearance is outside this deliverable.
 
-## Approaches and recommendation
+## Approaches and decision
 
-1. **Isolated native APIs (recommended, developing the approach discussed with the user).** Read the
+1. **Isolated native APIs (approved).** Read the
    Qt application palette and, on KDE, KColorScheme. Separate processes isolate toolkit majors and
    failures. This follows the actual toolkit environment and supports live updates, at the cost of
    optional native binaries and a larger Linux test matrix.
@@ -28,8 +28,7 @@ styles can paint outside QPalette; matching their complete appearance is outside
 3. **Continue reading only GTK on KDE.** Simple, but GTK settings may differ from the user's Qt palette.
    Retain GTK as an Automatic fallback, rather than treating it as the KDE source.
 
-The concrete policy below is the author's proposal for approval, not a claim that every detail has
-already been agreed. There is no application-code work in this design phase.
+The user approved the concrete policy below on 2026-10-25. There is no application-code work in this design phase.
 
 ## Settings and presentation
 
@@ -210,16 +209,16 @@ Acceptance: changing desktop colors updates Jasper without focus changes, mapped
 frames, or config writes; terminal/editor color choices remain independent. An unavailable source leaves a readable
 interface and truthful status. Compare screenshots against native Qt/KDE controls for color fidelity, not geometry.
 
-## Open implementation investigations and approval choices
+## Implementation investigations
 
 The compatibility spike must establish minimum-header availability for KDE Header roles, packaged baseline build
 prefixes, optional package dependency handling, Qt event behavior with no visible windows, and reliable KDE refresh.
 If these fail, revise the design explicitly rather than silently reducing Plasma5/6 coverage. The exact C++ file split,
 build tooling and test fixture helpers are left to the implementation plan.
 
-Approval is requested for one Qt / KDE selector, desktop-aware major preference, Qt family before GTK on Qt desktops,
-and current-palette-only Qt extraction with the existing opposite-appearance fallback. No implementation begins
-until the design is approved.
+The approved choices are one Qt / KDE selector, desktop-aware major preference, Qt family before GTK on Qt desktops,
+and current-palette-only Qt extraction with the existing opposite-appearance fallback. The implementation plans
+retain the compatibility gate before source/UI activation.
 
 ## Primary references
 
