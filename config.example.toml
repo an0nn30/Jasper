@@ -102,6 +102,10 @@ on_exit = "keep_open"
 # fish before config.fish, and into a zsh or fish $SHELL inside tmux; "manual" only exports JASPER_SHELL_INTEGRATION
 # for you to source; "off" does neither.
 shell_integration = "auto"
+# Live. How Terminal tabs are named: free text with pieces in braces. {dir} is the current folder's name, {full} its
+# whole path, {process} the running program and {title} the title the shell or a program set; plugins add their own,
+# such as Remote's {host}. Text between two pieces shows only when both have a value; {{ and }} write a brace.
+tab_name = "{dir} {process} {title}"
 # Colours for terminal panes, live: "match" uses the shown theme's own scheme; or a scheme id, <theme id>/<scheme key>,
 # such as "slate-cobalt/dark", "slate-cobalt/light" or "slate-cobalt/high-contrast".
 scheme = "match"

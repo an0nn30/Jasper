@@ -184,6 +184,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `terminal.scrollback` | integer | `10000` | 0–1000000 lines; `0` keeps no scrollback | New panes | Terminal › Scrollback lines |
 | `terminal.option_as_meta` | string | `"left"` | `"left"`, `"right"`, `"both"`, `"none"`: which Option key sends Meta, on macOS only | Live | Terminal › Option key as Meta (Left Option, Right Option, Both, Neither); hidden on Linux and Windows |
 | `terminal.dim_inactive_panes` | number | `0.3` | 0–1: `0` does not dim panes without focus, `1` dims them fully | Live | Terminal › Dim inactive panes |
+| `terminal.tab_name` | string | `"{dir} {process} {title}"` | 1–200 characters: free text with pieces in braces | Live | Terminal › Tab name |
 | `terminal.copy_on_select` | boolean | `false` | Copies a finished selection to the clipboard | Live | Terminal › Copy on select |
 | `terminal.bell` | string | `"visual"` | `"visual"` (a short flash), `"sound"` (the system beep), `"none"` | Live | Terminal › Bell |
 | `terminal.on_exit` | string | `"keep_open"` | When a pane's shell exits: `"keep_open"` keeps the pane and its output, `"close_on_success"` closes it after exit code 0, `"close"` closes it after any exit | Live, for later exits | Terminal › When the shell exits (Keep the pane open, Close when it succeeds, Close) |

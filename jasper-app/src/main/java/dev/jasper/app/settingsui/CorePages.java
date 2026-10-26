@@ -142,6 +142,7 @@ public final class CorePages {
                 .row(BUDDY_ENABLED),
             systemPage(system),
             SchemaPage.page("terminal", "Terminal")
+                .row(TERMINAL_TAB_NAME, Editors.technical())
                 .row(TERMINAL_SCROLLBACK, Editors.stepper("lines"))
                 .row(TERMINAL_BELL)
                 .row(TERMINAL_ON_EXIT, Editors.choice(Map.of("keep_open", "Keep the pane open",

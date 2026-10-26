@@ -12,7 +12,7 @@ import java.util.Objects;
 public record TerminalConfig(Shell shell, Map<String, String> env, int scrollback, OptionAsMeta optionAsMeta,
                       CursorStyle cursorShape, boolean cursorBlink, float dimInactivePanes,
                       boolean copyOnSelect, BellMode bell, ShellExitBehavior onExit,
-                      ShellIntegrationMode shellIntegration) {
+                      ShellIntegrationMode shellIntegration, String tabName) {
     public TerminalConfig(Shell shell, Map<String, String> env, int scrollback, OptionAsMeta optionAsMeta,
                    CursorStyle cursorShape, boolean cursorBlink, float dimInactivePanes,
                    boolean copyOnSelect, BellMode bell) {
@@ -25,6 +25,19 @@ public record TerminalConfig(Shell shell, Map<String, String> env, int scrollbac
                    boolean copyOnSelect, BellMode bell, ShellExitBehavior onExit) {
         this(shell, env, scrollback, optionAsMeta, cursorShape, cursorBlink, dimInactivePanes,
             copyOnSelect, bell, onExit, ShellIntegrationMode.AUTO);
+    }
+
+    public TerminalConfig(Shell shell, Map<String, String> env, int scrollback, OptionAsMeta optionAsMeta,
+                   CursorStyle cursorShape, boolean cursorBlink, float dimInactivePanes,
+                   boolean copyOnSelect, BellMode bell, ShellExitBehavior onExit, ShellIntegrationMode shellIntegration) {
+        this(shell, env, scrollback, optionAsMeta, cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit,
+            shellIntegration, TabNames.DEFAULT);
+    }
+
+    /** This configuration with another {@code terminal.tab_name} pattern. */
+    public TerminalConfig withTabName(String value) {
+        return new TerminalConfig(shell, env, scrollback, optionAsMeta, cursorShape, cursorBlink, dimInactivePanes,
+            copyOnSelect, bell, onExit, shellIntegration, value);
     }
 
     /**
@@ -82,6 +95,8 @@ public record TerminalConfig(Shell shell, Map<String, String> env, int scrollbac
         Objects.requireNonNull(bell, "bell");
         Objects.requireNonNull(onExit, "onExit");
         Objects.requireNonNull(shellIntegration, "shellIntegration");
+        Objects.requireNonNull(tabName, "tabName");
+        if (!TabNames.valid(tabName)) throw new IllegalArgumentException("The tab name must be a valid pattern.");
     }
 
     static boolean validEnvName(String name) {

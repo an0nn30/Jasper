@@ -157,6 +157,15 @@ public final class CoreSettings {
         .label("Shell integration").keywords("integration", "prompt marks", "osc 133", "zsh", "bash", "fish").applies(Applies.NEW_PANES)
         .description("Shell integration: \"auto\" loads Jasper's zsh/bash/fish script after your own startup files (new panes only),\n"
             + "\"manual\" only exports JASPER_SHELL_INTEGRATION so you can source it yourself, \"off\" does neither.").build();
+    public static final Setting<String> TERMINAL_TAB_NAME = Setting.of("terminal.tab_name",
+            SettingKind.string(TabNames::valid,
+                "Use 1 to 200 characters, with pieces such as {dir}, {full}, {process} and {title}, and {{ or }} for a brace; using the default."),
+            TabNames.DEFAULT)
+        .label("Tab name").keywords("tab", "title", "name", "format", "pattern", "folder", "directory", "process")
+        .description("Live. How Terminal tabs are named: free text with pieces in braces. {dir} is the current folder's name,\n"
+            + "{full} its whole path, {process} the running program and {title} the title the shell or a program set;\n"
+            + "plugins add their own, such as Remote's {host}. Text between two pieces shows only when both have a value.\n"
+            + "A tab named with Rename Tab keeps its name.").build();
     public static final Setting<String> TERMINAL_FONT_FAMILY = Setting.of("terminal.font.family",
             SettingKind.string(CoreSettings::fontName, FONT_NAME), FontConfig.defaults().family())
         .alias("font.family").label("Font").keywords("font", "typeface", "family")
@@ -285,7 +294,7 @@ public final class CoreSettings {
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT, WINDOW_MEMORY_INDICATOR,
             WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, NOTIFICATIONS_GROUPS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
-            TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
+            TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_TAB_NAME, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
             TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_APPEARANCE, UI_THEME_DARK, UI_THEME_LIGHT, UI_THEME_DESKTOP_SOURCE, UI_FONT_FAMILY, UI_FONT_SIZE,
             UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR, UI_ANIMATIONS_ENABLED),

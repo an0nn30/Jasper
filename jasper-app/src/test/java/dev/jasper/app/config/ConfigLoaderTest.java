@@ -484,6 +484,16 @@ class ConfigLoaderTest {
             .isEqualTo("Use \"match\" or a scheme id such as \"slate-cobalt/high-contrast\"; using the default.");
     }
 
+    @Test void aMalformedSavedPatternFallsBackToTheDefault() {
+        var good = parse("[terminal]\ntab_name = '{full} | {process}'");
+        assertThat(good.diagnostics()).isEmpty();
+        assertThat(good.snapshot().terminal().tabName()).isEqualTo("{full} | {process}");
+        var bad = parse("[terminal]\ntab_name = '{dir'");
+        assertThat(bad.diagnostics()).hasSize(1);
+        assertThat(bad.snapshot().terminal().tabName()).isEqualTo("{dir} {process} {title}");
+        assertThat(parse("[terminal]\ntab_name = '{dir} {host}'").diagnostics()).as("an unknown piece is not an error").isEmpty();
+    }
+
     @Test void anUnknownAppearanceOrSchemeUsesTheDefaultAndSaysSo() {
         var result = parse("[ui]\nappearance = \"sepia\"\n[terminal]\nscheme = \"nord\"\n");
         assertThat(result.snapshot().appearance()).isEqualTo(AppearanceMode.SYSTEM);

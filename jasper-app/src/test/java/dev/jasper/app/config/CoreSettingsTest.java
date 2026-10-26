@@ -78,7 +78,7 @@ class CoreSettingsTest {
     }
 
     @Test void everySettingIsDescribedAndItsTemplateValueRoundTrips() {
-        assertThat(CoreSettings.SCHEMA.settings()).hasSize(45);
+        assertThat(CoreSettings.SCHEMA.settings()).hasSize(46);
         for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
             assertThat(setting.label()).as(setting.name()).isNotBlank();
             assertThat(setting.description()).as(setting.name()).isNotBlank();
@@ -91,6 +91,17 @@ class CoreSettingsTest {
         var reading = setting.kind().read(TomlLiterals.parseValue(setting.kind().literal(value)), setting.defaultValue());
         assertThat(reading.issues()).as(setting.name()).isEmpty();
         assertThat(reading.value()).as(setting.name()).isEqualTo(value);
+    }
+
+    @Test void theTabNameIsALivePatternDefaultingToFolderProcessAndTitle() {
+        var setting = CoreSettings.TERMINAL_TAB_NAME;
+        assertThat(setting.name()).isEqualTo("terminal.tab_name");
+        assertThat(setting.label()).isEqualTo("Tab name");
+        assertThat(setting.defaultValue()).isEqualTo("{dir} {process} {title}");
+        assertThat(setting.applies()).isEqualTo(Applies.LIVE);
+        assertThat(setting.kind().check("{dir} | {host}")).isEmpty();
+        assertThat(setting.kind().check("{dir")).isPresent();
+        assertThat(setting.kind().check(" ")).isPresent();
     }
 
     @Test void theVersionTwoLayoutKeepsOldKeysAsAliases() {
