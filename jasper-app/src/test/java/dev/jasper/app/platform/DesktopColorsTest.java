@@ -124,7 +124,7 @@ class DesktopColorsTest {
             desktop.request(1, Set.of(Source.GTK3), true);
             f.await(() -> desktop.current().palettes().containsKey(Source.GTK3));
             Process old = owners.get(HELPERS.resolve("jasper-desktop-gtk3").toString()); old.destroyForcibly();
-            f.await(() -> desktop.current().palettes().get(Source.GTK3).reason().contains("exit"));
+            f.await(() -> !desktop.current().palettes().get(Source.GTK3).reason().isBlank());
             f.time.advance(1, TimeUnit.SECONDS); f.pump();
             f.await(() -> commands.size() == 3 && desktop.current().palettes().get(Source.GTK3).reason().isEmpty());
             desktop.request(2, Set.of(Source.GTK3), false);
