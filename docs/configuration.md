@@ -416,9 +416,9 @@ Claude runs and has set a title, and `moray zsh` at the prompt.
 
 Plugins add pieces of their own, such as Remote's `{host}`; a piece that nothing provides shows nothing. A piece without a
 value takes the text before it with it, or the text after it when no piece before it shows, so
-`{dir} | {process} | {title}` without a title reads `moray | zsh`. Text before the first piece and after the last always shows. `{{` and `}}` write a brace. A pattern that comes out
-empty names the tab after its shell. Settings › Terminal › Tab name previews the name the pattern gives the tab you
-are using.
+`{dir} | {process} | {title}` without a title reads `moray | zsh`. Text before the first piece and after the last always
+shows. `{{` and `}}` write a brace. A pattern that comes out empty names the tab after its shell. Settings › Terminal ›
+Tab name previews the name the pattern gives the tab you are using.
 
 ### Terminal font
 
