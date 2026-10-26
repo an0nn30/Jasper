@@ -45,6 +45,11 @@ Open deliberately, keep open across pointer exit, close on Escape, focus loss/ou
 row activation, all visible work ending, or Buddy hide/dispose. A focusable drawer is acceptable
 only when explicitly opened; refresh/drag/appearance updates must never steal focus. Ensure hidden
 drawers cannot reopen on stale anchors or pending refresh. Release listeners/timers on hide/dispose.
+Use a visible focusable Frame/Dialog owner for the drawer JWindow (active owner first, then a
+visible eligible fallback), chosen only on explicit opening. Owned-window focus retains its
+workspace owner activation. Ensure the drawer panel is focusable. Recreate the native drawer
+only when its owner changes on explicit open. If no eligible visible owner exists, use an
+undecorated focusable dialog fallback with the same buffered translucent rendering.
 All details stay in this one drawer rather than separate filtered drawers. No new completion history.
 
 ## Constraints and verification
