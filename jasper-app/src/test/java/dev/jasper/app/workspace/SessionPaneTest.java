@@ -87,11 +87,11 @@ class SessionPaneTest {
             connection.remote.write(("\033]2;old prompt\007\033]1341;jasper;cmd;" + command + "\007\033]133;C\007").getBytes(StandardCharsets.UTF_8));
             connection.remote.flush();
             until(() -> field[0].contextText().equals("build-host:/srv/app : sleep 12"));
-            edt(() -> assertThat(owner.currentTerminal().title()).isEqualTo("sleep 12"));
+            edt(() -> assertThat(owner.currentTerminal().title()).isEqualTo("app build-host"));
             connection.remote.write("\033]2;Claude Code — Reviewing files\007".getBytes(StandardCharsets.UTF_8)); connection.remote.flush();
             until(() -> field[0].contextText().equals("Claude Code — Reviewing files"));
             edt(() -> {
-                assertThat(owner.currentTerminal().title()).isEqualTo("Claude Code — Reviewing files");
+                assertThat(owner.currentTerminal().title()).isEqualTo("app build-host Claude Code — Reviewing files");
                 var tab = owner.currentTerminal();
                 owner.split(dev.jasper.app.layout.Side.RIGHT);
                 assertThat(field[0].contextText()).isNotEqualTo("Claude Code — Reviewing files");
@@ -102,7 +102,7 @@ class SessionPaneTest {
             });
             connection.remote.write("\033]133;D;0\007".getBytes(StandardCharsets.UTF_8)); connection.remote.flush();
             until(() -> field[0].contextText().equals("build-host:/srv/app : Shell"));
-            edt(() -> assertThat(owner.currentTerminal().title()).isEqualTo("build-host"));
+            edt(() -> assertThat(owner.currentTerminal().title()).isEqualTo("app build-host"));
         } finally { edt(() -> bar[0].close()); }
     }
 

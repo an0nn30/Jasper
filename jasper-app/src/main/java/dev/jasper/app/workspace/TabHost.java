@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.TabNames;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.terminal.view.FileLink;
@@ -39,6 +40,7 @@ final class TabHost {
         terminal.onError = (message, cause) -> owner.onLaunchFailure.accept(message, cause);
         terminal.lastInWindow = () -> owner.tabCount() == 1;
         terminal.configure = ready -> configure(tab, ready);
+        terminal.tabName = owner::tabNamePattern;
         terminal.setBackground(owner.theme().surface());
         terminal.setBackgroundOpacity((float) owner.backgroundOpacity());
         pane.applyTheme(owner.theme());
@@ -57,6 +59,7 @@ final class TabHost {
         terminal.onError = (message, cause) -> { };
         terminal.lastInWindow = () -> false;
         terminal.configure = ready -> { };
+        terminal.tabName = () -> TabNames.DEFAULT_PATTERN;
         unwire(terminal.pane());
     }
 

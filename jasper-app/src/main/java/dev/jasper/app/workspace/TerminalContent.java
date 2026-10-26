@@ -1,5 +1,7 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.config.TabNames;
+import dev.jasper.app.config.TitleTemplate;
 import dev.jasper.app.contributions.TabContent;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.persistence.WorkspaceFile;
@@ -68,8 +70,14 @@ public final class TerminalContent extends JPanel implements TabContent, AutoClo
     void start() { pane.start(); }
     /** Starts a restored terminal's shell the first time its tab shows (workspace tabs spec 13). */
     void startIfWaiting() { if (!closed && pane.waiting()) pane.start(); }
-    /** The tab's title: the name the user gave it, else the shell's title, else its folder's name, else "Terminal". */
-    String title() { return state.title(pane.tabTitle(), pane.directory()); }
+    /** The tab name pattern of the window holding the tab (tab names spec 3); its {@code TabHost} sets it. */
+    java.util.function.Supplier<TitleTemplate> tabName = () -> TabNames.DEFAULT_PATTERN;
+
+    /** The tab's title: the name the user gave it, else its window's pattern filled from {@link #namePieces()}. */
+    String title() { return state.renamed().orElseGet(() -> TabNames.format(tabName.get(), namePieces(), pane.shellLabel())); }
+
+    /** The pieces the tab's automatic name is made from (tab names spec 3). */
+    java.util.Map<String, String> namePieces() { return pane.namePieces(); }
     /** Names the tab; blank goes back to the automatic title. */
     void rename(String name) { state.rename(name); onChanged.run(); onRenamed.run(); }
     /** The name the user gave the tab, kept apart from the shell's title (workspace plan 6 saves it). */
@@ -119,6 +127,6 @@ public final class TerminalContent extends JPanel implements TabContent, AutoClo
         pane.close();
         removeAll();
         onChanged = () -> { }; onRenamed = () -> { }; onEmpty = () -> { }; onError = (message, cause) -> { };
-        lastInWindow = () -> false; configure = ready -> { };
+        lastInWindow = () -> false; configure = ready -> { }; tabName = () -> TabNames.DEFAULT_PATTERN;
     }
 }

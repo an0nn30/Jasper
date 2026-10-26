@@ -1,8 +1,6 @@
 package dev.jasper.app.workspace;
 
-import java.nio.file.Path;
-
-/** User-controlled and automatic naming state for one terminal tab. */
+/** The name the user gave one terminal tab, kept apart from its automatic name. */
 final class TabState {
     private String renamedTitle;
 
@@ -12,20 +10,4 @@ final class TabState {
 
     /** The name the user gave, if any. */
     java.util.Optional<String> renamed() { return java.util.Optional.ofNullable(renamedTitle); }
-
-    String title(String shellTitle, Path workingDirectory) {
-        if (renamedTitle != null) {
-            return renamedTitle;
-        }
-        if (shellTitle != null && !shellTitle.isBlank()) {
-            return shellTitle;
-        }
-        if (workingDirectory != null) {
-            Path name = workingDirectory.getFileName();
-            if (name != null && !name.toString().isBlank()) {
-                return name.toString();
-            }
-        }
-        return "Terminal";
-    }
 }
