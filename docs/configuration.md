@@ -201,9 +201,9 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `terminal.cursor.blink` | boolean | `true` | | Live | Cursor › Blinking cursor |
 | `terminal.env` | table | `{}` | Environment variables for new shells ([Shell](#shell-environment-and-history)) | New panes | Shell › Environment variables |
 | `ui.appearance` | string | `"system"` | `"system"`, `"dark"`, `"light"` ([Theme](#theme)) | Live | Appearance › Dark, Light, Match System |
-| `ui.theme.dark` | string | `"jasper-meadow"`, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Dark theme |
+| `ui.theme.dark` | string | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Dark theme |
 | `ui.theme.desktop_source` | string | `"auto"` | `"auto"`, `"gtk3"`, `"gtk4"` | Live | Desktop color source |
-| `ui.theme.light` | string | `"jasper-meadow"`, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Light theme |
+| `ui.theme.light` | string | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the [look's](#look-dependent-defaults) | A theme id | Live | Appearance › Light theme |
 | `ui.font.family` | string | `"system"` | `"system"` or a font family name ([Interface font](#interface-font)) | Live | Appearance › Font |
 | `ui.font.size` | number | Not set: the look's size | 8–32 points | Live | Appearance › Use platform font size, Font size |
 | `ui.workspace.opacity` | number | Not set: opaque | 10–100 percent: the opacity of terminal and editor backgrounds, the Editor's Markdown preview included; macOS only | Live | Appearance › Enable opacity, Opacity (macOS) |

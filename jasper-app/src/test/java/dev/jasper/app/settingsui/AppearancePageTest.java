@@ -25,7 +25,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(EdtTestExtension.class)
 class AppearancePageTest {
     private final AppearanceChoices appearance = AppearanceFixtures.CHOICES;
-    private final SettingsDraft draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
+    private final SettingsDraft draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values(),
+        new dev.jasper.app.config.DefaultSource(java.util.Map.of(CoreSettings.UI_THEME_DARK, "jasper-meadow",
+            CoreSettings.UI_THEME_LIGHT, "jasper-meadow")));
     private final PageContext context = PageKit.context(draft, id -> { }, () -> { });
     private final CorePages.SystemActions system = new CorePages.SystemActions(() -> Path.of("config.toml"),
         () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty());
@@ -202,7 +204,7 @@ class AppearancePageTest {
     }
 
     @Test void applyingASourceSavesItAndCancelDiscardsTheNextSourceDraft() {
-        try (var fixture = new DesktopSourceSelectionTest.Fixture("", true)) {
+        try (var fixture = new DesktopSourceSelectionTest.Fixture("[ui.theme]\ndark='jasper-meadow'\nlight='jasper-meadow'\n", true)) {
             var saved = new java.util.concurrent.atomic.AtomicReference<>(sourceState("auto"));
             var writes = new ArrayList<dev.jasper.app.config.SettingsEdit>();
             var hooks = new SettingsDialog.Hooks(edit -> {
@@ -256,7 +258,7 @@ class AppearancePageTest {
     }
 
     private static dev.jasper.app.config.ConfigService.State sourceState(String source) {
-        var parsed = ConfigLoader.parse(Path.of("config.toml"), "[ui.theme]\ndark='desktop-colors'\ndesktop_source='" + source + "'\n", true);
+        var parsed = ConfigLoader.parse(Path.of("config.toml"), "[ui.theme]\ndark='desktop-colors'\nlight='jasper-meadow'\ndesktop_source='" + source + "'\n", true);
         return new dev.jasper.app.config.ConfigService.State(parsed.snapshot(), parsed.diagnostics(), Path.of("config.toml"), true,
             parsed.legacyKeys(), parsed.deadTables(), parsed.values(), parsed.rejected());
     }

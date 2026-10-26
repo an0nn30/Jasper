@@ -21,7 +21,7 @@ class DesktopSourceSelectionTest {
         assertThat(ConfigSnapshot.defaults().toBuilder().desktopSource("gtk4").build().desktopSource()).isEqualTo("gtk4");
     }
     @Test void eitherStagedPickRevealsTheSourceAndAuthoredPicksRetainItsDraft() {
-        try (var f = new Fixture("", true)) {
+        try (var f = new Fixture("[ui.theme]\ndark='jasper-meadow'\nlight='jasper-meadow'\n", true)) {
             assertThat(node(f.page,"ui.appearance:desktop-source").state().visible()).isFalse();
             f.pick("dark-theme", "desktop-colors");
             assertThat(node(f.page,"ui.appearance:desktop-source").state().visible()).isTrue();
@@ -69,11 +69,13 @@ class DesktopSourceSelectionTest {
             f.pick("dark-theme", "jasper-meadow");
             kit(f.page, "ui.appearance:reset", JButton.class).doClick(0);
             assertThat(f.draft.value(CoreSettings.UI_APPEARANCE)).isEqualTo(AppearanceMode.SYSTEM);
-            assertThat(f.draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo("jasper-meadow");
-            assertThat(f.draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("jasper-meadow");
+            assertThat(f.draft.value(CoreSettings.UI_THEME_DARK)).isEqualTo(CoreSettings.UI_THEME_DARK.defaultValue());
+            assertThat(f.draft.value(CoreSettings.UI_THEME_LIGHT)).isEqualTo(CoreSettings.UI_THEME_LIGHT.defaultValue());
             assertThat(selected(f.source())).isEqualTo("auto");
             assertThat(f.draft.edit().changes()).containsEntry(CoreSettings.UI_THEME_DESKTOP_SOURCE, Optional.empty());
-            assertThat(f.demands).isEmpty();
+            if (CoreSettings.UI_THEME_DARK.defaultValue().equals("desktop-colors"))
+                assertThat(f.demands).containsExactlyInAnyOrder("auto:true", "auto:false");
+            else assertThat(f.demands).isEmpty();
         }
     }
     @Test void eachTileUsesItsMatchingDesktopPolarityAndChangingSourceLeavesTerminalAlone() {
@@ -90,7 +92,7 @@ class DesktopSourceSelectionTest {
         }
     }
     @Test void nonLinuxRetainsOnlySelectedDesktopPicksAndSourceWithoutAcquiringHelpers() {
-        try (var f = new Fixture("[ui.theme]\nlight='desktop-colors'\ndesktop_source='gtk4'\n", false)) {
+        try (var f = new Fixture("[ui.theme]\ndark='jasper-meadow'\nlight='desktop-colors'\ndesktop_source='gtk4'\n", false)) {
             assertThat(options(f.box("dark-theme"))).doesNotContain("Desktop colors", "Desktop colors (unavailable on this platform)");
             assertThat(options(f.box("light-theme"))).endsWith("Desktop colors (unavailable on this platform)");
             assertThat(selected(f.box("light-theme"))).isEqualTo("desktop-colors");

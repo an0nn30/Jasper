@@ -16,7 +16,7 @@ file and how to make one.
 | Catppuccin Macchiato | `catppuccin-macchiato` | Dark | Catppuccin Macchiato (`catppuccin-macchiato/dark`) |
 | Catppuccin Mocha | `catppuccin-mocha` | Dark | Catppuccin Mocha (`catppuccin-mocha/dark`) |
 | Ubuntu Yaru | `ubuntu-yaru` | Dark, Light | Ubuntu Yaru Dark (`ubuntu-yaru/dark`), Ubuntu Yaru Light (`ubuntu-yaru/light`) |
-| Jasper Meadow (the default theme) | `jasper-meadow` | Dark, Light | Jasper Meadow Dark (`jasper-meadow/dark`), Jasper Meadow Light (`jasper-meadow/light`) |
+| Jasper Meadow | `jasper-meadow` | Dark, Light | Jasper Meadow Dark (`jasper-meadow/dark`), Jasper Meadow Light (`jasper-meadow/light`) |
 
 - **Slate Cobalt**'s colours are defined in [the Slate Cobalt colour reference](design/theme-engine/slate-cobalt.md).
   High Contrast is a terminal scheme only, white on black, and can be used with any theme.
@@ -60,8 +60,8 @@ scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
 | Setting | Default | Values |
 |---|---|---|
 | `ui.appearance` | `"system"` | `"system"` follows the operating system's light or dark setting, live; macOS reports it directly and Linux uses the desktop portal. If unavailable, `"system"` shows Dark. `"dark"` and `"light"` choose one. A change of the system's setting never writes `config.toml`. |
-| `ui.theme.dark` | `"jasper-meadow"`, or the active look's default | The id of a theme with a Dark variant: built in, from a plugin, or installed |
-| `ui.theme.light` | `"jasper-meadow"`, or the active look's default | The id of a theme with a Light variant |
+| `ui.theme.dark` | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the active look's default | The id of a theme with a Dark variant: built in, from a plugin, or installed |
+| `ui.theme.light` | `"desktop-colors"` on Linux, `"jasper-meadow"` elsewhere, or the active look's default | The id of a theme with a Light variant |
 | `ui.theme.desktop_source` | `"auto"` | Desktop colors source: `"auto"`, `"gtk3"` or `"gtk4"` |
 | `terminal.scheme` | `"match"` | `"match"` uses the shown theme's own scheme, so it follows the appearance; a scheme id, `<theme id>/<scheme key>`, chooses one in either appearance |
 
@@ -87,8 +87,8 @@ Ctrl+Shift+P on Linux and Windows), **Themes…** opens it too, and **Terminal S
 `terminal.scheme` at once for every window. While `config.toml` has errors they are refused: "config.toml has errors,
 so changes can't be saved until they're fixed."
 
-On Linux, **Desktop colors** (`desktop-colors`) is available in both theme dropdowns. It derives interface colours
-from GTK 3.24+ or GTK 4.10+ with optional libadwaita. **Desktop source** offers Automatic, GTK 3 and GTK 4 / libadwaita;
+On Linux, **Desktop colors** (`desktop-colors`) is the default for both appearances unless the look sets its own
+defaults. It derives interface colours from GTK 3.24+ or GTK 4.10+ with optional libadwaita. **Desktop source** offers Automatic, GTK 3 and GTK 4 / libadwaita;
 Automatic prefers GTK 4 on GNOME and GTK 3 elsewhere, falling back to the other toolkit when necessary. An explicit
 source keeps that choice. The status beneath it identifies the source and library version, or explains unavailable
 helpers, toolkit/display support or the bundled fallback. The selector and status appear when a Desktop colors pick
@@ -150,7 +150,7 @@ is shown in a sheet.
 - **Remove *theme*** removes the theme the dropdown shows; for the Terminal scheme gear, the theme the scheme belongs
   to. It is unavailable for a built-in theme, a plugin's theme and Same as UI theme. It asks first and says what will
   change: the file is deleted, and every setting that names the theme or one of its schemes, saved or staged, returns
-  to its default (Jasper Meadow for Dark and Light, or the look's default under a look that sets one; Same as UI theme
+  to its default (Desktop colors on Linux, Jasper Meadow elsewhere, or the look's default; Same as UI theme
   for the scheme). Saved settings are written at once, and other staged changes stay
   staged. If the file cannot be deleted, nothing changes and the sheet says why.
 
