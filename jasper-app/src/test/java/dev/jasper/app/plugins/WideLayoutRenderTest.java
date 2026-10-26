@@ -47,14 +47,14 @@ class WideLayoutRenderTest {
 
     interface Populate { void run(PanelSurfaceFixture fixture) throws Exception; }
 
-    interface Check { void run(PanelSurfaceFixture fixture, boolean wide) throws Exception; }
+    interface Check { void run(PanelSurfaceFixture fixture, boolean wide, String look) throws Exception; }
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
     void theSessionsToolWindowLaysItsListBesideTheHostsDetails() throws Exception {
         wide(new Wide(PanelSurfaceFixture.SESSIONS, "sessions", "sessions", Slot.LEFT_TOP, Slot.RIGHT_TOP), fixture -> {
             var ids = fixture.hosts(TWO_HOSTS);
             fixture.selectSession(ids.get(1));
-        }, (fixture, wide) -> columns(fixture, "sessions", wide));
+        }, (fixture, wide, look) -> columns(fixture, "sessions", wide));
     }
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
@@ -64,9 +64,11 @@ class WideLayoutRenderTest {
             fixture.sftp("showPage", new Class<?>[] {String.class, String.class, List.class, long.class, long.class, boolean.class},
                 "prod", "/srv/app", List.of(fixture.fileEntry("src", "DIRECTORY", 0, MODIFIED), fixture.fileEntry("README.md", "FILE", 4_210, MODIFIED),
                     fixture.fileEntry("build.gradle.kts", "FILE", 18_400, MODIFIED)), 0L, 3L, false);
-        }, (fixture, wide) -> {
+        }, (fixture, wide, look) -> {
             var headers = new ArrayList<Rectangle>();
-            for (String column : List.of("name", "size", "modified", "permissions")) {
+            // The default look ends on Size at the trailing edge; Enterprise's table puts Size second.
+            var order = look.equals("enterprise") ? List.of("name", "size", "modified", "permissions") : List.of("name", "modified", "permissions", "size");
+            for (String column : order) {
                 var bounds = shown(fixture, "@table/sftp.files/header/" + column);
                 if (bounds != null) headers.add(bounds);
                 if (wide) assertThat(bounds).as("the %s header is showing", column).isNotNull();
@@ -88,7 +90,7 @@ class WideLayoutRenderTest {
             var web = fixture.tunnel("Web preview", hosts.get(1), "LOCAL", 8080, "localhost", 80);
             fixture.tunnelStates(Map.of(web, "up"));
             fixture.select("tunnels.rows", "tunnel:" + web);
-        }, (fixture, wide) -> columns(fixture, "tunnels", wide));
+        }, (fixture, wide, look) -> columns(fixture, "tunnels", wide));
     }
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
@@ -96,7 +98,7 @@ class WideLayoutRenderTest {
         wide(new Wide(PanelSurfaceFixture.FILE_SERVERS, "file-servers", "fileserver", Slot.LEFT_TOP, Slot.LEFT_BOTTOM), fixture -> {
             fixture.fileServer("Downloads", "HTTP");
             fixture.select("fileserver.rows", "server:" + fixture.fileServer("Shared drop", "SFTP"));
-        }, (fixture, wide) -> columns(fixture, "fileserver", wide));
+        }, (fixture, wide, look) -> columns(fixture, "fileserver", wide));
     }
 
     /** Runs {@code populate}, then the moves, under the default look and under Enterprise (Light), each with its own panel. */
@@ -117,26 +119,26 @@ class WideLayoutRenderTest {
     private static void moves(PanelSurfaceFixture fixture, Wide wide, Slot slot, String look, Check check) throws Exception {
         String as = wide.name() + " in the " + look + " look";
         fixture.size(WIDTH, HEIGHT);
-        check.run(fixture, false);
+        check.run(fixture, false, look);
 
         fixture.place(new Placement(slot, ToolWindowMode.FLOAT));
         fixture.size(WIDTH, HEIGHT);
-        check.run(fixture, true);
+        check.run(fixture, true, look);
         var image = fixture.render(WIDTH, HEIGHT);
         save(look, wide.name(), image);
         assertThat(colours(image)).as(as + ": the render is not one colour").isGreaterThan(1);
 
         fixture.place(new Placement(slot, ToolWindowMode.DOCKED));
         fixture.size(WIDTH, HEIGHT);
-        check.run(fixture, false);
+        check.run(fixture, false, look);
 
         fixture.place(new Placement(Slot.BOTTOM_LEFT, ToolWindowMode.DOCKED));
         fixture.size(WIDTH, HEIGHT);
-        check.run(fixture, true);
+        check.run(fixture, true, look);
 
         fixture.place(new Placement(slot, ToolWindowMode.DOCKED));
         fixture.size(WIDTH, HEIGHT);
-        check.run(fixture, false);
+        check.run(fixture, false, look);
     }
 
     /**

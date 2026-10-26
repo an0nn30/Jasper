@@ -52,10 +52,11 @@ class SftpWideTest {
             panel.wide(true);
             assertThat(panel.wide()).isTrue();
             var wide = table(panel);
-            assertThat(titles(wide)).containsExactly("Name", "Size", "Modified", "Permissions");
-            assertThat(ids(wide)).containsExactly("name", "size", "modified", "permissions");
+            assertThat(titles(wide)).as("Size last, at the trailing edge as docked").containsExactly("Name", "Modified", "Permissions", "Size");
+            assertThat(ids(wide)).containsExactly("name", "modified", "permissions", "size");
+            assertThat(wide.columns().get(3).numeric()).as("the last column is the right-aligned Size").isTrue();
             var cells = wide.rows().stream().filter(row -> row.id().equals(SftpPanel.ROW + "a.txt")).findFirst().orElseThrow().cells();
-            assertThat(cells).containsEntry("modified", SftpPanel.modified(FILE)).containsEntry("permissions", "rw-r--r--");
+            assertThat(cells).containsEntry("modified", "2026-09-28 14:05").containsEntry("permissions", "rw-r--r--").containsEntry("size", SftpPanel.formatSize(FILE));
             assertThat(wide.selectedIds()).as("the selection survives the switch").containsExactly(SftpPanel.ROW + "a.txt");
             panel.wide(false);
             assertThat(titles(table(panel))).containsExactly("Name", "Size");

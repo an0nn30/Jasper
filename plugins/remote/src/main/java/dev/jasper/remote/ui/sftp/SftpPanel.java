@@ -469,15 +469,15 @@ public final class SftpPanel implements AutoCloseable {
         return result;
     }
 
-    /** The table's columns: name and size docked, with the modified time and the permissions when wide. */
+    /** The table's columns: name and size docked; when wide the modified time and the permissions between them, the size staying at the trailing edge. */
     static final List<Column> COLUMNS=List.of(
         new Column("name","Name",Nodes.TextRole.BODY,false,2.4,Optional.empty()),
         new Column("size","Size",Nodes.TextRole.DESCRIPTION,true,1,Optional.empty()));
     static final List<Column> WIDE_COLUMNS=List.of(
         new Column("name","Name",Nodes.TextRole.BODY,false,2.4,Optional.empty()),
-        new Column("size","Size",Nodes.TextRole.DESCRIPTION,true,1,Optional.empty()),
         new Column("modified","Modified",Nodes.TextRole.DESCRIPTION,false,1.6,Optional.empty()),
-        new Column("permissions","Permissions",Nodes.TextRole.MONO_SMALL,false,1.2,Optional.empty()));
+        new Column("permissions","Permissions",Nodes.TextRole.MONO_SMALL,false,1.2,Optional.empty()),
+        new Column("size","Size",Nodes.TextRole.DESCRIPTION,true,1,Optional.empty()));
 
     private Nodes.Table table() {
         boolean columns=wide && !destination;
