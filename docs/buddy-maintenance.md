@@ -74,10 +74,9 @@ how `buddy.toml` saves his position.
 Edit [BuddyDeck](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyDeck.java),
 then its model tests. Preserve source-plus-key identity, newest-first replacement, the
 50-notice bound (`MAX_NOTICES`) and immutable snapshots. Every retained notice is live
-work, including suppressed entries. `BuddyGroups` projects visible snapshots into groups;
-context updates preserve arrival order and cannot restore dismissed IDs. The column's
-three-group/card limit (`BuddyDeckLayout.MAX_IN_COLUMN`) is separate from retained model capacity. Exercise the
-panels too when a model change affects what is displayed.
+work, including suppressed entries. `BuddyGroups` keeps first-observed group/member order,
+expansion and summary priority within retained capacity. Context updates cannot restore
+dismissed IDs. Exercise the panels when a model change affects what is displayed.
 
 ```sh
 ./gradlew :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddyDeckLayoutTest' --tests '*BuddyGroupsPresentationTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest'
@@ -89,9 +88,8 @@ panels too when a model change affects what is displayed.
    and [BuddyFrame](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/animation/BuddyFrame.java).
    Frame order is also the PNG column order; follow the [sprite workflow](../packaging/buddy/README.md)
    when adding artwork. Host working intent is independent of notification thresholds.
-2. For capsule arrival/hover timing use `BubbleMotion`; for retargeted placement use
-   `BubbleSpring` and `BuddyColumnPlacement`. Keep calculations caller-clock-driven;
-   schedule Swing timers only in presentation owners.
+2. For drawer hover timing use `BubbleMotion`; for direct summary placement use
+   `BuddyColumnPlacement`. Keep the summary free of idle animation timers.
 3. Extend clock-driven tests for interrupted motion, long clock gaps, hiding, working
    transitions and retargeting. Verify the exact path being changed: idle postures
    resolve absolute deadlines in constant time, working resolves elapsed typing cycles
@@ -154,8 +152,8 @@ it takes no output-directory argument and prints the directory; both previews pa
 (84 × 96), smaller than the app's 105 × 120. Relative paths use the
 Gradle subproject working directory.
 
-`buddyGroupsPreview` writes dark/light 2× contact sheets of a singleton, stacks, a
-filtered drawer and group overflow under `jasper-buddy/build/reports/buddy-groups/`.
+`buddyGroupsPreview` writes dark/light 2× contact sheets of single, mixed and attention
+summaries, an expanded drawer and a collapsed group under `jasper-buddy/build/reports/buddy-groups/`.
 
 `buddyStandUpPreview` writes normal and interrupted animated GIFs and timestamped contact sheets
 under `jasper-buddy/build/reports/buddy-stand-up/`, using the production animator and runtime
@@ -165,7 +163,7 @@ boundary to 230 ms while preserving the 500 ms total; contact labels show exact 
 under `jasper-buddy/build/reports/buddy-open-laptop/`.
 
 The [performance measurement](../jasper-buddy/src/test/java/dev/jasper/buddy/internal/presentation/BuddyPerformanceMeasurement.java)
-paints three running capsules at 2× density for 200 warm-up frames and 600 measured
+paints the compact running summary at 2× density for 200 warm-up frames and 600 measured
 frames, and prints the median, p95 and p99 paint time; an optional first argument
 names a PNG file for the last frame. It excludes native window/drag scheduling, so do
 not infer desktop throughput from it.

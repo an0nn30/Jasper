@@ -2,6 +2,17 @@
 
 **Qt / KDE Desktop colors — 2026-10-25:** The user approved the [design](superpowers/specs/2026-10-25-qt-kde-desktop-colors-design.md). Draft implementation plans cover [native helpers and compatibility](superpowers/plans/2026-10-25-qt-kde-native-helpers.md), then [application integration and release validation](superpowers/plans/2026-10-25-qt-kde-application-integration.md). They preserve the native gate before UI activation and distinguish healthy opposite-polarity observations from process failures. Plans await review; no implementation.
 
+**Compact Buddy activity — 2026-10-25.** `codex/buddy-compact-activity` replaces floating stacks with one
+quiet visible-work summary and an all-activity drawer with stable expandable groups. Attention priority,
+task/connection counts, duplicate labels, suppression and activation remain explicit. Drawer opening owns
+focus and native-owner selection; passive refresh and drag cannot reopen it. The [plan](superpowers/plans/2026-10-25-buddy-compact-activity.md)
+records delegated implementation bodies. Buddy check and application architecture passed: 175 tests,
+zero failures/errors/skips. Inspected light/dark headless previews under `jasper-buddy/build/reports/buddy-groups/`.
+Task and whole-branch reviews passed with no findings. Full headless check with Python 3.13 passed in
+8m 13s: 13,038 tests, zero failures/errors, 30 skips. GUI focus/outside-click acceptance
+remains user-run; no GUI, AOT, benchmark, merge or push.
+
+
 **Buddy laptop opening — 2026-10-25.** `codex/buddy-open-laptop` adds the authorized reverse-pose opening: 500 ms from standing, seated idle starts at the lowered-laptop pose, and sleeping wakes first. Work changes reverse either transition from its current pose with a full pose duration; repeated intent retains deadlines. Existing sprites are unchanged. Focused animator tests pass (34); Buddy check passes 186 tests with zero failures/errors/skips. Headless normal/interrupted opening and stand-up previews are under `jasper-buddy/build/reports/buddy-open-laptop/` and `buddy-stand-up/`. The [plan](superpowers/plans/2026-10-25-buddy-open-laptop.md) records the implementation-body delegation deviation. Task and whole-branch reviews passed with no findings. Full headless check with Python 3.13 passed in 8m 37s: 13,049 tests, zero failures/errors, 30 skips. Native GUI acceptance remains user-run; unmerged and unpushed.
 
 **Linux default interface colors — 2026-10-25** (`codex/linux-default-colors`; not merged or pushed): fresh and reset core settings use Desktop colors for both appearances on Linux, with Automatic source and system appearance. Saved theme picks and look defaults retain precedence; Enterprise keeps Meadow. Other platforms and extraction fallback are unchanged. Native Linux RED confirmed the empty-config regression before implementation; the full macOS check passed (13,019 tests, zero failures/errors, 30 skips), followed by 594 final focused tests and application architecture. Native Linux passed 591 of 594 focused tests, with one skip and only the previously recorded PaintedContrast/SelectionRendering baseline failures. Independent task and whole-branch reviews found no issues. The [plan](superpowers/plans/2026-10-25-linux-default-colors.md) records the small scope adjustments: configuration guide/default comments, explicit authored-look test fixtures, and preserving the authored invalid-pick preview fallback after the platform default changed.

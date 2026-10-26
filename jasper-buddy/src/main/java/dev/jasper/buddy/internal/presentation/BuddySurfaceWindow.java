@@ -7,7 +7,10 @@ import javax.swing.JWindow;
 final class BuddySurfaceWindow extends JWindow {
     private final BuddyFrameBuffer buffer = new BuddyFrameBuffer();
 
-    BuddySurfaceWindow() {
+    BuddySurfaceWindow() { this(null); }
+
+    BuddySurfaceWindow(java.awt.Window owner) {
+        super(owner);
         // X11's Swing buffer is opaque; compose Window.paint's background clear offscreen too.
         getRootPane().setDoubleBuffered(false);
     }

@@ -29,7 +29,7 @@ class BuddyColumnWindowTest {
     @Test void theBodyGapDoesNotIncludeItsTransparentShadowAndAnimationRoom() {
         Rectangle anchor = new Rectangle(600, 500, 84, 96);
         var size = new java.awt.Dimension(BuddyCard.WIDTH + 2 * BuddyColumnPanel.MARGIN,
-            BuddyCard.HEIGHT + 2 * BuddyColumnPanel.MARGIN + BuddyColumnPanel.ARRIVAL_ROOM);
+            BuddyCard.HEIGHT + 2 * BuddyColumnPanel.MARGIN);
         var above = BuddyColumnWindow.place(anchor, size, SCREEN, false);
         assertThat(anchor.y - (above.y + size.height - BuddyColumnPanel.MARGIN)).isEqualTo(30);
         var below = BuddyColumnWindow.place(anchor, size, SCREEN, true);

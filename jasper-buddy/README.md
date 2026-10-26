@@ -119,20 +119,19 @@ visibility in place; a null group makes the notice ungrouped. Context and title 
 preserve arrival order and never recreate a dismissed ID. The model holds at most 50
 notices, including suppressed notices, dropping the oldest beyond that limit.
 
-The column shows the newest three groups or ungrouped cards. Groups sort by their newest
-member; a singleton uses the group title and activates directly. Multiple members form a
-stack with at most two backing silhouettes and exact `N running` detail. Clicking it
-opens a drawer filtered to that group without activating a member. The drawer uses the
-group title as its header and each member's own title and live detail; duplicate member
-titles gain stable discriminators. Clicking Buddy opens all visible notices with group
-context. Overflow counts groups/cards. Clicking a drawer entry runs its activation.
+One compact summary counts visible tasks and connections. A single notice uses its group
+or notice title; attention takes priority and names the notice needing input or help.
+Clicking the summary or Buddy opens all visible work. The drawer groups members under
+expandable headers, keeps first-observed order and expansion while identities remain,
+and shows each member's title and live detail. Duplicate titles gain stable discriminators.
+Clicking a drawer entry runs its activation.
 
 A producer dismisses its notice when work ends. The drawer's × dismisses one entry;
-**Clear all**, shown for multiple entries, dismisses exactly the displayed entries,
-preserving suppressed notices and other groups. Dismissal removes the model entry without
-notifying the host; another post of the same ID shows it again. A filtered drawer closes
-when its group empties or is suppressed, and can remain open with one member. Buddy keeps
-no outcomes: hosts report those elsewhere (Jasper posts a notification). Cancel producer
+**Dismiss all**, shown for multiple entries, includes collapsed sections and preserves
+suppressed notices. Dismissal removes the model entry without notifying the host; another
+post of the same ID shows it again. Escape, focus loss, activation, an empty visible deck
+or hiding Buddy closes the drawer. It stays open across pointer exit. Buddy keeps no
+outcomes: hosts report those elsewhere (Jasper posts a notification). Cancel producer
 work first, then dismiss. Hiding the companion does not stop producers.
 
 ## Host appearance and position

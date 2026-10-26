@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Objects;
 import javax.swing.JWindow;
 import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 
 /** The window the thought column lives in: translucent, always on top, never focused. */
 final class BuddyColumnWindow {
@@ -22,14 +21,12 @@ final class BuddyColumnWindow {
     private final JWindow window = new BuddySurfaceWindow();
     private final BuddyDeck deck;
     private final BuddyColumnPanel panel;
-    /** Animate placement and running-text shimmer at 60 Hz; other live detail ticks once a second. */
-    private final Timer frames = new Timer(16, event -> tick());
     private Rectangle anchor;
     private final BuddyColumnPlacement placement = new BuddyColumnPlacement();
-    private boolean disposed, dragging;
+    private boolean disposed;
     private List<Rectangle> screens = List.of();
 
-    BuddyColumnWindow(BuddyOptions options, BuddyDeck deck, java.util.function.Consumer<dev.jasper.buddy.notice.BuddyNoticeId> onOpenDrawer) {
+    BuddyColumnWindow(BuddyOptions options, BuddyDeck deck, Runnable onOpenDrawer) {
         this.deck = Objects.requireNonNull(deck, "deck");
         this.panel = new BuddyColumnPanel(options, deck, this::onPanelChanged, Objects.requireNonNull(onOpenDrawer, "onOpenDrawer"));
         try {
@@ -55,31 +52,7 @@ final class BuddyColumnWindow {
         }
     }
 
-    private void tick() {
-        if (disposed || dragging || !window.isVisible()) { frames.stop(); return; }
-        Point next = placement.at(System.nanoTime());
-        if (!next.equals(window.getLocation())) window.setLocation(next);
-        panel.repaintFrame();
-        if (!moving() && !panel.needsDetailUpdates()) frames.stop();
-        else frames.setDelay(moving() ? 16 : 1000);
-    }
-
-    private boolean moving() { return placement.moving(System.nanoTime()) || panel.needsAnimationFrames(); }
-
-    /** Called whenever the panel starts something moving; harmless when it is already running. */
-    private void animate() {
-        if (disposed || dragging || !window.isVisible() || (!moving() && !panel.needsDetailUpdates())) return;
-        int delay = moving() ? 16 : 1000;
-        boolean speedUp = delay < frames.getDelay();
-        frames.setDelay(delay);
-        // setDelay alone does not cancel the already queued one-second detail tick.
-        if (!frames.isRunning() || speedUp) frames.restart();
-    }
-
-    private void onPanelChanged() {
-        layout();
-        animate();
-    }
+    private void onPanelChanged() { layout(); }
 
     /** Whether the column fits between the top of the screen and the top of his head. */
     static boolean fitsAbove(Rectangle anchor, int columnHeight, Rectangle screen) {
@@ -95,8 +68,6 @@ final class BuddyColumnWindow {
 
     void beginDrag() {
         if (disposed) return;
-        dragging = true;
-        frames.stop();
         refreshScreens();
     }
 
@@ -108,14 +79,13 @@ final class BuddyColumnWindow {
         if (window.isVisible()) panel.repaintFrame();
     }
 
-    void endDrag() { dragging = false; animate(); }
+    void endDrag() { }
 
     void refresh() { panel.refresh(); }
 
     void hide() {
         if (disposed) return;
-        frames.stop();
-        dragging = false;
+        anchor = null;
         window.setVisible(false);
     }
 
@@ -127,7 +97,6 @@ final class BuddyColumnWindow {
     void dispose() {
         if (disposed) return;
         disposed = true;
-        frames.stop();
         window.dispose();
     }
 
@@ -135,12 +104,12 @@ final class BuddyColumnWindow {
 
     private void layout() {
         if (disposed || anchor == null) return;
-        if (deck.isEmpty()) { frames.stop(); window.setVisible(false); return; }
+        if (deck.isEmpty()) { window.setVisible(false); return; }
         Rectangle screen = screenFor(anchor);
-        // The stack keeps the same window size while its direction and anchor-relative offset animate.
+        // Position the single capsule directly; no activity surface owns an idle timer.
         Dimension size = panel.getPreferredSize();
         long now = System.nanoTime();
-        boolean snap = !window.isVisible();
+        boolean snap = true;
         boolean below = placement.update(anchor, size, screen, now, snap);
         panel.setBelow(below, snap);
         if (size.width <= 0 || size.height <= 0) { window.setVisible(false); return; }
@@ -148,7 +117,6 @@ final class BuddyColumnWindow {
         Point next = placement.at(now);
         if (!next.equals(window.getLocation())) window.setLocation(next);
         if (!window.isVisible()) window.setVisible(true);
-        animate();
     }
 
     /** Account for transparent shadow/motion room: the visible body is 30px from his head. */

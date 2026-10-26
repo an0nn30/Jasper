@@ -130,7 +130,7 @@ public final class BuddyWindow {
         if (!location.equals(window.getLocation())) window.setLocation(location);
         Rectangle bounds = new Rectangle(location, window.getSize());
         if (column != null) column.moveBeside(bounds);
-        if (drawer != null && drawer.isShowing()) drawer.showBeside(bounds);
+        if (drawer != null && drawer.isShowing()) drawer.moveBeside(bounds);
     }
 
     private void endDrag() {
@@ -172,9 +172,10 @@ public final class BuddyWindow {
     /** A notice was posted, dismissed or cleared: re-place both surfaces around him. */
     public void refreshDeck() {
         if (column == null) return;
+        drawer.refresh();
         if (window.isVisible()) {
             column.showBeside(window.getBounds());
-            if (drawer.isShowing()) drawer.showBeside(window.getBounds());
+            if (drawer.isShowing()) drawer.moveBeside(window.getBounds());
         } else {
             column.hide();
             drawer.hide();
@@ -182,11 +183,8 @@ public final class BuddyWindow {
     }
 
     /** Single click: double-click already raises the terminal and right-click opens his menu. */
-    private void openDrawer() { openDrawer(null); }
-
-    private void openDrawer(dev.jasper.buddy.notice.BuddyNoticeId filter) {
+    private void openDrawer() {
         if (drawer == null || !window.isVisible()) return;
-        drawer.setGroupFilter(filter);
         drawer.showBeside(window.getBounds());
     }
 

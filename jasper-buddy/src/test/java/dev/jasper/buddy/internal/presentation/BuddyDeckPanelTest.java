@@ -69,7 +69,7 @@ class BuddyDeckPanelTest {
 
         assertThat(panel.handleClick(inCard(1))).isFalse();
 
-        assertThat(activated).containsExactly("one");
+        assertThat(activated).containsExactly("two");
     }
 
     @Test void theDismissTargetRemovesItsOwnCardAndNotTheOneBehindIt() {
@@ -79,7 +79,7 @@ class BuddyDeckPanelTest {
 
         assertThat(panel.handleClick(dismissOf(0))).as("the drawer stays open to dismiss more").isTrue();
 
-        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("older");
+        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("newer");
         assertThat(activated).as("dismissing is not activating").isEmpty();
     }
 
