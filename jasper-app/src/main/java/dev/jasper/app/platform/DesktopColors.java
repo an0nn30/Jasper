@@ -32,10 +32,12 @@ public final class DesktopColors implements AutoCloseable {
     private ExecutorService ownedManager;
     private boolean ownedTimer;
 
-    /** Fixed executable names in distribution order: portal, GTK 3, GTK 4. */
+    /** Fixed executable names in distribution order: portal, GTK 3/4, Qt 5/6, KDE 5/6. */
     public static List<String> helperNames() {
-        return List.of("jasper-desktop-portal", "jasper-desktop-gtk3", "jasper-desktop-gtk4",
-            "jasper-desktop-qt5", "jasper-desktop-qt6", "jasper-desktop-kde5", "jasper-desktop-kde6");
+        var names = new ArrayList<String>();
+        names.add("jasper-desktop-portal");
+        for (Source source : Source.values()) names.add(source.helperName());
+        return List.copyOf(names);
     }
 
     /** Absolute development override or helpers beside the installed application jar; never searches PATH or cwd. */
@@ -121,8 +123,8 @@ public final class DesktopColors implements AutoCloseable {
     private boolean active(Slot slot) { return slot.source == null || demand.sources().contains(slot.source); }
     private void start(Slot slot) {
         if (closed.get() || !active(slot)) return;
-        var process = new DesktopProcess(timer, manager, clock, launcher); slot.process = process; slot.owner = -1;
-        String name = helperNames().get(slot.source == null ? 0 : slot.source == Source.GTK3 ? 1 : 2);
+        var process = new DesktopProcess(timer, manager, clock, launcher, slot.source); slot.process = process; slot.owner = -1;
+        String name = slot.source == null ? "jasper-desktop-portal" : slot.source.helperName();
         process.launch(List.of(directory.resolve(name).toString(), "--protocol=1"),
             message -> observed(slot, process, message), reason -> failed(slot, process, reason));
         if (slot.source != null) process.sample(demand.generation(), demand.dark());
@@ -138,8 +140,13 @@ public final class DesktopColors implements AutoCloseable {
             Palette palette = value.value();
             Demand latest; synchronized (this) { latest = requested; }
             if (palette.generation() != latest.generation() || !latest.sources().contains(slot.source)) return;
-            if (palette.source() != slot.source || !palette.colors().containsKey(Pair.WINDOW)
-                || palette.appearance() != (latest.dark() ? Polarity.DARK : Polarity.LIGHT)) {
+            if (palette.source() != slot.source) {
+                process.close();
+                failed(slot, process, "Desktop toolkit returned an unexpected source");
+                return;
+            }
+            if (!slot.source.currentPaletteOnly() && (!palette.colors().containsKey(Pair.WINDOW)
+                || palette.appearance() != (latest.dark() ? Polarity.DARK : Polarity.LIGHT))) {
                 process.close();
                 failed(slot, process, palette.reason().isBlank() ? "Desktop toolkit did not provide a compatible window pair" : palette.reason(), palette);
                 return;
@@ -162,7 +169,10 @@ public final class DesktopColors implements AutoCloseable {
             Palette prior = palettes.get(slot.source);
             boolean compatible = prior != null && prior.appearance() == polarity();
             Palette metadata = capability != null ? capability : prior;
-            palettes.put(slot.source, new Palette(demand.generation(), slot.source, polarity(), compatible ? prior.colors() : Map.of(),
+            Polarity appearance = slot.source.currentPaletteOnly()
+                ? prior == null ? Polarity.UNKNOWN : prior.appearance() : polarity();
+            boolean retainColors = prior != null && (slot.source.currentPaletteOnly() || compatible);
+            palettes.put(slot.source, new Palette(demand.generation(), slot.source, appearance, retainColors ? prior.colors() : Map.of(),
                 metadata == null ? "" : metadata.implementation(), metadata == null ? "" : metadata.version(), reason));
             update(new DesktopObservation(current.portal(), palettes));
         }

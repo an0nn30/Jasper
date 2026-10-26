@@ -7,6 +7,8 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class DesktopColorsTest {
     private static final Path HELPERS = Path.of("packaged", "helpers").toAbsolutePath();
@@ -248,6 +250,172 @@ class DesktopColorsTest {
             f.time.advance(1, TimeUnit.DAYS); f.pump(); assertThat(commands).hasSize(2);
         }
     }
+    @ParameterizedTest @ValueSource(strings = { "QT5", "QT6", "KDE5", "KDE6" })
+    void currentOnlyQtReplyKeepsObserverAliveAcrossRequestsAndPeriodicSamples(String name) {
+        Source source = Source.valueOf(name);
+        try (var h = new DesktopColorsHarness()) {
+            h.portal(1, true, "");
+            h.service.request(1, Set.of(source), true);
+            h.palette(source, false, "1,1,1,1", "desktop is Light");
+            assertThat(h.service.current().palettes().get(source).appearance()).isEqualTo(Polarity.LIGHT);
+            h.awaitToolkit(source, true);
+            assertThat(h.launches()).contains("jasper-desktop-" + name.toLowerCase(Locale.ROOT));
+            h.advance(30);
+            h.answerPings(); h.portal(2, true, "");
+            h.palette(source, false, "1,1,1,1", "periodic Light");
+            h.service.request(2, Set.of(source), false);
+            h.awaitSample(source, 2);
+            h.palette(source, false, "1,1,1,1", "requested Light");
+            h.advance(30);
+            h.answerPings(); h.portal(3, true, "");
+            h.palette(source, false, "1,1,1,1", "second periodic Light");
+            h.advance(3);
+            assertThat(h.toolkitAlive(source)).isTrue();
+            assertThat(h.launches().stream().filter(("jasper-desktop-" + name.toLowerCase(Locale.ROOT))::equals).count()).isEqualTo(1);
+        }
+    }
+
+    @ParameterizedTest @ValueSource(strings = { "QT5", "QT6", "KDE5", "KDE6" })
+    void unknownOrMissingQtPairIsHealthyAndLiveEventsRecoverOnTheSameGeneration(String name) {
+        Source source = Source.valueOf(name);
+        try (var h = new DesktopColorsHarness()) {
+            h.portal(1, true, ""); h.service.request(8, Set.of(source), true); h.awaitSample(source, 8);
+            h.observation(source, source, 8, Polarity.UNKNOWN, "", "missing brush");
+            h.awaitPalette(source, 8, Polarity.UNKNOWN, "missing brush");
+            h.advance(3); assertThat(h.toolkitAlive(source)).isTrue();
+            h.observation(source, source, 8, Polarity.LIGHT, "", "no Window pair");
+            h.awaitPalette(source, 8, Polarity.LIGHT, "no Window pair");
+            assertThat(h.service.current().palettes().get(source).colors()).isEmpty();
+            h.observation(source, source, 8, Polarity.LIGHT, "1,1,1,1", "opposite event");
+            h.awaitPalette(source, 8, Polarity.LIGHT, "opposite event");
+            h.observation(source, source, 8, Polarity.DARK, "0,0,0,1", "recovered");
+            h.awaitPalette(source, 8, Polarity.DARK, "recovered");
+            assertThat(h.service.current().palettes().get(source).colors()).containsKey(Pair.WINDOW);
+            h.observation(source, source, 8, Polarity.LIGHT, "1,1,1,1", "desktop changed back");
+            h.awaitPalette(source, 8, Polarity.LIGHT, "desktop changed back");
+            assertThat(h.toolkitAlive(source)).isTrue();
+            assertThat(h.launches()).hasSize(2);
+        }
+    }
+
+    @ParameterizedTest @ValueSource(strings = { "GTK3", "GTK4" })
+    void gtkOppositeReplyRetainsFailureAndRestartBehavior(String name) {
+        Source source = Source.valueOf(name);
+        try (var h = new DesktopColorsHarness()) {
+            h.service.request(1, Set.of(source), true);
+            h.reply(source, false, "1,1,1,1", "opposite palette");
+            h.awaitFailure(source, "opposite palette");
+            assertThat(h.service.current().palettes().get(source).colors()).isEmpty();
+            h.retry(); h.awaitToolkit(source, true);
+            h.palette(source, true, "0,0,0,1", "");
+        }
+    }
+
+    @ParameterizedTest @ValueSource(strings = { "GTK3", "GTK4" })
+    void gtkOppositeUnsolicitedEventCannotReplaceCompatibleSnapshot(String name) {
+        Source source = Source.valueOf(name);
+        try (var h = new DesktopColorsHarness()) {
+            h.service.request(1, Set.of(source), true);
+            h.palette(source, true, "0,0,0,1", "initial");
+            h.observation(source, source, 1, Polarity.LIGHT, "1,1,1,1", "opposite event");
+            h.observation(source, source, 1, Polarity.DARK, "0,0,0,1", "still dark");
+            h.awaitPalette(source, 1, Polarity.DARK, "still dark");
+            assertThat(h.toolkitAlive(source)).isTrue();
+            assertThat(h.launches()).hasSize(2);
+        }
+    }
+
+    @ParameterizedTest @ValueSource(strings = { "QT5", "QT6", "KDE5", "KDE6" })
+    void qtCrashKeepsActualOppositePolarityAndColorsThenRecovers(String name) {
+        Source source = Source.valueOf(name);
+        try (var h = new DesktopColorsHarness()) {
+            h.service.request(1, Set.of(source), true);
+            h.palette(source, false, "1,1,1,1", "");
+            Palette prior = h.service.current().palettes().get(source);
+            h.fail(source);
+            h.awaitFailure(source, "exited");
+            Palette failed = h.service.current().palettes().get(source);
+            assertThat(failed.appearance()).isEqualTo(Polarity.LIGHT);
+            assertThat(failed.colors()).isEqualTo(prior.colors());
+            assertThat(failed.implementation()).isEqualTo("fixture");
+            assertThat(failed.version()).isEqualTo("1");
+            h.retry(); h.awaitSample(source, 1);
+            h.palette(source, true, "0,0,0,1", "recovered");
+            assertThat(h.service.current().palettes().get(source).appearance()).isEqualTo(Polarity.DARK);
+            assertThat(h.launches()).hasSize(3);
+        }
+    }
+
+    @ParameterizedTest @ValueSource(strings = { "QT5", "QT6", "KDE5", "KDE6" })
+    void qtTimeoutAndMalformedOutputFollowBackoffAndHealthyUnavailableResetsIt(String name) {
+        Source source = Source.valueOf(name);
+        try (var h = new DesktopColorsHarness()) {
+            h.portal(1, true, ""); h.service.request(1, Set.of(source), true); h.awaitSample(source, 1);
+            h.advance(2); h.awaitFailure(source, "timed out");
+            h.retry(); h.awaitToolkit(source, true); h.awaitSample(source, 1);
+            h.raw(source, "{bad json}"); h.awaitFailure(source, "invalid");
+            long launches = h.launches().size();
+            h.advance(1); assertThat(h.launches()).hasSize((int) launches);
+            h.advance(1); h.awaitToolkit(source, true); h.awaitSample(source, 1);
+            h.unavailable(source, "Qt fixture", "6.2.4", "brush unavailable");
+            h.raw(source, "{bad json}"); h.awaitFailure(source, "invalid");
+            h.retry(); h.awaitToolkit(source, true); h.awaitSample(source, 1);
+            h.palette(source, true, "0,0,0,1", "recovered");
+        }
+    }
+
+    @ParameterizedTest @ValueSource(strings = { "QT5", "QT6", "KDE5", "KDE6" })
+    void qtSlotRejectsWrongSourceWithoutBorrowingItsPalette(String name) {
+        Source source = Source.valueOf(name);
+        try (var h = new DesktopColorsHarness()) {
+            h.service.request(1, Set.of(source), true); h.awaitSample(source, 1);
+            h.observation(source, Source.GTK3, 1, Polarity.DARK, "0,0,0,1", "foreign palette");
+            h.awaitToolkit(source, false);
+            assertThat(h.service.current().palettes()).containsOnlyKeys(source);
+            assertThat(h.service.current().palettes().get(source).colors()).isEmpty();
+            assertThat(h.service.current().palettes().get(source).implementation()).isEmpty();
+            h.retry(); h.awaitSample(source, 1);
+            h.palette(source, false, "1,1,1,1", "native Light");
+            Palette prior = h.service.current().palettes().get(source);
+            h.observation(source, Source.GTK3, 1, Polarity.LIGHT, "0.5,0.5,0.5,1", "foreign event");
+            h.awaitFailure(source, "unexpected source");
+            assertThat(h.service.current().palettes().get(source).colors()).isEqualTo(prior.colors());
+            assertThat(h.service.current().palettes().get(source).appearance()).isEqualTo(Polarity.LIGHT);
+        }
+    }
+
+    @ParameterizedTest @ValueSource(strings = { "QT5", "QT6", "KDE5", "KDE6" })
+    void staleQtReplyCannotSatisfyNewGenerationAndDemandRemovalStopsIt(String name) {
+        Source source = Source.valueOf(name);
+        try (var h = new DesktopColorsHarness()) {
+            h.service.request(1, Set.of(source), true); h.awaitSample(source, 1);
+            h.service.request(9007199254740993L, Set.of(source), false); h.pump();
+            h.observation(source, source, 1, Polarity.DARK, "0,0,0,1", "stale");
+            h.awaitSample(source, 9007199254740993L);
+            assertThat(h.service.current().palettes()).isEmpty();
+            h.observation(source, source, 9007199254740993L, Polarity.LIGHT, "1,1,1,1", "latest");
+            h.awaitPalette(source, 9007199254740993L, Polarity.LIGHT, "latest");
+            h.observation(source, source, 1, Polarity.DARK, "0,0,0,1", "late stale");
+            h.observation(source, source, 9007199254740993L, Polarity.LIGHT, "1,1,1,1", "live");
+            h.awaitPalette(source, 9007199254740993L, Polarity.LIGHT, "live");
+            h.service.request(9007199254740994L, Set.of(), true); h.awaitToolkit(source, false);
+            assertThat(h.service.current().palettes()).isEmpty();
+            h.advance(3); assertThat(h.launches()).hasSize(2);
+        }
+    }
+
+    @Test void closeStopsPortalAndEveryDemandedSourceWithoutRestart() {
+        try (var h = new DesktopColorsHarness()) {
+            h.portal(1, true, "");
+            h.service.request(1, EnumSet.allOf(Source.class), true);
+            for (Source source : Source.values()) h.palette(source, true, "0,0,0,1", "");
+            assertThat(h.launches()).containsExactlyInAnyOrderElementsOf(DesktopColors.helperNames());
+            h.service.close(); h.service.close(); h.pump(); h.awaitAllStopped();
+            h.advance(60);
+            assertThat(h.launches()).hasSize(7);
+        }
+    }
+
     static final class CapturedWarnings implements AutoCloseable {
         private final java.util.logging.Logger logger;
         private final java.util.logging.Level previousLevel;

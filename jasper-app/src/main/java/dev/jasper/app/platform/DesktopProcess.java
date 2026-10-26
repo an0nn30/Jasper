@@ -22,6 +22,7 @@ final class DesktopProcess implements AutoCloseable {
     private final Executor manager;
     private final LongSupplier clock;
     private final Function<List<String>, Process> launcher;
+    private final DesktopObservation.Source source;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final byte[] diagnostics = new byte[16 * 1024];
     private int diagnosticEnd, diagnosticSize;
@@ -38,6 +39,11 @@ final class DesktopProcess implements AutoCloseable {
 
     DesktopProcess(ScheduledExecutorService timer, Executor manager, LongSupplier clock,
                    Function<List<String>, Process> launcher) {
+        this(timer, manager, clock, launcher, null);
+    }
+    DesktopProcess(ScheduledExecutorService timer, Executor manager, LongSupplier clock,
+                   Function<List<String>, Process> launcher, DesktopObservation.Source source) {
+        this.source = source;
         this.timer = Objects.requireNonNull(timer); this.manager = Objects.requireNonNull(manager);
         this.clock = Objects.requireNonNull(clock); this.launcher = Objects.requireNonNull(launcher);
     }
@@ -164,14 +170,17 @@ final class DesktopProcess implements AutoCloseable {
             ping = null; cancel(pingTimeout); pingTimeout = null; return;
         }
         if (message instanceof PaletteMessage palette) {
+            // The owner rejects foreign identities, including unsolicited opposite-polarity messages.
+            if (source != null && palette.value().source() != source) { deliver(message); return; }
             long generation = palette.value().generation();
             if (sampling != null && generation == sampling.generation()) {
                 completed = sampling; sampling = null; cancel(sampleTimeout); sampleTimeout = null;
                 deliver(message); flushSample(); return;
             }
-            // Toolkits send full updates for the most recently completed request, including appearance.
+            // Current-only observers report actual desktop polarity for the completed generation.
             if (sampling != null || completed == null || completed.generation() != generation
-                || (palette.value().appearance() != DesktopObservation.Polarity.UNKNOWN
+                || (!palette.value().source().currentPaletteOnly()
+                    && palette.value().appearance() != DesktopObservation.Polarity.UNKNOWN
                     && (palette.value().appearance() == DesktopObservation.Polarity.DARK) != completed.dark())) return;
         }
         deliver(message);

@@ -11,7 +11,20 @@ public record DesktopObservation(Portal portal, Map<Source, Palette> palettes) {
         palettes = Map.copyOf(palettes);
     }
 
-    public enum Source { GTK3, GTK4 }
+    public enum Source {
+        GTK3("jasper-desktop-gtk3", false), GTK4("jasper-desktop-gtk4", false),
+        QT5("jasper-desktop-qt5", true), QT6("jasper-desktop-qt6", true),
+        KDE5("jasper-desktop-kde5", true), KDE6("jasper-desktop-kde6", true);
+
+        private final String helperName;
+        private final boolean currentPaletteOnly;
+        Source(String helperName, boolean currentPaletteOnly) {
+            this.helperName = helperName;
+            this.currentPaletteOnly = currentPaletteOnly;
+        }
+        public String helperName() { return helperName; }
+        public boolean currentPaletteOnly() { return currentPaletteOnly; }
+    }
     public enum Polarity { DARK, LIGHT, UNKNOWN }
     public enum Pair { WINDOW, VIEW, HEADER, SIDEBAR, DIALOG, POPOVER, SELECTION }
 

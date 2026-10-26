@@ -46,6 +46,10 @@ final class DesktopProtocol {
         Source source = switch (string(fields, "source")) {
             case "gtk3" -> Source.GTK3;
             case "gtk4" -> Source.GTK4;
+            case "qt5" -> Source.QT5;
+            case "qt6" -> Source.QT6;
+            case "kde5" -> Source.KDE5;
+            case "kde6" -> Source.KDE6;
             default -> throw invalid();
         };
         var colors = new EnumMap<Pair, Colors>(Pair.class);

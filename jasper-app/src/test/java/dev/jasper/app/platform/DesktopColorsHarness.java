@@ -33,7 +33,7 @@ public final class DesktopColorsHarness implements AutoCloseable {
     }
     private void palette(Source source, boolean dark, String background, String reason, boolean accepted) {
         pump();
-        var process = processes.get("jasper-desktop-" + source.name().toLowerCase(Locale.ROOT));
+        var process = toolkit(source);
         fixture.await(() -> process.commands().contains("sample"));
         String commands = process.commands();
         String last = commands.lines().filter(line -> line.contains("sample")).reduce((a, b) -> b).orElseThrow();
@@ -49,7 +49,7 @@ public final class DesktopColorsHarness implements AutoCloseable {
     }
     public void unavailable(Source source, String implementation, String version, String reason) {
         pump();
-        var process = processes.get("jasper-desktop-" + source.name().toLowerCase(Locale.ROOT));
+        var process = toolkit(source);
         fixture.await(() -> process.commands().contains("sample"));
         String last = process.commands().lines().filter(line -> line.contains("sample")).reduce((a, b) -> b).orElseThrow();
         long generation = Long.parseLong(last.replaceAll(".*\"generation\":([0-9]+).*", "$1"));
@@ -84,6 +84,53 @@ public final class DesktopColorsHarness implements AutoCloseable {
         pump(); var process = processes.get("jasper-desktop-" + source.name().toLowerCase(Locale.ROOT));
         return process != null && process.isAlive();
     }
+    public void awaitSample(Source source, long generation) {
+        fixture.await(() -> {
+            var process = processes.get("jasper-desktop-" + source.name().toLowerCase(Locale.ROOT));
+            return process != null && process.isAlive() && process.commands().lines().filter(line -> line.contains("sample"))
+                .reduce((a, b) -> b).orElse("").contains("\"generation\":" + generation + ",");
+        });
+    }
+    public void observation(Source slot, Source source, long generation, Polarity appearance, String background, String reason) {
+        String colors = background.isEmpty() ? "" : ",\"window.bg\":\"" + background
+            + "\",\"window.fg\":\"" + (appearance == Polarity.DARK ? "1,1,1,1" : "0,0,0,1") + "\"";
+        raw(slot, "{\"v\":1,\"kind\":\"palette\",\"generation\":" + generation
+            + ",\"source\":\"" + source.name().toLowerCase(Locale.ROOT) + "\",\"appearance\":\""
+            + appearance.name().toLowerCase(Locale.ROOT) + "\",\"implementation\":\"fixture\",\"libraryVersion\":\"1\",\"reason\":\""
+            + reason + "\"" + colors + "}");
+    }
+    public void raw(Source slot, String wire) { emit(slot.name().toLowerCase(Locale.ROOT), wire); }
+    public void awaitPalette(Source source, long generation, Polarity appearance, String reason) {
+        fixture.await(() -> {
+            Palette value = service.current().palettes().get(source);
+            return value != null && value.generation() == generation && value.appearance() == appearance && value.reason().equals(reason);
+        });
+        publish();
+    }
+    public void awaitFailure(Source source, String reason) {
+        fixture.await(() -> service.current().palettes().containsKey(source)
+            && service.current().palettes().get(source).reason().contains(reason));
+        awaitToolkit(source, false);
+        publish();
+    }
+    public void answerPings() {
+        pump();
+        processes.values().forEach(process -> {
+            if (!process.isAlive()) return;
+            fixture.await(() -> process.lastPing() > process.answeredPing);
+            long generation = process.lastPing();
+            try { process.emit("{\"v\":1,\"kind\":\"pong\",\"generation\":" + generation + "}"); }
+            catch (IOException failure) { throw new UncheckedIOException(failure); }
+            process.answeredPing = generation;
+        });
+    }
+
+    public void awaitAllStopped() { fixture.await(() -> processes.values().stream().noneMatch(Process::isAlive)); }
+    private PipeProcess toolkit(Source source) {
+        String name = "jasper-desktop-" + source.name().toLowerCase(Locale.ROOT);
+        fixture.await(() -> processes.containsKey(name) && processes.get(name).isAlive());
+        return processes.get(name);
+    }
     private void emit(String name, String json) {
         fixture.await(() -> processes.containsKey("jasper-desktop-" + name));
         try { processes.get("jasper-desktop-" + name).emit(json); }
@@ -97,8 +144,14 @@ public final class DesktopColorsHarness implements AutoCloseable {
         private final PipedOutputStream output;
         private final ByteArrayOutputStream commands = new ByteArrayOutputStream();
         private volatile boolean alive = true;
+        private long answeredPing;
         PipeProcess() { try { output = new PipedOutputStream(input); } catch (IOException e) { throw new UncheckedIOException(e); } }
         String commands() { synchronized (commands) { return commands.toString(StandardCharsets.UTF_8); } }
+        long lastPing() {
+            String last = commands().lines().filter(line -> line.contains("\"kind\":\"ping\""))
+                .reduce((a, b) -> b).orElse("");
+            return last.isEmpty() ? 0 : Long.parseLong(last.replaceAll(".*\"generation\":([0-9]+).*", "$1"));
+        }
         void emit(String line) throws IOException { output.write((line + "\n").getBytes(StandardCharsets.UTF_8)); output.flush(); }
         @Override public OutputStream getOutputStream() { return commands; }
         @Override public InputStream getInputStream() { return input; }
