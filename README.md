@@ -217,10 +217,11 @@ the image layouts and the acceptance checklists.
   for a few seconds (no Dock icon) to train its start-up cache, and builds the DMG for the build machine's
   architecture. The app is ad-hoc signed. `:jasper-app:packageApp` and `:jasper-app:verifyPackage` build and check
   the app without launching it.
-- **Linux**: `./gradlew check :jasper-app:packageDist` builds the `.deb` and the `.rpm`. It needs `fakeroot` and
-  `dpkg-deb`, plus `rpmbuild`, `readelf`, `rpm2cpio` and `cpio` (on Ubuntu:
+- **Linux**: `./gradlew check :jasper-app:packageDist` builds the `.rpm` on recognized RPM-family hosts and both
+  `.deb` and `.rpm` on other hosts. RPM builds need `rpmbuild`, `readelf`, `rpm2cpio` and `cpio`; DEB builds also need
+  `fakeroot`, `dpkg-deb` and a Debian-family build host for dependency lookup (on Ubuntu:
   `sudo apt-get install fakeroot dpkg rpm cpio binutils g++`; on Fedora:
-  `sudo dnf install fakeroot dpkg rpm-build rpm cpio binutils libstdc++-static`).
+  `sudo dnf install rpm-build rpm cpio binutils libstdc++-static`).
 - **Windows**: `.\gradlew.bat check :jasper-app:packageDist` builds the portable ZIP;
   `.\gradlew.bat :jasper-app:packageInstaller` builds the setup wizard and needs WiX 3 on the `PATH`. Both carry the
   pinned Cygwin seed: Gradle downloads its hash-locked artifacts (about 510 MB) into

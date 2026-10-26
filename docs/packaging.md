@@ -50,7 +50,7 @@ All tasks belong to `:jasper-app`. Only those marked in the last column start Ja
 | `verifyCygwinDistribution` | all | Checks the staged Cygwin seed and the native acceptance recorded for it and the host architecture ([bundled Cygwin](#bundled-cygwin)) | no |
 | `cygwinSourcesZip` | all | Archives the Cygwin seed's sources and notices | no |
 | `packageDeb`, `packageRpm` | Linux | Verifies the image and builds one package | no |
-| `packageDist` | Linux | Both `packageDeb` and `packageRpm` | no |
+| `packageDist` | Linux | `packageRpm` on recognized RPM-family hosts; both `packageDeb` and `packageRpm` otherwise | no |
 | `installDist`, `distZip`, `distTar` | all | A portable distribution without jpackage or a bundled runtime | no |
 
 `-Pjasper.aot=true` makes `packageApp` train the cache too on macOS (and `verifyPackage` then depends on the
@@ -442,9 +442,11 @@ and its refresh, the relay, the native probes and the acceptance harnesses.
 
 ## Linux packages
 
-`packageDist` on Linux runs `packageDeb` and `packageRpm`, which build the `.deb` and `.rpm` from the verified image.
+`packageDist` on recognized RPM-family hosts (Fedora, RHEL and SUSE families) runs `packageRpm`; other Linux hosts,
+including Debian/Ubuntu, run both `packageDeb` and `packageRpm`. Both tasks remain individually callable and build
+their format from the verified image.
 Each format names the architecture its own way: Debian's `amd64` and `arm64` are RPM's `x86_64` and `aarch64`. An x64
-machine builds the x64 pair and an aarch64 machine the aarch64 pair; JetBrains ships no 32-bit Linux runtime.
+machine builds x64 packages and an aarch64 machine aarch64 packages; JetBrains ships no 32-bit Linux runtime.
 
 ```bash
 sudo apt-get install fakeroot rpm cpio binutils g++
@@ -456,9 +458,10 @@ Both packages are named `jasper` and install the image to `/opt/jasper`, with th
 and a desktop menu entry (`/opt/jasper/lib/jasper-Jasper.desktop`, categories
 `System;TerminalEmulator;Network;RemoteAccess;`, icon `/opt/jasper/lib/Jasper.png`) registered through
 `xdg-desktop-menu`. The package description, which is also the menu entry's comment, is "Jasper DevOps workstation" and
-the home page `https://github.com/an0nn30/Jasper`. The `.deb` depends on the Debian packages that jpackage finds for
-the runtime's shared libraries on the build machine. The `.rpm` requires, by soname, every shared library the image
-needs but does not bundle (for example `libX11.so.6()(64bit)`), which every RPM distribution resolves: jpackage's own
+the home page `https://github.com/an0nn30/Jasper`. DEB builds require `fakeroot`, `dpkg-deb` and a Debian-family host
+whose package database resolves the runtime's mandatory shared libraries to Debian packages. The `.rpm` requires,
+by soname, every shared library the image needs but does not bundle (for example `libX11.so.6()(64bit)`), which every
+RPM distribution resolves: jpackage's own
 RPM lookup asks the build machine's RPM database, which is empty on a Debian-family host. Before publishing either package,
 the task checks its name, version and architecture, unpacks it without installing it, compares every file with the
 verified image byte for byte (jpackage rewrites only `lib/app/.jpackage.xml`), checks the executable bits and the

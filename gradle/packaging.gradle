@@ -1058,12 +1058,15 @@ if (normalizedHost().os == 'windows') {
             }
         }
     }
-    def packageDeb = linuxPackage('deb', 'packageDeb', 'dpkg-deb and fakeroot')
-    def packageRpm = linuxPackage('rpm', 'packageRpm', 'rpmbuild, readelf, rpm2cpio and cpio')
+    linuxPackage('deb', 'packageDeb', 'dpkg-deb and fakeroot')
+    linuxPackage('rpm', 'packageRpm', 'rpmbuild, readelf, rpm2cpio and cpio')
+    File osRelease = new File('/etc/os-release')
+    if (!osRelease.exists()) osRelease = new File('/usr/lib/os-release')
+    List<String> aggregatePackages = linuxPackageTasks(osRelease.isFile() ? osRelease.getText('UTF-8') : '')
     tasks.register('packageDist') {
         group = 'distribution'
-        description = 'Creates the Linux .deb and .rpm packages after verifying their image.'
-        dependsOn(packageDeb, packageRpm)
+        description = 'Creates the Linux packages for this host distribution after verifying their image.'
+        dependsOn(aggregatePackages)
     }
 } else {
     def aotTrainingDirectory = packagingRoot.map { it.dir('aot-training') }
