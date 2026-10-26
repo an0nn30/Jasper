@@ -7,10 +7,14 @@ import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.sftp.FileEntry;
 import dev.jasper.remote.testsupport.Kits;
+import dev.jasper.remote.tunnels.Tunnel;
+import dev.jasper.remote.tunnels.TunnelKind;
 import dev.jasper.remote.ui.HostsPanel;
 import dev.jasper.remote.ui.sftp.SftpPanel;
 import dev.jasper.remote.ui.sftp.SftpTestAccess;
 import dev.jasper.remote.ui.sftp.SftpUi;
+import dev.jasper.remote.ui.tunnels.TunnelsPanel;
+import dev.jasper.remote.ui.tunnels.TunnelsUi;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.Nodes;
@@ -103,6 +107,48 @@ class PanelPlacementTest {
             assertThat(sftpColumns(host)).as("docked again").isEqualTo(2);
             place(host, SftpUi.PANEL, docked(Anchor.BOTTOM));
             assertThat(sftpColumns(host)).as("docked at the bottom").isEqualTo(4);
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** An SFTP panel built while it has a window of its own starts with its four columns. */
+    @Test void anSftpPanelBuiltInAWindowOfItsOwnStartsWide() throws Exception {
+        try (var host = new FakePluginHost(root.resolve("home"))) {
+            var plugin = started(host);
+            place(host, SftpUi.PANEL, own(PanelMode.WINDOW));
+            Kits.edt(() -> host.openPanel(SftpUi.PANEL));
+            var panel = SftpTestAccess.panel(plugin.sftp());
+            Kits.edt(() -> panel.showPage("prod", "/srv", List.of(new FileEntry("a.txt", FileEntry.Kind.FILE, 1200, 0, 0644, "")), 0, 1, false));
+            assertThat(sftpColumns(host)).isEqualTo(4);
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void theTunnelsPanelIsWideInAWindowOfItsOwnAndAtTheBottom() throws Exception {
+        try (var host = new FakePluginHost(root.resolve("home"))) {
+            var plugin = started(host);
+            plugin.tunnelStore().put(Tunnel.create("db", java.util.UUID.randomUUID(), TunnelKind.LOCAL, Tunnel.LOCALHOST, 5432, "db.internal", 5432));
+            settle(host);
+            Kits.edt(() -> host.openPanel(TunnelsUi.PANEL));
+            assertThat(has(host, TunnelsUi.PANEL, TunnelsPanel.COLUMNS)).as("docked on the left").isFalse();
+            place(host, TunnelsUi.PANEL, own(PanelMode.FLOAT));
+            assertThat(has(host, TunnelsUi.PANEL, TunnelsPanel.COLUMNS)).as("floating").isTrue();
+            place(host, TunnelsUi.PANEL, docked(Anchor.LEFT));
+            assertThat(has(host, TunnelsUi.PANEL, TunnelsPanel.COLUMNS)).as("docked again").isFalse();
+            place(host, TunnelsUi.PANEL, docked(Anchor.BOTTOM));
+            assertThat(has(host, TunnelsUi.PANEL, TunnelsPanel.COLUMNS)).as("docked at the bottom").isTrue();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void aTunnelsPanelBuiltInAWindowOfItsOwnStartsWide() throws Exception {
+        try (var host = new FakePluginHost(root.resolve("home"))) {
+            var plugin = started(host);
+            plugin.tunnelStore().put(Tunnel.create("db", java.util.UUID.randomUUID(), TunnelKind.LOCAL, Tunnel.LOCALHOST, 5432, "db.internal", 5432));
+            settle(host);
+            place(host, TunnelsUi.PANEL, own(PanelMode.WINDOW));
+            Kits.edt(() -> host.openPanel(TunnelsUi.PANEL));
+            assertThat(has(host, TunnelsUi.PANEL, TunnelsPanel.COLUMNS)).isTrue();
             assertThat(host.failures()).isEmpty();
         }
     }

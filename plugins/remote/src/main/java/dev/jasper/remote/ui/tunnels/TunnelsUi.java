@@ -188,6 +188,10 @@ public final class TunnelsUi implements AutoCloseable {
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::browse, this::copyAddress,
             () -> edit(window, Optional.empty(), Optional.empty())), layout);
         panel.onHeaderChanged(host::setHeader);
+        // In a window of its own or docked at the bottom the list sits beside the detail; the panel is right from the start
+        // and follows each move.
+        panel.wide(Layout.wide(host.placement()));
+        host.onPlacement(placement -> panel.wide(Layout.wide(placement)));
         this.panel = panel;
         panelHost = host;
         // The host disposed the view; the panel goes inert, so no later state change or tick touches it.
