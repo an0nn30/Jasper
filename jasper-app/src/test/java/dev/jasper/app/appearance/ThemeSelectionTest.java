@@ -20,13 +20,15 @@ import org.junit.jupiter.api.io.TempDir;
 class ThemeSelectionTest {
     @TempDir Path home;
 
-    @Test void freshSettingsUseMeadowForBothAppearances() {
+    @Test void freshSettingsUseThePlatformDefaultForBothAppearances() {
         var config = dev.jasper.app.config.ConfigSnapshot.defaults();
-        assertThat(config.lightTheme()).isEqualTo("jasper-meadow");
-        assertThat(config.darkTheme()).isEqualTo("jasper-meadow");
+        boolean linux = "Linux".equalsIgnoreCase(System.getProperty("os.name"));
+        assertThat(config.lightTheme()).isEqualTo(linux ? "desktop-colors" : "jasper-meadow");
+        assertThat(config.darkTheme()).isEqualTo(linux ? "desktop-colors" : "jasper-meadow");
         var selection = ThemeSelection.of(ThemeLibrary.bundledOnly(), config.darkTheme(), config.lightTheme(),
             TerminalSchemeChoice.MATCH, (key, message) -> fail(message));
-        assertThat(((ThemePick.Authored) selection.theme(false)).theme().name()).isEqualTo("Jasper Meadow");
+        if (linux) assertThat(selection.theme(false)).isEqualTo(new ThemePick.Desktop());
+        else assertThat(((ThemePick.Authored) selection.theme(false)).theme().name()).isEqualTo("Jasper Meadow");
         assertThat(selection.theme(true)).isEqualTo(selection.theme(false));
         assertThat(selection.terminal(true)).isSameAs(selection.theme(true).matching(true));
         assertThat(selection.terminal(false)).isSameAs(selection.theme(false).matching(false));

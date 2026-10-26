@@ -233,24 +233,30 @@ public final class CoreSettings {
             Map.entry("system", AppearanceMode.SYSTEM), Map.entry("dark", AppearanceMode.DARK), Map.entry("light", AppearanceMode.LIGHT))),
             AppearanceMode.SYSTEM)
         .label("Appearance").keywords("appearance", "theme", "dark", "light", "system", "slate cobalt", "look")
-        .description("The UI appearance: \"system\" (the default) follows the macOS light or dark setting (Linux and Windows\n"
-            + "report none, so it shows Dark there); \"dark\" or \"light\" chooses one. [ui.theme] names the theme each shows.\n"
+        .description("The UI appearance: \"system\" (the default) follows macOS or the Linux desktop portal;\n"
+            + "when unavailable, it shows Dark. \"dark\" or \"light\" chooses one. [ui.theme] names the theme each shows.\n"
             + "Switches live across windows.").build();
+    static String interfaceThemeByDefault(String osName, String authoredDefault) {
+        return "Linux".equalsIgnoreCase(osName) ? "desktop-colors" : authoredDefault;
+    }
+
     static final String THEME_ID = "Use a theme id such as \"slate-cobalt\"; using the default.";
     public static final Setting<String> UI_THEME_DARK = Setting.of("ui.theme.dark",
-            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.DARK_DEFAULT_ID)
+            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID),
+            interfaceThemeByDefault(System.getProperty("os.name"), dev.jasper.ui.theme.JasperTheme.DARK_DEFAULT_ID))
         .label("Dark theme").keywords("theme", "dark", "appearance", "jasper meadow", "slate cobalt", "imported")
-        .description("The theme the Dark appearance shows: \"jasper-meadow\" (the default unless the look sets its own), the\n"
-            + "built-in \"ubuntu-yaru\" or a Catppuccin flavour such as \"catppuccin-mocha\", a theme a plugin ships, or an\n"
-            + "imported theme's id, its file name in the themes folder without .json. A theme without a Dark variant is\n"
-            + "reported and Jasper Meadow Dark is used. Switches live.").build();
+        .description("The theme the Dark appearance shows: \"desktop-colors\" by default on Linux, \"jasper-meadow\" elsewhere,\n"
+            + "unless the look sets its own default. Other choices include \"ubuntu-yaru\", a Catppuccin flavour,\n"
+            + "a theme a plugin ships, or an imported theme's id (its file name in the themes folder without .json).\n"
+            + "A theme without a Dark variant is reported and Jasper Meadow Dark is used. Switches live.").build();
     public static final Setting<String> UI_THEME_LIGHT = Setting.of("ui.theme.light",
-            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID), dev.jasper.ui.theme.JasperTheme.LIGHT_DEFAULT_ID)
+            SettingKind.string(dev.jasper.ui.theme.JasperTheme::validId, THEME_ID),
+            interfaceThemeByDefault(System.getProperty("os.name"), dev.jasper.ui.theme.JasperTheme.LIGHT_DEFAULT_ID))
         .label("Light theme").keywords("theme", "light", "appearance", "jasper meadow", "slate cobalt", "imported")
-        .description("The theme the Light appearance shows: \"jasper-meadow\" (the default unless the look sets its own), the\n"
-            + "built-in \"slate-cobalt\", \"ubuntu-yaru\" or \"catppuccin-latte\", a theme a plugin ships, or an imported\n"
-            + "theme's id, its file name in the themes folder without .json. A theme without a Light variant is\n"
-            + "reported and Jasper Meadow Light is used. Switches live.").build();
+        .description("The theme the Light appearance shows: \"desktop-colors\" by default on Linux, \"jasper-meadow\" elsewhere,\n"
+            + "unless the look sets its own default. Other choices include \"slate-cobalt\", \"ubuntu-yaru\",\n"
+            + "\"catppuccin-latte\", a theme a plugin ships, or an imported theme's id (its file name in the themes folder\n"
+            + "without .json). A theme without a Light variant is reported and Jasper Meadow Light is used. Switches live.").build();
     public static final Setting<String> UI_THEME_DESKTOP_SOURCE = Setting.of("ui.theme.desktop_source", SettingKind.choice(List.of(
             Map.entry("auto", "auto"), Map.entry("gtk3", "gtk3"), Map.entry("gtk4", "gtk4"))), "auto")
         .label("Desktop color source").keywords("desktop", "theme", "gtk", "source")

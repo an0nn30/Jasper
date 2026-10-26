@@ -24,7 +24,9 @@ class AppearanceSelectionTest {
             new InstalledThemes.ThemeOption("jasper-meadow", "Jasper Meadow", MEADOW)),
         InstalledThemes.slateCobalt(DARK, LIGHT).schemes(), java.util.Map.of("slate-cobalt", "Slate Cobalt", "ocean", "Ocean", "jasper-meadow", "Jasper Meadow"));
 
-    static SettingsDraft draft(String config) { return new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values()); }
+    static SettingsDraft draft(String config) { return new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values(),
+        new dev.jasper.app.config.DefaultSource(java.util.Map.of(CoreSettings.UI_THEME_DARK, "jasper-meadow",
+            CoreSettings.UI_THEME_LIGHT, "jasper-meadow"))); }
     static AppearanceSelection editor(SettingsDraft draft) {
         return new AppearanceSelection(new AppearanceChoices(100f, false, () -> Optional.of(false),
             ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> THEMES, Optional.empty()), PageKit.context(draft, id -> { }, () -> { }));
