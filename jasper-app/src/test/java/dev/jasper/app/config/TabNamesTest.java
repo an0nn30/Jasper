@@ -32,6 +32,15 @@ class TabNamesTest {
         assertThat(TabNames.clean(null)).isEmpty();
     }
 
+    @Test void cleanTurnsLineSeparatorsIntoSpacesAndRemovesBidirectionalControls() {
+        assertThat(TabNames.clean("a\u2028b\u2029c")).isEqualTo("a b c");
+        assertThat(TabNames.clean("evil\u202Etxt.exe\u202A\u202B\u202C\u202D")).isEqualTo("eviltxt.exe");
+        assertThat(TabNames.clean("\u2066db\u2067-\u2068one\u2069")).isEqualTo("db-one");
+        String family = new String(Character.toChars(0x1F468)) + "\u200D" + new String(Character.toChars(0x1F469));
+        String heart = "\u2764\uFE0F";
+        assertThat(TabNames.clean(family + heart)).as("emoji keep their joiners and variation selectors").isEqualTo(family + heart);
+    }
+
     @Test void unknownListsPiecesNothingProvidesOnce() {
         var pattern = TitleTemplate.parse("{dir} {host} {branch} {host} {title}");
         assertThat(TabNames.unknown(pattern, Set.of())).containsExactly("host", "branch");

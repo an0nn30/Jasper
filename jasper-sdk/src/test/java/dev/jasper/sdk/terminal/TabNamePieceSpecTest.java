@@ -15,6 +15,11 @@ class TabNamePieceSpecTest {
             assertThatIllegalArgumentException().as(bad).isThrownBy(() -> new TabNamePieceSpec(bad, "x"));
         assertThatIllegalArgumentException().isThrownBy(() -> new TabNamePieceSpec("host", " "));
         assertThatIllegalArgumentException().isThrownBy(() -> new TabNamePieceSpec("host", "two\nlines"));
+        assertThatIllegalArgumentException().as("a line separator").isThrownBy(() -> new TabNamePieceSpec("host", "two\u2028lines"));
+        assertThatIllegalArgumentException().as("a paragraph separator").isThrownBy(() -> new TabNamePieceSpec("host", "two\u2029lines"));
+        assertThatIllegalArgumentException().as("a bidirectional override").isThrownBy(() -> new TabNamePieceSpec("host", "the \u202Ehost"))
+            .withMessageContaining("one nonblank line");
+        assertThatIllegalArgumentException().as("a bidirectional isolate").isThrownBy(() -> new TabNamePieceSpec("host", "the \u2066host\u2069"));
         assertThatNullPointerException().isThrownBy(() -> new TabNamePieceSpec(null, "x"));
     }
 

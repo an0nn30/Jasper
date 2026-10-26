@@ -3714,6 +3714,19 @@ public abstract class PluginContractTest {
         assertThat(h.tabNamePieces(tab)).as("a closed tab takes no value").isEmpty();
     }
 
+    @Test void aPieceValueLosesLineSeparatorsAndBidirectionalControls() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "ssh");
+        h.addTerminalPane(tab, "ssh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            terminals.addTabNamePiece(HOST).set(terminals.tab(tab).orElseThrow(), "\u202Edb1\u2028.example\u2029\u2066x\u2069");
+            assertThat(terminals.tab(tab).orElseThrow().namePieces()).containsEntry("host", "db1 .example x");
+        });
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("host", "db1 .example x"));
+    }
+
     @Test void aPieceNameIsHeldByOnePluginAtATime() {
         var alpha = new AtomicReference<PluginContext>();
         var beta = new AtomicReference<PluginContext>();

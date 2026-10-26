@@ -2175,7 +2175,10 @@ public final class FakePluginHost implements AutoCloseable {
 
     private static String cleanPiece(String value) {
         var result = new StringBuilder(value.length());
-        value.codePoints().forEach(point -> result.appendCodePoint(Character.isISOControl(point) ? ' ' : point));
+        value.codePoints().forEach(point -> {
+            boolean bidirectional = point >= 0x202A && point <= 0x202E || point >= 0x2066 && point <= 0x2069;
+            if (!bidirectional) result.appendCodePoint(Character.isISOControl(point) || point == 0x2028 || point == 0x2029 ? ' ' : point);
+        });
         return result.toString().strip();
     }
 

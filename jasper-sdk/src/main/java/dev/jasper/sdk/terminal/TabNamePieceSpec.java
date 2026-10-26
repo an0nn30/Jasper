@@ -31,7 +31,13 @@ public record TabNamePieceSpec(String name, String description) {
         if (!NAME.matcher(name).matches())
             throw new IllegalArgumentException("A tab name piece is 1 to 32 lowercase letters, digits and _, starting with a letter: " + name);
         if (BUILT_IN.contains(name)) throw new IllegalArgumentException("{" + name + "} is one of Jasper's own tab name pieces");
-        if (description.isBlank() || description.chars().anyMatch(Character::isISOControl))
+        if (description.isBlank() || description.chars().anyMatch(TabNamePieceSpec::breaksTheLine))
             throw new IllegalArgumentException("A tab name piece's description is one nonblank line");
+    }
+
+    /** A control character, a Unicode line or paragraph separator, or a bidirectional formatting character. */
+    private static boolean breaksTheLine(int point) {
+        return Character.isISOControl(point) || point == 0x2028 || point == 0x2029
+            || point >= 0x202A && point <= 0x202E || point >= 0x2066 && point <= 0x2069;
     }
 }

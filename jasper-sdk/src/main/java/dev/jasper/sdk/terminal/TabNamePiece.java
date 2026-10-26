@@ -18,9 +18,9 @@ public interface TabNamePiece extends Subscription {
 
     /**
      * Sets this piece's value for a terminal tab. The tab keeps it while it moves to another window or into another
-     * tab. Line breaks and other control characters become spaces, and the value is trimmed; a blank value clears it.
-     * Ignored for a content tab, and once the tab or this piece has closed. Any thread; Jasper applies it on the UI
-     * thread.
+     * tab. Line breaks and other control characters become spaces, bidirectional formatting characters are removed,
+     * and the value is trimmed; a blank value clears it. Ignored for a content tab, and once the tab or this piece has
+     * closed. Any thread; Jasper applies it on the UI thread.
      *
      * @param tab a terminal tab
      * @param value what the piece shows for that tab

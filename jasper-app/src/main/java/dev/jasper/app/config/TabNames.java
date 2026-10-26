@@ -35,12 +35,23 @@ public final class TabNames {
         return shell.isEmpty() ? "Terminal" : shell;
     }
 
-    /** A piece's value on one line: control characters, line breaks among them, become spaces; then trimmed. */
+    /**
+     * A piece's value on one line: control characters, line breaks and the Unicode line and paragraph separators become
+     * spaces, bidirectional formatting characters (which can reorder a label) are removed; then trimmed.
+     */
     public static String clean(String value) {
         if (value == null) return "";
         var result = new StringBuilder(value.length());
-        value.codePoints().forEach(point -> result.appendCodePoint(Character.isISOControl(point) ? ' ' : point));
+        value.codePoints().forEach(point -> {
+            if (bidirectionalControl(point)) return;
+            result.appendCodePoint(Character.isISOControl(point) || point == 0x2028 || point == 0x2029 ? ' ' : point);
+        });
         return result.toString().strip();
+    }
+
+    /** The embeddings, overrides and isolates: U+202A to U+202E and U+2066 to U+2069. */
+    private static boolean bidirectionalControl(int point) {
+        return point >= 0x202A && point <= 0x202E || point >= 0x2066 && point <= 0x2069;
     }
 
     /** The pieces {@code pattern} names that are neither built in nor in {@code known}, in order, each once. */
