@@ -33,6 +33,12 @@ public final class KeyHandlers {
         }
     }
 
+    /**
+     * @param key a key
+     * @return whether a {@code sethandler} entry names it, for any mode
+     */
+    public boolean has(KeyInput key) { return table.containsKey(key); }
+
     /** Forgets every entry (the vimrc is being read again). */
     public void clear() { table.clear(); }
 

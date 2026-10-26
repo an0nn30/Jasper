@@ -22,12 +22,14 @@ class MarkdownNavigationTest {
         edt(() -> {
             dev.jasper.editor.syntax.Languages.register();host=new FakePluginHost(home.resolve("plugins"));
             var context=host.start(new PluginInfo("dev.jasper.editor","Editor","0.1.0",Set.of()),Set.of(),Set.of(),c -> {});
+            context.kit().registerIcon(StatusLine.VIM_ICON); // as EditorPlugin.start does
             var settings=new EditorSettings("Monospaced",13,List.of(),false,1,false,4,false,8,false);
             var env=new EditorEnvironment(context,SwingUtilities::invokeLater,owner -> q -> q.dismissed(),owner -> (m,f) -> false,() -> settings,b -> java.util.concurrent.CompletableFuture.completedFuture(null),false);
             window=new EditorWindow(env,() -> {},d -> recents.add(d.key()));navigation=new MarkdownNavigation(window,context.platform()::browse);
         });
     }
-    @AfterEach void close() throws Exception {edt(host::close);}
+    /** As {@code EditorPlugin.stop}: the window closes its tabs before the host takes the Vim widget's icon away. */
+    @AfterEach void close() throws Exception {edt(() -> {window.dispose();host.close();});}
     void drain() throws Exception {for(int i=0;i<12;i++){host.runBackground();edt(() -> {});}}
     EditorTab open(String name,String text) throws Exception {
         var path=Files.writeString(home.resolve(name),text);edt(() -> window.openLocal(path));drain();EditorTab[] tab={null};edt(() -> tab[0]=window.selected().orElseThrow());return tab[0];

@@ -7,6 +7,33 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class UiValuesTest {
+    /** Vim IdeaVim keys spec 4: a status item may carry an icon, a dimmed state and a menu. */
+    @Test void contentStatusCarriesAnIconADimmedStateAndACopiedMenu() {
+        Runnable r = () -> {};
+        var plain = new ContentStatus("Ln 1", "Caret", null);
+        assertThat(plain.icon()).isEmpty();
+        assertThat(plain.dimmed()).isFalse();
+        assertThat(plain.menu()).isEmpty();
+        var check = ContentStatus.MenuEntry.check("Enabled", true, r);
+        assertThat(check.checkable()).isTrue();
+        assertThat(check.checked()).isTrue();
+        assertThat(check.run()).isSameAs(r);
+        assertThat(ContentStatus.MenuEntry.item("Open", r).checkable()).isFalse();
+        assertThatIllegalArgumentException().isThrownBy(() -> ContentStatus.MenuEntry.item(" ", r));
+        assertThatNullPointerException().isThrownBy(() -> ContentStatus.MenuEntry.item("Open", null));
+        assertThatIllegalArgumentException().isThrownBy(() -> new ContentStatus.MenuEntry("Open", r, false, true, false));
+        var separator = ContentStatus.MenuEntry.separatorLine();
+        assertThat(separator.separator()).isTrue();
+        assertThat(separator.run()).isNull();
+        var entries = new ArrayList<ContentStatus.MenuEntry>(List.of(check, separator));
+        var status = new ContentStatus("NORMAL", "Vim mode", null, "dev.jasper.test:v", true, entries);
+        entries.clear();
+        assertThat(status.menu()).containsExactly(check, separator);
+        assertThat(status.icon()).isEqualTo("dev.jasper.test:v");
+        assertThat(status.dimmed()).isTrue();
+        assertThatNullPointerException().isThrownBy(() -> new ContentStatus("A", "A", null, null, false, List.of()));
+    }
+
     /** The Editor's Color scheme setting: an editor scheme's id is its theme's id and its variant. */
     @Test void editorSchemeChecksItsId() {
         var c = java.awt.Color.GRAY;

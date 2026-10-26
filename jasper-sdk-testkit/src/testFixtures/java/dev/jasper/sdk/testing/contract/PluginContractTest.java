@@ -3513,6 +3513,17 @@ public abstract class PluginContractTest {
         h.ui(() -> assertThatIllegalStateException().isThrownBy(() -> settings.get().page(panel)));
     }
 
+    /** Vim IdeaVim keys spec 4: a plugin opens Settings at its own page, on the UI thread, while it runs. */
+    @Test void aPluginOpensItsSettingsPageOnTheUiThreadWhileItRuns() {
+        var settings = new AtomicReference<PluginSettings>();
+        h.start(info("test.show"), Set.of(), Set.of(), context -> settings.set(context.settings()));
+        assertThat(h.active("test.show")).isTrue();
+        h.ui(() -> settings.get().show());
+        assertThatIllegalStateException().as("off the UI thread").isThrownBy(() -> settings.get().show());
+        h.stopAll();
+        h.ui(() -> assertThatIllegalStateException().as("after the plugin stopped").isThrownBy(() -> settings.get().show()));
+    }
+
     @Test void setSavesTheValueAndItsListenersHearIt() throws Exception {
         var vim = new AtomicReference<Setting<Boolean>>();
         var size = new AtomicReference<Setting<Integer>>();

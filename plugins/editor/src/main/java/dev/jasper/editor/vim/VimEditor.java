@@ -273,6 +273,16 @@ public final class VimEditor {
         return mine;
     }
 
+    /**
+     * Asked before {@link #offer}: whether Vim would take the key by the default rule, with no {@code sethandler} entry
+     * for the mode, rather than because the command line, a prompt or the output panel owns every key. Such a key
+     * reports a shortcut conflict when it is bound outside Vim too (spec 2).
+     */
+    boolean ownsByDefault(KeyInput key) {
+        if (commandLine.active() || promptHandler != null || !output.isEmpty()) return false;
+        return vim.handlers().handler(key, handlerMode()) == KeyHandlers.Handler.DEFAULT;
+    }
+
     /** @return whether a mapping for the mode Vim is in starts with the key */
     private boolean startsMapping(KeyInput key) {
         int state = mapState(key);
@@ -560,6 +570,115 @@ public final class VimEditor {
     public Mode mode() {
         if (commandLine.active() || promptHandler != null) return Mode.COMMAND_LINE;
         return mode == Mode.NORMAL && machine.operatorPending() ? Mode.OPERATOR_PENDING : mode;
+    }
+
+    /** @return whether the mode is one of the Visual modes, where Copy, Cut and Paste act on the Visual area */
+    public boolean visual() { return mode().visual(); }
+
+    /**
+     * The Editor's Copy in Visual mode (IdeaVim): the area's text, as {@code y} would yank it, goes on the clipboard.
+     * Visual mode, the area and Vim's registers stay as they are.
+     *
+     * @return the text copied
+     */
+    String copyVisual() {
+        Context c = new Context(this);
+        String text = Operators.content(c, Visual.range(c, mode, "y").span()).text();
+        vim.host().writeClipboard().accept('+', text);
+        return text;
+    }
+
+    /**
+     * The Editor's Cut in Visual mode: {@link #copyVisual}, then {@link #deleteVisual}.
+     *
+     * @return the text copied
+     */
+    String cutVisual() {
+        String text = copyVisual();
+        deleteVisual();
+        return text;
+    }
+
+    /** The Editor's Delete in Visual mode: the area goes as {@code "_d} deletes it, in one undo step, and Normal mode follows. */
+    void deleteVisual() {
+        command(() -> {
+            Context c = new Context(this);
+            c.register = '_';
+            Span span = endVisual(c);
+            beginUndoStep();
+            try { Operators.delete(c, span, false); }
+            finally { endUndoStep(); }
+        });
+    }
+
+    /**
+     * The Editor's Paste (and Paste from a list) in Visual mode: {@code text} replaces the area in one undo step, and
+     * Normal mode follows with the cursor on the last character put in (the area's start when {@code text} is empty).
+     * Lines keep the last one's break; a block goes and {@code text} goes in once at its top-left corner. Vim's
+     * registers stay as they are.
+     *
+     * @param text the text to put in
+     */
+    void replaceVisual(String text) {
+        String put = text.replace("\r\n", "\n").replace('\r', '\n');
+        command(() -> {
+            Context c = new Context(this);
+            c.register = '_';
+            Mode was = mode;
+            Span span = endVisual(c);
+            beginUndoStep();
+            try {
+                int from;
+                String inserted = put;
+                if (was == Mode.VISUAL_BLOCK) {
+                    Operators.delete(c, span, false);
+                    from = buffer.offset(span.start().line, Visual.coladvance(buffer, span.start().line, span.block().startVcol(), c.tabstop()));
+                    buffer.insert(from, inserted);
+                } else if (span.linewise()) {
+                    if (inserted.endsWith("\n")) inserted = inserted.substring(0, inserted.length() - 1);
+                    from = buffer.start(span.start().line);
+                    buffer.replace(from, buffer.end(span.end().line), inserted);
+                } else {
+                    from = buffer.offset(span.start());
+                    buffer.replace(from, Operators.end(buffer, span), inserted);
+                }
+                int last = from + inserted.length() - 1;
+                if (last > from && Character.isLowSurrogate((char) buffer.charAt(last))) last--;
+                setCursor(inserted.isEmpty() ? span.start() : buffer.pos(last));
+            } finally { endUndoStep(); }
+        });
+    }
+
+    /** Ends Visual mode for a Paste with nothing to put in: the text stays as it is. */
+    void endVisual() { command(() -> Visual.end(this)); }
+
+    /** @return the Visual area's span, after Visual mode ends with the area remembered for {@code gv} */
+    private Span endVisual(Context c) {
+        Span span = Visual.range(c, mode, "d").span();
+        Visual.remember(this, mode);
+        visualAnchor = null;
+        mode = Mode.NORMAL;
+        setCursor(span.start(), true);
+        return span;
+    }
+
+    /**
+     * Runs an Editor command that changes Vim's state from outside a key: afterwards, as after a key, the cursor keeps
+     * off the end of the line, the window follows it and the listeners hear. Inside a key (an {@code <Action>}), the key
+     * does that.
+     */
+    private void command(Runnable work) {
+        boolean was = busy;
+        busy = true;
+        try { work.run(); }
+        finally { busy = was; }
+        if (was) return;
+        if (mode == Mode.NORMAL) setCursor(cursor());
+        view.updateTopline();
+        view.cursColumns();
+        viewport.show();
+        look();
+        fire();
     }
 
     /** @return the partly typed command ('showcmd') */

@@ -109,7 +109,13 @@ final class WindowStatusBar extends JPanel {
                 var button = PlainText.button(); button.setText(item.text());
                 button.setToolTipText(item.tooltip()); button.setBorder(BorderFactory.createEmptyBorder(0, NativeStyles.installed().metric(DesignMetrics.Role.STATUS_ITEM_GAP), 0, NativeStyles.installed().metric(DesignMetrics.Role.STATUS_ITEM_GAP)));
                 button.setContentAreaFilled(false); button.setFocusable(false); button.setFont(statusFont());
-                button.setForeground(muted()); if (item.run() != null) button.addActionListener(event -> item.run().run());
+                button.setIconTextGap(NativeStyles.installed().metric(DesignMetrics.Role.STATUS_ITEM_GAP));
+                button.setIcon(item.dimmed() && item.icon() instanceof dev.jasper.app.platform.PresentationIcon icon ? icon.in(SemanticColor.TEXT_PLACEHOLDER) : item.icon());
+                button.getAccessibleContext().setAccessibleName(item.text().isEmpty() ? item.tooltip() : item.text());
+                if (item.dimmed()) button.putClientProperty(DIMMED, true);
+                button.setForeground(itemColor(button));
+                if (!item.menu().isEmpty()) button.addActionListener(event -> contentMenuPopup.accept(button, contentMenu(item.menu())));
+                else if (item.run() != null) button.addActionListener(event -> item.run().run());
                 contentItems.add(button);
             }
         }
@@ -130,6 +136,54 @@ final class WindowStatusBar extends JPanel {
         }
         cells.refresh(this);
         revalidate(); repaint();
+    }
+
+    /** Marks a content item painted in the disabled colour. */
+    private static final String DIMMED = "Jasper.status.dimmed";
+
+    /**
+     * How a content item shows its menu, at {@link #menuPoint} in its root pane. A headless test, where nothing shows,
+     * records what a click would show instead.
+     */
+    java.util.function.BiConsumer<JComponent, JPopupMenu> contentMenuPopup = (invoker, menu) -> {
+        if (!invoker.isShowing()) return;
+        var root = SwingUtilities.getRootPane(invoker);
+        if (root == null) { menu.show(invoker, 0, invoker.getHeight()); return; }
+        Rectangle anchor = SwingUtilities.convertRectangle(invoker.getParent(), invoker.getBounds(), root);
+        Point at = SwingUtilities.convertPoint(root, menuPoint(anchor, menu.getPreferredSize(), new Rectangle(0, 0, root.getWidth(), root.getHeight())), invoker);
+        menu.show(invoker, at.x, at.y);
+    };
+
+    /**
+     * Where a menu of {@code menu}'s size opens for {@code anchor}, as the kit places a menu button's: right-aligned
+     * with an anchor right of the centre, else left-aligned; below it, or above when there is no room below; kept inside
+     * {@code available}.
+     */
+    static Point menuPoint(Rectangle anchor, Dimension menu, Rectangle available) {
+        boolean right = anchor.getCenterX() > available.getCenterX();
+        int x = right ? anchor.x + anchor.width - menu.width : anchor.x, y = anchor.y + anchor.height;
+        if (y + menu.height > available.y + available.height) y = anchor.y - menu.height;
+        x = Math.max(available.x, Math.min(x, available.x + available.width - menu.width));
+        y = Math.max(available.y, Math.min(y, available.y + available.height - menu.height));
+        return new Point(x, y);
+    }
+
+    /** A content item's menu in the themed popup the window's other menus use. */
+    private static JPopupMenu contentMenu(List<dev.jasper.app.contributions.ContentStatus.MenuEntry> entries) {
+        var menu = new JPopupMenu();
+        for (var entry : entries) {
+            if (entry.separator()) { menu.addSeparator(); continue; }
+            JMenuItem item = entry.checkable() ? PlainText.checkBox(entry.label(), null, entry.checked()) : PlainText.item(entry.label());
+            item.addActionListener(event -> entry.run().run());
+            menu.add(item);
+        }
+        NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        return menu;
+    }
+
+    /** A status item's text colour: the disabled colour for a dimmed content item, else the muted one. */
+    private Color itemColor(JButton item) {
+        return Boolean.TRUE.equals(item.getClientProperty(DIMMED)) ? ThemeZone.color(null, SemanticColor.TEXT_PLACEHOLDER) : muted();
     }
 
     void setConfiguration(ConfigService.State state) {
@@ -238,7 +292,7 @@ final class WindowStatusBar extends JPanel {
         left.refreshTheme(); right.refreshTheme(); breadcrumbs.refreshTheme();
         for (Box row : new Box[]{leftItems, rightItems, contentItems})
             for (Component child : row.getComponents()) if (child instanceof JButton item) {
-                item.setForeground(muted());
+                item.setForeground(itemColor(item));
                 item.setFont(statusFont());
             } else if (child instanceof StatusProgressView progress) progress.refreshTheme();
         configButton.setForeground(onStatus(configColor));

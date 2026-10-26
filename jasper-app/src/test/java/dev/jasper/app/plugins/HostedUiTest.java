@@ -686,6 +686,52 @@ class HostedUiTest {
         ui.closeAll();
     }
 
+    /** Vim IdeaVim keys spec 4: a status item's icon resolves through the kit, and its menu's runs are contained. */
+    @Test void contentStatusResolvesItsIconAndContainsItsMenuRuns() {
+        UUID window = terminalFixture.addWindow();
+        model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(window, tab -> { }, tab -> { }, tab -> { }, () -> { },
+            tab -> Optional.empty(), (tab, group, side) -> { }, (tab, side) -> false, tab -> false, tab -> { }, tab -> java.util.List.of(),
+            (tab, number) -> { }));
+        kit.registerIcon(new dev.jasper.sdk.ui.IconAsset("dev.x.tool:v", "M0 0h16v16H0z"));
+        var notes = ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), terminals.windowHandle(window), view());
+        Runnable boom = () -> { throw new IllegalStateException("boom"); };
+        notes.setStatus(List.of(new dev.jasper.sdk.ui.ContentStatus("NORMAL", "Vim mode", null, "dev.x.tool:v", true, List.of(
+            dev.jasper.sdk.ui.ContentStatus.MenuEntry.check("Enabled", true, boom), dev.jasper.sdk.ui.ContentStatus.MenuEntry.separatorLine(),
+            dev.jasper.sdk.ui.ContentStatus.MenuEntry.item("Settings\u2026", boom)))));
+        var status = model.tabs().inWindow(window).getFirst().status().getFirst();
+        assertThat(status.icon()).isInstanceOf(dev.jasper.app.platform.PresentationIcon.class);
+        notes.setStatus(List.of(new dev.jasper.sdk.ui.ContentStatus("INSERT", "Vim mode", null, "dev.x.tool:v", false, List.of())));
+        assertThat(model.tabs().inWindow(window).getFirst().status().getFirst().icon()).as("an icon resolves once")
+            .isSameAs(status.icon());
+        assertThat(status.dimmed()).isTrue();
+        assertThat(status.menu()).extracting(dev.jasper.app.contributions.ContentStatus.MenuEntry::label).containsExactly("Enabled", "", "Settings\u2026");
+        assertThat(status.menu().getFirst().checkable()).isTrue();
+        assertThat(status.menu().getFirst().checked()).isTrue();
+        assertThat(status.menu().get(1).separator()).isTrue();
+        assertThat(status.menu().get(1).run()).isNull();
+        assertThatCode(() -> status.menu().getFirst().run().run()).doesNotThrowAnyException();
+        assertThatCode(() -> status.menu().get(2).run().run()).doesNotThrowAnyException();
+        assertThat(containment.failures("dev.x.tool")).isEqualTo(2);
+        notes.setStatus(List.of(new dev.jasper.sdk.ui.ContentStatus("Ln 1", "Caret", null)));
+        assertThat(model.tabs().inWindow(window).getFirst().status().getFirst().icon()).isNull();
+        assertThatIllegalArgumentException().isThrownBy(() -> notes.setStatus(List.of(
+            new dev.jasper.sdk.ui.ContentStatus("NORMAL", "Vim mode", null, "dev.x.tool:missing", false, List.of()))));
+    }
+
+    /** A closed content tab's status, as its presentation, changes nothing, even with an icon no longer registered. */
+    @Test void aClosedContentTabsStatusChangesNothing() {
+        UUID window = terminalFixture.addWindow();
+        model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(window, tab -> { }, tab -> { }, tab -> { }, () -> { },
+            tab -> Optional.empty(), (tab, group, side) -> { }, (tab, side) -> false, tab -> false, tab -> { }, tab -> java.util.List.of(),
+            (tab, number) -> { }));
+        var notes = ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), terminals.windowHandle(window), view());
+        notes.close();
+        assertThat(notes.isClosed()).isTrue();
+        assertThatCode(() -> notes.setStatus(List.of(
+            new dev.jasper.sdk.ui.ContentStatus("NORMAL", "Vim mode", null, "dev.x.tool:missing", false, List.of()))))
+            .doesNotThrowAnyException();
+    }
+
     /**
      * Workspace plan 8b Task 4 review: Terminal Right beside a content tab is audited once its window opened it, as
      * {@code Terminals.split} is once its target resolves, and a split its window did not open (the final review) or a

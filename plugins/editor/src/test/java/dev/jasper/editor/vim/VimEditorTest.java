@@ -311,6 +311,54 @@ class VimEditorTest {
         return runs;
     }
 
+    @Test void ctrlShiftMappingsAreVimKeys() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "one\ntwo\n");
+            editor.vim().mappings().add(Mappings.NORMAL, KeyInput.parse("<C-S-j>"), KeyInput.parse("dd"), true, false);
+            assertThat(editor.offer(KeyInput.parse("<C-S-J>").getFirst())).isTrue();
+            assertThat(area.getText()).isEqualTo("two\n");
+            editor.offer(KeyInput.parse("<S-C-j>").getFirst());
+            assertThat(area.getText()).isEmpty();
+            var plain = editor(new VimTextArea(), "abc\n");
+            var ctrlShiftV = KeyInput.parse("<C-S-v>").getFirst();
+            assertThat(plain.offer(ctrlShiftV)).as("Normal").isFalse();
+            type(plain, "v");
+            assertThat(plain.offer(ctrlShiftV)).as("Visual").isFalse();
+            type(plain, "<Esc>i");
+            assertThat(plain.offer(ctrlShiftV)).as("Insert").isFalse();
+        });
+    }
+
+    @Test void ctrlShiftVReachesPasteFromAListAndCtrlShiftWInInsertModeLeavesVim() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc def\n");
+            int ctrlShift = InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
+            var pasted = new AtomicInteger();
+            area.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_V, ctrlShift), org.fife.ui.rtextarea.RTextAreaEditorKit.clipboardHistoryAction);
+            area.getActionMap().put(org.fife.ui.rtextarea.RTextAreaEditorKit.clipboardHistoryAction, new AbstractAction() {
+                @Override public void actionPerformed(ActionEvent event) { pasted.incrementAndGet(); }
+            });
+            area.processKeyEvent(pressed(area, ctrlShift, KeyEvent.VK_V));
+            assertThat(pasted).as("Normal mode").hasValue(1);
+            type(editor, "v");
+            area.processKeyEvent(pressed(area, ctrlShift, KeyEvent.VK_V));
+            assertThat(pasted).as("Visual mode").hasValue(2);
+            type(editor, "<Esc>$a");
+            var parent = new javax.swing.JPanel();
+            parent.add(area);
+            var closed = new AtomicInteger();
+            parent.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_W, ctrlShift), "close");
+            parent.getActionMap().put("close", new AbstractAction() {
+                @Override public void actionPerformed(ActionEvent event) { closed.incrementAndGet(); }
+            });
+            area.processKeyEvent(pressed(area, ctrlShift, KeyEvent.VK_W));
+            assertThat(closed).as("Ctrl+Shift+W in Insert mode is not Vim's").hasValue(1);
+            assertThat(area.getText()).isEqualTo("abc def\n");
+        });
+    }
+
     @Test void aKeyVimDeclinesInNormalModeRingsTheBellInsteadOfEditing() throws Exception {
         onEdt(() -> {
             var area = new VimTextArea();
@@ -419,6 +467,97 @@ class VimEditorTest {
             @Override public void actionPerformed(ActionEvent event) { runs.incrementAndGet(); }
         });
         return runs;
+    }
+
+    @Test void aKeyVimTakesThatIsAlsoAShortcutIsReported() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "1\n2\n3\n4\n5\n6\n7\n8\n9\n");
+            var reports = new java.util.ArrayList<String>();
+            area.onConflict((key, editorBinds) -> reports.add(key.notation() + " " + editorBinds));
+            var find = bind(area, KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK), "editor.find");
+            area.allowInNormalMode("editor.find");
+            var ctrlF = pressed(area, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_F);
+            area.processKeyEvent(ctrlF);
+            assertThat(ctrlF.isConsumed()).as("Vim takes Ctrl+F").isTrue();
+            assertThat(find).as("the Editor's binding does not run").hasValue(0);
+            assertThat(reports).containsExactly("<C-f> true");
+            area.processKeyEvent(pressed(area, 0, KeyEvent.VK_J));
+            area.processKeyEvent(typed(area, 0, 'j'));
+            assertThat(reports).as("j is bound nowhere else").hasSize(1);
+
+            reports.clear();
+            editor.vim().handlers().set(KeyInput.ctrl('f'), "n", KeyHandlers.Handler.VIM);
+            area.processKeyEvent(pressed(area, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_F));
+            assertThat(reports).as("a key with a sethandler entry").isEmpty();
+            editor.vim().handlers().clear();
+
+            type(editor, ":");
+            assertThat(editor.commandLineText()).isPresent();
+            area.processKeyEvent(pressed(area, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_F));
+            assertThat(reports).as("the command line takes every key").isEmpty();
+            type(editor, "<Esc>");
+
+            // Without the text area's own bindings, which on Linux and Windows hold many Ctrl keys (Ctrl+D, Ctrl+O).
+            area.setInputMap(JComponent.WHEN_FOCUSED, new javax.swing.InputMap());
+            var root = new javax.swing.JRootPane();
+            root.getContentPane().add(area);
+            var newTab = new AtomicInteger();
+            root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK), "app.window");
+            root.getActionMap().put("app.window", new AbstractAction() {
+                @Override public void actionPerformed(ActionEvent event) { newTab.incrementAndGet(); }
+            });
+            area.processKeyEvent(pressed(area, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_D));
+            assertThat(reports).as("bound only in the window").containsExactly("<C-d> false");
+            var bar = new javax.swing.JMenuBar();
+            var menu = new javax.swing.JMenu("Go");
+            var item = new javax.swing.JMenuItem("Back");
+            item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK));
+            menu.add(item);
+            bar.add(menu);
+            root.setJMenuBar(bar);
+            area.processKeyEvent(pressed(area, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_O));
+            assertThat(reports).as("a menu accelerator").containsExactly("<C-d> false", "<C-o> false");
+        });
+    }
+
+    @Test void textNavigationBindingsAreNotConflicts() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "1\n2\n3\n4\n5\n6\n7\n8\n9\n");
+            var reports = new java.util.ArrayList<String>();
+            area.onConflict((key, editorBinds) -> reports.add(key.notation() + " " + editorBinds));
+            // RSyntaxTextArea's macOS map binds Ctrl+F, Ctrl+A and Ctrl+O to caret moves and a line break; on Windows
+            // and Linux Ctrl+Shift+Left selects by word.
+            var map = area.getInputMap(JComponent.WHEN_FOCUSED);
+            int ctrl = InputEvent.CTRL_DOWN_MASK;
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_F, ctrl), javax.swing.text.DefaultEditorKit.forwardAction);
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, ctrl), javax.swing.text.DefaultEditorKit.beginLineAction);
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_O, ctrl), javax.swing.text.DefaultEditorKit.insertBreakAction);
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_E, ctrl), javax.swing.text.DefaultEditorKit.selectionEndLineAction);
+            for (int code : new int[] {KeyEvent.VK_F, KeyEvent.VK_A, KeyEvent.VK_O, KeyEvent.VK_E}) {
+                area.processKeyEvent(pressed(area, ctrl, code));
+                type(editor, "<Esc>");
+            }
+            assertThat(reports).as("navigation is not a shortcut").isEmpty();
+
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_B, ctrl), javax.swing.text.DefaultEditorKit.copyAction);
+            area.processKeyEvent(pressed(area, ctrl, KeyEvent.VK_B));
+            assertThat(reports).as("Copy is").containsExactly("<C-b> true");
+
+            reports.clear();
+            bindInAncestor(area, KeyStroke.getKeyStroke(KeyEvent.VK_F, ctrl), "app.find");
+            area.processKeyEvent(pressed(area, ctrl, KeyEvent.VK_F));
+            assertThat(reports).as("a navigation key the window binds is judged by the window").containsExactly("<C-f> false");
+
+            reports.clear();
+            type(editor, ":nnoremap <lt>D-j> j<CR>");
+            map.put(KeyStroke.getKeyStroke(KeyEvent.VK_J, InputEvent.META_DOWN_MASK), "rsta-delete-line");
+            var command = pressed(area, InputEvent.META_DOWN_MASK, KeyEvent.VK_J);
+            area.processKeyEvent(command);
+            assertThat(command.isConsumed()).as("the mapping takes it").isTrue();
+            assertThat(reports).as("a mapped ⌘ key the Editor binds").containsExactly("<D-j> true");
+        });
     }
 
     @Test void theAppsShortcutsOnAncestorsStillFireInNormalMode() throws Exception {

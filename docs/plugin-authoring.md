@@ -607,7 +607,10 @@ tab strip, the window and its menus, and in the main window the status bar; the 
   Find Previous, Copy, Paste, Increase Font Size, Decrease Font Size and Reset Font Size; Close Pane asks the item to
   close, and Close Tab every item of its tab.
 - `setStatus(List<ContentStatus>)`: items in the main window's status bar while the tab is active there (a child
-  window has none), each plain text or a button.
+  window has none), each plain text or a button. An item may show a registered icon before its text (alone when the
+  text is empty), be `dimmed` (painted in the disabled colour, still clickable), and carry a menu of
+  [`ContentStatus.MenuEntry`](sdk-reference.html#dev.jasper.sdk.ui.ContentStatus.MenuEntry) items, check items and
+  separator lines, which a click opens in place of `run`.
 - `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new child window
   (a child window's only tab stays where it is) and `moveToMainWindow()` to the main window, keeping the view and its
   state, and `window()` is the window that holds it (`WindowHandle.isMain()` tells the main window from a child window).
@@ -1302,6 +1305,8 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
   panel lives as long as the plugin, so Settings calls `reset` before `dispose` whenever it closes a page without a
   successful Apply, as on Cancel. Compose the page as the generated ones are
   ([Building plugin UI](plugin-ui.md#settings-pages)); the Sample's `SampleSettingsPanel` is a complete example.
+- **Opening Settings.** [`context.settings().show()`](sdk-reference.html#dev.jasper.sdk.settings.PluginSettings.show())
+  opens Settings at the plugin's page over the active window; UI thread.
 - Keep state that is not a setting under `context.dataDirectory()`.
 
 ## Services and other plugins' APIs

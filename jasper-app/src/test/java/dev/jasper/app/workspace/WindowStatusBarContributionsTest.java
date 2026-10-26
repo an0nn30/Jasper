@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
+import dev.jasper.app.contributions.ContentStatus;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.StatusEntry;
 import dev.jasper.app.testsupport.EdtTestExtension;
@@ -112,6 +113,75 @@ class WindowStatusBarContributionsTest {
     private static java.util.stream.Stream<java.awt.Component> descendants(java.awt.Container parent) {
         return java.util.Arrays.stream(parent.getComponents()).flatMap(c -> c instanceof java.awt.Container nested
             ? java.util.stream.Stream.concat(java.util.stream.Stream.of(c), descendants(nested)) : java.util.stream.Stream.of(c));
+    }
+
+    /** Vim IdeaVim keys spec 4: a content item shows its icon before its text, dims, and opens its menu instead of running. */
+    @Test void aContentItemShowsItsIconDimsAndOpensItsMenu() {
+        ThemeTestSupport.controller(false);
+        try {
+            var model = new Contributions();
+            var window = java.util.UUID.randomUUID();
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(window, tab -> { }, tab -> { }, tab -> { }, () -> { },
+                tab -> java.util.Optional.empty(), (tab, group, side) -> { }, (tab, side) -> false, tab -> false, tab -> { },
+                tab -> List.of(), (tab, number) -> { }));
+            var entry = model.tabs().open("dev.jasper.test", "notes", "Notes", window, new javax.swing.JLabel());
+            var ran = new ArrayList<String>();
+            var icon = new dev.jasper.app.platform.PresentationIcon("dev.jasper.test:v", "M0 0h16v16H0z");
+            entry.status(List.of(new ContentStatus("NORMAL", "Vim mode", () -> ran.add("run"), icon, false, List.of(
+                new ContentStatus.MenuEntry("Enabled", () -> ran.add("enabled"), true, true, false),
+                new ContentStatus.MenuEntry("", null, false, false, true),
+                new ContentStatus.MenuEntry("Settings\u2026", () -> ran.add("settings"), false, false, false)))));
+            var bar = new WindowStatusBar();
+            var shown = new ArrayList<javax.swing.JPopupMenu>();
+            bar.contentMenuPopup = (invoker, menu) -> shown.add(menu);
+            bar.setContent(entry);
+            var button = (JButton) bar.contentItems.getComponent(0);
+            assertThat(button.getText()).isEqualTo("NORMAL");
+            assertThat(button.getIcon()).isSameAs(icon);
+            assertThat(button.getForeground()).isEqualTo(bar.muted());
+            button.doClick();
+            assertThat(shown).hasSize(1);
+            var menu = shown.getFirst();
+            assertThat(menu.getComponentCount()).isEqualTo(3);
+            assertThat(menu.getComponent(0)).isInstanceOfSatisfying(javax.swing.JCheckBoxMenuItem.class, check -> {
+                assertThat(check.getText()).isEqualTo("Enabled");
+                assertThat(check.isSelected()).isTrue();
+            });
+            assertThat(menu.getComponent(1)).isInstanceOf(javax.swing.JPopupMenu.Separator.class);
+            var settings = (javax.swing.JMenuItem) menu.getComponent(2);
+            assertThat(settings).isNotInstanceOf(javax.swing.JCheckBoxMenuItem.class);
+            assertThat(settings.getText()).isEqualTo("Settings\u2026");
+            settings.doClick();
+            assertThat(ran).as("a menu item runs; the item's own run does not").containsExactly("settings");
+
+            entry.status(List.of(new ContentStatus("", "Vim mode", null, icon, true, List.of())));
+            bar.setContent(entry);
+            button = (JButton) bar.contentItems.getComponent(0);
+            assertThat(button.getText()).isEmpty();
+            assertThat(button.getIcon()).as("the dimmed artwork").isNotNull().isNotSameAs(icon);
+            var dimmed = dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.TEXT_PLACEHOLDER);
+            assertThat(button.getForeground()).isEqualTo(dimmed);
+            bar.refreshTheme();
+            assertThat(button.getForeground()).as("after a theme change").isEqualTo(dimmed);
+            button.doClick();
+            assertThat(shown).as("no menu").hasSize(1);
+        } finally { ThemeTestSupport.controller(true); }
+    }
+
+    /** A content item's menu opens as the kit's menu buttons do: aligned to the item's nearer edge, kept in the window. */
+    @Test void aContentItemsMenuAlignsToItsNearerEdgeAndStaysInTheWindow() {
+        var window = new java.awt.Rectangle(0, 0, 1000, 600);
+        var menu = new java.awt.Dimension(200, 120);
+        assertThat(WindowStatusBar.menuPoint(new java.awt.Rectangle(100, 580, 60, 20), menu, window))
+            .as("left half, bottom edge: left-aligned, above").isEqualTo(new java.awt.Point(100, 460));
+        assertThat(WindowStatusBar.menuPoint(new java.awt.Rectangle(900, 580, 80, 20), menu, window))
+            .as("right half: right-aligned").isEqualTo(new java.awt.Point(780, 460));
+        assertThat(WindowStatusBar.menuPoint(new java.awt.Rectangle(100, 100, 60, 20), menu, window))
+            .as("room below: below").isEqualTo(new java.awt.Point(100, 120));
+        assertThat(WindowStatusBar.menuPoint(new java.awt.Rectangle(960, 0, 300, 20), menu, window))
+            .as("clamped to the window").isEqualTo(new java.awt.Point(800, 20));
+        assertThat(WindowStatusBar.menuPoint(new java.awt.Rectangle(10, 50, 20, 20), new java.awt.Dimension(200, 700), window))
+            .as("taller than the window: clamped to its top").isEqualTo(new java.awt.Point(10, 0));
     }
 
     @Test void theConfigurationSegmentKeepsItsFullWidthWhenSpaceIsTight() {

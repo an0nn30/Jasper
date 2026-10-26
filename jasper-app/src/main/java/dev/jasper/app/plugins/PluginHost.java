@@ -111,6 +111,8 @@ final class PluginHost {
     java.util.function.Supplier<dev.jasper.ui.kit.Kit> kit = dev.jasper.ui.swing.FlatLafInstaller::installedKit;
     /** The keymap text a plugin's menus show beside an item's action. */
     java.util.function.Function<String, String> shortcuts = action -> "";
+    /** Opens Settings at a page over the active window ({@code PluginSettings.show}); UI thread. */
+    Consumer<String> openSettings = page -> { };
     /** The clipboard every plugin's Platform writes to; the application shares it with its own copies. */
     dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
     final Environment environment;
@@ -171,7 +173,7 @@ final class PluginHost {
                 + (why == PluginStatus.State.FAILED ? "failed to start" : why == PluginStatus.State.SKIPPED ? "was skipped" : "is not running"));
         }
         var declared = new DeclaredSettings(id, environment.settingsFiles(), containment, environment.ui(), environment.configReport(),
-            () -> settingsWritten(id), defaults.plugin(id), lookDefaultProblem);
+            () -> settingsWritten(id), defaults.plugin(id), lookDefaultProblem, environment.onUi(), page -> openSettings.accept(page));
         var context = new HostedContext(this, hosted, declared);
         contexts.put(id, context);
         Set<String> providers = new HashSet<>(hosted.requires());

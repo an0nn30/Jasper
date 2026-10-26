@@ -35,12 +35,23 @@ class KeyInputTest {
         assertThat(KeyInput.parse("<Action>()")).as("no id: literal").hasSize(10);
     }
 
+    @Test void ctrlShiftLetterIsItsOwnKey() {
+        int both = KeyInput.CTRL | KeyInput.SHIFT;
+        assertThat(KeyInput.parse("<C-V>")).isEqualTo(KeyInput.parse("<C-v>"));
+        assertThat(KeyInput.parse("<C-S-v>")).containsExactly(new KeyInput("v", both));
+        assertThat(KeyInput.parse("<C-S-V>")).isEqualTo(KeyInput.parse("<C-S-v>"));
+        assertThat(KeyInput.parse("<S-C-v>")).isEqualTo(KeyInput.parse("<C-S-v>"));
+        assertThat(KeyInput.parse("<C-S-v>")).isNotEqualTo(KeyInput.parse("<C-v>"));
+        assertThat(KeyInput.parse("<C-S-v>").getFirst().notation()).isEqualTo("<C-S-v>");
+        assertThat(KeyInput.parse("<S-a>")).isEqualTo(KeyInput.parse("A"));
+    }
+
     @Test void normalizesCtrlAndShiftAsVimDoes() {
         assertThat(KeyInput.parse("<C-W>")).containsExactly(new KeyInput("w", KeyInput.CTRL));
         assertThat(KeyInput.parse("<C-[>")).containsExactly(KeyInput.named("Esc"));
         assertThat(KeyInput.parse("<C-i><C-m>")).containsExactly(KeyInput.named("Tab"), KeyInput.named("CR"));
         assertThat(KeyInput.parse("<S-a>")).containsExactly(KeyInput.of('A'));
-        assertThat(KeyInput.parse("<C-S-a>")).containsExactly(new KeyInput("a", KeyInput.CTRL));
+        assertThat(KeyInput.parse("<M-S-a>")).containsExactly(new KeyInput("A", KeyInput.ALT));
         assertThat(KeyInput.ctrl('[')).isEqualTo(KeyInput.named("Esc"));
     }
 

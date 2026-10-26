@@ -293,6 +293,13 @@ class EditorPluginTest {
         throw new AssertionError("no " + text);
     }
 
+    @Test void registersTheVimWidgetsIcon() throws Exception {
+        try (var host = host()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin());
+            assertThat(context.kit().icons()).containsKey("dev.jasper.editor:vim");
+        }
+    }
+
     @Test void registersItsActionsAndPublishesTheEditorService() throws Exception {
         try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());

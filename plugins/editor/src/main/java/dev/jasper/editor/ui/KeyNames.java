@@ -55,6 +55,39 @@ public final class KeyNames {
         return out.append(key(stroke.getKeyCode())).toString();
     }
 
+    /**
+     * @param key a Vim key with Ctrl, Alt, ⌘ or Shift, or a named key
+     * @return the stroke that types it, for {@link #describe}
+     */
+    static KeyStroke stroke(dev.jasper.editor.vim.KeyInput key) {
+        int modifiers = 0;
+        if ((key.modifiers() & dev.jasper.editor.vim.KeyInput.CTRL) != 0) modifiers |= InputEvent.CTRL_DOWN_MASK;
+        if ((key.modifiers() & dev.jasper.editor.vim.KeyInput.ALT) != 0) modifiers |= InputEvent.ALT_DOWN_MASK;
+        if ((key.modifiers() & dev.jasper.editor.vim.KeyInput.SHIFT) != 0) modifiers |= InputEvent.SHIFT_DOWN_MASK;
+        if ((key.modifiers() & dev.jasper.editor.vim.KeyInput.META) != 0) modifiers |= InputEvent.META_DOWN_MASK;
+        int code = switch (key.key()) {
+            case "Esc" -> KeyEvent.VK_ESCAPE;
+            case "CR" -> KeyEvent.VK_ENTER;
+            case "Tab" -> KeyEvent.VK_TAB;
+            case "BS" -> KeyEvent.VK_BACK_SPACE;
+            case "Del" -> KeyEvent.VK_DELETE;
+            case "Insert" -> KeyEvent.VK_INSERT;
+            case "Home" -> KeyEvent.VK_HOME;
+            case "End" -> KeyEvent.VK_END;
+            case "PageUp" -> KeyEvent.VK_PAGE_UP;
+            case "PageDown" -> KeyEvent.VK_PAGE_DOWN;
+            case "Up" -> KeyEvent.VK_UP;
+            case "Down" -> KeyEvent.VK_DOWN;
+            case "Left" -> KeyEvent.VK_LEFT;
+            case "Right" -> KeyEvent.VK_RIGHT;
+            // Ctrl+6 types <C-^>.
+            case "^" -> KeyEvent.VK_6;
+            default -> key.key().matches("F([1-9]|1[0-2])") ? KeyEvent.VK_F1 + Integer.parseInt(key.key().substring(1)) - 1
+                : KeyEvent.getExtendedKeyCodeForChar(key.key().codePointAt(0));
+        };
+        return KeyStroke.getKeyStroke(code, modifiers);
+    }
+
     private static String key(int code) {
         return switch (code) {
             case KeyEvent.VK_SLASH -> "/";

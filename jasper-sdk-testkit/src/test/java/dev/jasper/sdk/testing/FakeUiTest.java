@@ -64,6 +64,35 @@ class FakeUiTest {
         }
     }
 
+    /** Vim IdeaVim keys spec 4: the fake keeps a status item's icon and menu and counts Settings opens. */
+    @Test void contentStatusKeepsItsIconAndMenuAndSettingsShowIsCounted() throws Exception {
+        try (var host = new FakePluginHost()) {
+            var window = host.addTerminalWindow();
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                context.kit().registerIcon(new dev.jasper.sdk.ui.IconAsset("dev.x.tool:v", "M0 0h16v16H0z"));
+                var view = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body",
+                    dev.jasper.sdk.ui.ControlState.READY, "Content", dev.jasper.sdk.ui.Nodes.TextRole.BODY)), e -> { });
+                var tab = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"),
+                    context.terminals().window(window).orElseThrow(), view);
+                Runnable r = () -> { };
+                var menu = List.of(dev.jasper.sdk.ui.ContentStatus.MenuEntry.check("Enabled", true, r),
+                    dev.jasper.sdk.ui.ContentStatus.MenuEntry.separatorLine(), dev.jasper.sdk.ui.ContentStatus.MenuEntry.item("Settings…", r));
+                tab.setStatus(List.of(new dev.jasper.sdk.ui.ContentStatus("NORMAL", "Vim mode", null, "dev.x.tool:v", true, menu)));
+                var status = host.contentStatus(tab).getFirst();
+                assertThat(status.icon()).isEqualTo("dev.x.tool:v");
+                assertThat(status.dimmed()).isTrue();
+                assertThat(status.menu()).isEqualTo(menu);
+                assertThatIllegalArgumentException().as("an unknown icon").isThrownBy(() ->
+                    tab.setStatus(List.of(new dev.jasper.sdk.ui.ContentStatus("NORMAL", "Vim mode", null, "dev.x.tool:missing", false, List.of()))));
+                assertThat(host.settingsShown(INFO.id())).isZero();
+                context.settings().show();
+                assertThat(host.settingsShown(INFO.id())).isEqualTo(1);
+            });
+            assertThatIllegalStateException().as("off the UI thread").isThrownBy(() -> context.settings().show());
+        }
+    }
+
     @Test void theHostKeepsEachActionsSpecAndChecksItsShortcutContext() {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });

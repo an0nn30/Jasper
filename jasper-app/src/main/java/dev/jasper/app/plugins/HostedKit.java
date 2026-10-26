@@ -24,6 +24,7 @@ final class HostedKit implements UiKit,AutoCloseable {
     private final AtomicBoolean closed=new AtomicBoolean();
     private final IconRegistry icons=new IconRegistry();
     private final Map<String, IconAsset> assets=new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, dev.jasper.app.platform.PresentationIcon> resolved=new java.util.concurrent.ConcurrentHashMap<>();
     private ThemeBinding binding;
     private Subscription updates;
     HostedKit(String owner,BooleanSupplier open,Supplier<ThemePair> themes,Appearance appearance,Containment containment){this(owner,open,themes,appearance,containment,() -> true);}
@@ -41,9 +42,18 @@ final class HostedKit implements UiKit,AutoCloseable {
             if (!available.contains(name)) throw new IllegalArgumentException("Unknown icon: " + name);
         });
     }
+    /**
+     * @return the named icon; one resolved before with the same artwork comes back, since a status item is set on every
+     *     caret move and native artwork is prepared once (the icon follows its mount's theme as it paints)
+     */
     javax.swing.Icon icon(String name){validateIcon(name);
         var asset=assets.get(name);
-        return new dev.jasper.app.platform.PresentationIcon(name, asset == null ? null : asset.pathData());
+        String pathData=asset == null ? null : asset.pathData();
+        var known=resolved.get(name);
+        if(known!=null && Objects.equals(known.pathData(),pathData))return known;
+        var icon=new dev.jasper.app.platform.PresentationIcon(name, pathData);
+        resolved.put(name,icon);
+        return icon;
     }
 
     /** A semantic colour of one theme slot, as the kit paints it; registered specialized content follows its view's slot. */

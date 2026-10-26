@@ -143,7 +143,7 @@ and these items:
 | `LF`, `CRLF` or `CR` | The line endings saves write; `Mixed → LF` (or `CRLF`, `CR`) until a save makes mixed endings one kind | |
 | `Spaces: 4` or `Tab: 4` | Whether the Tab key inserts spaces or a tab, and `tab_size` | |
 | `Wrap: On` or `Wrap: Off` | Soft wrap of this file, in every view of it | Toggles it |
-| `Vim: On` or `Vim: Off` | [Vim mode](#vim-mode) | Toggles it, in every tab |
+| A `V` icon and the mode: `NORMAL`, `INSERT`, `REPLACE`, `(INSERT)`, `VISUAL`, `V-LINE`, `V-BLOCK` or `COMMAND` | [Vim mode](#vim-mode); the icon alone, dimmed, while it is off | Opens a menu: **Enabled** (toggles it, in every tab), **Open vimrc**, **Reload vimrc**, **Settings…** |
 
 Before them, "Saving…" shows while a save runs, and for 3 seconds "Reloaded: changed on disk" after an
 [outside change](#outside-changes) reloaded the file, "Could not reload: *reason*", or why a
@@ -648,6 +648,7 @@ Under [Jasper home](getting-started.md#jasper-home):
 | `plugins/dev.jasper.editor/dev.jasper.editor.toml` | The [settings](#settings) |
 | `plugins/dev.jasper.editor/data/recent-files.toml` | [Recent files](#recent-files): `[[file]]` tables with `key`, `name`, `location`, `host` for a remote file, and `opened`. Jasper rewrites it; one it cannot read is renamed `recent-files.toml.bad` and the list starts empty. |
 | `plugins/dev.jasper.editor/data/vimrc` | Vim mode's [vimrc](#the-vimrc), which you create |
+| `plugins/dev.jasper.editor/data/shortcut-conflicts` | The keys Vim mode has posted a [shortcut-conflict notification](#which-keys-vim-takes) for, one key in Vim notation per line |
 
 While a local file is saved, its hidden `.<name>.jasper-<random>.tmp` stands beside it; the save removes it.
 
@@ -685,8 +686,8 @@ recorded corpus.
 
 ### Turning Vim mode on
 
-Set `vim = true`, turn on **Vim mode** in Settings › Tools › Editor, click `Vim: Off` in the status bar, or choose
-**Toggle Vim Mode** in an Editor tab's menu. Every Editor tab switches at once, and each keeps its text and undo
+Set `vim = true`, turn on **Vim mode** in Settings › Tools › Editor, choose **Enabled** in the status bar's Vim menu, or
+choose **Toggle Vim Mode** in an Editor tab's menu. Every Editor tab switches at once, and each keeps its text and undo
 history. Toggling saves `vim` in the settings file; when that fails, Vim mode stays as toggled until the Editor closes
 and a dialog says "Vim mode is on until the Editor closes: the setting could not be saved (*reason*)." ("off" when
 you turned it off).
@@ -713,14 +714,20 @@ you turned it off).
   area's own [editing keys](#commands-and-shortcuts): Shift+Tab and, on Linux and Windows, Alt+Up flash the Vim bar
   and change nothing. The Editor's commands, Jasper's window shortcuts (such as Ctrl+Shift+T on Linux and Windows) and
   keys a `sethandler` entry gives the Editor still work; a key nothing takes flashes the Vim bar.
-- On Linux and Windows several of the Editor's and the window's shortcuts are Vim keys, and Vim reads Ctrl+Shift with a
-  letter as Ctrl with that letter: in Normal mode Ctrl+F scrolls, Ctrl+Shift+G (the window's Find Next) shows the file's
-  position, Ctrl+L does nothing (Vim's redraw), Ctrl+N moves down and Ctrl+V starts blockwise Visual mode; in Insert
-  mode Ctrl+Shift+W (the window's Close Pane) deletes a word, Ctrl+V inserts the next key literally and Ctrl+C returns
-  to Normal mode, so neither Ctrl+V nor Ctrl+Shift+V pastes there. Ctrl+S and Ctrl+Shift+S still save (Vim has no
-  `<C-s>`). Use the tab's menu, `:action find` or a `sethandler` entry such as `sethandler <C-f> n:ide` for the others.
+- On Linux and Windows several of the Editor's and the window's shortcuts are Vim keys: in Normal mode Ctrl+F scrolls,
+  Ctrl+L does nothing (Vim's redraw), Ctrl+N moves down and Ctrl+V starts blockwise Visual mode; in Insert mode Ctrl+V
+  inserts the next key literally and Ctrl+C returns to Normal mode, so Ctrl+V does not paste there. Ctrl+S still saves
+  (Vim has no `<C-s>`). Ctrl+Shift with a letter is its own key (`<C-S-v>`), which Vim leaves to the Editor and the
+  window unless a mapping or `sethandler` names it: Ctrl+Shift+G is Find Next, Ctrl+Shift+W closes the pane in Insert
+  mode too and Ctrl+Shift+V pastes from the list in Normal, Visual and Insert mode. Use the tab's menu, `:action find`
+  or a `sethandler` entry such as `sethandler <C-f> n:ide` for the Ctrl keys.
 - `sethandler <C-f> n:vim i:ide` decides who gets a key in each mode (`n i v x o c`, or `a` for all, joined by `-`), as
   in IdeaVim.
+- The first time Vim takes a Ctrl, Alt or Cmd key that is also a shortcut of the Editor or of Jasper and no `sethandler`
+  entry names it, Vim still runs the key and a notification says, for example, "Ctrl+F is a shortcut for both Vim and
+  the Editor" ("and Jasper" when only the window binds it). **Use as Editor shortcut** gives the key to the Editor in
+  every mode; **Configure…** opens the vimrc in an Editor tab. Each key notifies once, ever: Jasper records it in
+  `shortcut-conflicts`. Keys Vim takes while the strip reads a pattern or command line do not notify.
 
 ### Searching and the command line
 
@@ -762,6 +769,9 @@ you turned it off).
 
 - `"+` is the system clipboard and `"*` the selection (the clipboard where there is none); `set clipboard=unnamed`
   (`"*`) or `unnamedplus` (`"+`) makes yanks, deletes and puts without a register use them.
+- In Visual mode the Editor's Copy puts the Visual area's text on the clipboard, as `y` would yank it, and Visual mode
+  stays; Cut copies it and deletes the area; Paste and Paste from a list replace the area. Vim's registers are
+  untouched.
 - Macros: `qa` … `q` records the keys you type into register `a`, `@a` runs them, `5@a` five times, `@@` the last
   register again and `@:` the last command line; `qA` appends to `a`. A macro stops at the first command that fails, so
   one that ends with `@a` runs to the end of the file; `u` undoes everything a macro or mapping changed at once.
@@ -774,15 +784,19 @@ you turned it off).
 ### The vimrc
 
 The vimrc is `plugins/dev.jasper.editor/data/vimrc` in Jasper home, in UTF-8. Jasper reads it the first time a tab has
-Vim mode on, running its lines in that tab, and again on **Reload vimrc** (an Editor tab's menu, the command
-palette, or `:action reload-vimrc`), which first puts mappings, options, `sethandler` entries and variables back to their defaults;
+Vim mode on, running its lines in that tab, and again on **Reload vimrc** (an Editor tab's menu, the status bar's Vim
+menu, the command palette, or `:action reload-vimrc`), which first puts mappings, options, `sethandler` entries and
+variables back to their defaults;
 registers and marks stay. It holds command lines, as a Vim or IdeaVim vimrc does: `set`, `let mapleader = ","`, the
 mapping commands, `sethandler`, `"` comments, lines continued with a leading `\`, `source ~/.vimrc` (relative names
 start from the sourcing file's folder; ten levels deep at most), `finish`, and `if` … `elseif` … `else` … `endif`
 blocks, where `has('ide')` and `has('jasper')` are true (so IdeaVim's blocks apply), a number is true when it is not 0,
 and anything else is false. Lines Jasper cannot run are skipped: a notification "Some vimrc lines were skipped" says how
 many, and `:messages` lists each with its line and the reason. A vimrc that cannot be read posts "Could not read the
-vimrc"; a missing one is not reported.
+vimrc"; a missing one is not reported. The shortcut-conflict notification's **Use as Editor shortcut** appends a line
+such as `sethandler <C-f> a:ide` to the vimrc, creating it if missing, and reloads it; a vimrc it cannot write posts
+"Could not update the vimrc". **Open vimrc** in the status bar's Vim menu opens it in the editor, creating it empty if
+missing; one it cannot create posts "Could not open the vimrc".
 
 ### Vim options
 

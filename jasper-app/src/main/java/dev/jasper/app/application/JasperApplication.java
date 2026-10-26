@@ -1319,6 +1319,7 @@ public final class JasperApplication {
         plugins.terminalTypography((configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).font());
         plugins.shortcuts(this::shortcutLabel);
         plugins.clipboard(clipboard);
+        plugins.openSettings(page -> openSettings(null, page));
         plugins.commandClient(CommandInstall.client(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),
             System.getProperty("jasper.commandClient")));
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));

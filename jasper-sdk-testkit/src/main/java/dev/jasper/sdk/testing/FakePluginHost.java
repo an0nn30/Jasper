@@ -499,6 +499,18 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
+     * How often a plugin opened Settings at its page with {@code PluginSettings.show()}.
+     *
+     * @param pluginId the plugin
+     * @return the count while it runs; 0 when it is not running
+     * @since 0.22.0
+     */
+    public int settingsShown(String pluginId) {
+        FakePluginContext context = contexts.get(pluginId);
+        return context == null ? 0 : context.settings.shown();
+    }
+
+    /**
      * Builds a plugin's own settings page as Settings would. {@code SettingsPanelHost.row} gives the standard rows
      * Jasper builds (ids {@code settings:<key>}, {@code settings:<key>:reset}, ...), which {@link #settingsPanelView}
      * can drive; an event one of those rows handles, emitted on that view, then calls the page's

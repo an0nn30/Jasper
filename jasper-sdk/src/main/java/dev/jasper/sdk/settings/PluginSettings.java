@@ -46,4 +46,12 @@ public interface PluginSettings {
      * @throws IllegalStateException after the plugin's start has returned, or when a page was already given
      */
     void page(SettingsPanel panel);
+
+    /**
+     * Opens Settings at this plugin's page over the active window. UI thread.
+     *
+     * @throws IllegalStateException off the UI thread, or after the plugin's context closed
+     * @since 0.22.0
+     */
+    void show();
 }

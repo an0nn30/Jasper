@@ -103,6 +103,8 @@ public final class EditorPlugin implements Plugin {
         Set<String> fonts = Set.copyOf(Arrays.asList(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()));
         EditorSettings.Declared settings = new EditorSettings.Declared(context.settings(), fonts);
         environment = environments.apply(context, settings);
+        // The Vim status widget's V (Vim IdeaVim keys spec 4).
+        context.kit().registerIcon(dev.jasper.editor.ui.StatusLine.VIM_ICON);
         openers = new Openers(failure -> context.log().log(System.Logger.Level.WARNING,
             "Open in Editor: an opener failed, so the next opener or the local chooser answers instead", failure));
         contextItems = new ContextItems(failure -> context.log().log(System.Logger.Level.WARNING,

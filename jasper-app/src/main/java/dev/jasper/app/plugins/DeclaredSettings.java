@@ -39,6 +39,8 @@ final class DeclaredSettings implements PluginSettings {
     private final Runnable written;
     private final Map<String, Object> lookDefaults;
     private final Consumer<String> problems;
+    private final java.util.function.BooleanSupplier onUi;
+    private final Consumer<String> openSettings;
     private final List<DeclaredSetting<?>> handles = new ArrayList<>();
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Runnable> reloadListeners = new CopyOnWriteArrayList<>();
@@ -51,11 +53,14 @@ final class DeclaredSettings implements PluginSettings {
 
     // written: runs on the UI thread after a save; the host clears the file's reports and reloads it.
     // lookDefaults: the look's raw defaults for this plugin's keys (spec 5.8); problems hears each one it cannot use.
+    // openSettings: opens Settings at a page over the active window, on the UI thread.
     DeclaredSettings(String pluginId, PluginSettingsFiles files, Containment containment, Consumer<Runnable> ui,
-                     Consumer<ConfigDiagnostic> report, Runnable written, Map<String, Object> lookDefaults, Consumer<String> problems) {
+                     Consumer<ConfigDiagnostic> report, Runnable written, Map<String, Object> lookDefaults, Consumer<String> problems,
+                     java.util.function.BooleanSupplier onUi, Consumer<String> openSettings) {
         this.pluginId = pluginId; this.files = files; this.containment = containment; this.ui = ui;
         this.report = report; this.written = written;
         this.lookDefaults = Map.copyOf(lookDefaults); this.problems = Objects.requireNonNull(problems, "problems");
+        this.onUi = Objects.requireNonNull(onUi, "onUi"); this.openSettings = Objects.requireNonNull(openSettings, "openSettings");
     }
 
     SettingValues values() { return values; }
@@ -94,6 +99,13 @@ final class DeclaredSettings implements PluginSettings {
     }
 
     Optional<SettingsPanel> panel() { return Optional.ofNullable(panel); }
+
+    /** Settings is modal, so it opens after the plugin's call returns. */
+    @Override public void show() {
+        if (closed) throw new IllegalStateException("Plugin context is closed: " + pluginId);
+        if (!onUi.getAsBoolean()) throw new IllegalStateException("Settings.show must be called on the UI thread: " + pluginId);
+        ui.accept(() -> openSettings.accept(PluginRuntime.settingsPageId(pluginId)));
+    }
 
     /**
      * The plugin's start returned: declarations close, the look's defaults for keys it never declared are reported once,
