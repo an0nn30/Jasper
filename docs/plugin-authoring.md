@@ -223,7 +223,7 @@ window (actions, menus, tool windows, content tabs, dialogs, notifications, sett
 
 | Capability | Lets the plugin | The review sheet says |
 | --- | --- | --- |
-| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()` and other tabs' titles in `ContentTab.tabChoices()` (which does not throw without it: its other tabs read "Tab N"), and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end |
+| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()` and other tabs' titles in `ContentTab.tabChoices()` (which does not throw without it: its other tabs read "Tab N"), read a tab's name pieces and add your own, and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end; add to tab names |
 | `terminal.selection` | read `PaneHandle.selection()` | Read the text you select in a terminal |
 | `terminal.inject` | call `PaneHandle.sendText`, `sendBytes` and `paste` | Type into your terminals |
 | `terminal.open` | open tabs and splits with a local request (the shell, a profile or a program), open a terminal beside a content tab with `ContentTab.split(SplitChoice.TERMINAL, …)`, and read `Terminals.profiles()` and `onProfilesChanged` | Open terminal tabs, splits and windows, and run programs in them |
@@ -909,12 +909,19 @@ private static void installTerminalDemo(PluginContext context) {
   `window()`, `title()`, `select()`.
   [`PaneHandle`](sdk-reference.html#dev.jasper.sdk.terminal.PaneHandle): `info()`, `foregroundJob()`, `selection()`,
   `sendText`, `sendBytes`, `paste` and `focus()`.
+- **Tab names.** A terminal tab's automatic name comes from the user's Tab name pattern
+  ([Tab names](configuration.md#tab-names)). `TabHandle.namePieces()` returns the pieces it is made from that have a
+  value: Jasper's `dir`, `full`, `process` and `title`, and every plugin's.
+  `Terminals.addTabNamePiece(new TabNamePieceSpec("branch", "the Git branch of this tab's folder"))` adds a piece users
+  can write as `{branch}`; the `TabNamePiece` it returns sets the piece's value per tab with `set(tab, value)`, from any
+  thread. A name is held by one plugin at a time, Jasper's four are reserved, and the piece ends with its handle or its
+  plugin. Both need `terminal.observe`.
 - **A pane can close at any moment.** Commands to a closed pane are ignored, queries return the last value the handle
   saw, and `isOpen()` tells. Do not treat that as an error. A tab Jasper closed with its windows comes back under the
   same id when they are restored; drop a handle on `TAB_CLOSED`. After the plugin stops, handle queries throw
   `IllegalStateException`; the send methods are ignored.
-- **Threads.** Everything here is UI-thread only except `sendText`, `sendBytes` and `paste`, which work from any
-  thread; calls from one thread keep their order. `foregroundJob()` completes on a worker thread.
+- **Threads.** Everything here is UI-thread only except `sendText`, `sendBytes`, `paste` and `TabNamePiece.set`, which
+  work from any thread; calls from one thread keep their order. `foregroundJob()` completes on a worker thread.
 - **`sendText` adds nothing.** End a command with `"\n"` to run it; leaving it out lets the user look first. `paste`
   behaves like the user's paste, bracketed when the program asked for it. Input to a pane whose session is not running
   (not started yet, still connecting, or ended) is dropped.
@@ -1352,7 +1359,7 @@ catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
 | Runs on, or may be called from | What |
 | --- | --- |
 | The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, content tabs, split items, restorers, dialogs, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
-| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
+| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; `TabNamePiece.set`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
 
 - **Slow work** goes to `context.background()`, whose tasks can run at the same time. UI-thread code does no I/O and
   returns promptly.

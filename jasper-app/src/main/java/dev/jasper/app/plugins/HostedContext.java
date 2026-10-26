@@ -82,7 +82,8 @@ final class HostedContext implements PluginContext {
         HostedTerminals[] self = new HostedTerminals[1];
         var sessions = new HostedSessions(id, host.containment, host.cleanup, paneId -> self[0].detachedPaneHandle(paneId), name -> uiIcon(name));
         this.terminals = new HostedTerminals(id, gate, host.environment.terminals(), host.environment.ui(), host.environment.onUi(),
-            () -> state != State.CLOSED, sessions, host.environment.profiles(), host.containment, host.shellContributions);
+            () -> state != State.CLOSED, sessions, host.environment.profiles(), host.containment, host.shellContributions,
+            host.environment.contributions().tabNamePieces());
         self[0] = terminals;
         this.ui = new HostedUi(id, host.environment.contributions(), host.containment, host.environment.ui(),
             host.environment.onUi(), () -> state != State.CLOSED, hosted.loader(),

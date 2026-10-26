@@ -32,7 +32,7 @@ class LookRowsTest {
     static List<String> rows(String pageId, PageContext context) {
         var spec = CorePages.specs(AppearanceFixtures.CHOICES, new CorePages.SystemActions(() -> Path.of("/fixture/config.toml"),
             () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE, id -> { }, true,
-            NotificationGroupChoices.NONE).stream().filter(page -> page.id().equals(pageId)).findFirst().orElseThrow();
+            NotificationGroupChoices.NONE, TabNameChoices.NONE).stream().filter(page -> page.id().equals(pageId)).findFirst().orElseThrow();
         var page = spec.build(context);
         page.component();
         try { return page.rows().stream().map(row -> row.setting().name()).toList(); } finally { page.dispose(); }
@@ -42,7 +42,7 @@ class LookRowsTest {
     static List<String> sections(String pageId, PageContext context) {
         var spec = CorePages.specs(AppearanceFixtures.CHOICES, new CorePages.SystemActions(() -> Path.of("/fixture/config.toml"),
             () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE, id -> { }, true,
-            NotificationGroupChoices.NONE).stream().filter(page -> page.id().equals(pageId)).findFirst().orElseThrow();
+            NotificationGroupChoices.NONE, TabNameChoices.NONE).stream().filter(page -> page.id().equals(pageId)).findFirst().orElseThrow();
         var page = spec.build(context);
         page.component();
         var titles = new ArrayList<String>();
@@ -75,7 +75,7 @@ class LookRowsTest {
         edt(() -> {
             var spec = CorePages.specs(AppearanceFixtures.CHOICES, new CorePages.SystemActions(() -> Path.of("/fixture/config.toml"),
                 () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE, id -> { }, true,
-                NotificationGroupChoices.NONE).stream().filter(page -> page.id().equals("appearance")).findFirst().orElseThrow();
+                NotificationGroupChoices.NONE, TabNameChoices.NONE).stream().filter(page -> page.id().equals("appearance")).findFirst().orElseThrow();
             var classic = spec.build(context(SettingsChromeTest.CLASSIC, KitTestSupport::context));
             var linux = spec.build(context(LINUX_DEFAULT, KitTestSupport::context));
             try {

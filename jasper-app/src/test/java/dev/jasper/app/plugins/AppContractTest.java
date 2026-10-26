@@ -646,6 +646,9 @@ class AppContractTest extends PluginContractTest {
             @Override public Map<String, String> shellVariables(Map<String, String> jasperEnvironment) {
                 return onEdtValue(() -> host.shellContributions.variables(jasperEnvironment));
             }
+            @Override public Map<String, String> tabNamePieces(UUID tabId) {
+                return onEdtValue(() -> contributions.tabNamePieces().values(tabId));
+            }
             @Override public void declareBundled(String pluginId) {
                 bundled.add(pluginId);
                 onEdt(() -> host.fileEditors.bundled(Set.copyOf(bundled)));

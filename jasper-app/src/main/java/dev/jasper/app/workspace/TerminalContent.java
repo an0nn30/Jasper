@@ -1,5 +1,7 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.config.TabNames;
+import dev.jasper.app.config.TitleTemplate;
 import dev.jasper.app.contributions.TabContent;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.persistence.WorkspaceFile;
@@ -68,8 +70,21 @@ public final class TerminalContent extends JPanel implements TabContent, AutoClo
     void start() { pane.start(); }
     /** Starts a restored terminal's shell the first time its tab shows (workspace tabs spec 13). */
     void startIfWaiting() { if (!closed && pane.waiting()) pane.start(); }
-    /** The tab's title: the name the user gave it, else the shell's title, else its folder's name, else "Terminal". */
-    String title() { return state.title(pane.tabTitle(), pane.directory()); }
+    /** The tab name pattern of the window holding the tab (tab names spec 3); its {@code TabHost} sets it. */
+    java.util.function.Supplier<TitleTemplate> tabName = () -> TabNames.DEFAULT_PATTERN;
+
+    /** The tab's title: the name the user gave it, else its window's pattern filled from {@link #namePieces()}. */
+    String title() { return state.renamed().orElseGet(() -> TabNames.format(tabName.get(), namePieces(), pane.shellLabel())); }
+
+    /** Plugins' pieces for a tab, by its id (tab names spec 6); its {@code TabHost} sets it. */
+    java.util.function.Function<java.util.UUID, java.util.Map<String, String>> pluginPieces = tab -> java.util.Map.of();
+
+    /** The pieces the tab's automatic name is made from: plugins' pieces for it, then the pane's built-in ones. */
+    java.util.Map<String, String> namePieces() {
+        var merged = new java.util.HashMap<>(pluginPieces.apply(id.value()));
+        merged.putAll(pane.namePieces());
+        return java.util.Map.copyOf(merged);
+    }
     /** Names the tab; blank goes back to the automatic title. */
     void rename(String name) { state.rename(name); onChanged.run(); onRenamed.run(); }
     /** The name the user gave the tab, kept apart from the shell's title (workspace plan 6 saves it). */
@@ -119,6 +134,7 @@ public final class TerminalContent extends JPanel implements TabContent, AutoClo
         pane.close();
         removeAll();
         onChanged = () -> { }; onRenamed = () -> { }; onEmpty = () -> { }; onError = (message, cause) -> { };
-        lastInWindow = () -> false; configure = ready -> { };
+        lastInWindow = () -> false; configure = ready -> { }; tabName = () -> TabNames.DEFAULT_PATTERN;
+        pluginPieces = tab -> java.util.Map.of();
     }
 }

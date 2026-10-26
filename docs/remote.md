@@ -288,7 +288,8 @@ not parse, every connection is refused ("known_hosts line 3 is not a known_hosts
 
 An SSH pane's terminal type is `xterm-256color`, and Remote asks the server to set `COLORTERM=truecolor`. A pane Remote
 opens in a folder (as [Project Index](project-index.md#projects-on-remote-hosts) does) starts the login shell there, or
-in the home folder when the folder cannot be entered.
+in the home folder when the folder cannot be entered. An SSH tab's `{host}` [tab name piece](configuration.md#tab-names)
+is the address of the saved host it opened, such as `db1.example.com`, and stays while the tab shows that host.
 
 ### Connections
 

@@ -23,8 +23,8 @@ Keep the app, runtime, and launcher files together.
 Linux: install the package for your distribution and architecture, for example
 "sudo apt install ./Jasper-<version>-linux-amd64.deb" or
 "sudo dnf install ./Jasper-<version>-linux-x86_64.rpm" (arm64/aarch64 for ARM).
-Jasper installs to /opt/jasper and adds a menu entry; the launcher is
-/opt/jasper/bin/Jasper. Remove it with your package manager (package "jasper");
+Jasper installs to /opt/jasper-workstation and adds a menu entry; the launcher is
+/opt/jasper-workstation/bin/Jasper. Remove it with your package manager (package "jasper-workstation");
 your settings and plugin data are preserved.
 
 No external Java installation is required on any platform because the matching

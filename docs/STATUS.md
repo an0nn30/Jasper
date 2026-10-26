@@ -2,6 +2,21 @@
 
 **Wide tool window layouts — 2026-10-26** (`claude/elastic-keller-d0d603`; [plan](superpowers/plans/2026-10-26-wide-tool-window-layouts.md), [spec](superpowers/specs/2026-10-26-jasper-wide-tool-window-layouts-design.md); executed with per-task subagents and reviews). Remote's Sessions, SFTP and Tunnels tool windows and File Server's File Servers tool window take a wide layout in a window of their own (Float or Window) and docked at the bottom, through SDK 0.22.0's `PanelHost.placement()` and `onPlacement`, in both looks: Sessions, Tunnels and File Servers put the selected row's details beside the list, and SFTP adds Modified and Permissions columns. Deviations from the plan text, recorded in its status banner: the list column's hint sits in the docked footer stack; the default look's wide SFTP table runs Name, Modified, Permissions, Size, because its table face has no cell inset and a right-aligned Size touched Modified (the design's SFTP row says Name, Size, Modified, Permissions, which Enterprise keeps); the default look's wide Tunnels detail says "Host missing" in its state line and Via field as the docked row does, and the classic Properties' State row uses the status line's words; the classic File Servers layout reveals the latest activity line on a choice and reveals nothing while no server is chosen. Remote is 0.17.0 and File Server 0.7.0 (SDK range unchanged), and the guides, the plugin version tables and `docs/sdk-reference.html` say so. `:jasper-plugin-remote:check` and `:jasper-plugin-fileserver:check` pass: Remote 626 tests, File Server 297, zero failures, errors and skips. GUI checks for the user: Sessions, SFTP, Tunnels and File Servers each floated, in Window mode and docked at the bottom, under both the default and the Enterprise look; the first Float of Sessions and SFTP, which opens at the docked width (about 260 px), where the split and the four SFTP columns are narrow until widened; where keyboard focus lands after View Mode › Float / Window and after a drag to the bottom (typing should reach the list or the search field); a click on a group row in the wide Sessions list (the detail shows "No Session Selected", as the docked card shows none); a classic File Servers activity log of more than 8 lines shows its latest line. `WideLayoutRenderTest` saves real-host renders of each wide layout under both looks to `jasper-app/build/wide-layouts/`. The full headless `./gradlew check` at `214023900` passed in 11m 43s: 13,345 tests, zero failures and errors, 30 skips. No GUI launched; not merged or pushed.
 
+**Linux package identity — 2026-10-26:** Linux packages use `jasper-workstation`, preserving the Jasper display name,
+`jasper` command and published filenames. Package options invalidate cached artifacts; RPM resources and desktop checks
+follow the new identity. Actual RPM/DEB builds exposed that JBR appends the package name beneath `--install-dir`;
+its source confirms the old `/opt/jasper` root cannot be retained through supported options. The approved correction
+uses `--install-dir /opt` and verifies `/opt/jasper-workstation`, updating the live package/command guides and packaged
+README. Disposable install checks preserve existing distro `jasper-libs`, which the Fedora equipped-runtime check now
+installs first. Corrected DEB install/check/remove and equipped Fedora RPM coexistence pass. The real Gradle RPM
+extraction exposed writer SIGPIPE after cpio's successful early exit; conversion now finishes into a work-directory
+archive before separately verified extraction. Its unread-padding and both-stage failure fixtures pass, as do portable
+packaging fixtures, four documentation checks and shell syntax. Actual Fedora `packageDist` passes after the extraction
+fix; DEB metadata and installation pass in the Ubuntu baseline/minimal containers. Both formats provide only
+`jasper-workstation`; Fedora coexistence preserves `jasper-libs-4.2.8-2.fc44.aarch64`. Independent review approves the
+final fixes. Latest main (`84cb18f25`) merges cleanly; packaging fixtures and documentation checks pass on the combined
+code. No GUI or AOT.
+
 **Linux distribution packaging — 2026-10-26:** `packageDist` selects only RPM on recognized Fedora/RHEL and SUSE
 families from `os-release`; Debian/Ubuntu and unknown hosts retain both formats. Explicit DEB/RPM tasks and mandatory
 dependency validation are unchanged. Portable packaging fixtures, four documentation checks and independent review
@@ -167,6 +182,18 @@ Open items, as the entries below record them:
 ## Handoff log
 
 Newest first. Each entry describes its change as it stood when the entry was written.
+
+**Terminal tab names, plans A and B — 2026-10-26** (`claude/terminal-tab-names`, worktree
+`.claude/worktrees/terminal-tab-names`, from `main` at `36fdeedc1`; not merged or pushed): `terminal.tab_name`
+(Settings › Terminal › Tab name, live) names Terminal tabs from a pattern of free text and `{dir}`, `{full}`,
+`{process}` and `{title}`, by default `{dir} {process} {title}`; Rename Tab still wins. `config.TitleTemplate` is
+shared with the look's window title. Settings previews the active terminal tab's name as you type. Spec:
+`docs/superpowers/specs/2026-10-23-jasper-terminal-tab-names-design.md`; plan:
+`docs/superpowers/plans/2026-10-23-terminal-tab-names-a-pattern.md` (deviations in its status banner). Plan B: plugins
+read a tab's pieces (`TabHandle.namePieces()`) and add their own (`Terminals.addTabNamePiece`, SDK 0.22.0, unreleased,
+no bump); Remote adds `{host}`; Settings lists plugin pieces; the `terminal.observe` consent line adds "add to tab
+names". Plan: `docs/superpowers/plans/2026-10-23-terminal-tab-names-b-plugin-pieces.md`. GUI check pending: the Tab
+name row's layout and preview, tab names on macOS, Linux and Windows, and `{dir} {host}` on an SSH tab.
 
 **Floating tool windows, plan 3: SDK panel placement — 2026-10-26** (`claude/floating-tool-windows`, worktree
 `.claude/worktrees/workspace-tabs`, `8ec218383..5d3e0071b` and the final review's documentation commit, on plan 2's

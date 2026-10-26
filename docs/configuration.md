@@ -148,7 +148,7 @@ the reason in the footer.
 | System Settings | Appearance & Behavior | **General**: Run in background; **Java Virtual Machine**; **Command line**; **Configuration file**: Location (**Open in Editor**, **Reveal**), Reload from disk (**Reload**), Migrate old settings (**Migrate…**) | [Background residency](#background-residency) |
 | Keymap | | Every shortcut | [Shortcuts](#shortcuts) |
 | Plugins | | Installed plugins ([Plugins](plugins.md)) | [Plugins](#plugins) |
-| Terminal | | Scrollback lines, Bell, When the shell exits, Copy on select, Option key as Meta (macOS), Dim inactive panes | [Supported settings](#supported-settings) |
+| Terminal | | Tab name, Scrollback lines, Bell, When the shell exits, Copy on select, Option key as Meta (macOS), Dim inactive panes | [Supported settings](#supported-settings) |
 | Font & Colors | Terminal | **Font**: Font, Font size, Fallback fonts, Ligatures, Line height; **Colors**: Terminal colors (**Choose Scheme…** opens Appearance) | [Terminal colors](#terminal-colors) |
 | Cursor | Terminal | Cursor shape, Blinking cursor | [Supported settings](#supported-settings) |
 | Shell | Terminal | Shell profile, Shell program, Shell arguments, Environment variables, Shell integration | [Shell, environment and history](#shell-environment-and-history) |
@@ -184,6 +184,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `terminal.scrollback` | integer | `10000` | 0–1000000 lines; `0` keeps no scrollback | New panes | Terminal › Scrollback lines |
 | `terminal.option_as_meta` | string | `"left"` | `"left"`, `"right"`, `"both"`, `"none"`: which Option key sends Meta, on macOS only | Live | Terminal › Option key as Meta (Left Option, Right Option, Both, Neither); hidden on Linux and Windows |
 | `terminal.dim_inactive_panes` | number | `0.3` | 0–1: `0` does not dim panes without focus, `1` dims them fully | Live | Terminal › Dim inactive panes |
+| `terminal.tab_name` | string | `"{dir} {process} {title}"` | 1–200 characters: free text with pieces in braces ([Tab names](#tab-names)) | Live | Terminal › Tab name |
 | `terminal.copy_on_select` | boolean | `false` | Copies a finished selection to the clipboard | Live | Terminal › Copy on select |
 | `terminal.bell` | string | `"visual"` | `"visual"` (a short flash), `"sound"` (the system beep), `"none"` | Live | Terminal › Bell |
 | `terminal.on_exit` | string | `"keep_open"` | When a pane's shell exits: `"keep_open"` keeps the pane and its output, `"close_on_success"` closes it after exit code 0, `"close"` closes it after any exit | Live, for later exits | Terminal › When the shell exits (Keep the pane open, Close when it succeeds, Close) |
@@ -399,6 +400,25 @@ that runs a program, such as an editor, closes after exit code 0 and keeps its o
 
 On macOS, `terminal.option_as_meta` decides which Option key sends Meta (Escape and the key) to the terminal; `"none"`
 leaves both for typing special characters. On Linux and Windows, Alt always sends Meta, except together with Ctrl.
+
+### Tab names
+
+`terminal.tab_name` names every Terminal tab: free text with pieces in braces, applied as you save. A tab you named
+with **Rename Tab** keeps that name. The default, `{dir} {process} {title}`, shows `moray claude Fix tab names` while
+Claude runs and has set a title, and `moray zsh` at the prompt.
+
+| Piece | Shows |
+| --- | --- |
+| `{dir}` | The name of the pane's [working directory](terminal.md#working-directory), `~` for your home folder: the folder its shell last reported, else the one the pane started in (PowerShell and Command Prompt report one only with [setup of your own](terminal.md#wsl-powershell-and-other-shells)); on another host, the last name of the path its shell reports |
+| `{full}` | The whole path of that directory, with your home folder as `~`; on another host, the path its shell reports |
+| `{process}` | The running program, such as `zsh`, `vim` or `claude`; on Windows and in a plugin's session, the shell's or session's name |
+| `{title}` | The title the shell or a program set (OSC 0, 1 or 2) |
+
+Plugins add pieces of their own, such as Remote's `{host}`; a piece that nothing provides shows nothing. A piece without a
+value takes the text before it with it, or the text after it when no piece before it shows, so
+`{dir} | {process} | {title}` without a title reads `moray | zsh`. Text before the first piece and after the last always
+shows. `{{` and `}}` write a brace. A pattern that comes out empty names the tab after its shell. Settings › Terminal ›
+Tab name previews the name the pattern gives the tab you are using.
 
 ### Terminal font
 

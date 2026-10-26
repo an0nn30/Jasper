@@ -6,6 +6,7 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.NativeStyles;
 
 import dev.jasper.app.config.ShellExitBehavior;
+import dev.jasper.app.config.TabNames;
 import dev.jasper.app.config.FontConfig;
 import dev.jasper.app.platform.BundledFonts;
 import dev.jasper.app.launch.ShellLauncher;
@@ -548,10 +549,44 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     String title() {
         return TerminalTitle.singleLine(!reportedTitle.isBlank() ? reportedTitle : runningCommand.strip());
     }
-    String tabTitle() {
-        String job = commandLabel();
-        return TerminalTitle.tab(displayTitle, request != null && job.equals("Shell") ? shellLabel : job);
+
+    /**
+     * The built-in tab name pieces (tab names spec 3), each on one line and "" when unknown: {@code dir}, the last name
+     * of the pane's directory ({@code ~} for the home folder, the root itself at a root; on another host, the reported
+     * path's last name); {@code full}, the directory as the window title writes it, or the reported remote path;
+     * {@code process}, the foreground program without a login shell's {@code -}, else the shell's label; {@code title},
+     * the title the shell or a program set, as the tab showed it before patterns.
+     */
+    java.util.Map<String, String> namePieces() {
+        Path home = Path.of(System.getProperty("user.home"));
+        String dir, full;
+        if (request != null || displayRemoteDirectory().isPresent()) {
+            full = displayRemoteDirectory().map(RemoteLocation::path).orElse("");
+            dir = remoteName(full);
+        } else {
+            Path directory = directory().toAbsolutePath().normalize();
+            dir = localName(directory, home.toAbsolutePath().normalize());
+            full = WindowTitle.homeRelative(directory, home);
+        }
+        String job = foregroundJob.startsWith("-") ? foregroundJob.substring(1) : foregroundJob;
+        return java.util.Map.of("dir", TabNames.clean(dir), "full", TabNames.clean(full),
+            "process", TabNames.clean(job.isBlank() ? shellLabel : job), "title", TabNames.clean(displayTitle));
     }
+
+    /** A local directory's name for {@code {dir}}: {@code ~} for the home folder, the root itself at a root. */
+    static String localName(Path directory, Path home) {
+        if (directory.equals(home)) return "~";
+        Path name = directory.getFileName();
+        return name == null ? directory.toString() : name.toString();
+    }
+
+    /** A remote path's name for {@code {dir}}: its last segment, ignoring a trailing {@code /}; the root itself. */
+    static String remoteName(String path) {
+        String trimmed = path.length() > 1 && path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+        int slash = trimmed.lastIndexOf('/');
+        return slash < 0 || trimmed.equals("/") ? trimmed : trimmed.substring(slash + 1);
+    }
+
     String programTitle() { return TerminalTitle.singleLine(displayTitle); }
     String commandLabel() {
         if (!runningCommand.isBlank()) return TerminalTitle.singleLine(runningCommand.strip());

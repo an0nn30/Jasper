@@ -131,4 +131,18 @@ public interface Terminals {
         java.util.Objects.requireNonNull(contributor, "contributor");
         return () -> { };
     }
+
+    /**
+     * Adds a piece to Terminal tab names: users write {@code {name}} in Settings › Terminal › Tab name, and each
+     * terminal tab shows the value this plugin sets for it. Settings lists the piece with its description. A name
+     * already held, by this or another plugin, is refused until that piece closes. Needs {@code terminal.observe}. UI
+     * thread only. The piece ends with the plugin.
+     *
+     * @param spec the piece's name and description
+     * @return the piece, which sets its value per tab
+     * @throws dev.jasper.sdk.MissingCapabilityException without {@code terminal.observe}
+     * @throws IllegalStateException when a piece of that name is already held
+     * @since 0.22.0
+     */
+    TabNamePiece addTabNamePiece(TabNamePieceSpec spec);
 }

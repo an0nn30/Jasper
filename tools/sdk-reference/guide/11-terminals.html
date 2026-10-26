@@ -2,7 +2,7 @@
 <h2>Terminals</h2>
 <p>{@link PluginContext#terminals()} is the plugin's view of Jasper's windows, tabs and panes. Finding them needs
 no capability; reading what a pane runs, typing into it, opening terminals and providing sessions do (see
-<a href="#capabilities">Capabilities</a>). Every call is on the UI thread except the three that send input. For the
+<a href="#capabilities">Capabilities</a>). Every call is on the UI thread except the three that send input and {@link TabNamePiece#set(TabHandle,String)}. For the
 user's side of panes and shell integration, see <a href="terminal.md">the terminal</a>.</p>
 
 <h3>Windows, tabs and panes</h3>
@@ -41,6 +41,14 @@ shows, and an item Jasper closed with its windows comes back under the same id, 
 <p>{@link PaneHandle#foregroundJob()} asks the operating system for the program in the foreground and completes on a
 worker thread. {@link TabHandle#title()} is the tab's title as its header shows it. Both need {@code terminal.observe};
 {@link PaneHandle#selection()}, the selected text, needs {@code terminal.selection}.</p>
+
+<h3>Tab names</h3>
+<p>A terminal tab's automatic name comes from the user's Tab name pattern. {@link TabHandle#namePieces()} returns the
+pieces it is made from that have a value: Jasper's {@code dir}, {@code full}, {@code process} and {@code title}, and every
+plugin's. {@link Terminals#addTabNamePiece(TabNamePieceSpec)} adds a piece users can write as <code>&#123;branch&#125;</code>; the
+{@link TabNamePiece} it returns sets the piece's value per tab with {@link TabNamePiece#set(TabHandle,String)}, from any
+thread. A name is held by one plugin at a time, Jasper's four are reserved, and the piece ends with its handle or its
+plugin. Both calls need {@code terminal.observe}.</p>
 
 <h3>Typing and pasting</h3>
 <p>With {@code terminal.inject}, {@link PaneHandle#sendText(String)} types text as UTF-8 and adds nothing: end a command

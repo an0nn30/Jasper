@@ -331,6 +331,8 @@ public interface ContractHarness extends AutoCloseable {
          * asked on the UI thread.
          */
         java.util.Map<String, String> shellVariables(java.util.Map<String, String> jasperEnvironment);
+        /** The values plugins' tab name pieces hold for a tab, by piece name; asked on the UI thread. */
+        java.util.Map<String, String> tabNamePieces(java.util.UUID tabId);
         /** Marks a plugin as one that ships with Jasper, whose editor replaces a non-bundled plugin's; before that plugin starts. */
         void declareBundled(String pluginId);
         /**

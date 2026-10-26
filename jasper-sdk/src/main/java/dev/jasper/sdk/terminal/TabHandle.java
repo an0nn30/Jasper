@@ -1,5 +1,6 @@
 package dev.jasper.sdk.terminal;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -60,6 +61,16 @@ public interface TabHandle {
      * @return the title; the last known one once the tab is closed
      */
     String title();
+
+    /**
+     * The pieces a terminal tab's automatic name is made from that have a value, by name without braces: Jasper's
+     * {@code dir}, {@code full}, {@code process} and {@code title}, and each plugin piece set for the tab. Empty for a
+     * content tab and once the tab has closed. Needs {@code terminal.observe}. UI thread only.
+     *
+     * @return the values, each on one line
+     * @since 0.22.0
+     */
+    Map<String, String> namePieces();
 
     /** Selects the tab in its window. Ignored once the tab is closed. */
     void select();

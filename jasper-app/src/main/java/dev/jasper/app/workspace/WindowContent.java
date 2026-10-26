@@ -39,6 +39,7 @@ import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.MacTitleBand;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.config.TitleTemplate;
 import dev.jasper.app.config.ToolbarMode;
 import dev.jasper.app.config.ViewMode;
 
@@ -2294,6 +2295,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /** This window's configuration, or null before the first one arrives. */
     ConfigSnapshot configured() { return workspaceConfiguration.snapshot(); }
+
+    /** The saved tab name pattern its Terminal tabs follow (tab names spec 3). */
+    TitleTemplate tabNamePattern() { return workspaceConfiguration.tabName(); }
+
+    /** Plugins' tab name pieces for a tab; none before the window is connected to the contributions model. */
+    java.util.Map<String, String> pluginNamePieces(java.util.UUID tabId) {
+        return contributed == null ? java.util.Map.of() : contributed.model().tabNamePieces().values(tabId);
+    }
 
     /** How much an inactive pane dims: the configured {@code terminal.dim_inactive_panes} (workspace plan 8a Rulings 12). */
     float paneDim() {

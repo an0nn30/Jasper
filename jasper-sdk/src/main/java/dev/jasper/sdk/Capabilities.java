@@ -8,7 +8,10 @@ import java.util.List;
  * contributions to the window need none. They are not a sandbox.
  */
 public final class Capabilities {
-    /** Pane metadata, working directories, titles, command text, and every {@code jasper.terminal.*} topic. */
+    /**
+     * Pane metadata, working directories, titles, command text, tab name pieces, and every {@code jasper.terminal.*}
+     * topic.
+     */
     public static final String TERMINAL_OBSERVE = "terminal.observe";
     /** Reading the text selected in a pane. */
     public static final String TERMINAL_SELECTION = "terminal.selection";

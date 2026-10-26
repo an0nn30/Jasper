@@ -231,7 +231,8 @@ Work in progress appears in one compact summary beside him:
   set to `0` disables command capsules. Work qualifies for his typing pose immediately out of sight, or after the
   threshold while visible; hiding or dismissing a capsule does not end that work.
   The drawer groups panes under their current tab-strip label, including a user rename, with
-  each pane's current program/command title and "Running · <time>". Clicking an entry brings its current window
+  each pane's tab name (the [Tab name](configuration.md#tab-names) pattern, or the name you gave the tab) and
+  "Running · <time>". Clicking an entry brings its current window
   forward, selects the tab and focuses the pane. Finishing removes the entry, including while hidden.
 - **A plugin's background work**, such as a File Server transfer that takes longer than a second, shows its
   progress in the drawer until it ends; clicking its entry brings Jasper forward and runs the plugin's action for it.

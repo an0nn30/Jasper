@@ -2166,6 +2166,77 @@ public final class FakePluginHost implements AutoCloseable {
             && value != null && value.indexOf('\0') < 0;
     }
 
+    /** A {@code Terminals.addTabNamePiece} piece and the plugin that added it. */
+    record NamePiece(FakePluginContext context, dev.jasper.sdk.terminal.TabNamePieceSpec spec) { }
+    final Map<String, NamePiece> namePieces = new java.util.concurrent.ConcurrentSkipListMap<>();
+    final Map<UUID, Map<String, String>> namePieceValues = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Adds a piece as the application does: one holder per name, values for open terminal tabs only, cleaned. */
+    dev.jasper.sdk.terminal.TabNamePiece addTabNamePiece(FakePluginContext context, dev.jasper.sdk.terminal.TabNamePieceSpec spec) {
+        var piece = new NamePiece(context, spec);
+        NamePiece held = namePieces.putIfAbsent(spec.name(), piece);
+        if (held != null) throw new IllegalStateException("{" + spec.name() + "} is already a tab name piece of " + held.context().plugin().id());
+        var closed = new java.util.concurrent.atomic.AtomicBoolean();
+        var handle = new dev.jasper.sdk.terminal.TabNamePiece() {
+            @Override public String name() { return spec.name(); }
+            @Override public void set(dev.jasper.sdk.terminal.TabHandle tab, String value) {
+                Objects.requireNonNull(tab, "tab");
+                Objects.requireNonNull(value, "value");
+                if (closed.get() || workspace.tab(tab.id()).filter(model -> model.open && model.kind == dev.jasper.sdk.terminal.TabHandle.Kind.TERMINAL).isEmpty()) return;
+                String cleaned = cleanPiece(value);
+                var values = namePieceValues.computeIfAbsent(tab.id(), id -> new java.util.concurrent.ConcurrentHashMap<>());
+                if (cleaned.isEmpty()) values.remove(spec.name()); else values.put(spec.name(), cleaned);
+            }
+            @Override public void close() {
+                if (!closed.compareAndSet(false, true)) return;
+                namePieces.remove(spec.name(), piece);
+                namePieceValues.values().forEach(values -> values.remove(spec.name()));
+            }
+        };
+        context.own(handle);
+        return handle;
+    }
+
+    private static String cleanPiece(String value) {
+        var result = new StringBuilder(value.length());
+        value.codePoints().forEach(point -> {
+            boolean bidirectional = point >= 0x202A && point <= 0x202E || point >= 0x2066 && point <= 0x2069;
+            if (!bidirectional) result.appendCodePoint(Character.isISOControl(point) || point == 0x2028 || point == 0x2029 ? ' ' : point);
+        });
+        return result.toString().strip();
+    }
+
+    /**
+     * Scripts the built-in pieces a terminal tab reports through {@code TabHandle.namePieces()}, as Jasper fills them
+     * from the tab's pane: {@code dir}, {@code full}, {@code process} and {@code title}.
+     *
+     * @param tabId a terminal tab
+     * @param builtIns each built-in piece's value by name
+     * @since 0.22.0
+     */
+    public void setTabNamePieces(UUID tabId, Map<String, String> builtIns) {
+        workspace.tab(tabId).ifPresent(tab -> tab.namePieces = Map.copyOf(builtIns));
+    }
+
+    /**
+     * The values plugins' tab name pieces hold for a tab.
+     *
+     * @param tabId a tab
+     * @return each value by piece name
+     * @since 0.22.0
+     */
+    public Map<String, String> tabNamePieces(UUID tabId) { return Map.copyOf(namePieceValues.getOrDefault(tabId, Map.of())); }
+
+    /**
+     * Every plugin's tab name piece.
+     *
+     * @return the pieces, in name order
+     * @since 0.22.0
+     */
+    public List<dev.jasper.sdk.terminal.TabNamePieceSpec> tabNamePieceSpecs() {
+        return namePieces.values().stream().map(NamePiece::spec).toList();
+    }
+
     /** The editor a plugin provides ({@code Platform.editor}) and the plugin that registered it. */
     record ProvidedEditor(FakePluginContext context, dev.jasper.sdk.ui.FileEditor editor) { }
     private volatile ProvidedEditor providedEditor;

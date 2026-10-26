@@ -46,7 +46,7 @@ final class WindowTerminals implements AutoCloseable {
         if (tab.content() instanceof TerminalContent terminal)
             return new TabEntry(tab.id().value(), owner.id(), TabEntry.Kind.TERMINAL,
                 () -> terminal.closed() ? Optional.empty() : Optional.of(entry(terminal, terminal.pane())),
-                terminal::title, () -> owner.selectTab(tab));
+                terminal::title, () -> owner.selectTab(tab), terminal::namePieces);
         return new TabEntry(tab.id().value(), owner.id(), TabEntry.Kind.CONTENT, Optional::empty, tab::title, () -> owner.selectTab(tab));
     }
 

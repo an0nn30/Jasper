@@ -143,8 +143,8 @@ class TerminalContentTest {
             assertThat(owner[0].currentTerminal().title()).isEqualTo("manual");
             assertThat(owner[0].currentTerminal().renamed()).contains("manual");
             owner[0].currentTerminal().rename("");
-            assertThat(owner[0].currentTerminal().title()).isEqualTo("new-shell-title");
-            assertThat(owner[0].selectedTab().title()).as("the tab's presentation follows").isEqualTo("new-shell-title");
+            assertThat(owner[0].currentTerminal().title()).isEqualTo("~ bash new-shell-title");
+            assertThat(owner[0].selectedTab().title()).as("the tab's presentation follows").isEqualTo("~ bash new-shell-title");
             owner[0].close();
         });
     }

@@ -360,12 +360,12 @@ call from a plugin that did not declare its capability.
 Jasper's log ([diagnostics](diagnostics.md)) records capability use under the logger `dev.jasper.app.plugins.audit`, as
 "Plugin *id* used *capability*: …", with amounts and never content: each write or paste into a pane (in bytes), each
 read of a selection or the clipboard (in characters), each tab or split opened (with the file name of the program it
-runs, if any), the shell-variable and editor registrations, and the first palette use, file-chooser registration,
+runs, if any), the shell-variable, editor and tab name piece registrations, and the first palette use, file-chooser registration,
 terminal-event subscription and list of other tabs' titles for a plugin's Move Pane to Tab menu.
 
 | Capability | The sheet says | Notes |
 |---|---|---|
-| `terminal.observe` | See your terminals: titles, folders, the commands you run and how they end | Also every terminal event a plugin can subscribe to. Without it a plugin's Move Pane to Tab menu still works, listing a tab as "Tab 2" instead of by title unless the tab shows one of the plugin's own items |
+| `terminal.observe` | See your terminals: titles, folders, the commands you run and how they end; add to tab names | Also every terminal event a plugin can subscribe to. Without it a plugin's Move Pane to Tab menu still works, listing a tab as "Tab 2" instead of by title unless the tab shows one of the plugin's own items |
 | `terminal.selection` | Read the text you select in a terminal | |
 | `terminal.inject` | Type into your terminals | Typing and pasting into a pane |
 | `terminal.open` | Open terminal tabs, splits and windows, and run programs in them | |

@@ -11,7 +11,7 @@ if command -v apt-get >/dev/null; then
     echo 'SKIP kde6: Ubuntu22 system runtime predates Qt6.5/KF6; minimum KDE6 runtime evidence remains a separate release requirement'
     runtime=optional
 else
-    dnf install -y -q binutils cmake python3 xorg-x11-server-Xvfb xorg-x11-xauth dbus-daemon glibc-langpack-de dejavu-sans-fonts qt5-qtbase-gui qt6-qtbase-gui kf5-kconfigwidgets kf6-kcolorscheme glib2
+    dnf install -y -q binutils cmake python3 xorg-x11-server-Xvfb xorg-x11-xauth dbus-daemon glibc-langpack-de dejavu-sans-fonts qt5-qtbase-gui qt6-qtbase-gui kf5-kconfigwidgets kf6-kcolorscheme glib2 jasper-libs
     targets="qt5 qt6 kde5 kde6"
     runtime=required
 fi

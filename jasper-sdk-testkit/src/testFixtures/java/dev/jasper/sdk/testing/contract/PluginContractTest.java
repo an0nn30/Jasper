@@ -65,6 +65,8 @@ import dev.jasper.sdk.terminal.OpenRequest;
 import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.SessionState;
 import dev.jasper.sdk.terminal.TabHandle;
+import dev.jasper.sdk.terminal.TabNamePiece;
+import dev.jasper.sdk.terminal.TabNamePieceSpec;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import java.nio.file.Path;
 import dev.jasper.sdk.terminal.ExitPolicy;
@@ -3752,6 +3754,115 @@ public abstract class PluginContractTest {
         assertThat(h.shellVariables(Map.of())).isEqualTo(Map.of("B", "2"));
         h.stopAll();
         assertThat(h.shellVariables(Map.of())).as("the registration ends with its plugin").isEmpty();
+    }
+
+    private static final TabNamePieceSpec HOST = new TabNamePieceSpec("host", "the SSH host this tab is connected to");
+
+    @Test void tabNamePiecesNeedTerminalObserve() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build");
+        h.addTerminalPane(tab, "make", Path.of("/src"));
+        var bare = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        h.ui(() -> {
+            assertThatThrownBy(() -> bare.get().terminals().addTabNamePiece(HOST))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("terminal.observe"));
+            assertThatThrownBy(() -> bare.get().terminals().tab(tab).orElseThrow().namePieces())
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("terminal.observe"));
+        });
+    }
+
+    @Test void aPluginPieceHoldsAValuePerTerminalTab() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "ssh");
+        UUID pane = h.addTerminalPane(tab, "ssh", Path.of("/"));
+        UUID notes = h.addContentTab(window, "notes");
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.beta", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), beta::set);
+        var piece = new AtomicReference<TabNamePiece>();
+        h.ui(() -> {
+            piece.set(alpha.get().terminals().addTabNamePiece(HOST));
+            assertThat(piece.get().name()).isEqualTo("host");
+            piece.get().set(alpha.get().terminals().tab(tab).orElseThrow(), " db1\n.example ");
+            piece.get().set(alpha.get().terminals().tab(notes).orElseThrow(), "ignored");
+            assertThat(beta.get().terminals().tab(tab).orElseThrow().namePieces()).as("another plugin reads it")
+                .containsEntry("host", "db1 .example");
+            assertThat(beta.get().terminals().tab(notes).orElseThrow().namePieces()).as("a content tab has none").isEmpty();
+        });
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("host", "db1 .example"));
+        assertThat(h.tabNamePieces(notes)).isEmpty();
+        var closing = new AtomicReference<TabHandle>();
+        h.ui(() -> {
+            closing.set(alpha.get().terminals().tab(tab).orElseThrow());
+            piece.get().set(closing.get(), "  ");
+        });
+        assertThat(h.tabNamePieces(tab)).as("blank clears").isEmpty();
+        h.ui(() -> piece.get().set(closing.get(), "db1"));
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("host", "db1"));
+        h.closeTerminalPane(pane);
+        assertThat(h.tabNamePieces(tab)).as("a closed tab's values go").isEmpty();
+        h.ui(() -> assertThatCode(() -> piece.get().set(closing.get(), "late")).doesNotThrowAnyException());
+        assertThat(h.tabNamePieces(tab)).as("a closed tab takes no value").isEmpty();
+    }
+
+    @Test void aPieceValueLosesLineSeparatorsAndBidirectionalControls() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "ssh");
+        h.addTerminalPane(tab, "ssh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            terminals.addTabNamePiece(HOST).set(terminals.tab(tab).orElseThrow(), "\u202Edb1\u2028.example\u2029\u2066x\u2069");
+            assertThat(terminals.tab(tab).orElseThrow().namePieces()).containsEntry("host", "db1 .example x");
+        });
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("host", "db1 .example x"));
+    }
+
+    @Test void aPieceNameIsHeldByOnePluginAtATime() {
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.beta", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), beta::set);
+        h.ui(() -> {
+            TabNamePiece held = alpha.get().terminals().addTabNamePiece(HOST);
+            assertThatIllegalStateException().isThrownBy(() -> beta.get().terminals().addTabNamePiece(HOST));
+            assertThatIllegalStateException().isThrownBy(() -> alpha.get().terminals().addTabNamePiece(HOST));
+            held.close();
+            held.close();
+            assertThat(beta.get().terminals().addTabNamePiece(HOST).name()).isEqualTo("host");
+        });
+    }
+
+    @Test void aPieceEndsWithItsHandleAndWithItsPlugin() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "ssh");
+        h.addTerminalPane(tab, "ssh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            TabNamePiece host = terminals.addTabNamePiece(HOST);
+            host.set(terminals.tab(tab).orElseThrow(), "db1");
+            host.close();
+            host.set(terminals.tab(tab).orElseThrow(), "db2");
+            terminals.addTabNamePiece(new TabNamePieceSpec("branch", "the branch")).set(terminals.tab(tab).orElseThrow(), "main");
+        });
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("branch", "main"));
+        h.stopAll();
+        assertThat(h.tabNamePieces(tab)).as("the piece ends with its plugin").isEmpty();
+    }
+
+    @Test void setMayBeCalledFromAnyThread() throws Exception {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "ssh");
+        h.addTerminalPane(tab, "ssh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        var piece = new AtomicReference<TabNamePiece>();
+        var handle = new AtomicReference<TabHandle>();
+        h.ui(() -> { piece.set(alpha.get().terminals().addTabNamePiece(HOST)); handle.set(alpha.get().terminals().tab(tab).orElseThrow()); });
+        Thread worker = Thread.ofVirtual().start(() -> piece.get().set(handle.get(), "db1"));
+        worker.join();
+        h.ui(() -> { });
+        assertThat(h.tabNamePieces(tab)).isEqualTo(Map.of("host", "db1"));
     }
 
     @Test void aTabOrASplitMayRunAProgramAndThatNeedsTerminalOpen() {

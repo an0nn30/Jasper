@@ -41,6 +41,8 @@ final class FakeWorkspace {
     /** An item, the one a pane shows: what the SDK calls a tab. */
     static final class Tab {
         final UUID id = UUID.randomUUID(); final TabHandle.Kind kind; Window window; Group group; String title; Pane pane; boolean open = true;
+        /** The built-in name pieces a test scripts, by name. */
+        java.util.Map<String, String> namePieces = java.util.Map.of();
         Tab(Window window, TabHandle.Kind kind, String title) { this.window = window; this.kind = kind; this.title = title; }
     }
     static final class Window {
@@ -327,6 +329,7 @@ final class FakeWorkspace {
             host.publishApp(TerminalEvents.PANE_CLOSED, new TerminalEvents.PaneEvent(tab.id, pane.id));
         }
         tab.open = false;
+        host.namePieceValues.remove(tab.id);
         boolean selected = takeOut(tab);
         host.publishApp(TerminalEvents.TAB_CLOSED, new TerminalEvents.TabEvent(window.id, tab.id));
         if (selected) reselect(window);

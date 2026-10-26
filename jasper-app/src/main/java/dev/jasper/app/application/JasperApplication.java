@@ -78,6 +78,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import dev.jasper.app.terminals.TabEntry;
 import dev.jasper.app.terminals.TerminalRegistry;
 
 /**
@@ -1426,6 +1427,9 @@ public final class JasperApplication {
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(appearanceChoices, system, shells,
                     new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName, plugins == null ? Map.of() : plugins.pluginIcons())),
+                    new dev.jasper.app.settingsui.TabNameChoices(this::tabNamePreview, () -> contributions.tabNamePieces().pieces().stream()
+                        .map(piece -> new dev.jasper.app.settingsui.TabNameChoices.Piece(piece.name(), piece.description(), pluginName(piece.ownerId())))
+                        .toList()),
                     new dev.jasper.app.settingsui.CorePages.Pages(
                         context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
                         context -> plugins.settingsPages(context))),
@@ -1593,6 +1597,18 @@ public final class JasperApplication {
     /** {@code notifications.groups}, live: each listed group's mode replaces its default from the next post on. */
     private void applyGroupModes(dev.jasper.app.config.ConfigService.State state) {
         notificationCenter.useModes(groupModes(state.values().get(dev.jasper.app.config.CoreSettings.NOTIFICATIONS_GROUPS)));
+    }
+
+    /**
+     * The Terminal tab Settings' Tab name row previews (tab names spec 5): the active window's shown tab when it is a
+     * terminal, else that window's first terminal tab; empty when it has none.
+     */
+    private Optional<dev.jasper.app.settingsui.TabNameChoices.Values> tabNamePreview() {
+        return terminals.activeWindow().flatMap(window -> window.selectedTab().get()
+                .filter(tab -> tab.kind() == TabEntry.Kind.TERMINAL)
+                .or(() -> window.tabs().get().stream().filter(tab -> tab.kind() == TabEntry.Kind.TERMINAL).findFirst()))
+            .flatMap(tab -> tab.terminal().get().map(pane ->
+                new dev.jasper.app.settingsui.TabNameChoices.Values(tab.namePieces().get(), pane.snapshot().get().shell())));
     }
 
     /** {@code window.memory_indicator}, live; the indicator shows only where the status bar does. */
