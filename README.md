@@ -159,6 +159,21 @@ The [documentation index](docs/README.md) lists every guide. The main ones:
 - A **C/C++ compiler**, because `check` builds and tests Jasper's own launcher and the native `jasper` command: the Xcode
   command line tools on macOS, `gcc` and `g++` on Linux, or Visual Studio or its Build Tools with the
   "Desktop development with C++" workload on Windows.
+- **Linux native dependencies**: `pkg-config` and GLib/GIO development headers for the desktop helpers.
+  The checks also need GTK 3, GTK 4 and libadwaita development headers, `readelf` (binutils), D-Bus,
+  Xvfb and Xauth. The launcher links the static C++ runtime (`libstdc++-static` on Fedora).
+  Qt/KDE helpers also require CMake 3.21+, Qt 5.15 and Qt 6.5+ Widgets, KF5 5.92+ Config/ConfigWidgets,
+  and KF6 6.0+ Config/ColorScheme development packages. Install the build/check dependencies and fonts with:
+
+  ```bash
+  # Debian / Ubuntu with KF6 packages available (use Python 3.11–3.13 for the checks)
+  sudo apt-get update
+  sudo apt-get install build-essential cmake extra-cmake-modules qtbase5-dev qt6-base-dev libkf5config-dev libkf5configwidgets-dev libkf6config-dev libkf6colorscheme-dev pkg-config libglib2.0-dev libgtk-3-dev libgtk-4-dev libadwaita-1-dev binutils dbus xvfb xauth python3 fonts-dejavu-core fonts-noto-cjk
+
+  # Fedora (select Python 3.13 explicitly when the system Python is newer)
+  sudo dnf install gcc gcc-c++ libstdc++-static make cmake extra-cmake-modules qt5-qtbase-devel qt6-qtbase-devel kf5-kconfig-devel kf5-kconfigwidgets-devel kf6-kconfig-devel kf6-kcolorscheme-devel pkgconf-pkg-config glib2-devel gtk3-devel gtk4-devel libadwaita-devel binutils dbus-daemon xorg-x11-server-Xvfb xorg-x11-xauth python3.13 dejavu-sans-fonts google-noto-sans-cjk-fonts
+  ./gradlew check -Pjasper.python=/usr/bin/python3.13
+  ```
 
 Use the checked-in Gradle wrapper (`./gradlew`, or `.\gradlew.bat` in PowerShell); the first build downloads Gradle
 and the dependencies.
@@ -188,7 +203,8 @@ the image layouts and the acceptance checklists.
   the app without launching it.
 - **Linux**: `./gradlew check :jasper-app:packageDist` builds the `.deb` and the `.rpm`. It needs `fakeroot` and
   `dpkg-deb`, plus `rpmbuild`, `readelf`, `rpm2cpio` and `cpio` (on Ubuntu:
-  `sudo apt-get install fakeroot rpm cpio binutils g++`).
+  `sudo apt-get install fakeroot dpkg rpm cpio binutils g++`; on Fedora:
+  `sudo dnf install fakeroot dpkg rpm-build rpm cpio binutils libstdc++-static`).
 - **Windows**: `.\gradlew.bat check :jasper-app:packageDist` builds the portable ZIP;
   `.\gradlew.bat :jasper-app:packageInstaller` builds the setup wizard and needs WiX 3 on the `PATH`. Both carry the
   pinned Cygwin seed: Gradle downloads its hash-locked artifacts (about 510 MB) into
