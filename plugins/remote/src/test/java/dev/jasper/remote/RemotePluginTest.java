@@ -201,6 +201,35 @@ class RemotePluginTest {
     static javax.swing.JMenuItem menuItem(javax.swing.JPopupMenu menu,String text) {
         return java.util.Arrays.stream(menu.getComponents()).filter(javax.swing.JMenuItem.class::isInstance).map(javax.swing.JMenuItem.class::cast).filter(item->item.getText().equals(text)).findFirst().orElseThrow();
     }
+    @Test void anOpenedHostNamesItsTabsHostPiece(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault();
+            host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            RemotePlugin plugin = plugin(dir.resolve("ssh"));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            assertThat(host.tabNamePieceSpecs()).extracting(dev.jasper.sdk.terminal.TabNamePieceSpec::name).containsExactly("host");
+            UUID credential = vault.password("deploy login", "deploy", "s3cret");
+            RemoteHost prod = RemoteHost.create("prod", "127.0.0.1", server.port(), "", new Auth.Vault(credential), "", Optional.empty()).withFollowDirectory(false);
+            plugin.store().put(prod);
+            settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            UUID local = host.addTerminalTab(window, "zsh");
+            var handle = context.terminals().window(window).orElseThrow();
+            Kits.edt(() -> plugin.openHost(handle, prod)); settle(host);
+            UUID pane = host.terminalPanes().getLast();
+            UUID tab = Kits.value(() -> context.terminals().pane(pane).orElseThrow().tab().id());
+            assertThat(host.tabNamePieces(tab)).as("the saved host's address").isEqualTo(Map.of("host", "127.0.0.1"));
+            assertThat(host.tabNamePieces(local)).as("a local tab has no host").isEmpty();
+            Kits.edt(() -> host.typeIntoSession(pane, "q")); settle(host);
+            assertThat(host.tabNamePieces(tab)).as("kept after the connection ends").isEqualTo(Map.of("host", "127.0.0.1"));
+            host.stopAll();
+            assertThat(host.tabNamePieceSpecs()).as("the piece ends with Remote").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
     @Test void endingAPanesSessionClearsTheSftpView(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             Path files = java.nio.file.Files.createDirectories(dir.resolve("files"));
