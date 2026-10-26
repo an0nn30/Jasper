@@ -807,7 +807,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `Contributions.tabNamePieces()` (Task 2); plan A's `TerminalContent.namePieces()`, `TabNameChoices`,
   `TabNameEditor`.
-- Produces: `TabNameChoices(Supplier<Optional<Preview>> preview, Supplier<List<Piece>> plugins)` with `record
+- Produces: `TabNameChoices(Supplier<Optional<Values>> preview, Supplier<List<Piece>> plugins)` with `record
   Piece(String name, String description, String owner)` (the one-argument constructor stays and passes `List::of`).
 
 - [ ] **Step 1: Write the failing tests**
@@ -920,7 +920,7 @@ and:
 `TabNameChoices` becomes:
 
 ```java
-public record TabNameChoices(Supplier<Optional<Preview>> preview, Supplier<List<Piece>> plugins) {
+public record TabNameChoices(Supplier<Optional<Values>> preview, Supplier<List<Piece>> plugins) {
     /** No Terminal tab and no plugin pieces, for pages built without an application: the preview uses sample values. */
     public static final TabNameChoices NONE = new TabNameChoices(Optional::empty, List::of);
 
@@ -930,7 +930,7 @@ public record TabNameChoices(Supplier<Optional<Preview>> preview, Supplier<List<
     }
 
     /** A preview with no plugin pieces. */
-    public TabNameChoices(Supplier<Optional<Preview>> preview) { this(preview, List::of); }
+    public TabNameChoices(Supplier<Optional<Values>> preview) { this(preview, List::of); }
 
     /**
      * A piece a plugin adds.
@@ -946,7 +946,7 @@ public record TabNameChoices(Supplier<Optional<Preview>> preview, Supplier<List<
             Objects.requireNonNull(owner, "owner");
         }
     }
-    // Preview as before
+    // Values as before (plan A renamed its Preview record to Values: production classes may not be named *Preview)
 }
 ```
 
