@@ -138,6 +138,13 @@ class SamplePluginTest {
         }
     }
 
+    private static final String PANEL = "dev.jasper.sample.panel";
+
+    /** The empty state that is the Sample panel's body. */
+    private static dev.jasper.sdk.ui.Nodes.Empty panelBody(dev.jasper.sdk.testing.FakeKitView view) {
+        return (dev.jasper.sdk.ui.Nodes.Empty) ((dev.jasper.sdk.ui.Nodes.Panel) view.spec().root()).body();
+    }
+
     /** The page's setting rows, in order, across its section cards. */
     private static java.util.List<dev.jasper.sdk.ui.Nodes.SettingRow> rows(dev.jasper.sdk.testing.FakeKitView view) {
         return ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children().stream()
@@ -201,6 +208,29 @@ class SamplePluginTest {
             assertThat(host.windows()).isEmpty();
             assertThat(host.contentTabs()).as("one About tab").hasSize(1);
             assertThat(host.contentView("dev.jasper.sample", "About Sample")).isPresent();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Floating tool windows plan 3: the panel hears where it is and describes another body in a window of its own. */
+    @Test void thePanelDescribesAnotherBodyWhileItHasAWindowOfItsOwn() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.setSetting("dev.jasper.sample", "demo_ui", true);
+            start(host, INFO, Set.of(), Set.of(), new SamplePlugin());
+            host.addTerminalWindow();
+            assertThat(host.openPanel(PANEL)).isNotNull();
+            var view = host.panelView(PANEL).orElseThrow();
+            var docked = panelBody(view);
+            assertThat(docked.description()).doesNotContain("window of its own");
+            var left = dev.jasper.sdk.ui.Anchor.LEFT;
+            host.placePanel(PANEL, new dev.jasper.sdk.ui.PanelPlacement(left, false, dev.jasper.sdk.ui.PanelMode.FLOAT));
+            var own = panelBody(view);
+            assertThat(own.description()).contains("window of its own");
+            assertThat(own.actions()).as("the run button keeps its id, so the kit keeps the control").isEqualTo(docked.actions());
+            host.placePanel(PANEL, new dev.jasper.sdk.ui.PanelPlacement(left, false, dev.jasper.sdk.ui.PanelMode.WINDOW));
+            assertThat(panelBody(view)).as("Window is a window of its own too").isEqualTo(own);
+            host.placePanel(PANEL, new dev.jasper.sdk.ui.PanelPlacement(left, false, dev.jasper.sdk.ui.PanelMode.DOCKED));
+            assertThat(panelBody(view)).as("docked again").isEqualTo(docked);
             assertThat(host.failures()).isEmpty();
         } });
     }

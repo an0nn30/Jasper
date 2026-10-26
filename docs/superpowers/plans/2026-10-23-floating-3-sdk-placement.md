@@ -1,5 +1,14 @@
 # Floating tool windows 3: SDK panel placement Implementation Plan
 
+**Status: executed on 2026-10-26** (`ecb632dd8`, `bd2f01e92`, `a8f542f78`, then the documentation commit); see
+`docs/STATUS.md`.
+Deviations from the plan's text: (1) Task 1's review fixes: `PanelHost.window()` and the class Javadoc no longer say the
+host owns the main window or that the place is in it, and a panel's baseline is recorded after its factory returns
+(`bd2f01e92`); (2) `PanelSite.notifyPlacement` has a round counter, so a listener whose own move started a newer
+notification ends the round; (3) the Sample's body comes from `panelBody(boolean ownWindow)`, not `spec(placement)`; (4)
+Task 3 also corrects the other statements that a tool window lives only in the main window, and the ones about a toggle
+from a child window (`Panels` and `PanelFactory`'s Javadoc, guides 07, 08 and 13, plugin authoring).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A plugin's tool window panel can read where it is — its anchor and half, docked or in a window of its own (Float or Window) — and hear when that changes, so it can describe another layout in its own window.

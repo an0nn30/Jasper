@@ -215,6 +215,15 @@ hidden and updates a live header without rebuilding the content, and closing the
 is a kit `Panel` view shows the same metadata in its own header row, which the tool window borrows
 (`KitView.setPanelHostHeader`), so there is never a second header.
 
+A panel hears where it is through `PanelHost.placement()` and `onPlacement`, which `HostedUi.host` adapts from `PanelSite`'s
+`Placement` (the panel's `dock.Slot`, its stripe button's while it has a window of its own, and its `ToolWindowMode`) to the
+SDK's `PanelPlacement` (anchor, split and `PanelMode`); `window()` stays the main window while the panel is detached. The
+`WindowContributions` listener tells each built panel whose id is in the dock change's `placed` (its slot or mode changed)
+after its component is in its new place, once per effective change of the place it was built in or last heard, never for
+visibility alone or a move within its half. A listener that moves the panel again ends the round, so the listeners after it
+never hear the place it overtook; a failing handler is contained, and nothing runs after the panel closes. A plugin that lays
+a panel out another way describes another `ViewSpec` and calls `UiView.update`, as the Sample plugin's does.
+
 `persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order and visibility, the dock's sizes
 and ratios (the default look's, and each other look's under `[look."<id>"]`), Zen mode, stripe visibility, auxiliary
 window bounds and the dragged command palette's place; `workspace.toml` holds the windows themselves. It is application state, not configuration: a bad

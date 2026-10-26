@@ -54,7 +54,7 @@ final class TargetsPanel {
         return new ViewSpec(new Nodes.Panel("targets", ControlState.READY, header, Optional.of(search), list, Optional.empty()));
     }
 }</code></pre>
-<p>Registered as a tool window, in the main window:</p>
+<p>Registered as a tool window:</p>
 <pre><code class="language-java">context.panels().register(new PanelSpec("dev.example.tool.targets", "Targets", "server", Anchor.LEFT),
     host -&gt; new TargetsPanel(context.kit()).view());</code></pre>
 

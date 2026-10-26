@@ -79,8 +79,8 @@ Open items, as the entries below record them:
   theirs. The workspace tabs series awaits the checks its entries list (plans 1, 3a, 3b, 4a, 4b and 5, a window's only
   tab, plans 7a to 8c, 6a, 6b, 9a and 9b; plan 2 had none), and so do its merge entries ("local main merged in",
   2026-10-19, the second sync, 2026-10-21, and the side branches with the third sync, 2026-10-22). One AOT training run
-  should confirm the seeded `workspace.toml` (2026-10-21). Floating tool windows plans 1 and 2 await the checks their
-  entries list (2026-10-23).
+  should confirm the seeded `workspace.toml` (2026-10-21). Floating tool windows plans 1 to 3 await the checks their
+  entries list (2026-10-23, 2026-10-26).
 - **Windows and Linux.** The only Windows `check` recorded as passing since the CI fixes (2026-10-14) is PR #1's hosted
   one; the local `check --continue` in the Windows installer build entry (2026-10-18) failed before PR #1's Windows
   fixes. Native Windows runs of `installWindowsUser` and `uninstallWindowsUser` (2026-10-20), plan 14's Windows
@@ -110,6 +110,77 @@ Open items, as the entries below record them:
 
 Newest first. Each entry describes its change as it stood when the entry was written.
 
+**Floating tool windows, plan 3: SDK panel placement — 2026-10-26** (`claude/floating-tool-windows`, worktree
+`.claude/worktrees/workspace-tabs`, `ecb632dd8..a8f542f78` and the documentation commit, on plan 2's branch; not merged
+or pushed; [plan](superpowers/plans/2026-10-23-floating-3-sdk-placement.md),
+[spec](superpowers/specs/2026-10-23-jasper-floating-tool-windows-design.md), "SDK"; executed with per-task subagents and
+reviews). A plugin's tool window can read where it is and hear when that changes, so it can lay itself out another way
+in a window of its own (SDK 0.21.0, unreleased: no version bump). What landed, in task order:
+1. `dev.jasper.sdk.ui.PanelMode` (`DOCKED`, `FLOAT`, `WINDOW`), `PanelPlacement(anchor, split, mode)` with `ownWindow()`,
+   and `PanelHost.placement()` and `onPlacement(Consumer<PanelPlacement>)`, all `@since 0.21.0`. In the app `PanelSite`
+   takes a `Supplier<PanelSite.Placement>` (a new constructor; the older ones report Left Top, docked) and has
+   `notifyPlacement` (contained, inert after close; a listener whose own move started a newer notification ends the
+   round, so the listeners after it never hear the place it overtook); `HostedUi.host` adapts it, guarded to the UI
+   thread and with the handler run in containment; `WindowContributions` keeps the place each panel was built in or last
+   heard and tells a built panel whose id is in `DockState.Change.placed` once its component is in its new place
+   (`ecb632dd8`). Review fixes: `window()`'s Javadoc no longer says the host owns the main window (a Window is
+   unowned), the class Javadoc names the place, the baseline is recorded after the factory returns, and `migration.csv`
+   rows (`bd2f01e92`).
+2. The testkit: `FakePluginHost.placePanel(panelId, placement)` moves an open panel as a drag would (a different
+   placement becomes `placement()` and reaches each handler once, a throwing handler is recorded in `failures()` and the
+   others still run; the same placement, a closed panel and one that is not open are silent), `ContractHarness.placePanel`
+   with `FakeContractTest`'s and `AppContractTest`'s implementations, and `PluginContractTest`'s
+   `aPanelReadsItsPlacementAndHearsItChange` states it once for both runtimes (`a8f542f78`).
+3. The Sample plugin's panel reads `placement().ownWindow()` in its factory and from an `onPlacement` handler that calls
+   `view.update`: in a window of its own its empty state's sentence says so, and docked it reads as before. It is the
+   compiled `pluginpanels` example of plugin authoring.
+Documentation: plugin authoring's Tool windows (the example, the `PanelHost` bullets with `placement()`, `onPlacement` and
+`window()` staying the main window, the testkit table's `placePanel`), the SDK README's Tool windows row, guide
+`07-contributions` (View Mode, own windows, placement), `08-ui` and `13-testing`, the "Panels, the rail and plugin
+dialogs" section of the [SDK architecture](sdk-architecture.md), the `Panels` and `PanelFactory` Javadoc, the regenerated
+`docs/sdk-reference.html`, plan 2's entry below (item 1 and 2's grab) and the plan's status banner.
+
+Rulings (each costs what its last words say if wrong):
+- The statements that tool windows live only in the main window (`Panels`' Javadoc, `PanelFactory`'s, guide 07 and 08,
+  plugin authoring's code comment and the Sample's, which plan 1's final review found stale) are corrected here, and so are
+  the ones about a toggle from a child window: `WindowManager.routePanel` brings a detached tool window's own window
+  forward, not the main window, so they say "its window" (a few more doc lines; `Toolbar` and `ToolbarViewFactory` say
+  the main window is the only window with a toolbar, which stays true).
+- `PanelHost.window()` is the main window while a panel has a window of its own, as the tool window's owner, and says so
+  (a plugin that wants the tool window's own window has no handle to it).
+- Fix round 1 took three reviewer minors along with the missing `migration.csv` rows: the false "which it owns", the class
+  Javadoc's "place in the main window" and the baseline recorded after the factory (public Javadoc must be true; the
+  baseline is one line).
+  A factory that moves its own panel is not told after it returns; `placement()` already shows the new place.
+- The Sample describes its body from `panelBody(boolean ownWindow)`, not the plan's `spec(placement)`: the body depends
+  only on `ownWindow()`.
+
+Deferred, worth knowing:
+- The fake catches `RuntimeException` only in placement handlers, as in its visibility and closed handlers, while the app
+  contains `Exception | LinkageError`; a `LinkageError` thrown by a handler diverges between them.
+- The contract test's "a panel that is not open is not moved" and its post-close assertion are vacuous on the fake; the
+  app's "same placement is silent" is enforced by `AppContractTest`'s harness (production is covered by
+  `PanelPlacementNotificationsTest`); the fake has a duplicated kit panel-view block; the testkit README's panel row is long.
+- `PanelPlacementNotificationsTest.floatingAndDockingNotify` does not pin the native shell kind at notification time;
+  `HostedUi`'s static `placement(...)` shares a name with the instance method; the first assertion message of
+  `aMoveWhileTheFactoryRunsLeavesNoStaleBaseline` overclaims.
+- The external THD plugin still needs its rebuild against SDK 0.21.0 (open since plan 6b).
+
+Check: `./gradlew check --continue` (BUILD SUCCESSFUL in 16m 19s; the Buddy, SDK, testkit and Sample plugin tests were up
+to date): **12,988 tests, 0 failures, 0 errors, 29 skipped** (this run's XML holds 12,460; the up-to-date tasks' results
+are the other 528). The plan's new tests are `PanelPlacementTest` (2) and `PanelPlacementNotificationsTest` (7), the
+contract test `aPanelReadsItsPlacementAndHearsItChange` (once on each runtime), and cases in `HostedUiTest`,
+`FakePanelsAndWindowsTest` and `SamplePluginTest`. The external example (`-p docs/examples/external-plugin
+-PjasperSdkDir="$PWD/build/sdk-release" check pluginZip`): BUILD SUCCESSFUL, 1 test, 0 failures. Task 1's fix round ran
+`ClassicCompositionRenderTest` at a load average of about 365 (macOS's temp-folder cleanup) and it failed on the plugin
+shutdown wait ("Plugin workers did not finish resource cleanup after stop"); this check ran under a load of about 5 to 30
+and it passed. GUI checks for the user, none run (no window was launched), on each platform in the default look: with
+`demo_ui = true` (Settings › Plugins › Sample), open the Sample tool window: its empty state reads "Runs a short demo
+activity in the background."; View Mode › Float and then Window change the sentence to "This tool window has a window of
+its own. It runs a short demo activity in the background." in the same view (the button keeps its place), and Docked,
+Move to and dragging its button or header out and back change it as they move the tool window; a move within its stripe
+or hiding it changes nothing; restart with the Sample in a Float window: it opens with the own-window sentence.
+
 **Floating tool windows, plan 2: drag a tool window out — 2026-10-23** (`claude/floating-tool-windows`, worktree
 `.claude/worktrees/workspace-tabs`, `67a7a0c5a..12f936f60` and the final review's documentation commit, on plan 1's
 branch; not merged or pushed; [plan](superpowers/plans/2026-10-23-floating-2-drag-out.md),
@@ -120,13 +191,14 @@ landed, in task order:
 1. `DockDrag` tracks the pointer on screen. Outside the window's frame (its title bar included), or where `covered` says
    another window is in front, the target is Detach (`detaching()`): no stripe gap, guide or ghost, and a `TabDragLabel`
    with the tool window's title and icon follows the pointer; moving back resolves a target and hides the label. A
-   release there calls `onDetach(id, Detach(screen, grab))`, where the grab is the press point in the pressed component;
-   Esc, another press, the window deactivating and `cancel()` end the drag without it, outside too; a release inside on no
+   release there calls `onDetach(id, Detach(screen, grab))`, where the grab is the press point in the dragged surface (the
+   header, for a press anywhere in a header); Esc, another press, the window deactivating and `cancel()` end the drag without it, outside too; a release inside on no
    target still drops nothing. A stripe drop of a detached window previews no frame, as a hidden one's (`f26c98276`).
 2. `WindowContributions.detachDropped` detaches the tool window as Float, or in the mode it has, at
    `DetachedToolWindows.droppedBounds` and activates it: the size is `initialBounds`'s rule (the bounds it last had, else
-   its docked frame's, else its landing size, at least 240 by 160 scaled), the grab, clamped into the window, stays under
-   the pointer, and the window is fitted to the display under the pointer. A hidden tool window shows; one dragged out
+   its docked frame's, else its landing size, at least 240 by 160 scaled), the grab, clamped into the window, puts the
+   window's corner that far from the pointer (its native title bar not counted), and the window is fitted to the display
+   under the pointer. A hidden tool window shows; one dragged out
    again moves its window and keeps its mode; dropped on a stripe it stays detached and its button moves; dropped on the
    workspace it docks (`c98ef7e9d`).
 3. Over a child window or another main window that came to the front after the dragged one, the target is Detach too:
