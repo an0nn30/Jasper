@@ -26,7 +26,7 @@ class ResetMenuTest {
 
     static SchemaPage page(String id, PageContext context, NotificationGroupChoices groups) {
         var spec = CorePages.specs(AppearanceFixtures.CHOICES, new CorePages.SystemActions(() -> Path.of("/fixture/config.toml"),
-            () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE, page -> { }, true, groups)
+            () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE, page -> { }, true, groups, TabNameChoices.NONE)
             .stream().filter(candidate -> candidate.id().equals(id)).findFirst().orElseThrow();
         var page = spec.build(context);
         page.component();

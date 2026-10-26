@@ -196,7 +196,7 @@ final class EnterpriseSettings implements AutoCloseable {
                 var pages = new CorePages.Pages(context -> new KeymapPage(keymapHooks, context), context -> manager.page(context), context -> runtime[0].settingsPages(context));
                 // Match the mock's macOS workspace capability as well as its projections and shortcut labels.
                 dialog[0] = new SettingsDialog(windows, CorePages.pages(choices, new CorePages.SystemActions(() -> Path.of("/Users/RQ7RQVF/.config/jasper/config.toml"),
-                        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.of(vm()), Optional.of(commandLine())), ShellChoices.NONE, new NotificationGroupChoices(EnterpriseSettings::groups), pages, true),
+                        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.of(vm()), Optional.of(commandLine())), ShellChoices.NONE, new NotificationGroupChoices(EnterpriseSettings::groups), TabNameChoices.NONE, pages, true),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }), () -> { }, () -> { },
                         uri -> { }, (parent, count) -> true, () -> themes[0].appearance().context(ThemeRoute.CHROME), projections.settings(), projections.composition()));
                 dialog[0].open(null, "appearance");

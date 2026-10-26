@@ -86,7 +86,7 @@ public final class CorePages {
      * section) and Option key as Meta.
      */
     static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate, boolean macOs) {
-        return specs(appearance, system, shells, navigate, macOs, NotificationGroupChoices.NONE);
+        return specs(appearance, system, shells, navigate, macOs, NotificationGroupChoices.NONE, TabNameChoices.NONE);
     }
 
     /** Settings › Appearance. */
@@ -110,9 +110,10 @@ public final class CorePages {
             .row(UI_ANIMATIONS_ENABLED);
     }
 
-    /** As above, with the notification groups the Notifications page lists. */
+    /** As above, with the notification groups the Notifications page lists and the tab the Tab name row previews. */
     static List<SchemaPage.Spec> specs(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
-                                       java.util.function.Consumer<String> navigate, boolean macOs, NotificationGroupChoices groups) {
+                                       java.util.function.Consumer<String> navigate, boolean macOs, NotificationGroupChoices groups,
+                                       TabNameChoices tabNames) {
         return List.of(
             appearance(appearance, macOs),
             SchemaPage.page("window", "Window").parent("appearance-behavior")
@@ -142,7 +143,7 @@ public final class CorePages {
                 .row(BUDDY_ENABLED),
             systemPage(system),
             SchemaPage.page("terminal", "Terminal")
-                .row(TERMINAL_TAB_NAME, Editors.technical())
+                .row(TERMINAL_TAB_NAME, TabNameEditor.factory(tabNames))
                 .row(TERMINAL_SCROLLBACK, Editors.stepper("lines"))
                 .row(TERMINAL_BELL)
                 .row(TERMINAL_ON_EXIT, Editors.choice(Map.of("keep_open", "Keep the pane open",
@@ -251,14 +252,20 @@ public final class CorePages {
     /** The whole tree for one dialog, in display order, with the notification groups and pages the application supplies. */
     public static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
                                                                    NotificationGroupChoices groups, Pages supplied) {
-        return pages(appearance, system, shells, groups, supplied, com.formdev.flatlaf.util.SystemInfo.isMacOS);
+        return pages(appearance, system, shells, groups, TabNameChoices.NONE, supplied);
+    }
+
+    /** As above, with the tab the Tab name row previews. */
+    public static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
+                                                                   NotificationGroupChoices groups, TabNameChoices tabNames, Pages supplied) {
+        return pages(appearance, system, shells, groups, tabNames, supplied, com.formdev.flatlaf.util.SystemInfo.isMacOS);
     }
 
     /** The whole tree with an explicit workspace-glass capability, for host-specific previews. */
     static Function<PageContext, List<SettingsPage>> pages(AppearanceChoices appearance, SystemActions system, ShellChoices shells,
-                                                          NotificationGroupChoices groups, Pages supplied, boolean glass) {
+                                                          NotificationGroupChoices groups, TabNameChoices tabNames, Pages supplied, boolean glass) {
         return context -> {
-            var specs = specs(appearance, system, shells, context.navigate(), glass, groups);
+            var specs = specs(appearance, system, shells, context.navigate(), glass, groups, tabNames);
             var all = new ArrayList<SettingsPage>();
             Function<String, Supplier<List<SettingsPage>>> childrenOf = id ->
                 () -> all.stream().filter(page -> page.parent().equals(Optional.of(id))).toList();
