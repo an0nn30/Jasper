@@ -126,7 +126,7 @@ fails to load is posted as "*name* could not be loaded".
 | --- | --- |
 | `Plugin.start` and `stop`, registrations, event delivery, settings listeners, view events, action handlers, palette scopes, file source methods, subcommand handlers | The UI thread (the event dispatch thread) |
 | `background()` tasks | One virtual thread per task, `jasper-plugin-<id>-<n>`; tasks may run at the same time; each runs contained |
-| `Events.publish`, activity and connection handles, notification posts, `Setting.get` and `set`, `PaneHandle.sendText`, `sendBytes` and `paste`, `Services.find` and `require`, closing a `Subscription` | Any thread |
+| `Events.publish`, activity and connection handles, notification posts, `Setting.get` and `set`, `PaneHandle.sendText`, `sendBytes` and `paste`, `TabNamePiece.set`, `Services.find` and `require`, closing a `Subscription` | Any thread |
 | Saving a setting | A virtual thread, `jasper-plugin-settings-save`; a successful save completes the returned stage on the UI thread, a failed write completes it exceptionally on the save thread, and an invalid value or a save after the plugin stopped fails it at once |
 | Reading changed plugin settings files | The daemon `jasper-plugin-settings` polls every second; listeners run on the UI thread |
 | `PaneHandle.foregroundJob()` | Completes on a virtual thread, `jasper-foreground-job` |

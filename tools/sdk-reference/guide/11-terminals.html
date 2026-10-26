@@ -2,7 +2,7 @@
 <h2>Terminals</h2>
 <p>{@link PluginContext#terminals()} is the plugin's view of Jasper's windows, tabs and panes. Finding them needs
 no capability; reading what a pane runs, typing into it, opening terminals and providing sessions do (see
-<a href="#capabilities">Capabilities</a>). Every call is on the UI thread except the three that send input. For the
+<a href="#capabilities">Capabilities</a>). Every call is on the UI thread except the three that send input and {@link TabNamePiece#set(TabHandle,String)}. For the
 user's side of panes and shell integration, see <a href="terminal.md">the terminal</a>.</p>
 
 <h3>Windows, tabs and panes</h3>

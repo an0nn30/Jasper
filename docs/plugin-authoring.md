@@ -902,8 +902,8 @@ private static void installTerminalDemo(PluginContext context) {
   saw, and `isOpen()` tells. Do not treat that as an error. A tab Jasper closed with its windows comes back under the
   same id when they are restored; drop a handle on `TAB_CLOSED`. After the plugin stops, handle queries throw
   `IllegalStateException`; the send methods are ignored.
-- **Threads.** Everything here is UI-thread only except `sendText`, `sendBytes` and `paste`, which work from any
-  thread; calls from one thread keep their order. `foregroundJob()` completes on a worker thread.
+- **Threads.** Everything here is UI-thread only except `sendText`, `sendBytes`, `paste` and `TabNamePiece.set`, which
+  work from any thread; calls from one thread keep their order. `foregroundJob()` completes on a worker thread.
 - **`sendText` adds nothing.** End a command with `"\n"` to run it; leaving it out lets the user look first. `paste`
   behaves like the user's paste, bracketed when the program asked for it. Input to a pane whose session is not running
   (not started yet, still connecting, or ended) is dropped.
@@ -1341,7 +1341,7 @@ catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
 | Runs on, or may be called from | What |
 | --- | --- |
 | The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, content tabs, split items, restorers, dialogs, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
-| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
+| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; `TabNamePiece.set`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
 
 - **Slow work** goes to `context.background()`, whose tasks can run at the same time. UI-thread code does no I/O and
   returns promptly.

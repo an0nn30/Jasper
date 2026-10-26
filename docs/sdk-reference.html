@@ -1289,6 +1289,7 @@ listed per type in the API reference; the main ones:</p>
 <tr><td><a href="#dev.jasper.sdk.settings.Setting.get()"><code>Setting.get()</code></a>, <a href="#dev.jasper.sdk.settings.Setting.set(Object)"><code>Setting.set(Object)</code></a></td><td>A successful save completes its future on the UI thread; a failed one may complete it on another thread, so hop to the UI thread before touching the UI.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.services.Services.find(Class)"><code>Services.find(Class)</code></a>, <a href="#dev.jasper.sdk.services.Services.require(Class)"><code>Services.require(Class)</code></a></td><td>Cache reads that run no provider code.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.terminal.PaneHandle.sendText(String)"><code>PaneHandle.sendText(String)</code></a>, <a href="#dev.jasper.sdk.terminal.PaneHandle.sendBytes(byte[])"><code>PaneHandle.sendBytes(byte[])</code></a>, <a href="#dev.jasper.sdk.terminal.PaneHandle.paste(String)"><code>PaneHandle.paste(String)</code></a></td><td>Calls from one thread keep their order.</td></tr>
+<tr><td><a href="#dev.jasper.sdk.terminal.TabNamePiece.set(TabHandle,String)"><code>TabNamePiece.set(TabHandle, String)</code></a></td><td>Jasper applies the value on the UI thread.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.terminal.PendingSession"><code>PendingSession</code></a></td><td>Every method, also after the plugin stopped.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.cli.CommandCall.out(String)"><code>CommandCall.out(String)</code></a>, <a href="#dev.jasper.sdk.cli.CommandCall.err(String)"><code>CommandCall.err(String)</code></a></td><td>Write to the caller's terminal while the call runs.</td></tr>
 <tr><td><a href="#dev.jasper.sdk.ui.Platform.openInEditor(Path)"><code>Platform.openInEditor(Path)</code></a>, <a href="#dev.jasper.sdk.ui.Platform.browse(URI)"><code>Platform.browse(URI)</code></a></td><td>They do their work in the background.</td></tr>
@@ -2205,7 +2206,7 @@ it, and test with a fake of the interface.</p>
 <h2>Terminals</h2>
 <p><a href="#dev.jasper.sdk.plugin.PluginContext.terminals()"><code>PluginContext.terminals()</code></a> is the plugin's view of Jasper's windows, tabs and panes. Finding them needs
 no capability; reading what a pane runs, typing into it, opening terminals and providing sessions do (see
-<a href="#capabilities">Capabilities</a>). Every call is on the UI thread except the three that send input. For the
+<a href="#capabilities">Capabilities</a>). Every call is on the UI thread except the three that send input and <a href="#dev.jasper.sdk.terminal.TabNamePiece.set(TabHandle,String)"><code>TabNamePiece.set(TabHandle, String)</code></a>. For the
 user's side of panes and shell integration, see <a href="terminal.md">the terminal</a>.</p>
 
 <h3>Windows, tabs and panes</h3>
