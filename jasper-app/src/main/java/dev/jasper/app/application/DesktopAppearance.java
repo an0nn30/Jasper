@@ -7,12 +7,14 @@ import dev.jasper.app.appearance.ThemeSelection;
 import dev.jasper.app.config.AppearanceMode;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.platform.DesktopColors;
+import dev.jasper.app.platform.DesktopEnvironment;
 import dev.jasper.app.platform.DesktopObservation;
 import dev.jasper.app.platform.DesktopObservation.*;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /** EDT-owned desktop demand and transactional publication. Native sampling and theme generation run on workers. */
@@ -22,7 +24,8 @@ final class DesktopAppearance implements AutoCloseable {
     private record Applied(ConfigSnapshot config, ThemeSelection selection, boolean dark, DesktopPalette.SourceMode source) { }
     private final ThemeController themes;
     private final DesktopColors desktop;
-    private final String currentDesktop;
+    private final Supplier<DesktopEnvironment> environmentSupplier;
+    private DesktopEnvironment environment;
     private final Executor worker, edt;
     private final Runnable unsubscribe, unsubscribeResample;
     private final Map<Key, Palette> cache = new HashMap<>();
@@ -39,16 +42,18 @@ final class DesktopAppearance implements AutoCloseable {
     private Consumer<ThemeController.InstallationFailure> failure = problem -> System.getLogger(DesktopAppearance.class.getName())
         .log(System.Logger.Level.WARNING, "Could not apply desktop colors", problem);
 
-    DesktopAppearance(ThemeController themes, DesktopColors desktop, String currentDesktop, Executor worker) {
-        this(themes, desktop, currentDesktop, worker, SwingUtilities::invokeLater);
+    DesktopAppearance(ThemeController themes, DesktopColors desktop, Supplier<DesktopEnvironment> environmentSupplier, Executor worker) {
+        this(themes, desktop, environmentSupplier, worker, SwingUtilities::invokeLater);
     }
-    DesktopAppearance(ThemeController themes, DesktopColors desktop, String currentDesktop, Executor worker, Executor edt) {
-        this(themes, desktop, currentDesktop, worker, edt, desktop::current);
+    DesktopAppearance(ThemeController themes, DesktopColors desktop, Supplier<DesktopEnvironment> environmentSupplier, Executor worker, Executor edt) {
+        this(themes, desktop, environmentSupplier, worker, edt, desktop::current);
     }
-    DesktopAppearance(ThemeController themes, DesktopColors desktop, String currentDesktop, Executor worker, Executor edt,
-            java.util.function.Supplier<DesktopObservation> initial) {
+    DesktopAppearance(ThemeController themes, DesktopColors desktop, Supplier<DesktopEnvironment> environmentSupplier, Executor worker, Executor edt,
+            Supplier<DesktopObservation> initial) {
         this.themes = Objects.requireNonNull(themes); this.desktop = Objects.requireNonNull(desktop);
-        this.currentDesktop = currentDesktop; this.worker = Objects.requireNonNull(worker); this.edt = Objects.requireNonNull(edt);
+        this.environmentSupplier = Objects.requireNonNull(environmentSupplier);
+        this.environment = Objects.requireNonNull(environmentSupplier.get());
+        this.worker = Objects.requireNonNull(worker); this.edt = Objects.requireNonNull(edt);
         current = new DesktopPalette.Result(themes.current().chrome(), Optional.empty(), "Desktop palette pending");
         // Read the latest snapshot when the EDT handles a notification: a callback queued
         // during initialization must not replace a newer opening snapshot.
@@ -68,6 +73,7 @@ final class DesktopAppearance implements AutoCloseable {
     }
     void reload() {
         requireEdt(); if (closed) return;
+        environment = Objects.requireNonNull(environmentSupplier.get());
         revision++; previews.forEach(preview -> preview.sampled = false);
         desktop.reload(); syncDemand(); resolve();
     }
@@ -117,12 +123,12 @@ final class DesktopAppearance implements AutoCloseable {
                     || !previous.implementation().equals(palette.implementation()) || !previous.version().equals(palette.version());
                 if (changed) for (Preview preview : previews)
                     if (preview.dark != (palette.appearance() == Polarity.DARK)
-                            && DesktopPalette.preferredSources(preview.source, currentDesktop).contains(palette.source())) preview.sampled = false;
+                            && DesktopPalette.preferredSources(preview.source, environment).contains(palette.source())) preview.sampled = false;
             }
         }
         if (portalChanged) previews.forEach(preview -> preview.sampled = false);
         for (Preview preview : previews) {
-            if (demand != null && preview.dark == demand.dark() && DesktopPalette.preferredSources(preview.source, currentDesktop).stream()
+            if (demand != null && preview.dark == demand.dark() && DesktopPalette.preferredSources(preview.source, environment).stream()
                     .allMatch(source -> value.palettes().containsKey(source) && value.palettes().get(source).generation() == generation))
                 preview.sampled = true;
         }
@@ -137,11 +143,11 @@ final class DesktopAppearance implements AutoCloseable {
         boolean dark = pending != null ? pending.dark : appliedDesktop ? applied.dark()
             : !previews.isEmpty() ? previews.getFirst().dark : applied != null && applied.dark();
         var sources = EnumSet.noneOf(Source.class);
-        if (pending != null) sources.addAll(DesktopPalette.preferredSources(pending.source, currentDesktop));
+        if (pending != null) sources.addAll(DesktopPalette.preferredSources(pending.source, environment));
         if (appliedDesktop)
-            sources.addAll(DesktopPalette.preferredSources(applied.source(), currentDesktop));
+            sources.addAll(DesktopPalette.preferredSources(applied.source(), environment));
         for (Preview preview : previews)
-            sources.addAll(DesktopPalette.preferredSources(preview.source, currentDesktop));
+            sources.addAll(DesktopPalette.preferredSources(preview.source, environment));
         var next = new Demand(Set.copyOf(sources), dark);
         if (!next.equals(demand)) { demand = next; desktop.request(++generation, next.sources(), dark); }
     }
@@ -164,6 +170,7 @@ final class DesktopAppearance implements AutoCloseable {
     private void resolve() {
         if (closed) return;
         long ticket = revision;
+        DesktopEnvironment context = environment;
         Portal portal = observation.portal();
         Applied applied = applied();
         if (applied != null && !(applied.selection().theme(applied.dark()) instanceof ThemePick.Desktop)) {
@@ -175,11 +182,11 @@ final class DesktopAppearance implements AutoCloseable {
         var inputs = requests.stream().map(preview -> input(preview.dark)).toList();
         worker.execute(() -> {
             DesktopPalette.Result result = applied != null && applied.selection().theme(applied.dark()) instanceof ThemePick.Desktop
-                ? resolved(applied.dark(), applied.source(), appliedInput) : null;
+                ? resolved(applied.dark(), applied.source(), context, appliedInput) : null;
             var previewResults = new ArrayList<DesktopPalette.Result>();
             for (int i = 0; i < requests.size(); i++) {
                 Preview preview = requests.get(i);
-                previewResults.add(resolved(preview.dark, preview.source, inputs.get(i)));
+                previewResults.add(resolved(preview.dark, preview.source, context, inputs.get(i)));
             }
             edt.execute(() -> {
                 if (closed || revision != ticket || !desktop.current().portal().equals(portal)) return;
@@ -201,8 +208,8 @@ final class DesktopAppearance implements AutoCloseable {
             });
         });
     }
-    private DesktopPalette.Result resolved(boolean dark, DesktopPalette.SourceMode source, DesktopObservation input) {
-        var result = DesktopPalette.resolve(dark, source, currentDesktop, input);
+    private DesktopPalette.Result resolved(boolean dark, DesktopPalette.SourceMode source, DesktopEnvironment context, DesktopObservation input) {
+        var result = DesktopPalette.resolve(dark, source, context, input);
         String status = result.status();
         if (!input.portal().reason().isBlank()) status += "; " + input.portal().reason();
         return new DesktopPalette.Result(result.theme(), result.source(), status);

@@ -1,6 +1,7 @@
 package dev.jasper.app.appearance;
 
 import dev.jasper.app.platform.DesktopObservation;
+import dev.jasper.app.platform.DesktopEnvironment;
 import dev.jasper.app.platform.DesktopObservation.*;
 import dev.jasper.ui.theme.*;
 import java.awt.Color;
@@ -8,6 +9,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import static dev.jasper.ui.theme.SemanticColor.*;
@@ -15,19 +17,47 @@ import static dev.jasper.ui.theme.SemanticColor.*;
 /** Pure interface palette resolution. Native content never replaces editor, terminal, syntax or glass values. */
 public final class DesktopPalette {
     private DesktopPalette() { }
-    public enum SourceMode { AUTO, GTK3, GTK4 }
+    public enum SourceMode { AUTO, QT, GTK3, GTK4 }
     public record Result(GeneratedTheme theme, Optional<Source> source, String status) {
         public Result { Objects.requireNonNull(theme); Objects.requireNonNull(source); Objects.requireNonNull(status); }
     }
 
-    /** Explicit modes never borrow another toolkit. Desktop names are colon-separated, case-insensitive tokens. */
-    public static List<Source> preferredSources(SourceMode mode, String currentDesktop) {
-        Objects.requireNonNull(mode);
+    /** One source order drives both resolution and demand; explicit modes stay within their selected family. */
+    public static List<Source> preferredSources(SourceMode mode, DesktopEnvironment environment) {
+        Objects.requireNonNull(mode); Objects.requireNonNull(environment);
         if (mode == SourceMode.GTK3) return List.of(Source.GTK3);
         if (mode == SourceMode.GTK4) return List.of(Source.GTK4);
-        boolean gnome = currentDesktop != null && java.util.Arrays.stream(currentDesktop.split(":"))
-            .anyMatch(token -> token.equalsIgnoreCase("GNOME"));
-        return gnome ? List.of(Source.GTK4, Source.GTK3) : List.of(Source.GTK3, Source.GTK4);
+        String desktop = desktop(environment);
+        String hint = qtHint(environment.qtPlatformTheme());
+        boolean qt5 = hint.equals("qt5ct");
+        List<Source> ordered = switch (desktop) {
+            case "kde" -> environment.kdeSessionVersion().trim().equals("5")
+                ? List.of(Source.KDE5, Source.QT5, Source.KDE6, Source.QT6, Source.GTK3, Source.GTK4)
+                : List.of(Source.KDE6, Source.QT6, Source.KDE5, Source.QT5, Source.GTK3, Source.GTK4);
+            case "gnome" -> List.of(Source.GTK4, Source.GTK3, Source.QT6, Source.QT5);
+            case "lxqt" -> qt5 ? List.of(Source.QT5, Source.QT6, Source.GTK3, Source.GTK4)
+                : List.of(Source.QT6, Source.QT5, Source.GTK3, Source.GTK4);
+            default -> qt5 ? List.of(Source.QT5, Source.QT6, Source.GTK3, Source.GTK4)
+                : hint.equals("qt6ct")
+                    ? List.of(Source.QT6, Source.QT5, Source.GTK3, Source.GTK4)
+                    : List.of(Source.GTK3, Source.GTK4, Source.QT6, Source.QT5);
+        };
+        return mode == SourceMode.QT ? ordered.stream().filter(source -> source != Source.GTK3 && source != Source.GTK4).toList() : ordered;
+    }
+
+    private static String desktop(DesktopEnvironment environment) {
+        for (String token : environment.currentDesktop().split(":")) {
+            String name = token.trim().toLowerCase(Locale.ROOT);
+            if (name.equals("kde") || name.equals("gnome") || name.equals("lxqt")) return name;
+        }
+        return environment.kdeFullSession().trim().equalsIgnoreCase("true") ? "kde" : "";
+    }
+    private static String qtHint(String value) {
+        for (String entry : value.split(";")) {
+            String key = entry.split(":", 2)[0].trim().toLowerCase(Locale.ROOT);
+            if (key.equals("qt5ct") || key.equals("qt6ct")) return key;
+        }
+        return "";
     }
 
     /** Whether this observation supplies a readable opaque window for the requested appearance. */
@@ -38,11 +68,11 @@ public final class DesktopPalette {
     }
 
     /** A complete selected-source WINDOW pair is the sole admission gate; optional pairs stay with that source. */
-    public static Result resolve(boolean dark, SourceMode mode, String currentDesktop, DesktopObservation input) {
+    public static Result resolve(boolean dark, SourceMode mode, DesktopEnvironment environment, DesktopObservation input) {
         Objects.requireNonNull(input);
         var base = JasperTheme.builtIn("slate-cobalt").orElseThrow().generated(dark);
         Palette selected = null;
-        for (var source : preferredSources(mode, currentDesktop)) {
+        for (var source : preferredSources(mode, environment)) {
             Palette candidate = input.palettes().get(source);
             if (usable(dark, candidate)) {
                 selected = candidate; break;
@@ -58,7 +88,7 @@ public final class DesktopPalette {
         boolean repaired = repair(base, colors, overrides, high);
         String status = selected == null ? "Desktop palette unavailable; using Slate Cobalt" : capability(selected) + " desktop palette";
         if (selected != null && !selected.reason().isBlank()) status += "; using last good palette; " + selected.reason();
-        if (selected == null) for (Source source : preferredSources(mode, currentDesktop)) {
+        if (selected == null) for (Source source : preferredSources(mode, environment)) {
             Palette candidate = input.palettes().get(source);
             if (candidate != null) status += "; " + capability(candidate) + " unavailable"
                 + (candidate.reason().isBlank() ? "" : ": " + candidate.reason());
@@ -91,8 +121,16 @@ public final class DesktopPalette {
     }
 
     private static String capability(Palette palette) {
-        String label = palette.source() == Source.GTK3 ? "GTK 3"
-            : palette.implementation().equalsIgnoreCase("libadwaita") ? "libadwaita" : "GTK 4";
+        String label = switch (palette.source()) {
+            case GTK3 -> "GTK 3";
+            case GTK4 -> palette.implementation().equalsIgnoreCase("libadwaita") ? "libadwaita" : "GTK 4";
+            case QT5 -> "Qt 5";
+            case QT6 -> "Qt 6";
+            case KDE5 -> "KDE 5 KColorScheme";
+            case KDE6 -> "KDE 6 KColorScheme";
+        };
+        if (palette.source().currentPaletteOnly() && !palette.implementation().isBlank())
+            label += " (" + palette.implementation() + ")";
         return label + (palette.version().isBlank() ? "" : " " + palette.version());
     }
 

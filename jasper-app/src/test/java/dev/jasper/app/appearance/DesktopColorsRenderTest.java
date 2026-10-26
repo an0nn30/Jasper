@@ -1,5 +1,6 @@
 package dev.jasper.app.appearance;
 
+import dev.jasper.app.platform.DesktopEnvironment;
 import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.platform.DesktopObservation;
 import dev.jasper.app.platform.DesktopRenderFixtures;
@@ -29,7 +30,7 @@ class DesktopColorsRenderTest {
     @Test void desktopFallbackPreservesContentPalettes() {
         var portal = new DesktopObservation.Portal(1, DesktopObservation.Polarity.DARK,
             Optional.empty(), Optional.of(false), "");
-        var result = DesktopPalette.resolve(true, DesktopPalette.SourceMode.AUTO, "GNOME",
+        var result = DesktopPalette.resolve(true, DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")),
             new DesktopObservation(portal, Map.of()));
         var bundled = JasperTheme.bundled().generated(true);
         assertThat(result.theme().terminal()).isEqualTo(bundled.terminal());
@@ -56,7 +57,7 @@ class DesktopColorsRenderTest {
         assertThat(catalog).hasSize(8);
         try {
             for (var fixture : DesktopRenderFixtures.read()) {
-                var resolved = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, "GNOME", fixture.input());
+                var resolved = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")), fixture.input());
                 if (fixture.name().equals("mismatched-appearance")) assertThat(resolved.source()).isEmpty();
                 else assertThat(resolved.source()).contains(fixture.input().palettes().keySet().iterator().next());
                 var theme = resolved.theme();
@@ -116,7 +117,7 @@ class DesktopColorsRenderTest {
 
     @Test void hoveredNoticeLinksRetainHighContrastOnTheirPaintedTint() throws Exception {
         var fixture=DesktopRenderFixtures.read().stream().filter(f->f.name().equals("yellow-high-contrast")&&!f.dark()).findFirst().orElseThrow();
-        var theme=DesktopPalette.resolve(false,DesktopPalette.SourceMode.AUTO,"GNOME",fixture.input()).theme();
+        var theme=DesktopPalette.resolve(false,DesktopPalette.SourceMode.AUTO,DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")),fixture.input()).theme();
         var previous=UIManager.getLookAndFeel();
         try {
             for(var kit:List.of(dev.jasper.ui.kit.Kit.DEFAULT,dev.jasper.ui.kit.Kit.CLASSIC)) {
@@ -132,7 +133,7 @@ class DesktopColorsRenderTest {
 
     @Test void lowContrastImportedSurfaceWithSharedTextIsRejectedBeforePainting() throws Exception {
         for (var fixture : DesktopRenderFixtures.read()) if (fixture.name().equals("low-contrast-shared-text")) {
-            var theme = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, "", fixture.input()).theme();
+            var theme = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of()), fixture.input()).theme();
             assertThat(ColorMath.contrast(SemanticColor.TEXT_PRIMARY.color(theme),
                 SemanticColor.SURFACE_DIALOG.color(theme))).isGreaterThanOrEqualTo(4.5);
             assertThat(SemanticColor.SURFACE_DIALOG.color(theme)).isNotEqualTo(fixture.dark() ? new Color(230,230,230) : new Color(26,26,26));
@@ -141,7 +142,7 @@ class DesktopColorsRenderTest {
 
     @Test void transparentNativeInputResolvesToAnOpaqueReadablePaintSurface() throws Exception {
         for (var fixture : DesktopRenderFixtures.read()) if (fixture.name().equals("transparent-input")) {
-            var theme = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, "", fixture.input()).theme();
+            var theme = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of()), fixture.input()).theme();
             var surface = SemanticColor.SURFACE_INPUT.color(theme);
             assertThat(surface.getAlpha()).isEqualTo(255);
             assertThat(ColorMath.contrast(SemanticColor.TEXT_PRIMARY.color(theme), surface)).isGreaterThanOrEqualTo(4.5);
@@ -150,7 +151,7 @@ class DesktopColorsRenderTest {
 
     @Test void whiteAndYellowPortalAccentsKeepEnabledTextReadableAfterPaintGuards() throws Exception {
         for (var fixture : DesktopRenderFixtures.read()) if (fixture.name().contains("accent") || fixture.high()) {
-            var theme = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, "", fixture.input()).theme();
+            var theme = DesktopPalette.resolve(fixture.dark(), DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of()), fixture.input()).theme();
             assertThat(DesktopPaintPairs.validate(theme, fixture.high())).isEmpty();
             assertThat(ColorMath.contrast(SemanticColor.TEXT_ONACCENT.color(theme),
                 SemanticColor.ACCENT.color(theme))).isGreaterThanOrEqualTo(fixture.high()?7:4.5);

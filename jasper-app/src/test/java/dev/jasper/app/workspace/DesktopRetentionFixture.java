@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.DesktopEnvironment;
 import dev.jasper.app.appearance.*;
 import dev.jasper.app.config.*;
 import dev.jasper.app.launch.ShellLauncher;
@@ -56,7 +57,7 @@ public final class DesktopRetentionFixture {
                     }
                     var before=views.stream().map(DesktopRetentionFixture::paint).toList();
                     for(var fixture:fixtures) {
-                        var next=DesktopPalette.resolve(fixture.dark(),DesktopPalette.SourceMode.AUTO,"GNOME",fixture.input()).theme();
+                        var next=DesktopPalette.resolve(fixture.dark(),DesktopPalette.SourceMode.AUTO,DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")),fixture.input()).theme();
                         for(int repeat=0;repeat<2;repeat++) {
                             themes[0].configure(fixture.dark(),selection,UiFontConfig.defaults(),next);
                             assertThat(themes[0].current().palette()).isEqualTo(palette);

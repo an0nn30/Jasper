@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.platform.DesktopEnvironment;
 import dev.jasper.app.appearance.*;
 import dev.jasper.app.config.*;
 import dev.jasper.app.platform.DesktopObservation;
@@ -37,7 +38,7 @@ class DesktopEditorSchemeTest {
                 for (boolean dark : new boolean[] { true, false, true }) {
                     var portal = new DesktopObservation.Portal(3, DesktopObservation.Polarity.LIGHT,
                         Optional.of(new DesktopObservation.Rgba(.8, .2, .4, 1)), Optional.of(true), "");
-                    var result = DesktopPalette.resolve(dark, DesktopPalette.SourceMode.GTK3, "", new DesktopObservation(portal, Map.of()));
+                    var result = DesktopPalette.resolve(dark, DesktopPalette.SourceMode.GTK3, DesktopEnvironment.from(Map.of()), new DesktopObservation(portal, Map.of()));
                     themes.configure(dark, selection, UiFontConfig.defaults(), result.theme());
                     assertThat(background(editor)).isEqualTo(expected.background().getRGB() & 0xffffff);
                     assertThat(area.getForeground()).isEqualTo(expected.foreground());

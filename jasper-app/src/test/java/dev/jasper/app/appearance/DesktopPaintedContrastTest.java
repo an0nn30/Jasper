@@ -1,5 +1,6 @@
 package dev.jasper.app.appearance;
 
+import dev.jasper.app.platform.DesktopEnvironment;
 import dev.jasper.app.platform.DesktopObservation;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.KitTestSupport;
@@ -139,6 +140,6 @@ class DesktopPaintedContrastTest {
             Map.of(DesktopObservation.Pair.WINDOW, new DesktopObservation.Colors(background, foreground)), "test", "1", "");
         var input = new DesktopObservation(new DesktopObservation.Portal(0, DesktopObservation.Polarity.UNKNOWN,
             Optional.empty(), Optional.of(high), ""), nativePalette ? Map.of(DesktopObservation.Source.GTK3, palette) : Map.of());
-        return DesktopPalette.resolve(dark, DesktopPalette.SourceMode.AUTO, "", input).theme();
+        return DesktopPalette.resolve(dark, DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of()), input).theme();
     }
 }

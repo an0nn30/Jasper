@@ -1,5 +1,7 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.platform.DesktopEnvironment;
+import java.util.Map;
 import dev.jasper.app.appearance.*;
 import dev.jasper.app.config.*;
 import dev.jasper.app.platform.DesktopRenderFixtures;
@@ -45,7 +47,7 @@ public final class DesktopEditorRetentionFixture {
                 assertThat(position.y).isPositive();
                 var colors = JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false).editor();
                 for(var fixture : fixtures) {
-                    var next = DesktopPalette.resolve(fixture.dark(),DesktopPalette.SourceMode.AUTO,"GNOME",fixture.input()).theme();
+                    var next = DesktopPalette.resolve(fixture.dark(),DesktopPalette.SourceMode.AUTO,DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")),fixture.input()).theme();
                     for(int repeat=0;repeat<2;repeat++) {
                         themes.configure(fixture.dark(),selection,UiFontConfig.defaults(),next);
                         assertThat(editor.selectedTab()).isSameAs(tab);

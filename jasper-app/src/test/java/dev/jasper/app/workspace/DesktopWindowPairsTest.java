@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.platform.DesktopEnvironment;
 import dev.jasper.app.appearance.DesktopPalette;
 import dev.jasper.app.platform.DesktopObservation;
 import dev.jasper.ui.theme.*;
@@ -14,7 +15,7 @@ class DesktopWindowPairsTest {
         for (boolean dark : List.of(false, true)) for (boolean high : List.of(false, true)) {
             var input = new DesktopObservation(new DesktopObservation.Portal(0, DesktopObservation.Polarity.UNKNOWN,
                 Optional.empty(), Optional.of(high), ""), Map.of());
-            var theme = DesktopPalette.resolve(dark, DesktopPalette.SourceMode.AUTO, "", input).theme();
+            var theme = DesktopPalette.resolve(dark, DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of()), input).theme();
             for (var pair : WindowPairs.ALL) {
                 if (pair.guard().kind() != SurfaceContrast.Guard.Kind.CONTRAST || pair.guard().equals(SurfaceContrast.Guard.STRUCTURAL)) continue;
                 double minimum = pair.guard().equals(SurfaceContrast.Guard.TEXT) ? high ? 7 : 4.5 : 3;

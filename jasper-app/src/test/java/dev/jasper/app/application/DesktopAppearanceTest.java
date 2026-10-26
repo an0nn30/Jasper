@@ -3,6 +3,7 @@ package dev.jasper.app.application;
 import dev.jasper.app.appearance.*;
 import dev.jasper.app.config.*;
 import dev.jasper.app.platform.DesktopColorsHarness;
+import dev.jasper.app.platform.DesktopEnvironment;
 import dev.jasper.app.platform.DesktopObservation.Source;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.ui.kit.Kit;
@@ -27,7 +28,7 @@ class DesktopAppearanceTest {
                 kit -> theme -> true, failure -> { throw failure; }).controller()) {
             input.portal(1, true, "");
             var dispatch = new ArrayDeque<Runnable>();
-            try (var owner = new DesktopAppearance(themes, input.service, "GNOME", Runnable::run, dispatch::add, () -> {
+            try (var owner = new DesktopAppearance(themes, input.service, () -> DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")), Runnable::run, dispatch::add, () -> {
                 var before = input.service.current();
                 input.portal(2, newerSnapshot, "");
                 if (newerSnapshot) input.portal(3, false, "");
@@ -118,6 +119,8 @@ class DesktopAppearanceTest {
     @Test void automaticUsesAlternateWhilePreferredHasNoPalette() {
         try (var f = new Fixture()) {
             f.owner.update(config("auto", true)); f.drain();
+            f.nativeInput.unavailable(Source.QT6, "Qt 6", "6.2.4", "fixture unavailable");
+            f.nativeInput.unavailable(Source.QT5, "Qt 5", "5.15.2", "fixture unavailable"); f.drain();
             f.nativeInput.palette(Source.GTK3, true, "0.1,0.1,0.1,1", ""); f.drain();
             assertThat(f.owner.current().source()).contains(Source.GTK3);
             f.nativeInput.palette(Source.GTK4, true, "0.2,0.2,0.2,1", ""); f.drain();
@@ -307,6 +310,63 @@ class DesktopAppearanceTest {
         }
     }
 
+    @Test void suppliedEnvironmentIsCapturedUntilReloadAndReloadRejectsQueuedWorkerTickets() throws Exception {
+        var environment = new AtomicReference<>(DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")));
+        var reads = new AtomicInteger();
+        try (var f = new Fixture(() -> { reads.incrementAndGet(); return environment.get(); })) {
+            var saved = config("auto", true);
+            f.owner.update(saved); f.drain();
+            f.nativeInput.palette(Source.GTK4, true, "0.1,0.1,0.1,1", ""); f.drain();
+            assertThat(f.owner.current().source()).contains(Source.GTK4);
+            environment.set(DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "LXQt", "QT_QPA_PLATFORMTHEME", "qt5ct")));
+            f.owner.update(saved); f.drain();
+            assertThat(reads.get()).isEqualTo(1);
+            assertThat(f.owner.current().source()).contains(Source.GTK4);
+            f.nativeInput.palette(Source.QT5, true, "0.2,0.2,0.2,1", "");
+            f.nativeInput.unavailable(Source.QT6, "Qt 6", "6.2.4", "fixture unavailable");
+            f.nativeInput.unavailable(Source.GTK3, "GTK 3", "3.24", "fixture unavailable"); f.drain();
+            var previews = new ArrayList<DesktopPalette.Result>();
+            var preview = f.owner.preview(DesktopPalette.SourceMode.AUTO, true, previews::add);
+            try {
+                f.drain(); previews.clear();
+                f.nativeInput.palette(Source.GTK4, true, "0.15,0.15,0.15,1", "queued source update"); f.edt();
+                Runnable oldWorker = f.worker.removeLast();
+                var before = f.owner.current();
+                f.owner.reload();
+                oldWorker.run(); f.edt();
+                assertThat(f.owner.current()).isSameAs(before);
+                assertThat(previews).isEmpty();
+                f.drain();
+                assertThat(reads.get()).isEqualTo(2);
+                assertThat(f.owner.current().source()).contains(Source.QT5);
+                assertThat(f.owner.current().theme().semantic().color(SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(51, 51, 51));
+                assertThat(previews.getLast().source()).contains(Source.QT5);
+                assertThat(saved.desktopSource()).isEqualTo("auto");
+                // Reapplying the saved setting retains Automatic and the reloaded context.
+                f.owner.update(saved); f.drain();
+                assertThat(f.owner.current().source()).contains(Source.QT5);
+                assertThat(reads.get()).isEqualTo(2);
+            } finally { preview.close(); }
+        }
+    }
+    @Test void reloadChangesCandidateDemandForApplicationAndPreviewTogether() throws Exception {
+        var environment = new AtomicReference<>(DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")));
+        try (var f = new Fixture(environment::get)) {
+            f.owner.update(config("gtk3", true)); f.drain();
+            var preview = f.owner.preview(DesktopPalette.SourceMode.QT, true, value -> { });
+            try {
+                f.drain();
+                f.nativeInput.awaitToolkit(Source.QT6, true); f.nativeInput.awaitToolkit(Source.QT5, true);
+                f.nativeInput.awaitToolkit(Source.KDE5, false); f.nativeInput.awaitToolkit(Source.KDE6, false);
+                environment.set(DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "KDE", "KDE_SESSION_VERSION", "5")));
+                f.owner.reload(); f.drain();
+                f.nativeInput.awaitToolkit(Source.KDE5, true); f.nativeInput.awaitToolkit(Source.KDE6, true);
+                f.nativeInput.palette(Source.GTK3, true, "0.1,0.1,0.1,1", ""); f.drain();
+                assertThat(f.owner.current().source()).contains(Source.GTK3);
+            } finally { preview.close(); }
+        }
+    }
+
     static ConfigSnapshot config(String source, boolean dark) {
         return ConfigSnapshot.defaults().toBuilder().darkTheme("desktop-colors").lightTheme("desktop-colors")
             .desktopSource(source).appearance(dark ? AppearanceMode.DARK : AppearanceMode.LIGHT).build();
@@ -318,8 +378,12 @@ class DesktopAppearanceTest {
         final List<ThemeController.InstallationFailure> failures = new ArrayList<>();
         final ThemeController themes = ThemeController.start(true, ThemeSelection.slateCobalt(TerminalSchemeChoice.MATCH), Kit.DEFAULT,
             kit -> theme -> { installs.incrementAndGet(); return !fail.get(); }, failure -> { throw failure; }).controller();
-        final DesktopAppearance owner = new DesktopAppearance(themes, nativeInput.service, "GNOME", worker::add, dispatch::add);
-        Fixture() { owner.onFailure(failures::add); }
+        final DesktopAppearance owner;
+        Fixture() { this(() -> DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME"))); }
+        Fixture(java.util.function.Supplier<DesktopEnvironment> environment) {
+            owner = new DesktopAppearance(themes, nativeInput.service, environment, worker::add, dispatch::add);
+            owner.onFailure(failures::add);
+        }
         void edt() { while (!dispatch.isEmpty()) dispatch.remove().run(); }
         void work() { while (!worker.isEmpty()) worker.remove().run(); }
         void drain() { for (int i = 0; i < 5; i++) { nativeInput.pump(); edt(); work(); edt(); } }

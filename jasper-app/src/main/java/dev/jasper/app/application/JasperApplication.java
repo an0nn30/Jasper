@@ -386,7 +386,7 @@ public final class JasperApplication {
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
         if (desktopColors != null) desktopAppearance = new DesktopAppearance(themes, desktopColors,
-            System.getenv("XDG_CURRENT_DESKTOP"), java.util.concurrent.Executors.newSingleThreadExecutor(
+            dev.jasper.app.platform.DesktopEnvironment::capture, java.util.concurrent.Executors.newSingleThreadExecutor(
                 Thread.ofPlatform().daemon().name("jasper-desktop-palette").factory()));
         // The owner is reachable by failure/shutdown cleanup before any asynchronous resolution can publish.
         configuration = service == null ? null : new ConfigurationController(themes, service, this::openForEditing,

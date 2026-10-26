@@ -1,6 +1,7 @@
 package dev.jasper.app.appearance;
 
 import dev.jasper.app.platform.DesktopObservation;
+import dev.jasper.app.platform.DesktopEnvironment;
 import org.junit.jupiter.api.Test;
 import dev.jasper.app.platform.DesktopObservation.*;
 import dev.jasper.ui.theme.*;
@@ -10,24 +11,63 @@ import static dev.jasper.ui.theme.SemanticColor.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DesktopPaletteTest {
+    @Test void qtAndKdeStatusIdentifiesActualSourceImplementationAndVersion() {
+        for (var source : List.of(Source.QT5, Source.QT6, Source.KDE5, Source.KDE6)) {
+            String implementation = switch (source) {
+                case QT5 -> "Qt 5 application palette / QFusionStyle";
+                case QT6 -> "Qt 6 application palette / QFusionStyle";
+                case KDE5 -> "KDE Frameworks 5 / Qt 5 / QFusionStyle";
+                case KDE6 -> "KDE Frameworks 6 / Qt 6 / QFusionStyle";
+                default -> throw new AssertionError(source);
+            };
+            String version = source == Source.QT5 ? "5.15.2" : source == Source.QT6 ? "6.2.4"
+                : source == Source.KDE5 ? "5.92.0 (Qt 5.15.2)" : "6.0.0 (Qt 6.5.0)";
+            var palette = new Palette(1, source, Polarity.LIGHT, Map.of(Pair.WINDOW, colors(0xffffff, 0)), implementation, version, "");
+            var result = DesktopPalette.resolve(false, DesktopPalette.SourceMode.QT,
+                DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "KDE")), input(false, Map.of(source, palette), Optional.empty()));
+            assertThat(result.source()).contains(source);
+            assertThat(result.status()).contains(implementation, version, switch (source) {
+                case QT5 -> "Qt 5"; case QT6 -> "Qt 6";
+                case KDE5 -> "KDE 5"; case KDE6 -> "KDE 6";
+                default -> throw new AssertionError(source);
+            }).doesNotContain("GTK", "qt5ct", "qt6ct");
+            if (source == Source.KDE5 || source == Source.KDE6) assertThat(result.status()).contains("KColorScheme");
+        }
+    }
+    @Test void kdeResolverRejectsIncompatiblePreferredSourceAndRecoversItsWholeSnapshot() {
+        var environment = DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "KDE", "KDE_SESSION_VERSION", "5"));
+        var fallback = palette(Source.QT5, false, Map.of(Pair.WINDOW, colors(0xfafafa, 0), Pair.POPOVER, colors(0xeeeeff, 0)));
+        var incompatible = palette(Source.KDE5, true, Map.of(Pair.WINDOW, colors(0x111111, 0xffffff)));
+        var before = DesktopPalette.resolve(false, DesktopPalette.SourceMode.AUTO, environment,
+            input(false, Map.of(Source.KDE5, incompatible, Source.QT5, fallback), Optional.empty()));
+        assertThat(before.source()).contains(Source.QT5);
+        assertThat(before.theme().semantic().color(SURFACE_APP)).isEqualTo(new Color(0xfafafa));
+        var recovered = palette(Source.KDE5, false, Map.of(Pair.WINDOW, colors(0xffffff, 0)));
+        var after = DesktopPalette.resolve(false, DesktopPalette.SourceMode.AUTO, environment,
+            input(false, Map.of(Source.KDE5, recovered, Source.QT5, fallback), Optional.empty()));
+        assertThat(after.source()).contains(Source.KDE5);
+        assertThat(after.theme().semantic().color(SURFACE_APP)).isEqualTo(Color.WHITE);
+        assertThat(after.theme().semantic().color(SURFACE_MENU)).as("missing optional role stays with the KDE window").isEqualTo(Color.WHITE);
+        preservesContent(false, after.theme());
+    }
+    @Test void explicitQtRefusesUsableGtkWhenQtHasNoCompatibleWindow() {
+        var gtk = palette(Source.GTK3, false, Map.of(Pair.WINDOW, colors(0xfafafa, 0)));
+        var qt = palette(Source.QT6, true, Map.of(Pair.WINDOW, colors(0x111111, 0xffffff)));
+        var observation = input(false, Map.of(Source.GTK3, gtk, Source.QT6, qt), Optional.empty());
+        var result = DesktopPalette.resolve(false, DesktopPalette.SourceMode.QT, DesktopEnvironment.from(Map.of()), observation);
+        assertThat(result.source()).isEmpty();
+        assertThat(result.status()).contains("Slate Cobalt", "Qt 6").doesNotContain("GTK");
+    }
+
     @Test void statusIdentifiesTheActualImplementationAndItsVersion() {
         for (var implementation : List.of("gtk4", "libadwaita")) {
             String version = implementation.equals("gtk4") ? "4.22.4" : "1.9.1 (GTK 4.22.4)";
             var palette = new Palette(1, Source.GTK4, Polarity.DARK,
                 Map.of(Pair.WINDOW, colors(0x111111, 0xffffff)), implementation, version, "");
-            var result = DesktopPalette.resolve(true, DesktopPalette.SourceMode.GTK4, "GNOME", input(false, Map.of(Source.GTK4, palette), Optional.empty()));
+            var result = DesktopPalette.resolve(true, DesktopPalette.SourceMode.GTK4, DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")), input(false, Map.of(Source.GTK4, palette), Optional.empty()));
             assertThat(result.status()).contains(version, implementation.equals("gtk4") ? "GTK 4" : "libadwaita");
             if (implementation.equals("gtk4")) assertThat(result.status()).doesNotContain("libadwaita");
         }
-    }
-
-    @Test void automaticUsesDesktopTokensAndExplicitSelectionStaysExplicit() {
-        assertThat(DesktopPalette.preferredSources(DesktopPalette.SourceMode.AUTO, "ubuntu:GNOME"))
-            .containsExactly(DesktopObservation.Source.GTK4, DesktopObservation.Source.GTK3);
-        assertThat(DesktopPalette.preferredSources(DesktopPalette.SourceMode.AUTO, "not-gnome"))
-            .containsExactly(DesktopObservation.Source.GTK3, DesktopObservation.Source.GTK4);
-        assertThat(DesktopPalette.preferredSources(DesktopPalette.SourceMode.GTK3, "GNOME"))
-            .containsExactly(DesktopObservation.Source.GTK3);
     }
 
     @Test void noPortalOrGtkStillProducesValidatedBothAppearances() {
@@ -63,7 +103,7 @@ class DesktopPaletteTest {
     @Test void explicitUnavailableSourceDoesNotUseUsableAlternate() {
         var input = input(false, Map.of(Source.GTK4, palette(Source.GTK4, false,
             Map.of(Pair.WINDOW, colors(0xfafafa, 0x111111)))), Optional.empty());
-        assertThat(DesktopPalette.resolve(false, DesktopPalette.SourceMode.GTK3, "GNOME", input).source()).isEmpty();
+        assertThat(DesktopPalette.resolve(false, DesktopPalette.SourceMode.GTK3, DesktopEnvironment.from(Map.of("XDG_CURRENT_DESKTOP", "GNOME")), input).source()).isEmpty();
     }
 
     @Test void missingVariantAndInvalidWindowAreUnavailable() {
@@ -73,12 +113,6 @@ class DesktopPaletteTest {
         assertThat(resolve(false, false, Map.of(Source.GTK3, low), Optional.empty()).source()).isEmpty();
         var alpha = palette(Source.GTK3, false, Map.of(Pair.WINDOW, new Colors(new Rgba(1,1,1,.5), rgba(0))));
         assertThat(resolve(false, false, Map.of(Source.GTK3, alpha), Optional.empty()).source()).isEmpty();
-    }
-
-    @Test void unknownAndEmptyDesktopPreferGtk3() {
-        for (String desktop : List.of("", "KDE", "not-gnome"))
-            assertThat(DesktopPalette.preferredSources(DesktopPalette.SourceMode.AUTO, desktop)).containsExactly(Source.GTK3, Source.GTK4);
-        assertThat(DesktopPalette.preferredSources(DesktopPalette.SourceMode.AUTO, "ubuntu:gNoMe")).containsExactly(Source.GTK4, Source.GTK3);
     }
 
     @Test void conflictingPopoverRejectsSurfaceInsteadOfReplacingSharedInk() {
@@ -177,7 +211,7 @@ class DesktopPaletteTest {
         assertThat(theme.glass()).isSameAs(base.glass());
     }
     private static DesktopPalette.Result resolve(boolean dark, boolean high, Map<Source, Palette> palettes, Optional<Rgba> accent) {
-        return DesktopPalette.resolve(dark, DesktopPalette.SourceMode.AUTO, "", input(high, palettes, accent));
+        return DesktopPalette.resolve(dark, DesktopPalette.SourceMode.AUTO, DesktopEnvironment.from(Map.of()), input(high, palettes, accent));
     }
     private static DesktopObservation input(boolean high, Map<Source, Palette> palettes, Optional<Rgba> accent) {
         return new DesktopObservation(new Portal(0, Polarity.UNKNOWN, accent, Optional.of(high), ""), palettes);
