@@ -270,7 +270,7 @@ tasks.register('verifyDesktopQtCompatibility') {
             invoke(['cmake', '--build', build.absolutePath, '--parallel', '2'])
             invoke(['xvfb-run', '-a', '-s', '-screen 0 1024x768x24 -nolisten tcp',
                 'dbus-run-session', '--config-file=' + new File(fixtures, 'themes/private-bus.conf').absolutePath,
-                '--', 'ctest', '--test-dir', build.absolutePath, '--output-on-failure'])
+                '--', 'ctest', '--test-dir', build.absolutePath, '--verbose', '--output-on-failure'])
         }
     }
 }

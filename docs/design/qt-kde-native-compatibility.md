@@ -2,8 +2,8 @@
 
 Status: preparation implemented; native compatibility gate **pending**. The user authorized
 local work while Fedora updates. SSH became available as `dustin@10.211.55.13` during
-preparation; the parent confirmed Fedora 44 KDE aarch64 with g++ but without the Qt
-development/CMake/Ninja prerequisites. Ubuntu VM use is excluded. Ubuntu 22.04
+preparation; the parent prepared a disposable rootless Fedora 44 aarch64 Podman container
+with the development prerequisites and ran all four probes. Ubuntu VM use is excluded. Ubuntu 22.04
 remains the packaged ELF userspace baseline; containers/PRoot on Fedora are baseline
 userspaces, not booted desktop acceptance.
 
@@ -38,7 +38,8 @@ Header detection compiles `KColorScheme(QPalette::Active, KColorScheme::Header)`
 selected imported libraries and defines `DC_HAVE_KCOLORSCHEME_HEADER=0|1`. The pinned
 [KF5 header](https://invent.kde.org/frameworks/kconfigwidgets/-/blob/v5.92.0/src/kcolorscheme.h)
 and [KF6 header](https://invent.kde.org/frameworks/kcolorscheme/-/blob/v6.0.0/src/kcolorscheme.h)
-contain this enum. A successful compile is still pending; theme support separately needs
+contain this enum. Modern Fedora KF5/KF6 compile checks passed; floor-version checks remain
+pending. Theme support separately needs
 `Colors:Header` evidence. No Header color is inferred from a Window fallback.
 
 ## Source preparation
@@ -109,7 +110,55 @@ On the macOS development host with AppleClang 21, CMake and Python 3.14.7:
   -DDC_QT_MAJOR=5 -DDC_PROBE_KIND=qt -DDC_BUILD_TESTS=ON`: exit 1, named
   `Missing desktop-colors SDK: Qt5 Widgets >= 5.15`. This is missing infrastructure.
 
-The four probes have not compiled or run. Linux dependency preparation, baseline ELF
-requirements, system runtime/plugin loading, fixture reparse, palette events, Header
-guards, no-window behavior, config-write audit and both architectures remain pending.
-Task 1 and the native gate remain open; source/UI activation must wait for their evidence.
+## Modern Fedora system-runtime evidence
+
+The parent built probe source from `213739400` with GNU C++ 16.2.1 and ran verbose CTest
+under private Xvfb/D-Bus in the disposable Fedora 44 aarch64 container. This is headless
+container evidence, not booted desktop/theme-engine acceptance.
+
+The parent created `jasper-qt-tests` from `docker.io/library/fedora:44`, installed CMake,
+Ninja, GCC C++, Qt5/Qt6 development packages, KF5 ConfigWidgets, KF6 ColorScheme/Config
+development packages, Python, binutils, Xvfb and dbus-daemon inside it, and copied source
+to `/work/packaging/desktop-colors`. After `ssh dustin@10.211.55.13` and
+`podman exec -it jasper-qt-tests bash`, the reproducer is:
+
+```sh
+mkdir -p /tmp/runtime-root
+chmod 700 /tmp/runtime-root
+export XDG_RUNTIME_DIR=/tmp/runtime-root
+for target in qt5 qt6 kde5 kde6; do
+  major=${target: -1}
+  kind=${target%?}
+  cmake -S /work/packaging/desktop-colors -B /work/build/$target -G Ninja \
+    -DDC_QT_MAJOR=$major -DDC_PROBE_KIND=$kind -DDC_BUILD_TESTS=ON
+  cmake --build /work/build/$target -j2
+  xvfb-run -a dbus-run-session -- ctest --test-dir /work/build/$target --verbose
+done
+```
+
+| Target | Compiled/runtime Qt | Built-against KF | CTest | Application/widget palette events | Visible windows |
+| --- | --- | --- | --- | --- | --- |
+| Qt5 | 5.15.18 / 5.15.18 | — | 1 passed | 4 / 2 | 0 |
+| Qt6 | 6.11.2 / 6.11.2 | — | 1 passed | 4 / 1 | 0 |
+| KDE5 | 5.15.18 / 5.15.18 | 5.116.0 | 1 passed | 4 / 2 | 0 |
+| KDE6 | 6.11.2 / 6.11.2 | 6.31.0 | 1 passed | 4 / 1 | 0 |
+
+Both KDE Header constructor compile checks succeeded; both fixtures report Header theme
+absent. Both KDE fixtures read back all four distinctive pairs and reparse the changed
+Window background (`#ff0b0c0d` to `#ff333435`). Mapped Qt/KF library paths are under
+`/usr/lib64/`, including `libQt5Core.so.5.15.18`, `libQt6Core.so.6.11.2`,
+`libKF5ConfigWidgets.so.5.116.0` and `libKF6ColorScheme.so.6.31.0`; runtime KF version
+remains explicitly unknown through public APIs.
+
+Raw logs: `/private/tmp/jasper-fedora-compatibility.log` (Qt5/Qt6/KDE5 plus initial missing
+KF6 Config development package), `/private/tmp/jasper-fedora-kde6.log` (KDE6 successful
+rerun after installing that package inside the container). The first log includes D-Bus
+portal activation/teardown warnings despite all three probe tests passing. These runs do
+not establish clean desktop integration or the complete release gate. The Gradle task now
+uses `ctest --verbose --output-on-failure` so successful version/event/Header/mapping
+evidence is visible in its captured output, as it is in these manually verbose runs.
+
+Pinned private SDK preparation, minimum-version runtime tests, baseline ELF requirements,
+external mapped-window/config-write audit, real theme-engine events and x86_64 evidence
+remain pending. Task 1 and the native gate remain open; source/UI activation must wait
+for their evidence.
