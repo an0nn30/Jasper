@@ -1100,8 +1100,13 @@ the piece ends with its handle or its plugin. Both need `terminal.observe`.
 - `docs/sdk-architecture.md`, `## Terminal API`: add one sentence: "Tab name pieces (`TabNamePieceSpec`,
   `TabNamePiece`, `Terminals.addTabNamePiece`, `TabHandle.namePieces`) feed the Tab name pattern; the app keeps plugin
   pieces in `contributions.TabNamePieces`, which windows and Settings read."
-- `docs/remote.md`, `## SSH sessions`: add this sentence (written as code so this plan's own links are not checked):
-  `` An SSH tab's `{host}` [tab name piece](configuration.md#tab-names) is the address of the saved host it opened, such as `db1.example.com`, and stays while the tab shows that host. ``
+- `docs/remote.md`, `## SSH sessions`: add this sentence (fenced so this plan's own link check skips it):
+
+```markdown
+An SSH tab's `{host}` [tab name piece](configuration.md#tab-names) is the address of the saved host it opened, such as
+`db1.example.com`, and stays while the tab shows that host.
+```
+
 - `jasper-sdk/README.md`: add `TabNamePiece` and `TabNamePieceSpec` to the `dev.jasper.sdk.terminal` row.
 - `jasper-sdk-testkit/README.md`: where it lists `FakePluginHost`'s terminal scripting methods, add
   `setTabNamePieces`, `tabNamePieces` and `tabNamePieceSpecs`.
