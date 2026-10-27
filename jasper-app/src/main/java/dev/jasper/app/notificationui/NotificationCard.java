@@ -33,9 +33,9 @@ import javax.swing.SwingUtilities;
  * role), at most five lines of content in the description role, up to three action links with the rest under More, and a
  * close button shown on hover (always for a sticky card). Clicking the body runs the notification's default action;
  * that and an action link first ask {@code raise} to bring the window the notification pertains to forward, unless the
- * entry has expired. An app-owned layout shell (ruling G6) on the kit's notice surface (a grouped card's radius, hairline and padding), hosting
- * pointer-only kit views (ruling G5): nothing in it takes the keyboard from the terminal. Plain text only. EDT only;
- * close it when it leaves its layer.
+ * entry has expired. An app-owned layout shell (ruling G6) on the kit's notice surface (a grouped card's radius,
+ * hairline and padding), hosting pointer-only kit views (ruling G5): nothing in it takes the keyboard from the
+ * terminal. Plain text only. EDT only; close it when it leaves its layer.
  */
 final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements AutoCloseable {
     static final int CONTENT_LINES = 5;

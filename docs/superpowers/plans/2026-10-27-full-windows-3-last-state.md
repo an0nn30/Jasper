@@ -1,5 +1,14 @@
 # Full windows 3: the last state and relaunch Implementation Plan
 
+> **Status (2026-10-27):** Executed, Tasks 1-4, on `claude/full-windows` (not merged or pushed). Additions to the plan
+> text: `WindowManager.Opening` gained `ToolWindows tools` (the window's own tool windows: the saved window's for a
+> restore, `ToolWindows.BUILT_IN` for a first window with nothing saved, else a copy of the active window's).
+> `WindowContent.replaceToolWindows` and `WindowContributions.discard` serve the failed-restore fallback, which swaps a
+> restored window's tool windows for the built-in ones. Controller Rulings: 1, the status bar's visibility stays the
+> `window.status_bar` setting (not saved per window); 2, a failed restore opens the `BUILT_IN` tool windows; 3, a
+> window's activation schedules the debounced save. Task 4 also made `UiState` read an older `version` quietly (INFO, no
+> stack trace) and updated the guides.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Each window keeps its own tool window state; `workspace.toml` saves one window, the last to close; relaunch

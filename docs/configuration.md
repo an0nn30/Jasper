@@ -41,7 +41,7 @@ and never changes the login item, so the `system.run_in_background` in its file 
 | `plugins.toml`, `plugins.lock` | Which plugins are enabled and the capabilities you consented to; the lock held while that file changes. |
 | `themes/` | Imported themes, one `<id>.json` each ([Themes](themes.md)). |
 | `ui-state.toml`, `workspace.toml`, `command-history.toml`, `buddy.toml` | [Application state](#application-state-files). |
-| `workspace.toml.bad` | Saved windows Jasper could not restore ([workspace.toml](#workspacetoml)). |
+| `workspace.toml.bad` | The saved window Jasper could not restore ([workspace.toml](#workspacetoml)). |
 | `logs/` | Jasper's log files ([Diagnostics](diagnostics.md)). |
 | `shell-integration/` | The [shell integration](#shell-integration) scripts, extracted at every start. |
 | `daemon/` | Owner-only on macOS and Linux. The instance lock (`instance.lock`, with the owner's process id in `instance.pid`) that the Jasper owning the home holds while it runs, resident or not ([one Jasper per home](command-line.md#one-jasper-per-home)); the handoff socket a second launch hands its request to (`socket`, with `token`); the `jasper` command's socket (`commands`, with `commands.token` and `commands.token.pid`); and `subcommands`, the plugin commands `jasper --help` lists. |
@@ -216,7 +216,7 @@ Choices made outside Settings save here too, at once: View › Show/Hide › Too
 palette's **Toolbar: …**, **Show Status Bar**/**Hide Status Bar** and **Terminal Scheme: …** commands. While
 `config.toml` is rejected they are refused with a message. Some choices last only for the session: a pane's or Editor
 tab's own font size (Increase, Decrease and Reset Font Size) and **Show Jasper**/**Hide Jasper**. View › Show/Hide ›
-Rail is kept in [`ui-state.toml`](#ui-statetoml).
+Rail is kept per window in [`workspace.toml`](#workspacetoml).
 
 ### Look-dependent defaults
 
@@ -273,7 +273,7 @@ search field, and opens the command palette as a floating card; `"normal"` (the 
 header. The change applies after a restart, and `window.toolbar` keeps its value for a return to Normal.
 
 Zen (View › View Modes › Zen) hides the window's status bar and tool windows. It is not a setting: Jasper keeps it
-as `zen_mode` in [`ui-state.toml`](#ui-statetoml). Its action, `toggle_zen_mode`, has no default shortcut.
+per window in [`workspace.toml`](#workspacetoml). Its action, `toggle_zen_mode`, has no default shortcut.
 [The workspace](workspace.md) describes both modes.
 
 ### Animations
@@ -354,7 +354,8 @@ With `system.run_in_background` on (the default on macOS and Windows), Jasper ke
 closes, so the next window opens without a cold start; plugins keep running, but no shell does. On macOS, Quit (Cmd+Q)
 closes every window and leaves Jasper in the menu bar, whose item offers **New Window**, **Settings…** and
 **Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and **Quit Jasper**. Linux has
-no such icon, so the default there is off. [The workspace](workspace.md) describes quitting and reopening; `system.reopen` chooses whether the reopened window holds the last window you closed or the built-in layout.
+no such icon, so the default there is off. [The workspace](workspace.md) describes quitting and reopening;
+`system.reopen` chooses whether the reopened window holds the last window you closed or the built-in layout.
 
 Residency also starts Jasper in the background at login:
 
@@ -613,26 +614,19 @@ which is kept aside ([below](#workspacetoml)).
 
 | File | Holds |
 |---|---|
-| `ui-state.toml` | The tool window layout and where dialogs were ([below](#ui-statetoml)) |
-| `workspace.toml` | Jasper's windows, tabs and panes ([below](#workspacetoml)) |
+| `ui-state.toml` | Where dialogs, the palette and the file chooser's choices were ([below](#ui-statetoml)) |
+| `workspace.toml` | A window's place, tabs, panes and tool windows ([below](#workspacetoml)) |
 | `command-history.toml` | The command palette's recent commands and how often you used each result ([Command palette](command-palette.md)) |
 | `buddy.toml` | The desk buddy's position: `version = 1`, `x`, `y` |
 
 ### ui-state.toml
 
-At most 256 KiB. Jasper writes it whenever the layout changes and when it quits; the dock layout is shared by every window, and the last window to change or close it sets the
-next one's, a resident Jasper's included. The windows themselves are in [`workspace.toml`](#workspacetoml).
+At most 256 KiB. Jasper writes it whenever a saved value changes and when it quits. A window's tool windows (the
+dock, Zen and the rails) are in [`workspace.toml`](#workspacetoml). A file with an older `version` is read as defaults.
 
 | Key | Holds |
 |---|---|
-| `version` | `2` |
-| `rail_visible` | Whether the tool-window rails show (View › Show/Hide › Rail) |
-| `zen_mode` | Whether Zen is on |
-| `[dock]` `left_width`, `right_width`, `bottom_height` | The dock areas' sizes, in unscaled pixels |
-| `[dock]` `left_ratio`, `right_ratio`, `bottom_ratio` | How each area divides between its two slots |
-| `[panels."<id>"]` `slot`, `order`, `visible` | A tool window's slot (`LEFT_TOP`, `LEFT_BOTTOM`, `BOTTOM_LEFT`, `RIGHT_TOP`, `RIGHT_BOTTOM` or `BOTTOM_RIGHT`), its place on the stripe, and whether it showed |
-| `[panels."<id>"]` `mode`, `window` | `"float"` or `"window"` for a tool window with a window of its own (a docked one has no `mode`; the `slot` of one with a window is where its button sits and where it docks back), and that window's bounds, `{ x, y, width, height }` in screen coordinates, kept after the tool window docks again ([Float and Window](workspace.md#float-and-window)) |
-| `[look."<plugin id>".dock]`, `[look."<plugin id>".panels."<id>"]` | The same for a plugin's look, such as Enterprise, which keeps a layout of its own |
+| `version` | `3` |
 | `[windows."<id>"]` `x`, `y`, `width`, `height` | Where Settings (`app.settings`), the file chooser (`file-chooser`), About (`jasper.about`), Licenses (`jasper.licenses`) and a plugin's window-sized dialog, under its plugin id and title, such as the Credential Vault manager (`dev.jasper.vault\|Credential Vault`), were |
 | `[palette]` `center_x`, `top` | Where the palette card was dragged, as fractions of the window |
 | `[palette.run_window]` `left`, `bottom` | Where the Run window was dragged, as fractions of the window |
@@ -640,10 +634,17 @@ next one's, a resident Jasper's included. The windows themselves are in [`worksp
 
 ### workspace.toml
 
-At most 256 KiB. `workspace.toml` keeps Jasper's windows, each with its size, position and maximised state, its tabs in order with the one it shows, and each tab's split panes,
-the active one and what each pane holds. Jasper saves it within a second of each change, at once when a window closes,
-and before closing every window together (Quit, going to the background). It restores every
-window, in the order they were last active, whenever a window opens with none open, at start or after the last one closed, from what it saved last, else from the file. A
+At most 256 KiB. `workspace.toml` keeps one window: its size, position and maximised state (`[window]`), its tabs in
+order with the one it shows, each tab's split panes, the active one and what each pane holds, and its tool windows
+(`[window.tool_windows]`: whether the rails show and Zen is on; `.dock`, the dock's sizes and ratios; `.panels."<id>"`,
+each tool window's slot, place on the stripe, visibility, mode and own window's bounds; and `.look."<plugin id>"`, the
+same for a plugin's look, such as Enterprise). The file is `version = 2`; a version 1 file is read as nothing saved. Jasper
+saves it within a second of each change and of a window coming to the front, with the most recently active window's
+state; at once when you close a window, with that window's state; and on Quit or going to the background, with the
+most recently active window's. A window a move empties writes nothing at once, so the last window to close is the one
+saved. Whenever a window opens with none open, at start or after the last one closed, Jasper opens exactly one window,
+from what it saved last, else from the file; with `system.reopen` set to `empty_state` it opens the built-in layout
+(one terminal tab and the look's built-in tool windows) at the saved window's bounds instead. A
 window keeps its normal bounds while maximised or minimised and never comes back minimised; one that no longer fits an
 available display is fitted to a usable display. A terminal comes back with the name you gave it and its profile and a
 new shell in its last local directory, or where a new shell starts when that directory was on another host or is gone;
@@ -655,8 +656,8 @@ and, while its plugin runs, Retry. Scrollback, running programs, plugin views th
 untitled Editor tab, and Jasper's own tabs, such as the Errors tab, do not come back. When the windows would pass the
 size limit, Jasper leaves out plugins' views and then terminals, the largest first, and logs each one.
 
-When saved windows do not all come back (the file cannot be read, has another `version` or keeps no window, an
-entry in it is bad, or a window cannot be restored), Jasper keeps them as `workspace.toml.bad`, opens what it could
-(one terminal tab when the file itself is unusable) and posts "Jasper could not restore your windows". Quit Jasper
+When the saved window does not all come back (the file cannot be read, has another `version` or keeps no window, an
+entry in it is bad, or the window cannot be restored), Jasper keeps it as `workspace.toml.bad`, opens what it could
+(the built-in layout when the file itself is unusable) and posts "Jasper could not restore your window". Quit Jasper
 before changing the file: once Jasper has opened a window it restores from what it last saved, not from the file, and
 a later save may replace the change.

@@ -24,8 +24,9 @@ look can be active at a time."); [looks and plugin themes](plugins.md#looks-and-
 several are enabled. `jasper --safe-mode` always starts with the standard look
 ([command line](command-line.md#launching-jasper-with-options)).
 
-The Enterprise look keeps its own tool window layout in `ui-state.toml` (under `[look."dev.jasper.enterprise"]`), apart
-from the standard look's, so each comes back as you left it. After turning Enterprise off, a theme pick you saved as
+The Enterprise look keeps its own tool window layout in `workspace.toml` (under
+`[window.tool_windows.look."dev.jasper.enterprise"]`), apart from the standard look's, so each comes back as you
+left it. After turning Enterprise off, a theme pick you saved as
 `enterprise` shows the appearance's default theme, Jasper Meadow, without a warning, until Enterprise is on again.
 
 ### If the look does not start

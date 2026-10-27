@@ -56,7 +56,7 @@ public record AppDirs(Path root, Path configFile, Path logs, boolean overridden)
         return root.resolve("ui-state.toml");
     }
 
-    /** The saved windows, their parent tabs, splits, groups and tabs ({@code workspace.toml}). */
+    /** The saved window, its tabs, splits and panes ({@code workspace.toml}). */
     public Path workspaceState() {
         return root.resolve("workspace.toml");
     }

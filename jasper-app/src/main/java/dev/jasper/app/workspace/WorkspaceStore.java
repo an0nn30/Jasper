@@ -15,13 +15,13 @@ import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /**
- * Where Jasper's windows are saved (workspace tabs spec 13): {@code workspace.toml} in the Jasper home. The first change
- * after a save is saved {@link #DELAY} later, with every change made meanwhile, so a crash loses at most that; a window
- * closing saves at once ({@link #save(WorkspaceFile.Snapshot)}). Each save takes its snapshot on the EDT and writes it on {@code writer}, off the EDT, after the
- * writes before it, whatever happened to them. Closing the last window, Quit and going to the background save, then hold
- * every save ({@link #hold()}) until the windows are restored ({@link #load()}). A snapshot or a write that fails, or a
- * write the writer refuses, is logged and costs only that save: the next save writes the windows, changed or not. EDT
- * only, except {@link #written()}.
+ * Where Jasper's window is saved (workspace tabs spec 13; full windows spec 6.1): {@code workspace.toml} in the Jasper
+ * home. The first change after a save is saved {@link #DELAY} later, with every change made meanwhile, so a crash loses
+ * at most that; a window closing saves at once ({@link #save(WorkspaceFile.Snapshot)}). Each save takes its snapshot on
+ * the EDT and writes it on {@code writer}, off the EDT, after the writes before it, whatever happened to them. Closing
+ * the last window, Quit and going to the background save, then hold every save ({@link #hold()}) until the window is
+ * restored ({@link #load()}). A snapshot or a write that fails, or a write the writer refuses, is logged and costs only
+ * that save: the next save writes the window, changed or not. EDT only, except {@link #written()}.
  */
 public final class WorkspaceStore {
     /** The longest a change waits to be saved (spec 13: "within one second of each layout change"). */
@@ -54,7 +54,7 @@ public final class WorkspaceStore {
      * @param snapshot what to save now; empty while there is nothing to save (no window open)
      * @param schedule runs a task on the EDT after a delay and returns how to cancel it
      * @param writer where writes run, off the EDT
-     * @param setAside told where saved windows that could not be restored were kept ({@code workspace.toml.bad}): an
+     * @param setAside told where the saved window that could not be restored was kept ({@code workspace.toml.bad}): an
      *     unreadable file {@link #load()} read, a file whose reader dropped a window, a tab or an item entry, or a
      *     workspace {@link #setAside(WorkspaceFile.Snapshot)} keeps
      */

@@ -42,8 +42,8 @@ When more than one look plugin could still load (for example one loaded with `--
   another look's plugin; one look can be active at a time") and the election runs again without it.
 
 Jasper reads the look plugins' files once, while it starts and before it reads `config.toml`, so edits to them also
-apply after a restart. Each look keeps its own tool window layout in `ui-state.toml`: the default look's at the top of
-the file and a plugin look's under `[look."<plugin id>"]` ([ui-state.toml](configuration.md#ui-statetoml)).
+apply after a restart. Each look keeps its own tool window layout in each window's saved state in `workspace.toml`: the default look's under
+`[window.tool_windows]` and a plugin look's under its `.look."<plugin id>"` ([workspace.toml](configuration.md#workspacetoml)).
 
 `jasper --safe-mode` loads no look plugin, bundled ones included, and uses the default look; their status reads
 "safe mode uses the standard look" ([safe mode](plugins.md#safe-mode)).

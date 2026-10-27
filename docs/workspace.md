@@ -29,8 +29,8 @@ the focus, and they act on that window.
 ## Windows
 
 **New Window** (File menu, the toolbar's New Window button, Cmd+N on macOS, Ctrl+Shift+N on Linux and
-Windows) opens a window with one terminal tab and the tool windows as Jasper last saved them; while another window is
-open it opens out of Zen, with Float and Window tool windows hidden. Its shell starts in the focused pane's folder when Jasper knows
+Windows) opens a window with one terminal tab; with another window open it takes a copy of the active window's tool windows,
+out of Zen and with Float and Window tool windows hidden, and with none open it restores the saved window. Its shell starts in the focused pane's folder when Jasper knows
 it, otherwise in your home folder. **Close Window** (File menu, Cmd+Shift+W on macOS, no default shortcut on Linux and
 Windows) closes the window it runs in, as its title-bar close button does.
 
@@ -41,7 +41,7 @@ that offers **New Terminal Tab** and **Open File…** with their shortcuts; a ne
 dropped on it take its place. A window whose last tab moves to another window closes.
 
 A request that names no window, such as a file opened with the `jasper` command or a plugin's tab with no owner,
-goes to the most recently active window; when no window is open, Jasper restores its saved windows first.
+goes to the most recently active window; when no window is open, Jasper restores its saved window first.
 
 **Move Tab to New Window** (the window's ⋮, a terminal's right-click menu, a tab's menu and the command palette; no
 default shortcut) moves the shown tab, or the tab whose menu it was, with all its panes into a new window, when
@@ -60,17 +60,19 @@ workspace it left, where you release it.
 ### Saving and restoring the windows
 
 Jasper saves its windows to `workspace.toml` in Jasper home within a second of each change, at once when a window
-closes, and on Quit and when it goes to the background. It restores them at the next start and whenever a
-window opens with none open: every saved window, in the order they were last active, with its size, position and maximised state (fitted onto a
-display when its place is no longer on one; never minimised), its tabs in order with the one it showed, and each tab's
+closes, and on Quit and when it goes to the background, with the most recently active window's state (the closing
+window's, when you close one yourself). It restores one window at the next start and whenever a window opens with none
+open: the window saved last, with its size, position and maximised state (fitted onto a
+display when its place is no longer on one; never minimised), its tool windows, its tabs in order with the one it showed, and each tab's
 split panes with their sizes, the active pane, a maximised pane and the item each pane held. A terminal comes back with
 its name and profile and a new shell in its last local folder, or where a new shell starts when that folder is gone;
 only the shown tab's terminals start at once, the others when their tab first shows. Scrollback, running programs and
 dialogs, such as the Credential Vault's, do not come back. An Editor file ([Editor](editor.md#tabs)) or a Remote SSH tab
 ([Remote](remote.md#restored-ssh-tabs)) comes back through its plugin; a plugin's item that cannot come back shows a
-placeholder that says why, with **Close** and, while its plugin runs, **Retry**. When the saved windows cannot all come
+placeholder that says why, with **Close** and, while its plugin runs, **Retry**. When the saved window cannot all come
 back, Jasper opens what it can, keeps the saved file as `workspace.toml.bad` and says "Jasper could not restore your
-windows". Folders a launch names open in new tabs after the restored ones. See
+window". With **Reopen with** (`system.reopen`) set to **Empty State**, the window opens with one terminal tab and
+the built-in tool windows at the saved window's place. Folders a launch names open in new tabs after the restored ones. See
 [workspace.toml](configuration.md#workspacetoml).
 
 ### Title bar and menus
@@ -302,7 +304,7 @@ tooltip gives the count; see [the Notifications panel](notifications.md#the-noti
 for **View Mode**, **Move to** and **Hide**.
 
 A rail shows only while it holds a button. View › Show/Hide › Rail (palette: **Show Rail** / **Hide Rail**; no default
-shortcut, `toggle_rail`) hides or shows both rails in the window, and Jasper remembers the choice in `ui-state.toml`.
+shortcut, `toggle_rail`) hides or shows both rails in the window, and Jasper remembers the choice for the window in `workspace.toml`.
 `window.rail_width` (Settings › Window › Panel rail width) sets their width.
 
 Each tool window has a header: its title, the plugin's buttons, **Options** (⋮) with **View Mode**, **Move to** and
@@ -337,8 +339,8 @@ The tool window keeps its rail button or stripe button, in its slot, highlighted
   whole, such as New Tab or the command palette, run in the window the tool window belongs to and bring it to the front.
 - Zen hides these windows with the docked tool windows and shows them again when it ends.
 
-Jasper saves each tool window's mode, whether it shows and its window's position and size in `ui-state.toml`, for the
-look in use ([the keys](configuration.md#ui-statetoml)); a window that showed opens again with its window at the next
+Jasper saves each tool window's mode, whether it shows and its window's position and size in `workspace.toml`, for the
+window and the look in use ([the keys](configuration.md#workspacetoml)); a window that showed opens again with its window at the next
 start, and one saved on a display that is no longer connected opens on a connected one.
 
 ### Moving and resizing
@@ -365,8 +367,9 @@ start, and one saved on a display that is no longer connected opens on a connect
 When the window is too small for everything, the bottom area gives way first, then the right side, then the left,
 before the terminal column shrinks.
 
-Jasper saves the layout, which tool windows show and the rails' visibility in `ui-state.toml` whenever it changes; the
-next start uses the last saved layout.
+Jasper saves the layout, which tool windows show and the rails' visibility in `workspace.toml` whenever it changes; the
+next start uses the last saved window's layout. A window opened while another is open starts with a copy of the active
+window's tool windows, out of Zen and with its Float and Window tool windows hidden.
 
 ## View modes
 
@@ -375,7 +378,7 @@ next start uses the last saved layout.
 The header, toolbar and tabs stay. A tool window you open while in Zen shows in its slot as usual, without the
 rails. Leaving Zen hides those and shows the remembered ones again. View › Show/Hide › Status Bar and Rail, and their
 shortcuts, are unavailable in Zen. Zen is each window's own: a window opens in the Zen saved in
-`ui-state.toml`, or out of Zen while another window is open, and saves it each time you toggle it there. The saved layout keeps the tool
+`workspace.toml`, or out of Zen while another window is open, and saves it each time you toggle it there. The saved layout keeps the tool
 windows that showed before Zen, so one opened in Zen is not saved as showing.
 
 **Compact** (Settings › Appearance › View mode, `window.view_mode = "compact"`, after a restart) uses the system's
@@ -507,7 +510,7 @@ licence text. Escape closes either window; **Done** closes Licenses.
 Jasper keeps its files in **Jasper home**, the folder that holds `config.toml` (`~/.config/jasper` on macOS,
 `$XDG_CONFIG_HOME/jasper` or `~/.config/jasper` on Linux, `%APPDATA%\jasper` on Windows);
 [Files in Jasper's home](configuration.md#files-in-jaspers-home) lists what it holds and
-[ui-state.toml](configuration.md#ui-statetoml) what the layout file records.
+[workspace.toml](configuration.md#workspacetoml) what the layout file records.
 
 The `JASPER_HOME` environment variable, or the `jasper.home` system property, moves it; a Jasper in another home runs
 beside the installed app's and is never resident (see [Command line](command-line.md)).

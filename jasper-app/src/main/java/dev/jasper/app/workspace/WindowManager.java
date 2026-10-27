@@ -307,9 +307,9 @@ public final class WindowManager {
      * The window as the store has it (workspace tabs spec 13; tabs and panes spec 12; full windows spec 6.1), where it
      * was with its tabs, splits and panes, its items and its tool windows; with nothing to restore, or a window that
      * cannot be restored, a new window with one terminal tab in {@code directory} and the built-in tool windows. A
-     * restored window opens {@code directory} in a new tab after its own. A window that cannot be restored is not lost: the store keeps the
-     * saved window as {@code workspace.toml.bad} and says so (spec 15). The store is read here, after
-     * {@link #ensureWindow}'s checks, since reading it ends its hold.
+     * restored window opens {@code directory} in a new tab after its own. A window that cannot be restored is not
+     * lost: the store keeps the saved window as {@code workspace.toml.bad} and says so (spec 15). The store is read
+     * here, after {@link #ensureWindow}'s checks, since reading it ends its hold.
      */
     private Optional<JasperWindow> restore(String trigger, Path directory) {
         WorkspaceFile.Loaded loaded = store == null ? new WorkspaceFile.Loaded.Fresh(Optional.empty()) : store.load();

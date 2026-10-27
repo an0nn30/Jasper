@@ -24,7 +24,7 @@ import java.util.function.Supplier;
 /**
  * Runs the start-up benchmark: each launch goes through LaunchServices ({@code open}), like a Dock click, with the trace
  * file and, by default, an isolated home passed in {@code JAVA_TOOL_OPTIONS}. Before each launch in the isolated home
- * its saved windows are re-seeded ({@link #seedWorkspace}), so every run restores the same window; {@code --real-home}
+ * its saved window is re-seeded ({@link #seedWorkspace}), so every run restores the same window; {@code --real-home}
  * restores the user's own. Never part of the headless check.
  */
 final class StartupRuns {
@@ -78,20 +78,20 @@ final class StartupRuns {
     }
 
     /**
-     * The saved windows every run in an isolated home restores, a resource beside this class: one window with one
+     * The saved window every run in an isolated home restores, a resource beside this class: one window with one
      * terminal tab, the file AOT training restores too ({@code aotTrainingWorkspace} in
      * {@code gradle/packaging-support.gradle}).
      */
     static final String WORKSPACE_SEED = "startup-workspace.toml";
 
-    /** Where an isolated home keeps Jasper's saved windows. */
+    /** Where an isolated home keeps Jasper's saved window. */
     static Path isolatedWorkspace(Path home) {
         return home.resolve(".config/jasper/workspace.toml");
     }
 
     /**
-     * Replaces the isolated home's saved windows with {@link #WORKSPACE_SEED}, whatever the run before saved as it quit:
-     * every run then restores the same window, as a normal start restores the saved windows and as the AOT cache was
+     * Replaces the isolated home's saved window with {@link #WORKSPACE_SEED}, whatever the run before saved as it quit:
+     * every run then restores the same window, as a normal start restores the saved window and as the AOT cache was
      * trained.
      */
     static void seedWorkspace(Path home) throws IOException {

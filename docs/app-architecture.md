@@ -188,8 +188,8 @@ bounds and maximised state, its tabs in strip order with the one it shows, each 
 in the user's words: window, tab, pane, item). `WindowManager.snapshot()` builds what is saved, within a second of each
 change (a non-sliding timer on the EDT, the write on a virtual thread) and at once when a window closes, leaving items
 out until the file fits `WorkspaceFile.MAX_BYTES` (256 KiB); closing every window saves first and holds saving until
-the windows come back. `ensureWindow` restores every saved window when none is open, each with its
-place, tabs and items; a restored terminal's shell starts when its tab first shows, and until then its pane reports
+the windows come back. `ensureWindow` restores the saved window when none is open (`system.reopen`: the saved window, or the built-in
+layout at its place), with its place, tabs, items and tool windows; a restored terminal's shell starts when its tab first shows, and until then its pane reports
 `NOT_STARTED`; a plugin's item comes back through its plugin's restorer or as a placeholder (`PlaceholderContent`; see
 [SDK architecture](sdk-architecture.md)). The reader drops a bad window, tab or item entry alone; whenever saved windows
 do not all come back, the file is kept as `workspace.toml.bad` and a notice says where.
@@ -221,8 +221,8 @@ the operating system does not report the command line.
 2. It stops session admission and shell-profile detection, stops reporting Cygwin package management (its supervisor
    process runs on), closes the command recents, the heap watch and the memory indicator, then stops the plugins in
    reverse start order; their drained background work joins the wait.
-3. It clears pending clipboard secrets, closes the auxiliary windows, saves `ui-state.toml` (the windows were saved to
-   `workspace.toml` as they closed), and closes the
+3. It clears pending clipboard secrets, closes the auxiliary windows, saves `ui-state.toml` (the window was saved to
+   `workspace.toml` as it closed), and closes the
    notifiers, the themes, Buddy, the notification views and the configuration, then removes the desktop's application
    handlers.
 4. Cleanups registered with `JasperApplication.onShutdown` (the handoff endpoint, the command listener) run on daemon
@@ -428,8 +428,8 @@ activate that frame and move the keyboard to its first keyed control other than 
 the frame; a press in the terminal column clears the tint. The two requests come from the host's own toggle actions
 and from a `Panels.toggle` or `PanelHost.show()` made while the panel's own declared toggle action runs (`HostedUi`);
 any other plugin toggle or show is plain. As IntelliJ's activate action, an activating toggle of a shown frame that is
-not the active one activates it, and only the active one hides. `UiState` keeps such a look's dock
-under `[look."<provider id>"]`, and the application's Notifications panel becomes Event Log in the bottom strip
+not the active one activates it, and only the active one hides. Each window's saved state keeps such a look's dock
+under `[window.tool_windows.look."<provider id>"]` of each window's saved state, and the application's Notifications panel becomes Event Log in the bottom strip
 (`AppPanels`).
 
 ## Themes

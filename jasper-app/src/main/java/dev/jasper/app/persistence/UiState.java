@@ -149,6 +149,10 @@ public final class UiState {
         TomlParseResult toml = Toml.parse(text);
         if (toml.hasErrors()) throw new IOException("Invalid UI state format");
         Object version = toml.get(List.of("version"));
+        if (version instanceof Long older && older < VERSION) {
+            LOG.log(System.Logger.Level.INFO, "Not reading the UI state: version " + older + " is an older version's");
+            return;
+        }
         if (!Long.valueOf(VERSION).equals(version)) throw new IOException("Unknown UI state version: " + version);
         if (toml.get(List.of("windows")) instanceof TomlTable table)
             for (String id : table.keySet())

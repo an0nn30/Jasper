@@ -103,7 +103,7 @@ Setting the `JASPER_HOME` environment variable moves it; a Jasper in another hom
 never stays in the background ([one Jasper per home](command-line.md#one-jasper-per-home)). The home holds
 `config.toml` (written the first time you save a change in Settings), `logs/`, `themes/` for imported themes, `plugins/`
 with each plugin's settings file and data, `plugins.toml` with each plugin's enabled state and your consent,
-`ui-state.toml` with the tool window layout, and `workspace.toml` with the windows, tabs and panes Jasper restores. The
+`ui-state.toml` with where dialogs were, and `workspace.toml` with the window, tabs, panes and tool windows Jasper restores. The
 home is separate from the installed application, so removing or upgrading Jasper keeps your settings and data.
 [Configuration](configuration.md) lists every setting and file.
 

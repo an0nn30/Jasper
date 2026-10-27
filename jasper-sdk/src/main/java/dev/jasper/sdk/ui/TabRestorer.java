@@ -34,7 +34,7 @@ public interface TabRestorer {
      * a {@link LinkageError}: that closes the tab, which comes back as a placeholder, and is the plugin's failure as a
      * throw is, while the other saved tabs and windows come back. A {@link VirtualMachineError} (such as
      * {@link OutOfMemoryError} or {@link StackOverflowError}) is not contained: the tab it opened is closed and the
-     * error propagates, so the restore of that window fails. Jasper then keeps the saved windows aside and, for the
+     * error propagates, so the restore of that window fails. Jasper then keeps the saved window aside and, for the
      * first window, opens a new one in its place.
      *
      * @param request the window, the saved title and the restore state

@@ -223,10 +223,10 @@ visibility alone or a move within its half. A listener that moves the panel agai
 never hear the place it overtook; a failing handler is contained, and nothing runs after the panel closes. A plugin that lays
 a panel out another way describes another `ViewSpec` and calls `UiView.update`, as the Sample plugin's does.
 
-`persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order, visibility, mode and own window's
-bounds, the dock's sizes and ratios (the default look's, and each other look's under `[look."<id>"]`), Zen mode, stripe
-visibility, auxiliary window bounds and the dragged command palette's place; `workspace.toml` holds the windows
-themselves. It is application state, not configuration: a bad panel, window or dock entry falls back alone, an
+`persistence.UiState` (`ui-state.toml`, version 3) holds auxiliary window bounds, the dragged command palette's and Run
+window's places and the file chooser's choices; `workspace.toml` holds the window itself with its tool windows (each
+panel's slot, order, visibility, mode and own window's bounds, the dock's sizes and ratios per look, Zen and rail
+visibility). It is application state, not configuration: a bad panel, window or dock entry falls back alone, an
 unreadable file falls back to defaults, and writes are atomic.
 
 Plugin dialogs and the application's auxiliary windows follow the `WindowFrame`/`WindowContent` split.

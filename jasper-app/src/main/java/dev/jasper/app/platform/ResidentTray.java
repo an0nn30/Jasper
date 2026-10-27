@@ -42,7 +42,7 @@ public final class ResidentTray {
      *
      * @param open Windows: opens a window or raises the open one (also a double-click on the icon, unless a notification
      *     waits to be clicked)
-     * @param newWindow macOS: opens a window with a terminal tab, after the saved windows are restored
+     * @param newWindow macOS: opens a window with a terminal tab, after the saved window is restored
      * @param settings macOS: opens Settings
      * @param quit quits completely, through the normal quit path
      */

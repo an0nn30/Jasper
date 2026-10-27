@@ -826,7 +826,7 @@ public final class JasperApplication {
         };
     }
 
-    /** The saved windows, restored as {@link #open} restores them when none is open (or every one closes). EDT. */
+    /** The saved window, restored as {@link #open} restores it when none is open (or the last one closes). EDT. */
     private void restoreForSubcommand() { windows.ensureWindow(HANDOFF, null); }
 
     /**
@@ -1008,7 +1008,7 @@ public final class JasperApplication {
     }
 
     /**
-     * The menu bar item's New Window: a new window with a terminal tab, after the saved windows are restored
+     * The menu bar item's New Window: a new window with a terminal tab, after the saved window is restored
      * when none is open (workspace tabs spec 6.4 and 6.5), in front of other applications. EDT.
      */
     private void newWindowFromMenuBar() {
@@ -1044,7 +1044,7 @@ public final class JasperApplication {
     /**
      * Every outside request to show Jasper ends here: a second launch's handoff, the {@code jasper} command, the macOS
      * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3, 5.4, 6.4 and 13; full windows spec 5.2).
-     * The saved windows are restored first when none is open, as this process last saved them, else as
+     * The saved window is restored first when none is open, as this process last saved it, else as
      * {@code workspace.toml} has them, and the first directory the request names opens in a new tab of the first after
      * its restored ones (with nothing to restore, a new window opens there); otherwise the most recently active window
      * is raised. Each other directory opens as a new terminal tab and each
@@ -1067,8 +1067,8 @@ public final class JasperApplication {
 
     /**
      *
-     * A launch's first window, timed as a cold start unless a {@code --background} launch warmed up: the saved windows
-     * restored as this process last saved them, else as {@code workspace.toml} has them (workspace tabs spec 13), the
+     * A launch's first window, timed as a cold start unless a {@code --background} launch warmed up: the saved window
+     * restored as this process last saved it, else as {@code workspace.toml} has it (workspace tabs spec 13), the
      * first directory {@code paths} names opening in a new tab of the first after its restored ones; with nothing to
      * restore, a new window whose tab starts in that directory, else where a new shell starts. The rest of the paths
      * open in it as {@link #open} opens them (plan Ruling 13). EDT.
@@ -1987,7 +1987,7 @@ public final class JasperApplication {
 
     /**
      * Brings a window to the front for a click on an OS notification: the notification's window while it is open (the
-     * window holding its pane now, {@link #holderOf}), else the one used last, the saved windows restored first when none
+     * window holding its pane now, {@link #holderOf}), else the one used last, the saved window restored first when none
      * is open. Names the window; empty while Jasper quits.
      */
     private Optional<UUID> raiseFor(Optional<UUID> target) {

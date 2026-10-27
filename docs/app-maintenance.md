@@ -471,7 +471,7 @@ host (`connectContributions(model, state, hostsContent)` with `false`), so plugi
 error, info and launch-failure callbacks are logged, never shown, posted as notifications or recorded as incidents
 (`Rehearsal.silence`). It uses its own in-memory `UiState`, never restores the saved dock layout and is discarded rather
 than closed (`WindowFrame.discard`; a window that failed to open is discarded by `WindowManager`), so its default dock
-layout never replaces a window's in `ui-state.toml`; it bypasses `WindowManager`, so it never reads or writes
+layout never replaces a window's saved one; it bypasses `WindowManager`, so it never reads or writes
 `workspace.toml`. A process that has warmed up labels its first plain window `menu` rather than `cold`. Once `done` has
 run, on every path (a played rehearsal, a failed one, an `Error`, and the headless early return), `warmUp` starts one
 `System.gc()` on a daemon thread from a later EDT event, so the rehearsal's garbage does not stay in the resident heap;

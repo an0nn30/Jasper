@@ -10210,7 +10210,7 @@ restorer that has opened its tab keeps it whatever it then returns or throws, ex
 a <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/LinkageError.html"><code>LinkageError</code></a>: that closes the tab, which comes back as a placeholder, and is the plugin's failure as a
 throw is, while the other saved tabs and windows come back. A <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/VirtualMachineError.html"><code>VirtualMachineError</code></a> (such as
 <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/OutOfMemoryError.html"><code>OutOfMemoryError</code></a> or <a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/StackOverflowError.html"><code>StackOverflowError</code></a>) is not contained: the tab it opened is closed and the
-error propagates, so the restore of that window fails. Jasper then keeps the saved windows aside and, for the
+error propagates, so the restore of that window fails. Jasper then keeps the saved window aside and, for the
 first window, opens a new one in its place.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>request</code> the window, the saved title and the restore state</dd><dt>Returns</dt><dd>empty once the tab is open again; else why it cannot come back, which its placeholder shows after
     "could not restore this tab:"</dd></dl>

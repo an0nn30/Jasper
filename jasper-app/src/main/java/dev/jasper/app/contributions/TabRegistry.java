@@ -33,7 +33,7 @@ public final class TabRegistry {
     private static final System.Logger LOG = System.getLogger(TabRegistry.class.getName());
     private final Map<UUID, WorkspaceHost> hosts = new LinkedHashMap<>();
     private final List<Tab> tabs = new ArrayList<>();
-    /** The tabs asked for while the saved windows were being restored, in the order they were asked for. */
+    /** The tabs asked for while the saved window was being restored, in the order they were asked for. */
     private final List<Tab> waiting = new ArrayList<>();
     private final Map<String, BiFunction<List<Tab>, Boolean, CompletableFuture<Boolean>>> guards = new HashMap<>();
     /** The owner of Jasper's own content tabs, such as the Errors tab; a plugin's id is never {@code jasper}. */
@@ -102,7 +102,7 @@ public final class TabRegistry {
      * @param movedOut a move of a tab out of this window has ended, whether or not the tab left, or a tab placed in it
      *     failed to show: the window manager closes a window left without a tab now, never in the middle of the move
      * @param emptyWindow opens an empty window for a tab placed in a new window and gives its id; null when none opens
-     *     (the saved windows are being restored, or a test plays the windows), and the tab then opens where an
+     *     (the saved window is being restored, or a test plays the windows), and the tab then opens where an
      *     {@link Placement#NEW_TAB} one would
      */
     public record Windows(Supplier<UUID> window, Consumer<Tab> newWindow, Consumer<UUID> movedOut, Supplier<UUID> emptyWindow) {
@@ -226,7 +226,7 @@ public final class TabRegistry {
      * {@code owner} is null or not registered, and shows it (tabs and panes spec 13; full windows spec 5.2). A (plugin, key)
      * already open is selected again, and attached to a window again when it lost its own. Asked for a window while none
      * is open, it restores the windows first, so an item that restore brings back under the same (plugin, key) is the one
-     * selected, never a second. While the saved windows are being restored, a tab for them waits
+     * selected, never a second. While the saved window is being restored, a tab for it waits
      * ({@link #windowOpened}, {@link #windowFailed}).
      */
     public Tab open(String plugin, String key, String title, UUID owner, JComponent component) {
@@ -236,7 +236,7 @@ public final class TabRegistry {
     /**
      * As {@link #open(String, String, String, UUID, JComponent)}, the new tab where {@code placement} puts it: in a new
      * tab of that window or a new pane beside its focused pane, or in a new window of its own (workspace tabs spec 14). A
-     * (plugin, key) already open is selected where it is. One asked for while the saved windows are being restored waits
+     * (plugin, key) already open is selected where it is. One asked for while the saved window is being restored waits
      * for them and opens in a new tab of the first, whatever its placement.
      */
     public Tab open(String plugin, String key, String title, UUID owner, JComponent component, Placement placement) {
@@ -323,7 +323,7 @@ public final class TabRegistry {
     }
 
     /**
-     * The workspace of the window a tab with no window of its own goes to, the most recently active, the saved windows
+     * The workspace of the window a tab with no window of its own goes to, the most recently active, the saved window
      * restored first by the window manager when none is open (full windows spec 5.2); null while they are being restored.
      */
     private WorkspaceHost target() {
@@ -337,7 +337,7 @@ public final class TabRegistry {
      * The window a tab with no window of its own goes to now: the most recently active (full windows spec 5.2), the saved
      * windows restored first when none is open.
      *
-     * @return its id; null while the saved windows are being restored
+     * @return its id; null while the saved window is being restored
      */
     public UUID recentWindow() {
         requireEdt();
@@ -345,7 +345,7 @@ public final class TabRegistry {
         return host == null ? null : host.id();
     }
 
-    /** A tab asked for while the saved windows are being restored (a panel factory, say) waits for them (spec 6.4). */
+    /** A tab asked for while the saved window is being restored (a panel factory, say) waits for it (spec 6.4). */
     private void waitForWindow(Tab tab) { if (!waiting.contains(tab)) waiting.add(tab); }
 
     /**
@@ -391,7 +391,7 @@ public final class TabRegistry {
     }
 
     /**
-     * The saved windows failed to open (workspace tabs spec 6.4): the tabs that waited for them are removed, so disposed,
+     * The saved window failed to open (workspace tabs spec 6.4): the tabs that waited for it are removed, so disposed,
      * whatever removing another one throws, and nothing asks for a window again for them.
      *
      * @param failure the window's failure, which keeps theirs suppressed under it; the window manager rethrows it
