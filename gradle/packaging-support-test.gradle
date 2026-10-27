@@ -578,12 +578,13 @@ MODULES="java.base java.desktop jdk.jpackage"
             'its release file names no JCEF version'
         assert jcefRuntimeProblem('') == 'it has no jcef module'
         assert jcefRuntimeProblem(jcef.replace(' jcef ', ' jcef.something ')) == 'it has no jcef module'
-        requireJcefRuntime(new File('/jbr'), jcef)
+        File sdk = new File('/jbr') // the message prints the File, which is \jbr on Windows
+        requireJcefRuntime(sdk, jcef)
         try {
-            requireJcefRuntime(new File('/jbr'), plain)
+            requireJcefRuntime(sdk, plain)
             assert false : 'a runtime without JCEF must be refused'
         } catch (GradleException expected) {
-            assert expected.message == 'The selected JBR SDK at /jbr is not the JCEF build: it has no jcef module. ' +
+            assert expected.message == "The selected JBR SDK at ${sdk} is not the JCEF build: it has no jcef module. " +
                 'Install jbrsdk_jcef-25.0.4.1 (docs/packaging.md).'
         }
         logger.lifecycle('Verified the JCEF runtime check')
