@@ -1,6 +1,8 @@
 # Jasper Browser plugin
 
-Status: **Approved by the user on 2026-10-21** ("Looks good to me - lets go ahead and write out the plan"). **Refreshed
+Status: **Superseded on 2026-10-26** by the [iTerm2-parity design](2026-10-26-jasper-browser-plugin-design.md): the user
+narrowed the scope to "mirror the behavior of iTerms built-in browser. Nothing more nothing less." Kept as the record of
+plans 1 and 3. Was: **Approved by the user on 2026-10-21** ("Looks good to me - lets go ahead and write out the plan"). **Refreshed
 against main on 2026-10-22**, after the tab rework and its pane flexibility amendment landed. Decisions marked *(user)* are the
 user's own. Decisions marked *(call)* are the designer's calls. Most of them were shown to the user in the conversation;
 the ones made after the builder check (in sections 4, 5, 7, 8 and 9) are listed in the hand-over for the user to check.
