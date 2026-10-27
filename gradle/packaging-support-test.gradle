@@ -326,8 +326,13 @@ printf '%s\\n' "$@" > "${cache%/*}/options.txt"
         assert aotTrainingConfig(new File('/w/say "hi"/s.sh')).contains('args = ["/w/say \\"hi\\"/s.sh"]')
         expectFailure('Jasper exited (3) before start-up settled') { runAotTraining(fake('exits', 'exit 3\n'), work, 20, 20) }
         expectFailure('start-up settled without OUTPUT_PAINTED, so the cache would miss') {
-            runAotTraining(fake('no-output', settles('"WINDOW_SHOWN":1.0,"PLUGINS_BOUND":3.0', true)), work, 20, 20)
+            runAotTraining(fake('no-output', settles('"WINDOW_SHOWN":1.0,"PLUGINS_BOUND":3.0', true)), work, 5, 20)
         }
+        // A start slower than the trace's cap: settled without the milestones first, rewritten with them a second later.
+        String early = 'printf \'{"schema":1,"pid":%s,"kind":"cold","settled":true,"milestones":{}}\' "$$" > "$trace.part"\n' +
+            'mv "$trace.part" "$trace"\n' +
+            'sleep 1\n'
+        assert runAotTraining(fake('slow', early + settles(complete, true)), work, 20, 20).getText('UTF-8') == 'cache'
         expectFailure('start-up did not settle within 1 s') { runAotTraining(fake('stalls', 'while :; do sleep 1; done\n'), work, 1, 20) }
         expectFailure('the JVM wrote no cache') { runAotTraining(fake('no-cache', settles(complete, false)), work, 20, 20) }
         logger.lifecycle('Verified AOT training orchestration against stand-in launchers')

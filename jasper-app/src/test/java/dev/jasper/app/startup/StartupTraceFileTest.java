@@ -66,6 +66,21 @@ class StartupTraceFileTest {
             .containsEntry("trigger", "cold").containsEntry("requested", 600.0).containsEntry("OUTPUT_PAINTED", 630.0));
     }
 
+    @Test void aMilestoneMarkedAfterTheCapSettledRewritesTheDocument() throws Exception {
+        var fixture = new StartupTraceTest.Fixture();
+        Path file = temp.resolve("trace.json");
+        StartupTrace trace = fixture.trace(file);
+        fixture.at(8_000);
+        trace.mark(StartupTrace.Milestone.TOOLKIT_READY);
+        fixture.timers.getFirst().run();
+        assertThat(map(StartupTraceFile.read(file).get("milestones"))).doesNotContainKey("PLUGINS_BOUND");
+        fixture.at(11_000);
+        trace.mark(StartupTrace.Milestone.PLUGINS_BOUND);
+        Map<String, Object> rewritten = StartupTraceFile.read(file);
+        assertThat(rewritten).containsEntry("settled", true);
+        assertThat(map(rewritten.get("milestones"))).containsEntry("PLUGINS_BOUND", 11_100.0);
+    }
+
     @Test void anUnwritableTraceFileIsReportedOnceAndNeverThrows() throws Exception {
         var fixture = new StartupTraceTest.Fixture();
         Path blocked = temp.resolve("a-file");
