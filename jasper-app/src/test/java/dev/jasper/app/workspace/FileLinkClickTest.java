@@ -1,14 +1,18 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.launch.LaunchSettings;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.launch.ShellProfile;
 import dev.jasper.app.terminals.SessionAttempt;
 import dev.jasper.app.terminals.SessionRequest;
+import dev.jasper.app.testsupport.IdleTerminalSession;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.session.AttachedConnection;
 import dev.jasper.terminal.session.SessionLaunchOptions;
 import dev.jasper.terminal.session.TerminalSession;
+import dev.jasper.terminal.view.TerminalLink;
 import dev.jasper.terminal.view.TerminalView;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
@@ -48,11 +52,13 @@ import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 class FileLinkClickTest {
     private static final boolean MAC = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac");
     private static final int LINK = MAC ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
+    /** The split click: Cmd+Shift (Ctrl+Shift elsewhere), with no program asking for mouse reports. */
+    private static final int SPLIT = LINK | InputEvent.SHIFT_DOWN_MASK;
 
     @TempDir Path directory;
     private final PipedOutputStream remote = new PipedOutputStream();
     private final List<String> opened = Collections.synchronizedList(new ArrayList<>());
-    private final List<String> links = Collections.synchronizedList(new ArrayList<>());
+    private final List<LinkClick> clicks = Collections.synchronizedList(new ArrayList<>());
     private final List<WindowContent> windows = new ArrayList<>();
     private int writes;
 
@@ -204,7 +210,9 @@ class FileLinkClickTest {
         click(pane, 2, 2);
         click(pane, 2, 3);
 
-        assertThat(links).containsExactly("https://example.com/a?b=1", "ftp://files.example.com/x", "mailto:someone@example.com");
+        assertThat(clicks).extracting(click -> click.link().url())
+            .containsExactly("https://example.com/a?b=1", "ftp://files.example.com/x", "mailto:someone@example.com");
+        assertThat(clicks).extracting(click -> click.link().gesture()).as("Cmd-clicks (Ctrl-clicks elsewhere)").containsOnly(TerminalLink.Gesture.OPEN);
         assertThat(opened).containsExactly(directory.resolve("src").resolve("Foo.java") + ":3");
     }
 
@@ -221,13 +229,98 @@ class FileLinkClickTest {
 
         click(pane[0], 6, 0);
 
-        assertThat(links).containsExactly("https://example.com/remote");
+        assertThat(clicks).extracting(click -> click.link().url()).containsExactly("https://example.com/remote");
+    }
+
+    /**
+     * Browser plan 3b: a split click (Cmd+Shift-click, Ctrl+Shift-click elsewhere) in a pane wider than it is tall reaches
+     * the window as a click in a wide pane, which the application opens in a split to the right
+     * ({@code JasperApplicationPluginsTest.aTerminalClickReachesTheBrowserAsATabOrASplitByItsPanesShape}).
+     */
+    @Test void aSplitClickInAWidePaneIsSplitRight() throws Exception {
+        TerminalPane pane = localPane(attached());
+        write(pane, "see https://example.com/wide now\r\n");
+        edt(() -> pane.setSize(800, 300));
+
+        click(pane, 6, 0, SPLIT);
+
+        assertThat(clicks).containsExactly(
+            new LinkClick(new TerminalLink("https://example.com/wide", TerminalLink.Gesture.SPLIT, Optional.empty()), true));
+    }
+
+    /** As above, in a pane taller than it is wide, or as wide as it is tall: the application opens the link below it. */
+    @Test void aSplitClickInATallPaneIsSplitDown() throws Exception {
+        TerminalPane pane = localPane(attached());
+        write(pane, "see https://example.com/tall now\r\n");
+        edt(() -> pane.setSize(300, 800));
+        click(pane, 6, 0, SPLIT);
+        edt(() -> pane.setSize(500, 500));
+        click(pane, 6, 0, SPLIT);
+
+        var link = new TerminalLink("https://example.com/tall", TerminalLink.Gesture.SPLIT, Optional.empty());
+        assertThat(clicks).as("a square pane is not wide").containsExactly(new LinkClick(link, false), new LinkClick(link, false));
+    }
+
+    /**
+     * Browser plan 3b, Review Focus 1: a split click in a pane that is not the active one splits the pane clicked. Focus
+     * reaches that pane through focus events, after the click, so the view's link opener makes it the active pane before
+     * the window's {@code onOpenLink} hears the click; the active group is read there, as the application reads it. In a
+     * shown window the window's press listener makes a pressed pane the active one before the view hears the press; the
+     * first click leaves that listener out, so the opener's own activation is what it checks, and the second has both.
+     */
+    @Test void aSplitClickInAnUnfocusedPaneSplitsThatPane() throws Exception {
+        Queue<TerminalSession> sessions = new ArrayDeque<>(List.of(IdleTerminalSession.start(), attached()));
+        Queue<Runnable> pending = new ArrayDeque<>();
+        WindowContent[] owner = new WindowContent[1];
+        edt(() -> owner[0] = window(new ShellLauncher(pending::add, path -> sessions.remove(), "sh")));
+        pending.remove().run();
+        until(() -> owner[0].currentPane().view() != null);
+        TerminalPane[] panes = new TerminalPane[2];
+        edt(() -> { panes[0] = owner[0].currentPane(); owner[0].split(Side.RIGHT); });
+        pending.remove().run();
+        until(() -> owner[0].currentPane() != panes[0] && owner[0].currentPane().view() != null);
+        edt(() -> panes[1] = owner[0].currentPane());
+        write(panes[1], "see https://example.com/second now\r\n");
+        GroupId[] second = new GroupId[1];
+        List<GroupId> activeAtClick = new ArrayList<>();
+        edt(() -> {
+            second[0] = owner[0].workspace().model().groupOf(owner[0].tabHolding(panes[1]).id()).orElseThrow();
+            owner[0].focusGroup(Side.LEFT);
+            assertThat(owner[0].currentPane()).as("focus on the first pane").isSameAs(panes[0]);
+            owner[0].onOpenLink = click -> { clicks.add(click); activeAtClick.add(owner[0].workspace().model().activeGroup()); };
+        });
+
+        clickTheViewAlone(panes[1], 6, 0, SPLIT);
+        edt(() -> owner[0].focusGroup(Side.LEFT));
+        click(panes[1], 6, 0, SPLIT);
+
+        var link = new TerminalLink("https://example.com/second", TerminalLink.Gesture.SPLIT, Optional.empty());
+        assertThat(clicks).extracting(LinkClick::link).containsExactly(link, link);
+        assertThat(activeAtClick).as("the clicked pane's group, as the opener ran").containsExactly(second[0], second[0]);
+    }
+
+    /**
+     * Browser plan 3b: an OSC 8 link's {@code target=} name reaches the window's {@code onOpenLink} with the click, whichever
+     * the gesture; a URL written in the output has none.
+     */
+    @Test void theTargetReachesTheWindowsOpener() throws Exception {
+        TerminalPane pane = localPane(attached());
+        write(pane, "\033]8;target=docs;https://example.com/docs\007docs\033]8;;\007 https://example.com/plain\r\n");
+
+        click(pane, 1, 0);
+        click(pane, 1, 0, SPLIT);
+        click(pane, 8, 0);
+
+        assertThat(clicks).extracting(LinkClick::link).containsExactly(
+            new TerminalLink("https://example.com/docs", TerminalLink.Gesture.OPEN, Optional.of("docs")),
+            new TerminalLink("https://example.com/docs", TerminalLink.Gesture.SPLIT, Optional.of("docs")),
+            new TerminalLink("https://example.com/plain", TerminalLink.Gesture.OPEN, Optional.empty()));
     }
 
     private WindowContent window(ShellLauncher launcher) {
         WindowContent owner = new WindowContent(launcher, directory, path -> { }, () -> { }, () -> { });
         owner.onOpenFile = (file, line) -> opened.add(file + ":" + line);
-        owner.onOpenLink = links::add;
+        owner.onOpenLink = clicks::add;
         windows.add(owner);
         return owner;
     }
@@ -273,14 +366,32 @@ class FileLinkClickTest {
     }
 
     /** A Cmd-click (Ctrl-click elsewhere) on a cell, through the view's own mouse listener. */
-    private static void click(TerminalPane pane, int column, int row) throws Exception {
+    private static void click(TerminalPane pane, int column, int row) throws Exception { click(pane, column, row, LINK); }
+
+    /** A click on a cell with {@code modifiers} held, through the view's own mouse listener. */
+    private static void click(TerminalPane pane, int column, int row, int modifiers) throws Exception {
+        edt(() -> { for (MouseEvent event : clickOn(pane, column, row, modifiers)) pane.view().dispatchEvent(event); });
+    }
+
+    /**
+     * As {@link #click(TerminalPane, int, int, int)}, the press and release handed to the view's mouse listeners alone, so
+     * no other listener, such as the window's press listener, hears them.
+     */
+    private static void clickTheViewAlone(TerminalPane pane, int column, int row, int modifiers) throws Exception {
         edt(() -> {
-            TerminalView view = pane.view();
-            int x = column * (view.getPreferredSize().width / pane.session().columns()) + 1;
-            int y = row * (view.getPreferredSize().height / pane.session().rows()) + 1;
-            view.dispatchEvent(new MouseEvent(view, MouseEvent.MOUSE_PRESSED, 0, LINK | InputEvent.BUTTON1_DOWN_MASK, x, y, 1, false,
-                MouseEvent.BUTTON1));
-            view.dispatchEvent(new MouseEvent(view, MouseEvent.MOUSE_RELEASED, 0, LINK, x, y, 1, false, MouseEvent.BUTTON1));
+            MouseEvent[] click = clickOn(pane, column, row, modifiers);
+            for (var listener : pane.view().getMouseListeners()) listener.mousePressed(click[0]);
+            for (var listener : pane.view().getMouseListeners()) listener.mouseReleased(click[1]);
         });
+    }
+
+    /** The press and release of a click on a cell of {@code pane}'s view with {@code modifiers} held. EDT. */
+    private static MouseEvent[] clickOn(TerminalPane pane, int column, int row, int modifiers) {
+        TerminalView view = pane.view();
+        int x = column * (view.getPreferredSize().width / pane.session().columns()) + 1;
+        int y = row * (view.getPreferredSize().height / pane.session().rows()) + 1;
+        return new MouseEvent[] {
+            new MouseEvent(view, MouseEvent.MOUSE_PRESSED, 0, modifiers | InputEvent.BUTTON1_DOWN_MASK, x, y, 1, false, MouseEvent.BUTTON1),
+            new MouseEvent(view, MouseEvent.MOUSE_RELEASED, 0, modifiers, x, y, 1, false, MouseEvent.BUTTON1)};
     }
 }

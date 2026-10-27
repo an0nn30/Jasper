@@ -6,6 +6,8 @@ import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.testsupport.PluginJars;
+import dev.jasper.app.workspace.LinkClick;
+import dev.jasper.terminal.view.TerminalLink;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryType;
@@ -605,7 +607,7 @@ class JasperApplicationPluginsTest {
         edt(() -> {
             application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
             application[0].systemBrowser = address -> system.add(address.toString());
-            application[0].openLink("https://example.com/early", window);
+            application[0].openLink(clicked("https://example.com/early"), window);
         });
         assertThat(system).as("before the plugins start").containsExactly("https://example.com/early");
 
@@ -616,11 +618,11 @@ class JasperApplicationPluginsTest {
             + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
         edt(() -> {
             application[0].startPlugins(null, dev, false, dirs);
-            application[0].openLink("https://example.com/a", window);
-            application[0].openLink("HTTPS://Example.com/declined", window);
-            application[0].openLink("mailto:someone@example.com", window);
-            application[0].openLink("ftp://files.example.com/x", window);
-            application[0].openLink("https://example.com/a b", window);
+            application[0].openLink(clicked("https://example.com/a"), window);
+            application[0].openLink(clicked("HTTPS://Example.com/declined"), window);
+            application[0].openLink(clicked("mailto:someone@example.com"), window);
+            application[0].openLink(clicked("ftp://files.example.com/x"), window);
+            application[0].openLink(clicked("https://example.com/a b"), window);
         });
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
             .as("as clicks; a window that is not open is no window")
@@ -649,8 +651,8 @@ class JasperApplicationPluginsTest {
             application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
             application[0].systemBrowser = address -> system.add(address.toString());
             application[0].startPlugins(null, dev, false, dirs);
-            application[0].openLink("http://my_host/", window);
-            application[0].openLink("https://example.com/a", window);
+            application[0].openLink(clicked("http://my_host/"), window);
+            application[0].openLink(clicked("https://example.com/a"), window);
         });
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
             .as("only the address with a host reached the browser").containsExactly("https://example.com/a|CLICK|-");
@@ -810,13 +812,63 @@ class JasperApplicationPluginsTest {
                 () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
             main[0] = application[0].openFirstWindow(List.of()).orElseThrow();
         });
-        edt(() -> main[0].content().onOpenLink.accept("https://example.com/e"));
+        edt(() -> main[0].content().onOpenLink.accept(clicked("https://example.com/e")));
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
             .containsExactly("https://example.com/e|CLICK|" + main[0].id());
         assertThat(system).as("the browser took it").isEmpty();
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         ApplicationPluginCleanup.await(application[0]);
+    }
+
+    /**
+     * Browser plan 3b: a window's terminal link opener sends a Cmd-click (Ctrl-click elsewhere) to the provided browser in
+     * a tab, and a split click in a split of its pane, to the right of a pane wider than it is tall and below any other,
+     * each with its OSC 8 target and that window; a link that is no web address goes to the system browser whatever the
+     * gesture.
+     */
+    @Test void aTerminalClickReachesTheBrowserAsATabOrASplitByItsPanesShape() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("web-plugin");
+        PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        var system = new CopyOnWriteArrayList<String>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        dev.jasper.app.workspace.MainWindow[] main = new dev.jasper.app.workspace.MainWindow[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> system.add(address.toString());
+            application[0].startPlugins(null, dev, false, dirs);
+            // A stand-in frame opens the main window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
+            application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
+                () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            main[0] = application[0].openFirstWindow(List.of()).orElseThrow();
+        });
+        edt(() -> {
+            var opener = main[0].content().onOpenLink;
+            opener.accept(new LinkClick(new TerminalLink("https://example.com/open", TerminalLink.Gesture.OPEN, Optional.of("docs")), true));
+            opener.accept(new LinkClick(new TerminalLink("https://example.com/wide", TerminalLink.Gesture.SPLIT, Optional.empty()), true));
+            opener.accept(new LinkClick(new TerminalLink("https://example.com/tall", TerminalLink.Gesture.SPLIT, Optional.of("t")), false));
+            opener.accept(new LinkClick(new TerminalLink("mailto:someone@example.com", TerminalLink.Gesture.SPLIT, Optional.empty()), true));
+            opener.accept(new LinkClick(new TerminalLink("ftp://files.example.com/x", TerminalLink.Gesture.SPLIT, Optional.of("t")), false));
+            opener.accept(new LinkClick(new TerminalLink("http:/notes", TerminalLink.Gesture.SPLIT, Optional.empty()), true));
+        });
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/placed"))).containsExactly(
+            "https://example.com/open|TAB|docs", "https://example.com/wide|SPLIT_RIGHT|-", "https://example.com/tall|SPLIT_DOWN|t");
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened"))).containsExactly(
+            "https://example.com/open|CLICK|" + main[0].id(), "https://example.com/wide|CLICK|" + main[0].id(),
+            "https://example.com/tall|CLICK|" + main[0].id());
+        assertThat(system).as("mailto, ftp and an http link with no authority")
+            .containsExactly("mailto:someone@example.com", "ftp://files.example.com/x", "http:/notes");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
+    /** A Cmd-click (Ctrl-click elsewhere) on {@code url} in a pane, as a window's {@code onOpenLink} hears it. */
+    private static LinkClick clicked(String url) {
+        return new LinkClick(new TerminalLink(url, TerminalLink.Gesture.OPEN, Optional.empty()), false);
     }
 
     /**

@@ -40,6 +40,7 @@ import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.windows.NativeShells;
 import dev.jasper.app.workspace.DetachedFrame;
 import dev.jasper.app.workspace.JasperWindow;
+import dev.jasper.app.workspace.LinkClick;
 import dev.jasper.app.workspace.MainWindow;
 import dev.jasper.app.workspace.TerminalPane;
 import dev.jasper.app.workspace.WindowContent;
@@ -606,7 +607,7 @@ public final class JasperApplication {
             content.onInfo = (title, details) -> notificationViews.info(title, details, windowId);
             content.onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
             content.onOpenFile = (file, line) -> openFileAt(file, line, windowId);
-            content.onOpenLink = link -> openLink(link, windowId);
+            content.onOpenLink = click -> openLink(click, windowId);
             // File › Open File… (spec 13): the plugins' file chooser over this window; nothing before plugins start.
             content.fileChooser = folder -> auxiliary == null ? Optional.empty() : auxiliary.openFile(windowId, folder);
             if (main) notificationViews.attach(content);
@@ -782,14 +783,16 @@ public final class JasperApplication {
     /**
      * Opens a link a Cmd-click (Ctrl-click elsewhere) in window {@code window} handed over, as the terminal read it
      * (browser plan 3): a web address ({@code webAddress}) through the web browser a plugin provides, as a click from that
-     * window, else the system browser; any other link the terminal opens, an {@code ftp} URL or an OSC 8 {@code mailto}
-     * link, in the system browser, as before. A link that is not a URI opens nothing, and the log does not repeat it: it
-     * is program output. EDT.
+     * window with the link's OSC 8 target, in a tab, or for a split click in a split of the clicked pane (browser plan 3b:
+     * to the right of a pane wider than it is tall, otherwise below it), else the system browser; any other link the
+     * terminal opens, an {@code ftp} URL or an OSC 8 {@code mailto} link, in the system browser, as before, whatever the
+     * gesture. A link that is not a URI opens nothing, and the log does not repeat it: it is program output. EDT.
      */
-    void openLink(String link, UUID window) {
+    void openLink(LinkClick click, UUID window) {
+        String link = click.link().url();
         Optional<java.net.URI> address = webAddress(link);
         if (address.isPresent()) {
-            openWebAddress(address.get(), Optional.of(window));
+            openWebAddress(address.get(), placement(click), click.link().target(), Optional.of(window));
             return;
         }
         try {
@@ -799,14 +802,28 @@ public final class JasperApplication {
         }
     }
 
+    /** Where a clicked link asks to open: a Cmd-click in a tab, a split click beside its pane, by the pane's shape. */
+    private static PluginRuntime.Placement placement(LinkClick click) {
+        return switch (click.link().gesture()) {
+            case OPEN -> PluginRuntime.Placement.TAB;
+            case SPLIT -> click.paneWide() ? PluginRuntime.Placement.SPLIT_RIGHT : PluginRuntime.Placement.SPLIT_DOWN;
+        };
+    }
+
     /**
-     * Opens a web address the user asked for: the web browser a plugin provides, as a click from {@code window}, else the
-     * system browser; before the plugins start, the system browser. EDT.
+     * Opens a web address the user asked for: the web browser a plugin provides, as a click from {@code window} in a tab
+     * with no target, else the system browser; before the plugins start, the system browser. EDT.
      */
     private void openWebAddress(java.net.URI address, Optional<UUID> window) {
+        openWebAddress(address, PluginRuntime.Placement.TAB, Optional.empty(), window);
+    }
+
+    /** As above, where {@code placement} and the OSC 8 {@code target} ask. EDT. */
+    private void openWebAddress(java.net.URI address, PluginRuntime.Placement placement, Optional<String> target,
+                                Optional<UUID> window) {
         PluginRuntime runtime = plugins;
         if (runtime == null) systemBrowser.accept(address);
-        else runtime.openLink(address, PluginRuntime.Placement.TAB, Optional.empty(), window, systemBrowser);
+        else runtime.openLink(address, placement, target, window, systemBrowser);
     }
 
     /**

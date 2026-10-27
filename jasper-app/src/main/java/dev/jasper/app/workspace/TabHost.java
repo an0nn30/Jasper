@@ -5,6 +5,7 @@ import dev.jasper.app.config.TabNames;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.terminal.view.FileLink;
+import dev.jasper.terminal.view.TerminalLink;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
@@ -158,7 +159,17 @@ final class TabHost {
             owner.chrome().contextMenu().show(pane.view(), event.getX(), event.getY());
         });
         pane.view().setFileLinkHandler(link -> openFileLink(pane, link));
-        pane.view().setLinkOpener(link -> owner.onOpenLink.accept(link.url()));
+        pane.view().setLinkOpener(link -> openLink(tab, pane, link));
+    }
+
+    /**
+     * A link clicked in {@code pane} (browser plan 3b, Review Focus 1): its tab becomes the window's active tab and its
+     * group the active group at once, as focus going into the pane makes them, since the focus events of the click arrive
+     * later and a split click splits the pane clicked; then the window's {@code onOpenLink} hears it with the pane's shape.
+     */
+    private void openLink(Tab tab, TerminalPane pane, TerminalLink link) {
+        owner.tabFocused(tab);
+        owner.onOpenLink.accept(new LinkClick(link, pane.getWidth() > pane.getHeight()));
     }
 
     private static void unwire(TerminalPane pane) {

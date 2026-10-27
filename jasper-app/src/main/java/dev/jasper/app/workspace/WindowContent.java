@@ -263,11 +263,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      */
     public java.util.function.BiConsumer<Path, Integer> onOpenFile = (file, line) -> { };
     /**
-     * A Cmd-click (Ctrl-click elsewhere) opened a URL in one of this window's panes: the link as the terminal read it, an
-     * {@code http}, {@code https} or {@code ftp} URL or an OSC 8 {@code mailto} link, which may not parse as a URI. The
-     * application opens it; by default nothing opens. EDT.
+     * A Cmd-click (Ctrl-click elsewhere) or a split click opened a URL in one of this window's panes: the link as the
+     * terminal read it, an {@code http}, {@code https} or {@code ftp} URL or an OSC 8 {@code mailto} link, which may not
+     * parse as a URI, with its gesture, its OSC 8 target and whether the clicked pane is wider than it is tall. The clicked
+     * pane is the active one by then. The application opens it; by default nothing opens. EDT.
      */
-    public java.util.function.Consumer<String> onOpenLink = link -> { };
+    public java.util.function.Consumer<LinkClick> onOpenLink = click -> { };
     /**
      * File › Open File…'s chooser: given the active pane's folder, the file the person chose, or empty when they cancelled.
      * The application shows its file chooser over this window; by default nothing is chosen. EDT.
@@ -2816,7 +2817,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         childTitleColors = null;
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
-        onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; onOpenLink = link -> {}; fileChooser = folder -> java.util.Optional.empty();
+        onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; onOpenLink = click -> {}; fileChooser = folder -> java.util.Optional.empty();
         onLayoutChanged = () -> {};
         activityListeners.clear();
         anyWindowActive = () -> false;

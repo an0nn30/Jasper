@@ -428,10 +428,12 @@ the UI thread with a `WebLink`, and hand the address to the system browser when 
 no `WebLink`, it declines or it throws; before the plugins start, the system browser opens it. `openLocalWebFile` asks
 it for a `file:` link and answers whether it took it.
 A Cmd-click (Ctrl-click on Linux and Windows) on a URL in any terminal pane reaches `TerminalView.setLinkOpener`, which
-`TabHost` points at the window's `WindowContent.onOpenLink`; `JasperApplication.openLink` sends an absolute `http` or
-`https` address the role's way with the clicked window, and any other link the terminal opens (`ftp`, an OSC 8 `mailto`)
-to the system browser. `JasperApplication.commands()` sends `jasper <address>…`, when every argument is one, as
-external addresses in the calling pane's window, before the path and subcommand handling.
+`TabHost` points at the window's `WindowContent.onOpenLink`; `TabHost` first makes the clicked pane the active one and
+passes a `LinkClick` (the `TerminalLink` and whether the pane is wider than tall). `JasperApplication.openLink` sends
+an absolute `http` or `https` address the role's way with the clicked window and the OSC 8 target, as `TAB`, or for
+the `SPLIT` gesture as `SPLIT_RIGHT` from a wide pane and `SPLIT_DOWN` otherwise, and any other link the terminal
+opens (`ftp`, an OSC 8 `mailto`) to the system browser. `JasperApplication.commands()` sends `jasper <address>…`, when
+every argument is one, as external addresses in the calling pane's window, before the path and subcommand handling.
 `Platform.openInBrowser` asks the role as a click in the active window, then opens the system browser on the plugin's
 worker as `Platform.browse` does. `JasperApplication.browse`, which Settings' Help button, the Licenses window and the
 plugin manager use for Jasper's own links, sends them the clicks' way with the active window.
