@@ -47,6 +47,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
     private final NotificationCenter center;
     private final BiFunction<Duration, Runnable, Runnable> schedule;
     private final LongSupplier nanoTime;
+    private final Consumer<UUID> raise;
     private final Consumer<UUID> timedOut;
     /** Top to bottom: oldest to newest. */
     private final List<Slot> slots = new ArrayList<>();
@@ -81,20 +82,23 @@ public final class CardLayer extends JComponent implements AutoCloseable {
      * @param center the notification store
      * @param focused whether the window is active
      * @param openHistory shows the Notifications panel, for the "+N more" chip
+     * @param raise receives a card's id when the user clicks its body or an action, to bring the window the entry pertains to forward
      * @param timedOut receives a card's id after its countdown hides the card here, so the other windows can drop it
      */
-    public CardLayer(KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory, Consumer<UUID> timedOut) {
-        this(kit, center, focused, openHistory, timedOut, CardLayer::swingTimer, System::nanoTime);
+    public CardLayer(KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory, Consumer<UUID> raise,
+                     Consumer<UUID> timedOut) {
+        this(kit, center, focused, openHistory, raise, timedOut, CardLayer::swingTimer, System::nanoTime);
     }
 
-    CardLayer(KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory, Consumer<UUID> timedOut,
-              BiFunction<Duration, Runnable, Runnable> schedule, LongSupplier nanoTime) {
+    CardLayer(KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory, Consumer<UUID> raise,
+              Consumer<UUID> timedOut, BiFunction<Duration, Runnable, Runnable> schedule, LongSupplier nanoTime) {
         this.kit = Objects.requireNonNull(kit, "kit");
         this.center = Objects.requireNonNull(center, "center");
         this.schedule = Objects.requireNonNull(schedule, "schedule");
         this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
         this.focused = focused;
         Objects.requireNonNull(openHistory, "openHistory");
+        this.raise = Objects.requireNonNull(raise, "raise");
         this.timedOut = Objects.requireNonNull(timedOut, "timedOut");
         setLayout(null);
         setOpaque(false);
@@ -213,7 +217,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
 
     private void place(Notification notification) {
         boolean sticky = center.mode(notification.request().group()) == DisplayMode.STICKY;
-        var slot = new Slot(new NotificationCard(kit, center, notification, sticky));
+        var slot = new Slot(new NotificationCard(kit, center, notification, sticky, raise));
         slot.card.onHover = hovered -> {
             slot.hovered = hovered;
             if (hovered) pause(slot);

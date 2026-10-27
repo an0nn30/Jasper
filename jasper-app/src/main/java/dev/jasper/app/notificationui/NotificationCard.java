@@ -22,6 +22,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
@@ -30,7 +31,7 @@ import javax.swing.SwingUtilities;
 /**
  * One notification as a card (spec section 3): severity glyph, wrapping strong title with a muted repeat count (the count
  * role), at most five lines of content in the description role, up to three action links with the rest under More, and a
- * close button shown on hover (always for a sticky card). Clicking the body runs the notification's default action. An
+ * close button shown on hover (always for a sticky card). Clicking the body runs the notification's default action; that and an action link first ask {@code raise} to bring the window the notification pertains to forward. An
  * app-owned layout shell (ruling G6) on the kit's notice surface (a grouped card's radius, hairline and padding), hosting
  * pointer-only kit views (ruling G5): nothing in it takes the keyboard from the terminal. Plain text only. EDT only;
  * close it when it leaves its layer.
@@ -45,6 +46,7 @@ final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements
     private final dev.jasper.app.platform.PresentationIcons presentationIcons = new dev.jasper.app.platform.PresentationIcons();
     private final NotificationCenter center;
     private final boolean sticky;
+    private final Consumer<UUID> raise;
     private Notification notification;
     private final KitView icon, more, close;
     /** One pointer-only view per leading link, reused by position; hidden when not shown. */
@@ -59,12 +61,14 @@ final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements
     /** Told when the pointer enters or leaves the card, so its countdown pauses. */
     Consumer<Boolean> onHover = value -> {};
 
-    NotificationCard(KitContext kit, NotificationCenter center, Notification notification, boolean sticky) {
+    NotificationCard(KitContext kit, NotificationCenter center, Notification notification, boolean sticky,
+                     Consumer<UUID> raise) {
         super(kit, dev.jasper.ui.swing.SurfacePanel.Kind.NOTICE);
         this.kit = presentationIcons.context(kit);
         kit = this.kit;
         this.center = center;
         this.sticky = sticky;
+        this.raise = java.util.Objects.requireNonNull(raise, "raise");
         this.notification = notification;
         setLayout(null);
         setOpaque(false);
@@ -85,8 +89,10 @@ final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements
             @Override public void mouseEntered(MouseEvent event) { setHovered(true); }
             @Override public void mouseExited(MouseEvent event) { if (!pointerInside()) setHovered(false); }
             @Override public void mouseClicked(MouseEvent event) {
-                if (event.getSource() == NotificationCard.this && SwingUtilities.isLeftMouseButton(event))
-                    center.activate(NotificationCard.this.notification.id());
+                if (event.getSource() != NotificationCard.this || !SwingUtilities.isLeftMouseButton(event)) return;
+                UUID id = NotificationCard.this.notification.id();
+                raise.accept(id);
+                center.activate(id);
             }
         };
         addMouseListener(hover);
@@ -136,7 +142,10 @@ final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements
     private void event(UiEvent event) {
         if (closed || !(event instanceof UiEvent.Action action)) return;
         if (action.id().equals(CLOSE)) center.markRead(notification.id());
-        else if (action.id().startsWith(ACTION)) center.runAction(notification.id(), Integer.parseInt(action.id().substring(ACTION.length())));
+        else if (action.id().startsWith(ACTION)) {
+            raise.accept(notification.id());
+            center.runAction(notification.id(), Integer.parseInt(action.id().substring(ACTION.length())));
+        }
     }
 
     private ViewSpec closeSpec() {

@@ -10,6 +10,7 @@ import dev.jasper.app.startup.StartupTrace;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -136,5 +137,22 @@ class JasperApplicationSystemNoticesTest {
         // Stopping begins before plugins stop and the notices close: a plugin may still post from its stop().
         assertThat(JasperApplication.systemNotificationsEnabled(true, false, true)).as("stopped").isFalse();
         assertThat(JasperApplication.systemNotificationsEnabled(true, true, true)).isFalse();
+    }
+
+    @Test void clickingASystemNotificationRaisesThePertainingWindowNotTheLastActive() throws Exception {
+        var fixture = new PertainingWindowFixture();
+        try {
+            edt(() -> {
+                fixture.open();
+                UUID id = fixture.finished(fixture.paneOfA(), () -> { });
+                fixture.b.events().activated().accept(true);
+                assertThat(fixture.application.windows().lastActive()).as("B was active last").contains(fixture.b);
+                fixture.frames.clear();
+                fixture.application.systemNotices().clicked(id);
+                assertThat(fixture.frames).as("A comes forward, not B").containsExactly("front w0");
+            });
+        } finally {
+            fixture.close();
+        }
     }
 }

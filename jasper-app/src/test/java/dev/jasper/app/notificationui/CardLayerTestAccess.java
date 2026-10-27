@@ -11,8 +11,15 @@ import java.util.function.LongSupplier;
 public final class CardLayerTestAccess {
     private CardLayerTestAccess() {}
 
+    /** Clicks the body of the entry's card in the layer, as the pointer does. */
+    public static void clickBody(CardLayer layer, UUID id) {
+        var card = layer.card(id);
+        card.dispatchEvent(new java.awt.event.MouseEvent(card, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 5, 5, 1, false,
+            java.awt.event.MouseEvent.BUTTON1));
+    }
+
     public static CardLayer layer(dev.jasper.ui.swing.KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory,
-                                  Consumer<UUID> timedOut, BiFunction<Duration, Runnable, Runnable> schedule, LongSupplier nanoTime) {
-        return new CardLayer(kit, center, focused, openHistory, timedOut, schedule, nanoTime);
+                                  Consumer<UUID> raise, Consumer<UUID> timedOut, BiFunction<Duration, Runnable, Runnable> schedule, LongSupplier nanoTime) {
+        return new CardLayer(kit, center, focused, openHistory, raise, timedOut, schedule, nanoTime);
     }
 }

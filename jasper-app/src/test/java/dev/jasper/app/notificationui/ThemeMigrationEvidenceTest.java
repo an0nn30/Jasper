@@ -24,7 +24,7 @@ class ThemeMigrationEvidenceTest {
             var request = dev.jasper.app.notifications.NotificationRequest.of(group.id(), dev.jasper.app.notifications.Severity.WARNING, "Fixture notification").withContent("A fixture operation needs attention.")
                 .withAction(dev.jasper.app.notifications.NotificationAction.of("Review", () -> { }));
             var notification = center.find(center.post(request).orElseThrow()).orElseThrow();
-            var card = new NotificationCard(kit, center, notification, true);
+            var card = new NotificationCard(kit, center, notification, true, id2 -> { });
             save("notifications", theme, "warning-card", card, 360, 160);
             var incidents = new Incidents(Clock.fixed(Instant.parse("2026-10-05T12:00:00Z"), ZoneOffset.UTC));
             // The Errors tab, as production mounts it: the workspace route on its painted surface.

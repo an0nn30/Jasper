@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,54 @@ class JasperApplicationNotificationsTest {
                 assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
             }
             service.close();
+        }
+    }
+
+    /** Full windows 2: a card clicked in any window raises the window holding its pane now. */
+    @Test void clickingACardRaisesTheWindowHoldingItsPaneNow() throws Exception {
+        var fixture = new PertainingWindowFixture();
+        try {
+            edt(() -> {
+                fixture.open();
+                var ran = new ArrayDeque<String>();
+                UUID pane = fixture.paneOfA();
+                UUID id = fixture.finished(pane, () -> ran.add("focused"));
+                var layer = fixture.application.notificationViews().layer(fixture.b.id());
+                assertThat(layer.showing()).as("the card shows in B").containsExactly(id);
+                fixture.moveFirstTabToC();
+                assertThat(fixture.application.terminals().tab(fixture.application.terminals().pane(pane).orElseThrow().tabId())
+                    .orElseThrow().windowId()).as("the pane's tab moved to C").isEqualTo(fixture.c.id());
+                fixture.frames.clear();
+                dev.jasper.app.notificationui.CardLayerTestAccess.clickBody(layer, id);
+                assertThat(fixture.frames).as("C, which holds the pane now, comes forward").containsExactly("front w2");
+                assertThat(ran).as("and the pane is focused").containsExactly("focused");
+            });
+        } finally {
+            fixture.close();
+        }
+    }
+
+    @Test void clickingACardWhoseWindowClosedRunsItsActionInPlace() throws Exception {
+        var fixture = new PertainingWindowFixture();
+        try {
+            edt(() -> {
+                fixture.open();
+                var ran = new ArrayDeque<String>();
+                var request = NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.INFO, "For A")
+                    .withActivate(() -> ran.add("ran")).withTarget(fixture.a.id());
+                UUID id = fixture.application.notificationCenter().post(request).map(fixture::shownEverywhere).orElseThrow();
+                var layer = fixture.application.notificationViews().layer(fixture.b.id());
+                assertThat(layer.showing()).containsExactly(id);
+                fixture.a.requestClose();
+                assertThat(fixture.application.windows().windows()).hasSize(2);
+                fixture.frames.clear();
+                dev.jasper.app.notificationui.CardLayerTestAccess.clickBody(layer, id);
+                assertThat(ran).as("the action ran where it was clicked").containsExactly("ran");
+                assertThat(fixture.frames).as("no window came forward and none opened").isEmpty();
+                assertThat(fixture.application.windows().windows()).hasSize(2);
+            });
+        } finally {
+            fixture.close();
         }
     }
 }

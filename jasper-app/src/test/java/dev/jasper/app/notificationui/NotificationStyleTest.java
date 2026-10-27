@@ -54,7 +54,7 @@ class NotificationStyleTest {
             var icon=NotificationStyle.icon("icon",entry,receiver);
             assertThat(icon.name()).isEqualTo("owner:custom");assertThat(icon.severity()).contains(Nodes.Severity.WARNING);
             assertThat(context.icons().names()).contains("owner:custom");
-            var card=new NotificationCard(context,center,entry,false);
+            var card=new NotificationCard(context,center,entry,false, id2 -> { });
             card.close();
             // Stale delivery/update after disposal must not re-register or access a closed receiver.
             card.update(entry);assertThat(card.closed()).isTrue();
@@ -67,7 +67,7 @@ class NotificationStyleTest {
             center.register(new NotificationGroup("test.cards", "Cards", "jasper", DisplayMode.CARD));
             var request = NotificationRequest.of("test.cards", Severity.WARNING, "Repeated");
             var id = center.post(request.withIcon(new dev.jasper.app.platform.PresentationIcon("owner:old", "M 2 2 L 14 14"))).orElseThrow();
-            try (var card = new NotificationCard(dev.jasper.app.testsupport.KitTestSupport.context(), center, center.find(id).orElseThrow(), false)) {
+            try (var card = new NotificationCard(dev.jasper.app.testsupport.KitTestSupport.context(), center, center.find(id).orElseThrow(), false, id2 -> { })) {
                 var next = new dev.jasper.app.platform.PresentationIcon(nextName, nextName.contains(":") ? "M 2 14 L 14 2" : null);
                 assertThat(center.post(request.withIcon(next))).contains(id);
                 card.update(center.find(id).orElseThrow());
@@ -84,7 +84,7 @@ class NotificationStyleTest {
         var request=NotificationRequest.of("test.cards",Severity.WARNING,"Repeated");
         var first=new dev.jasper.app.platform.PresentationIcon("owner:mark","M 2 2 L 14 14");
         var id=center.post(request.withIcon(first)).orElseThrow();
-        try(var card=new NotificationCard(context,center,center.find(id).orElseThrow(),false)) {
+        try(var card=new NotificationCard(context,center,center.find(id).orElseThrow(),false, id2 -> { })) {
             var label=dev.jasper.app.testsupport.KitTestSupport.require(card.iconView(),NotificationCard.ICON,javax.swing.JLabel.class);
             var before=dev.jasper.app.testsupport.IconPixels.of(label.getIcon());
             var next=new dev.jasper.app.platform.PresentationIcon("owner:mark","M 2 14 L 14 2");

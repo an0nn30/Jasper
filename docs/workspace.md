@@ -437,7 +437,7 @@ Palette, or by clicking the header's search field; it drops down from the field.
 
 ## Notifications
 
-Jasper reports results and problems as cards in the bottom-right corner of a window instead of dialogs. The
+Jasper reports results and problems as cards in the bottom-right corner of every window instead of dialogs. The
 Notifications tool window (bell button, Right Top) keeps this session's history
 ([the Notifications panel](notifications.md#the-notifications-panel)), and **Notifications: Show Errors** opens the
 Errors tab in the most recently active window. When Jasper is in the background, the operating system shows them too. See

@@ -1,5 +1,14 @@
 # Full windows 2: notifications in every window Implementation Plan
 
+> **Status (2026-10-27):** Executed, Tasks 1-2, on `claude/full-windows` (not merged or pushed). Additions to the plan
+> text: Task 1 added `NotificationsFeature.LayerFactory` (builds a window's layer; tests inject controlled schedules), the
+> test bridge `CardLayerTestAccess` and public `CardLayer.waiting()`. Controller Ruling 1: the feature's `raise` goes
+> through `LayerFactory` too (`create(content, raise, timedOut)`), keeping one construction path; `raise` sits after
+> `openHistory` and before `timedOut` in the `CardLayer` constructors. Task 2's application tests show each card in every
+> layer by hand (headless, no Jasper window is ever active, so delivery sends no card), and `JasperApplication` gained
+> package-private `notificationViews()`, `commandNotifier()` and `systemNotices()` for them. `docs/notifications.md` was
+> updated beside `docs/workspace.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A notification card shows in every open window at once, leaves every window together, and clicking it (or

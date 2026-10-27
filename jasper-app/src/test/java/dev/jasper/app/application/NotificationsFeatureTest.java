@@ -144,8 +144,9 @@ class NotificationsFeatureTest {
         var tasks = new ArrayList<Runnable>();
         var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context,
             new dev.jasper.app.presentation.AppPanels("Notifications", Slot.RIGHT_TOP),
-            (content, timedOut) -> dev.jasper.app.notificationui.CardLayerTestAccess.layer(dev.jasper.app.testsupport.KitTestSupport.context(), center, true,
-                () -> { }, timedOut, (delay, task) -> {
+            id -> { },
+            (content, raise, timedOut) -> dev.jasper.app.notificationui.CardLayerTestAccess.layer(dev.jasper.app.testsupport.KitTestSupport.context(), center, true,
+                () -> { }, raise, timedOut, (delay, task) -> {
                     tasks.add(task);
                     return () -> { };
                 }, () -> 0L));

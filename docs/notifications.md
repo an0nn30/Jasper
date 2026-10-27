@@ -1,14 +1,14 @@
 # Notifications
 
 Jasper and its plugins tell you about errors and results with notifications instead of dialogs that stop your work.
-A notification shows as a card in one window (the one it concerns, otherwise the most recently active), waits in the Notifications panel until you have read it, and, while
+A notification shows as a card in every window at once, waits in the Notifications panel until you have read it, and, while
 Jasper is in the background, also shows as the operating system's own notification. Notifications are kept in memory
 only, at most the latest 500: they start fresh every time Jasper starts, and a resident Jasper (one still running with
 no window open) keeps them until it quits completely.
 
 ## Cards
 
-A card appears in the bottom-right corner of that window's tool window area, above the status bar and over any tool
+A card appears in the bottom-right corner of every window's tool window area, above the status bar and over any tool
 window docked there. It shows:
 
 - an icon for its severity (information, warning or error), or one its sender chose, in the severity's colour;
@@ -17,14 +17,17 @@ window docked there. It shows:
 - up to three links for what you can do next, as many as fit on one line, with the rest under **More ▾**.
 
 Clicking a card's body marks it read, closes it and, when the notification points somewhere, goes there (the pointer
-becomes a hand only then). A link also marks the notification read. The close button (tooltip "Close notification")
+becomes a hand only then). A link also marks the notification read. Either first brings forward the window the notification
+concerns, the one holding its terminal pane or else the one it was posted for while that is open; with none open, it acts
+where you clicked. The close button (tooltip "Close notification")
 shows while the pointer is over the card, and always on a sticky card.
 
 At most three cards show at once, the newest at the bottom; a fourth pushes out the oldest card that hides by itself.
 Cards never take the keyboard, clicks beside them go where they would anyway, and nothing animates.
 
-A card hides after ten seconds of you being in its window; the countdown pauses while the pointer is over the card and
-while the window is in the background. A hidden card stays unread in the panel. Sticky cards, such as configuration
+A card hides after ten seconds of you being in a window that shows it, and then leaves every window; the countdown pauses
+while the pointer is over the card and while the window is in the background. Reading or closing a card in one window
+removes it from all. A hidden card stays unread in the panel. Sticky cards, such as configuration
 problems, stay until you close them. When the three cards showing are all sticky, more wait behind a **+N more** link
 that opens the panel.
 

@@ -376,7 +376,8 @@ public final class JasperApplication {
         themes.appearance().shortcuts(this::shortcutLabel);
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
         notificationViews = new NotificationsFeature(notificationCenter, contributions,
-            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), presentation().projections().panels());
+            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), presentation().projections().panels(),
+            id -> pertainingWindow(id).flatMap(windows::window).ifPresent(JasperWindow::toFront));
         systemNotices = new SystemNotices(notificationCenter, this::systemNotificationsEnabled,
             new SystemNotices.Windows(this::raiseFor, this::showHistory, this::showErrors, this::holderOf));
         incidents = new Incidents(notificationCenter.clock());
@@ -2014,6 +2015,17 @@ public final class JasperApplication {
     }
 
     /**
+     * The window a notification pertains to, for a click on its card: the window holding its pane now ({@link #holderOf}),
+     * else the window the request targeted, kept only while that window is open. Empty when there is none, so a click then
+     * raises nothing and the action runs where it was clicked.
+     */
+    private Optional<UUID> pertainingWindow(UUID notification) {
+        return holderOf(notification)
+            .or(() -> notificationCenter.find(notification).flatMap(entry -> entry.request().target()))
+            .filter(id -> windows.window(id).isPresent());
+    }
+
+    /**
      * {@code notifications.system}, live: whether the operating system shows notifications while Jasper is away; never
      * once Jasper quits.
      */
@@ -2091,6 +2103,12 @@ public final class JasperApplication {
     dev.jasper.app.contributions.Contributions contributions() { return contributions; }
 
     NotificationCenter notificationCenter() { return notificationCenter; }
+
+    NotificationsFeature notificationViews() { return notificationViews; }
+
+    CommandNotifier commandNotifier() { return notifications; }
+
+    SystemNotices systemNotices() { return systemNotices; }
 
     Incidents incidents() { return incidents; }
 

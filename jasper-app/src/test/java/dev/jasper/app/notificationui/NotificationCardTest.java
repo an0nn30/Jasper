@@ -50,7 +50,11 @@ class NotificationCardTest {
     private NotificationCard card(Notification notification, boolean sticky) { return card(KitTestSupport.context(), notification, sticky); }
 
     private NotificationCard card(KitContext kit, Notification notification, boolean sticky) {
-        return new NotificationCard(kit, center, notification, sticky);
+        return card(kit, notification, sticky, id -> { });
+    }
+
+    private NotificationCard card(KitContext kit, Notification notification, boolean sticky, java.util.function.Consumer<java.util.UUID> raise) {
+        return new NotificationCard(kit, center, notification, sticky, raise);
     }
 
     private static void click(JComponent card) {
@@ -161,6 +165,25 @@ class NotificationCardTest {
         assertThat(center.find(plain.notification().id()).orElseThrow().read()).as("spec section 2: clicking the body marks it read").isTrue();
         assertThat(ran).containsExactly("activated");
         withDefault.close(); plain.close();
+    }
+
+    @Test void aClickRaisesThenActivates() {
+        var order = new ArrayList<String>();
+        var body = card(KitTestSupport.context(), posted(titled("Body").withActivate(() -> order.add("activated"))), false,
+            id -> order.add("raised " + id));
+        click(body);
+        assertThat(order).containsExactly("raised " + body.notification().id(), "activated");
+        order.clear();
+        var withAction = card(KitTestSupport.context(), posted(titled("Action").withAction(NotificationAction.of("Go", () -> order.add("ran")))),
+            false, id -> order.add("raised"));
+        link(withAction, 0).doClick(0);
+        assertThat(order).as("an action link raises first").containsExactly("raised", "ran");
+        order.clear();
+        var closing = card(KitTestSupport.context(), posted(titled("Closing")), true, id -> order.add("raised"));
+        find(closing.closeView(), NotificationCard.CLOSE, AbstractButton.class).doClick(0);
+        assertThat(order).as("Close only reads").isEmpty();
+        assertThat(center.find(closing.notification().id()).orElseThrow().read()).isTrue();
+        body.close(); withAction.close(); closing.close();
     }
 
     @Test void closeShowsOnHoverForAutoHidingCardsAndAlwaysForStickyOnes() {

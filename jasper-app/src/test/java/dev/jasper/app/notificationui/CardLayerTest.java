@@ -47,7 +47,7 @@ class CardLayerTest {
     private CardLayer layer(KitContext kit, boolean focused) {
         center.register(CARDS);
         center.register(STICKY);
-        return new CardLayer(kit, center, focused, () -> opened.add("history"), timedOut::add, (delay, task) -> {
+        return new CardLayer(kit, center, focused, () -> opened.add("history"), id -> { }, timedOut::add, (delay, task) -> {
             boolean[] cancelled = {false};
             scheduled.add(new Scheduled(delay, task, cancelled));
             return () -> cancelled[0] = true;

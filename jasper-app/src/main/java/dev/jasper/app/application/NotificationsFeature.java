@@ -43,6 +43,7 @@ final class NotificationsFeature implements AutoCloseable {
     private final Subscription listening;
     private final java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit;
     private final LayerFactory layers;
+    private final java.util.function.Consumer<UUID> raise;
     private boolean closed;
 
     /** {@code kit} supplies the chrome kit context the cards and the Notifications panel are built with: the default look's panel. */
@@ -53,21 +54,32 @@ final class NotificationsFeature implements AutoCloseable {
     /** As the three-argument form, with the panel's title and default slot under the look: Event Log at Bottom Left under labelled stripes. */
     NotificationsFeature(NotificationCenter center, Contributions contributions, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit,
                          dev.jasper.app.presentation.AppPanels panels) {
-        this(center, contributions, kit, panels, null);
+        this(center, contributions, kit, panels, id -> { });
     }
 
-    /** Builds a window's card layer from its content and the callback a countdown that hides a card reports to; tests inject controlled schedules. */
+    /**
+     * Builds a window's card layer from its content, the feature's {@code raise} (a click on a card brings the window the
+     * notification pertains to forward) and the callback a countdown that hides a card reports to; tests inject controlled schedules.
+     */
     interface LayerFactory {
-        CardLayer create(WindowContent content, java.util.function.Consumer<UUID> timedOut);
+        CardLayer create(WindowContent content, java.util.function.Consumer<UUID> raise, java.util.function.Consumer<UUID> timedOut);
+    }
+
+    /** As the four-argument form, with {@code raise}: told a card's id when it is clicked, to bring its window forward. */
+    NotificationsFeature(NotificationCenter center, Contributions contributions, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit,
+                         dev.jasper.app.presentation.AppPanels panels, java.util.function.Consumer<UUID> raise) {
+        this(center, contributions, kit, panels, raise, null);
     }
 
     NotificationsFeature(NotificationCenter center, Contributions contributions, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit,
-                         dev.jasper.app.presentation.AppPanels panels, LayerFactory layers) {
+                         dev.jasper.app.presentation.AppPanels panels, java.util.function.Consumer<UUID> raise, LayerFactory layers) {
         this.center = center;
         this.contributions = contributions;
         this.kit = java.util.Objects.requireNonNull(kit, "kit");
-        this.layers = layers != null ? layers : (content, timedOut) -> new CardLayer(this.kit.get(), this.center, content.isActiveAndOpen(),
-            () -> this.contributions.requestPanel(new Contributions.PanelRequest(content.id(), PANEL_ID, Contributions.PanelRequest.Op.SHOW)), timedOut);
+        this.raise = java.util.Objects.requireNonNull(raise, "raise");
+        this.layers = layers != null ? layers : (content, cardRaise, timedOut) -> new CardLayer(this.kit.get(), this.center, content.isActiveAndOpen(),
+            () -> this.contributions.requestPanel(new Contributions.PanelRequest(content.id(), PANEL_ID, Contributions.PanelRequest.Op.SHOW)),
+            cardRaise, timedOut);
         center.register(GENERAL);
         center.register(CONFIG);
         var icon = AppIcons.semantic("bell");
@@ -92,7 +104,7 @@ final class NotificationsFeature implements AutoCloseable {
     void attach(WindowContent content) {
         if (closed || windows.containsKey(content.id())) return;
         UUID id = content.id();
-        var layer = layers.create(content, shown -> windows.values().forEach(each -> {
+        var layer = layers.create(content, raise, shown -> windows.values().forEach(each -> {
             if (each.content() != content) each.layer().withdraw(shown);
         }));
         content.mountCornerLayer(layer);

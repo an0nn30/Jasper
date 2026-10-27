@@ -35,14 +35,14 @@ class Task9cNoticeEvidenceTest {
                                 .withActivate(()->{});
                             for(int i=0;i<6;i++)request=request.withAction(NotificationAction.of("Review operation "+(i+1),()->{}));
                             var id=center.post(request).orElseThrow();center.post(request);
-                            try(var card=new NotificationCard(kit,center,center.find(id).orElseThrow(),false)) {
+                            try(var card=new NotificationCard(kit,center,center.find(id).orElseThrow(),false, id2 -> { })) {
                                 save(card,family,severity+"-auto-hide",360,card.getPreferredSize().height);
                                 assertThat(card.contains(0,0)).as("notice retains prior rectangular hit policy").isTrue();
                                 card.setHovered(true);save(card,family,severity+"-hover-close",360,card.getPreferredSize().height);
                                 var menu=KitTestSupport.require(card.moreView(),NotificationCard.MORE,JComponent.class).getComponentPopupMenu();
                                 save(menu,family,severity+"-more-popup",menu.getPreferredSize().width,menu.getPreferredSize().height);
                             }
-                            try(var sticky=new NotificationCard(kit,center,center.find(id).orElseThrow(),true)) {
+                            try(var sticky=new NotificationCard(kit,center,center.find(id).orElseThrow(),true, id2 -> { })) {
                                 save(sticky,family,severity+"-sticky",360,sticky.getPreferredSize().height);
                                 if(severity==Severity.ERROR)SurfaceEvidence.save(Path.of("build/theme-surfaces9c/notices",family,"ERROR-sticky-1x.png"),sticky,360,sticky.getPreferredSize().height,1);
                             }
