@@ -1,8 +1,8 @@
 # Jasper — Status and Handoff
 
 
-**JDK-8376576 workarounds retired — 2026-10-27** (`claude/great-wilson-b8a1e4`, on top of
-`claude/browser-jcef-runtime-0c197e`; the user chose each option). JBR 25.0.4.1 b635.75 fixes JDK-8376576, so
+**JDK-8376576 workarounds retired — 2026-10-27** (`claude/great-wilson-b8a1e4`, merged into
+`claude/browser-jcef-runtime-0c197e` at `aa58e637f`; the user chose each option). JBR 25.0.4.1 b635.75 fixes JDK-8376576, so
 `stagePackage` no longer unseals class-path jars, `verifyPackage` no longer rejects sealed ones, and `jbr-api` ships as
 published (no `Jasper-Modified` attribute, no modification notice in the Licenses window). `verifyLauncherImage`'s
 trained cache now runs from its copy once the training image is gone and checks the sealed probe's two classes and the
@@ -13,7 +13,7 @@ does. Headless `check` on macOS aarch64 (b635.75 jcef, after `cleanTest`) passed
 and the image's `jbr-api-1.9.0.jar` is byte-identical to Maven's. The user-approved `trainAotCache` run passed (73 MB
 cache): with the training copy deleted, `verifyAotCache` and `verifyPackage` accepted the cache, and the image's
 `java -XX:AOTMode=on -version` loaded all 13 classes it loads from `jbr-api`'s sealed package `com.jetbrains` (and
-3,015 of Jasper's) from the cache. Open: not merged or pushed; main's `e0f4de63e` gave the image test another killing
+3,015 of Jasper's) from the cache. Open: not pushed; main's `e0f4de63e` gave the image test another killing
 cache and removed the sealed probe, so its merge with this branch must keep the sealed probe and the trained cache's
 case; a normal start of a trained `Jasper.app` (GUI) is the user's; Windows and Linux runs of the image test wait for CI.
 
