@@ -102,8 +102,7 @@ With a COMMAND, runs it in the running Jasper. Jasper is started first when it i
 |---|---|
 | `jasper` | Brings the main window to the front, restoring Jasper's windows first when none is open and starting Jasper first when none is running, and exits with status 0. A new window it opens does not start in the caller's working directory. |
 | `jasper PATH...` | Opens each file in the [default editor](editor.md#default-editor), or reveals it in the file manager when no editor plugin runs or the default editor is **System default app**, and each folder as a terminal tab, in the main window, starting Jasper first when none is running. A relative PATH resolves against the caller's working directory, and every PATH must name an existing file or folder. A subcommand of the same name wins, so `jasper ./editor` opens a file named `editor`. |
-| `jasper URL...` | When every argument is an absolute `http` or `https` address, such as `jasper https://example.com`, opens each as a clicked link opens: in the web browser a plugin provides, from the window of the pane `jasper` ran in, else in your default browser. It exits with status 0. Before Jasper's plugins start, your default browser opens them. A call that mixes addresses and paths is a `PATH...` call. |
-| `jasper open-url URL` | Opens one `http` or `https` address a program asked for, such as a sign-in page, in the web browser a plugin provides when it takes it, else in your default browser, and exits with status 0. It is the command programs use, so `jasper --help` does not list it, and no plugin can declare a subcommand of that name. |
+| `jasper URL...` | When every argument is an absolute `http` or `https` address, such as `jasper https://example.com`, opens each, without asking first, in the web browser a plugin provides, from the window of the pane `jasper` ran in, else in your default browser. It exits with status 0. Before Jasper's plugins start, your default browser opens them. A call that mixes addresses and paths is a `PATH...` call. |
 | `jasper --help` | Prints the usage and the subcommands of the plugins that were running when Jasper last started, read from `daemon/subcommands` in Jasper home, without contacting Jasper. Before that file exists it prints "Start Jasper once to list the plugin commands." |
 | `jasper --<option> ...` | Any first argument starting with `--`, other than `--help`, starts Jasper with all the arguments (at most 64; with more it exits with status 1 and starts nothing), detached, in the caller's working directory and environment, so relative paths resolve there. Every [launcher option](#launching-jasper-with-options) works, including those the usage leaves out; while Jasper runs, the launch hands off and the running Jasper says that it keeps its own options. It exits with status 0 once it has started the launcher and does not wait, so a Jasper that rejects its arguments shows nothing. |
 | `jasper COMMAND [ARGUMENTS...]` | Runs a plugin's subcommand in the running Jasper, which first restores its windows when no main window is open and the subcommand's plugin runs. Its output reaches the caller's standard output and error as it is written, and `jasper` exits with the subcommand's exit code. Ctrl+C, or any other end of the `jasper` process, cancels the call. |
@@ -188,7 +187,6 @@ otherwise it quits once the call has ended and no Jasper window is open, or afte
 |---|---|---|
 | `jasper: unknown command <name>; run jasper --help for the list` | 2 | No plugin declares that subcommand, and no file or folder has that name. |
 | `jasper: no such file or folder: <arguments>` | 1 | The first argument names a file or folder, but the arguments listed name nothing. |
-| `jasper: open-url needs one web address (http or https)` | 2 | `jasper open-url` with no address, more than one, or one that is not an absolute `http` or `https` address. |
 | `jasper: <name> is unavailable (the <plugin> plugin is off)` | 1 | The plugin that declares it is not running (disabled, awaiting review, skipped in safe mode or unable to start), or has not registered a handler. |
 | `jasper: <name> failed: <message>` | 1 | The subcommand's handler failed. |
 | `jasper: <name> stopped` | 1 | The plugin stopped while the call was running. |
@@ -261,7 +259,7 @@ name = "tool"
 summary = "Do the tool's work"
 ```
 
-A name matches `[a-z][a-z0-9-]*`; `help`, `version` and `open-url` are reserved. The summary is the one line `jasper --help`
+A name matches `[a-z][a-z0-9-]*`; `help` and `version` are reserved. The summary is the one line `jasper --help`
 shows. Jasper decides who answers each name when it starts: a bundled plugin before any other, then the lowest plugin
 id. A running plugin that loses a name gets the plugin problem "A plugin command was not added". A plugin that is not
 running still owns the names no running plugin declares, so `jasper <name>` reports it off rather than unknown. The

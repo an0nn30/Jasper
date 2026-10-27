@@ -3,6 +3,7 @@ package dev.jasper.app.application;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.platform.AppDirs;
+import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.testsupport.PluginJars;
 import java.lang.management.ManagementFactory;
@@ -563,7 +564,10 @@ class JasperApplicationPluginsTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
 
-    /** A web browser that appends {@code <address>|<origin>|<window id or ->} to {@code data/opened} and declines {@code /declined}. */
+    /**
+     * A web browser that appends {@code <address>|<origin>|<window id or ->} to {@code data/opened} and
+     * {@code <address>|<placement>|<target or ->} to {@code data/placed}, and declines {@code /declined}.
+     */
     private static final String WEB_BROWSER = """
         package fix.web;
         import dev.jasper.sdk.plugin.Plugin;
@@ -577,6 +581,9 @@ class JasperApplicationPluginsTest {
                         Files.writeString(context.dataDirectory().resolve("opened"),
                             link.address() + "|" + link.origin() + "|"
                                 + link.window().map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-") + "\\n",
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                        Files.writeString(context.dataDirectory().resolve("placed"),
+                            link.address() + "|" + link.placement() + "|" + link.target().orElse("-") + "\\n",
                             StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                     } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
                     return !link.address().getPath().equals("/declined");
@@ -698,8 +705,11 @@ class JasperApplicationPluginsTest {
         ApplicationPluginCleanup.await(application[0]);
     }
 
-    /** Browser plan 3: jasper's addresses reach the provided browser, as clicks in the calling pane's window or as a program's. */
-    @Test void theJasperCommandsAddressesGoToTheProvidedBrowser() throws Exception {
+    /**
+     * Browser plan 3b: {@code jasper <address>} reaches the provided browser as an external address, as a tab with no
+     * target, in the window of the pane that ran the command (R9), or in none when the call names no pane.
+     */
+    @Test void aWebAddressGivenToTheCommandIsExternal() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
         Path dev = home.resolve("web-plugin");
         PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
@@ -722,15 +732,57 @@ class JasperApplicationPluginsTest {
                 .flatMap(tab -> tab.terminal().get()).orElseThrow().id();
         });
         var commands = application[0].commands();
-        var clicked = commands.dispatch(new dev.jasper.app.commandline.Invocation(List.of("https://example.com/c", "https://example.com/d"),
+        var fromAPane = commands.dispatch(new dev.jasper.app.commandline.Invocation(List.of("https://example.com/c", "https://example.com/d"),
             home, Optional.of(pane[0]), text -> { }, text -> { }));
-        assertThat(clicked.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
-        var program = commands.dispatch(new dev.jasper.app.commandline.Invocation(List.of("open-url", "https://example.com/sign-in"),
+        assertThat(fromAPane.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
+        var fromElsewhere = commands.dispatch(new dev.jasper.app.commandline.Invocation(List.of("https://example.com/sign-in"),
             home, Optional.empty(), text -> { }, text -> { }));
-        assertThat(program.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
+        assertThat(fromElsewhere.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened"))).containsExactly(
-            "https://example.com/c|CLICK|" + calling[0], "https://example.com/d|CLICK|" + calling[0], "https://example.com/sign-in|EXTERNAL|-");
+            "https://example.com/c|EXTERNAL|" + calling[0], "https://example.com/d|EXTERNAL|" + calling[0], "https://example.com/sign-in|EXTERNAL|-");
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/placed"))).as("each in a tab, with no target")
+            .containsExactly("https://example.com/c|TAB|-", "https://example.com/d|TAB|-", "https://example.com/sign-in|TAB|-");
         assertThat(system).as("the browser took each one").isEmpty();
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
+    /**
+     * Browser plan 3b: a link clicked with the split gesture reaches the provided browser as a click that asks for a split
+     * of its pane, with its OSC 8 target; a browser that declines it, or a target no {@code WebLink} holds, leaves it to the
+     * system browser.
+     */
+    @Test void aSplitClickReachesTheBrowserAsSplitRight() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("web-plugin");
+        PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        var system = new CopyOnWriteArrayList<String>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        java.util.UUID window = java.util.UUID.randomUUID();
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> system.add(address.toString());
+            application[0].startPlugins(null, dev, false, dirs);
+            var runtime = application[0].pluginRuntime();
+            runtime.openLink(java.net.URI.create("https://example.com/r"), PluginRuntime.Placement.SPLIT_RIGHT,
+                Optional.of("t"), Optional.of(window), application[0].systemBrowser);
+            runtime.openLink(java.net.URI.create("https://example.com/d"), PluginRuntime.Placement.SPLIT_DOWN,
+                Optional.empty(), Optional.empty(), application[0].systemBrowser);
+            runtime.openLink(java.net.URI.create("https://example.com/declined"), PluginRuntime.Placement.SPLIT_RIGHT,
+                Optional.of("t"), Optional.empty(), application[0].systemBrowser);
+            runtime.openLink(java.net.URI.create("https://example.com/long"), PluginRuntime.Placement.SPLIT_RIGHT,
+                Optional.of("t".repeat(257)), Optional.empty(), application[0].systemBrowser);
+        });
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/placed")))
+            .as("the long target never reached the browser")
+            .containsExactly("https://example.com/r|SPLIT_RIGHT|t", "https://example.com/d|SPLIT_DOWN|-", "https://example.com/declined|SPLIT_RIGHT|t");
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
+            .as("as clicks; a window that is not open is no window")
+            .containsExactly("https://example.com/r|CLICK|-", "https://example.com/d|CLICK|-", "https://example.com/declined|CLICK|-");
+        assertThat(system).containsExactly("https://example.com/declined", "https://example.com/long");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         ApplicationPluginCleanup.await(application[0]);

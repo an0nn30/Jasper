@@ -422,14 +422,16 @@ plugin's editor should edit the file and never run it. A failed `Platform.openIn
 notification group, as is a failed `Platform.browse`, which accepts only an absolute http or https address.
 
 `Platform.browser` (needs `browser.provide`) registers a `WebBrowser` in `plugins.WebBrowsers`, one at a time, by the
-same bundled rule; it runs on the UI thread and must not block, so nothing waits for it. `PluginRuntime.openLink` and
-`openProgramLink` ask it on the UI thread with `LinkOrigin.CLICK` or `PROGRAM`, and hand the address to the system
-browser when no plugin provides one, it declines or it throws; before the plugins start, the system browser opens it.
+same bundled rule; it runs on the UI thread and must not block, so nothing waits for it. `PluginRuntime.openLink`
+(`LinkOrigin.CLICK`, with a `PluginRuntime.Placement` and an OSC 8 target) and `openExternalLink` (`EXTERNAL`) ask it on
+the UI thread with a `WebLink`, and hand the address to the system browser when no plugin provides one, the parts make
+no `WebLink`, it declines or it throws; before the plugins start, the system browser opens it. `openLocalWebFile` asks
+it for a `file:` link and answers whether it took it.
 A Cmd-click (Ctrl-click on Linux and Windows) on a URL in any terminal pane reaches `TerminalView.setLinkOpener`, which
 `TabHost` points at the window's `WindowContent.onOpenLink`; `JasperApplication.openLink` sends an absolute `http` or
 `https` address the role's way with the clicked window, and any other link the terminal opens (`ftp`, an OSC 8 `mailto`)
-to the system browser. `JasperApplication.commands()` sends `jasper <address>…`, when every argument is one, as clicks
-in the calling pane's window, and `jasper open-url <address>` as a program's, before the path and subcommand handling.
+to the system browser. `JasperApplication.commands()` sends `jasper <address>…`, when every argument is one, as
+external addresses in the calling pane's window, before the path and subcommand handling.
 `Platform.openInBrowser` asks the role as a click in the active window, then opens the system browser on the plugin's
 worker as `Platform.browse` does. `JasperApplication.browse`, which Settings' Help button, the Licenses window and the
 plugin manager use for Jasper's own links, sends them the clicks' way with the active window.

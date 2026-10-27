@@ -690,42 +690,85 @@ public final class PluginRuntime {
         else current.fileEditors.openFromWorker(file, line, window, desktop);
     }
 
-    /**
-     * Opens a web address the user asked for (a link clicked in a terminal, {@code jasper <address>}): the web browser
-     * a plugin provides ({@code Platform.browser}), asked on this thread as a click from {@code window}, then
-     * {@code desktop} when no plugin provides one, or it declines or throws. Before the plugins start, {@code desktop}
-     * alone. UI thread: the browser must not block, so nothing waits for it.
-     *
-     * @param address an absolute http or https address
-     * @param window the Jasper window the address came from, or empty
-     * @param desktop the system browser's opener; it must not block
-     * @throws IllegalStateException off the UI thread
-     */
-    public void openLink(java.net.URI address, Optional<UUID> window, Consumer<java.net.URI> desktop) {
-        openAddress(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, window, desktop);
+    /** Where a web link asks to open, as the application states it; {@code dev.jasper.sdk.ui.LinkPlacement} stays in this package. */
+    public enum Placement {
+        /** A tab, as the browser places it. */
+        TAB,
+        /** A split to the right of the pane the link was clicked in. */
+        SPLIT_RIGHT,
+        /** A split below the pane the link was clicked in. */
+        SPLIT_DOWN
     }
 
     /**
-     * As {@link #openLink}, for an address a program asked for ({@code jasper open-url}): the browser hears it as an
-     * external address's. UI thread.
+     * Opens a web address the user clicked (a link in a terminal, one of Jasper's own): the web browser a plugin
+     * provides ({@code Platform.browser}), asked on this thread as a click from {@code windowId} with {@code placement}
+     * and the link's OSC 8 {@code target}, then {@code desktop} when no plugin provides one, the parts make no web link,
+     * or it declines or throws. Before the plugins start, {@code desktop} alone. UI thread: the browser must not block,
+     * so nothing waits for it.
      *
      * @param address an absolute http or https address
-     * @param window the Jasper window of the pane the program ran in, or empty
+     * @param placement where the link asks to open
+     * @param target the OSC 8 {@code target=} name, or empty
+     * @param windowId the Jasper window the address came from, or empty
      * @param desktop the system browser's opener; it must not block
      * @throws IllegalStateException off the UI thread
      */
-    public void openProgramLink(java.net.URI address, Optional<UUID> window, Consumer<java.net.URI> desktop) {
-        openAddress(address, dev.jasper.sdk.ui.LinkOrigin.EXTERNAL, window, desktop);
+    public void openLink(java.net.URI address, Placement placement, Optional<String> target, Optional<UUID> windowId,
+                         Consumer<java.net.URI> desktop) {
+        Objects.requireNonNull(placement, "placement");
+        Objects.requireNonNull(target, "target");
+        openAddress(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, linkPlacement(placement), target, windowId, desktop);
     }
 
-    private void openAddress(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, Optional<UUID> window,
-                             Consumer<java.net.URI> desktop) {
+    /**
+     * As {@link #openLink}, for an address from outside Jasper ({@code jasper <address>}): the browser hears it as an
+     * external address, in a tab and with no target. UI thread.
+     *
+     * @param address an absolute http or https address
+     * @param windowId the Jasper window of the pane the command ran in, or empty
+     * @param desktop the system browser's opener; it must not block
+     * @throws IllegalStateException off the UI thread
+     */
+    public void openExternalLink(java.net.URI address, Optional<UUID> windowId, Consumer<java.net.URI> desktop) {
+        openAddress(address, dev.jasper.sdk.ui.LinkOrigin.EXTERNAL, dev.jasper.sdk.ui.LinkPlacement.TAB, Optional.empty(), windowId, desktop);
+    }
+
+    /**
+     * Asks the web browser a plugin provides to open a local file as a click on its {@code file:} link, in a tab.
+     * UI thread: the browser must not block, so nothing waits for it.
+     *
+     * @param file the file; the caller has checked that it is a web page
+     * @param windowId the Jasper window the click came from, or empty
+     * @return true when a browser took the link; false before the plugins start, when no plugin provides a browser, or
+     *     when it declined or threw, and the caller opens the file as it would without one
+     * @throws IllegalStateException off the UI thread
+     */
+    public boolean openLocalWebFile(Path file, Optional<UUID> windowId) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Web addresses are opened on the UI thread");
+        Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(windowId, "windowId");
+        PluginHost current = host;
+        return current != null && current.webBrowsers.open(file.toUri(), dev.jasper.sdk.ui.LinkOrigin.CLICK,
+            dev.jasper.sdk.ui.LinkPlacement.TAB, Optional.empty(), windowId);
+    }
+
+    private static dev.jasper.sdk.ui.LinkPlacement linkPlacement(Placement placement) {
+        return switch (placement) {
+            case TAB -> dev.jasper.sdk.ui.LinkPlacement.TAB;
+            case SPLIT_RIGHT -> dev.jasper.sdk.ui.LinkPlacement.SPLIT_RIGHT;
+            case SPLIT_DOWN -> dev.jasper.sdk.ui.LinkPlacement.SPLIT_DOWN;
+        };
+    }
+
+    private void openAddress(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, dev.jasper.sdk.ui.LinkPlacement placement,
+                             Optional<String> target, Optional<UUID> windowId, Consumer<java.net.URI> desktop) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Web addresses are opened on the UI thread");
         Objects.requireNonNull(address, "address");
-        Objects.requireNonNull(window, "window");
+        Objects.requireNonNull(windowId, "windowId");
         Objects.requireNonNull(desktop, "desktop");
         PluginHost current = host;
-        if (current == null || !current.webBrowsers.open(address, origin, dev.jasper.sdk.ui.LinkPlacement.TAB, Optional.empty(), window))
+        if (current == null || !current.webBrowsers.open(address, origin, placement, target, windowId))
             desktop.accept(address);
     }
 

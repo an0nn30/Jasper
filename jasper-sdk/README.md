@@ -44,7 +44,7 @@ third-party plugin. The SDK depends only on the JDK.
 | Tool windows | `Panels`, `PanelSpec`, `Anchor`, `PanelFactory`, `PanelHost`, `PanelPlacement`, `PanelMode`, `PanelHeader` |
 | Dialogs, content tabs and split items | `Windows`, `WindowSurface`, `DialogSpec`, `PluginDialog`, `OverlaySpec`, `PluginPopover`, `ContentSpec`, `ContentTab`, `TabPlacement`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `SplitItemSpec`, `SplitChoice`, `TabChoice`, `TabRestorer`, `RestoreRequest` |
 | Colours for custom content and the look | `Appearance`, `SemanticColor`, `WorkspacePalette`, `EditorPalette`, `EditorScheme`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Presentation`, `TerminalTypography` |
-| Desktop integration | `Platform`, `FileEditor`, `WebBrowser`, `LinkOrigin` |
+| Desktop integration | `Platform`, `FileEditor`, `WebBrowser`, `WebLink`, `LinkOrigin`, `LinkPlacement` |
 
 A plugin implements `Plugin`, `PaletteScope`, `FileSource`, `FileBrowser` and `SettingsPanel`, the functional
 `CommandHandler`, `FileEditor`, `WebBrowser`, `PanelFactory`, `TabRestorer` and `ToolbarViewFactory`, and the service interfaces it

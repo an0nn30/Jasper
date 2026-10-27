@@ -70,8 +70,7 @@ class ApplicationCommandsTest {
         JasperApplication application = application(() -> { });
         Files.writeString(dir.resolve("notes.txt"), "");
         DesktopTestSupport.edt(application::quitNow);
-        for (List<String> arguments : List.of(List.<String>of(), List.of("notes.txt"), List.of("https://example.com/a"),
-                List.of("open-url", "https://example.com/a"))) {
+        for (List<String> arguments : List.of(List.<String>of(), List.of("notes.txt"), List.of("https://example.com/a"))) {
             var err = new StringBuilder();
             var answer = application.commands().dispatch(new Invocation(arguments, dir, Optional.empty(), text -> { }, err::append));
             assertThatThrownBy(() -> answer.toCompletableFuture().get(5, TimeUnit.SECONDS))
@@ -168,31 +167,41 @@ class ApplicationCommandsTest {
         var opened = new java.util.concurrent.CopyOnWriteArrayList<String>();
         DesktopTestSupport.edt(() -> application.systemBrowser = address -> opened.add(address.toString()));
         var err = new StringBuilder();
-        var clicked = application.commands().dispatch(new Invocation(List.of("https://example.com/a", "HTTP://Example.com/b"), dir,
+        var addresses = application.commands().dispatch(new Invocation(List.of("https://example.com/a", "HTTP://Example.com/b"), dir,
             Optional.of(UUID.randomUUID()), text -> { }, err::append));
-        assertThat(clicked.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
-        var program = application.commands().dispatch(new Invocation(List.of("open-url", "https://example.com/sign-in"), dir,
-            Optional.empty(), text -> { }, err::append));
-        assertThat(program.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
-        assertThat(opened).containsExactly("https://example.com/a", "HTTP://Example.com/b", "https://example.com/sign-in");
+        assertThat(addresses.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
+        assertThat(opened).containsExactly("https://example.com/a", "HTTP://Example.com/b");
         assertThat(err).isEmpty();
         DesktopTestSupport.edt(application::quitNow);
     }
 
-    /** Browser plan 3, Review Focus 4: open-url takes exactly one web address; anything else is a usage error that opens nothing. */
-    @Test void openUrlNeedsExactlyOneWebAddress() throws Exception {
+    /**
+     * Browser plan 3b (R5): {@code open-url} is no command of Jasper's. {@code jasper open-url https://example.com} is the
+     * arguments {@code open-url} and the address, which any other first word would be: with no plugins running, "Jasper's
+     * plugins are not running"; with a file named {@code open-url} in the folder, a path call that names the address as
+     * the missing path. Nothing opens either way.
+     */
+    @Test void openUrlIsNoLongerACommand() throws Exception {
         JasperApplication application = application(() -> { });
         var opened = new java.util.concurrent.CopyOnWriteArrayList<String>();
         DesktopTestSupport.edt(() -> application.systemBrowser = address -> opened.add(address.toString()));
-        Files.writeString(dir.resolve("notes.txt"), "");
-        for (List<String> arguments : List.of(List.of("open-url"), List.of("open-url", "ftp://files.example.com/x"),
-                List.of("open-url", "https://example.com/a", "https://example.com/b"), List.of("open-url", "notes.txt"),
-                List.of("open-url", "example.com"), List.of("open-url", "C:\\Users\\me\\page.html"))) {
-            var err = new StringBuilder();
-            var exit = application.commands().dispatch(new Invocation(arguments, dir, Optional.empty(), text -> { }, err::append));
-            assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).as("%s", arguments).isEqualTo(2);
-            assertThat(err).as("%s", arguments).hasToString("jasper: open-url needs one web address (http or https)\n");
-        }
+        var err = new StringBuilder();
+        var exit = application.commands().dispatch(new Invocation(List.of("open-url", "https://example.com"), dir, Optional.empty(),
+            text -> { }, err::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
+        assertThat(err).as("as any other unknown first word").hasToString("jasper: Jasper's plugins are not running\n");
+        var other = new StringBuilder();
+        exit = application.commands().dispatch(new Invocation(List.of("open-ur", "https://example.com"), dir, Optional.empty(),
+            text -> { }, other::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
+        assertThat(other).hasToString(err.toString());
+
+        Files.writeString(dir.resolve("open-url"), "");
+        var path = new StringBuilder();
+        exit = application.commands().dispatch(new Invocation(List.of("open-url", "https://example.com"), dir, Optional.empty(),
+            text -> { }, path::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
+        assertThat(path).as("a file named open-url is a path").hasToString("jasper: no such file or folder: https://example.com\n");
         assertThat(opened).isEmpty();
         DesktopTestSupport.edt(application::quitNow);
     }

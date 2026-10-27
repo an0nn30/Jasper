@@ -289,6 +289,18 @@ class DescriptorParserTest {
         assertThat(DescriptorParser.parse(HEAD).subcommands()).isEmpty();
     }
 
+    /** Browser plan 3b: {@code open-url} is no command of Jasper's, so a plugin may declare a subcommand of that name. */
+    @Test void aPluginMayDeclareASubcommandNamedOpenUrl() throws Exception {
+        PluginDescriptor descriptor = DescriptorParser.parse(HEAD + """
+
+            [[subcommands]]
+            name = "open-url"
+            summary = "Open an address"
+            """);
+        assertThat(descriptor.subcommands()).containsExactly(new PluginDescriptor.Subcommand("open-url", "Open an address"));
+        assertThat(DescriptorParser.RESERVED_SUBCOMMANDS).containsExactlyInAnyOrder("help", "version");
+    }
+
     @Test void malformedSubcommandsNameTheirProblem() {
         Map<String, String> cases = Map.of(
             "subcommands = \"editor\"\n", "subcommands must be an array of tables",
@@ -296,7 +308,6 @@ class DescriptorParserTest {
             "[[subcommands]]\nname = \"Editor\"\nsummary = \"s\"\n", "subcommands.name is not a command name: Editor",
             "[[subcommands]]\nname = \"-x\"\nsummary = \"s\"\n", "subcommands.name is not a command name: -x",
             "[[subcommands]]\nname = \"help\"\nsummary = \"s\"\n", "subcommands.name is reserved: help",
-            "[[subcommands]]\nname = \"open-url\"\nsummary = \"s\"\n", "subcommands.name is reserved: open-url",
             "[[subcommands]]\nname = \"a\"\nsummary = \"s\"\n[[subcommands]]\nname = \"a\"\nsummary = \"t\"\n", "subcommands names a command twice: a",
             "[[subcommands]]\nname = \"a\"\n", "Missing required key: summary",
             "[[subcommands]]\nname = \"a\"\nsummary = \"two\\nlines\"\n", "subcommands.summary must be one visible line: a",

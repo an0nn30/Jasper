@@ -128,7 +128,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `clipboard()` | The `FakeClipboard` every plugin's `Platform` writes to |
 | `browsed()`, `openedInEditor()` | Addresses that reached the system browser (each `browse`, and each `openInBrowser` no provided browser took); files opened in an editor that no provided editor took |
 | `edit(file, line, windowId)`, `editorPlugin()`, `declareBundled(id)` | Opens a file as Jasper's own opens do, through the editor a plugin provides; which plugin provides it; marks a plugin as bundled before it starts, so its editor and browser replace another's |
-| `openLink(address, origin, windowId)`, `browserPlugin()` | Opens a web address as Jasper's own routes do (a clicked terminal link is `LinkOrigin.CLICK`, `jasper open-url` is `PROGRAM`), through the browser a plugin provides; which plugin provides it |
+| `openLink(address, origin, placement, target, windowId)`, `browserPlugin()` | Opens a web link as Jasper's own routes do (a clicked terminal link is `LinkOrigin.CLICK`, an address given to `jasper` is `EXTERNAL`), through the browser a plugin provides, and answers what it answered; which plugin provides it |
 | `setCommandClient(path)` | What `CommandLine.client()` returns |
 | `declareSubcommand(pluginId, name, summary)`, `call(name, arguments, workingDirectory[, paneId])` | Declares a subcommand as `[[subcommands]]` would, before the plugin starts; calls it as `jasper <name> …` would and returns a `FakeCommandCall` |
 
