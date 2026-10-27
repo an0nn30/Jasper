@@ -125,6 +125,19 @@ class NotificationsFeatureTest {
         assertThat(feature.layer(third.id()).showing()).isEqualTo(feature.layer(first.id()).showing());
     }
 
+    @Test void aWindowAttachedWhileStickyCardsWaitTakesThemInTheSameOrder() {
+        var feature = feature();
+        var first = window();
+        feature.attach(first);
+        for (int i = 1; i <= CardLayer.VISIBLE + 2; i++)
+            center.post(NotificationRequest.of(NotificationsFeature.CONFIG.id(), Severity.WARNING, "Problem " + i));
+        assertThat(feature.layer(first.id()).waiting()).as("sticky cards overflow behind the chip").hasSize(2);
+        var second = window();
+        feature.attach(second);
+        assertThat(feature.layer(second.id()).showing()).isEqualTo(feature.layer(first.id()).showing());
+        assertThat(feature.layer(second.id()).waiting()).isEqualTo(feature.layer(first.id()).waiting());
+    }
+
     @Test void closingTheWindowACardCameFromKeepsItElsewhere() {
         var feature = feature();
         var first = window();
@@ -177,6 +190,26 @@ class NotificationsFeatureTest {
         assertThat(feature.layer(window.id()).showing()).hasSize(2);
     }
 
+    @Test void notificationsFromWhileJasperWasAwayReachEachWindowOnceWhenOneIsFocused() {
+        presence = Delivery.Presence.NO_WINDOW;
+        var feature = feature();
+        var first = window();
+        var second = window();
+        feature.attach(first);
+        feature.attach(second);
+        feature.error("While away", "details");
+        center.post(NotificationRequest.of(NotificationsFeature.CONFIG.id(), Severity.WARNING, "config.toml has warnings"));
+        assertThat(feature.layer(first.id()).showing()).isEmpty();
+        presence = Delivery.Presence.FOCUSED;
+        feature.activated(first);
+        var ids = center.history().stream().map(dev.jasper.app.notifications.Notification::id).toList();
+        assertThat(feature.layer(first.id()).showing()).containsExactlyInAnyOrderElementsOf(ids);
+        assertThat(feature.layer(second.id()).showing()).isEqualTo(feature.layer(first.id()).showing());
+        feature.activated(second);
+        assertThat(feature.layer(second.id()).showing()).as("shown once: focusing another window replays nothing")
+            .isEqualTo(feature.layer(first.id()).showing()).hasSize(2);
+    }
+
     @Test void aCardPostedWhileAWindowOpensWaitsForItsFirstActivation() {
         // The window is attached but the native activation event has not arrived yet: the application reports NO_WINDOW.
         presence = Delivery.Presence.NO_WINDOW;
@@ -220,15 +253,30 @@ class NotificationsFeatureTest {
         assertThat(center.unread()).isZero();
     }
 
-    @Test void dismissCardsFromAWindowWithoutCardsClosesTheMainWindowsCards() {
+    @Test void dismissCardsFromOneWindowClearsEveryWindow() {
+        var feature = feature();
+        var first = window();
+        var second = window();
+        feature.attach(first);
+        feature.attach(second);
+        feature.info("One", "");
+        center.post(NotificationRequest.of(NotificationsFeature.CONFIG.id(), Severity.WARNING, "Sticky"));
+        contributions.action(NotificationsFeature.DISMISS_CARDS).orElseThrow()
+            .invoke(new Contributions.Invocation(first.id(), Optional.empty()));
+        assertThat(feature.layer(first.id()).showing()).isEmpty();
+        assertThat(feature.layer(second.id()).showing()).isEmpty();
+        assertThat(center.unread()).isZero();
+    }
+
+    @Test void dismissCardsFromAWindowWithoutALayerClosesEveryCard() {
         // Dismiss Cards run from a window without a layer closes every window's cards.
         var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
-        var main = window();
-        feature.attach(main);
+        var window = window();
+        feature.attach(window);
         feature.info("One", "");
         contributions.action(NotificationsFeature.DISMISS_CARDS).orElseThrow()
             .invoke(new Contributions.Invocation(UUID.randomUUID(), Optional.empty()));
-        assertThat(feature.layer(main.id()).showing()).isEmpty();
+        assertThat(feature.layer(window.id()).showing()).isEmpty();
         assertThat(center.unread()).isZero();
     }
 

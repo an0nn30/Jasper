@@ -186,6 +186,28 @@ class NotificationCardTest {
         body.close(); withAction.close(); closing.close();
     }
 
+    @Test void anActionFromMoreRaisesBeforeItRuns() {
+        var order = new ArrayList<String>();
+        var request = titled("Many");
+        for (String label : List.of("One", "Two", "Three", "Four"))
+            request = request.withAction(NotificationAction.of(label, () -> order.add("ran " + label)));
+        var card = card(KitTestSupport.context(), posted(request), false, id -> order.add("raised"));
+        moreItems(card).getFirst().doClick(0);
+        assertThat(order).containsExactly("raised", "ran Four");
+        card.close();
+    }
+
+    @Test void anExpiredEntrysCardRaisesNothing() {
+        var order = new ArrayList<String>();
+        var card = card(KitTestSupport.context(), posted(titled("Gone").withActivate(() -> order.add("activated"))
+            .withAction(NotificationAction.of("Go", () -> order.add("ran")))), false, id -> order.add("raised"));
+        center.expire(card.notification().id());
+        click(card);
+        link(card, 0).doClick(0);
+        assertThat(order).isEmpty();
+        card.close();
+    }
+
     @Test void closeShowsOnHoverForAutoHidingCardsAndAlwaysForStickyOnes() {
         var hovers = new ArrayList<Boolean>();
         var card = card(posted(titled("Hover")), false);

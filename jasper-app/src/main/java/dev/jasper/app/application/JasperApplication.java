@@ -377,7 +377,7 @@ public final class JasperApplication {
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
         notificationViews = new NotificationsFeature(notificationCenter, contributions,
             () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), presentation().projections().panels(),
-            id -> pertainingWindow(id).flatMap(windows::window).ifPresent(JasperWindow::toFront));
+            this::raiseForCard);
         systemNotices = new SystemNotices(notificationCenter, this::systemNotificationsEnabled,
             new SystemNotices.Windows(this::raiseFor, this::showHistory, this::showErrors, this::holderOf));
         incidents = new Incidents(notificationCenter.clock());
@@ -1990,8 +1990,19 @@ public final class JasperApplication {
     private Optional<UUID> raiseFor(Optional<UUID> target) {
         if (quitting || stopped) return Optional.empty();
         Optional<JasperWindow> window = target.flatMap(windows::window).or(() -> windows.ensureWindow("notification", null));
-        window.ifPresent(JasperWindow::toFront);
+        window.ifPresent(windows::raise);
         return window.map(JasperWindow::id);
+    }
+
+    /**
+     * Brings the window a clicked card's notification pertains to forward ({@link #pertainingWindow}), as the most recently
+     * active window at once, so what the card's action opens there lands in it. The window already active is left as it
+     * is, keyboard focus included.
+     */
+    private void raiseForCard(UUID notification) {
+        pertainingWindow(notification).flatMap(windows::window)
+            .filter(window -> !(windows.lastActive().orElse(null) == window && window.content().isActiveAndOpen()))
+            .ifPresent(windows::raise);
     }
 
     /**

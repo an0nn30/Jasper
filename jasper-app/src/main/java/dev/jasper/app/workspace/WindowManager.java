@@ -1007,16 +1007,33 @@ public final class WindowManager {
         return openEmpty(null, null).map(JasperWindow::id).orElseThrow(() -> new IllegalStateException(CLOSING));
     }
 
+    /**
+     * Brings an open window to the front for a gesture that goes on to act in the same event: it is the most recently
+     * active window at once ({@link #lastActive}, {@link #ensureWindow}), before the operating system reports the
+     * activation, so what the gesture opens next lands in it. The activated hook runs when that report arrives. EDT.
+     */
+    public void raise(JasperWindow window) {
+        requireEdt();
+        if (window.closed() || !windows.contains(window)) return;
+        mostRecent(window);
+        window.toFront();
+    }
+
     void activated(JasperWindow window) {
-        if (window != lastOpened) lastOpened = null;
-        activations.remove(window);
-        activations.addFirst(window);
+        mostRecent(window);
         tabDrag.activated(window.content());
         if (!watchingFronts) {
             Toolkit.getDefaultToolkit().addAWTEventListener(fronts, AWTEvent.WINDOW_EVENT_MASK);
             watchingFronts = true;
         }
         hooks.activated().accept(window);
+    }
+
+    /** Puts the window first in the activation order. */
+    private void mostRecent(JasperWindow window) {
+        if (window != lastOpened) lastOpened = null;
+        activations.remove(window);
+        activations.addFirst(window);
     }
 
     /** A window is about to close, its content whole. */

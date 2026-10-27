@@ -126,4 +126,59 @@ class JasperApplicationNotificationsTest {
             fixture.close();
         }
     }
+
+    /**
+     * Full windows 2, final review I1: a card's action that opens a tab in the most recently active window opens it in the
+     * window the click raised, not behind it in the window clicked.
+     */
+    @Test void aCardsActionOpensItsTabInTheWindowTheClickRaised() throws Exception {
+        var fixture = new PertainingWindowFixture();
+        try {
+            edt(() -> {
+                fixture.open();
+                fixture.b.events().activated().accept(true);
+                var opened = new ArrayDeque<dev.jasper.app.contributions.Tab>();
+                var request = NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.ERROR, "For A")
+                    .withAction(dev.jasper.app.notifications.NotificationAction.of("Open", () -> opened.add(
+                        fixture.application.contributions().tabs().open(dev.jasper.app.contributions.TabRegistry.APP_OWNER,
+                            "probe", "Probe", null, new javax.swing.JPanel()))))
+                    .withTarget(fixture.a.id());
+                UUID id = fixture.application.notificationCenter().post(request).map(fixture::shownEverywhere).orElseThrow();
+                fixture.frames.clear();
+                dev.jasper.app.notificationui.CardLayerTestAccess.clickAction(
+                    fixture.application.notificationViews().layer(fixture.b.id()), id, 0);
+                assertThat(fixture.frames).as("A comes forward (and again as its new tab is selected); B never does").containsOnly("front w0");
+                assertThat(fixture.application.windows().lastActive()).as("at once").contains(fixture.a);
+                assertThat(opened).singleElement().satisfies(tab -> assertThat(tab.window()).as("the tab opens in A")
+                    .isEqualTo(fixture.a.id()));
+            });
+        } finally {
+            fixture.close();
+        }
+    }
+
+    /** Final review I2: a click on a card about the window already active leaves it, and its keyboard focus, as they are. */
+    @Test void clickingACardAboutTheActiveWindowRaisesNothing() throws Exception {
+        var fixture = new PertainingWindowFixture();
+        try {
+            edt(() -> {
+                fixture.open();
+                assertThat(fixture.application.windows().lastActive()).contains(fixture.a);
+                var request = NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.INFO, "For A").withTarget(fixture.a.id());
+                UUID id = fixture.application.notificationCenter().post(request).map(fixture::shownEverywhere).orElseThrow();
+                fixture.frames.clear();
+                dev.jasper.app.notificationui.CardLayerTestAccess.clickBody(fixture.application.notificationViews().layer(fixture.a.id()), id);
+                assertThat(fixture.frames).as("A is already in front: nothing is raised, nothing refocused").isEmpty();
+                assertThat(fixture.application.notificationCenter().find(id).orElseThrow().read()).isTrue();
+                fixture.a.events().activated().accept(false);
+                UUID again = fixture.application.notificationCenter().post(
+                    NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.INFO, "For A again").withTarget(fixture.a.id()))
+                    .map(fixture::shownEverywhere).orElseThrow();
+                dev.jasper.app.notificationui.CardLayerTestAccess.clickBody(fixture.application.notificationViews().layer(fixture.a.id()), again);
+                assertThat(fixture.frames).as("used last but no longer active: A is raised").containsExactly("front w0");
+            });
+        } finally {
+            fixture.close();
+        }
+    }
 }

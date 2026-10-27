@@ -155,4 +155,29 @@ class JasperApplicationSystemNoticesTest {
             fixture.close();
         }
     }
+
+    /** Full windows 2, final review I1: what the click's action opens in the most recently active window lands in the raised one. */
+    @Test void aSystemNotificationsActionOpensItsTabInTheWindowTheClickRaised() throws Exception {
+        var fixture = new PertainingWindowFixture();
+        try {
+            edt(() -> {
+                fixture.open();
+                fixture.b.events().activated().accept(true);
+                var opened = new ArrayDeque<dev.jasper.app.contributions.Tab>();
+                var request = NotificationRequest.of(NotificationsFeature.GENERAL.id(),
+                        Severity.ERROR, "For A")
+                    .withActivate(() -> opened.add(fixture.application.contributions().tabs().open(
+                        dev.jasper.app.contributions.TabRegistry.APP_OWNER, "probe", "Probe", null, new javax.swing.JPanel())))
+                    .withTarget(fixture.a.id());
+                UUID id = fixture.application.notificationCenter().post(request).orElseThrow();
+                fixture.frames.clear();
+                fixture.application.systemNotices().clicked(id);
+                assertThat(fixture.frames).as("A comes forward (and again as its new tab is selected); B never does").containsOnly("front w0");
+                assertThat(opened).singleElement().satisfies(tab -> assertThat(tab.window()).as("the tab opens in A")
+                    .isEqualTo(fixture.a.id()));
+            });
+        } finally {
+            fixture.close();
+        }
+    }
 }

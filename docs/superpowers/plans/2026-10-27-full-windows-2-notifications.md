@@ -8,6 +8,10 @@
 > layer by hand (headless, no Jasper window is ever active, so delivery sends no card), and `JasperApplication` gained
 > package-private `notificationViews()`, `commandNotifier()` and `systemNotices()` for them. `docs/notifications.md` was
 > updated beside `docs/workspace.md`.
+> Final-review fix wave (Controller Ruling 2): `WindowManager.raise(window)` makes the window the most recently active at
+> once, then fronts it (the activated hook still runs on the operating system's activation), so what a card's or a system
+> notification's action opens in the most recently active window lands in the raised one; a card raises nothing when its
+> window is already the active one, or when its entry has expired. `CardLayerTestAccess.clickAction` was added.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

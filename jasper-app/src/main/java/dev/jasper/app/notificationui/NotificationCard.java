@@ -31,8 +31,9 @@ import javax.swing.SwingUtilities;
 /**
  * One notification as a card (spec section 3): severity glyph, wrapping strong title with a muted repeat count (the count
  * role), at most five lines of content in the description role, up to three action links with the rest under More, and a
- * close button shown on hover (always for a sticky card). Clicking the body runs the notification's default action; that and an action link first ask {@code raise} to bring the window the notification pertains to forward. An
- * app-owned layout shell (ruling G6) on the kit's notice surface (a grouped card's radius, hairline and padding), hosting
+ * close button shown on hover (always for a sticky card). Clicking the body runs the notification's default action;
+ * that and an action link first ask {@code raise} to bring the window the notification pertains to forward, unless the
+ * entry has expired. An app-owned layout shell (ruling G6) on the kit's notice surface (a grouped card's radius, hairline and padding), hosting
  * pointer-only kit views (ruling G5): nothing in it takes the keyboard from the terminal. Plain text only. EDT only;
  * close it when it leaves its layer.
  */
@@ -91,7 +92,7 @@ final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements
             @Override public void mouseClicked(MouseEvent event) {
                 if (event.getSource() != NotificationCard.this || !SwingUtilities.isLeftMouseButton(event)) return;
                 UUID id = NotificationCard.this.notification.id();
-                raise.accept(id);
+                raiseUnlessExpired(id);
                 center.activate(id);
             }
         };
@@ -143,9 +144,14 @@ final class NotificationCard extends dev.jasper.ui.swing.SurfacePanel implements
         if (closed || !(event instanceof UiEvent.Action action)) return;
         if (action.id().equals(CLOSE)) center.markRead(notification.id());
         else if (action.id().startsWith(ACTION)) {
-            raise.accept(notification.id());
+            raiseUnlessExpired(notification.id());
             center.runAction(notification.id(), Integer.parseInt(action.id().substring(ACTION.length())));
         }
+    }
+
+    /** An expired entry's click does nothing ({@link NotificationCenter#activate}), so it raises nothing either. */
+    private void raiseUnlessExpired(UUID id) {
+        if (center.find(id).filter(entry -> !entry.expired()).isPresent()) raise.accept(id);
     }
 
     private ViewSpec closeSpec() {

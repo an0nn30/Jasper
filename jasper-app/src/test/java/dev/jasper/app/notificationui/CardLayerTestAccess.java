@@ -18,6 +18,11 @@ public final class CardLayerTestAccess {
             java.awt.event.MouseEvent.BUTTON1));
     }
 
+    /** Clicks the entry card's leading action link at {@code index}, as the pointer does. */
+    public static void clickAction(CardLayer layer, UUID id, int index) {
+        NotificationCardTest.link(layer.card(id), index).doClick(0);
+    }
+
     public static CardLayer layer(dev.jasper.ui.swing.KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory,
                                   Consumer<UUID> raise, Consumer<UUID> timedOut, BiFunction<Duration, Runnable, Runnable> schedule, LongSupplier nanoTime) {
         return new CardLayer(kit, center, focused, openHistory, raise, timedOut, schedule, nanoTime);

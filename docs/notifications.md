@@ -17,19 +17,19 @@ window docked there. It shows:
 - up to three links for what you can do next, as many as fit on one line, with the rest under **More ▾**.
 
 Clicking a card's body marks it read, closes it and, when the notification points somewhere, goes there (the pointer
-becomes a hand only then). A link also marks the notification read. Either first brings forward the window the notification
-concerns, the one holding its terminal pane or else the one it was posted for while that is open; with none open, it acts
-where you clicked. The close button (tooltip "Close notification")
-shows while the pointer is over the card, and always on a sticky card.
+becomes a hand only then). A link also marks the notification read. Either first brings forward the window the
+notification concerns, the one holding its terminal pane or else the one it was posted for while that is open; with none
+open, it acts where you clicked. The close button (tooltip "Close notification") shows while the pointer is over the
+card, and always on a sticky card.
 
 At most three cards show at once, the newest at the bottom; a fourth pushes out the oldest card that hides by itself.
 Cards never take the keyboard, clicks beside them go where they would anyway, and nothing animates.
 
-A card hides after ten seconds of you being in a window that shows it, and then leaves every window; the countdown pauses
-while the pointer is over the card and while the window is in the background. Reading or closing a card in one window
-removes it from all. A hidden card stays unread in the panel. Sticky cards, such as configuration
-problems, stay until you close them. When the three cards showing are all sticky, more wait behind a **+N more** link
-that opens the panel.
+A card hides after ten seconds of you being in a window that shows it, and then leaves every window; the countdown
+pauses while the pointer is over the card and while the window is in the background. Each window counts down on its own,
+so the countdown starts again in a window you switch to. Reading or closing a card in one window removes it from all. A
+hidden card stays unread in the panel. Sticky cards, such as configuration problems, stay until you close them. When the
+three cards showing are all sticky, more wait behind a **+N more** link that opens the panel.
 
 When the same notification (same group, severity, title, details and incident) arrives within 60 seconds of its last
 arrival, it counts on the existing entry instead of adding one: the entry becomes unread again, moves to the top and
