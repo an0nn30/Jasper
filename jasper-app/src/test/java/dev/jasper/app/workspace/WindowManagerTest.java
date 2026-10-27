@@ -1117,6 +1117,32 @@ class WindowManagerTest {
         launch();
     }
 
+    /**
+     * Full windows plan 5: a pane moved to a new window takes only the default layout's tool windows for a new window, and
+     * one tab holding the pane alone; the only pane of a window's only tab stays.
+     */
+    @Test void aPaneMovedToANewWindowTakesTheDefaultLayoutsToolWindows(@TempDir Path folder) throws Exception {
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            Tab only = first.content().selectedTab();
+            assertThat(manager.movePaneToNewWindow(first.content(), only, new java.awt.Rectangle(40, 50, 600, 400),
+                new java.awt.Point(90, 60))).as("the only pane of the only tab stays").isEmpty();
+            assertThat(manager.windows()).containsExactly(first);
+            first.content().split(dev.jasper.app.layout.Side.RIGHT);
+            first.content().toggleZenMode();
+            manager.layouts(layouts(folder, defaultOf(new ToolWindows(false, false, Map.of()), terminal("one", HOME), terminal("two", HOME))));
+            Tab moved = first.content().selectedTab();
+            JasperWindow second = manager.movePaneToNewWindow(first.content(), moved,
+                new java.awt.Rectangle(40, 50, 600, 400), new java.awt.Point(90, 60)).orElseThrow();
+            assertThat(second.content().parentTabCount()).isEqualTo(1);
+            assertThat(second.content().tabs()).containsExactly(moved);
+            assertThat(second.content().toolWindows().railVisible()).isFalse();
+            assertThat(second.content().zenMode()).isFalse();
+            assertThat(first.content().tabs()).containsExactly(only);
+        });
+        launch();
+    }
+
     /** Full windows plan 4: Empty State opens the default layout, exactly, where the saved window was. */
     @Test void emptyStateOpensTheDefaultLayoutAtTheSavedBounds(@TempDir Path folder) throws Exception {
         Path file = folder.resolve("workspace.toml");

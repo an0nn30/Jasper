@@ -1590,6 +1590,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
+     * Whether a pane drag's release outside every window may take {@code tab} into a new full window (full windows plan
+     * 5): an item of this window that the registry moves, but not the only pane of its only tab; never without a window
+     * manager.
+     *
+     * @param tab an item, or null
+     * @return whether it would move
+     */
+    boolean mayMovePaneToNewWindow(Tab tab) {
+        if (closed || manager == null || tab == null || !registry.movable(tab)) return false;
+        return parentTabs.holding(tab).map(view -> parentTabs.count() > 1 || view.tabCount() > 1).orElse(false);
+    }
+
+    /**
      *
      * Whether the Move Tab to Window action may take the shown parent tab: one holding tabs that may all move, while
      * another window is open (Rulings 7).

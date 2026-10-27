@@ -82,10 +82,11 @@ import javax.swing.text.JTextComponent;
  * shows again when the drag ends, unless its drop lands in that window (spec 13); a new-tab place in the strip
  * ({@link TabStrip#newTabPlace}: an entry's outer quarter, the classic tabs' "+" and the room after them), where it
  * becomes a new tab, except in its own window for its tab's only pane, which Move Pane to New Tab leaves where it is
- * too; and a window's empty workspace, anywhere over it, a new tab in its place. A pane takes targets in windows
- * alone, as a pane never becomes a window; the drag of an item that is pinned or being closed never starts.
+ * too; and a window's empty workspace, anywhere over it, a new tab in its place. Outside every window, a new full
+ * window holding a tab with the pane alone, sized and placed as a torn-out tab's is, except for the only pane of a
+ * window's only tab; the drag of an item that is pinned or being closed never starts.
  * <p>Releasing the left button carries the target out: a tab along its own strip as a reorder and a pane within its
- * window as a layout change, neither through the tab registry; into another window, or a tab out of every window,
+ * window as a layout change, neither through the tab registry; into another window, or a tab or pane out of every window,
  * through the window manager of the drag's window, which moves the items through the tab registry, a moved pane's item
  * taking the focus where it lands; none touches an item's content or session, and a window no manager opened moves
  * nothing out of itself.
@@ -215,7 +216,10 @@ final class TabDrag {
     private Tab tab;
     private Component source;
     private Point pressedAt;
-    /** Where the press held the entry, from its top-left corner, and the size of the tab's workspace: a tear-out's window. */
+    /**
+     * Where the press held the entry or the pane, from its top-left corner, and the size of the tab's workspace: a
+     * tear-out's window.
+     */
     private Point grab;
     private Dimension size;
     private boolean dragging;
@@ -351,6 +355,11 @@ final class TabDrag {
         pane = true;
         source = event.getComponent();
         pressedAt = screen(event);
+        // A tear-out's window: the tab's workspace, with the pane's corner where the press holds it.
+        WorkspaceView view = window.parentTabs().view(id.get()).orElseThrow();
+        Component held = item.group().map(view::groupView).map(Component.class::cast).orElse(view);
+        grab = SwingUtilities.convertPoint(source, event.getPoint(), held);
+        size = view.getSize();
     }
 
     /**
@@ -394,6 +403,7 @@ final class TabDrag {
         Tab moving = tab;
         WindowContent home = from;
         ParentTabId parent = parentTab;
+        boolean movingPane = pane;
         Optional<Target> where = Optional.empty();
         WindowContent kept = null;
         ParentTabId before = null;
@@ -407,7 +417,7 @@ final class TabDrag {
         }
         if (where.isEmpty()) return;
         try {
-            drop(moving, home, parent, where.get());
+            drop(moving, movingPane, home, parent, where.get());
         } catch (RuntimeException | Error failure) {
             try {
                 unhover(kept, before, home, moving);
@@ -605,8 +615,10 @@ final class TabDrag {
             return;
         }
         if (pane) {
-            // A pane takes targets in a window alone: it never becomes a window (tabs and panes spec 7).
             if (window != null) target = onPanes(window, at);
+            // Outside every window of Jasper's: a full window, except for the only pane of a window's only tab, or an
+            // item that is pinned or being closed (full windows plan 5).
+            else if (from.mayMovePaneToNewWindow(tab)) target = Optional.of(new Target.TearOut(tearOutBounds(at), new Point(at)));
             showLanding();
             return;
         }
@@ -883,7 +895,7 @@ final class TabDrag {
      * Shows the target's landing on its window's layered pane: for a tab, a bar where it would go in the strip as the
      * placeholder, or the band of a strip that hides as the highlight; for a pane, the half of the pane beside which it
      * would go as the highlight, or a bar at the new-tab place where it would become a tab as the placeholder; for a tab
-     * dropped beside a pane, that half of the pane as the highlight too (pane flexibility spec 5); the main
+     * dropped beside a pane, that half of the pane as the highlight too (pane flexibility spec 5); a
      * window's whole empty workspace for what drops there. Without a target in a window the overlay leaves its window.
      */
     private void showLanding() {
@@ -983,12 +995,12 @@ final class TabDrag {
      * place there; on another window's strip, or out of every window into a full window, the window manager moves it
      * whole ({@code home}, the drag's window, holds {@code parent}). A pane beside another pane of its window, or onto a
      * new-tab place of its strip, moves there as a layout change; beside another window's pane, onto a new-tab place of
-     * its strip or onto a window's empty workspace, the window manager moves its item there (workspace plan 8c
-     * Rulings 12). A tab beside a pane of its window merges into that pane's tab as a layout change, and beside another
-     * window's pane through the window manager (pane flexibility spec 5; workspace plan 9a Rulings 12 and 13). A window no
-     * manager opened moves nothing out of itself.
+     * its strip or onto a window's empty workspace, or out of every window into a full window, the window manager moves
+     * its item there (workspace plan 8c Rulings 12; full windows plan 5). A tab beside a pane of its window merges into
+     * that pane's tab as a layout change, and beside another window's pane through the window manager (pane flexibility
+     * spec 5; workspace plan 9a Rulings 12 and 13). A window no manager opened moves nothing out of itself.
      */
-    private void drop(Tab moving, WindowContent home, ParentTabId parent, Target where) {
+    private void drop(Tab moving, boolean movingPane, WindowContent home, ParentTabId parent, Target where) {
         if (moving.closed()) return;
         switch (where) {
             case Target.Bar bar -> {
@@ -996,7 +1008,11 @@ final class TabDrag {
                 // Another window's strip: the window manager moves the tab whole, through the tab registry.
                 else home.manager().ifPresent(manager -> manager.moveParentTab(home, parent, bar.window(), bar.index()));
             }
-            case Target.TearOut out -> home.manager().ifPresent(manager -> manager.moveTabToNewWindow(home, parent, out.bounds(), out.cursor()));
+            case Target.TearOut out -> home.manager().ifPresent(manager -> {
+                // A pane leaves its tab for the new window; a tab goes whole (full windows plan 5).
+                if (movingPane) manager.movePaneToNewWindow(home, moving, out.bounds(), out.cursor());
+                else manager.moveTabToNewWindow(home, parent, out.bounds(), out.cursor());
+            });
             case Target.Beside beside -> {
                 if (beside.window() == home) home.movePane(moving, beside.group(), beside.side());
                 // Another window's pane: the window manager moves the item there, through the tab registry.
@@ -1027,9 +1043,9 @@ final class TabDrag {
     }
 
     /**
-     * A tear-out's workspace on screen: the size of the tab's workspace, with the entry where the cursor holds it, as
-     * IntelliJ and VS Code size a window from the content dragged out of it. The new frame grows it by its own title bar
-     * and keeps itself on the display under the cursor ({@code WindowFrame}).
+     * A tear-out's workspace on screen: the size of the tab's workspace, with the entry, or the pane a pane drag carries,
+     * where the cursor holds it, as IntelliJ and VS Code size a window from the content dragged out of it. The new frame
+     * grows it by its own title bar and keeps itself on the display under the cursor ({@code WindowFrame}).
      */
     private Rectangle tearOutBounds(Point at) {
         return new Rectangle(at.x - grab.x, at.y - grab.y, size.width, size.height);

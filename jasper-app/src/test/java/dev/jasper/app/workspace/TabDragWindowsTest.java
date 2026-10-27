@@ -302,8 +302,8 @@ class TabDragWindowsTest {
         });
     }
 
-    /** Workspace plan 7c Rulings 5: the main window's empty workspace takes a tab dragged along its top, in its place. */
-    @Test void theEmptyMainWorkspaceTakesATabAlongItsTop() throws Exception {
+    /** Workspace plan 7c Rulings 5: a window's empty workspace takes a tab dragged along its top, in its place. */
+    @Test void anEmptyWorkspaceTakesATabAlongItsTop() throws Exception {
         ParentTabId[] id = new ParentTabId[1];
         edt(() -> id[0] = secondTab(child));
         launch();
@@ -326,10 +326,10 @@ class TabDragWindowsTest {
     }
 
     /**
-     * Workspace plan 7c's final fix wave (the controller's ruling for 8a): the main window's empty workspace has no panes,
+     * Workspace plan 7c's final fix wave (the controller's ruling for 8a): a window's empty workspace has no panes,
      * so it takes a tab dragged anywhere over it in its place, and the whole of it is the landing.
      */
-    @Test void theEmptyMainWorkspaceTakesATabAnywhereOverIt() throws Exception {
+    @Test void anEmptyWorkspaceTakesATabAnywhereOverIt() throws Exception {
         ParentTabId[] id = new ParentTabId[1];
         edt(() -> id[0] = secondTab(child));
         launch();
@@ -1042,8 +1042,94 @@ class TabDragWindowsTest {
         }));
     }
 
-    /** Tabs and panes spec 7: outside every window a pane drops nothing, and no window opens for it. */
-    @Test void outsideEveryWindowAPaneDropsNothing() throws Exception {
+    /**
+     * Full windows plan 5: a pane released outside every window becomes a full window under the cursor, sized as a torn-out
+     * tab's is, holding a tab with that pane alone; its tab in the drag's window keeps the other pane, and its session is
+     * the one it had.
+     */
+    @Test void aPaneReleasedOutsideEveryWindowBecomesAFullWindow() throws Exception {
+        edt(() -> {
+            main.content().split(Side.RIGHT);
+            relayout(frameOf(main));
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content();
+            List<Tab> panes = from.workspace().tabs();
+            Tab moving = panes.get(1), stays = panes.get(0);
+            Object session = session(moving);
+            WorkspaceView workspace = from.workspace();
+            GroupView group = workspace.groupView(moving.group().orElseThrow());
+            Rectangle home = onScreen(group, new Rectangle(group.getSize()));
+            Point press = middle(inPane(from, moving));
+            Point outside = new Point(3000, 3000);
+            // The new window's workspace is the tab's size, with the pane's corner where the cursor holds it.
+            Rectangle expected = new Rectangle(outside.x - (press.x - home.x), outside.y - (press.y - home.y),
+                workspace.getWidth(), workspace.getHeight());
+            facts.clear();
+            Component source = startPane(from, moving, outside);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.TearOut(expected, outside));
+            assertThat(manager.tabDrag().overlay().getParent()).as("no landing in any window").isNull();
+            mouse(source, MouseEvent.MOUSE_RELEASED, outside, PANE);
+            assertThat(manager.windows()).hasSize(3);
+            JasperWindow full = others().getLast();
+            assertThat(full).isNotSameAs(child);
+            assertThat(full.content().parentTabCount()).as("one tab").isEqualTo(1);
+            assertThat(full.content().workspace().tabs()).as("holding the pane alone").containsExactly(moving);
+            assertThat(from.workspace().tabs()).as("its tab keeps the other pane").containsExactly(stays);
+            assertThat(placed).as("its workspace, which its frame grows by its title bar").containsExactly(expected);
+            assertThat(cursors).as("on the display under the cursor").containsExactly(outside);
+            assertThat(session(moving)).as("no new session").isSameAs(session);
+            assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(moving.id().value(), main.id(), full.id()));
+        });
+    }
+
+    /** Full windows plan 5: the only pane of a window's only tab tears nothing out; no window opens for it. */
+    @Test void theOnlyPaneOfTheOnlyTabTearsNothingOut() throws Exception {
+        edt(() -> {
+            WindowContent from = main.content();
+            Tab moving = from.selectedTab();
+            ParentTabs before = from.parentTabs().model();
+            Point outside = new Point(3000, 3000);
+            Component source = startPane(from, moving, outside);
+            assertThat(manager.tabDrag().active()).isTrue();
+            assertThat(manager.tabDrag().target()).isEmpty();
+            mouse(source, MouseEvent.MOUSE_RELEASED, outside, PANE);
+            assertThat(manager.windows()).containsExactly(main, child);
+            assertThat(placed).as("no window was placed").isEmpty();
+            assertThat(from.parentTabs().model()).isEqualTo(before);
+        });
+    }
+
+    /** Full windows plan 5: a tab's only pane tears out and its tab goes; the window keeps its other tab and stays open. */
+    @Test void aTabsOnlyPaneTearsOutAndItsTabGoes() throws Exception {
+        ParentTabId[] ids = new ParentTabId[2];
+        edt(() -> {
+            ids[0] = main.content().activeParentTab();
+            ids[1] = secondTab(main);
+            main.content().selectParentTab(ids[0]);
+            relayout(frameOf(main));
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content();
+            Tab moving = from.workspace().tabs().getFirst();
+            Point outside = new Point(3000, 3000);
+            facts.clear();
+            Component source = startPane(from, moving, outside);
+            assertThat(manager.tabDrag().target()).containsInstanceOf(TabDrag.Target.TearOut.class);
+            mouse(source, MouseEvent.MOUSE_RELEASED, outside, PANE);
+            JasperWindow full = others().getLast();
+            assertThat(full).isNotSameAs(child);
+            assertThat(full.content().workspace().tabs()).containsExactly(moving);
+            assertThat(main.closed()).as("the window it left stays open").isFalse();
+            assertThat(tabIds(from)).as("with its other tab only").containsExactly(ids[1]);
+            assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(moving.id().value(), main.id(), full.id()));
+        });
+    }
+
+    /** Full windows plan 5: a pinned item's pane never tears out. */
+    @Test void aPinnedPaneNeverTearsOut() throws Exception {
         edt(() -> {
             main.content().split(Side.RIGHT);
             relayout(frameOf(main));
@@ -1052,14 +1138,20 @@ class TabDragWindowsTest {
         edt(() -> {
             WindowContent from = main.content();
             Tab moving = from.workspace().tabs().get(1);
-            Point outside = new Point(3000, 3000);
-            Component source = startPane(from, moving, outside);
-            assertThat(manager.tabDrag().active()).isTrue();
-            assertThat(manager.tabDrag().target()).isEmpty();
-            mouse(source, MouseEvent.MOUSE_RELEASED, outside, PANE);
-            assertThat(manager.windows()).containsExactly(main, child);
-            assertThat(placed).as("no window was placed").isEmpty();
-            assertThat(from.workspace().tabs()).contains(moving);
+            var pin = moving.pin();
+            try {
+                facts.clear();
+                Point outside = new Point(3000, 3000);
+                Component source = startPane(from, moving, outside);
+                assertThat(manager.tabDrag().target()).as("a modal owner holds it in its window").isEmpty();
+                mouse(source, MouseEvent.MOUSE_RELEASED, outside, PANE);
+                assertThat(manager.windows()).containsExactly(main, child);
+                assertThat(placed).isEmpty();
+                assertThat(from.workspace().tabs()).contains(moving);
+                assertThat(moves()).isEmpty();
+            } finally {
+                pin.close();
+            }
         });
     }
 
@@ -1096,8 +1188,8 @@ class TabDragWindowsTest {
         });
     }
 
-    /** Review Focus 5 and workspace plan 8c Rulings 10: the main window's empty workspace takes a pane anywhere over it, in its place. */
-    @Test void theMainWindowsEmptyWorkspaceTakesAPaneAnywhereOverIt() throws Exception {
+    /** Review Focus 5 and workspace plan 8c Rulings 10: a window's empty workspace takes a pane anywhere over it, in its place. */
+    @Test void anEmptyWorkspaceTakesAPaneAnywhereOverIt() throws Exception {
         edt(() -> {
             child.content().split(Side.DOWN);
             relayout(frameOf(child));
@@ -1122,6 +1214,44 @@ class TabDragWindowsTest {
             assertThat(from.workspace().tabs()).hasSize(1);
             assertThat(moves()).as("exactly one TAB_MOVED").containsExactly(new TerminalEvent.TabMoved(moving.id().value(),
                 child.id(), main.id()));
+        });
+    }
+
+    /**
+     * Full windows plan 5: any window's empty workspace, not only the first window's, takes a tab anywhere over it in its
+     * place, and a pane as a new tab in its place.
+     */
+    @Test void anyWindowsEmptyWorkspaceTakesATabAndAPane() throws Exception {
+        ParentTabId[] ids = new ParentTabId[2];
+        edt(() -> {
+            ids[0] = main.content().activeParentTab();
+            main.content().split(Side.RIGHT);
+            ids[1] = secondTab(main);
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content(), empty = child.content();
+            empty.closeTab(empty.selectedTab());
+            relayout(frameOf(child));
+            assertThat(empty.parentTabs().isEmpty()).isTrue();
+            var parents = empty.parentTabs();
+            Point anywhere = inside(onScreen(parents, new Rectangle(parents.getSize())), 0.4, 0.6);
+            Component source = start(from, entryOf(from, ids[1]), anywhere);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.Bar(empty, 0));
+            mouse(source, MouseEvent.MOUSE_RELEASED, anywhere);
+            assertThat(tabIds(empty)).as("the tab, in the empty workspace's place").containsExactly(ids[1]);
+            empty.closeTab(empty.selectedTab());
+            relayout(frameOf(child));
+            relayout(frameOf(main));
+            assertThat(empty.parentTabs().isEmpty()).isTrue();
+            ParentTabId only = empty.activeParentTab();
+            Tab moving = from.workspace().tabs().get(1);
+            source = startPane(from, moving, anywhere);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.NewTab(empty, 0));
+            mouse(source, MouseEvent.MOUSE_RELEASED, anywhere, PANE);
+            assertThat(empty.workspace().tabs()).as("the pane, as a tab in its place").containsExactly(moving);
+            assertThat(tabIds(empty)).containsExactly(only);
+            assertThat(tabIds(from)).containsExactly(ids[0]);
         });
     }
 

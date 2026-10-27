@@ -779,6 +779,33 @@ public final class WindowManager {
         return to.parentTabs().contains(tab);
     }
 
+    /**
+     * A pane drag's release outside every window (full windows plan 5): {@code tab}'s pane leaves {@code from} for a new
+     * full window, opened as a torn-out tab's is ({@link #moveTabToNewWindow(WindowContent, ParentTabId, Rectangle, Point)}),
+     * whose one tab holds it alone, through the tab registry, so it reports {@code TAB_MOVED} once and keeps its content
+     * and session. Its tab in {@code from} goes with its last pane. An item that is pinned or being closed stays, and so
+     * does the only pane of a window's only tab, so {@code from} keeps a tab.
+     *
+     * @param from the window holding the item
+     * @param tab the item
+     * @param bounds where the full window's workspace goes on screen; null for where the platform puts it
+     * @param cursor a point on the display it opens on; null exactly when {@code bounds} is
+     * @return the new full window; empty when the item stayed
+     */
+    public Optional<JasperWindow> movePaneToNewWindow(WindowContent from, Tab tab, Rectangle bounds, Point cursor) {
+        requireEdt();
+        if (from == null || from.closed() || !from.mayMovePaneToNewWindow(tab)) return Optional.empty();
+        Optional<JasperWindow> opened = openEmpty(bounds, cursor);
+        if (opened.isEmpty()) return opened;
+        Throwable failure = null;
+        try {
+            model.tabs().move(tab, opened.get().id());
+        } catch (RuntimeException | Error thrown) {
+            failure = thrown;
+        }
+        return settle(opened.get(), failure);
+    }
+
     /** Whether {@code tab}, an item of {@code from}, may move to {@code to}, another open window: one the registry moves. */
     private boolean mayMovePane(WindowContent from, Tab tab, WindowContent to) {
         return from != null && to != null && from != to && !from.closed() && !to.closed() && from.parentTabs().contains(tab)
