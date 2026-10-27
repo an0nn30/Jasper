@@ -185,6 +185,11 @@ public final class JasperApplication {
      * virtual thread of its own.
      */
     Executor workspaceWriter = task -> Thread.ofVirtual().name("jasper-workspace-save").start(task);
+    /**
+     * Test seam: where a clicked or requested file's checks, browser offer and editor run. Production starts each on a
+     * virtual thread of its own.
+     */
+    Executor fileOpener = task -> Thread.ofVirtual().name("jasper-open-file").start(task);
     /** Test seams. Production plans from this process's own command line and starts a real process. */
     Function<RestartMode, Optional<List<String>>> restartPlanner = mode -> RestartCommand.current(mode, List.of());
     Consumer<List<String>> spawner = command -> {
@@ -789,7 +794,7 @@ public final class JasperApplication {
 
     /** Opens {@code file} on a virtual thread; a local web file goes to the browser first only when {@code browserFirst}. */
     private void openFile(Path file, int line, UUID window, Consumer<Path> fallback, String failed, boolean browserFirst) {
-        Thread.ofVirtual().name("jasper-open-file").start(() -> {
+        fileOpener.execute(() -> {
             try {
                 if (!java.nio.file.Files.isRegularFile(file)) return;
                 PluginRuntime runtime = plugins;
@@ -808,11 +813,13 @@ public final class JasperApplication {
     /**
      * Asks the web browser a plugin provides to open {@code file} on the UI thread, where it must be asked, and waits for
      * its answer on the calling thread, which is never the UI thread: the browser does not block, so the wait is short.
+     * The file's address is made here, off the UI thread, because {@code Path.toUri} reads the file system.
      */
     private static boolean browserTook(PluginRuntime runtime, Path file, UUID window) {
+        java.net.URI address = file.toUri();
         var answer = new java.util.concurrent.CompletableFuture<Boolean>();
         SwingUtilities.invokeLater(() -> {
-            try { answer.complete(runtime.openLocalWebFile(file, Optional.of(window))); }
+            try { answer.complete(runtime.openLocalWebFile(address, Optional.of(window))); }
             catch (Throwable failure) { answer.completeExceptionally(failure); throw failure; }
         });
         return answer.join();

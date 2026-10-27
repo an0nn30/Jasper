@@ -973,7 +973,7 @@ class PluginRuntimeTest {
                 Optional.empty(), address -> desktop.add(address.toString()));
             runtime.openExternalLink(java.net.URI.create("https://example.com/before-external"), Optional.empty(),
                 address -> desktop.add(address.toString()));
-            assertThat(runtime.openLocalWebFile(page, Optional.empty())).as("before the plugins start").isFalse();
+            assertThat(runtime.openLocalWebFile(page.toUri(), Optional.empty())).as("before the plugins start").isFalse();
         });
         assertThat(desktop).as("before the plugins start").containsExactly("https://example.com/before", "https://example.com/before-external");
 
@@ -987,7 +987,7 @@ class PluginRuntimeTest {
                 Optional.empty(), address -> desktop.add(address.toString()));
             runtime.openExternalLink(java.net.URI.create("https://example.com/sign-in"), Optional.empty(),
                 address -> desktop.add(address.toString()));
-            assertThat(runtime.openLocalWebFile(page, Optional.empty())).as("a browser took the file").isTrue();
+            assertThat(runtime.openLocalWebFile(page.toUri(), Optional.empty())).as("a browser took the file").isTrue();
             assertThat(desktop).as("the browser took each one").isEmpty();
             runtime.openLink(java.net.URI.create("https://example.com/declined"), PluginRuntime.Placement.TAB, Optional.empty(),
                 Optional.empty(), address -> desktop.add(address.toString()));
@@ -995,8 +995,8 @@ class PluginRuntimeTest {
                 address -> desktop.add(address.toString()));
             runtime.openLink(java.net.URI.create("https://example.com/long"), PluginRuntime.Placement.TAB, Optional.of("t".repeat(257)),
                 Optional.empty(), address -> desktop.add(address.toString()));
-            assertThat(runtime.openLocalWebFile(declined, Optional.empty())).as("a browser that declines").isFalse();
-            assertThat(runtime.openLocalWebFile(thrown, Optional.empty())).as("a browser that throws").isFalse();
+            assertThat(runtime.openLocalWebFile(declined.toUri(), Optional.empty())).as("a browser that declines").isFalse();
+            assertThat(runtime.openLocalWebFile(thrown.toUri(), Optional.empty())).as("a browser that throws").isFalse();
         });
         assertThat(desktop).as("declined, thrown and a target no WebLink holds go to the caller")
             .containsExactly("https://example.com/declined", "https://example.com/throws", "https://example.com/long");
@@ -1010,13 +1010,13 @@ class PluginRuntimeTest {
         assertThatIllegalStateException().as("never off the UI thread")
             .isThrownBy(() -> runtime.openLink(address, PluginRuntime.Placement.TAB, Optional.empty(), Optional.empty(), next -> { }));
         assertThatIllegalStateException().isThrownBy(() -> runtime.openExternalLink(address, Optional.empty(), next -> { }));
-        assertThatIllegalStateException().isThrownBy(() -> runtime.openLocalWebFile(page, Optional.empty()));
+        assertThatIllegalStateException().isThrownBy(() -> runtime.openLocalWebFile(page.toUri(), Optional.empty()));
 
         stopAndWait(runtime);
         desktop.clear();
         onEdt(() -> {
             runtime.openExternalLink(address, Optional.empty(), next -> desktop.add(next.toString()));
-            assertThat(runtime.openLocalWebFile(page, Optional.empty())).as("after the plugin stopped").isFalse();
+            assertThat(runtime.openLocalWebFile(page.toUri(), Optional.empty())).as("after the plugin stopped").isFalse();
         });
         assertThat(desktop).containsExactly(address.toString());
         assertThat(Files.readAllLines(root.resolve("absent/dev.example.web/data/opened"))).as("a stopped plugin's browser is not asked").hasSize(8);

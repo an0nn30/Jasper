@@ -7318,9 +7318,9 @@ Modal only.</dd>
 <div class="doc"><p>Who asked Jasper to open a web address, as <a href="#dev.jasper.sdk.ui.WebBrowser.open(WebLink)"><code>WebBrowser.open</code></a> hears it.</p></div>
 <h5>Constants</h5>
 <dl class="constants">
-<dt id="dev.jasper.sdk.ui.LinkOrigin.CLICK"><code>CLICK</code></dt><dd>The user asked for it: a link Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, one of Jasper's
-own web links such as Settings' Help, or a plugin's
-<a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)">Platform.openInBrowser</a>.</dd>
+<dt id="dev.jasper.sdk.ui.LinkOrigin.CLICK"><code>CLICK</code></dt><dd>The user asked for it: a link Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, a local web file
+clicked there, which arrives as a <code>file:</code> link, one of Jasper's own web links such as Settings' Help, or a
+plugin's <a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)">Platform.openInBrowser</a>.</dd>
 <dt id="dev.jasper.sdk.ui.LinkOrigin.EXTERNAL"><code>EXTERNAL</code></dt><dd>An address from outside Jasper: the <code>jasper &lt;address&gt;</code> command, or the system. It reaches the browser
 without the routing prompt a click can show.</dd>
 </dl>
@@ -9532,7 +9532,7 @@ the user or by any plugin, is left alone.</p></div>
 <div class="doc"><p>Makes this plugin the editor Jasper opens files with: <code>config.toml</code>, the plugin settings files, the custom VM
 options file, every <a href="#dev.jasper.sdk.ui.Platform.openInEditor(Path)"><code>openInEditor</code></a> and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a
 local terminal pane go to <code>editor</code> first, on the UI thread; a click brings the path's line and the clicked
-window. A clicked path comes from program output, and an OSC 8 link's target can differ from the text shown, so
+window. A clicked path comes from program output, and an OSC 8 link's address can differ from the text shown, so
 an editor edits the file and never runs it. One at a time: a bundled plugin's registration replaces a plugin's
 that is not bundled; otherwise the first stays and any later one, this plugin's own included, throws. When the
 editor returns false or throws, when no plugin provides one, and when Jasper waited 30 seconds for the UI
@@ -9551,7 +9551,7 @@ Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, with that wi
 with the active window; and the addresses given to the <code>jasper</code> command, with the window of the pane it ran
 in, go to <code>browser</code> first, on the UI thread, as a <a href="#dev.jasper.sdk.ui.WebLink"><code>WebLink</code></a> that says who asked
 (<a href="#dev.jasper.sdk.ui.LinkOrigin"><code>LinkOrigin</code></a>). A local file the user clicked in a terminal also arrives, as a <code>file:</code> link.
-A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown, so a browser
+A clicked link comes from program output, and an OSC 8 link's address can differ from the text shown, so a browser
 should treat the address as untrusted input and show it before acting on it. Other
 schemes, such as <code>mailto</code>, and <a href="#dev.jasper.sdk.ui.Platform.browse(URI)"><code>browse</code></a> always go to the system browser. One at a time: a bundled
 plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this

@@ -121,7 +121,7 @@ class MouseControllerLinkGestureTest {
         return new TerminalLink("https://m.dev", gesture, Optional.empty());
     }
 
-    /** A left press and release on the link's {@code m} with {@code modifiers} held at the press. */
+    /** A left press and release on the link's {@code :} (column 8) with {@code modifiers} held at the press. */
     private void click(MouseController controller, int modifiers) {
         int x = 8 * CELL_WIDTH + CELL_WIDTH / 2;
         int y = CELL_HEIGHT / 2;

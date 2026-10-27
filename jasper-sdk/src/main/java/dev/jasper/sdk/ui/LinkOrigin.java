@@ -7,9 +7,9 @@ package dev.jasper.sdk.ui;
  */
 public enum LinkOrigin {
     /**
-     * The user asked for it: a link Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, one of Jasper's
-     * own web links such as Settings' Help, or a plugin's
-     * {@link Platform#openInBrowser(java.net.URI) Platform.openInBrowser}.
+     * The user asked for it: a link Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, a local web file
+     * clicked there, which arrives as a {@code file:} link, one of Jasper's own web links such as Settings' Help, or a
+     * plugin's {@link Platform#openInBrowser(java.net.URI) Platform.openInBrowser}.
      */
     CLICK,
     /**

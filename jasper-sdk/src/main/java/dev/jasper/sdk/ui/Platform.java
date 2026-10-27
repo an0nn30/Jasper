@@ -81,7 +81,7 @@ public interface Platform {
      * Makes this plugin the editor Jasper opens files with: {@code config.toml}, the plugin settings files, the custom VM
      * options file, every {@link #openInEditor} and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a
      * local terminal pane go to {@code editor} first, on the UI thread; a click brings the path's line and the clicked
-     * window. A clicked path comes from program output, and an OSC 8 link's target can differ from the text shown, so
+     * window. A clicked path comes from program output, and an OSC 8 link's address can differ from the text shown, so
      * an editor edits the file and never runs it. One at a time: a bundled plugin's registration replaces a plugin's
      * that is not bundled; otherwise the first stays and any later one, this plugin's own included, throws. When the
      * editor returns false or throws, when no plugin provides one, and when Jasper waited 30 seconds for the UI
@@ -108,7 +108,7 @@ public interface Platform {
      * with the active window; and the addresses given to the {@code jasper} command, with the window of the pane it ran
      * in, go to {@code browser} first, on the UI thread, as a {@link WebLink} that says who asked
      * ({@link LinkOrigin}). A local file the user clicked in a terminal also arrives, as a {@code file:} link.
-     * A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown, so a browser
+     * A clicked link comes from program output, and an OSC 8 link's address can differ from the text shown, so a browser
      * should treat the address as untrusted input and show it before acting on it. Other
      * schemes, such as {@code mailto}, and {@link #browse} always go to the system browser. One at a time: a bundled
      * plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this

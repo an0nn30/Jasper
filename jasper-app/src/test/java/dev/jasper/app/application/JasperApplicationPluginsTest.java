@@ -924,13 +924,19 @@ class JasperApplicationPluginsTest {
         Path browsed = dirs.plugins().resolve("dev.example.both/data/browsed");
         Path edited = dirs.plugins().resolve("dev.example.both/data/edited");
         java.util.UUID window = java.util.UUID.randomUUID();
+        // Every open runs on a thread of its own, so each sub-case waits for the threads it started before it looks.
+        var opens = new CopyOnWriteArrayList<Thread>();
+        application.fileOpener = task -> opens.add(Thread.ofVirtual().name("jasper-open-file").start(task));
 
         edt(() -> application.openClickedFile(page, 7, window));
+        joinAll(opens);
         assertThat(awaitLines(browsed, 1)).as("a click in a tab; a window that is not open is no window")
             .containsExactly(page.toUri() + "|CLICK|TAB|-");
+        assertThat(edited).as("the browser took it, so the editor was not asked").doesNotExist();
 
         // The editor is asked after the browser by the same thread, so its line shows what each click reached.
         edt(() -> application.openClickedFile(notes, 3, window));
+        joinAll(opens);
         assertThat(awaitLines(edited, 1)).as("the editor heard only the file no browser displays, at its line")
             .containsExactly("notes.txt|3");
 
@@ -939,7 +945,9 @@ class JasperApplicationPluginsTest {
             application.openClickedFile(home.resolve("gone.html"), 0, window);
             application.openClickedFile(notes, 0, window);
         });
-        assertThat(awaitLines(edited, 2)).as("neither a folder nor a missing file opened").containsExactlyInAnyOrder("notes.txt|3", "notes.txt|-");
+        joinAll(opens);
+        assertThat(java.nio.file.Files.readAllLines(edited)).as("neither a folder nor a missing file opened")
+            .containsExactlyInAnyOrder("notes.txt|3", "notes.txt|-");
         assertThat(java.nio.file.Files.readAllLines(browsed)).as("nor was the browser asked about them").hasSize(1);
         edt(application::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
@@ -1035,6 +1043,14 @@ class JasperApplicationPluginsTest {
         assertThat(calls).containsExactly("edit:index.html");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    /** Waits for every thread in {@code threads}, which an open's executor collected, to finish, and forgets them. */
+    private static void joinAll(List<Thread> threads) throws InterruptedException {
+        for (Thread thread : List.copyOf(threads)) {
+            assertThat(thread.join(java.time.Duration.ofSeconds(10))).as("%s finished", thread.getName()).isTrue();
+            threads.remove(thread);
+        }
     }
 
     /** The lines of {@code file} once it has {@code count}, or the lines it has when ten seconds have passed. */

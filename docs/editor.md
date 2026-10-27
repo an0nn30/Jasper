@@ -37,8 +37,8 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
 - Cmd-click (Ctrl-click on Linux and Windows) a file path in a terminal pane, **File › Open File…**, and the files
   Jasper opens itself (`config.toml`, a plugin's settings file, the custom VM options file) go to the
   [default editor](#default-editor), which is this Editor unless you choose another. A click opens only an existing
-  file, at the line the path names; a file a browser displays is offered to the web browser a plugin provides first.
-  [Links and file paths](terminal.md#links-and-file-paths) lists the forms Jasper recognises.
+  file, at the line the path names; a clicked file a browser displays is offered to the web browser a plugin provides
+  first. [Links and file paths](terminal.md#links-and-file-paths) lists the forms Jasper recognises.
 - `jasper editor FILE[:LINE[:COLUMN]]...`, the [jasper command](command-line.md#jasper-editor), opens each file in the
   window of the Jasper pane it ran in, with the caret on LINE and COLUMN. A file that does not exist yet, in a folder
   that does, opens as an empty tab that its first save creates. With `--wait` (`-w`) the command returns once the last

@@ -373,15 +373,16 @@ final class WindowChrome {
 
     /** Builds contributed entries; {@code item} makes menu-bar items or ordinary popup items. */
     private List<Component> build(List<MenuEntry> entries, java.util.function.Function<Action, JMenuItem> item) {
-        return build(entries, item, Optional.empty());
+        return build(entries, item, Optional::empty);
     }
 
     /**
      * As above; a web-address item shows only when {@code webAddress}, the right-clicked pane's selection as one web
-     * address, is present, and its item gives the action that address (browser plan 3b Task 6).
+     * address, is present, and its item gives the action that address (browser plan 3b Task 6). Only a web-address item
+     * asks for it.
      */
     private List<Component> build(List<MenuEntry> entries, java.util.function.Function<Action, JMenuItem> item,
-                                  Optional<URI> webAddress) {
+                                  java.util.function.Supplier<Optional<URI>> webAddress) {
         List<Component> built = new ArrayList<>();
         for (MenuEntry entry : entries) {
             switch (entry) {
@@ -390,7 +391,7 @@ final class WindowChrome {
                     if (action != null) built.add(item.apply(action));
                 }
                 case MenuEntry.WebAddressItem placed -> {
-                    Action action = webAddress.map(address -> contributions.action(placed.actionId(), address)).orElse(null);
+                    Action action = webAddress.get().map(address -> contributions.action(placed.actionId(), address)).orElse(null);
                     if (action != null) built.add(item.apply(action));
                 }
                 case MenuEntry.Separator separator -> built.add(new JPopupMenu.Separator());
@@ -745,6 +746,20 @@ final class WindowChrome {
         }
     }
 
+    /** A pane's selection as one web address, read by the first {@link #get} and kept for the rest of the menu. */
+    private static final class SelectedWebAddress implements java.util.function.Supplier<Optional<URI>> {
+        private final TerminalPane pane;
+        private Optional<URI> address;
+
+        SelectedWebAddress(TerminalPane pane) { this.pane = pane; }
+
+        @Override public Optional<URI> get() {
+            if (address == null)
+                address = pane == null ? Optional.empty() : pane.selectedText().flatMap(MenuEntry.WebAddressItem::addressIn);
+            return address;
+        }
+    }
+
     JPopupMenu contextMenu() {
         owner.updateActions();
         JPopupMenu menu = new JPopupMenu();
@@ -763,8 +778,8 @@ final class WindowChrome {
         for (ActionId id : owner.windowMenuItems()) menu.add(owner.action(id));
         if (contributions != null) {
             // Read while the menu is built, so no plugin code runs (browser plan 3b Task 6); the right-clicked pane is current.
-            TerminalPane pane = owner.currentPane();
-            Optional<URI> webAddress = pane == null ? Optional.empty() : pane.selectedText().flatMap(MenuEntry.WebAddressItem::addressIn);
+            // A selection over a long scrollback is a large string, so it is read only when an entry shows a web address.
+            var webAddress = new SelectedWebAddress(owner.currentPane());
             for (MenuSection section : contributions.model().menus()) {
                 if (section.target().type() != MenuTarget.Type.CONTEXT) continue;
                 List<Component> built = build(section.entries(), PlainText::item, webAddress);

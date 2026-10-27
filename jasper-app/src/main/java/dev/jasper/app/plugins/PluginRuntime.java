@@ -738,18 +738,19 @@ public final class PluginRuntime {
      * Asks the web browser a plugin provides to open a local file as a click on its {@code file:} link, in a tab.
      * UI thread: the browser must not block, so nothing waits for it.
      *
-     * @param file the file; the caller has checked that it is a web page
+     * @param file the file's {@code file:} address, made by the caller off the UI thread ({@code Path.toUri} reads the
+     *     file system) once it had checked that the file is a web page
      * @param windowId the Jasper window the click came from, or empty
      * @return true when a browser took the link; false before the plugins start, when no plugin provides a browser, or
      *     when it declined or threw, and the caller opens the file as it would without one
      * @throws IllegalStateException off the UI thread
      */
-    public boolean openLocalWebFile(Path file, Optional<UUID> windowId) {
+    public boolean openLocalWebFile(java.net.URI file, Optional<UUID> windowId) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Web addresses are opened on the UI thread");
         Objects.requireNonNull(file, "file");
         Objects.requireNonNull(windowId, "windowId");
         PluginHost current = host;
-        return current != null && current.webBrowsers.open(file.toUri(), dev.jasper.sdk.ui.LinkOrigin.CLICK,
+        return current != null && current.webBrowsers.open(file, dev.jasper.sdk.ui.LinkOrigin.CLICK,
             dev.jasper.sdk.ui.LinkPlacement.TAB, Optional.empty(), windowId);
     }
 

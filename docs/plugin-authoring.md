@@ -1161,7 +1161,7 @@ terminal pane, with the path's line and the clicked window. The Editor takes thi
   must not block, and returns whether it opened the file. `false`, a handler that throws, or no answer within 30 seconds
   hands the file to the desktop, which for a click edits the file or shows it in the file manager instead of opening
   it.
-- A clicked path comes from program output, and an OSC 8 link's target can differ from the text shown, so edit the
+- A clicked path comes from program output, and an OSC 8 link's address can differ from the text shown, so edit the
   file and never run it.
 - One plugin at a time: a bundled plugin's registration replaces one that is not bundled; otherwise a later
   registration throws `IllegalStateException` ("The editor is already provided by *id*"). The role ends with the
@@ -1187,7 +1187,7 @@ as a `file:` link.
   the browser can reuse the item the name refers to; and the `window`, the plugin's own handle for the Jasper window
   the link came from.
 - An `EXTERNAL` link asks for a `TAB` and has no target; a `file:` link is a `CLICK` in a `TAB`.
-- A clicked link comes from program output, and an OSC 8 link's target can differ from the text shown, so treat the
+- A clicked link comes from program output, and an OSC 8 link's address can differ from the text shown, so treat the
   address as untrusted input and show it before acting on it.
 - `ftp` and `mailto` links, and `Platform.browse`, always go to the system browser.
 - One plugin at a time: a bundled plugin's registration replaces one that is not bundled; otherwise a later
@@ -1445,7 +1445,7 @@ try (var host = new FakePluginHost()) {
 | --- | --- |
 | Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView` (an event a standard row handles there calls `pendingChanged()`), `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel`; `setKitDefault(id, key, value)` (a look's default, before any plugin starts) and `lookDefaultProblems(id)` |
 | The look and the terminal font | `setPresentation(presentation)` before any plugin starts, with `FakePresentations.STANDARD` (what the fake reports until told otherwise) or `CLASSIC`; `presentation()`; `setTerminalTypography(value)`, delivered by `flush()` |
-| Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `status()`, `progress()`, `rail()` |
+| Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `contextMenu(paneId)`, `chooseFromContextMenu(paneId, actionId)`, `status()`, `progress()`, `rail()` |
 | Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the main window), `panelView`, `panelHeader`, `placePanel` (moves the tool window as a drag would, to a `PanelPlacement`; one that is not open is built there), `closePanel`; `windows()` (the open dialogs and overlays), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
 | Terminals | `addTerminalWindow()` (the first one added while no main window is open is the main window), `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`, `moveTab`, `closeTab`, `windowTabs(windowId)` (a window's tabs, each its items pane by pane), `focusTerminalPane`, `closeTerminalPane`, `holdPane` (a local pane that waits, `NOT_STARTED`, until its tab is shown), `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
