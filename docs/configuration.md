@@ -280,8 +280,8 @@ as `zen_mode` in [`ui-state.toml`](#ui-statetoml). Its action, `toggle_zen_mode`
 `ui.animations.enabled` turns motion on or off in every window: workspace tabs sliding as they open and close, the
 command palette card unrolling as it opens, and modal overlays fading in. Turning it off finishes running transitions
 at once. Under a look without motion, such as Enterprise, nothing in the windows moves whatever it says, and Settings
-hides the row. The turtle on the Meadow [splash screen](looks.md#branding) is animated unless the setting is `false`,
-under every look.
+hides the row. The [splash screen](looks.md#branding) uses a still illustration of the interface theme selected at the next launch.
+Its original Meadow fallback animates the turtle unless the setting is `false`.
 
 ### Window
 

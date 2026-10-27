@@ -142,7 +142,9 @@ public final class ApplicationBootstrap {
         SplashPainter painter;
         try { painter = branding.present()
             ? SplashPainter.of(splashContent(presentation, BuildInfo.current()), screenScale())
-            : SplashPainter.meadow(BuildInfo.current().buildLine(), screenScale()); }
+            : SplashPainter.themed(SplashSelection.theme(startup.service() == null ? dev.jasper.app.config.ConfigSnapshot.defaults()
+                : startup.service().initialState().snapshot(), startup.selection()),
+                BuildInfo.current().buildLine(), screenScale()); }
         catch (RuntimeException undrawable) {
             LOG.log(System.Logger.Level.WARNING, "The " + product + " splash cannot be drawn; starting without it", undrawable);
             return StartupSteps.NONE;

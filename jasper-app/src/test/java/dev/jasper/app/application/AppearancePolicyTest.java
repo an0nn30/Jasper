@@ -1,5 +1,6 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.appearance.AppearancePolicy;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.app.config.AppearanceMode;

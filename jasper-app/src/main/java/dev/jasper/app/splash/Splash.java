@@ -18,9 +18,9 @@ import java.util.function.Consumer;
  * The boot splash's window (spec 10.11): undecorated, unfocusable and centred on the main screen, carrying the look's
  * window icons. It appears and closes at once, and paints each step at once through the window's own
  * graphics, because the event thread is busy starting Jasper and would not get to a queued repaint. Every paint is a copy
- * from {@code SplashBuffer}, so a step changes only the step's line and the bar on screen. It is a plain AWT window, not
+ * from {@code SplashBuffer}, which also preserves fractional-scale illustration sampling between steps. It is a plain AWT window, not
  * a Swing one, so opening it initializes no look and feel ahead of the application's. A window that cannot be made is
- * logged and the splash stays closed; start-up goes on. Window lifecycle and step updates are EDT-owned. The standard
+ * logged and the splash stays closed; start-up goes on. Window lifecycle and step updates are EDT-owned. The fallback
  * Meadow animation paints on a daemon while startup occupies the EDT; all buffer and live-window paint access is
  * serialized by a private lock, and closing cancels the worker before disposing the window outside that lock.
  */
