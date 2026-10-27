@@ -17,9 +17,9 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 /**
- * What the main window's workspace shows once its last tab has closed (workspace tabs spec 1 decision 9, spec 10): New
+ * What a window's workspace shows once its last tab has closed (workspace tabs spec 1 decision 9, spec 10): New
  * Terminal Tab and Open File, each with its current shortcut, as VS Code's and IntelliJ's empty editor areas do. A click
- * runs the window's action. A child window is never empty: it closes with its last tab. EDT only.
+ * runs the window's action. EDT only.
  */
 final class EmptyWorkspace extends JPanel {
     /** One command: the button that runs it and the caption that shows its shortcut. */

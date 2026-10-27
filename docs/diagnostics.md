@@ -96,8 +96,8 @@ that piece of work took. Phases overlap (`application` includes `plugins`), so d
 Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …, output painted … after the
 request`. `<trigger>` is `cold` (a launch's first window), `menu`, `reopen` (a Dock click, Spotlight or `open -a` on
 macOS), `handoff` (a second launch or a `jasper` call), `open-file` (a macOS open-file event), `notification` (a click
-on a system notification), `plugin` (a plugin's view opening with no window open) or `restore` (a child window coming
-back with the main window). A window opened after the last one had closed adds `; no window for … before`, and on
+on a system notification), `plugin` (a plugin's view opening with no window open) or `restore` (a saved window coming
+back with the first). A window opened after the last one had closed adds `; no window for … before`, and on
 Windows also `… page faults until shown, working set … to … MB`. With `-Djasper.startupTrace=<file>` the same data is
 also written as JSON; the start-up benchmark uses it.
 

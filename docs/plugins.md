@@ -22,12 +22,12 @@ Shortcuts below are given as macOS / Linux and Windows.
 - Items in the File, Edit, View, Tab, Tools, Session and Transfer menus, a menu of its own, and items in the
   terminal's context menu. Jasper has no Tools, Session or Transfer items of its own, so those menus appear only while
   a plugin has entries in them.
-- Toolbar buttons, buttons on the left tool window stripe and status-bar items, all in the main window, and dialogs.
+- Toolbar buttons, buttons on the left tool window stripe and status-bar items, all in every window, and dialogs.
 - Content tabs: its own views in tabs and panes beside terminals, in any window. They can open a terminal or another
   item beside themselves, can be offered in the Split menus, and can come back when Jasper restores its windows.
 - Background activities, shown on [Desk Buddy](notifications.md#desk-buddy) while they run and posted in the plugin's
   "*name* activities" notification group when they succeed or fail.
-- Tool windows, docked in the main window or in a window of their own, each with a toggle in View › Tool Windows (in
+- Tool windows, docked in a window or in a window of their own, each with a toggle in View › Tool Windows (in
   the Window menu under the Enterprise look).
 - Command palette scopes, and places in Jasper's file chooser.
 - Terminal sessions of its own, such as SSH, which can come back when Jasper restores its windows, and variables in

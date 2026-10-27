@@ -18,10 +18,9 @@ import java.awt.event.WindowEvent;
 import javax.swing.*;
 
 /**
- * The native frame of one Jasper window (workspace tabs spec 6.2 and 6.3), around its {@link WindowContent}: the main
- * window's with the look's title bar, header and menus; a child window's with a title bar and the active tab's title, the
- * screen menu bar's menus on macOS while the look shows them there, and no menu row anywhere else. Both take the Keymap
- * on their own root, the command palette and workspace glass. Everything testable lives in {@link JasperWindow} and
+ * The native frame of one Jasper window (workspace tabs spec 6.2 and 6.3), around its {@link WindowContent}: every
+ * window's with the look's title bar, header and menus. Every window takes the Keymap
+ * on its own root, the command palette and workspace glass. Everything testable lives in {@link JasperWindow} and
  * {@link WindowManager}; this is never constructed in headless tests.
  */
 public final class WindowFrame {

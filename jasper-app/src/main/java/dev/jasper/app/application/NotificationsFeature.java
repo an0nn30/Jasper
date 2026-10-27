@@ -23,7 +23,7 @@ import java.util.UUID;
 
 /**
  * The application's notification surfaces: Jasper's own groups, the built-in Notifications panel with its unread
- * badge and actions, and one card layer per attached window (the application attaches the main window's), routing each
+ * badge and actions, and one card layer per attached window (the application attaches every window's), routing each
  * requested card to its target window or the window used last. EDT only; the application closes it at shutdown.
  */
 final class NotificationsFeature implements AutoCloseable {
@@ -64,7 +64,7 @@ final class NotificationsFeature implements AutoCloseable {
                 Contributions.PanelRequest.Op.ACTIVATING_TOGGLE)));
         contributions.addAction(DISMISS_CARDS, "Notifications: Dismiss Cards", null,
             List.of("notifications", "close", "clear", "balloons", "cards"), Optional.empty(), invocation -> {
-                // Cards show in the main window only, so a child window's Dismiss Cards closes them there.
+                // Cards show in one window, the one the card targets else the most recently active, so Dismiss Cards closes them there.
                 Attached attached = windows.get(invocation.windowId());
                 if (attached != null) attached.layer().dismissAll();
                 else windows.values().forEach(each -> each.layer().dismissAll());
@@ -95,7 +95,7 @@ final class NotificationsFeature implements AutoCloseable {
     }
 
     /**
-     * A Jasper window was activated: the main window, which holds the cards, is the default target, and cards that
+     * A Jasper window was activated: the most recently active window is the default target, and cards that
      * waited for focus show now.
      */
     void activated(WindowContent content) {

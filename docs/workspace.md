@@ -1,7 +1,7 @@
 # The workspace
 
 A Jasper window is the workspace: tabs in the middle, each holding split panes of terminals, Editor files and plugins'
-views. The main window adds tool windows docked around them, a header with the command palette's search field and the
+views. Around them it has tool windows docked, a header with the command palette's search field and the
 toolbar, the menus and a status bar. This guide describes that frame and the dialogs that belong to it. What runs
 inside a terminal pane is in [Terminal](terminal.md); features such as SSH, the Credential Vault or the Editor come from
 bundled plugins and have their own guides, listed in [Plugins](plugins.md). Every shortcut named here is a default;
@@ -9,7 +9,7 @@ bundled plugins and have their own guides, listed in [Plugins](plugins.md). Ever
 
 ## The window at a glance
 
-Jasper has one main window and any number of child windows. From top to bottom, the main window shows:
+Jasper has any number of windows, and each one is complete. From top to bottom, a window shows:
 
 - **Header.** The search field in the middle shows what the focused pane is doing (`user@~/project : make` for a local
   shell, `host:path` for a remote one, or the title a program set) with the command palette's shortcut; clicking it
@@ -22,33 +22,33 @@ Jasper has one main window and any number of child windows. From top to bottom, 
 - **[Status bar](#the-status-bar).** The focused pane's shell and folder, plugin items, the terminal size and the
   configuration state.
 
-Notification cards appear in the bottom-right corner of the tool window area, above the status bar. A child window has
-only its title bar, which shows the shown tab's title and ends with the window's ⋮ menu, above its tabs: no toolbar,
-tool windows, status bar or Zen of its own, and on Linux and Windows no menu row. On macOS the screen menu bar shows the
-same menus while a child window has the focus, and they act on that window. A child window has the same command palette
-and keymap as the main window.
+Notification cards appear in the bottom-right corner of the tool window area, above the status bar. Each window has its
+own tool windows, status bar, rails and Zen. On macOS the screen menu bar shows the same menus for the window that has
+the focus, and they act on that window.
 
 ## Windows
 
 **New Window** (File menu, the toolbar's New Window button, Cmd+N on macOS, Ctrl+Shift+N on Linux and
-Windows) opens a child window with one terminal tab. Its shell starts in the focused pane's folder when Jasper knows
+Windows) opens a window with one terminal tab, with the tool windows of the default layout. Its shell starts in the focused pane's folder when Jasper knows
 it, otherwise in your home folder. **Close Window** (File menu, Cmd+Shift+W on macOS, no default shortcut on Linux and
 Windows) closes the window it runs in, as its title-bar close button does.
 
 Closing a window closes every tab in it at once; Jasper does not ask about running programs. Only a plugin's item with
-unsaved work, such as an Editor document, can ask first, and a refusal leaves the window open. A child window closes
-with its last tab, whether that tab closes or moves to another window. Closing the main window closes every child
-window too, after asking the items of every window. The main window's last tab leaves it open with an empty workspace
+unsaved work, such as an Editor document, can ask first, and a refusal leaves the window open. Closing a window leaves
+the others open. A window's last tab leaves it open with an empty workspace
 that offers **New Terminal Tab** and **Open File…** with their shortcuts; a new tab, a file you open and a tab or pane
-dropped on it take its place.
+dropped on it take its place. A window whose last tab moves to another window closes.
+
+A request that names no window, such as a file opened with the `jasper` command or a plugin's tab with no owner,
+goes to the most recently active window; when no window is open, Jasper restores its saved windows first.
 
 **Move Tab to New Window** (the window's ⋮, a terminal's right-click menu, a tab's menu and the command palette; no
-default shortcut) moves the shown tab, or the tab whose menu it was, with all its panes into a new child window, when
-its window holds two or more tabs. Dragging a tab out of every window does the same ([Tabs](#tabs)). In a child window,
-**Move to Main Window** (the window's ⋮, a terminal's right-click menu and the command palette) moves its tabs into the
-main window in their order, after the tab the main window shows: the tab the child window showed shows there, the main
-window comes to the front, and the child window closes. A move keeps every shell, file and view as it was. Neither runs
-while a dialog is open in one of the panes it would move.
+default shortcut) moves the shown tab, or the tab whose menu it was, with all its panes into a new window, when
+its window holds two or more tabs. Dragging a tab out of every window does the same ([Tabs](#tabs)).
+**Move Tab to Window ▸** (the window's ⋮, a terminal's right-click menu and the command palette), while another window is
+open, lists the other windows by their shown tab's title and moves the shown tab to the one you choose, which comes to the
+front; the command palette's moves it to the most recently active other window. A move keeps every shell, file and view
+as it was. Neither runs while a dialog is open in one of the panes it would move.
 
 ### Size and position
 
@@ -59,8 +59,8 @@ workspace it left, where you release it.
 ### Saving and restoring the windows
 
 Jasper saves its windows to `workspace.toml` in Jasper home within a second of each change, at once when a window
-closes, and on Quit and when it goes to the background. It restores them at the next start and whenever the main
-window opens again: the main window and each child window with its size, position and maximised state (fitted onto a
+closes, and on Quit and when it goes to the background. It restores them at the next start and whenever a
+window opens with none open: every saved window, in the order they were last active, with its size, position and maximised state (fitted onto a
 display when its place is no longer on one; never minimised), its tabs in order with the one it showed, and each tab's
 split panes with their sizes, the active pane, a maximised pane and the item each pane held. A terminal comes back with
 its name and profile and a new shell in its last local folder, or where a new shell starts when that folder is gone;
@@ -98,7 +98,7 @@ titles, each named after its active pane.
 |---|---|
 | Select a tab | Click it, or use **Select Tab 1**–**9** (Cmd+1–9; Ctrl+1–9), **Next Tab** (Cmd+Shift+]; Ctrl+PageDown) or **Previous Tab** (Cmd+Shift+[; Ctrl+PageUp), all in the Tab menu. Next and Previous wrap around. |
 | Close a tab | Click the × that appears on hover (when the tab is wide enough to show it), middle-click the tab, choose **Close Tab** on its right-click menu or in the File menu, or press Cmd+Option+W (Ctrl+Alt+Shift+W). Close Tab closes every pane of the tab; when one of its items with unsaved work stays open, none closes. |
-| Reorder or move tabs | Drag a tab along the strip to reorder it, onto another window's strip (or the top of a window that shows none, or anywhere over the main window's empty workspace) to move it there, onto a pane of the tab another window shows to put all its panes beside that pane, on the side the landing shows, or out of every window into a new child window (not a window's only tab). Hold it still over another tab's entry, in any window, for half a second to show that tab, then drop it beside one of its panes. A child window left without tabs closes. Where another of Jasper's windows, such as Settings, lies over the window under the cursor, nothing takes the drop. A tab with a dialog open in one of its panes moves along its strip only. Escape cancels. |
+| Reorder or move tabs | Drag a tab along the strip to reorder it, onto another window's strip (or the top of a window that shows none, or anywhere over a window's empty workspace) to move it there, onto a pane of the tab another window shows to put all its panes beside that pane, on the side the landing shows, or out of every window into a new window (not a window's only tab). Hold it still over another tab's entry, in any window, for half a second to show that tab, then drop it beside one of its panes. A window left without tabs by the move closes. Where another of Jasper's windows, such as Settings, lies over the window under the cursor, nothing takes the drop. A tab with a dialog open in one of its panes moves along its strip only. Escape cancels. |
 | Move a tab into another tab | **Move Tab Into** on the tab's right-click menu, or in the Tab menu for the tab that shows, lists the window's other tabs, numbered as **Select Tab** numbers them; choosing one puts all the tab's panes to the right of that tab's active pane, keeping their arrangement and sizes. The moved tab's entry goes, the tab it joined shows, and the moved tab's active pane takes the focus, so the tab is named after that pane. **Move Tab Into Tab 1** to **9** do the same for the tab that shows from the keyboard; they have no default shortcut. |
 | Rename a tab | **Rename Tab** (Tab menu or the tab's right-click menu, Cmd+I; Ctrl+Shift+I) asks "Tab name (leave blank for automatic):" and names the terminal in the tab's active pane. |
 
@@ -113,7 +113,7 @@ its title (a plugin tab's shows its location), followed by its **Select Tab** sh
 
 Plugins can open their own items in tabs and panes beside terminals; the Editor opens each document this way (see
 [Editor](editor.md)). A plugin opens an item in a new tab, in a new pane beside the focused one (from a
-[Split](#panes-and-splits) list) or in a new child window; a new tab fills the main window's empty workspace. A plugin's
+[Split](#panes-and-splits) list) or in a new window; a new tab fills a window's empty workspace. A plugin's
 item shows ● before its title while it has unsaved changes. While one is active:
 
 - its own commands take their shortcuts (the Editor's Cmd+S, Ctrl+S on Linux and Windows, and so on), and **Find**,
@@ -147,7 +147,7 @@ Each tab holds one or more panes, and each pane one terminal, Editor file or plu
 - Hold Cmd+Option (Ctrl+Alt on Linux and Windows; on Windows the left Alt key) and drag inside a pane to move it: onto
   another pane of the tab any window shows, which it splits on the side nearest the cursor; over the middle of a tab's
   entry, which shows that tab for the drop; onto the outer quarter of a tab's entry (under the Enterprise look also its
-  "+" or the room after the tabs), where it becomes a new tab; or anywhere over the main window's empty workspace. The
+  "+" or the room after the tabs), where it becomes a new tab; or anywhere over a window's empty workspace. The
   moved pane takes the focus where it lands, and a pane never becomes a window. Because the keys start the drag, a
   Cmd+Option-click (Ctrl+Alt-click) reaches neither a link nor the program in a terminal. Let go of the keys before
   pressing Escape to cancel, as Cmd+Option+Esc is Force Quit on macOS and Ctrl+Alt+Esc kills a window on some Linux
@@ -178,7 +178,7 @@ The toolbar sits at the trailing end of the header:
 | New Tab, New Window | **New Tab**, **New Window** |
 | **Split** ▾ | A menu with **Split Right** and **Split Down** |
 | Maximize Pane | **Maximize Pane** |
-| Plugin buttons | What plugins add, after their own separator. The Editor adds **New Editor Window**, which opens an untitled file in a new child window; Remote adds a **Sessions** menu of your saved hosts, your WSL distributions on Windows, and **Manage Sessions…**. |
+| Plugin buttons | What plugins add, after their own separator. The Editor adds **New Editor Window**, which opens an untitled file in a new window; Remote adds a **Sessions** menu of your saved hosts, your WSL distributions on Windows, and **Manage Sessions…**. |
 | Find, Settings | **Find**, [Settings](#settings) |
 | ⋮ (View Options) | The window menu: **Move Tab to New Window** |
 
@@ -259,16 +259,14 @@ On macOS, while the menus are in the screen menu bar, the application menu (Jasp
 
 | Where | Items |
 |---|---|
-| A terminal pane | Copy, Paste, Find, Clear Terminal, Split › (as in the Tab menu), Move Pane to New Tab, Move Pane to Tab ›, Maximize Pane, Close Pane, then the window menu's Move Tab to New Window (and Move to Main Window in a child window); then plugins' items: Remote's **Forward a Port...** and **Open SFTP here**, File Server's **Share Path** › HTTP, HTTPS, FTP, FTPS, SFTP, TFTP |
+| A terminal pane | Copy, Paste, Find, Clear Terminal, Split › (as in the Tab menu), Move Pane to New Tab, Move Pane to Tab ›, Maximize Pane, Close Pane, then the window menu's Move Tab to New Window and Move Tab to Window ›; then plugins' items: Remote's **Forward a Port...** and **Open SFTP here**, File Server's **Share Path** › HTTP, HTTPS, FTP, FTPS, SFTP, TFTP |
 | A tab's entry in the strip | Rename Tab (for a terminal), Move Tab to New Window, Move Tab Into ›, Close Tab, then the active item's own commands |
 | A rail button, or a tool window's Options (⋮) button | View Mode › Docked, Float, Window (the current one checked); Move to › Left Top, Left Bottom, Bottom Left, Right Top, Right Bottom, Bottom Right (the current slot checked); Hide |
 
 ## Tool windows and the dock
 
 Tool windows are panels such as the Sessions list, the SFTP browser or the Notifications history. Jasper and plugins
-supply them, and they belong to the main window only: a tool window's toggle run in a child window shows the tool window
-and brings the main window to the front, or the tool window's own window when it has one
-([Float and Window](#float-and-window)), and never hides it. Under the default look they start here:
+supply them, and every window has its own: a tool window's toggle acts on the window it runs in. Under the default look they start here:
 
 | Tool window | From | Starts in | Toggle |
 |---|---|---|---|
@@ -313,12 +311,12 @@ Each tool window has a header: its title, the plugin's buttons, **Options** (⋮
 
 A tool window can have a window of its own. In its Options menu, or the right-click menu of its rail button or stripe
 button, **View Mode** › **Float** or **Window** gives it one, which takes the focus if the tool window was showing, and
-dragging its button or header out of the main window opens a Float window for it ([Moving and
+dragging its button or header out of its window opens a Float window for it ([Moving and
 resizing](#moving-and-resizing)); **Docked** puts it back at its place on the stripe, showing there if it was showing.
-**Float** is a window owned by the main window: it stays above it, minimises and closes with it and has no taskbar or
+**Float** is a window owned by the window it was opened from: it stays above it, minimises and closes with it and has no taskbar or
 Dock entry of its own. **Window** is an ordinary window: it has its own entry in the taskbar or the window switcher and
-can go behind the main window. Either one has the tool window's title and its header, with Options and Hide, above its
-content. From a menu it opens where the tool window's frame was, or centred on the main window when the tool window was
+can go behind its window. Either one has the tool window's title and its header, with Options and Hide, above its
+content. From a menu it opens where the tool window's frame was, or centred on its window when the tool window was
 hidden, and afterwards where it last was; dragged out, it opens at the pointer. Either way it is fitted to the displays
 that are connected. In it, and docked at the bottom, Remote's Sessions, SFTP and Tunnels and File Server's File Servers
 take a wider layout ([Sessions](remote.md#the-sessions-panel), [File Servers](file-server.md#the-file-servers-tool-window)).
@@ -329,17 +327,17 @@ The tool window keeps its rail button or stripe button, in its slot, highlighted
   window's toggle shortcut show it the same way, bring a window that shows but is not the active one to the front with
   the focus, and hide the one that is, as the shortcut does when pressed in the window itself.
 - Closing the window hides the tool window: the system's close button, **Hide**, or the keys of Close Pane, Close Tab or
-  Close Window pressed in it (they close no pane, tab or window of the main window from there). It stays in the mode it
+  Close Window pressed in it (they close no pane, tab or window of its window from there). It stays in the mode it
   has, its button stays on the stripe, and showing it again opens its window where it was. A window shown without being
   asked for, such as one that comes back at start or after Zen, opens without taking the focus.
 - **Move to** on a tool window that has a window of its own docks it at the place you choose, its own slot included,
   and shows it there.
 - Jasper's shortcuts work while the window has the focus, the tool window's own among them. Commands for the window as a
-  whole, such as New Tab or the command palette, run in the main window and bring it to the front.
+  whole, such as New Tab or the command palette, run in the window the tool window belongs to and bring it to the front.
 - Zen hides these windows with the docked tool windows and shows them again when it ends.
 
 Jasper saves each tool window's mode, whether it shows and its window's position and size in `ui-state.toml`, for the
-look in use ([the keys](configuration.md#ui-statetoml)); a window that showed opens again with the main window at the next
+look in use ([the keys](configuration.md#ui-statetoml)); a window that showed opens again with its window at the next
 start, and one saved on a display that is no longer connected opens on a connected one.
 
 ### Moving and resizing
@@ -348,7 +346,7 @@ start, and one saved on a display that is no longer connected opens on a connect
   and an outline shows where it would land. Release it on a rail to move it there, keeping it shown or hidden as it
   was, or over the workspace near its left, right or bottom edge to move it there and show it. Escape, a click with
   another button or switching windows cancels the drag. An empty, hidden rail still takes a drop at its window edge.
-- **Drag it out of the main window** (a rail button, a labelled stripe's or the bottom strip's tab, or a docked tool
+- **Drag it out of its window** (a rail button, a labelled stripe's or the bottom strip's tab, or a docked tool
   window's header) and release it outside the window, or over another of Jasper's windows that lies in front of it, to
   open the tool window in a window of its own there, focused, whether it was showing or not: a Float window, or a
   Window if that is its mode ([Float and Window](#float-and-window)). While the pointer is there, the rails' gap and the
@@ -375,8 +373,8 @@ next start uses the last saved layout.
 `toggle_zen_mode`) hides the status bar, both rails and every tool window that was showing, which Jasper remembers.
 The header, toolbar and tabs stay. A tool window you open while in Zen shows in its slot as usual, without the
 rails. Leaving Zen hides those and shows the remembered ones again. View › Show/Hide › Status Bar and Rail, and their
-shortcuts, are unavailable in Zen. Zen is the main window's: the main window opens in the Zen saved in
-`ui-state.toml` and saves it each time you toggle it, and a child window has no Zen. The saved layout keeps the tool
+shortcuts, are unavailable in Zen. Zen is each window's own: a window opens in the Zen saved in
+`ui-state.toml` and saves it each time you toggle it there. The saved layout keeps the tool
 windows that showed before Zen, so one opened in Zen is not saved as showing.
 
 **Compact** (Settings › Appearance › View mode, `window.view_mode = "compact"`, after a restart) uses the system's
@@ -434,15 +432,14 @@ Saving writes `config.toml` in Jasper's home, keeping your comments;
 
 The command palette finds and runs everything: every menu command, every plugin action, and plugins' searches such as
 saved SSH hosts, shell history, snippets or project files. Open it with Cmd+Shift+P (Ctrl+Shift+P), View › Command
-Palette, or by clicking the header's search field; it drops down from the field. In Compact mode, and in a child
-window, which has no header, it opens centred over the window. See [Command palette](command-palette.md).
+Palette, or by clicking the header's search field; it drops down from the field. In Compact mode it opens centred over the window. See [Command palette](command-palette.md).
 
 ## Notifications
 
-Jasper reports results and problems as cards in the bottom-right corner of the main window instead of dialogs. The
+Jasper reports results and problems as cards in the bottom-right corner of a window instead of dialogs. The
 Notifications tool window (bell button, Right Top) keeps this session's history
 ([the Notifications panel](notifications.md#the-notifications-panel)), and **Notifications: Show Errors** opens the
-Errors tab in the main window. When Jasper is in the background, the operating system shows them too. See
+Errors tab in the most recently active window. When Jasper is in the background, the operating system shows them too. See
 [Notifications](notifications.md).
 
 ## Quitting, background residency and restarts
@@ -453,16 +450,16 @@ work, such as Editor documents, and plugins with work running, such as File Serv
 stops, except on macOS while it runs in the background (below).
 
 One Jasper runs per home. Launching it again, with its launcher or the
-[`jasper` command](command-line.md#one-jasper-per-home), hands the request to the running one, which brings its main
+[`jasper` command](command-line.md#one-jasper-per-home), hands the request to the running one, which brings its most recently active
 window to the front, restoring its windows first when none is open, and opens the files and folders the launch
-named (`Jasper notes.txt src`): each folder as a terminal tab in the main window, and each file in the
-[default editor](editor.md#default-editor), which is the Editor, in the main window, unless you chose another. On macOS
+named (`Jasper notes.txt src`): each folder as a terminal tab in that window, and each file in the
+[default editor](editor.md#default-editor), which is the Editor, in that window, unless you chose another. On macOS
 a file or folder you open with Jasper in Finder (Open With), or drop on its Dock icon, opens the same way. A running
 Jasper that does not answer within 10 seconds is reported with its process id, and the launch starts no second one.
 
 With **Run in background** on (Settings › System Settings, `system.run_in_background`; on by default on macOS and
-Windows, off on Linux; applies after a restart), Jasper keeps running when you close the main window, and with it every
-window, with its plugins but no shells, so the next window opens quickly. In an installed Jasper on macOS and Windows it
+Windows, off on Linux; applies after a restart), Jasper keeps running when you close its last window,
+with its plugins but no shells, so the next window opens quickly. In an installed Jasper on macOS and Windows it
 also starts at login, with no window. The menu bar item or notification-area icon appears once start-up has settled:
 when the first window has painted its shell's first output, 2 seconds after its first paint, or, at login, once Jasper
 has prepared its first window.
@@ -478,12 +475,12 @@ has prepared its first window.
   unread, opens that notification. Quit in the File menu quits.
 - **Linux:** there is no icon; launch Jasper again to get a window. Quit quits.
 
-With Run in background off, closing the main window quits Jasper. See
+With Run in background off, closing the last window quits Jasper. See
 [Configuration](configuration.md#background-residency).
 
 Finder does not replace a running app, so choose **Quit Jasper Completely** before installing a new version from the
 disk image. When the app is replaced another way while Jasper runs, the next Dock click or launch with no window open
-starts the new build in its place, opening what the launch named; with windows open it brings the main window to the
+starts the new build in its place, opening what the launch named; with windows open it brings the most recently active window to the
 front, and a launch of the new build says that Jasper was updated, with a Restart action ([Command line](command-line.md)).
 
 Some changes need a restart: rows marked "Takes effect after restart", plugin changes and custom VM options. The

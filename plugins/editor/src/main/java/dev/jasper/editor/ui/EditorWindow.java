@@ -280,7 +280,7 @@ public final class EditorWindow {
     public void open(EditorDocument document) { open(document, null); }
 
     /**
-     * Opens a file in the window the request came from; null chooses the main window. A file already open has its view
+     * Opens a file in the window the request came from; null chooses the most recently active window. A file already open has its view
      * selected, of several the one focused last (pane flexibility spec 6).
      */
     public void open(EditorDocument document, WindowOwner owner) {
@@ -436,7 +436,7 @@ public final class EditorWindow {
     /**
      * Opens a local file for the default editor ({@code FileEditor.edit}): an existing file with the caret on
      * {@code line}, a missing one whose folder exists as a tab its first save creates. The tab opens in {@code window}
-     * when that is a Jasper window, else in the main window.
+     * when that is a Jasper window, else in the most recently active window.
      *
      * @return false for a folder or a file whose folder does not exist, which the desktop then opens or reports
      */
@@ -485,7 +485,7 @@ public final class EditorWindow {
     public void openLocalFiles(List<Path> files, WindowOwner owner) { for (Path file : files) openLocal(file, owner); }
     public void newUntitled() { newUntitled(owner()); }
     public void newUntitled(WindowOwner owner) { newUntitled(owner, dev.jasper.sdk.ui.TabPlacement.NEW_TAB); }
-    /** A new untitled document whose tab opens where {@code placement} puts it: New Editor Window's is a new child window. */
+    /** A new untitled document whose tab opens where {@code placement} puts it: New Editor Window's is a new window. */
     public void newUntitled(WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
         origin = owner;
         var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();

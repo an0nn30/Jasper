@@ -13,7 +13,7 @@ import javax.swing.JRootPane;
 import javax.swing.JToolTip;
 
 /**
- * Paint-time zone lookup using only JDK client properties. EDT only. A {@code "titlebar"} zone, the main window's
+ * Paint-time zone lookup using only JDK client properties. EDT only. A {@code "titlebar"} zone, a window's
  * header row ({@link #titleBar}), paints with the installed theme's {@link dev.jasper.ui.theme.TitleBarTheme}.
  */
 public final class ThemeZone {

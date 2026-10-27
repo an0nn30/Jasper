@@ -233,7 +233,7 @@ Measure a trained image, as users get it: build it with `./gradlew :jasper-app:p
 By default every run of one invocation shares one isolated home in a new folder under `/tmp` (`-Duser.home`), with an
 empty `jasper.vmoptions` (through `JASPER_VM_OPTIONS`), so the user's configuration, VM options, logs and login items
 are untouched. Before each launch, priming launches included, the isolated home's `workspace.toml` is replaced with the
-one AOT training restores (one main window with one terminal tab), so every run restores the same window, whatever the
+one AOT training restores (one window with one terminal tab), so every run restores the same window, whatever the
 run before it saved as it quit. Warm mode always uses an isolated home, whose `config.toml` turns residency on.
 `--real-home` measures the user's own setup, its saved windows included, and warns when the configured terminal
 program looks like tmux or screen, whose servers keep a session per launch.

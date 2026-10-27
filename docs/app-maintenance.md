@@ -238,7 +238,7 @@ Application code never opens a message dialog to tell the user something; it pos
   confirmation or input prompts stay dialogs: notifications are for things that happen elsewhere or later.
 - Cards, history rows and the Errors tab read the kit's semantic roles and metrics through the chrome `KitContext`
   (`notificationui.NotificationStyle`); nothing there reads `UIManager`. The unread badge is
-  `PanelEntry.setBadge` on the panel: the main window's icon rail stripe button shows it as a `BadgedIcon`, with the count in the
+  `PanelEntry.setBadge` on the panel: a window's icon rail stripe button shows it as a `BadgedIcon`, with the count in the
   tooltip and accessible description, and a labelled stripe or the bottom strip shows a count pill after the label
   (`StripeLabels`). Cards stack in the layer `WindowContent.mountCornerLayer` keeps in the bottom-right corner of the
   `ToolWindowArea`, on `PALETTE_LAYER`, below a dock drag's `DRAG_LAYER` guides.
@@ -257,7 +257,7 @@ producer, and its entry points are safe from any thread:
   `PluginRuntime.reportFailuresTo`. Give each contained call a short operation ("panel <id>", "action <id>"): it is
   the incident's header and the notification's title.
 - `launchFailure(window, details, failure)` is for a shell that could not start, from `WindowContent.onLaunchFailure`.
-  Every occurrence is announced on its own, as a card in the main window with its details and Show more…, while the
+  Every occurrence is announced on its own, as a card with its details and Show more…, while the
   incident itself still counts up.
 
 Expected failures the user can act on, such as a file that cannot be read or a host that cannot be reached, are not
@@ -471,7 +471,7 @@ host (`connectContributions(model, state, hostsContent)` with `false`), so plugi
 error, info and launch-failure callbacks are logged, never shown, posted as notifications or recorded as incidents
 (`Rehearsal.silence`). It uses its own in-memory `UiState`, never restores the saved dock layout and is discarded rather
 than closed (`WindowFrame.discard`; a window that failed to open is discarded by `WindowManager`), so its default dock
-layout never replaces the main window's in `ui-state.toml`; it bypasses `WindowManager`, so it never reads or writes
+layout never replaces a window's in `ui-state.toml`; it bypasses `WindowManager`, so it never reads or writes
 `workspace.toml`. A process that has warmed up labels its first plain window `menu` rather than `cold`. Once `done` has
 run, on every path (a played rehearsal, a failed one, an `Error`, and the headless early return), `warmUp` starts one
 `System.gc()` on a daemon thread from a later EDT event, so the rehearsal's garbage does not stay in the resident heap;
@@ -790,7 +790,7 @@ Check the native traffic lights at ordinary and scaled display settings.
 
 `WindowToolbar` allocates whole buttons by stable priority and builds its overflow menu from the same `Action`s as
 their original placements; do not keep a second plugin registry for overflow. A contributed toolbar view
-(`ToolbarEntry.View`) is built once, for the main window, when `WindowContent.connectTerminals` reports it open (never
+(`ToolbarEntry.View`) is built once for each window when `WindowContent.connectTerminals` reports it open (never
 for the warm-up rehearsal), and closed with its window or its entry; it lays out at its preferred size and hides,
 never overflows, when the row is too narrow. Theme changes must keep the selected tab readable when the terminal's
 colours differ from the chrome's. The classic header's buttons are `ClassicToolbarButton`s: with labels hidden
@@ -811,7 +811,7 @@ gutters and no lower corner spacer: it fills the workspace edge to edge.
 
 Exterior gutters are the kit's `WORKSPACE_GUTTER` (6 px by default, none under the classic kit) on each edge a frame
 touches, except where something else supplies the spacing: a visible stripe on its side, a visible status bar at the
-bottom (hiding it restores the bottom gutter), and the header at the top, which the main window has except in Compact.
+bottom (hiding it restores the bottom gutter), and the header at the top, which a window has except in Compact.
 On a side whose stripe is hidden, tool window frames get the gutter back without reparenting their content; the
 terminal column never has side gutters. Adjacent frames omit their facing gutters, so the area's divider supplies the
 gap. Slot sizes and the saved dock sizes include exterior gutters. The centre host derives its minimum size from the
@@ -939,8 +939,8 @@ coordinates over the windows the `WindowManager` lists, most recently active fir
 cursor and the landing on the target window's `DockDropOverlay`. A parent tab's place in a strip is
 `WorkspaceDropResolver.place`: change the rule in the resolver and its tests first. A drop along its own strip is
 `WindowContent.reorderParentTab`; one into another window goes through `WindowManager.moveParentTab` (a window whose
-strip hides takes it over the band at its top, the main window's empty workspace anywhere over it), and a tear-out
-through `WindowManager.moveTabToNewWindow`, a new child window. Beside a pane of a window's shown tab other than its own
+strip hides takes it over the band at its top, a window's empty workspace anywhere over it), and a tear-out
+through `WindowManager.moveTabToNewWindow`, a new window. Beside a pane of a window's shown tab other than its own
 (`TabDrag.Target.Into`) a parent tab merges into that tab, as one nested split (`Layout.insertBeside`): in its window
 through `WindowContent.mergeTab`, into another through `WindowManager.moveTabInto` and the tab registry. Its entry
 resting on another tab's entry for `TabDrag.SPRING_DELAY` shows that tab (spring-loading, the `TabDrag.spring` timer,
@@ -961,7 +961,7 @@ A pane drags with the same `TabDrag`: a window's `paneClicks` hands it a left pr
 press's drags and release, so no item hears the gesture (`TerminalView` leaves a consumed event alone). It drops beside
 a pane of a shown tab (`WorkspaceDropResolver.resolve`, the nearest side), shows a hovered entry's tab until the drag
 ends (the drop's window keeps what the drop shows), and makes a new tab at a strip's new-tab place
-(`TabStrip.newTabPlace`: an entry's outer quarter, the classic "+" and the room after it) or on the main window's empty
+(`TabStrip.newTabPlace`: an entry's outer quarter, the classic "+" and the room after it) or on a window's empty
 workspace; within its window `WindowContent.movePane` and `movePaneToNewTab` move it, into another
 `WindowManager.movePane` and `movePaneToNewTab`, through the tab registry. A text view's text drag sits out the gesture.
 `PaneDragTest` and `TabDragWindowsTest` drive it.

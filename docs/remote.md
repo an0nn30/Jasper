@@ -7,8 +7,7 @@ lists Windows' WSL distributions beside your hosts. Turn it off or on in Setting
 
 Remote works with two other bundled plugins when they are on: [Credential Vault](credential-vault.md) holds the
 passwords and keys hosts sign in with (the SSH agent works without it), and the [Editor](editor.md) edits remote files.
-Remote's tool windows are in the main window ([Tool windows and the dock](workspace.md#tool-windows-and-the-dock)): from
-a child window, their commands bring the main window forward and show them there. Under a classic look, such as
+Remote's tool windows are in every window ([Tool windows and the dock](workspace.md#tool-windows-and-the-dock)). Under a classic look, such as
 [Enterprise](enterprise.md), they take their classic layout ([below](#under-a-classic-look)).
 
 ## Commands and shortcuts
@@ -346,7 +345,7 @@ of new panes, choose it there (see [Shell, environment and history](configuratio
 
 ### Opening the browser
 
-There is one SFTP browser, in the main window's SFTP tool window (in the lower half of the left side to start with). It
+There is one SFTP browser, in each window's SFTP tool window (in the lower half of the left side to start with). It
 shows the SSH pane you focus in any window: focusing another SSH pane switches it, and focusing a local pane leaves it
 as it is.
 
@@ -416,7 +415,7 @@ deletes links themselves and never what they lead to, and can be cancelled; what
 
 ### Transfers
 
-Uploads, downloads and host-to-host copies go into one queue that the main window shows: at the foot of the SFTP panel
+Uploads, downloads and host-to-host copies go into one queue that each window shows: at the foot of the SFTP panel
 (three rows at a time), or in the Transfers tool window under a classic look. **Transfers** (Cmd+Option+3, Alt+3, or
 Transfer › Transfers) shows them.
 

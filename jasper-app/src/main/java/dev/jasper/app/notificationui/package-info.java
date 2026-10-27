@@ -1,7 +1,7 @@
 /**
- * EDT Swing views of the notification center: the main window's card stack, the history panel, the Errors tab's
+ * EDT Swing views of the notification center: a window's card stack, the history panel, the Errors tab's
  * view, and their text, style and focus helpers. Views subscribe to the center or the incidents and close their
- * subscriptions when closed; the application owns the center, mounts the main window's card layer and closes it with
+ * subscriptions when closed; the application owns the center, mounts each window's card layer and closes it with
  * the window, and the Errors tab closes its view.
  * Controls are jasper-ui kit descriptors (dev.jasper.ui.model, dev.jasper.ui.swing) on the chrome KitContext (the
  * Errors tab's on the workspace one, as content), mounted in

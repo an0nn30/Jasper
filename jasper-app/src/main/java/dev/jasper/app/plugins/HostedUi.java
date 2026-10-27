@@ -303,7 +303,7 @@ final class HostedUi {
         return tracked(registration::close);
     }
 
-    /** A toolbar view's mount: the main window's toolbar. */
+    /** A toolbar view's mount: a window's toolbar. */
     private record ToolbarMount(java.util.UUID windowId) { }
 
     /**

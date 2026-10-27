@@ -160,15 +160,11 @@ checks the open context and the UI thread, enforces namespaces (ids start with `
 the plugin's own actions, contains callbacks, and writes the single application-wide `Contributions` model. Everything
 a plugin registered is removed, newest first, when it stops or fails to start. Each `WindowContent` connects to the
 model once: `WindowContributions` turns every contributed action into a Swing `Action` in the window's
-`CommandRegistry` (so each is also a command palette command), and the window's chrome, and the main window's status
-bar, rebuild only their plugin sections when the model changes. A child window takes the actions, the menus and the
-palette scopes; panels and status entries are the main window's. Workspace code never sees an SDK type.
+`CommandRegistry` (so each is also a command palette command), and the window's chrome and status bar rebuild only their plugin sections when the model changes. Every window takes the actions, the menus, the palette scopes, the panels and the status entries. Workspace code never sees an SDK type.
 
-A toolbar view (`ToolbarItem.View`) is built by the plugin's factory, inside containment, each time the main window
-opens; a child window has no toolbar. `ToolbarViewAdmission` admits only an INLINE `Stack` of LABEL `Text`, DROPDOWN,
+A toolbar view (`ToolbarItem.View`) is built by the plugin's factory, inside containment, each time a window opens. `ToolbarViewAdmission` admits only an INLINE `Stack` of LABEL `Text`, DROPDOWN,
 SEARCHABLE or PICKER `Choice`, at most one PRIMARY `Button`, icon-only GHOST `Button`s (a blank label), `MenuButton`s
-and `Separator`s, when the view is built and on every update; a refused or throwing factory leaves that main window
-without the view.
+and `Separator`s, when the view is built and on every update; a refused or throwing factory leaves that window without the view.
 
 `KeyBindings` is keyed by action id. The user's `[keybindings]` entry for a contributed action wins; otherwise the
 plugin's default for the platform applies unless it is invalid or a binding in a conflicting context already holds the
@@ -178,7 +174,7 @@ ignored."; a dropped plugin default is logged and shown on the action's row in S
 ## Panels, the rail and plugin dialogs
 
 Panels and rail actions are part of the `Contributions` model. Each panel carries its default `dock.Slot`, which
-`HostedUi` maps from the SDK's `Anchor` and `PanelSpec.split`. The main window's `WindowContributions` keeps one
+`HostedUi` maps from the SDK's `Anchor` and `PanelSpec.split`. Each window's `WindowContributions` keeps one
 lazily built instance per panel and docks the panels in the window's `DockState` (per slot an ordered list with at most one
 showing window; per-side sizes and ratios). One listener on that state builds what starts showing, lays out
 `ToolWindowArea` (the terminal column, the tab strip over the deck, and a frame with a `ToolWindowHeader` for each
@@ -198,9 +194,7 @@ visibility; a workspace drop moves and shows it. A release outside the window, o
 front of it, is the Detach target: the tool window opens in a Float window where it is released, or a detached one's
 window moves there.
 
-Requests to show, hide or toggle a panel travel through the model tagged with a window id, and
-`Contributions.panelRoute` sends a child window's to the main window, where a toggle only shows: the main window comes
-forward, or for a detached tool window its own window (an activating show raises it even when it already shows). Every
+Requests to show, hide or toggle a panel travel through the model tagged with a window id, and only that window answers; a show of a detached tool window raises its own window (an activating show raises it even when it already shows). Every
 panel's toggle action is listed under View › Tool Windows (in the Enterprise look, the Window menu): the
 application-registered `<panel id>.toggle`, or the plugin's own action named by
 `PanelSpec.toggleActionId`, which must already be registered, so a plugin action that toggles a panel appears once in
@@ -222,7 +216,7 @@ is a kit `Panel` view shows the same metadata in its own header row, which the t
 
 A panel hears where it is through `PanelHost.placement()` and `onPlacement`, which `HostedUi.host` adapts from `PanelSite`'s
 `Placement` (the panel's `dock.Slot`, its stripe button's while it has a window of its own, and its `ToolWindowMode`) to the
-SDK's `PanelPlacement` (anchor, split and `PanelMode`); `window()` stays the main window while the panel is detached. The
+SDK's `PanelPlacement` (anchor, split and `PanelMode`); `window()` stays the window whose dock holds the panel while it is detached. The
 `WindowContributions` listener tells each built panel whose id is in the dock change's `placed` (its slot or mode changed)
 after its component is in its new place, once per effective change of the place it was built in or last heard, never for
 visibility alone or a move within its half. A listener that moves the panel again ends the round, so the listeners after it
@@ -268,15 +262,12 @@ where the look draws one (`TitleInset`).
 
 `Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)` mounts a plugin's view as an item in a Jasper
 window, translated to `contributions.TabRegistry` and `Tab`. Keys are scoped to the plugin; opening a key that is open
-selects its tab and returns its handle. A missing or closed owner window uses the main window, restoring it when
-needed; a `TabPlacement` opens the item in a new tab of the window, a new pane beside the focused one or a new child
-window. A foreign owner is refused. A split item (`Windows.splitItem`) joins every window's Split lists through the
+selects its tab and returns its handle. A missing or closed owner window uses the most recently active window, restoring the saved windows first when none is open; a `TabPlacement` opens the item in a new tab of the window, a new pane beside the focused one or a new window. A foreign owner is refused. A split item (`Windows.splitItem`) joins every window's Split lists through the
 application's contributions model, its two actions registered as the plugin's own; `ContentTab.split`, `moveToNewTab`,
 `tabChoices` and `moveToTab` reach the item's window through the tab registry. `WindowContent` hosts terminal and
 plugin items alike in its `WorkspaceView`. Content views take the workspace theme.
 
-`ContentTab` updates its literal presentation, commands and status items, moves to a new child window, the main
-window, a new tab or another tab of its window without disposing the content, and is a dialog and chooser owner whose
+`ContentTab` updates its literal presentation, commands and status items, moves to a new window, another window, a new tab or another tab of its window without disposing the content, and is a dialog and chooser owner whose
 later prompts follow its current window. A move is ignored while a close decision or a modal prompt is pending. `requestClose` asks the plugin's
 `Windows.onTabsClosing` guard, which gets the affected tabs and whether the request closes a window, quits or
 restarts; an exception or a false decision keeps the content. Repeated requests share the pending result; `close`

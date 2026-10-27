@@ -239,7 +239,7 @@ behind, the task names the `hdiutil detach -force` command to run.
 - `user.home` is `aot-training/home`, whose `config.toml` turns residency off (`system.run_in_background = false`)
   and replaces the login shell with a stand-in (`/bin/sh training-shell.sh`) that prints one `jasper-aot-training$ `
   prompt and discards its input;
-- the home's `workspace.toml` holds one main window, 960 by 600 points at 100, 100, with one terminal tab
+- the home's `workspace.toml` holds one window, 960 by 600 points at 100, 100, with one terminal tab
   (`startup-workspace.toml` in `jasper-app/src/main/resources/dev/jasper/app/benchmark/`), which the launch restores as
   a normal start restores the saved windows, so the cache holds the restore path's classes too;
 - `JAVA_TOOL_OPTIONS` asks for the cache (`-XX:AOTCacheOutput`), the start-up trace (`-Djasper.startupTrace`) and no
@@ -304,7 +304,7 @@ Command-line tools started from Apple's Terminal are exempt from the permission,
 Jasper appears in Finder's Open With and takes drops on its Dock icon without becoming any type's default application.
 macOS hands the files and folders to Jasper as an open-file event, to the running Jasper when there is one: each file
 opens in the [default editor](editor.md#default-editor), or is revealed in the file manager when no editor plugin runs or
-the default editor is **System default app**, and each folder as a terminal tab, in the main window
+the default editor is **System default app**, and each folder as a terminal tab, in the most recently active window
 ([one Jasper per home](command-line.md#one-jasper-per-home)). `verifyPackage` checks the key.
 
 ## Windows

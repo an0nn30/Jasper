@@ -271,7 +271,7 @@ size = 14
 search field, and opens the command palette as a floating card; `"normal"` (the default) keeps the full workspace
 header. The change applies after a restart, and `window.toolbar` keeps its value for a return to Normal.
 
-Zen (View › View Modes › Zen) hides the main window's status bar and tool windows. It is not a setting: Jasper keeps it
+Zen (View › View Modes › Zen) hides the window's status bar and tool windows. It is not a setting: Jasper keeps it
 as `zen_mode` in [`ui-state.toml`](#ui-statetoml). Its action, `toggle_zen_mode`, has no default shortcut.
 [The workspace](workspace.md) describes both modes.
 
@@ -342,7 +342,7 @@ kept in [`ui-state.toml`](#ui-statetoml). [Command palette](command-palette.md) 
 
 ### Desk buddy
 
-`buddy.enabled` shows the pixel-art Jasper who floats above your windows while the main window is open and not
+`buddy.enabled` shows the pixel-art Jasper who floats above your windows while a window is open and not
 minimised. The command palette's **Show Jasper**/**Hide Jasper** and his right-click **Hide Jasper** show or hide him
 for the session only; a saved change to `buddy.enabled` replaces that choice. His position is kept in `buddy.toml` in
 Jasper's home. [Notifications](notifications.md) describes what he shows.
@@ -619,7 +619,7 @@ which is kept aside ([below](#workspacetoml)).
 
 ### ui-state.toml
 
-At most 256 KiB. Jasper writes it whenever the layout changes and when it quits; the main window's dock layout is the
+At most 256 KiB. Jasper writes it whenever the layout changes and when it quits; the dock layout is shared by every window, and the last window to change or close it sets the
 next one's, a resident Jasper's included. The windows themselves are in [`workspace.toml`](#workspacetoml).
 
 | Key | Holds |
@@ -639,11 +639,10 @@ next one's, a resident Jasper's included. The windows themselves are in [`worksp
 
 ### workspace.toml
 
-At most 256 KiB. `workspace.toml` keeps Jasper's windows: the main window and each child window (`role = "full"` in the
-file), with its size, position and maximised state, its tabs in order with the one it shows, and each tab's split panes,
+At most 256 KiB. `workspace.toml` keeps Jasper's windows, each with its size, position and maximised state, its tabs in order with the one it shows, and each tab's split panes,
 the active one and what each pane holds. Jasper saves it within a second of each change, at once when a window closes,
-and before closing every window together (closing the main window, Quit, going to the background). It restores the
-windows whenever the main window opens, at start or after it closed, from what it saved last, else from the file. A
+and before closing every window together (Quit, going to the background). It restores every
+window, in the order they were last active, whenever a window opens with none open, at start or after the last one closed, from what it saved last, else from the file. A
 window keeps its normal bounds while maximised or minimised and never comes back minimised; one that no longer fits an
 available display is fitted to a usable display. A terminal comes back with the name you gave it and its profile and a
 new shell in its last local directory, or where a new shell starts when that directory was on another host or is gone;
@@ -655,7 +654,7 @@ and, while its plugin runs, Retry. Scrollback, running programs, plugin views th
 untitled Editor tab, and Jasper's own tabs, such as the Errors tab, do not come back. When the windows would pass the
 size limit, Jasper leaves out plugins' views and then terminals, the largest first, and logs each one.
 
-When saved windows do not all come back (the file cannot be read, has another `version` or keeps no main window, an
+When saved windows do not all come back (the file cannot be read, has another `version` or keeps no window, an
 entry in it is bad, or a window cannot be restored), Jasper keeps them as `workspace.toml.bad`, opens what it could
 (one terminal tab when the file itself is unusable) and posts "Jasper could not restore your windows". Quit Jasper
 before changing the file: once Jasper has opened a window it restores from what it last saved, not from the file, and

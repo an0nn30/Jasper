@@ -23,7 +23,7 @@ import javax.swing.SwingUtilities;
  * IntelliJ Classic's macOS title row (its {@code ToolbarServiceImpl} {@code setTransparentTitleBar}): the root takes
  * full-window content under a transparent title bar, and this band, in the toolbar's colour, sits above the content,
  * so macOS draws the traffic lights and the frame's own title over it. It is never a title-bar zone: it paints the
- * fill it is given, with no rule and no text, and holds no control but a child window's ⋮ at its trailing end (parent
+ * fill it is given, with no rule and no text, and holds no control but a window's ⋮ at its trailing end (parent
  * tabs spec 6). Full screen removes it, so the content meets the screen's
  * top edge, and leaving full screen restores it. A double-click acts as the system setting says
  * ({@link MacTitleDoubleClick}). EDT.
@@ -123,7 +123,7 @@ public final class MacTitleBand extends JComponent implements AutoCloseable {
     }
 
     /**
-     * A control at the band's trailing end, such as a child window's ⋮ (parent tabs spec 6), centred on the band and
+     * A control at the band's trailing end, such as a window's ⋮ (parent tabs spec 6), centred on the band and
      * 8 pt from the window's edge. Once only.
      *
      * @param component the control

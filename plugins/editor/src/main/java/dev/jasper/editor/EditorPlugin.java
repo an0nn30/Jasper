@@ -158,7 +158,7 @@ public final class EditorPlugin implements Plugin {
         context.actions().register(ActionSpec.of(SPLIT_FILE_DOWN, "Split File Down")
                 .withKeywords(List.of("editor", "split", "file", "down", "view", "pane")),
             invoked -> window().splitFile(invoked.window(), dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN));
-        // Workspace tabs spec 6.5: an untitled document in a child window of its own; no default key. Its icon is the toolbar button's.
+        // Workspace tabs spec 6.5: an untitled document in a window of its own; no default key. Its icon is the toolbar button's.
         context.actions().register(ActionSpec.of(NEW_WINDOW, "New Editor Window").withIcon("file")
                 .withKeywords(List.of("editor", "new", "window", "untitled")),
             invoked -> window().newUntitled(invoked.window(), dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW));

@@ -124,7 +124,9 @@ public final class WorkspacePanelsFixture implements AutoCloseable {
     public void theme(ResolvedTheme value) { onEdt(() -> appearance.setPair(value)); }
 
     private static Object field(Object object, String name) {
-        try { var found = object.getClass().getDeclaredField(name); found.setAccessible(true); return found.get(object); }
+        try {
+            if (name.equals("sessionsPanel")) { var accessor = object.getClass().getDeclaredMethod("hostsPanel"); accessor.setAccessible(true); return accessor.invoke(object); }
+            var found = object.getClass().getDeclaredField(name); found.setAccessible(true); return found.get(object); }
         catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 

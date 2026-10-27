@@ -61,7 +61,7 @@ desktop menu. The package is named `jasper-workstation`. The packages are unsign
 
 ## First launch
 
-Jasper opens its main window with one tab running your shell: your login shell on macOS and Linux, PowerShell on
+Jasper opens a window with one tab running your shell: your login shell on macOS and Linux, PowerShell on
 Windows (Settings › Terminal › Shell chooses another, such as [Cygwin Bash](terminal.md#cygwin-bash)). The first window
 is sized for 100 columns by 35 rows of the terminal font, bundled Cousine Nerd Font Mono at 12 points; after that,
 Jasper [restores its windows, tabs and panes](workspace.md#saving-and-restoring-the-windows) as you left them at each
@@ -77,7 +77,7 @@ Under the default look the window has:
 
 - a **header** with a search field in the middle, which shows where the current pane is (`user@~/path` locally,
   `host:path` over SSH) and opens the [command palette](command-palette.md) when you click it, and a toolbar: New
-  tab, New terminal window, Split, Maximize pane, the plugins' buttons (the Editor's New Editor Window, Remote's
+  tab, New window, Split, Maximize pane, the plugins' buttons (the Editor's New Editor Window, Remote's
   Sessions menu), Find, Settings and the window's ⋮ menu. On macOS the header shares the title bar with the window
   controls and the menus are in the menu bar; on Linux and Windows the menus sit in Jasper's own title bar;
 - the **terminal**, with a row of tabs above it once the window has more than one tab;
@@ -115,11 +115,11 @@ keeps Jasper running with no windows open, so a new window opens at once. It tak
 | | macOS | Windows | Linux |
 | --- | --- | --- | --- |
 | Default | On | On | Off |
-| Closing the main window (and with it every window) | Jasper keeps running in its menu bar item: **New Window**, **Settings…**, **Quit Jasper Completely** | Jasper keeps running in its notification-area icon: **Open Jasper**, **Quit Jasper** | Jasper quits. With the setting on, it keeps running with no icon; launch Jasper again for a window |
+| Closing the last window | Jasper keeps running in its menu bar item: **New Window**, **Settings…**, **Quit Jasper Completely** | Jasper keeps running in its notification-area icon: **Open Jasper**, **Quit Jasper** | Jasper quits. With the setting on, it keeps running with no icon; launch Jasper again for a window |
 | Quit | Cmd+Q closes every window and keeps Jasper in the menu bar; **Quit Jasper Completely** ends it | Quit (Ctrl+Alt+Shift+Q) ends Jasper | Quit (Ctrl+Alt+Shift+Q) ends Jasper |
 | At login | An installed Jasper starts in the background, with no Dock icon | An installed Jasper starts in the background | Not started |
 
-One Jasper runs per home, with the setting on or off: launching it again brings the running Jasper's main window
+One Jasper runs per home, with the setting on or off: launching it again brings the running Jasper's most recently active window
 forward, restoring its windows first when none is open, and opens the files and folders you named. On macOS a file or
 folder you open with Jasper in Finder (Open With), or drop on its Dock icon, opens the same way, and the Dock icon shows
 only while one of Jasper's windows is open. Turning the setting off also removes the login item when you save.
@@ -129,7 +129,7 @@ only while one of Jasper's windows is open. Turning the setting off also removes
 ### Tabs and splits
 
 - **New Tab** (Cmd+T on macOS, Ctrl+Shift+T on Linux and Windows) opens a tab; **New Window** (Cmd+N,
-  Ctrl+Shift+N) a child window, which has only a title bar and its tabs. New tabs, windows and splits start in the
+  Ctrl+Shift+N) a new window. New tabs, windows and splits start in the
   current pane's folder once its shell has reported it, as shell integration does.
 - **Split Right** (Cmd+D, Ctrl+Shift+D) and **Split Down** (Cmd+Shift+D, Ctrl+Alt+Shift+D) split the current pane;
   drag the divider to resize. **Focus Pane Left / Right / Up / Down** (Cmd+Option+Arrow, Ctrl+Alt+Shift+Arrow) moves
@@ -139,9 +139,9 @@ only while one of Jasper's windows is open. Turning the setting off also removes
   own.
 - **Close Pane** (Cmd+W, Ctrl+Shift+W) closes the current pane, and its tab with the last pane; **Close Tab**
   (Cmd+Option+W, Ctrl+Alt+Shift+W) closes the whole tab, and **Close Window** (Cmd+Shift+W on macOS, no default
-  shortcut on Linux and Windows) the window. A child window closes with its last tab; the main window stays open with
-  an empty workspace. **Rename Tab** (Cmd+I, Ctrl+Shift+I) names a tab; an empty name returns to the automatic title.
-- Drag a tab to reorder it, onto another window to move it there, or out of every window into a child window of its
+  shortcut on Linux and Windows) the window. A window stays open with
+  an empty workspace when its last tab closes. **Rename Tab** (Cmd+I, Ctrl+Shift+I) names a tab; an empty name returns to the automatic title.
+- Drag a tab to reorder it, onto another window to move it there, or out of every window into a window of its
   own; middle-click it to close it. Hold Cmd+Option (Ctrl+Alt on Linux and Windows) and drag a pane to move it beside
   another pane or into a tab of its own. Right-click a pane for Copy, Paste, Find, the split and move commands and the
   plugins' commands for that pane.
@@ -182,7 +182,7 @@ page. See [configuration](configuration.md) and [keyboard shortcuts](keyboard-sh
 
 ### Tool windows
 
-Tool windows are panels beside and below the terminal in the main window: Sessions, SFTP, Tunnels and File Servers on
+Tool windows are panels beside and below the terminal in each window: Sessions, SFTP, Tunnels and File Servers on
 the left, and Notifications on the right; Remote's file transfers show at the foot of the SFTP tool window. Click a rail
 button to show or hide one; View › Tool Windows lists them too, and some have shortcuts, such as **Toggle SSH hosts**
 (Cmd+Option+1, Alt+1) and **Toggle SFTP** (Cmd+Option+2, Alt+2). Drag a rail button or a tool window's header to

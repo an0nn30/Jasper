@@ -29,7 +29,7 @@ import javax.swing.JPanel;
  * with the window's tab strip ({@link ParentTabBar}) on top, and paints nothing itself. Only the shown parent tab's
  * workspace is visible; the others stay in the tree, hidden, with their groups, tabs and sessions as they were, so a
  * switch restarts nothing. A parent tab joins holding its first tab and leaves with its last one, except the window's
- * only parent tab, which the main window keeps as its empty workspace. EDT only.
+ * only parent tab, which a window keeps as its empty workspace. EDT only.
  */
 final class ParentTabsView extends JPanel {
     private final WindowContent owner;
@@ -102,7 +102,7 @@ final class ParentTabsView extends JPanel {
         return count;
     }
 
-    /** Whether the window holds no tab: its only parent tab is empty, as only the main window's may stay. */
+    /** Whether the window holds no tab: its only parent tab is empty, as a window's may stay. */
     boolean isEmpty() { return count() == 1 && active().isEmpty(); }
 
     /**

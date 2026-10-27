@@ -154,8 +154,10 @@ class FileServerRenderEvidenceTest {
             var entryType = plugin.getClass().getClassLoader().loadClass("dev.jasper.fileserver.runtime.ActivityLog$Entry");
             var constructor = entryType.getConstructor(Instant.class, String.class);
             for (int index = 0; index < 12; index++) entries.add(constructor.newInstance(Instant.parse("2026-10-10T10:00:00Z").plusSeconds(index), "event " + index));
-            var panelField = plugin.getClass().getDeclaredField("panel"); panelField.setAccessible(true);
-            var owner = panelField.get(plugin);
+            var instances = plugin.getClass().getDeclaredField("panels"); instances.setAccessible(true);
+            var instance = ((java.util.Map<?, ?>) instances.get(plugin)).values().iterator().next();
+            var panelField = instance.getClass().getDeclaredField("panel"); panelField.setAccessible(true);
+            var owner = panelField.get(instance);
             owner.getClass().getMethod("refreshActivity").invoke(owner);
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }

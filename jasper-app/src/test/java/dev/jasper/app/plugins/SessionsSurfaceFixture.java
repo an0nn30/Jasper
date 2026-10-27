@@ -98,7 +98,7 @@ public final class SessionsSurfaceFixture implements AutoCloseable {
     }
     public Object panel() { return field(remote,"sessionsPanel"); }
     public static void layout(Container parent) { parent.doLayout();for(var child:parent.getComponents())if(child instanceof Container nested)layout(nested); }
-    private static Object field(Object object,String name) {try{var f=object.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(object);}catch(ReflectiveOperationException e){throw new AssertionError(e);}}
+    private static Object field(Object object,String name) {try{if(name.equals("sessionsPanel")){var m=object.getClass().getDeclaredMethod("hostsPanel");m.setAccessible(true);return m.invoke(object);}var f=object.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(object);}catch(ReflectiveOperationException e){throw new AssertionError(e);}}
     private static Object invoke(Object object,String name) {return invoke(object,name,new Class<?>[0]);}
     private static Object invoke(Object object,String name,Class<?>[] types,Object... args) {try{return object.getClass().getMethod(name,types).invoke(object,args);}catch(ReflectiveOperationException e){throw new AssertionError(e);}}
     @Override public void close() throws Exception {try{onEdt(site::notifyClosed);}finally{try{vault.close();}finally{loader.close();}}}

@@ -214,8 +214,7 @@ static ViewSpec serversPanel(List<String> names, Set<String> running, String que
 ```
 
 Register it with `context.panels().register(new PanelSpec(...), host -> context.kit().create(...))` and keep your model
-outside the view: Jasper builds it in the main window the first time it shows, and again after the main window closed
-and opened anew. Two-line rows in a tool window are compact: the name leads
+outside the view: Jasper builds it in each window the first time it shows there, and again after that window closed and opened anew. Two-line rows in a tool window are compact: the name leads
 the title line and keeps its width before whatever follows it; a `Chip` and a `MONO_SMALL` endpoint form the second
 line; one compact `Toggle` trails. A row switch is its own control: toggling it never activates the row, and its state
 follows what your domain confirms (set `pending` while a start or stop is in flight). A note above an `Empty` body, such

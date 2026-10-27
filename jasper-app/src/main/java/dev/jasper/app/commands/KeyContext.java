@@ -27,7 +27,7 @@ public record KeyContext(Kind kind, String owner) {
     /** The content tabs one plugin opened. */
     public static KeyContext content(String pluginId) { return new KeyContext(Kind.CONTENT, pluginId); }
 
-    /** Inside one panel, in the main window. */
+    /** Inside one panel, in a window. */
     public static KeyContext panel(String panelId) { return new KeyContext(Kind.PANEL, panelId); }
 
     /** Specificity: 0 for Global, 1 for Terminal, 2 for the owned kinds. */

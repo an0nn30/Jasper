@@ -298,9 +298,9 @@ on `surface.panel`, `surface.sidebar` and `surface.card`.
 
 ### Title bar roles
 
-Two optional roles give the main window's header row (the title, the command field and the toolbar buttons) colours
+Two optional roles give each window's header row (the title, the command field and the toolbar buttons) colours
 of its own, such as a dark title bar on a light theme. Slate Cobalt leaves both out; Ubuntu Yaru sets both. Under the
-Enterprise look the main window's header row and, on macOS and Windows, IntelliJ Classic's title bar above it take
+Enterprise look each window's header row and, on macOS and Windows, IntelliJ Classic's title bar above it take
 `surface.app` instead.
 
 | Role | Paints | Left out, it is |

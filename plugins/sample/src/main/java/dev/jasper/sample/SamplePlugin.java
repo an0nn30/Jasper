@@ -112,7 +112,7 @@ public final class SamplePlugin implements Plugin {
 
     // example:pluginpanels:start
     private static void installPanelAndAboutTab(PluginContext context, long stepMillis) {
-        // Built the first time the panel shows, docked in the main window or in a window of its own, as the user chooses.
+        // Built the first time the panel shows, docked in a window or in a window of its own, as the user chooses.
         // The view starts with the body for where the panel is now; a move to or from a window of its own describes the other.
         context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, panelAnchor(context)), host -> {
             UiView view = context.kit().create(panelBody(host.placement().ownWindow()), event -> {

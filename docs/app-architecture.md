@@ -87,7 +87,7 @@ sequenceDiagram
   Bootstrap->>App: Compose on the EDT: theme and kit, notifications, Buddy, configuration
   App->>Runtime: Start plugins once, before any window
   Bootstrap->>Bootstrap: The owner's handoff endpoint and command socket, bound with the lock, start answering
-  App->>Window: Restored or new main window, warm-up (--background) or none (--no-window)
+  App->>Window: Restored or new window, warm-up (--background) or none (--no-window)
 ```
 
 1. `Main.main` calls `ApplicationBootstrap.main`, which marks `MAIN_ENTERED` and parses `AppArguments`. An argument
@@ -124,7 +124,7 @@ sequenceDiagram
    windows, the Errors tab, the About windows, the plugin runtime, the application's own contributions and the Settings
    dialog, and starts every selected plugin.
 7. `compose` then gives the launch its login-item reconciler, lets the owner answer handoffs (once the EDT has taken
-   one, within a second, and none while it quits) and presents: the main window `WindowManager.ensureMain` restores or
+   one, within a second, and none while it quits) and presents: the windows `WindowManager.ensureWindow` restores or
    opens, with the launch's paths opened in it (`JasperApplication.openFirstWindow`, `OpenPlan`), the `--background`
    warm-up, or, for `--no-window`, serving the command socket.
 
@@ -152,7 +152,7 @@ start-up flags (`AppArguments.residencyAllowed`: a home from `jasper.home` or `J
 does not change it. The home's owner serves the handoff endpoint (`<home>/daemon/socket`) and the `jasper` command
 socket (`<home>/daemon/commands`), resident or not; a resident owner keeps its plugins, configuration watcher and
 command recents after its last window closes. A handoff opens the request's files and folders, or brings Jasper forward,
-restoring the main window when none is open. `--config`, `--safe-mode` and `--plugin-dir` apply only to a Jasper that
+restoring the saved windows when none is open. `--config`, `--safe-mode` and `--plugin-dir` apply only to a Jasper that
 starts: a later launch hands off, they are ignored, and the running Jasper says to quit it first; a Jasper started with
 one is never resident. [Command line](command-line.md) describes the client.
 
@@ -164,10 +164,10 @@ notice offers Restart.
 
 ## Windows and the saved workspace
 
-Jasper has one main window and any number of child windows, all made, tracked and closed by the application's
-`WindowManager` (workspace). The main window (`MainWindow`) has every piece of chrome around its workspace and keeps an
-empty workspace (`EmptyWorkspace`) when its last tab closes; a child window (`ChildWindow`, `WindowRole.CHILD` content)
-shows only a title bar over its workspace and closes with its last tab. A window holds tabs, a tab holds split panes and
+Jasper has any number of windows, all one kind (`JasperWindow`) made, tracked and closed by the application's
+`WindowManager` (workspace), which keeps them in opening order and in activation order. Every window has every piece of
+chrome around its workspace (its own dock, status bar, Zen and notification card layer) and keeps an
+empty workspace (`EmptyWorkspace`) when its last tab closes. A window holds tabs, a tab holds split panes and
 a pane holds one item. The code names them otherwise: a tab is a parent tab (`layout.ParentTab`, shown by
 `ParentTabsView` under the window's one strip, `ParentTabBar`), a pane is a group (`layout.Group`, drawn by `GroupView`)
 and an item is a tab (`contributions.Tab`). Each parent tab is a `WorkspaceView` over an immutable `layout.Layout` of
@@ -175,20 +175,20 @@ weighted splits, drawn as `SplitContainer`s over the `GroupView`s; every change 
 
 The `TabRegistry` (contributions) owns every item for its whole life: a move detaches it from one window's
 `WorkspaceHost` and attaches it to another's, never replacing its content or touching its session. `WindowManager`
-moves a parent tab into a new child window and a child window's parent tabs to the main window: `WindowContent.receive`
+moves a parent tab into a new window or into another window (Move Tab to Window): `WindowContent.receive`
 lands each item through the tab registry, then, once every item has arrived, `WorkspaceView.rearrange` gives the parent
-tab its planned layout. Every outside request, a plugin's item opened with no window open and the menu bar item
-restore the main window first; closing the main window, Quit and going to the background close the child windows, then
-the main window. `verifyApplicationArchitecture` pins where the windows are made: `MainWindow` only in
-`WindowManager.ensureMain`, the `WindowManager` only in `JasperApplication`'s constructor, and `WindowFrame`, a window's
+tab its planned layout. Every outside request and a plugin's item opened with no owner go to the most recently active window, and restore the
+saved windows first when none is open; Quit and going to the background close every window together, the most recently
+active last. `verifyApplicationArchitecture` pins where the windows are made: a `JasperWindow` only in
+`WindowManager.open`, the `WindowManager` only in `JasperApplication`'s constructor, and `WindowFrame`, a window's
 native frame, only in `JasperApplication.frameOnScreen` and `rehearsalWindow`.
 
-`WorkspaceStore` (workspace) keeps the windows in `workspace.toml` (`persistence.WorkspaceFile`: each window's role,
+`WorkspaceStore` (workspace) keeps the windows in `workspace.toml` (`persistence.WorkspaceFile`: each window's
 bounds and maximised state, its tabs in strip order with the one it shows, each tab's panes and the item each holds,
 in the user's words: window, tab, pane, item). `WindowManager.snapshot()` builds what is saved, within a second of each
 change (a non-sliding timer on the EDT, the write on a virtual thread) and at once when a window closes, leaving items
 out until the file fits `WorkspaceFile.MAX_BYTES` (256 KiB); closing every window saves first and holds saving until
-the windows come back. `ensureMain` restores the main window before it shows, then the child windows, each with its
+the windows come back. `ensureWindow` restores every saved window when none is open, each with its
 place, tabs and items; a restored terminal's shell starts when its tab first shows, and until then its pane reports
 `NOT_STARTED`; a plugin's item comes back through its plugin's restorer or as a placeholder (`PlaceholderContent`; see
 [SDK architecture](sdk-architecture.md)). The reader drops a bad window, tab or item entry alone; whenever saved windows
@@ -300,7 +300,7 @@ bootstrap builds the login-item reconciler and hands it over. Plugin settings li
 | `root` | `Main` only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT arguments, the home's instance lock and the handoff, the pre-pass and EDT composition. `StartupResources` owns rollback until explicit transfer; the owner's `Instance` keeps its lock for the life of the process. |
 | `application` | EDT application composition and feature lifetimes (notifications, incidents, VM options, memory warnings, About, the Errors tab, Settings appearance wiring); the launch coordinator synchronises admission and shutdown waits off the EDT. `JasperApplication` closes its children. |
-| `workspace` | EDT windows (`WindowManager`, `MainWindow`, `ChildWindow`, their `WindowFrame`s), their parent tabs (`ParentTabsView`, with the window's strip `ParentTabBar`), each a workspace of groups, its panes, each showing one item (`WorkspaceView`, `GroupView`, `SplitContainer`), the main window's `EmptyWorkspace`, the saved workspace (`WorkspaceStore`) and a plugin item's placeholder (`PlaceholderContent`), terminal items (`TerminalContent`, one `TerminalPane` each), the tab and pane drag (`TabDrag`, the window manager's one, shared by its windows), the tool window area, stripes, headers and dock drag (`DockDrag`, whose Detach target, outside the window or over another of Jasper's windows in front of it, opens the tool window's own window where it is released), the main window's detached tool windows (`DetachedToolWindows`, which keeps one native window per shown Float or Window tool window in line with the dock through `Shell`s, and `DetachedFrame`, the native Float dialog and Window frame that `JasperApplication` gives it), action and configuration adapters, activity events, each window's presence in the terminal registry, the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). `WindowContent` closes subscriptions and panes, its `WindowContributions` the detached tool windows' windows; each pane closes its session. |
+| `workspace` | EDT windows (`WindowManager`, `JasperWindow`, their `WindowFrame`s), their parent tabs (`ParentTabsView`, with the window's strip `ParentTabBar`), each a workspace of groups, its panes, each showing one item (`WorkspaceView`, `GroupView`, `SplitContainer`), each window's `EmptyWorkspace`, the saved workspace (`WorkspaceStore`) and a plugin item's placeholder (`PlaceholderContent`), terminal items (`TerminalContent`, one `TerminalPane` each), the tab and pane drag (`TabDrag`, the window manager's one, shared by its windows), the tool window area, stripes, headers and dock drag (`DockDrag`, whose Detach target, outside the window or over another of Jasper's windows in front of it, opens the tool window's own window where it is released), each window's detached tool windows (`DetachedToolWindows`, which keeps one native window per shown Float or Window tool window in line with the dock through `Shell`s, and `DetachedFrame`, the native Float dialog and Window frame that `JasperApplication` gives it), action and configuration adapters, activity events, each window's presence in the terminal registry, the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). `WindowContent` closes subscriptions and panes, its `WindowContributions` the detached tool windows' windows; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState` (also each tool window's `ToolWindowMode`, docked or detached as Float or Window, and the bounds of its own window), `DockGeometry` and the drag's `DockDropResolver`; and the tab and pane drag's `WorkspaceDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, and the layout's group ids and sides); each window owns its state on the EDT. |
 | `layout` | Pure workspace layout model: a window's parent tabs (`ParentTabs`, with the shown one and their order of use), parent tab, tab and group ids, a workspace's groups (its panes, one item each) in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximised group and the groups' order of use, the operations that return a new layout, each group's region of the unit square with its directional neighbours, and what a plugin's item needs to come back (`TabRestore`). JDK-only (nothing from Swing or AWT); immutable values, safe on any thread; whoever holds a layout replaces it. `persistence.WorkspaceFile` reads and writes each window's `ParentTabs` as `workspace.toml`. |
 | `commands` | EDT action registry, `ActionId` and `KeyContext`, pure command ranking and metadata, and the palette's command recents (`command-history.toml`). The registry owns listeners until registration or registry close; the application flushes the recents at shutdown. |
@@ -315,7 +315,7 @@ bootstrap builds the login-item reconciler and hands it over. Plugin settings li
 | `windows` | Application-built auxiliary windows, dialogs and in-window overlays: the headless `AuxiliarySurface` core and `NativeShells`, the only class besides `WindowFrame` that creates native frames. The application owns `AuxiliaryWindows` and closes it at shutdown. |
 | `files` | Jasper's file chooser: the headless `ChooserModel` over `Location`s, `Browser`s and `ChooserSource`s (the local disk is `LocalSource`/`LocalBrowser`; plugin sources are adapted in `plugins`) and the Swing `FileChooserPanel`. `NativeShells` shows it in a dialog and owns that dialog's worker; the model applies worker results on the EDT, drops stale ones and closes the browsers it opened. |
 | `notifications` | EDT notification centre (groups, the in-memory history, read and expired state, delivery routing) and its values, the incident store with its captures and reports, and terminal and activity notice production for Buddy. The application owns the center and the incidents and closes notifiers before the companion. |
-| `notificationui` | EDT views of the centre: the main window's `CardLayer`, the history panel, the Errors tab's `ErrorsView`, and their text, style and focus helpers. The application mounts each layer through `WindowContent` and closes it with its window; the Errors tab closes its view when it closes. |
+| `notificationui` | EDT views of the centre: a window's `CardLayer`, the history panel, the Errors tab's `ErrorsView`, and their text, style and focus helpers. The application mounts each layer through `WindowContent` and closes it with its window; the Errors tab closes its view when it closes. |
 | `about` | The About and Licenses windows' views and the third-party notices index read from resources. The application's `AboutWindows` owns both windows and closes each view with its window. |
 | `splash` | The boot splash: `SplashPainter` draws the Meadow splash (`MeadowSplash`: `meadow.svg` and the Desk Buddy sprite strip) or a branded look's own files, and `Splash` is its undecorated window, which every paint reaches as one copy from `SplashBuffer`. The bootstrap decodes the files off the EDT, opens the window on the EDT and closes it through `StartupSteps` after the first window's first visible paint or when start-up stops. `SplashAnimation`'s `jasper-splash-animation` daemon paints the Meadow turtle's next frame every 220 ms, so it moves while start-up holds the EDT, under a lock it shares with step painting and closing; it does not start when `ui.animations.enabled` is false. |
 | `cygwin` | Jasper's own Cygwin on Windows (`%LOCALAPPDATA%\Jasper\cygwin`): its layout, ownership and state, the seed manifest, provisioning, launch reservations and the package-management supervisor. JDK and JNA Platform only, because the same sources also build `cygwin-tool.jar`, the helper the installers, `provision-cygwin.cmd` and package management run. `launch.CygwinLaunch` prepares the verified relay and the Bash environment off the EDT; `application.CygwinFeature`, owned and closed by the application, runs one management request at a time and reports it as a notification. See [bundled Cygwin](../packaging/windows/cygwin/README.md). |
@@ -350,9 +350,9 @@ whether the unified macOS title bar is available. A look whose start did not fin
 (`PresentationAttempt`); a kit that fails to install falls back to the default kit. [Enterprise](enterprise.md)
 describes the bundled look, and [Looks](looks.md#writing-a-look) how a plugin provides one.
 
-The main window has a header row above its parent tabs: `ParentTabBar`, the window's one tab strip (in the
+A window has a header row above its parent tabs: `ParentTabBar`, the window's one tab strip (in the
 standard look, none while the window holds a single parent tab), then the shown parent tab's workspace of groups, its
-panes; a child window has only its title bar, which ends with the window's ⋮, above its parent tabs. `WindowHeader`
+panes. `WindowHeader`
 (workspace) centres `TitleSearchField` on the window and packs `WindowChrome`'s toolbar (tab and window, pane, plugin,
 then Find and Settings groups, then the window's ⋮, `WindowMenuButton`; tooltips carry live shortcuts) against the
 trailing edge. As the window narrows, the sides give way first (toolbar labels, then controls
@@ -364,24 +364,23 @@ under `ClassicHeader`; Compact (`window.view_mode`) removes the header.
 keeps it clear of the traffic lights; on Windows and Linux FlatLaf's title pane embeds `CollapsingMenuBar`, which
 carries the header under the menus; with `window.native_decorations = true` the system title bar stays and the header
 is the top row of `WindowContent`. A look with a native title gives every platform the system title bar; with
-`menu_bar = "window"` the bootstrap turns macOS's screen menu bar off, so the main window's menus are a row in the
-window (a child window shows none, and an auxiliary frame shows none and binds Close Window's shortcut itself).
-Otherwise, on macOS a focused child window's screen menu bar shows its own copy of the main window's menus, built from
+`menu_bar = "window"` the bootstrap turns macOS's screen menu bar off, so each window's menus are a row in the
+window (an auxiliary frame shows none and binds Close Window's shortcut itself).
+Otherwise, on macOS the screen menu bar follows the focused window, built from
 the same model. A native-titled macOS frame's
 appearance follows the theme.
 
 The Enterprise look's classic title (`title_bar = "classic"`) is IntelliJ Classic's, and on macOS and Windows it
 commits the default look's desktop flags, so a failed start falls back to exactly the default look:
 
-- On macOS, `MacTitleBand` (platform) gives the main window's root pane a transparent, full-window-content title
+- On macOS, `MacTitleBand` (platform) gives each window's root pane a transparent, full-window-content title
   and paints a 28 pt band in the toolbar's colour above the toolbar row, where macOS draws the traffic lights and the
-  title; a child window has it too. The window takes the vibrant light or dark appearance by the theme, full screen removes the band, and
+  title. The window takes the vibrant light or dark appearance by the theme, full screen removes the band, and
   `MacTitleDoubleClick` gives a double-click in it the system's action. The menus stay in the screen menu bar, and an
   auxiliary frame keeps its system title bar and shows the minimal File menu there.
 - On Windows, FlatLaf's 28 px title pane, in the toolbar's colour, embeds `CollapsingMenuBar` and then
   `ClassicWindowTitle`, the window title left-aligned after the menus and dimmed while the window is inactive, over
-  the classic menu row's 1 px rule. A child window's title pane is 28 px in the toolbar's colour and holds FlatLaf's
-  title and the window's ⋮, dimmed while the window is inactive. Auxiliary frames and dialogs take FlatLaf's title panes
+  the classic menu row's 1 px rule. Auxiliary frames and dialogs take FlatLaf's title panes
   without a menu row.
   `window.native_decorations = true` gives the system title bar and the in-window menu row.
 - On Linux it is the system title bar, with exactly `native`'s projections.

@@ -36,7 +36,7 @@ import java.util.function.Supplier;
 /**
  * The "Tunnels" rail panel on one host-rendered kit view: a filter, saved tunnels by name, then quick forwards under
  * their own heading. Each row shows a state dot, the name and host, the mapping and a start/stop switch; problems stay
- * visible and the live counters are in the row tooltip. One, in the main window.
+ * visible and the live counters are in the row tooltip. One for each window.
  *
  * <p>Rows are keyed by the tunnel's id. The switch shows only the confirmed state the plugin passes in (on while Up,
  * pending while Starting, an error while Failed) and never flips by itself; operating it, Enter or Space stops a running

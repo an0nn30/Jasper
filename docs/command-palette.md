@@ -81,9 +81,8 @@ new snippet.
 
 ## The card
 
-Under the default look the card drops from the main window header's search field: it covers the field, centred on it
-and at least 560 px wide, and moves or narrows to stay clear of the window controls. In Compact view mode, in a child
-window, which has no header, or when the window has no room for the field, it opens centred across the window with its
+Under the default look the card drops from the window header's search field: it covers the field, centred on it
+and at least 560 px wide, and moves or narrows to stay clear of the window controls. In Compact view mode, or when the window has no room for the field, it opens centred across the window with its
 top one fifth of the way down.
 
 - A fresh opening unrolls the card downward over 300 ms while animations are on (`ui.animations.enabled`).

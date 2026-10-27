@@ -33,7 +33,7 @@ import java.util.function.ToIntFunction;
 
 /**
  * The "Sessions" rail panel on one host-rendered kit view: search, the WSL distributions the application detected,
- * grouped hosts, and the selected row's card with Connect (a host) or Open (a distribution). One, in the main window.
+ * grouped hosts, and the selected row's card with Connect (a host) or Open (a distribution). One for each window.
  *
  * <p>Rows are keyed by stable ids (a host's UUID, a distribution's profile id, a group's name). A single click toggles
  * a group; Enter or a double click connects to a host, opens a distribution or toggles a group. A host's star reports

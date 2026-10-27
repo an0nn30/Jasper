@@ -35,7 +35,7 @@ pane by a screen less one line on every platform; they are not rebindable and ne
 Right-clicking a pane (Shift-right-clicking while a program asks for [mouse reports](#mouse-reporting)) focuses it and
 opens its context menu: **Copy**, **Paste**, **Find**, **Clear Terminal**, **Split** (a terminal, an editor, a file you
 choose or a plugin's view, right or down), **Move Pane to New Tab**, **Move Pane to Tab**, **Maximize Pane** and **Close
-Pane**, then **Move Tab to New Window** (and **Move to Main Window** in a child window) and the items plugins add, such
+Pane**, then **Move Tab to New Window** and **Move Tab to Window ▸** and the items plugins add, such
 as Remote's **Open SFTP here** and File Server's **Share Path**.
 
 ## Shells and profiles
@@ -536,8 +536,7 @@ shell exits** (`terminal.on_exit`):
 A pane that stays closes when you press a key that is neither a modifier nor one of Jasper's shortcuts. A change applies
 to the next exit in every pane, but never closes a pane that already exited. A pane running a program instead of the
 shell, such as a terminal editor the default editor opened, closes after exit code 0 and stays otherwise, whatever
-this setting says. Closing a tab's last pane closes the tab; a child window closes with its last tab, and the main
-window shows its empty workspace.
+this setting says. Closing a tab's last pane closes the tab; a window shows its empty workspace when its last tab closes.
 
 A session a plugin provides shows "Connecting…" with **Cancel** while it connects. When it ends or fails, a banner says
 "Disconnected (exit N)", "Disconnected: *reason*" or the plugin's message, with **Reconnect** (**Retry** when it never

@@ -1,14 +1,14 @@
 # Notifications
 
 Jasper and its plugins tell you about errors and results with notifications instead of dialogs that stop your work.
-A notification shows as a card in the main window, waits in the Notifications panel until you have read it, and, while
+A notification shows as a card in one window (the one it concerns, otherwise the most recently active), waits in the Notifications panel until you have read it, and, while
 Jasper is in the background, also shows as the operating system's own notification. Notifications are kept in memory
 only, at most the latest 500: they start fresh every time Jasper starts, and a resident Jasper (one still running with
 no window open) keeps them until it quits completely.
 
 ## Cards
 
-A card appears in the bottom-right corner of the main window's tool window area, above the status bar and over any tool
+A card appears in the bottom-right corner of that window's tool window area, above the status bar and over any tool
 window docked there. It shows:
 
 - an icon for its severity (information, warning or error), or one its sender chose, in the severity's colour;
@@ -42,7 +42,7 @@ that window is focused. Waiting cards show in the order they arrived.
 
 ## The Notifications panel
 
-The Notifications [tool window](workspace.md) starts in the upper half of the main window's right side. Under the
+The Notifications [tool window](workspace.md) starts in the upper half of a window's right side. Under the
 [Enterprise look](enterprise.md) it is titled **Event Log** and starts on the left of the bottom strip. Its button,
 or **Notifications: Show History** in the command palette, opens and closes it; under the Enterprise look either one
 opening it makes it the [active tool window](enterprise.md#windows-and-menus), with the keyboard, and Show History
@@ -126,7 +126,7 @@ Plugins. A plugin that failed while starting is reported once, by its incident's
 When something fails unexpectedly, in Jasper or in a plugin, Jasper records it as an incident and tells you with an
 error notification: "Unexpected error in Jasper", or, for a plugin, "<name> failed to start", "<name> failed to stop"
 or "<name> failed in <operation>". A plugin's offers **Disable Plugin**, and both offer **Show more…**, which opens the
-Errors tab at that incident, in the main window. **Notifications: Show Errors** in the command palette opens the tab
+Errors tab at that incident, in the most recently active window. **Notifications: Show Errors** in the command palette opens the tab
 too. A shell that could not start is recorded as well: each failure is announced as "Could not start the terminal",
 with its folder and cause, and offers **Show more…**.
 
@@ -188,7 +188,7 @@ opens [finished-command notifications](configuration.md#finished-command-notific
 | Command | Does |
 |---|---|
 | Notifications: Show History | Opens or closes the Notifications panel |
-| Notifications: Dismiss Cards | Marks every card in the main window read, showing or waiting, and closes them |
+| Notifications: Dismiss Cards | Marks every card read, showing or waiting, and closes them |
 | Notifications: Show Errors | Opens the Errors tab |
 
 None has a default shortcut; assign one in Settings › Keymap.
@@ -202,7 +202,7 @@ ended is a notification.
 ### Showing him
 
 Turn him on with **Show Jasper** (`buddy.enabled`, off by default) in Settings › Appearance & Behavior › **Desk
-Buddy**; the change applies at once. He shows while the main window is open and not minimised. The palette
+Buddy**; the change applies at once. He shows while the most recently active window is open and not minimised. The palette
 command **Show Jasper** / **Hide Jasper**, and **Hide Jasper** on his right-click menu, show or hide him for this
 session only; saving a new `buddy.enabled` value ends that choice. When the system has no always-on-top or translucent
 windows, he stays off for the session and the log says "Desk buddy disabled".

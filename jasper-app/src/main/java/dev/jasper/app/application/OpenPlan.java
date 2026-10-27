@@ -5,11 +5,11 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * Where an outside request's paths open (workspace-tabs spec 5.3, 5.4 and 6.4): in the main window, each directory as a
+ * Where an outside request's paths open (workspace-tabs spec 5.3, 5.4 and 6.4): in the most recently active window, each directory as a
  * terminal tab, each file in the editor a plugin provides; anything else is skipped and a repeated path opens once. With
- * no main window open one opens first, in the first directory when there is one. Pure.
+ * no window open one opens first, in the first directory when there is one. Pure.
  *
- * @param newWindow whether the main window opens first
+ * @param newWindow whether a window opens first
  * @param windowDirectory where the new window's tab starts; null for where a new shell starts
  * @param tabs the directories that open as terminal tabs in the target window, in order
  * @param files the files that open in the target window, in order
@@ -24,7 +24,7 @@ record OpenPlan(boolean newWindow, Path windowDirectory, List<Path> tabs, List<P
      * Plans {@code paths}.
      *
      * @param paths absolute paths, in the order the request names them
-     * @param windowOpen whether the main window is open
+     * @param windowOpen whether a window is open
      * @param directory whether a path is a directory
      * @param file whether a path is a regular file
      * @return the plan

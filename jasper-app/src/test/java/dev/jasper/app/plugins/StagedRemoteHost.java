@@ -153,8 +153,9 @@ final class StagedRemoteHost implements AutoCloseable {
     void sessionsState(java.util.function.ToIntFunction<Object> sessions, String credential) {
         try {
             // The plugin's Sessions panel: its method table names optional Vault types, which are absent here.
-            var sessionsField = plugin.getClass().getDeclaredField("sessionsPanel"); sessionsField.setAccessible(true);
-            Object panel = sessionsField.get(plugin);
+            // A window's own panel: the first window's, from the plugin's map of them (a field read resolves no method types).
+            Object windowSessions = ((java.util.Map<?, ?>) field(plugin, "sessionsPanels")).values().iterator().next();
+            Object panel = field(windowSessions, "panel");
             panel.getClass().getMethod("setCredentialLabels", Function.class).invoke(panel, (Function<Object, String>) host -> credential);
             panel.getClass().getMethod("setHostDetails", Function.class, java.util.function.ToIntFunction.class)
                 .invoke(panel, (Function<Object, String>) host -> "Ubuntu 24.04", sessions);
@@ -196,6 +197,10 @@ final class StagedRemoteHost implements AutoCloseable {
     }
 
     private static Object field(Object owner, String name) throws ReflectiveOperationException {
+        if (name.equals("panel") && owner.getClass().getSimpleName().equals("TunnelsUi")) {
+            var accessor = owner.getClass().getDeclaredMethod("panel"); accessor.setAccessible(true);
+            return accessor.invoke(owner);
+        }
         var field = owner.getClass().getDeclaredField(name); field.setAccessible(true);
         return field.get(owner);
     }

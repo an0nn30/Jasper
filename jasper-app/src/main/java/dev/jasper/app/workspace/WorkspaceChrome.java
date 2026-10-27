@@ -122,7 +122,7 @@ public final class WorkspaceChrome {
 
     /**
      * Whether a window holding {@code count} tabs shows its tab strip (tabs and panes spec 5): the equal tabs from two
-     * tabs; the classic tabs (Enterprise) always, over the main window's empty workspace too.
+     * tabs; the classic tabs (Enterprise) always, over a window's empty workspace too.
      */
     boolean showsTabStrip(int count) {
         return switch (tabs) {

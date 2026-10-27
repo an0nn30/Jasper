@@ -1,5 +1,17 @@
 # Full windows 1: every window is a full window Implementation Plan
 
+> **Status (2026-10-27):** Executed, Tasks 1-6, on `claude/full-windows` (not merged or pushed). Deviations from the plan
+> text: Task 4 also changed Credential Vault's manager dialog (it opens over the window that asked, no longer over the main
+> window); Task 5 also fixed Sessions (one panel per window, as the other four plugins). Rulings made during execution:
+> R1 until Task 4 removed it, the interim `WindowHandle.isMain()` answered true for the first window; R2 each bundled
+> plugin's version rises one minor, once, in Task 4; R3 the `MOVE_TO_MAIN_WINDOW` action was a stopgap until Task 3
+> replaced it; R4 `openWindow` and `emptyWindow` restore the saved windows first while none is open; R5 New Window
+> cascades from the most recently active window after that restore; R6 the palette's Move Tab to Window moves the shown
+> tab to the most recently active other window; R7 Task 4 replaced the plugins' `isMain` branches with
+> `Panels.show(panelId, window)`, and Task 5 did their per-window instances; R8 the Task 4 review's leftovers (Editor API
+> Javadoc, Vault Javadoc, dead plugin fields, window assertions) went to Task 5; R9 Sessions was fixed in Task 5, and
+> File Server selects a server only in the window that asked.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Every Jasper window has all of Jasper's chrome and its own tool windows; the main/child split goes; cmd+n opens a

@@ -368,9 +368,16 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         try { snapshot.get(60, java.util.concurrent.TimeUnit.SECONDS); }
         catch (java.util.concurrent.TimeoutException slow) { throw new AssertionError("The Remote plugin's transfer store did not open", slow); }
     }
+    /** A field's value; a panel is read through the plugin's accessor for the first window's, as each window has its own. */
     static Object field(Object object, String name) {
-        try { var f = object.getClass().getDeclaredField(name); f.setAccessible(true); return f.get(object); }
-        catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+        try {
+            if (name.equals("sessionsPanel") || name.equals("panel")) {
+                var accessor = object.getClass().getDeclaredMethod(name.equals("panel") ? "panel" : "hostsPanel");
+                accessor.setAccessible(true);
+                return accessor.invoke(object);
+            }
+            var f = object.getClass().getDeclaredField(name); f.setAccessible(true); return f.get(object);
+        } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
     }
     @Override public void close() throws Exception {
         try { onEdt(site::notifyClosed); } finally { try { vault.close(); } finally { loader.close(); } }

@@ -624,12 +624,10 @@ class WindowManagerTest {
         launch();
     }
 
-    /** A window's requests and the panel route belong to the EDT. */
-    @Test void aWindowsRequestsAndThePanelRouteBelongToTheEdt() throws Exception {
+    /** A window's requests belong to the EDT. */
+    @Test void aWindowsRequestsBelongToTheEdt() throws Exception {
         JasperWindow[] window = new JasperWindow[1];
         edt(() -> window[0] = manager.ensureWindow("cold", null).orElseThrow());
-        assertThatThrownBy(() -> model.panelRoute(request -> request)).isInstanceOf(IllegalStateException.class)
-            .hasMessage("Contributions belong to the EDT");
         assertThatThrownBy(() -> window[0].events().activated().accept(true)).isInstanceOf(IllegalStateException.class)
             .hasMessage("Windows belong to the EDT");
         assertThatThrownBy(window[0]::requestClose).isInstanceOf(IllegalStateException.class).hasMessage("Windows belong to the EDT");

@@ -11,7 +11,7 @@ import javax.swing.JButton;
 /**
  * A window's ⋮ (parent tabs spec 6), as IntelliJ's tool windows have one: it opens the window menu for the window's active
  * pane and parent tab ({@link WindowContent#windowMenu()}). The standard toolbar ends with one, styled as its overflow
- * button; a child window shows one alone, its compact toolbar, at the trailing end of its title row (workspace plan 7b
+ * button; a window with no toolbar shows one alone, its compact toolbar, at the trailing end of its title row (workspace plan 7b
  * Rulings 16 and 17), or the classic ⋮ under a classic title. A toolbar pins it ({@link WindowToolbar#pin}): it never
  * moves into the overflow menu, which sits before it, and never shows a label. Its size is fixed. EDT only.
  */

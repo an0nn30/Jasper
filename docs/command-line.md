@@ -31,7 +31,7 @@ Usage: jasper [--config <path>] [--background] [--no-window] [--safe-mode] [--pl
 | `--background` | Starts with no window, to stay resident; the login item starts Jasper this way. It exits without a window when a Jasper already runs, or when it would not be resident: `system.run_in_background` is off (it then removes the login item), or the launch has `--config`, `--safe-mode` or `--plugin-dir` or runs in another home. Otherwise it becomes resident and prepares its first window without showing it. On macOS a packaged app started this way shows no Dock icon until a window opens. |
 | `--no-window` | Starts with no window, to serve the `jasper` command; the command starts Jasper this way when nothing answers it. It exits without a window when a Jasper already runs, or when it cannot serve the command socket. A Jasper that becomes resident stays; any other quits once its calls have ended and no Jasper window is open, or after 30 seconds without a call. Cannot be combined with `--background`. |
 | `--help` | Prints the usage line to standard output and exits with status 0, without reading configuration or opening a window. |
-| `<path>...` | Files and folders to open in the main window: each file in the [Editor](editor.md#opening-files), or revealed when no editor plugin runs, and each folder as a terminal tab. A relative path resolves against the working directory; a path that names nothing is skipped. |
+| `<path>...` | Files and folders to open in the most recently active window: each file in the [Editor](editor.md#opening-files), or revealed when no editor plugin runs, and each folder as a terminal tab. A relative path resolves against the working directory; a path that names nothing is skipped. |
 
 Each option may appear once. A value follows its option as the next argument; `--config=<path>` is an unknown
 argument.
@@ -40,7 +40,7 @@ argument.
 
 One Jasper process runs per Jasper home; it holds the home's instance lock (`daemon/instance.lock`) for as long as it
 runs, resident or not. A launch while it runs hands its request to it and exits with status 0: the running Jasper
-brings its main window to the front, restoring its windows first when none is open, and opens the files and folders
+brings its most recently active window to the front, restoring its windows first when none is open, and opens the files and folders
 the launch named. On macOS a Dock click, Finder's Open With and a drop on the Dock icon reach the running Jasper
 without a second process ([macOS Open With](packaging.md#macos-open-with)). `--config`, `--safe-mode` and
 `--plugin-dir` apply only to a Jasper that starts: a second launch hands off without them, and the running Jasper posts
@@ -100,11 +100,11 @@ With a COMMAND, runs it in the running Jasper. Jasper is started first when it i
 
 | Form | What it does |
 |---|---|
-| `jasper` | Brings the main window to the front, restoring Jasper's windows first when none is open and starting Jasper first when none is running, and exits with status 0. A new window it opens does not start in the caller's working directory. |
-| `jasper PATH...` | Opens each file in the [default editor](editor.md#default-editor), or reveals it in the file manager when no editor plugin runs or the default editor is **System default app**, and each folder as a terminal tab, in the main window, starting Jasper first when none is running. A relative PATH resolves against the caller's working directory, and every PATH must name an existing file or folder. A subcommand of the same name wins, so `jasper ./editor` opens a file named `editor`. |
+| `jasper` | Brings the most recently active window to the front, restoring Jasper's windows first when none is open and starting Jasper first when none is running, and exits with status 0. A new window it opens does not start in the caller's working directory. |
+| `jasper PATH...` | Opens each file in the [default editor](editor.md#default-editor), or reveals it in the file manager when no editor plugin runs or the default editor is **System default app**, and each folder as a terminal tab, in the most recently active window, starting Jasper first when none is running. A relative PATH resolves against the caller's working directory, and every PATH must name an existing file or folder. A subcommand of the same name wins, so `jasper ./editor` opens a file named `editor`. |
 | `jasper --help` | Prints the usage and the subcommands of the plugins that were running when Jasper last started, read from `daemon/subcommands` in Jasper home, without contacting Jasper. Before that file exists it prints "Start Jasper once to list the plugin commands." |
 | `jasper --<option> ...` | Any first argument starting with `--`, other than `--help`, starts Jasper with all the arguments (at most 64; with more it exits with status 1 and starts nothing), detached, in the caller's working directory and environment, so relative paths resolve there. Every [launcher option](#launching-jasper-with-options) works, including those the usage leaves out; while Jasper runs, the launch hands off and the running Jasper says that it keeps its own options. It exits with status 0 once it has started the launcher and does not wait, so a Jasper that rejects its arguments shows nothing. |
-| `jasper COMMAND [ARGUMENTS...]` | Runs a plugin's subcommand in the running Jasper, which first restores its windows when no main window is open and the subcommand's plugin runs. Its output reaches the caller's standard output and error as it is written, and `jasper` exits with the subcommand's exit code. Ctrl+C, or any other end of the `jasper` process, cancels the call. |
+| `jasper COMMAND [ARGUMENTS...]` | Runs a plugin's subcommand in the running Jasper, which first restores its windows when no window is open and the subcommand's plugin runs. Its output reaches the caller's standard output and error as it is written, and `jasper` exits with the subcommand's exit code. Ctrl+C, or any other end of the `jasper` process, cancels the call. |
 
 `jasper --help` lists each subcommand with its summary:
 
@@ -226,7 +226,7 @@ when you save it. With --wait, returns once every tab it opened has closed, as g
 | `FILE[:LINE[:COLUMN]]` | A file to open, relative to the caller's working directory. An argument that names an existing file opens as written, even `a:1`; otherwise a trailing `:LINE` or `:LINE:COLUMN` of digits is split off, so `C:\notes.txt` is never split. LINE and COLUMN start at 1. |
 
 With no Jasper window open, Jasper first restores its windows, so a FILE that was a saved tab selects that tab. Each
-FILE opens in an Editor tab, in the window of the Jasper pane the command ran in, otherwise in the main window; a file
+FILE opens in an Editor tab, in the window of the Jasper pane the command ran in, otherwise in the most recently active window; a file
 already open selects its tab. The caret moves to the line and column once the text is loaded. A FILE that does not
 exist yet opens as an empty tab, and its first save creates it, when its folder exists. With no FILE the command shows
 the Editor: the selected Editor tab, or a new untitled tab when there is none.

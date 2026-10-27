@@ -18,7 +18,7 @@ import javax.swing.SwingUtilities;
  * Where Jasper's windows are saved (workspace tabs spec 13): {@code workspace.toml} in the Jasper home. The first change
  * after a save is saved {@link #DELAY} later, with every change made meanwhile, so a crash loses at most that; a window
  * closing saves at once. Each save takes its snapshot on the EDT and writes it on {@code writer}, off the EDT, after the
- * writes before it, whatever happened to them. Closing the main window, Quit and going to the background save, then hold
+ * writes before it, whatever happened to them. Closing the last window, Quit and going to the background save, then hold
  * every save ({@link #hold()}) until the windows are restored ({@link #load()}). A snapshot or a write that fails, or a
  * write the writer refuses, is logged and costs only that save: the next save writes the windows, changed or not. EDT
  * only, except {@link #written()}.
@@ -36,7 +36,7 @@ public final class WorkspaceStore {
     /** Cancels the save a change scheduled; null while none is pending. */
     private Runnable pending;
     private boolean held;
-    /** What this process saved last: what reopening the main window restores. */
+    /** What this process saved last: what reopening a window restores. */
     private WorkspaceFile.Snapshot saved;
     /**
      * What the file holds, or the latest write asked for will put there: an equal snapshot is not written again. A write
@@ -51,7 +51,7 @@ public final class WorkspaceStore {
      * The store of {@code file}.
      *
      * @param file {@code workspace.toml}
-     * @param snapshot what to save now; empty while there is nothing to save (no main window open)
+     * @param snapshot what to save now; empty while there is nothing to save (no window open)
      * @param schedule runs a task on the EDT after a delay and returns how to cancel it
      * @param writer where writes run, off the EDT
      * @param setAside told where saved windows that could not be restored were kept ({@code workspace.toml.bad}): an
@@ -68,11 +68,11 @@ public final class WorkspaceStore {
     }
 
     /**
-     * What the main window restores, and saving starts again: what this process saved last, else the file. A file that
+     * What the first window restores, and saving starts again: what this process saved last, else the file. A file that
      * cannot be read was set aside ({@code workspace.toml.bad}) and {@code setAside} hears where; so does a file whose
      * reader dropped a window, a tab or an item entry, which the reader copied there (workspace plan 2).
      *
-     * @return the windows to restore, or that the main window opens fresh
+     * @return the windows to restore, or that the window opens fresh
      */
     public WorkspaceFile.Loaded load() {
         requireEdt();
@@ -122,7 +122,7 @@ public final class WorkspaceStore {
 
     /**
      * Saves now, as a closing window does; a save a change scheduled is not needed any more once this one has the
-     * windows. With nothing to save yet (no main window open, or it opens), or a snapshot that fails, the scheduled save
+     * windows. With nothing to save yet (no window open, or one opens), or a snapshot that fails, the scheduled save
      * stays.
      */
     public void save() {
@@ -150,7 +150,7 @@ public final class WorkspaceStore {
     }
 
     /**
-     * The main window and its child windows close together (closing the main window, Quit, going to the background): saves
+     * The windows close together (Quit, going to the background): saves
      * them as they are now, then nothing until {@link #load()} restores them, so closing their tabs is not saved. It holds
      * even when that save fails.
      */

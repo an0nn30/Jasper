@@ -20,7 +20,7 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   (command palette and File menu) and **Split Down with Editor** (command palette) put one in a new pane beside the
   focused pane; the Split submenus of the Tab menu and of a terminal's or an editor's right-click menu list them as
   **Editor Right** and **Editor Down**. **New Editor Window** (File menu, command palette and the toolbar's New
-  Editor Window button) opens one in a new child window. New Editor Tab, Split Right with Editor, Split Down with
+  Editor Window button) opens one in a new window. New Editor Tab, Split Right with Editor, Split Down with
   Editor and New Editor Window have no default shortcut. A new file's first save asks where to save it.
 - **Open File Right…** and **Open File Down…**, in the Split submenus (the command palette calls them **Split Right
   with Open File…** and **Split Down with Open File…**), and **Open in Editor Pane…** in the File menu, which does what
@@ -46,10 +46,9 @@ Other plugins open files in it through its API: Remote for files on SFTP hosts, 
   messages here; Ctrl+C stops waiting and leaves the tabs open. With no file it does what **Show Editor** does.
 - The files a launch names (`Jasper notes.txt`, or `jasper notes.txt` with the
   [jasper command](command-line.md#the-jasper-command)), and on macOS the files you open with Jasper in Finder (Open
-  With) or drop on its Dock icon, go to the [default editor](#default-editor); this Editor opens them in the main
-  window ([One Jasper per home](command-line.md#one-jasper-per-home)).
+  With) or drop on its Dock icon, go to the [default editor](#default-editor); this Editor opens them in the most recently active window ([One Jasper per home](command-line.md#one-jasper-per-home)).
 
-A file opens in a new tab of the window it was opened from, otherwise of the main window. Opening a file that is already
+A file opens in a new tab of the window it was opened from, otherwise of the most recently active window. Opening a file that is already
 open selects its tab, of several [views](#views-of-one-file) the one you were in last; `jasper editor` and a Cmd-click
 also move the caret to the line. While a file loads, its tab shows "Loading *name*…" ("Loading *name* from *host*…" for
 a remote file) with **Cancel**, which closes its pane. A file that cannot be opened shows **Could Not Open File** with
@@ -67,8 +66,7 @@ others in a tab ([Plugin tabs](workspace.md#plugin-tabs)). A tab shows its activ
 
 Right-click the tab for **Move Tab to New Window**, **Move Tab Into** and **Close Tab**, then every
 [command](#commands-and-shortcuts) but Close Pane, with its shortcut, **Copy**, **Paste**, **Select All**, **Cut**,
-**Delete**, **Undo**, **Redo**, **Increase Font Size**, **Decrease Font Size** and **Reset Font Size**; a child
-window's ⋮ menu also has **Move to Main Window**. Moving a tab keeps its text, undo history, unsaved changes and
+**Delete**, **Undo**, **Redo**, **Increase Font Size**, **Decrease Font Size** and **Reset Font Size**; the window's ⋮ menu also has **Move Tab to Window ▸**. Moving a tab keeps its text, undo history, unsaved changes and
 Markdown view.
 Right-click the text for Undo, Redo, Cut, Copy, Paste, Delete, Select All and the **Folding** submenu (Toggle Current
 Fold, Collapse All Comments, Collapse All Folds, Expand All Folds), followed by **Save**, **Find…**, **Go to Line…**,
@@ -79,7 +77,7 @@ own while its tab holds another pane, **Move Pane to Tab**, which moves it into 
 items other plugins add.
 
 While an Editor file's pane is the active pane of the tab that shows, its own shortcuts take precedence over the
-window's: on macOS Cmd+N makes a new file instead of a new terminal window. The Edit menu's **Copy**, **Paste**,
+window's: on macOS Cmd+N makes a new file instead of a new window. The Edit menu's **Copy**, **Paste**,
 **Find**, **Find Next** and **Find Previous** act on that pane; the File menu's **Close Pane** closes it, and
 **Close Tab** its whole tab. **Next Tab**, **Previous Tab** and **Select Tab 1**–**9** count the window's tabs, whatever
 their panes hold.

@@ -168,7 +168,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     }
 
     /**
-     * A control at the trailing end of a title row without a header, such as a child window's ⋮ (parent tabs spec 6):
+     * A control at the trailing end of a title row without a header, such as a window's ⋮ (parent tabs spec 6):
      * centred on the row, clear of the window's edge, while the title stays centred on the window. Once only.
      *
      * @param component the control

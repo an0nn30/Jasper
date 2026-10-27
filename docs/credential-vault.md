@@ -85,9 +85,8 @@ data folder instead, readable by your account only. The manager's footer names t
 
 ## The manager
 
-The manager is one modeless dialog, **Credential Vault**, over the main window, whichever window you open it from: the
-main window comes forward first, restored if it was minimised. Opening it again brings it to the front, and it closes
-with the main window. You can resize it, and Jasper remembers its size and position. Its first row has a lock button
+The manager is one modeless dialog, **Credential Vault**, over the window you open it from. Opening it again brings it to the front, and it closes
+with that window. You can resize it, and Jasper remembers its size and position. Its first row has a lock button
 (tooltip "Lock vault") and the add menu (tooltip "Add entry"): **Login**, **SSH Key**, **Secure Note** and **Generate
 SSH Key...**.
 

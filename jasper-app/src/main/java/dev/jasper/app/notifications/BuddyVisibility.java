@@ -3,7 +3,7 @@ package dev.jasper.app.notifications;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Saved default, session toggle and main-window states → whether the buddy is on screen. */
+/** Saved default, session toggle and window states → whether the buddy is on screen. */
 public final class BuddyVisibility {
     private record WindowState(boolean showing, boolean iconified) { }
 

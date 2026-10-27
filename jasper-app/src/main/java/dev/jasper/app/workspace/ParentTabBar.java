@@ -13,7 +13,7 @@ import javax.swing.JPopupMenu;
 /**
  * A window's one tab strip (tabs and panes spec 5): the look's strip over the window's tabs, each shown as its active
  * pane's item, as terminal apps title a tab. It shows from two tabs under the equal tabs and always under the classic
- * tabs (Enterprise), over the main window's empty workspace too (workspace plan 8a Rulings 10). A click shows a tab, and
+ * tabs (Enterprise), over a window's empty workspace too (workspace plan 8a Rulings 10). A click shows a tab, and
  * its close button, a middle click and its menu close it after its items' guards; a press on an entry may start the tab
  * drag (spec 6). Under the equal tabs, tabs open and close with the motion where the look has it, and take their places
  * at once otherwise (Rulings 20). The code calls a tab a parent tab (Rulings 1). EDT only.
@@ -51,7 +51,7 @@ final class ParentTabBar {
     /** The window the strip is in. */
     WindowContent owner() { return owner; }
 
-    /** Each tab's active item, in strip order; the main window's empty workspace has none. */
+    /** Each tab's active item, in strip order; a window's empty workspace has none. */
     List<Tab> tabs() {
         var shown = new ArrayList<Tab>();
         for (WorkspaceView view : parentTabs.views()) if (view.selected() != null) shown.add(view.selected());
