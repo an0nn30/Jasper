@@ -1,15 +1,17 @@
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.CodeSource;
 
 /**
  * The launcher image test's application: appends what the launcher handed the JVM to $PROBE_OUTPUT, then "end". It
  * loads the two classes of the sealed package sealedprobe when their jar is on the class path, so an AOT cache trained
- * with it holds both.
+ * with it holds both, and reports the jar its own code source names.
  */
 public final class LauncherProbe {
     private LauncherProbe() {
@@ -27,6 +29,7 @@ public final class LauncherProbe {
         line(report, "aotSkipVariable", System.getenv("JASPER_AOT_CACHE_SKIP"));
         line(report, "diagnoseVariable", System.getenv("JASPER_LAUNCH_DIAGNOSE"));
         line(report, "sealed", sealedClasses());
+        line(report, "codeSource", codeSource());
         line(report, "marker", System.getProperty("probe.marker"));
         for (String input : ManagementFactory.getRuntimeMXBean().getInputArguments()) {
             line(report, "input", input);
@@ -48,6 +51,16 @@ public final class LauncherProbe {
                 + Class.forName("sealedprobe.Second").getSimpleName();
         } catch (ClassNotFoundException absent) {
             return "absent";
+        }
+    }
+
+    private static String codeSource() {
+        CodeSource source = LauncherProbe.class.getProtectionDomain().getCodeSource();
+        if (source == null || source.getLocation() == null) return "none";
+        try {
+            return Path.of(source.getLocation().toURI()).toString();
+        } catch (URISyntaxException | IllegalArgumentException unusable) {
+            return "unusable " + source.getLocation();
         }
     }
 

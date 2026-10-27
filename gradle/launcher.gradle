@@ -653,8 +653,8 @@ def launcherProbeJar = tasks.register('launcherProbeJar', Jar) {
     destinationDirectory.set(launcherBuild.map { it.dir('probe-input') })
 }
 
-// A sealed package for the image test's cache-training probe: the copy that starts with the trained cache must still
-// load both its classes, which JDK-8376576 broke for a cache trained in another directory.
+// A sealed package for the image test's cache-training probe: the copy that starts with the trained cache once the training
+// image is gone must still load both its classes, which JDK-8376576 broke.
 def launcherSealedProbeJar = tasks.register('launcherSealedProbeJar', Jar) {
     description = "Packs the launcher image test's sealed package."
     from(compileLauncherProbes)
@@ -994,10 +994,8 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
         expect('JASPER_AOT_CACHE_SKIP', one(report, 'aotCacheSkipped') == 'manual' && one(report, 'aotSkipVariable') == 'null' &&
             !usesCache(report), 'the variable skips the cache and never reaches the JVM', report)
 
-        // A cache that kills the JVM: the copy runs with -XX:AOTMode=on, under which HotSpot ends a start that cannot use
-        // the cache, and the cache goes stale once a jar on its class path has another modification time (HotSpot checks
-        // each jar's size and time). The watcher starts the probe once more without the cache option; -XX:AOTMode=on stays,
-        // so that start maps the runtime's default CDS archive instead.
+        // The probe's trained cache, run from a copy of its image with -XX:AOTMode=on, under which HotSpot ends a start that
+        // cannot use the cache.
         File trainingImages = new File(work, 'aot-training')
         File training = image('LauncherProbeAot', true, trainingImages, launcherAotProbeInput.get().destinationDir,
             // Keeps bin/java, which writes the cache, and writes the default CDS archive.
@@ -1017,11 +1015,21 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
         installedConfig.setText(withJavaOption(withJavaOption(installedConfig.getText('UTF-8'), '-XX:AOTCache=$APPDIR/probe.aot'),
             '-XX:AOTMode=on'), 'UTF-8')
         File installed = launcherIn(installedImages, 'LauncherProbeAot')
+        File probeJar = new File(installedConfig.parentFile, 'launcher-probe.jar')
+        // JDK-8376576, fixed in JBR 25.0.4.1 b635.75: with the training image gone, a JBR that has it gives cached classes no
+        // code source, so a sealed package refuses its second class and the JVM stops. jbr-api, on Jasper's class path, seals
+        // its package.
+        delete(trainingImages)
         File aotHome = home('aot-home', null)
         report = launch('aot-used', installed, environment([JASPER_HOME: aotHome.absolutePath]))
-        expect('trained cache', one(report, 'aotCacheSkipped') == 'null' && one(report, 'sealed') == 'First+Second' && usesCache(report),
-            'the copy starts with the cache', report)
-        File probeJar = new File(installedConfig.parentFile, 'launcher-probe.jar')
+        String codeSource = one(report, 'codeSource')
+        expect('trained cache', one(report, 'aotCacheSkipped') == 'null' && one(report, 'sealed') == 'First+Second' && usesCache(report) &&
+            codeSource != null && new File(codeSource).canonicalFile == probeJar.canonicalFile,
+            'the copy starts with the cache once the training image is gone, loads both classes of the sealed package and ' +
+            "names its own jar as the probe's code source; a JBR that fails this has JDK-8376576 (packaging/launcher/README.md)", report)
+        // A cache that kills the JVM: the cache goes stale once a jar on its class path has another modification time
+        // (HotSpot checks each jar's size and time). The watcher starts the probe once more without the cache option;
+        // -XX:AOTMode=on stays, so that start maps the runtime's default CDS archive instead.
         if (!probeJar.setLastModified(probeJar.lastModified() - TimeUnit.DAYS.toMillis(1))) {
             throw new GradleException("verifyLauncherImage: could not change the modification time of ${probeJar}")
         }
