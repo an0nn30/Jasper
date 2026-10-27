@@ -880,6 +880,39 @@ class WindowManagerTest {
         launch();
     }
 
+    /** Full windows plan 3: with system.reopen at empty_state, a restore opens the built-in layout where the saved window was. */
+    @Test void emptyStateOpensTheBuiltInLayoutAtTheSavedBounds(@TempDir Path folder) throws Exception {
+        Path file = folder.resolve("workspace.toml");
+        WorkspaceFile.WindowRecord window = savedWindow(dev.jasper.app.layout.TabId.random());
+        var bounds = new UiState.Bounds(50, 60, 1000, 700);
+        WorkspaceFile.write(file, new WorkspaceFile.Snapshot(new WorkspaceFile.WindowRecord(Optional.of(bounds), 6,
+            window.layout(), window.tabs(), new ToolWindows(false, false, Map.of()))));
+        edt(() -> {
+            manager.workspace(new WorkspaceStore(file, manager::snapshot, (delay, task) -> () -> { }, Runnable::run, aside -> { }));
+            manager.reopen(() -> dev.jasper.app.config.ReopenMode.EMPTY_STATE);
+            JasperWindow opened = manager.ensureWindow("cold", null).orElseThrow();
+            assertThat(manager.windows()).containsExactly(opened);
+            assertThat(opened.content().terminalTabs()).hasSize(1);
+            assertThat(opened.placement()).isEqualTo(new JasperWindow.Placement(Optional.of(bounds), 6));
+            assertThat(opened.content().toolWindows().snapshot()).isEqualTo(ToolWindows.BUILT_IN);
+        });
+        launch();
+    }
+
+    @Test void emptyStateStartsTheRequestedDirectory(@TempDir Path folder) throws Exception {
+        Path file = folder.resolve("workspace.toml");
+        WorkspaceFile.write(file, new WorkspaceFile.Snapshot(savedWindow(dev.jasper.app.layout.TabId.random())));
+        Path requested = java.nio.file.Files.createDirectories(folder.resolve("requested"));
+        edt(() -> {
+            manager.workspace(new WorkspaceStore(file, manager::snapshot, (delay, task) -> () -> { }, Runnable::run, aside -> { }));
+            manager.reopen(() -> dev.jasper.app.config.ReopenMode.EMPTY_STATE);
+            JasperWindow opened = manager.ensureWindow("handoff", requested).orElseThrow();
+            assertThat(opened.content().terminalTabs()).singleElement()
+                .satisfies(tab -> assertThat(tab.pane().directory()).isEqualTo(requested));
+        });
+        launch();
+    }
+
     /**
      * Full windows plan 1 Controller Ruling 10, until plan 4: a window opened beside another takes a copy of the most
      * recently active window's tool windows, out of Zen and with its floating ones hidden; that window keeps its own.

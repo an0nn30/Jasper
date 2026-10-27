@@ -6,6 +6,7 @@ import dev.jasper.app.commandline.CommandInstall;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.ReopenMode;
 import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.config.FontConfig;
 import dev.jasper.app.config.KeyBindings;
@@ -503,6 +504,7 @@ public final class JasperApplication {
         workspaceStore = new WorkspaceStore(file, windows::snapshot, JasperApplication::afterDelay, workspaceWriter,
             this::workspaceSetAside);
         windows.workspace(workspaceStore);
+        windows.reopen(() -> configuration == null ? ReopenMode.LAST_KNOWN_STATE : configuration.snapshot().reopen());
         // A saved tab of a plugin that does not run comes back as a placeholder that says why (workspace tabs spec 13).
         windows.plugins(id -> {
             PluginRuntime running = plugins;

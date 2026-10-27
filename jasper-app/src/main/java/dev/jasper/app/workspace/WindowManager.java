@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.config.ReopenMode;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
@@ -35,6 +36,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /**
@@ -163,6 +165,8 @@ public final class WindowManager {
     private boolean restoring;
     /** Where the windows are saved; none in a test that does not save. */
     private WorkspaceStore store;
+    /** What a restore opens; the application gives the setting ({@link #reopen}). */
+    private Supplier<ReopenMode> reopen = () -> ReopenMode.LAST_KNOWN_STATE;
     /** How each plugin stands, by id: without the application's answer, none is installed. */
     private Function<String, PluginState> plugins = id -> new PluginState(id, PluginState.Kind.NOT_INSTALLED);
     /** The items the size limit has left out of a save so far, each logged once (workspace plan 6b Rulings 16). */
@@ -207,6 +211,14 @@ public final class WindowManager {
      * @param value the store
      */
     public void workspace(WorkspaceStore value) { store = Objects.requireNonNull(value, "value"); }
+
+    /**
+     * What a restore opens (the {@code system.reopen} setting): the saved window, or the built-in layout at its place.
+     * Read at each restore; {@link ReopenMode#LAST_KNOWN_STATE} until given.
+     *
+     * @param mode the setting's current value
+     */
+    public void reopen(Supplier<ReopenMode> mode) { reopen = Objects.requireNonNull(mode, "mode"); }
 
     /** Something {@code workspace.toml} saves changed: a layout, a tab's name or directory, where a window is, its tool windows. */
     void changed() { if (store != null) store.changed(); }
@@ -304,6 +316,13 @@ public final class WindowManager {
         if (!(loaded instanceof WorkspaceFile.Loaded.Restore restore))
             return open(new Opening(false, directory, trigger, Optional.empty(), Optional.empty(), ToolWindows.BUILT_IN));
         WorkspaceFile.Snapshot saved = restore.snapshot();
+        if (reopen.get() == ReopenMode.EMPTY_STATE) {
+            // The built-in layout where the saved window was; the file stays until the next save replaces it.
+            return open(new Opening(false, directory, trigger, Optional.empty(), Optional.empty(), ToolWindows.BUILT_IN), window -> {
+                window.placed(new JasperWindow.Placement(saved.window().bounds(), saved.window().extendedState()));
+                return true;
+            });
+        }
         boolean[] restored = new boolean[1];
         Optional<JasperWindow> opened = open(new Opening(true, null, trigger, Optional.empty(), Optional.empty(), saved.window().tools()), window -> {
                 try {

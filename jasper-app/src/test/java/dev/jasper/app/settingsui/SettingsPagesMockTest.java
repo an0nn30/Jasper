@@ -134,9 +134,9 @@ class SettingsPagesMockTest {
             "Add Variable… right edge", "Add Variable… top edge");
         PROBES.put("command-palette", List.of(probe("box top", 600, 53, "window rule"), probe("box bottom", 900, 108, "window rule"), probe("spinner left edge", 929, 83, "border.input")));
         PROBES.put("desk-buddy", List.of(probe("box bottom", 700, 108, "window rule")));
-        // Edit Custom VM Options… and Reveal are each 1 px wider than the mock's (Task 3's rounded label advances) and 7 apart
+        // The Reopen with row sits above the VM section: its face probe is one row (36 px) lower. Edit Custom VM Options… and Reveal are each 1 px wider than the mock's (Task 3's rounded label advances) and 7 apart
         // (INLINE_GAP) against 6, so the left edge lies 3 px early: the probe takes its face, Reveal's right edge the row's end.
-        PROBES.put("system", List.of(probe("Run in background checkbox", 262, 82, "accent"), probe("Edit Custom VM Options… face", 790, 213, "button.secondary.bg"),
+        PROBES.put("system", List.of(probe("Run in background checkbox", 262, 82, "accent"), probe("Edit Custom VM Options… face", 790, 249, "button.secondary.bg"),
             probe("Reveal right edge", 1010, 219, "button.secondary.border")));
         face("system", "Edit Custom VM Options… face", "Reveal right edge");
         PROBES.put("terminal.font", List.of(probe("fallback list top", 400, 172, "border.control"), probe("second fallback row", 400, 196, "surface.zebra"),

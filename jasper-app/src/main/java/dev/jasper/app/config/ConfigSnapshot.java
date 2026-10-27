@@ -13,7 +13,7 @@ import java.util.Objects;
 /** Validated saved defaults; only a pane's own font size is kept separately, by the pane. */
 public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar, FontConfig font,
                       Map<String, String> keybindings, int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                      int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
+                      int visibleRows, int longCommandSeconds, boolean backgroundEnabled, ReopenMode reopen,
                       Map<String, Map<String, Object>> plugins, UiFontConfig uiFont,
                       int railWidth, int toolbarHeight, int statusBarHeight, boolean nativeDecorations,
                       ViewMode viewMode, GlassSettings glass, AnimationSettings animations,
@@ -81,7 +81,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
 
     public static ConfigSnapshot defaults() {
         return new ConfigSnapshot(30, ToolbarMode.ICONS_AND_LABELS, true, FontConfig.defaults(), Map.of(), 100, 35, TerminalConfig.defaults(),
-            false, PaletteSettings.DEFAULT_VISIBLE_ROWS, 10, CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue(), Map.of(),
+            false, PaletteSettings.DEFAULT_VISIBLE_ROWS, 10, CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue(),
+            CoreSettings.SYSTEM_REOPEN.defaultValue(), Map.of(),
             UiFontConfig.defaults(), DEFAULT_RAIL_WIDTH, DEFAULT_TOOLBAR_HEIGHT, DEFAULT_STATUS_BAR_HEIGHT, false, ViewMode.NORMAL,
             GlassSettings.UNSET, AnimationSettings.defaults(), AppearanceMode.SYSTEM, TerminalSchemeChoice.MATCH,
             CoreSettings.UI_THEME_DARK.defaultValue(), CoreSettings.UI_THEME_LIGHT.defaultValue(), CoreSettings.UI_THEME_DESKTOP_SOURCE.defaultValue());
@@ -121,7 +122,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                 values.get(CoreSettings.TERMINAL_BELL), values.get(CoreSettings.TERMINAL_ON_EXIT), values.get(CoreSettings.TERMINAL_SHELL_INTEGRATION),
                 values.get(CoreSettings.TERMINAL_TAB_NAME)),
             values.get(CoreSettings.BUDDY_ENABLED), values.get(CoreSettings.PALETTE_VISIBLE_ROWS),
-            values.get(CoreSettings.NOTIFICATIONS_LONG_COMMAND_SECONDS), values.get(CoreSettings.SYSTEM_RUN_IN_BACKGROUND), plugins,
+            values.get(CoreSettings.NOTIFICATIONS_LONG_COMMAND_SECONDS), values.get(CoreSettings.SYSTEM_RUN_IN_BACKGROUND),
+            values.get(CoreSettings.SYSTEM_REOPEN), plugins,
             new UiFontConfig(values.get(CoreSettings.UI_FONT_FAMILY), values.get(CoreSettings.UI_FONT_SIZE)),
             values.get(CoreSettings.WINDOW_RAIL_WIDTH), values.get(CoreSettings.WINDOW_TOOLBAR_HEIGHT),
             values.get(CoreSettings.WINDOW_STATUS_BAR_HEIGHT), values.get(CoreSettings.WINDOW_NATIVE_DECORATIONS),
@@ -156,6 +158,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private int visibleRows;
         private int longCommandSeconds;
         private boolean backgroundEnabled;
+        private ReopenMode reopen;
         private Map<String, Map<String, Object>> plugins;
         private GlassSettings glass;
         private AnimationSettings animations;
@@ -183,6 +186,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             visibleRows = source.visibleRows();
             longCommandSeconds = source.longCommandSeconds();
             backgroundEnabled = source.backgroundEnabled();
+            reopen = source.reopen();
             plugins = source.plugins();
             glass = source.glass();
             animations = source.animations();
@@ -220,12 +224,13 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder visibleRows(int value) { visibleRows = value; return this; }
         public Builder longCommandSeconds(int value) { longCommandSeconds = value; return this; }
         public Builder backgroundEnabled(boolean value) { backgroundEnabled = value; return this; }
+        public Builder reopen(ReopenMode value) { reopen = value; return this; }
         public Builder glass(GlassSettings value) { glass = value; return this; }
         public Builder animations(AnimationSettings value) { animations = value; return this; }
         public Builder plugins(Map<String, Map<String, Object>> value) { plugins = Map.copyOf(value); return this; }
         public ConfigSnapshot build() {
             return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, keybindings, columns, lines, terminal, buddyEnabled,
-                visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, railWidth, toolbarHeight, statusBarHeight,
+                visibleRows, longCommandSeconds, backgroundEnabled, reopen, plugins, uiFont, railWidth, toolbarHeight, statusBarHeight,
                 nativeDecorations, viewMode, glass, animations, appearance, terminalScheme, darkTheme, lightTheme, desktopSource);
         }
     }

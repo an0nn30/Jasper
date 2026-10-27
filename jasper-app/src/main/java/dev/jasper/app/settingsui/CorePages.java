@@ -186,7 +186,8 @@ public final class CorePages {
     private static SchemaPage.Spec systemPage(SystemActions system) {
         var page = SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
             .section("General")
-            .row(SYSTEM_RUN_IN_BACKGROUND);
+            .row(SYSTEM_RUN_IN_BACKGROUND)
+            .row(SYSTEM_REOPEN, Editors.choice(Map.of("last_known_state", "Last Known State", "empty_state", "Empty State")));
         system.vm().ifPresent(vm -> page.section("Java Virtual Machine")
             .notice("vm.state", vm.state())
             .external(vm.heap())

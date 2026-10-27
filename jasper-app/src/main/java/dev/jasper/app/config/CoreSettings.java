@@ -121,6 +121,12 @@ public final class CoreSettings {
             + "at login. On by default on macOS and Windows, off on Linux. On macOS, Quit (Cmd+Q) closes every window and\n"
             + "keeps Jasper in the menu bar; Quit Jasper Completely there ends it. Residency applies from the next start;\n"
             + "the login item updates as soon as you save. Autostart needs an installed Jasper, not a development run.").build();
+    public static final Setting<ReopenMode> SYSTEM_REOPEN = Setting.of("system.reopen", SettingKind.choice(List.of(
+            Map.entry("last_known_state", ReopenMode.LAST_KNOWN_STATE), Map.entry("empty_state", ReopenMode.EMPTY_STATE))),
+            ReopenMode.LAST_KNOWN_STATE)
+        .label("Reopen with").keywords("reopen", "restore", "last window", "empty", "layout", "startup")
+        .description("Live. What the window Jasper opens while none is open holds: \"last_known_state\" (the last window you\n"
+            + "closed) or \"empty_state\" (the built-in layout, where that window was).").build();
     public static final Setting<Integer> PALETTE_VISIBLE_ROWS = Setting.of("palette.visible_rows",
             SettingKind.integer(PaletteSettings.MIN_VISIBLE_ROWS, PaletteSettings.MAX_VISIBLE_ROWS, DEFAULT), PaletteSettings.DEFAULT_VISIBLE_ROWS)
         .alias("palette.max_results").label("Visible rows").keywords("palette", "search", "results", "rows", "height")
@@ -292,7 +298,7 @@ public final class CoreSettings {
         .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows Slate Cobalt, which does not blur.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT, WINDOW_MEMORY_INDICATOR,
-            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, NOTIFICATIONS_GROUPS, SYSTEM_RUN_IN_BACKGROUND,
+            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, NOTIFICATIONS_GROUPS, SYSTEM_RUN_IN_BACKGROUND, SYSTEM_REOPEN,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_TAB_NAME, TERMINAL_SCHEME, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,

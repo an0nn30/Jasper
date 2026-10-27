@@ -145,7 +145,7 @@ the reason in the footer.
 | Notifications | Appearance & Behavior | **System Notifications**: Show system notifications, Notify after; **Groups** | [Finished-command notifications](#finished-command-notifications) |
 | Command Palette | Appearance & Behavior | Visible rows | [Palette](#palette) |
 | Desk Buddy | Appearance & Behavior | Show Jasper | [Desk buddy](#desk-buddy) |
-| System Settings | Appearance & Behavior | **General**: Run in background; **Java Virtual Machine**; **Command line**; **Configuration file**: Location (**Open in Editor**, **Reveal**), Reload from disk (**Reload**), Migrate old settings (**Migrate…**) | [Background residency](#background-residency) |
+| System Settings | Appearance & Behavior | **General**: Run in background, Reopen with; **Java Virtual Machine**; **Command line**; **Configuration file**: Location (**Open in Editor**, **Reveal**), Reload from disk (**Reload**), Migrate old settings (**Migrate…**) | [Background residency](#background-residency) |
 | Keymap | | Every shortcut | [Shortcuts](#shortcuts) |
 | Plugins | | Installed plugins ([Plugins](plugins.md)) | [Plugins](#plugins) |
 | Terminal | | Tab name, Scrollback lines, Bell, When the shell exits, Copy on select, Option key as Meta (macOS), Dim inactive panes | [Supported settings](#supported-settings) |
@@ -180,6 +180,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `notifications.system` | boolean | `true` | Also shows notifications as the operating system's own while Jasper is away | Live | Notifications › Show system notifications |
 | `notifications.groups` | table | `{}` | Group id to `"card"`, `"sticky"`, `"history"` or `"off"` ([Notification groups](#notification-groups)) | Live | Notifications › Groups |
 | `system.run_in_background` | boolean | `true` on macOS and Windows, `false` on Linux | [Background residency](#background-residency) | Restart; the login item at once | System Settings › Run in background |
+| `system.reopen` | string | `"last_known_state"` | `"last_known_state"` or `"empty_state"`: what the window Jasper opens while none is open holds, the last window you closed or the built-in layout where it was | Live | System Settings › Reopen with |
 | `palette.visible_rows` | integer | `5`, or the [look's](#look-dependent-defaults) | 1–20 rows | Live | Command Palette › Visible rows |
 | `terminal.scrollback` | integer | `10000` | 0–1000000 lines; `0` keeps no scrollback | New panes | Terminal › Scrollback lines |
 | `terminal.option_as_meta` | string | `"left"` | `"left"`, `"right"`, `"both"`, `"none"`: which Option key sends Meta, on macOS only | Live | Terminal › Option key as Meta (Left Option, Right Option, Both, Neither); hidden on Linux and Windows |
@@ -353,7 +354,7 @@ With `system.run_in_background` on (the default on macOS and Windows), Jasper ke
 closes, so the next window opens without a cold start; plugins keep running, but no shell does. On macOS, Quit (Cmd+Q)
 closes every window and leaves Jasper in the menu bar, whose item offers **New Window**, **Settings…** and
 **Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and **Quit Jasper**. Linux has
-no such icon, so the default there is off. [The workspace](workspace.md) describes quitting and reopening.
+no such icon, so the default there is off. [The workspace](workspace.md) describes quitting and reopening; `system.reopen` chooses whether the reopened window holds the last window you closed or the built-in layout.
 
 Residency also starts Jasper in the background at login:
 

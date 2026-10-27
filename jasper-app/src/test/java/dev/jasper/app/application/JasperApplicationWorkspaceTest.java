@@ -156,6 +156,43 @@ class JasperApplicationWorkspaceTest {
         }
     }
 
+    /** Full windows plan 3: with system.reopen at empty_state, the window Jasper reopens holds the built-in layout. */
+    @Test void reopeningWhileResidentFollowsTheSetting() throws Exception {
+        Path config = home.resolve("config.toml");
+        Files.writeString(config, "");
+        var service = new dev.jasper.app.config.ConfigService(config, true, new dev.jasper.app.testsupport.ConfigPollWorker(),
+            javax.swing.SwingUtilities::invokeLater);
+        JasperApplication[] held = new JasperApplication[1];
+        try {
+            edt(() -> {
+                held[0] = new JasperApplication(service, DesktopTestSupport.idleLauncher(pending), new CommandHistory(), null, () -> { });
+                held[0].frames = window -> new WindowShell(() -> { }, () -> { }, () -> { }, () -> { }, () -> null,
+                    component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+                held[0].workspace(file());
+                held[0].residency(true);
+                JasperWindow main = held[0].openFirstWindow(List.of()).orElseThrow();
+                main.content().newTab(home);
+                main.content().toolWindows().setRailVisible(false);
+                main.requestClose();
+                assertThat(held[0].windows().isEmpty()).isTrue();
+            });
+            Files.writeString(config, "[system]\nreopen = \"empty_state\"\n");
+            assertThat(service.reload().get(5, TimeUnit.SECONDS).snapshot().reopen())
+                .isEqualTo(dev.jasper.app.config.ReopenMode.EMPTY_STATE);
+            edt(() -> {
+                held[0].open(List.of(), "reopen");
+                assertThat(held[0].windows().windows()).singleElement().satisfies(window -> {
+                    assertThat(window.content().terminalTabs()).as("one terminal tab").hasSize(1);
+                    assertThat(window.content().toolWindows().railVisible()).as("the built-in layout, not the saved one").isTrue();
+                });
+            });
+            launch();
+        } finally {
+            if (held[0] != null) edt(held[0]::quitNow);
+            service.close();
+        }
+    }
+
     /** Tabs and panes spec 13: each directory a launch names opens in a new tab after the restored ones. */
     @Test void aLaunchsPathsOpenInNewTabsAfterTheRestore() throws Exception {
         Path first = Files.createDirectories(home.resolve("first")), second = Files.createDirectories(home.resolve("second"));

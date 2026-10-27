@@ -78,7 +78,7 @@ class CoreSettingsTest {
     }
 
     @Test void everySettingIsDescribedAndItsTemplateValueRoundTrips() {
-        assertThat(CoreSettings.SCHEMA.settings()).hasSize(46);
+        assertThat(CoreSettings.SCHEMA.settings()).hasSize(47);
         for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
             assertThat(setting.label()).as(setting.name()).isNotBlank();
             assertThat(setting.description()).as(setting.name()).isNotBlank();
@@ -202,4 +202,9 @@ class CoreSettingsTest {
             assertThat(diagnostic.key()).isEqualTo("ui.theme.desktop_source"));
     }
 
+
+    @Test void reopenDefaultsToTheLastKnownState() {
+        assertThat(CoreSettings.SYSTEM_REOPEN.key()).containsExactly("system", "reopen");
+        assertThat(CoreSettings.SYSTEM_REOPEN.defaultValue()).isEqualTo(ReopenMode.LAST_KNOWN_STATE);
+    }
 }

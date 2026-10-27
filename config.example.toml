@@ -61,6 +61,9 @@ system = true
 # Restart required for residency; the login item updates on reload. Autostart requires an installed Jasper: a
 # ./gradlew run development session uses its own home, is never resident and never registers a login item.
 # run_in_background = true
+# Live. What the window Jasper opens while none is open holds: "last_known_state" (the last window you
+# closed) or "empty_state" (the built-in layout, where that window was).
+reopen = "last_known_state"
 
 [palette]
 # Live. Result rows the palette list shows before it scrolls. Range: 1-20.
