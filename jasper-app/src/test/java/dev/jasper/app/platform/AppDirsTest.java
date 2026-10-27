@@ -64,6 +64,7 @@ class AppDirsTest {
         AppDirs dirs = AppDirs.resolve("Mac OS X", Map.of(), home);
         assertThat(dirs.workspaceState()).isEqualTo(home.resolve(".config/jasper/workspace.toml"));
         assertThat(dirs.workspaceState().getParent()).isEqualTo(dirs.uiState().getParent());
+        assertThat(dirs.layouts()).isEqualTo(home.resolve(".config/jasper/layouts.toml"));
     }
 
     @Test void daemonFilesShareOwnTheirOwnSubdirectoryOfTheRoot() {

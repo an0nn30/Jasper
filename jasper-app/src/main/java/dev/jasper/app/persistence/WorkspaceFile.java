@@ -259,7 +259,7 @@ public final class WorkspaceFile {
      * One window entry with its bad items dropped; empty when the entry itself is bad. Every drop is logged and recorded in
      * {@code dropped}.
      */
-    private static Optional<WindowRecord> window(TomlTable entry, List<String> dropped) {
+    static Optional<WindowRecord> window(TomlTable entry, List<String> dropped) {
         try {
             ParentTabs held = parentTabs(entry, dropped);
             Map<TabId, TabRecord> records = tabs(entry, dropped);
@@ -517,7 +517,7 @@ public final class WorkspaceFile {
     }
 
     /** What {@link #sizes} has counted so far: each part of the text is counted once written, then dropped. */
-    private static final class Counted {
+    static final class Counted {
         long total;
         final Map<TabId, Long> items = new HashMap<>();
     }
@@ -544,23 +544,37 @@ public final class WorkspaceFile {
     /** Writes {@code snapshot}'s text into {@code text}; with {@code sizes} each part is counted there instead of kept. */
     private static void encode(Snapshot snapshot, StringBuilder text, Counted sizes) {
         text.append("version = ").append(VERSION).append('\n');
-        WindowRecord window = snapshot.window();
-        text.append("\n[window]\n");
+        appendWindow(text, "\n[window]\n", "window", snapshot.window(), sizes);
+    }
+
+    /**
+     * One window's text under the table {@code prefix}: {@code header} opens its table ({@code [window]}, or
+     * {@code [[layouts]]} with its name in a layouts file), then its keys, tool windows, tabs and items.
+     */
+    static void appendWindow(StringBuilder text, String header, String prefix, WindowRecord window, Counted sizes) {
+        text.append(header);
         window.bounds().ifPresent(bounds -> text.append("x = ").append(bounds.x()).append("\ny = ").append(bounds.y())
             .append("\nwidth = ").append(bounds.width()).append("\nheight = ").append(bounds.height()).append('\n'));
         text.append("extended_state = ").append(window.extendedState()).append('\n');
         text.append("shown_tab = \"").append(window.layout().active()).append("\"\n");
-        window.tools().append(text, "window.tool_windows");
+        window.tools().append(text, prefix + ".tool_windows");
         for (ParentTab parent : window.layout().parentTabs()) {
             counted(sizes, text, null);
-            text.append("\n[[window.tabs]]\nid = \"").append(parent.id()).append("\"\n");
-            appendLayout(text, parent.layout(), "window.tabs.nodes", sizes);
+            text.append("\n[[").append(prefix).append(".tabs]]\nid = \"").append(parent.id()).append("\"\n");
+            appendLayout(text, parent.layout(), prefix + ".tabs.nodes", sizes);
         }
         for (TabId tab : window.layout().tabs()) {
-            appendTab(text, tab, window.tabs().get(tab));
+            appendTab(text, prefix, tab, window.tabs().get(tab));
             counted(sizes, text, tab);
         }
         counted(sizes, text, null);
+    }
+
+    /** {@code window}'s text under {@code prefix}, for a file that holds windows of its own. */
+    static String encodeWindow(String header, String prefix, WindowRecord window) {
+        var text = new StringBuilder();
+        appendWindow(text, header, prefix, window, null);
+        return text.toString();
     }
 
     /**
@@ -605,8 +619,8 @@ public final class WorkspaceFile {
         }
     }
 
-    private static void appendTab(StringBuilder text, TabId id, TabRecord saved) {
-        text.append("\n[[window.items]]\nid = \"").append(id.value()).append("\"\n");
+    private static void appendTab(StringBuilder text, String prefix, TabId id, TabRecord saved) {
+        text.append("\n[[").append(prefix).append(".items]]\nid = \"").append(id.value()).append("\"\n");
         switch (saved) {
             case TabRecord.Terminal terminal -> text.append("kind = \"terminal\"\ntitle = ").append(UiState.quote(terminal.title()))
                 .append("\ndirectory = ").append(UiState.quote(terminal.directory()))

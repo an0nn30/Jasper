@@ -61,6 +61,11 @@ public record AppDirs(Path root, Path configFile, Path logs, boolean overridden)
         return root.resolve("workspace.toml");
     }
 
+    /** The saved default layout and named layouts ({@code layouts.toml}). */
+    public Path layouts() {
+        return root.resolve("layouts.toml");
+    }
+
     /**
      * The handoff endpoint's own directory. It is a subdirectory rather than {@link #root()}
      * because binding sets its parent to owner-only, and the root also holds the user's config.
