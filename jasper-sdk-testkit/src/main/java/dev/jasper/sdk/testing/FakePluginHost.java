@@ -773,9 +773,12 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code TAB}, {@code TOOLS}, {@code SESSION},
      *     {@code TRANSFER}, {@code context} or {@code top:<menuId>}
-     * @return {@code item:id}, {@code ---} and {@code submenu:title} lines, children indented, sections separated by {@code ===}
+     * @return {@code item:id}, {@code web-address:id} (an {@code addForWebAddress} item), {@code ---} and
+     *     {@code submenu:title} lines, children indented, sections separated by {@code ===}
      */
-    public List<String> menu(String target) {
+    public List<String> menu(String target) { return menu(target, true); }
+
+    private List<String> menu(String target, boolean webAddress) {
         List<String> lines = new ArrayList<>();
         boolean first = true;
         for (FakePluginContext context : contexts.values()) {
@@ -783,10 +786,48 @@ public final class FakePluginHost implements AutoCloseable {
                 if (!section.target.equals(target)) continue;
                 if (!first) lines.add("===");
                 first = false;
-                section.render(lines, "");
+                section.render(lines, "", webAddress);
             }
         }
         return lines;
+    }
+
+    /**
+     * The plugin sections of a pane's right-click menu, as a right-click in the pane shows them now.
+     *
+     * @param paneId a pane
+     * @return the lines {@link #menu(String) menu("context")} gives, each {@code web-address:id} line only while the
+     *     pane's selection ({@link #setSelection}) is one web address; empty for a pane that is not open
+     * @since 0.23.0
+     */
+    public List<String> contextMenu(UUID paneId) {
+        return workspace.pane(paneId).map(pane -> menu("context", FakeUi.webAddress(pane.selection).isPresent())).orElse(List.of());
+    }
+
+    /**
+     * Chooses an action's first item in a pane's right-click menu ({@link #contextMenu}) as the user would: the action runs
+     * in the pane's window for that pane, and only a {@code web-address} item gives it the selected address as
+     * {@code ActionContext.webAddress()}.
+     *
+     * @param paneId a pane
+     * @param actionId the action
+     * @return whether an enabled action ran; false when the menu shows no item for it
+     * @since 0.23.0
+     */
+    public boolean chooseFromContextMenu(UUID paneId, String actionId) {
+        var pane = workspace.pane(paneId);
+        if (pane.isEmpty()) return false;
+        Optional<java.net.URI> address = FakeUi.webAddress(pane.get().selection);
+        for (FakePluginContext context : contexts.values()) {
+            for (FakeUi.Menu section : context.ui.sections) {
+                if (!section.target.equals("context")) continue;
+                Object item = section.shown(actionId, address.isPresent());
+                if (item == null) continue;
+                return context.ui.invoke(actionId, pane.get().tab.window.id, paneId,
+                    item instanceof FakeUi.Menu.WebAddressItem ? address : Optional.empty());
+            }
+        }
+        return false;
     }
 
     /**

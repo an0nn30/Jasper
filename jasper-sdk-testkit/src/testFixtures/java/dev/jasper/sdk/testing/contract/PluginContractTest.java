@@ -782,6 +782,95 @@ public abstract class PluginContractTest {
         assertThat(h.menu("TOOLS")).isEmpty();
     }
 
+    /**
+     * Browser plan 3b Task 6 (Review Focus 4): a web-address item shows in a pane's right-click menu only while the pane's
+     * selection, trimmed, is one http or https address with a host, and the action chosen from it hears that address.
+     */
+    @Test void aWebAddressItemShowsOnlyForAWebAddressSelection() {
+        List<Optional<java.net.URI>> heard = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.split", "Open URL in Split Right"), invoked -> heard.add(invoked.webAddress()));
+            context.menus().terminalContext().addForWebAddress("test.alpha.split");
+        });
+        UUID window = h.addTerminalWindow(), pane = h.addTerminalPane(h.addTerminalTab(window, "zsh"), "zsh", Path.of("/"));
+        assertThat(h.menu("context")).containsExactly("web-address:test.alpha.split");
+        assertThat(h.contextMenu(pane)).as("nothing selected").isEmpty();
+        assertThat(h.chooseFromContextMenu(pane, "test.alpha.split")).isFalse();
+
+        h.selectInPane(pane, "  https://example.com/x  ");
+        assertThat(h.contextMenu(pane)).containsExactly("web-address:test.alpha.split");
+        assertThat(h.chooseFromContextMenu(pane, "test.alpha.split")).isTrue();
+        assertThat(heard).containsExactly(Optional.of(java.net.URI.create("https://example.com/x")));
+
+        for (String almost : List.of("see https://example.com", "https://a.com https://b.com", "https://a.com\nmore",
+                "mailto:a@b.c", "ftp://h/x", "", "https:///x", "http://my_host/")) {
+            h.selectInPane(pane, almost);
+            assertThat(h.contextMenu(pane)).as(almost).isEmpty();
+            assertThat(h.chooseFromContextMenu(pane, "test.alpha.split")).as(almost).isFalse();
+        }
+        assertThat(heard).hasSize(1);
+
+        h.selectInPane(pane, "HTTP://Example.com/a\n");
+        assertThat(h.contextMenu(pane)).as("any case of the scheme; a line break at the end is trimmed")
+            .containsExactly("web-address:test.alpha.split");
+        assertThat(h.chooseFromContextMenu(pane, "test.alpha.split")).isTrue();
+        assertThat(heard.getLast()).contains(java.net.URI.create("HTTP://Example.com/a"));
+    }
+
+    /**
+     * Browser plan 3b Task 6: only an action chosen from a web-address item hears the address. A plain item of the same
+     * section, and the action run as a shortcut or the palette runs it, hear none while an address is selected. A submenu
+     * of the section takes web-address items too, and closing one's subscription removes it.
+     */
+    @Test void onlyAnActionChosenFromAWebAddressItemHearsTheAddress() {
+        List<String> heard = Collections.synchronizedList(new ArrayList<>());
+        var nested = new AtomicReference<Subscription>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            for (String id : List.of("test.alpha.plain", "test.alpha.split", "test.alpha.down"))
+                context.actions().register(ActionSpec.of(id, id), invoked -> heard.add(id + "|"
+                    + invoked.pane().map(chosen -> chosen.id().toString()).orElse("none") + "|"
+                    + invoked.webAddress().map(java.net.URI::toString).orElse("none")));
+            PluginMenu section = context.menus().terminalContext();
+            section.add("test.alpha.plain");
+            section.addForWebAddress("test.alpha.split");
+            nested.set(section.submenu("Open URL").addForWebAddress("test.alpha.down"));
+        });
+        UUID window = h.addTerminalWindow(), pane = h.addTerminalPane(h.addTerminalTab(window, "zsh"), "zsh", Path.of("/"));
+        h.selectInPane(pane, "https://example.com/x");
+        assertThat(h.contextMenu(pane)).containsExactly("item:test.alpha.plain", "web-address:test.alpha.split",
+            "submenu:Open URL", "  web-address:test.alpha.down");
+
+        assertThat(h.chooseFromContextMenu(pane, "test.alpha.plain")).isTrue();
+        assertThat(h.chooseFromContextMenu(pane, "test.alpha.down")).isTrue();
+        assertThat(h.invoke("test.alpha.split", window, pane)).as("as a shortcut or the palette runs it").isTrue();
+        assertThat(heard).containsExactly("test.alpha.plain|" + pane + "|none", "test.alpha.down|" + pane + "|https://example.com/x",
+            "test.alpha.split|" + pane + "|none");
+
+        h.ui(() -> nested.get().close());
+        assertThat(h.contextMenu(pane)).containsExactly("item:test.alpha.plain", "web-address:test.alpha.split", "submenu:Open URL");
+        h.selectInPane(pane, "plain text");
+        assertThat(h.contextMenu(pane)).as("a plain item shows whatever is selected").containsExactly("item:test.alpha.plain", "submenu:Open URL");
+    }
+
+    /** Browser plan 3b Task 6: web-address items belong to the terminal's right-click menu and name the plugin's own actions. */
+    @Test void addForWebAddressOutsideTheTerminalMenuThrows() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.split", "Open URL in Split Right"), invoked -> { });
+            for (PluginMenu elsewhere : List.of(context.menus().standard(StandardMenu.TOOLS), context.menus().create("test.alpha.menu", "Alpha"),
+                    context.menus().standard(StandardMenu.VIEW).submenu("More")))
+                assertThatIllegalStateException().isThrownBy(() -> elsewhere.addForWebAddress("test.alpha.split"))
+                    .withMessage("addForWebAddress belongs to the terminal's right-click menu");
+            PluginMenu section = context.menus().terminalContext();
+            assertThatIllegalArgumentException().as("an action the plugin did not register")
+                .isThrownBy(() -> section.addForWebAddress("test.alpha.absent"));
+            section.submenu("Open URL").addForWebAddress("test.alpha.split");
+        });
+        assertThat(h.active("test.alpha")).isTrue();
+        assertThat(h.menu("TOOLS")).isEmpty();
+        assertThat(h.menu("top:test.alpha.menu")).isEmpty();
+        assertThat(h.menu("context")).containsExactly("submenu:Open URL", "  web-address:test.alpha.split");
+    }
+
     @Test void statusItemsAreOrderedGlobalAndInertAfterClose() {
         var late = new AtomicReference<StatusItem>();
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {

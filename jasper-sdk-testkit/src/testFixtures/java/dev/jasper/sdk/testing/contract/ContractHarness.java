@@ -61,10 +61,25 @@ public interface ContractHarness extends AutoCloseable {
     /**
      * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code TAB}, {@code TOOLS},
      * {@code SESSION}, {@code TRANSFER}, {@code context},
-     * {@code top:<menuId>}): {@code item:id}, {@code ---}, {@code submenu:title}, children indented two
-     * spaces, sections separated by {@code ===}; items of closed actions omitted.
+     * {@code top:<menuId>}): {@code item:id}, {@code web-address:id} (an {@code addForWebAddress} item), {@code ---},
+     * {@code submenu:title}, children indented two spaces, sections separated by {@code ===}; items of closed actions
+     * omitted.
      */
     List<String> menu(String target);
+
+    /**
+     * The plugin sections of a pane's right-click menu as a right-click in it shows them now: the lines {@link #menu} gives
+     * for {@code context}, each {@code web-address:id} line only while the pane's selection is one web address; empty for a
+     * pane that is not open.
+     */
+    List<String> contextMenu(java.util.UUID paneId);
+
+    /**
+     * Chooses the action's first item in a pane's right-click menu ({@link #contextMenu}) as the user would, and waits: the
+     * action runs in the pane's window for that pane, and hears the selected address only from a {@code web-address} item.
+     * True when an enabled action ran; false when the menu shows no item for it.
+     */
+    boolean chooseFromContextMenu(java.util.UUID paneId, String actionId);
 
     /** Visible status items as {@code id|side|text|tooltip|actionId}, ascending priority. */
     List<String> status();

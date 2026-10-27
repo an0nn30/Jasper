@@ -56,6 +56,8 @@ class FakeContractTest extends PluginContractTest {
                 throw new AssertionError("No toolbar view button " + buttonId + " in " + windowId);
             }
             @Override public List<String> menu(String target) { return host.menu(target); }
+            @Override public List<String> contextMenu(java.util.UUID paneId) { return host.contextMenu(paneId); }
+            @Override public boolean chooseFromContextMenu(java.util.UUID paneId, String actionId) { return host.chooseFromContextMenu(paneId, actionId); }
             @Override public List<String> status() { return host.status(); }
             @Override public List<String> panels() { return host.panels(); }
             @Override public javax.swing.JComponent openPanel(String panelId) { return host.openPanel(panelId); }

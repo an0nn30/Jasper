@@ -296,7 +296,8 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **The handle.** `register` returns a [`PluginAction`](sdk-reference.html#dev.jasper.sdk.ui.PluginAction):
   `setEnabled` and `setTitle` change it everywhere it is placed, and `close()` removes it and every placement.
 - **The handler** gets an [`ActionContext`](sdk-reference.html#dev.jasper.sdk.ui.ActionContext): `window()`, the
-  window it was invoked in, and `pane()`, the pane under a terminal's right-click menu, or else the focused pane.
+  window it was invoked in, `pane()`, the pane under a terminal's right-click menu, or else the focused pane, and
+  `webAddress()`, a selected web address (see [Menus](#menus)).
 - **Placements** name only actions the plugin registered.
 - **Plain text.** Jasper shows the text a plugin supplies as written: menu titles and items, toolbar items and
   dropdowns, status items, tooltips, tab and window titles, and the text of [kit views](plugin-ui.md). A string
@@ -329,6 +330,13 @@ private static void installUi(PluginContext context, long stepMillis) {
   end of every terminal pane's right-click menu.
 - A [`PluginMenu`](sdk-reference.html#dev.jasper.sdk.ui.PluginMenu) takes `add(actionId)`, `addSeparator()`,
   `submenu(title)` and `clear()`. Each change replaces the section whole, so windows never show half of it.
+- [`addForWebAddress(actionId)`](sdk-reference.html#dev.jasper.sdk.ui.PluginMenu.addForWebAddress(String)), in the
+  `terminalContext()` section or a submenu of it, adds an item that shows only while the right-clicked pane's selection
+  is one web address: trimmed of leading and trailing whitespace, an `http` or `https` address with a host and no
+  whitespace inside. The action chosen from it gets the address as
+  [`webAddress()`](sdk-reference.html#dev.jasper.sdk.ui.ActionContext.webAddress()); chosen any other way, it gets
+  none. It needs no capability, since the user chose the item with that selection. Any other menu throws
+  `IllegalStateException`.
 
 | `StandardMenu` | For |
 | --- | --- |

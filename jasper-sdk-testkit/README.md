@@ -84,7 +84,8 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `invoke(actionId, windowId, paneIdOrNull)` | Runs an action as a window would; false when it is disabled or unknown |
 | `toolbar()` | The plugin toolbar section as `button:<id>`, `menu:<title>:<id>,<id>` and `view` |
 | `toolbarViews(windowId)`, `closeToolbarViews(windowId)` | Builds a window's toolbar views, as the window does when it opens; closes them, as closing the window does |
-| `menu(target)` | One menu's contributed entries (`FILE`, `EDIT`, `VIEW`, `TAB`, `TOOLS`, `SESSION`, `TRANSFER`, `context` or `top:<menuId>`) as `item:<id>`, `---` and `submenu:<title>` lines, children indented, sections separated by `===` |
+| `menu(target)` | One menu's contributed entries (`FILE`, `EDIT`, `VIEW`, `TAB`, `TOOLS`, `SESSION`, `TRANSFER`, `context` or `top:<menuId>`) as `item:<id>`, `web-address:<id>` (an `addForWebAddress` item), `---` and `submenu:<title>` lines, children indented, sections separated by `===` |
+| `contextMenu(paneId)`, `chooseFromContextMenu(paneId, actionId)` | A pane's right-click menu as `menu("context")`'s lines, each `web-address:<id>` line only while the pane's selection (`setSelection`) is one web address; chooses an action's first item there as the user would, for that pane, and only a `web-address` item gives the handler the address as `webAddress()`; false when the menu shows no item for it |
 | `status()`, `progress()` | Visible status items as `id\|side\|text\|tooltip\|actionId`; visible progress states by id |
 | `rail()` | Rail buttons' action ids |
 | `panels()` | Registered panels as `id\|title\|ANCHOR`, with `+split` for a panel that starts in the second half and `\|<action id>` for one that names its own toggle |

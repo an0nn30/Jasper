@@ -39,9 +39,10 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 
 <h3>Actions and shortcuts</h3>
 <p>An action is a command: an id, a title, an optional icon and keywords, and a handler that runs on the UI thread with
-an {@link ActionContext}, which names the window it was invoked in and the pane it concerns (the pane under a context
-menu, otherwise the window's focused pane). Registering an action lists it in every window's command palette and in
-Settings › Keymap under the plugin's name; then place it:</p>
+an {@link ActionContext}, which names the window it was invoked in, the pane it concerns (the pane under a context
+menu, otherwise the window's focused pane) and, for a web-address item (see Menus), the address selected. Registering
+an action lists it in every window's command palette and in Settings › Keymap under the plugin's name; then place
+it:</p>
 <pre><code class="language-java">String run = "dev.example.tool.run";
 PluginAction action = context.actions().register(ActionSpec.of(run, "Run Deploy Checks")
         .withIcon("play").withKeywords(List.of("deploy", "check")).withDefaultBinding("cmd+alt+d"),
@@ -82,7 +83,10 @@ plugin has entries in them: Tools for utility commands, Session for connecting t
 Transfer for file browsers, transfers and file servers. {@link Menus#create(String,String)} adds a top-level menu, placed
 with the other plugins' menus. {@link Menus#terminalContext()} is a section at the end of every pane's right-click menu;
 an action run from it receives that pane. A section is a {@link PluginMenu}: add actions, separators and submenus, and
-rebuild it at any time with {@link PluginMenu#clear()}.</p>
+rebuild it at any time with {@link PluginMenu#clear()}. In the terminal section and its submenus,
+{@link PluginMenu#addForWebAddress(String)} adds an action that shows only while the pane's selection is one {@code http}
+or {@code https} address with a host; the action chosen from it receives the address as
+{@link ActionContext#webAddress()}, with no capability, since the user chose the item with that selection.</p>
 
 <h3>Toolbar</h3>
 <p>{@link ToolbarItem#action(String)} is a button for one action, {@link ToolbarItem#menu(String,String,List)} a button
