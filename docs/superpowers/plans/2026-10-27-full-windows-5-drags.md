@@ -1,5 +1,8 @@
 # Full windows 5: panes tear out into full windows Implementation Plan
 
+> **Status (2026-10-27):** Executed, Tasks 1-2, on `claude/full-windows` (not merged or pushed). Deviation from the plan
+> text: the new window keeps the cursor at the same spot within the moved pane, sized to the whole tab's workspace.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A pane dragged outside every Jasper window becomes a full window holding a tab with that pane, and every

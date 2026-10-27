@@ -618,7 +618,9 @@ final class TabDrag {
             if (window != null) target = onPanes(window, at);
             // Outside every window of Jasper's: a full window, except for the only pane of a window's only tab, or an
             // item that is pinned or being closed (full windows plan 5).
-            else if (from.mayMovePaneToNewWindow(tab)) target = Optional.of(new Target.TearOut(tearOutBounds(at), new Point(at)));
+            else if (from.mayMovePaneToNewWindow(tab)) {
+                target = Optional.of(new Target.TearOut(tearOutBounds(at), new Point(at)));
+            }
             showLanding();
             return;
         }
