@@ -17,7 +17,7 @@ import javax.swing.SwingUtilities;
 /**
  * Where Jasper's windows are saved (workspace tabs spec 13): {@code workspace.toml} in the Jasper home. The first change
  * after a save is saved {@link #DELAY} later, with every change made meanwhile, so a crash loses at most that; a window
- * closing saves at once. Each save takes its snapshot on the EDT and writes it on {@code writer}, off the EDT, after the
+ * closing saves at once ({@link #save(WorkspaceFile.Snapshot)}). Each save takes its snapshot on the EDT and writes it on {@code writer}, off the EDT, after the
  * writes before it, whatever happened to them. Closing the last window, Quit and going to the background save, then hold
  * every save ({@link #hold()}) until the windows are restored ({@link #load()}). A snapshot or a write that fails, or a
  * write the writer refuses, is logged and costs only that save: the next save writes the windows, changed or not. EDT
@@ -147,6 +147,22 @@ public final class WorkspaceStore {
         saved = writing;
         lastWritten.set(writing);
         writeLater(file, writing);
+    }
+
+    /**
+     * Writes {@code windows} now, as the window the user closes is the last state: after the writes before it, unless
+     * saving is held or the file holds these windows already; this process's last save, which {@link #load()} returns.
+     * A save a change scheduled stays scheduled.
+     *
+     * @param windows what to write
+     */
+    public void save(WorkspaceFile.Snapshot windows) {
+        requireEdt();
+        Objects.requireNonNull(windows, "windows");
+        if (held || windows.equals(lastWritten.get())) return;
+        saved = windows;
+        lastWritten.set(windows);
+        writeLater(file, windows);
     }
 
     /**

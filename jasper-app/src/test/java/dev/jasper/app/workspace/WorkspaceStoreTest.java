@@ -135,6 +135,23 @@ class WorkspaceStoreTest {
         assertThat(writes).as("no main window: nothing to save").isEmpty();
     }
 
+    @Test void savingASnapshotWritesExactlyThatNowAndLoadReturnsIt() throws Exception {
+        store();
+        current = Optional.of(workspace("/work/active"));
+        var closing = workspace("/work/closing");
+        edt(() -> { store.changed(); store.save(closing); });
+        assertThat(due).as("the scheduled save stays").hasSize(1);
+        write();
+        assertThat(onDisk()).isEqualTo(closing);
+        edt(() -> store.save(closing));
+        assertThat(writes).as("the same snapshot is not written twice").isEmpty();
+        edt(() -> assertThat(store.load()).isEqualTo(new WorkspaceFile.Loaded.Restore(closing, Optional.empty())));
+        edt(() -> store.hold());
+        write();
+        edt(() -> store.save(workspace("/work/held")));
+        assertThat(writes).as("held: nothing").isEmpty();
+    }
+
     /** Workspace plan 6a Task 5's review: a save with nothing to save yet leaves the save a change scheduled in place. */
     @Test void aSaveWithNothingToSaveKeepsTheSaveAChangeScheduled() throws Exception {
         store();

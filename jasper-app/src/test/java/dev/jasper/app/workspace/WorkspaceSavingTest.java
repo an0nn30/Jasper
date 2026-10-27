@@ -135,26 +135,24 @@ class WorkspaceSavingTest {
             assertThat(saved().window().layout()).as("an item moving into a window of its own leaves this one")
                 .isEqualTo(main.content().windowLayout());
             windows.manager.moveTabToWindow(full.content(), full.content().activeParentTab(), main.content());
-            assertThat(saved().window().layout().tabs()).as("Move Tab to Window: its window closing is saved at once")
-                .containsExactlyElementsOf(main.content().windowLayout().tabs());
             second();
             assertThat(saved().window().layout()).as("and where its tab came back, within the second").isEqualTo(main.content().windowLayout());
         });
         windows.launch();
     }
 
-    @Test void aWindowClosedAloneLeavesTheOtherSavedAtOnce() throws Exception {
+    @Test void closingAWindowSavesThatWindowAsTheLastState() throws Exception {
         windows();
         edt(() -> {
             JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
             JasperWindow child = windows.manager.openWindow(folder).orElseThrow();
             child.content().newTab(folder);
             second();
-            child.events().activated().accept(true);
-            assertThat(windows.manager.snapshot().orElseThrow().window().layout()).isEqualTo(child.content().windowLayout());
+            main.events().activated().accept(true);
+            second();
+            var childLayout = child.content().windowLayout();
             child.requestClose();
-            assertThat(saved().window().layout()).as("saved at once, the window that is left").isEqualTo(main.content().windowLayout());
-            assertThat(due).isEmpty();
+            assertThat(saved().window().layout()).as("saved at once, the window closed, though the other is active").isEqualTo(childLayout);
         });
         windows.launch();
     }
@@ -172,7 +170,6 @@ class WorkspaceSavingTest {
             assertThat(windows.manager.isEmpty()).isTrue();
             assertThat(store.held()).isTrue();
         });
-        assertThat(file()).doesNotExist();
         assertThat(storeLog.warnings()).as("each save that could not take the snapshot says so").isNotEmpty()
             .containsOnly("Could not take the workspace's snapshot to save");
         windows.launch();
@@ -236,10 +233,12 @@ class WorkspaceSavingTest {
             assertThat(saved().window().layout()).as("the window it moved to, the most recently active")
                 .isEqualTo(full.content().windowLayout());
             assertThat(saved().window().tabs()).containsKey(moving.id());
+            var fullLayout = full.content().windowLayout();
             full.requestClose();
-            assertThat(saved().window().layout()).as("saved at once, the window that is left").isEqualTo(main.content().windowLayout());
+            assertThat(saved().window().layout()).as("saved at once, the window closed").isEqualTo(fullLayout);
+            due.clear();
             full.content().layoutChanged();
-            full.placed(new JasperWindow.Placement(Optional.of(new UiState.Bounds(10, 20, 1200, 800)), 0));
+            full.placed(new JasperWindow.Placement(Optional.of(new UiState.Bounds(30, 40, 1200, 800)), 0));
             assertThat(due).as("a closed window's layout or place").isEmpty();
         });
         windows.launch();
@@ -259,6 +258,58 @@ class WorkspaceSavingTest {
             }
             second();
             assertThat(shown().activeTab()).as("the selection the model took").contains(first.id());
+        });
+        windows.launch();
+    }
+
+    @Test void aWindowAMoveEmptiesIsNotSavedAsTheLastState() throws Exception {
+        windows();
+        edt(() -> {
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
+            JasperWindow other = windows.manager.openWindow(folder).orElseThrow();
+            other.events().activated().accept(true);
+            second();
+            var before = saved().window().layout();
+            assertThat(windows.manager.moveTabToWindow(other.content(), other.content().activeParentTab(), main.content())).isTrue();
+            assertThat(other.closed()).isTrue();
+            assertThat(saved().window().layout()).as("no write at once").isEqualTo(before);
+            second();
+            assertThat(saved().window().layout()).as("the debounced write is the window that is left").isEqualTo(main.content().windowLayout());
+        });
+        windows.launch();
+    }
+
+    @Test void aGuardThatRefusesTheCloseSavesNothing() throws Exception {
+        windows();
+        edt(() -> {
+            windows.manager.ensureWindow("cold", folder).orElseThrow();
+            JasperWindow other = windows.manager.openWindow(folder).orElseThrow();
+            windows.model.tabs().open("dev.example.editor", "notes", "notes.txt", other.id(), new javax.swing.JPanel());
+            windows.model.tabs().guard("dev.example.editor", (tabs, batch) -> java.util.concurrent.CompletableFuture.completedFuture(false));
+            second();
+            var before = saved();
+            other.events().activated().accept(true);
+            due.clear();
+            other.requestClose();
+            assertThat(other.closed()).isFalse();
+            assertThat(saved()).as("no write").isEqualTo(before);
+            assertThat(due).isEmpty();
+        });
+        windows.launch();
+    }
+
+    @Test void activatingAnotherWindowSavesItWithinASecond() throws Exception {
+        windows();
+        edt(() -> {
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
+            JasperWindow other = windows.manager.openWindow(folder).orElseThrow();
+            other.content().newTab(folder);
+            other.events().activated().accept(true);
+            second();
+            assertThat(saved().window().layout()).isEqualTo(other.content().windowLayout());
+            main.events().activated().accept(true);
+            second();
+            assertThat(saved().window().layout()).as("the file follows the most recently active window").isEqualTo(main.content().windowLayout());
         });
         windows.launch();
     }

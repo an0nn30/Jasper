@@ -113,17 +113,44 @@ class JasperApplicationWorkspaceTest {
         }
     }
 
-    @Test void aWindowTheUserClosesLeavesTheOtherOneSaved() throws Exception {
-        JasperApplication application = application(() -> { });
+    @Test void quitAfterClosingOneWindowRestoresTheOneActiveAtQuit() throws Exception {
+        JasperApplication first = application(() -> { });
+        edt(() -> {
+            JasperWindow a = first.openFirstWindow(List.of()).orElseThrow();
+            JasperWindow b = first.windows().openWindow(home).orElseThrow();
+            b.requestClose();
+            a.content().newTab(home);
+            first.quitNow();
+        });
+        launch();
+        first.workspaceStore().written().get(5, TimeUnit.SECONDS);
+        JasperApplication second = application(() -> { });
         try {
-            var kept = new java.util.concurrent.atomic.AtomicReference<dev.jasper.app.layout.ParentTabs>();
             edt(() -> {
-                kept.set(application.openFirstWindow(List.of()).orElseThrow().content().windowLayout());
-                application.windows().openWindow(home).orElseThrow().requestClose();
+                JasperWindow main = second.openFirstWindow(List.of()).orElseThrow();
+                assertThat(main.content().terminalTabs()).as("window A with its two tabs").hasSize(2);
+                assertThat(second.windows().windows()).containsExactly(main);
             });
             launch();
-            application.workspaceStore().written().get(5, TimeUnit.SECONDS);
-            assertThat(saved().window().layout()).isEqualTo(kept.get());
+        } finally {
+            quit(second);
+        }
+    }
+
+    @Test void closingTheLastWindowWhileResidentRestoresItOnReopen() throws Exception {
+        JasperApplication application = application(() -> { });
+        try {
+            edt(() -> {
+                application.residency(true);
+                JasperWindow main = application.openFirstWindow(List.of()).orElseThrow();
+                main.content().newTab(home);
+                main.requestClose();
+                assertThat(application.windows().isEmpty()).isTrue();
+                application.open(List.of(), "reopen");
+                assertThat(application.windows().windows()).as("one window comes back").singleElement()
+                    .satisfies(window -> assertThat(window.content().terminalTabs()).hasSize(2));
+            });
+            launch();
         } finally {
             quit(application);
         }

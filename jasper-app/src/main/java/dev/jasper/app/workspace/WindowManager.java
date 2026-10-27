@@ -986,8 +986,24 @@ public final class WindowManager {
         window.toFront();
     }
 
+    /**
+     * The user closes {@code window} and its guards agreed, its content whole: it is saved at once as the last state,
+     * though another window is the most recently active (the last window to close is the one that comes back). A failing
+     * snapshot costs only this save.
+     */
+    void closingByUser(JasperWindow window) {
+        if (store == null || restoring) return;
+        try {
+            store.save(fitted(windowRecord(window)));
+        } catch (RuntimeException | Error failure) {
+            LOG.log(System.Logger.Level.WARNING, "Could not take the workspace's snapshot to save", failure);
+        }
+    }
+
     void activated(JasperWindow window) {
         mostRecent(window);
+        // The file follows the most recently active window within a second.
+        if (store != null) store.changed();
         tabDrag.activated(window.content());
         if (!watchingFronts) {
             Toolkit.getDefaultToolkit().addAWTEventListener(fronts, AWTEvent.WINDOW_EVENT_MASK);
@@ -1019,13 +1035,7 @@ public final class WindowManager {
             Toolkit.getDefaultToolkit().removeAWTEventListener(fronts);
             watchingFronts = false;
         }
-        try {
-            // A window closing is saved at once: a window the user closed is gone with its tabs (spec 13).
-            if (store != null) store.save();
-        } finally {
-            // Residency, the Dock and shutdown hear of every window, whatever the save did.
-            hooks.closed().accept(window);
-        }
+        hooks.closed().accept(window);
     }
 
     static void requireEdt() {

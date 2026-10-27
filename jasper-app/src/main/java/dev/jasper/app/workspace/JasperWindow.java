@@ -122,7 +122,11 @@ public final class JasperWindow {
     public Events events() { return new Events(this::requestClose, this::activated, this::stateChanged); }
 
     /** The close a request makes: see {@link #requestClose()}. */
-    private void closeRequested() { if (content.mayClose()) close(); }
+    private void closeRequested() {
+        if (!content.mayClose()) return;
+        manager.closingByUser(this);
+        close();
+    }
 
     /**
      * Restores the window as it was saved (workspace tabs spec 13; tabs and panes spec 12): where it was, its tabs and
