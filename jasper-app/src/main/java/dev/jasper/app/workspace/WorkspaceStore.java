@@ -74,16 +74,25 @@ public final class WorkspaceStore {
      *
      * @return the windows to restore, or that the window opens fresh
      */
-    public WorkspaceFile.Loaded load() {
+    public WorkspaceFile.Loaded load() { return load(true); }
+
+    /**
+     * As {@link #load()}; with {@code announce} false a file the reader set aside or kept aside stays there but
+     * {@code setAside} is not told (a reopen that does not restore the file has nothing to say about it).
+     *
+     * @param announce whether {@code setAside} hears of a file the reader set aside
+     * @return the windows to restore, or that the window opens fresh
+     */
+    public WorkspaceFile.Loaded load(boolean announce) {
         requireEdt();
         held = false;
         keptOnLoad = false;
         if (saved != null) return new WorkspaceFile.Loaded.Restore(saved, Optional.empty());
         WorkspaceFile.Loaded loaded = WorkspaceFile.read(file);
-        if (loaded instanceof WorkspaceFile.Loaded.Fresh fresh) fresh.setAside().ifPresent(setAside);
+        if (announce && loaded instanceof WorkspaceFile.Loaded.Fresh fresh) fresh.setAside().ifPresent(setAside);
         if (loaded instanceof WorkspaceFile.Loaded.Restore restore && restore.keptAside().isPresent()) {
             keptOnLoad = true;
-            setAside.accept(restore.keptAside().get());
+            if (announce) setAside.accept(restore.keptAside().get());
         }
         return loaded;
     }

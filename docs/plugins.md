@@ -24,13 +24,13 @@ Shortcuts below are given as macOS / Linux and Windows.
   a plugin has entries in them.
 - Toolbar buttons, buttons on the left tool window stripe and status-bar items, all in every window, and dialogs.
 - Content tabs: its own views in tabs and panes beside terminals, in any window. They can open a terminal or another
-  item beside themselves, can be offered in the Split menus, and can come back when Jasper restores its windows.
+  item beside themselves, can be offered in the Split menus, and can come back when Jasper restores its window.
 - Background activities, shown on [Desk Buddy](notifications.md#desk-buddy) while they run and posted in the plugin's
   "*name* activities" notification group when they succeed or fail.
 - Tool windows, docked in a window or in a window of their own, each with a toggle in View › Tool Windows (in
   the Window menu under the Enterprise look).
 - Command palette scopes, and places in Jasper's file chooser.
-- Terminal sessions of its own, such as SSH, which can come back when Jasper restores its windows, and variables in
+- Terminal sessions of its own, such as SSH, which can come back when Jasper restores its window, and variables in
   the environment of new shells.
 - The editor Jasper opens files with, `jasper` commands, notifications in its own groups, a page in Settings › Tools,
   themes and a look.
@@ -61,7 +61,7 @@ present" only while that plugin is running; without it, the features that need i
 ### Remote
 
 SSH, SFTP and tunnels: saved hosts with groups, favourites and ProxyJump jump hosts, host-key trust, Vault or SSH-agent
-authentication, SSH terminal tabs and splits that come back when Jasper restores its windows, an SFTP browser with
+authentication, SSH terminal tabs and splits that come back when Jasper restores its window, an SFTP browser with
 persistent file transfers, local, remote and SOCKS tunnels with live counters, import from `~/.ssh/config`, a Sessions
 tool window that also lists the WSL distributions on Windows, the `ssh >` and `tunnels >` palette scopes, and saved
 hosts as places in Jasper's file chooser.
@@ -153,7 +153,7 @@ plugin's code does nothing; Credential Vault, Remote and File Server use their c
 The smallest complete plugin: the runtime's end-to-end test fixture and the source of the compiled examples in
 [plugin authoring](plugin-authoring.md). It is enabled but does nothing until you set one of its `demo_*` settings in
 Settings › Tools › Sample (or its settings file): a demonstration activity; toolbar, menu and status-bar items with a
-Sample tool window and an **About Sample** tab that comes back when Jasper restores its windows; a terminal greeting; an
+Sample tool window and an **About Sample** tab that comes back when Jasper restores its window; a terminal greeting; an
 echo session; and a "Greetings" palette scope.
 
 - **Capabilities** `terminal.observe`, `terminal.inject`, `terminal.open`, `session.provide`, `palette.contribute`.

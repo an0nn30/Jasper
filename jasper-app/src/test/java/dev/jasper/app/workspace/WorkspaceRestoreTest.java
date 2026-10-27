@@ -213,7 +213,7 @@ class WorkspaceRestoreTest {
      * Tabs and panes spec 13: a request's directory opens in a new tab after the restored ones, which shows; the restored
      * tab that showed before waits as a hidden tab does (workspace plan 6a Rulings 4 and 31).
      */
-    @Test void aRestoredMainWindowOpensTheRequestsDirectoryInANewTab() throws Exception {
+    @Test void aRestoredWindowOpensTheRequestsDirectoryInANewTab() throws Exception {
         Path work = Files.createDirectories(folder.resolve("work"));
         Path logs = Files.createDirectories(folder.resolve("logs"));
         Path asked = Files.createDirectories(folder.resolve("asked"));
@@ -445,7 +445,7 @@ class WorkspaceRestoreTest {
         windows.launch();
     }
 
-    @Test void reopeningTheMainWindowRestoresWhatWasSavedWhenItClosed() throws Exception {
+    @Test void reopeningTheWindowRestoresWhatWasSavedWhenItClosed() throws Exception {
         Path work = Files.createDirectories(folder.resolve("work"));
         windows();
         TabId[] saved = new TabId[3];

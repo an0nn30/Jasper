@@ -8,6 +8,10 @@
 > `window.status_bar` setting (not saved per window); 2, a failed restore opens the `BUILT_IN` tool windows; 3, a
 > window's activation schedules the debounced save. Task 4 also made `UiState` read an older `version` quietly (INFO, no
 > stack trace) and updated the guides.
+> Final-review fix wave (Controller Ruling 4): the guides say one window is saved and restored; Empty State reads
+> the file with `WorkspaceStore.load(false)` so a set-aside file keeps its `.bad` copy without a notice; Last Known
+> State is worded "the window you used last"; the failed-restore fallback logs a failure of its own and keeps the
+> window.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

@@ -513,7 +513,7 @@ tabs, dialogs, overlays and popovers when the plugin stops. A view of the plugin
 [content tab](#content-tabs) (a modal dialog pins the tab to its window) or a
 [`UiAnchor`](sdk-reference.html#dev.jasper.sdk.ui.UiAnchor). A modal dialog's `show()` returns after it closes, and its
 form's Escape runs the form's cancel action. A dialog also closes, running its `onClosed` handlers, when the Jasper
-window that owns it closes, and Jasper does not restore it with its windows. A modeless dialog whose content is a
+window that owns it closes, and Jasper does not restore it with its window. A modeless dialog whose content is a
 `FormKind.WINDOW` form, such as the Credential Vault manager, opens at a window's size, can be resized and
 remembers its bounds under the plugin's id and its title; other dialogs remember nothing.
 
@@ -585,7 +585,7 @@ normalised; do the file work in the background.
 A content tab is a document of the plugin's in a pane, beside terminals, as the Editor's files are. Jasper provides the
 tab strip, the window and its menus, and the status bar; the plugin provides the view.
 
-- `windows().openTab(new ContentSpec(key, title), owner, view)` opens the view in a new tab of the owner's window, or of the most recently active window when the owner is null or closed (Jasper restores its windows first when none is open), and
+- `windows().openTab(new ContentSpec(key, title), owner, view)` opens the view in a new tab of the owner's window, or of the most recently active window when the owner is null or closed (Jasper restores its window first when none is open), and
   returns a [`ContentTab`](sdk-reference.html#dev.jasper.sdk.ui.ContentTab).
   `openTab(spec, owner, view, placement)` takes a
   [`TabPlacement`](sdk-reference.html#dev.jasper.sdk.ui.TabPlacement): `NEW_TAB` (the three-argument form),
@@ -639,7 +639,7 @@ that builds its own right-click menu, as the Editor does, lists `windows().split
 
 ### Coming back with the windows
 
-Jasper saves its windows to `workspace.toml` and restores them at start and whenever a window opens with none open. A
+Jasper saves the window you used last to `workspace.toml` and restores it at start and whenever a window opens with none open. A
 content tab comes back if the plugin says how: give its `ContentSpec` a
 [`RestoreState`](sdk-reference.html#dev.jasper.sdk.RestoreState)
 (`spec.withRestore(RestoreState.of("document", "path", file.toString()))`), change it with `ContentTab.setRestore`
@@ -926,7 +926,7 @@ private static void installTerminalDemo(PluginContext context) {
 - `PaneInfo` also holds the title, the grid's columns and rows (0 before the session starts), whether shell integration
   is on, the session's kind (`LOCAL` or `PLUGIN`, with the provider's id), its state (`NOT_STARTED`, `CONNECTING`,
   `RUNNING`, `EXITED`), the exit status, and `shell`: the launcher's label (`zsh`, `fish`) or a provided session's title.
-- **A restored terminal may not have started.** Jasper restores its windows at start and whenever a window opens with none open; a terminal whose tab Jasper has not shown yet reports `SessionState.NOT_STARTED` until its tab is first shown:
+- **A restored terminal may not have started.** Jasper restores its window at start and whenever a window opens with none open; a terminal whose tab Jasper has not shown yet reports `SessionState.NOT_STARTED` until its tab is first shown:
   nothing runs there yet, and text sent to it is dropped. In the testkit `FakePluginHost.holdPane` holds a local pane
   the same way until its tab is shown; a pane with a provided session is refused.
 - **Opening tabs.** `openTab(window, request)` opens a terminal in a new tab at the end of the window's strip and

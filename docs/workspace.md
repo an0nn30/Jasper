@@ -60,7 +60,7 @@ workspace it left, where you release it.
 
 ### Saving and restoring the windows
 
-Jasper saves its windows to `workspace.toml` in Jasper home within a second of each change, at once when a window
+Jasper saves the window you used last to `workspace.toml` in Jasper home within a second of each change, at once when a window
 closes, and on Quit and when it goes to the background, with the most recently active window's state (the closing
 window's, when you close one yourself). It restores one window at the next start and whenever a window opens with none
 open: the window saved last, with its size, position and maximised state (fitted onto a
@@ -460,7 +460,7 @@ stops, except on macOS while it runs in the background (below).
 
 One Jasper runs per home. Launching it again, with its launcher or the
 [`jasper` command](command-line.md#one-jasper-per-home), hands the request to the running one, which brings its most recently active
-window to the front, restoring its windows first when none is open, and opens the files and folders the launch
+window to the front, restoring its window first when none is open, and opens the files and folders the launch
 named (`Jasper notes.txt src`): each folder as a terminal tab in that window, and each file in the
 [default editor](editor.md#default-editor), which is the Editor, in that window, unless you chose another. On macOS
 a file or folder you open with Jasper in Finder (Open With), or drop on its Dock icon, opens the same way. A running

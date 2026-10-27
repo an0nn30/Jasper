@@ -43,7 +43,7 @@ When more than one look plugin could still load (for example one loaded with `--
 
 Jasper reads the look plugins' files once, while it starts and before it reads `config.toml`, so edits to them also
 apply after a restart.
-Each look keeps its own tool window layout in each window's saved state in `workspace.toml`: the default
+Each look keeps its own tool window layout in the saved window's state in `workspace.toml`: the default
 look's under `[window.tool_windows]` and a plugin look's under its `.look."<plugin id>"`
 ([workspace.toml](configuration.md#workspacetoml)).
 

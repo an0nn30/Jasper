@@ -125,8 +125,8 @@ public final class CoreSettings {
             Map.entry("last_known_state", ReopenMode.LAST_KNOWN_STATE), Map.entry("empty_state", ReopenMode.EMPTY_STATE))),
             ReopenMode.LAST_KNOWN_STATE)
         .label("Reopen with").keywords("reopen", "restore", "last window", "empty", "layout", "startup")
-        .description("Live. What the window Jasper opens while none is open holds: \"last_known_state\" (the last window you\n"
-            + "closed) or \"empty_state\" (the built-in layout, where that window was).").build();
+        .description("Live. What the window Jasper opens while none is open holds: \"last_known_state\" (the window you used\n"
+            + "last) or \"empty_state\" (the built-in layout, where that window was).").build();
     public static final Setting<Integer> PALETTE_VISIBLE_ROWS = Setting.of("palette.visible_rows",
             SettingKind.integer(PaletteSettings.MIN_VISIBLE_ROWS, PaletteSettings.MAX_VISIBLE_ROWS, DEFAULT), PaletteSettings.DEFAULT_VISIBLE_ROWS)
         .alias("palette.max_results").label("Visible rows").keywords("palette", "search", "results", "rows", "height")

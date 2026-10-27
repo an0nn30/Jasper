@@ -124,7 +124,7 @@ public final class WindowManager {
      * @param state a window was shown, minimized or restored
      * @param closing a window is about to close, its content still whole; never for one that failed to open
      * @param closingAll every window is about to close (Quit, going to the background), before any
-     *     does, and the workspace store has saved them as they are
+     *     does, and the workspace store has saved the most recently active one as it is
      */
     public record Hooks(Function<Opening, WindowContent> content, Function<JasperWindow, WindowShell> frames,
                         Consumer<JasperWindow> opened, Consumer<JasperWindow> activated, Consumer<JasperWindow> closed,
@@ -312,7 +312,7 @@ public final class WindowManager {
      * here, after {@link #ensureWindow}'s checks, since reading it ends its hold.
      */
     private Optional<JasperWindow> restore(String trigger, Path directory) {
-        WorkspaceFile.Loaded loaded = store == null ? new WorkspaceFile.Loaded.Fresh(Optional.empty()) : store.load();
+        WorkspaceFile.Loaded loaded = store == null ? new WorkspaceFile.Loaded.Fresh(Optional.empty()) : store.load(reopen.get() != ReopenMode.EMPTY_STATE);
         if (!(loaded instanceof WorkspaceFile.Loaded.Restore restore))
             return open(new Opening(false, directory, trigger, Optional.empty(), Optional.empty(), ToolWindows.BUILT_IN));
         WorkspaceFile.Snapshot saved = restore.snapshot();
@@ -336,10 +336,14 @@ public final class WindowManager {
                     LOG.log(System.Logger.Level.WARNING, "Could not restore the saved window; it opens as a new one", failure);
                     keepAside(saved);
                     // The built-in layout, tool windows included (Controller Ruling 2): the record's are not kept either.
-                    WindowContent content = window.content();
-                    content.replaceToolWindows(new ToolWindowState(ToolWindows.BUILT_IN, content.toolWindows().look()));
-                    content.toolWindows().onChanged(this::changed);
-                    content.newTab(directory);
+                    try {
+                        WindowContent content = window.content();
+                        content.replaceToolWindows(new ToolWindowState(ToolWindows.BUILT_IN, content.toolWindows().look()));
+                        content.toolWindows().onChanged(this::changed);
+                        content.newTab(directory);
+                    } catch (RuntimeException | Error again) {
+                        LOG.log(System.Logger.Level.WARNING, "Could not give the failed window the built-in layout; it stays as it is", again);
+                    }
                 }
                 return true;
             });

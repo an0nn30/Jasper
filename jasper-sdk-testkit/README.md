@@ -95,7 +95,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `requestQuit()` | Asks the content tabs' close guards, then every quit guard, and closes nothing |
 | `contentTabs()`, `contentPresentation(tab)`, `contentStatus(tab)`, `contentCommands(tab)`, `contentOwner(tab)`, `contentComponent(tab)` | Content tabs and what each shows, including the status items and commands it last published |
 | `contentTab(pluginId, title)`, `contentView(pluginId, title)` | A plugin's open content tab, found by its title, and the view it shows |
-| `restoreState(tab)`, `restoreTab(pluginId, windowId, title, state)`, `declinedRestores()` | The restore state a tab gives; runs a plugin's restorer as Jasper does when it restores its windows (the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown); the reasons restorers gave when no tab came back |
+| `restoreState(tab)`, `restoreTab(pluginId, windowId, title, state)`, `declinedRestores()` | The restore state a tab gives; runs a plugin's restorer as Jasper does when it restores its window (the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown); the reasons restorers gave when no tab came back |
 
 ### Terminals and sessions
 

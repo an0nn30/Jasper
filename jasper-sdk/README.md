@@ -22,7 +22,7 @@ third-party plugin. The SDK depends only on the JDK.
 
 | Package | Contents |
 | --- | --- |
-| [`dev.jasper.sdk`](../docs/sdk-reference.html#package-dev.jasper.sdk) | `JasperSdk.VERSION`; `PluginInfo` (a plugin's id, name, version and capabilities); `Capabilities`, the twelve capability strings, and `MissingCapabilityException`; `Subscription`, which every registration returns; `Variant` (dark or light); `WindowOwner`, which dialogs, choosers and content tabs belong to; `RestoreState`, how a plugin's tab comes back when Jasper restores its windows |
+| [`dev.jasper.sdk`](../docs/sdk-reference.html#package-dev.jasper.sdk) | `JasperSdk.VERSION`; `PluginInfo` (a plugin's id, name, version and capabilities); `Capabilities`, the twelve capability strings, and `MissingCapabilityException`; `Subscription`, which every registration returns; `Variant` (dark or light); `WindowOwner`, which dialogs, choosers and content tabs belong to; `RestoreState`, how a plugin's tab comes back when Jasper restores its window |
 | [`dev.jasper.sdk.plugin`](../docs/sdk-reference.html#package-dev.jasper.sdk.plugin) | `Plugin`, the entry point a plugin implements, and `PluginContext`, the plugin's own context, which reaches every other package |
 | [`dev.jasper.sdk.events`](../docs/sdk-reference.html#package-dev.jasper.sdk.events) | `Topic`, `Events` (the queued event bus) and `AppEvents` (the application's topics) |
 | [`dev.jasper.sdk.activity`](../docs/sdk-reference.html#package-dev.jasper.sdk.activity) | Activities, shown on Buddy and posted when they end (`Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`), and connections such as tunnels (`ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent`) |

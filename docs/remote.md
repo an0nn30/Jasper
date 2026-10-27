@@ -316,7 +316,7 @@ connection. Opening the Sessions panel connects to nothing.
 
 ### Restored SSH tabs
 
-When Jasper [restores its windows](workspace.md#saving-and-restoring-the-windows), each SSH tab comes back to its host,
+When Jasper [restores its window](workspace.md#saving-and-restoring-the-windows), each SSH tab comes back to its host,
 named after it, in the folder it was opened in, if any (a folder too long to save is left out), and waits until it is
 first shown. Then it connects at once when signing in asks nothing (every host on its route signs in through the SSH
 agent), after any connection in progress in that window. Otherwise, for example with a Vault login, locked or not, it
@@ -494,7 +494,7 @@ connection has closed, the next one reconnects and asks you to sign in in the wi
 active one; with no Jasper window open it fails ("Reconnecting to prod-web needs an open Jasper window for the sign-in
 prompt.").
 
-When Jasper restores its windows, a remote file's Editor tab reads the file only when signing in asks nothing (an open
+When Jasper restores its window, a remote file's Editor tab reads the file only when signing in asks nothing (an open
 connection, or the SSH agent for every host on its route), and answers a host-key question with Cancel; otherwise it
 says "Not signed in to prod-web; Retry signs in", and **Retry** signs in as usual. A file whose host is no longer saved
 says "Its host is no longer saved in Remote", or comes back as a placeholder ([Editor tabs](editor.md#tabs)).

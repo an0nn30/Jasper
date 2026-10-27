@@ -89,7 +89,7 @@ Ctrl+Shift+0) returns the pane to the saved [font size](#fonts), the terminal's 
 Saving a new font size applies it to every Editor pane, as does turning **Follow terminal font** on or off when that
 changes the size; other font changes keep each pane's own size.
 
-When Jasper restores its windows, each file comes back in its tab and pane: a local file is read at once, and one
+When Jasper restores its window, each file comes back in its tab and pane: a local file is read at once, and one
 deleted since comes back as a failed read with **Retry**; a remote one, through Remote, shows "*name* on *host* loads
 when you select it" with **Close** and **Load** until its tab is first active or you press **Load**, and then reads
 only if signing in asks nothing (an open connection, or the SSH agent); otherwise it says so, and **Retry** signs in.
@@ -125,7 +125,7 @@ starting with its source's. Closing a view closes only that view, and the others
 Jasper asks about unsaved changes when the file's last view closes, and a window that closes with one view of a file
 another window still shows asks nothing. **Cancel** in one view of a file that is still loading closes that view, and
 the file goes on loading for the others. **Open in Editor…** of an open file selects the view you were in last, and
-Recent files lists the file once. When Jasper restores its windows every view comes back, and the file is read once for
+Recent files lists the file once. When Jasper restores its window every view comes back, and the file is read once for
 all of them.
 
 ## Status bar

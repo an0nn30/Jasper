@@ -180,7 +180,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `notifications.system` | boolean | `true` | Also shows notifications as the operating system's own while Jasper is away | Live | Notifications › Show system notifications |
 | `notifications.groups` | table | `{}` | Group id to `"card"`, `"sticky"`, `"history"` or `"off"` ([Notification groups](#notification-groups)) | Live | Notifications › Groups |
 | `system.run_in_background` | boolean | `true` on macOS and Windows, `false` on Linux | [Background residency](#background-residency) | Restart; the login item at once | System Settings › Run in background |
-| `system.reopen` | string | `"last_known_state"` | `"last_known_state"` or `"empty_state"`: what the window Jasper opens while none is open holds, the last window you closed or the built-in layout where it was | Live | System Settings › Reopen with |
+| `system.reopen` | string | `"last_known_state"` | `"last_known_state"` or `"empty_state"`: what the window Jasper opens while none is open holds, the window you used last or the built-in layout where it was | Live | System Settings › Reopen with |
 | `palette.visible_rows` | integer | `5`, or the [look's](#look-dependent-defaults) | 1–20 rows | Live | Command Palette › Visible rows |
 | `terminal.scrollback` | integer | `10000` | 0–1000000 lines; `0` keeps no scrollback | New panes | Terminal › Scrollback lines |
 | `terminal.option_as_meta` | string | `"left"` | `"left"`, `"right"`, `"both"`, `"none"`: which Option key sends Meta, on macOS only | Live | Terminal › Option key as Meta (Left Option, Right Option, Both, Neither); hidden on Linux and Windows |
@@ -287,7 +287,7 @@ under every look.
 ### Window
 
 `window.columns` and `window.lines` are the terminal grid a new window opens with, measured in the saved terminal font
-and limited to the display's usable area. Jasper restores its windows where they were
+and limited to the display's usable area. Jasper restores its window where it was
 ([`workspace.toml`](#workspacetoml)); the grid sizes any other new window, except one a tab dragged out of every window
 opens, which is as large as the workspace it left. A window keeps its size when they change; new tabs and splits in it
 take the space the layout gives them.
@@ -355,7 +355,7 @@ closes, so the next window opens without a cold start; plugins keep running, but
 closes every window and leaves Jasper in the menu bar, whose item offers **New Window**, **Settings…** and
 **Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and **Quit Jasper**. Linux has
 no such icon, so the default there is off. [The workspace](workspace.md) describes quitting and reopening;
-`system.reopen` chooses whether the reopened window holds the last window you closed or the built-in layout.
+`system.reopen` chooses whether the reopened window holds the window you used last or the built-in layout.
 
 Residency also starts Jasper in the background at login:
 
@@ -648,12 +648,12 @@ from what it saved last, else from the file; with `system.reopen` set to `empty_
 window keeps its normal bounds while maximised or minimised and never comes back minimised; one that no longer fits an
 available display is fitted to a usable display. A terminal comes back with the name you gave it and its profile and a
 new shell in its last local directory, or where a new shell starts when that directory was on another host or is gone;
-only the terminals of the tab each window shows start at once, the others when their tab first shows. A plugin's view
+only the terminals of the tab the window shows start at once, the others when their tab first shows. A plugin's view
 that its plugin saves for restoring (the Editor's files, Remote's SSH tabs) comes back in its tab and pane; when its
 plugin does not run or cannot restore it, a placeholder says why (the plugin is not installed, turned off, marked for
 removal, off in safe mode, waiting for your review or could not start, or it could not restore that view), with Close
 and, while its plugin runs, Retry. Scrollback, running programs, plugin views their plugin does not save, such as an
-untitled Editor tab, and Jasper's own tabs, such as the Errors tab, do not come back. When the windows would pass the
+untitled Editor tab, and Jasper's own tabs, such as the Errors tab, do not come back. When the window would pass the
 size limit, Jasper leaves out plugins' views and then terminals, the largest first, and logs each one.
 
 When the saved window does not all come back (the file cannot be read, has an unknown `version` (not 1 or 2) or keeps no

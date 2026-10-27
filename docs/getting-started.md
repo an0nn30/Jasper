@@ -64,7 +64,7 @@ desktop menu. The package is named `jasper-workstation`. The packages are unsign
 Jasper opens a window with one tab running your shell: your login shell on macOS and Linux, PowerShell on
 Windows (Settings › Terminal › Shell chooses another, such as [Cygwin Bash](terminal.md#cygwin-bash)). The first window
 is sized for 100 columns by 35 rows of the terminal font, bundled Cousine Nerd Font Mono at 12 points; after that,
-Jasper [restores its windows, tabs and panes](workspace.md#saving-and-restoring-the-windows) as you left them at each
+Jasper [restores its window, tabs and panes](workspace.md#saving-and-restoring-the-windows) as you left them at each
 start. On macOS Jasper follows the system's dark or light appearance; on Linux and Windows it shows Dark until you
 choose Light. The default theme is Jasper Meadow in both Dark and Light.
 
@@ -120,7 +120,7 @@ keeps Jasper running with no windows open, so a new window opens at once. It tak
 | At login | An installed Jasper starts in the background, with no Dock icon | An installed Jasper starts in the background | Not started |
 
 One Jasper runs per home, with the setting on or off: launching it again brings the running Jasper's most recently active window
-forward, restoring its windows first when none is open, and opens the files and folders you named. On macOS a file or
+forward, restoring its window first when none is open, and opens the files and folders you named. On macOS a file or
 folder you open with Jasper in Finder (Open With), or drop on its Dock icon, opens the same way, and the Dock icon shows
 only while one of Jasper's windows is open. Turning the setting off also removes the login item when you save.
 

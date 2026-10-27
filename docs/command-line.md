@@ -40,7 +40,7 @@ argument.
 
 One Jasper process runs per Jasper home; it holds the home's instance lock (`daemon/instance.lock`) for as long as it
 runs, resident or not. A launch while it runs hands its request to it and exits with status 0: the running Jasper
-brings its most recently active window to the front, restoring its windows first when none is open, and opens the files and folders
+brings its most recently active window to the front, restoring its window first when none is open, and opens the files and folders
 the launch named. On macOS a Dock click, Finder's Open With and a drop on the Dock icon reach the running Jasper
 without a second process ([macOS Open With](packaging.md#macos-open-with)). `--config`, `--safe-mode` and
 `--plugin-dir` apply only to a Jasper that starts: a second launch hands off without them, and the running Jasper posts
@@ -104,7 +104,7 @@ With a COMMAND, runs it in the running Jasper. Jasper is started first when it i
 | `jasper PATH...` | Opens each file in the [default editor](editor.md#default-editor), or reveals it in the file manager when no editor plugin runs or the default editor is **System default app**, and each folder as a terminal tab, in the most recently active window, starting Jasper first when none is running. A relative PATH resolves against the caller's working directory, and every PATH must name an existing file or folder. A subcommand of the same name wins, so `jasper ./editor` opens a file named `editor`. |
 | `jasper --help` | Prints the usage and the subcommands of the plugins that were running when Jasper last started, read from `daemon/subcommands` in Jasper home, without contacting Jasper. Before that file exists it prints "Start Jasper once to list the plugin commands." |
 | `jasper --<option> ...` | Any first argument starting with `--`, other than `--help`, starts Jasper with all the arguments (at most 64; with more it exits with status 1 and starts nothing), detached, in the caller's working directory and environment, so relative paths resolve there. Every [launcher option](#launching-jasper-with-options) works, including those the usage leaves out; while Jasper runs, the launch hands off and the running Jasper says that it keeps its own options. It exits with status 0 once it has started the launcher and does not wait, so a Jasper that rejects its arguments shows nothing. |
-| `jasper COMMAND [ARGUMENTS...]` | Runs a plugin's subcommand in the running Jasper, which first restores its windows when no window is open and the subcommand's plugin runs. Its output reaches the caller's standard output and error as it is written, and `jasper` exits with the subcommand's exit code. Ctrl+C, or any other end of the `jasper` process, cancels the call. |
+| `jasper COMMAND [ARGUMENTS...]` | Runs a plugin's subcommand in the running Jasper, which first restores its window when no window is open and the subcommand's plugin runs. Its output reaches the caller's standard output and error as it is written, and `jasper` exits with the subcommand's exit code. Ctrl+C, or any other end of the `jasper` process, cancels the call. |
 
 `jasper --help` lists each subcommand with its summary:
 
@@ -225,7 +225,7 @@ when you save it. With --wait, returns once every tab it opened has closed, as g
 | `--` | Every later argument is a FILE, even one starting with `-`. |
 | `FILE[:LINE[:COLUMN]]` | A file to open, relative to the caller's working directory. An argument that names an existing file opens as written, even `a:1`; otherwise a trailing `:LINE` or `:LINE:COLUMN` of digits is split off, so `C:\notes.txt` is never split. LINE and COLUMN start at 1. |
 
-With no Jasper window open, Jasper first restores its windows, so a FILE that was a saved tab selects that tab. Each
+With no Jasper window open, Jasper first restores its window, so a FILE that was a saved tab selects that tab. Each
 FILE opens in an Editor tab, in the window of the Jasper pane the command ran in, otherwise in the most recently active window; a file
 already open selects its tab. The caret moves to the line and column once the text is loaded. A FILE that does not
 exist yet opens as an empty tab, and its first save creates it, when its folder exists. With no FILE the command shows

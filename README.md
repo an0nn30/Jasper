@@ -18,7 +18,7 @@ grow with what you need: the bundled plugins use the same API as any plugin you 
   notification when a long command finishes. See [the terminal](docs/terminal.md).
 - **Workspace**: windows whose tabs hold split panes, each pane a terminal, an Editor file or a
   plugin's view. Drag a tab along its strip, into another tab or window, or out into a window of its own, drag a pane
-  beside another, and maximise a pane; Jasper saves its windows, tabs and panes and restores them at the next start.
+  beside another, and maximise a pane; Jasper saves the window you used last, with its tabs and panes, and restores it at the next start.
   Each window has a dock of tool windows that you drag between its left, right and bottom edges. See
   [the workspace](docs/workspace.md).
 - **Command palette**: one search surface for commands and the plugins' scopes: saved hosts, shell history,

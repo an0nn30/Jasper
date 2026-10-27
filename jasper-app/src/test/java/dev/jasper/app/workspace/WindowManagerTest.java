@@ -899,6 +899,21 @@ class WindowManagerTest {
         launch();
     }
 
+    /** Empty State never tries the file, so one the reader set aside is kept as workspace.toml.bad without a notice. */
+    @Test void emptyStateSetsAnUnreadableFileAsideWithoutANotice(@TempDir Path folder) throws Exception {
+        Path file = folder.resolve("workspace.toml");
+        java.nio.file.Files.writeString(file, "this is = not [valid toml");
+        java.util.List<Path> told = new java.util.ArrayList<>();
+        edt(() -> {
+            manager.workspace(new WorkspaceStore(file, manager::snapshot, (delay, task) -> () -> { }, Runnable::run, told::add));
+            manager.reopen(() -> dev.jasper.app.config.ReopenMode.EMPTY_STATE);
+            assertThat(manager.ensureWindow("cold", null)).isPresent();
+        });
+        assertThat(told).isEmpty();
+        assertThat(java.nio.file.Files.exists(folder.resolve("workspace.toml.bad"))).isTrue();
+        launch();
+    }
+
     @Test void emptyStateStartsTheRequestedDirectory(@TempDir Path folder) throws Exception {
         Path file = folder.resolve("workspace.toml");
         WorkspaceFile.write(file, new WorkspaceFile.Snapshot(savedWindow(dev.jasper.app.layout.TabId.random())));
