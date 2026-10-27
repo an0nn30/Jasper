@@ -47,7 +47,7 @@ import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 /**
  * A Cmd-click (Ctrl-click elsewhere) on a file or a URL in a pane, through the real view, to the window's
- * {@code onOpenFile} or {@code onOpenLink}.
+ * {@code onOpenClickedFile} or {@code onOpenLink}.
  */
 class FileLinkClickTest {
     private static final boolean MAC = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac");
@@ -58,6 +58,7 @@ class FileLinkClickTest {
     @TempDir Path directory;
     private final PipedOutputStream remote = new PipedOutputStream();
     private final List<String> opened = Collections.synchronizedList(new ArrayList<>());
+    private final List<String> chosen = Collections.synchronizedList(new ArrayList<>());
     private final List<LinkClick> clicks = Collections.synchronizedList(new ArrayList<>());
     private final List<WindowContent> windows = new ArrayList<>();
     private int writes;
@@ -83,6 +84,22 @@ class FileLinkClickTest {
         assertThat(opened).as("a pane that reported no directory resolves against the one it started in").containsExactly(
             directory.resolve("src").resolve("Foo.java") + ":42", directory.resolve("Foo.cs") + ":7",
             Path.of(System.getProperty("user.home")).resolve("notes.txt") + ":0", log + ":12");
+    }
+
+    /**
+     * Browser plan 3b (R8): a clicked path goes to the window's {@code onOpenClickedFile}, where the application offers a
+     * web file to the browser first; {@code onOpenFile}, which File › Open File… uses, never hears a click.
+     */
+    @Test void aClickedPathGoesToTheTerminalClickOpenerAndNeverToOpenFilesOwn() throws Exception {
+        TerminalPane pane = localPane(attached());
+        write(pane, "docs/index.html:7\r\nsrc/Foo.java:3\r\n");
+
+        click(pane, 2, 0);
+        click(pane, 2, 1);
+
+        assertThat(opened).containsExactly(directory.resolve("docs").resolve("index.html") + ":7",
+            directory.resolve("src").resolve("Foo.java") + ":3");
+        assertThat(chosen).as("the opener of File › Open File…").isEmpty();
     }
 
     /** Review Focus 3: once the shell reports a remote directory, nothing opens, not even a same-named local file. */
@@ -198,7 +215,7 @@ class FileLinkClickTest {
 
     /**
      * Browser plan 3, Review Focus 1, the window's half: a URL under the pointer, plain text or OSC 8, goes to the window's
-     * {@code onOpenLink} as the terminal read it, and a path still goes to {@code onOpenFile}.
+     * {@code onOpenLink} as the terminal read it, and a path still goes to {@code onOpenClickedFile}.
      */
     @Test void aClickedUrlGoesToTheWindowsLinkOpenerAsWritten() throws Exception {
         TerminalPane pane = localPane(attached());
@@ -319,7 +336,8 @@ class FileLinkClickTest {
 
     private WindowContent window(ShellLauncher launcher) {
         WindowContent owner = new WindowContent(launcher, directory, path -> { }, () -> { }, () -> { });
-        owner.onOpenFile = (file, line) -> opened.add(file + ":" + line);
+        owner.onOpenClickedFile = (file, line) -> opened.add(file + ":" + line);
+        owner.onOpenFile = (file, line) -> chosen.add(file + ":" + line);
         owner.onOpenLink = clicks::add;
         windows.add(owner);
         return owner;

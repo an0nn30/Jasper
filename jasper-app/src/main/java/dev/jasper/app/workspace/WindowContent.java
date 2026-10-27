@@ -258,8 +258,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public java.util.function.BooleanSupplier anyWindowActive = () -> true;
     /**
      * A Cmd-click (Ctrl-click elsewhere) named a file in one of this window's local panes: the resolved path, and the
-     * line written after it, 0 for none. The application checks the file off the EDT and opens it; by default nothing
-     * opens. EDT.
+     * line written after it, 0 for none. The application checks the file off the EDT and opens it, offering a web page to
+     * the browser first (browser plan 3b); by default nothing opens. EDT.
+     */
+    public java.util.function.BiConsumer<Path, Integer> onOpenClickedFile = (file, line) -> { };
+    /**
+     * File › Open File… chose a file: the path, and 0 for no line. The application checks the file off the EDT and opens
+     * it in the Default editor; by default nothing opens. EDT.
      */
     public java.util.function.BiConsumer<Path, Integer> onOpenFile = (file, line) -> { };
     /**
@@ -2817,7 +2822,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         childTitleColors = null;
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
-        onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; onOpenLink = click -> {}; fileChooser = folder -> java.util.Optional.empty();
+        onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; onOpenClickedFile = (file, line) -> {}; onOpenLink = click -> {}; fileChooser = folder -> java.util.Optional.empty();
         onLayoutChanged = () -> {};
         activityListeners.clear();
         anyWindowActive = () -> false;

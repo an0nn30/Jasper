@@ -138,6 +138,7 @@ final class Rehearsal {
         content.onInfo = (title, details) -> report.accept(title + ": " + details);
         content.onLaunchFailure = (details, cause) -> report.accept("Could not start the terminal: " + details);
         content.onOpenFile = (file, line) -> { };
+        content.onOpenClickedFile = (file, line) -> { };
         content.fileChooser = folder -> java.util.Optional.empty();
     }
 

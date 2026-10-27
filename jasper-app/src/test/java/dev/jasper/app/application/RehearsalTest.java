@@ -519,9 +519,11 @@ class RehearsalTest {
         edt(() -> {
             var content = DesktopTestSupport.content(launcher(new ArrayDeque<>()));
             content.onOpenFile = (file, line) -> opened.add(file + ":" + line);
+            content.onOpenClickedFile = (file, line) -> opened.add(file + ":" + line);
             content.fileChooser = folder -> java.util.Optional.of(java.nio.file.Path.of("chosen.txt"));
             Rehearsal.silence(content);
             content.onOpenFile.accept(java.nio.file.Path.of("notes.txt"), 3);
+            content.onOpenClickedFile.accept(java.nio.file.Path.of("index.html"), 4);
             chosen.add(content.fileChooser.apply(java.util.Optional.empty()).isPresent());
         });
         assertThat(opened).isEmpty();

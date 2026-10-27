@@ -866,6 +866,188 @@ class JasperApplicationPluginsTest {
         ApplicationPluginCleanup.await(application[0]);
     }
 
+    /**
+     * One plugin that provides both roles. Its browser appends {@code <address>|<origin>|<placement>|<window id or ->} to
+     * {@code data/browsed} and declines a file named {@code declined.html}; its editor appends {@code <file name>|<line or ->}
+     * to {@code data/edited}.
+     */
+    private static final String BROWSER_AND_EDITOR = """
+        package fix.both;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import java.nio.file.Files;
+        import java.nio.file.StandardOpenOption;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) {
+                context.platform().browser(link -> {
+                    append(context, "browsed", link.address() + "|" + link.origin() + "|" + link.placement() + "|"
+                        + link.window().map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-"));
+                    return !link.address().getPath().endsWith("/declined.html");
+                });
+                context.platform().editor((file, line, window) -> {
+                    append(context, "edited", file.getFileName() + "|" + (line.isPresent() ? String.valueOf(line.getAsInt()) : "-"));
+                    return true;
+                });
+            }
+            private static void append(PluginContext context, String name, String line) {
+                try { Files.writeString(context.dataDirectory().resolve(name), line + "\\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND); }
+                catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+            }
+        }
+        """;
+
+    /** Starts an application whose one plugin is {@link #BROWSER_AND_EDITOR}; no window opens. */
+    private JasperApplication startedWithBrowserAndEditor(AppDirs dirs, CountDownLatch terminated) throws Exception {
+        Path dev = home.resolve("both-plugin");
+        PluginJars.build(dev, "both.jar", PluginJars.descriptor("dev.example.both", "1.0.0", "fix.both.Main")
+            + "capabilities = [\"browser.provide\", \"editor.provide\"]\n", Map.of("fix.both.Main", BROWSER_AND_EDITOR), List.of());
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, dev, false, dirs);
+        });
+        return application[0];
+    }
+
+    /**
+     * Browser plan 3b, Task 7: a file clicked in a terminal that a browser can display (any case of the extension) goes to
+     * the provided browser first, as a click in a tab on its {@code file:} link, and the editor is not asked; a file no
+     * browser displays goes to the editor with its line, and a folder or a missing file named like a web page opens nothing.
+     */
+    @Test void aClickedLocalWebFileIsOfferedToTheBrowserFirst() throws Exception {
+        Path page = java.nio.file.Files.writeString(home.resolve("index.HTML"), "<p>hi</p>\n");
+        Path notes = java.nio.file.Files.writeString(home.resolve("notes.txt"), "notes\n");
+        java.nio.file.Files.createDirectory(home.resolve("site.html"));
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = startedWithBrowserAndEditor(dirs, terminated);
+        Path browsed = dirs.plugins().resolve("dev.example.both/data/browsed");
+        Path edited = dirs.plugins().resolve("dev.example.both/data/edited");
+        java.util.UUID window = java.util.UUID.randomUUID();
+
+        edt(() -> application.openClickedFile(page, 7, window));
+        assertThat(awaitLines(browsed, 1)).as("a click in a tab; a window that is not open is no window")
+            .containsExactly(page.toUri() + "|CLICK|TAB|-");
+
+        // The editor is asked after the browser by the same thread, so its line shows what each click reached.
+        edt(() -> application.openClickedFile(notes, 3, window));
+        assertThat(awaitLines(edited, 1)).as("the editor heard only the file no browser displays, at its line")
+            .containsExactly("notes.txt|3");
+
+        edt(() -> {
+            application.openClickedFile(home.resolve("site.html"), 0, window);
+            application.openClickedFile(home.resolve("gone.html"), 0, window);
+            application.openClickedFile(notes, 0, window);
+        });
+        assertThat(awaitLines(edited, 2)).as("neither a folder nor a missing file opened").containsExactlyInAnyOrder("notes.txt|3", "notes.txt|-");
+        assertThat(java.nio.file.Files.readAllLines(browsed)).as("nor was the browser asked about them").hasSize(1);
+        edt(application::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application);
+    }
+
+    /** Browser plan 3b, Task 7: a web file the browser declines opens in the Default editor at its line, as every file does. */
+    @Test void aDeclinedLocalWebFileOpensInTheDefaultEditor() throws Exception {
+        Path declined = java.nio.file.Files.writeString(home.resolve("declined.html"), "<p>no</p>\n");
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = startedWithBrowserAndEditor(dirs, terminated);
+        Path browsed = dirs.plugins().resolve("dev.example.both/data/browsed");
+        Path edited = dirs.plugins().resolve("dev.example.both/data/edited");
+
+        edt(() -> application.openClickedFile(declined, 9, java.util.UUID.randomUUID()));
+
+        assertThat(awaitLines(edited, 1)).containsExactly("declined.html|9");
+        assertThat(java.nio.file.Files.readAllLines(browsed)).as("the browser was asked first").containsExactly(declined.toUri() + "|CLICK|TAB|-");
+        edt(application::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application);
+    }
+
+    /**
+     * Browser plan 3b, Task 7 and spec 9: only a terminal click asks the browser. {@code jasper index.html}, the open-file
+     * event and a launch's files ({@code openRequestedFile}) and File › Open File… ({@code openFileAt}) open the file in the
+     * editor although a browser that would take it is provided.
+     */
+    @Test void jasperFileHtmlStillOpensInTheEditor() throws Exception {
+        Path page = java.nio.file.Files.writeString(home.resolve("index.html"), "<p>hi</p>\n");
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = startedWithBrowserAndEditor(dirs, terminated);
+        Path browsed = dirs.plugins().resolve("dev.example.both/data/browsed");
+        Path edited = dirs.plugins().resolve("dev.example.both/data/edited");
+        java.util.UUID window = java.util.UUID.randomUUID();
+
+        edt(() -> {
+            application.openRequestedFile(page, window);
+            application.openFileAt(page, 5, window);
+        });
+
+        assertThat(awaitLines(edited, 2)).containsExactlyInAnyOrder("index.html|-", "index.html|5");
+        assertThat(browsed).as("the editor is asked in place of a browser, not after one").doesNotExist();
+        edt(application::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application);
+    }
+
+    /**
+     * Browser plan 3b, Task 7 (R8): {@code composeContent} wires a window's {@code onOpenClickedFile}, which a terminal click
+     * uses, to the browser first with that window, and its {@code onOpenFile}, which File › Open File… uses, to the editor.
+     */
+    @Test void aWindowsTerminalFileClickOffersAWebFileToTheBrowserAndOpenFileDoesNot() throws Exception {
+        Path page = java.nio.file.Files.writeString(home.resolve("index.html"), "<p>hi</p>\n");
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = startedWithBrowserAndEditor(dirs, terminated);
+        Path browsed = dirs.plugins().resolve("dev.example.both/data/browsed");
+        Path edited = dirs.plugins().resolve("dev.example.both/data/edited");
+        dev.jasper.app.workspace.MainWindow[] main = new dev.jasper.app.workspace.MainWindow[1];
+        edt(() -> {
+            // A stand-in frame opens the main window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
+            application.frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
+                () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            main[0] = application.openFirstWindow(List.of()).orElseThrow();
+        });
+
+        edt(() -> main[0].content().onOpenClickedFile.accept(page, 0));
+        assertThat(awaitLines(browsed, 1)).as("a terminal click, from that window").containsExactly(page.toUri() + "|CLICK|TAB|" + main[0].id());
+        edt(() -> main[0].content().onOpenFile.accept(page, 0));
+        assertThat(awaitLines(edited, 1)).as("File › Open File…").containsExactly("index.html|-");
+        assertThat(java.nio.file.Files.readAllLines(browsed)).as("the browser was not asked again").hasSize(1);
+        edt(application::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application);
+    }
+
+    /** Browser plan 3b, Task 7: before the plugins start no browser is asked, and a web file opens as every clicked file does. */
+    @Test void aClickedLocalWebFileBeforeThePluginsStartOpensWithTheDesktop() throws Exception {
+        Path page = java.nio.file.Files.writeString(home.resolve("index.html"), "<p>hi</p>\n");
+        var calls = new CopyOnWriteArrayList<String>();
+        var desktop = new dev.jasper.app.platform.ConfigEditor(path -> calls.add("edit:" + path.getFileName()),
+            path -> calls.add("open:" + path.getFileName()), path -> calls.add("reveal:" + path.getFileName()));
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].openClickedFile(page, 0, java.util.UUID.randomUUID(), desktop);
+        });
+        awaitCalls(calls, 1);
+        assertThat(calls).containsExactly("edit:index.html");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    /** The lines of {@code file} once it has {@code count}, or the lines it has when ten seconds have passed. */
+    private static List<String> awaitLines(Path file, int count) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        List<String> lines = List.of();
+        while (System.nanoTime() < deadline && lines.size() < count) {
+            if (java.nio.file.Files.exists(file)) lines = java.nio.file.Files.readAllLines(file);
+            if (lines.size() < count) Thread.sleep(10);
+        }
+        return lines;
+    }
+
     /** A Cmd-click (Ctrl-click elsewhere) on {@code url} in a pane, as a window's {@code onOpenLink} hears it. */
     private static LinkClick clicked(String url) {
         return new LinkClick(new TerminalLink(url, TerminalLink.Gesture.OPEN, Optional.empty()), false);

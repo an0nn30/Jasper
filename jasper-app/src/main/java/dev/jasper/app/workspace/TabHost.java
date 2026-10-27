@@ -194,13 +194,13 @@ final class TabHost {
 
     /**
      * A Cmd-click on a file in {@code pane}: resolved against the pane's local directory and given to the window's
-     * {@code onOpenFile}. A provided session, or a shell that reports a directory on another host, opens nothing.
+     * {@code onOpenClickedFile}. A provided session, or a shell that reports a directory on another host, opens nothing.
      */
     private void openFileLink(TerminalPane pane, FileLink link) {
         Optional<Path> local = pane.localDirectory();
         if (local.isEmpty()) return;
         FileLinks.resolve(link.path(), local, Path.of(System.getProperty("user.home")),
                 System.getProperty("os.name", "").startsWith("Windows"), pane.wsl())
-            .ifPresent(file -> owner.onOpenFile.accept(file, link.line()));
+            .ifPresent(file -> owner.onOpenClickedFile.accept(file, link.line()));
     }
 }

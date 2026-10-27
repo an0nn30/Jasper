@@ -607,6 +607,7 @@ public final class JasperApplication {
             content.onInfo = (title, details) -> notificationViews.info(title, details, windowId);
             content.onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
             content.onOpenFile = (file, line) -> openFileAt(file, line, windowId);
+            content.onOpenClickedFile = (file, line) -> openClickedFile(file, line, windowId);
             content.onOpenLink = click -> openLink(click, windowId);
             // File › Open File… (spec 13): the plugins' file chooser over this window; nothing before plugins start.
             content.fileChooser = folder -> auxiliary == null ? Optional.empty() : auxiliary.openFile(windowId, folder);
@@ -738,10 +739,10 @@ public final class JasperApplication {
     }
 
     /**
-     * Opens a file that a Cmd-click in window {@code window} named, at {@code line} (0 for none), when it is an existing
-     * regular file: on a virtual thread, through the editor a plugin provides, else the desktop's edit or reveal action.
-     * The file's path is program output, so it is opened for editing only: never the desktop's open action, which runs
-     * programs and scripts. Anything else opens nothing and tells nobody. Reads {@link #plugins} when the thread runs.
+     * Opens a file that File › Open File… chose in window {@code window}, at {@code line} (0 for none), when it is an
+     * existing regular file: on a virtual thread, through the editor a plugin provides, else the desktop's edit or reveal
+     * action. Never the desktop's open action, which runs programs and scripts. Anything else opens nothing and tells
+     * nobody. Reads {@link #plugins} when the thread runs.
      */
     void openFileAt(Path file, int line, UUID window) {
         openFileAt(file, line, window, new dev.jasper.app.platform.ConfigEditor());
@@ -749,7 +750,26 @@ public final class JasperApplication {
 
     /** As {@link #openFileAt(Path, int, UUID)}, falling back to {@code desktop}; tests inject its actions. */
     void openFileAt(Path file, int line, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
-        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file");
+        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file", false);
+    }
+
+    /**
+     * Opens a file that a Cmd-click (Ctrl-click elsewhere) in a terminal of window {@code window} named, at {@code line}
+     * (0 for none), as {@link #openFileAt(Path, int, UUID)} does, except that a local web file (HTML, an image, a PDF and
+     * the like: {@link LocalWebFiles}) is offered to the web browser a plugin provides first, as a click on its
+     * {@code file:} link in a tab, and opens in the editor only when no browser takes it (browser plan 3b, spec 9). Only a
+     * terminal click asks the browser: a file named by Open File…, {@code jasper <file>}, the open-file event or a launch
+     * never does. The file's path is program output, so it is opened for editing only: never the desktop's open action,
+     * which runs programs and scripts. The file checks and the editor run on the virtual thread; the browser is asked on
+     * the UI thread, which the thread waits for.
+     */
+    void openClickedFile(Path file, int line, UUID window) {
+        openClickedFile(file, line, window, new dev.jasper.app.platform.ConfigEditor());
+    }
+
+    /** As {@link #openClickedFile(Path, int, UUID)}, falling back to {@code desktop}; tests inject its actions. */
+    void openClickedFile(Path file, int line, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
+        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file", true);
     }
 
     /**
@@ -764,20 +784,38 @@ public final class JasperApplication {
 
     /** As {@link #openRequestedFile(Path, UUID)}, falling back to {@code desktop}; tests inject its actions. */
     void openRequestedFile(Path file, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
-        openFile(file, 0, window, desktop::revealOnly, "Could not open a requested file");
+        openFile(file, 0, window, desktop::revealOnly, "Could not open a requested file", false);
     }
 
-    private void openFile(Path file, int line, UUID window, Consumer<Path> fallback, String failed) {
+    /** Opens {@code file} on a virtual thread; a local web file goes to the browser first only when {@code browserFirst}. */
+    private void openFile(Path file, int line, UUID window, Consumer<Path> fallback, String failed, boolean browserFirst) {
         Thread.ofVirtual().name("jasper-open-file").start(() -> {
             try {
                 if (!java.nio.file.Files.isRegularFile(file)) return;
                 PluginRuntime runtime = plugins;
-                if (runtime == null) fallback.accept(file);
-                else runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), fallback);
+                if (runtime == null) {
+                    fallback.accept(file);
+                    return;
+                }
+                if (browserFirst && LocalWebFiles.matches(file) && browserTook(runtime, file, window)) return;
+                runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), fallback);
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, failed, failure);
             }
         });
+    }
+
+    /**
+     * Asks the web browser a plugin provides to open {@code file} on the UI thread, where it must be asked, and waits for
+     * its answer on the calling thread, which is never the UI thread: the browser does not block, so the wait is short.
+     */
+    private static boolean browserTook(PluginRuntime runtime, Path file, UUID window) {
+        var answer = new java.util.concurrent.CompletableFuture<Boolean>();
+        SwingUtilities.invokeLater(() -> {
+            try { answer.complete(runtime.openLocalWebFile(file, Optional.of(window))); }
+            catch (Throwable failure) { answer.completeExceptionally(failure); throw failure; }
+        });
+        return answer.join();
     }
 
     /**

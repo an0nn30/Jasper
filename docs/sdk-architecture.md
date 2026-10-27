@@ -415,8 +415,9 @@ plugin's replaces a non-bundled plugin's. Every editor open in the application (
 page's settings files, the VM options file and `Platform.openInEditor`) runs on a worker, which asks the file editor on
 the UI thread through `FileEditors.editFromWorker`, waits up to 30 s, and otherwise opens the file with the desktop:
 its edit action, then its open action, then revealing it. A Cmd-click (Ctrl-click on Linux and Windows) on a file
-path in a local terminal pane (`JasperApplication.openFileAt`) asks the same way, with the line and the clicked
-window, and so does File › Open File…, at no line. A clicked path is program output, and an OSC 8 link's target can
+path in a local terminal pane (`JasperApplication.openClickedFile`) asks the same way, with the line and the clicked
+window, and so does File › Open File… (`openFileAt`), at no line; `openClickedFile` first offers a local web file to
+the web browser role (below). A clicked path is program output, and an OSC 8 link's target can
 differ from the text shown, so that fallback is the desktop's edit or reveal action, never its open action, and a
 plugin's editor should edit the file and never run it. A failed `Platform.openInEditor` is posted in the plugin's
 notification group, as is a failed `Platform.browse`, which accepts only an absolute http or https address.
