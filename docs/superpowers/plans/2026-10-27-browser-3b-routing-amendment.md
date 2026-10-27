@@ -3,6 +3,54 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Execution status (2026-10-27): executed** (commits `f89fcee81` to `60599de5d`, then "STATUS: browser plan 3b's
+check"); see `docs/STATUS.md`. The task reviews recorded these deviations from the plan's text:
+- **Branch:** executed on `claude/browser-routing-3b-b72db8`, cut from `claude/browser-link-routing` at `665d4bce5`, not
+  on `claude/browser-link-routing` as the Global Constraints say.
+- **Spec, step 1 of Task 8:** section 23 puts the plugin-off notification for addresses from outside in this amendment.
+  It needs the "is Jasper the system's default browser" check, which belongs with registering as a browser, so both move
+  to plan 4. Until then `jasper <address>` with no browser provided opens the system browser.
+- **Task 1:** also made the minimal app edits that keep `jasper-app` compiling and run the new contract cases on the app
+  runtime (`WebBrowsers.open` builds the `WebLink`); the app's routing returns false, so the system browser opens, for
+  an address `WebLink` refuses (an http(s) URI with an authority but no host, such as `http://my_host/`); `WebLink`'s
+  scheme check is case-insensitive and refuses an opaque or relative `file:` URI; and `MarkdownNavigationTest` and
+  `TunnelsPluginTest` were updated for the new `WebBrowser.open`.
+- **Task 2:** `PluginRuntime.openLink` and `openExternalLink` keep plan 3's `Consumer<URI> desktop` fallback; the final
+  review changed `openLocalWebFile` to take the file's `file:` URI (built off the UI thread) instead of a `Path`.
+  `openUrlIsNoLongerACommand` asserts that `open-url` gets the same answer as any unknown first word ("Jasper's plugins
+  are not running" without plugins), not "no such file or folder", which applies only when a file named `open-url`
+  exists. `aWebAddressGivenToTheCommandIsExternal` is in `JasperApplicationPluginsTest`, not `ApplicationCommandsTest`
+  (only that class runs a real provided browser). `jasper <url>` keeps the calling pane's window.
+- **Task 3:** `LinkHit` is in `dev.jasper.terminal.internal.text`, not the package of `BufferQueries` (the view never
+  depends on `internal.emulation`), and `TerminalAccess.linkAt` changed too. The filter also ends a held OSC at U+009C,
+  as JediTerm does, and follows an OSC 8 that names a target with an empty `link-target`, so no target outlives its
+  link; the brief's first filter test therefore expects that trailing clear. The engine re-checks a `link-target` a
+  program sends itself.
+- **Task 4:** the `supported` set gains only `view.TerminalLink` (the check strips nested names, so
+  `view.TerminalLink$Gesture` could never match); `MouseRouting.linkGesture` and `MouseControllerLinkGestureTest` run
+  every platform's rule on every host (the view tests for Linux and Windows skip on the Mac). Docs where "target" meant
+  a link's URI now say "address" or "URI".
+- **Task 5:** the placement mapping is asserted in `JasperApplicationPluginsTest` (`FileLinkClickTest`'s package cannot
+  reach `JasperApplication`); `WindowContent.paneClicks` already selects a pressed pane's tab in a shown window, and the
+  opener's own `tabFocused` call pins presses that bypass it; `TerminalPane` needed no edit.
+- **Task 6:** `PluginMenu.addForWebAddress` returns a `Subscription` (not `void`) and also works in submenus of the
+  terminal section; the selection is trimmed of all leading and trailing whitespace (`strip()`), so a selected line's
+  trailing line break is accepted; the testkit gains `FakePluginHost.contextMenu(paneId)` and
+  `chooseFromContextMenu(paneId, actionId)` (and the contract harness the same), documented as the terminal menu's model
+  lines; `menu()` lists `web-address:<id>`. Step 4's combined command cannot run as one Gradle invocation
+  (`sdkReference` and `verifySdkReference` have no ordering), so they run separately.
+- **Task 7:** terminal file clicks get their own `WindowContent.onOpenClickedFile` (Open File… shared `onOpenFile` with
+  them); a file named only by its extension (`.html`) has no extension; the browser cases are in
+  `JasperApplicationPluginsTest`; `JasperApplication.fileOpener` is a package-private test seam like `workspaceWriter`.
+- **Order:** the final whole-branch review ran over Tasks 1-7 before Task 8, so the check covers its fixes.
+- **Final review:** its fixes (`60599de5d`) build the file URI off the UI thread, say "address" where an OSC 8 link's
+  address was called its target, read the selection for the web-address items lazily, and regenerate
+  `docs/sdk-reference.html`.
+- **Task 8:** `./gradlew check --continue` (Python 3.13, JBR 25.0.4.1 b635.75) ran 13,538 tests with 0 failures, 0
+  errors and 32 skipped (the baseline was 13,474 and 30; the two extra skips are Linux-only view tests, which skip on
+  the Mac). Every task passed except `:jasper-app:verifyLauncherImage`, which fails on this JBR on every branch and
+  which plan 2's `claude/browser-jcef-runtime-0c197e` fixes.
+
 **Goal:** Bring plan 3's link routing in line with the approved iTerm2-parity design. It adds origins `CLICK` and
 `EXTERNAL`, split clicks, OSC 8 targets, right-click items for a selected URL, and local web files offered to the
 browser. It also removes `jasper open-url` and the `PROGRAM` origin.

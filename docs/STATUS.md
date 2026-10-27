@@ -637,6 +637,43 @@ SDK and testkit additions are `@since 0.23.0`, and Editor and Remote, which `mai
 meanwhile, become 0.17.0 and 0.18.0. `docs/sdk-reference.html` is regenerated. `./gradlew check --continue` (Python 3.13, JBR
 25.0.4.1 b635.75): **13,474 tests, 0 failures, 0 errors, 30 skipped**; the example external plugin builds against
 `build/sdk-release` (1 test, 0 failures). No GUI was launched.
+**Plan 3b, the routing amendment — 2026-10-27** (`claude/browser-routing-3b-b72db8`, worktree
+`.claude/worktrees/browser-routing-3b-b72db8`, from `claude/browser-link-routing` at `665d4bce5`; not merged or pushed):
+plan 3's routing brought in line with the approved iTerm2-parity design
+(`docs/superpowers/plans/2026-10-27-browser-3b-routing-amendment.md`). The SDK, still 0.23.0, replaces
+`LinkOrigin.PROGRAM` with `EXTERNAL` (`CLICK` stays) and gains `LinkPlacement` (`TAB`, `SPLIT_RIGHT`, `SPLIT_DOWN`) and
+`WebLink` (address, origin, placement, OSC 8 target, window); `WebBrowser.open` takes one `WebLink`. `jasper <address>…`
+reaches the role as `EXTERNAL` from the calling pane's window, and `jasper open-url` is gone (it answers as any unknown
+first word does). jasper-terminal keeps an OSC 8 link's `target=` (`ShellIntegrationFilter` forwards it as
+`OSC 1341;jasper;link-target;…` and follows the link with an empty one, so no target outlives its link), and
+`TerminalView.setLinkOpener` hears the public `view.TerminalLink` (address, `Gesture` `OPEN` or `SPLIT`, target): a
+Cmd+Shift-click (Ctrl+Shift-click on Windows and Linux, where it stays an ordinary open while a program asks for mouse
+reports) is the split. A terminal click reaches the role with its placement (a split goes to the right of a pane wider
+than it is tall, otherwise below it), its target and the pane's window, the clicked pane already the focused one.
+`PluginMenu.addForWebAddress` adds terminal right-click items shown only while the pane's selection is one `http` or
+`https` address with a host; the action reads it as `ActionContext.webAddress()`, and the testkit lists and chooses them
+(`FakePluginHost.contextMenu`, `chooseFromContextMenu`). A local web file clicked in a terminal (HTML, XML, SVG, CSS,
+JavaScript, PDF, PNG, JPEG, GIF, WebP, HEIC) is offered to the browser as a `file:` click before the Default editor;
+`jasper file.html` and Open File… are not. No browser plugin exists yet, so everything still opens as before. **The
+plan's own deviation from the spec:** section 23 puts the plugin-off notification for addresses from outside in this
+amendment; it needs the "is Jasper the system's default browser" check, which belongs with registering as a browser, so
+both move to plan 4, and until then `jasper <address>` with no browser provided opens the system browser. Other
+deviations from the plan's text (its banner lists them): the work ran on this branch, not `claude/browser-link-routing`;
+Task 1 also edited the app so it compiles and runs the new contract cases, and an address `WebLink` refuses
+(`http://my_host/`) goes to the system browser; `LinkHit` is in `dev.jasper.terminal.internal.text`; the shell filter
+also ends a held OSC at U+009C; the terminal's `supported` set gains only `view.TerminalLink`; terminal file clicks have
+their own `WindowContent.onOpenClickedFile`; `addForWebAddress` returns a `Subscription`; and the final whole-branch
+review (fixes in `60599de5d`) ran before this check. For plan 4: double-clicking a URL does not select it whole, though
+spec 9 says it should (word selection stays on one row, counts `.` as a word character and not `(`), so a double-click
+must select what `LinkDetector` finds, across soft wraps, before Open URL in Split Right/Down ships; web-address actions
+also appear in the palette and the Keymap, where `webAddress()` is empty; the `browser.provide` review sheet does not
+mention local files; and a file the browser hands back to the editor after an asynchronous prompt loses its line (an
+additive `openInEditor(Path, line)` would fix it). `./gradlew check --continue` (Python 3.13, JBR 25.0.4.1 b635.75, at
+`60599de5d`, 24 min 26 s): every task passed except `:jasper-app:verifyLauncherImage`, which fails on this JBR on every
+branch ("a cache that kills the JVM"; plan 2's `claude/browser-jcef-runtime-0c197e` fixes it); **13,538 tests, 0
+failures, 0 errors, 32 skipped** (the baseline was 13,474 and 30; the two extra skips are Linux-only view tests, which
+skip on the Mac). Source hygiene is clean over 3,042 Java files, and the example external plugin builds against
+`build/sdk-release` (1 test, 0 failures). No GUI was launched.
 
 **Staged Remote fixture waits for its transfer store — 2026-10-22** (`claude/staged-remote-sessions-flake`, worktree
 `.claude/worktrees/staged-remote-flake`, from `claude/workspace-tabs` at `6f66a3603`; not merged or pushed):
