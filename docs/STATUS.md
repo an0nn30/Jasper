@@ -1,6 +1,20 @@
 # Jasper — Status and Handoff
 
 
+**JDK-8376576 workarounds retired — 2026-10-27** (`claude/great-wilson-b8a1e4`, on top of
+`claude/browser-jcef-runtime-0c197e`; the user chose each option). JBR 25.0.4.1 b635.75 fixes JDK-8376576, so
+`stagePackage` no longer unseals class-path jars, `verifyPackage` no longer rejects sealed ones, and `jbr-api` ships as
+published (no `Jasper-Modified` attribute, no modification notice in the Licenses window). `verifyLauncherImage`'s
+trained cache now runs from its copy once the training image is gone and checks the sealed probe's two classes and the
+probe's code source, so `check` fails on a JBR with the bug. `CodeSourceScanTest` is gone; `CodeLocation` and its
+callers stay, its Javadoc without the bug. `trainAotCache` still trains in a deleted copy, now documented for what it
+does. Headless `check` on macOS aarch64 (b635.75 jcef, after `cleanTest`) passed in 23m 59s: 13,451 JUnit tests (plan 2's
+13,452 less `CodeSourceScanTest`), zero failures and errors, 30 skips; `packageApp` and `verifyPackage` without AOT pass
+and the image's `jbr-api-1.9.0.jar` is byte-identical to Maven's. Open: not merged or pushed; main's `e0f4de63e` gave
+the image test another killing cache and removed the sealed probe, so its merge with this branch must keep the sealed
+probe and the trained cache's case; one `trainAotCache` run (opens a window, the user's OK) would show the trained
+`Jasper.app` starting with its cache and a sealed `jbr-api`; Windows and Linux runs of the image test wait for CI.
+
 **JCEF runtime (browser plan 2) — 2026-10-27** (`claude/browser-jcef-runtime-0c197e`;
 [plan](superpowers/plans/2026-10-27-browser-2-jcef-runtime.md); executed with per-task subagents and reviews). Jasper
 builds, tests and packages on JBR 25.0.4.1 b635.75 with JCEF, so every package carries Chromium; nothing starts it.
@@ -23,8 +37,8 @@ libcef's direct `DT_NEEDED`, the rpm path's view, while the deb path's `ldd` als
 install job first sees the `.deb`'s dependencies) and Task 7 (AOT training with `-Pjasper.aot=true`, start-up and memory
 benchmarks), which needs the user's OK per batch. Open: not merged or pushed; GUI check of the Licenses window's longest
 caption ("JogAmp licenses (BSD 2-Clause and others)", 41 characters) on a narrow window; plan 4's first Chromium start
-shows whether the framework is found; Linux `lib/chrome-sandbox` keeps jlink's mode; the JDK-8376576 workarounds
-(unsealing `jbr-api`, training in a deleted copy, their wording) are a proposed follow-up.
+shows whether the framework is found; Linux `lib/chrome-sandbox` keeps jlink's mode. The JDK-8376576 workarounds
+(unsealing `jbr-api`, training in a deleted copy, their wording) are retired or re-justified in the entry above.
 
 **Theme-selected splash artwork — 2026-10-26** (`codex/theme-splashes`; [plan](superpowers/plans/2026-10-26-theme-splashes.md)).
 Ordinary launches choose one of seven approved landscapes and recolored/coated Buddy illustrations from the saved
