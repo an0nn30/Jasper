@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.persistence.ToolWindowState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.PresentationIcon;
 import dev.jasper.app.presentation.ChromeSpec;
@@ -40,7 +42,7 @@ class EnterpriseDockWindowTest {
         var look = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", ChromeRenderTest.LINUX);
         var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, WorkspaceChrome.of(look.workspace(), look.title()));
         try {
-            var state = UiState.inMemory(look.dockLayout().key());
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, look.dockLayout().key());
             var model = new Contributions();
             owner.connectContributions(model, state);
             model.addAction("test.sftp.toggle", "Toggle SFTP", null, List.of("sftp"), Optional.of("alt+1"), invocation -> { });

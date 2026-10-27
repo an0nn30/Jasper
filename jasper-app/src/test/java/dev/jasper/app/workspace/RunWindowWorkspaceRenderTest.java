@@ -9,6 +9,8 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.palette.PaletteTestSupport;
 import dev.jasper.app.palette.RunWindowRenderTest;
+import dev.jasper.app.persistence.ToolWindowState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.presentation.PaletteLook;
@@ -46,7 +48,7 @@ class RunWindowWorkspaceRenderTest {
                     false, path -> { }, () -> { }, themes, KeyBindings.defaults(true), new CommandHistory(), true, look.chrome()));
                 // The mock's tool windows, so the left and right stripes and the bottom strip the home measures from are there.
                 var model = new Contributions();
-                owner.connectContributions(model, UiState.inMemory(projections.dockLayout().key()));
+                owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, projections.dockLayout().key()));
                 model.addPanel("test.sftp", "SFTP", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("sftp"));
                 model.addPanel("test.servers", "File Servers", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("servers"));
                 model.addPanel("test.sessions", "Sessions", new ImageIcon(), Slot.RIGHT_TOP, site -> new JLabel("sessions"));

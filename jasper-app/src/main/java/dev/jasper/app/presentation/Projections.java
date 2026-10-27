@@ -18,7 +18,7 @@ import java.util.Set;
  * @param dialogs the dialog mapping
  * @param motion the motion policy
  * @param title the frame title template
- * @param dockLayout the ui-state key of the dock
+ * @param dockLayout the key of the dock each window's tool windows save
  * @param panels the app's own panels
  * @param plugins what plugins learn of the look (plan 15a)
  */

@@ -27,6 +27,8 @@ import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.dock.DockState;
+import dev.jasper.app.persistence.ToolWindowState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.commands.CommandHistory;
@@ -164,7 +166,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * window and nothing out of it, as a move to another window needs a manager ({@link #mayMoveTabToNewWindow}).
      */
     private TabDrag tabDrag = new TabDrag(() -> java.util.List.of(this));
+    /** The application's state: where the palette and the Run window were dragged. */
     private UiState uiState = UiState.inMemory();
+    /** This window's own tool windows (full windows spec 6.1), which {@code workspace.toml} saves with it. */
+    private ToolWindowState toolWindows = new ToolWindowState(ToolWindows.BUILT_IN, "");
     private boolean railVisible = true;
     /** False once {@link #forgetLayout} ran: closing then saves nothing. */
     private boolean rememberLayout = true;
@@ -1100,6 +1105,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** The palette opened or closed: the run item repaints. */
     void paletteChanged() { var run = chrome.status().runItem(); if (run != null) run.paletteChanged(); }
     UiState uiState() { return uiState; }
+
+    /** @return this window's own tool windows: its Zen mode, its stripes and, per look, its dock */
+    public ToolWindowState toolWindows() { return toolWindows; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
     boolean statusVisible() { return statusVisible; }
@@ -1109,8 +1117,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void toggleZenMode() {
         if (closed) return;
         setZenMode(!zenMode());
-        uiState.setZenMode(zenMode());
-        uiState.save();
+        toolWindows.setZenMode(zenMode());
+        toolWindows.changed();
     }
 
     private void setZenMode(boolean enabled) {
@@ -1193,44 +1201,46 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return result;
     }
 
+    /** As {@link #connectContributions(Contributions, UiState, ToolWindowState, boolean)}, in memory with the built-in tool windows. */
     public void connectContributions(Contributions model) { connectContributions(model, UiState.inMemory()); }
 
-    /**
-     * Connects this window to the application-wide contributions model, once, remembering panel
-     * placement and rail visibility in {@code state}.
-     */
-    public void connectContributions(Contributions model, UiState state) { connectContributions(model, state, true); }
+    /** As {@link #connectContributions(Contributions, UiState, ToolWindowState, boolean)}, with the built-in tool windows. */
+    public void connectContributions(Contributions model, UiState app) { connectContributions(model, app, true); }
+
+    /** As {@link #connectContributions(Contributions, UiState, ToolWindowState, boolean)}, with the built-in tool windows. */
+    public void connectContributions(Contributions model, UiState app, boolean hostsContent) {
+        connectContributions(model, app, new ToolWindowState(ToolWindows.BUILT_IN, ""), hostsContent);
+    }
+
+    /** As {@link #connectContributions(Contributions, UiState, ToolWindowState, boolean)}, in memory. */
+    public void connectContributions(Contributions model, ToolWindowState tools) { connectContributions(model, UiState.inMemory(), tools, true); }
 
     /**
      * Closing this window will not save its dock layout or stripe visibility: it is being discarded (it failed to
-     * compose, or it is the warm-up rehearsal's), not closed by the user, so it never becomes the last window closed,
-     * whose layout the next window restores. EDT.
+     * compose, or it is the warm-up rehearsal's), not closed by the user. EDT.
      */
     public void forgetLayout() { rememberLayout = false; }
 
     /**
+     * Connects this window to the application-wide contributions model, once: its tool windows dock, show and are
+     * remembered as {@code tools} has them, and the palette and the Run window remember where they were dragged in
+     * {@code app}. A window that does not {@code hostsContent} is wired to the model but never registered as a place
+     * where plugin content opens, so the tab registry cannot choose it for a tab with no window of its own: the warm-up
+     * rehearsal is such a window, and content opened in it would vanish when it closes.
      *
-     * As {@link #connectContributions(Contributions, UiState)}. A window that does not {@code hostsContent} is wired to
-     * the model but never registered as a place where plugin content opens, so the tab registry cannot choose it for a
-     * tab with no window of its own: the warm-up rehearsal is such a window, and content opened in it would vanish when
-     * it closes.
+     * @param model the application's contributions
+     * @param app the application's state
+     * @param tools this window's own tool windows, from then on {@link #toolWindows()}
+     * @param hostsContent whether plugin content may open in this window
      */
-    public void connectContributions(Contributions model, UiState state, boolean hostsContent) {
-        connectContributions(model, state, hostsContent, false);
-    }
-
-    /**
-     * As {@link #connectContributions(Contributions, UiState, boolean)}; a window opened while {@code anotherOpen} starts
-     * out of Zen, and its tool windows saved in Float or Window mode start hidden, keeping their mode and bounds
-     * (full windows plan 1 Controller Ruling 10): the saved state is the other window's too.
-     */
-    public void connectContributions(Contributions model, UiState state, boolean hostsContent, boolean anotherOpen) {
+    public void connectContributions(Contributions model, UiState app, ToolWindowState tools, boolean hostsContent) {
         if (closed || contributed != null) return;
-        uiState = Objects.requireNonNull(state);
-        railVisible = state.railVisible();
+        uiState = Objects.requireNonNull(app, "app");
+        toolWindows = Objects.requireNonNull(tools, "tools");
+        railVisible = tools.railVisible();
         // Restore before contributions can build or show saved panels.
-        setZenMode(!anotherOpen && state.zenMode());
-        contributed = new WindowContributions(this, Objects.requireNonNull(model), state, anotherOpen);
+        setZenMode(tools.zenMode());
+        contributed = new WindowContributions(this, Objects.requireNonNull(model), tools);
         if (hostsContent) {
             // The window joins the application's registry, taking the tabs it already holds along (workspace plan 3a Rulings 3).
             TabRegistry shared = model.tabs();
@@ -2004,8 +2014,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         // A drag shows its view on the stripes that showed when it began; showing or hiding them ends it.
         dockDrag.cancel();
         railVisible = value;
-        uiState.setRailVisible(value);
-        uiState.save();
+        toolWindows.setRailVisible(value);
+        toolWindows.changed();
         syncRailVisibility();
         updateActions();
     }

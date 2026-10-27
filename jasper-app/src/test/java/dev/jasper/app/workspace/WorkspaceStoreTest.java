@@ -9,6 +9,7 @@ import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.TabId;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.testsupport.LogRecorder;
 import java.nio.file.Files;
@@ -87,8 +88,8 @@ class WorkspaceStoreTest {
     /** A workspace of one main window holding one terminal tab in {@code directory}. */
     private static WorkspaceFile.Snapshot workspace(String directory) {
         TabId tab = TabId.random();
-        return new WorkspaceFile.Snapshot(java.util.List.of(new WorkspaceFile.WindowRecord(Optional.empty(), 0,
-            only(tab), Map.of(tab, new WorkspaceFile.TabRecord.Terminal("", directory, "")))));
+        return new WorkspaceFile.Snapshot(new WorkspaceFile.WindowRecord(Optional.empty(), 0,
+            only(tab), Map.of(tab, new WorkspaceFile.TabRecord.Terminal("", directory, "")), ToolWindows.BUILT_IN));
     }
 
     private void write() {
@@ -227,7 +228,7 @@ class WorkspaceStoreTest {
         WorkspaceFile.write(file(), saved);
         store();
         edt(() -> assertThat(store.load()).isEqualTo(new WorkspaceFile.Loaded.Restore(saved, Optional.empty())));
-        Files.writeString(file(), "version = 1\n[[windows]]\nrole = ");
+        Files.writeString(file(), "version = 2\n[window]\nrole = ");
         store();
         Path bad = dir.resolve("workspace.toml.bad");
         edt(() -> assertThat(store.load()).isEqualTo(new WorkspaceFile.Loaded.Fresh(Optional.of(bad))));
@@ -345,11 +346,16 @@ class WorkspaceStoreTest {
         assertThat(onDisk()).as("the next save writes the windows as they are").isEqualTo(current.get());
     }
 
-    /** Workspace plan 2's keptAside: a file whose reader dropped a window is kept aside as it was, and told once. */
-    @Test void aFileThatDroppedAWindowOnReadingIsKeptAsideAsItWasAndToldOnce() throws Exception {
-        WorkspaceFile.Snapshot kept = workspace("/work");
-        TabId away = TabId.random();
-        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(java.util.List.of(kept.windows().getFirst(), new WorkspaceFile.WindowRecord(Optional.empty(), 0, only(away), Map.of(away, new WorkspaceFile.TabRecord.Terminal("", "/away", ""))))));
+    /** Workspace plan 2's keptAside: a file whose reader dropped a tab is kept aside as it was, and told once. */
+    @Test void aFileThatDroppedATabOnReadingIsKeptAsideAsItWasAndToldOnce() throws Exception {
+        TabId tab = TabId.random(), away = TabId.random();
+        ParentTab first = new ParentTab(ParentTabId.random(), Layout.of(tab));
+        var both = new ParentTabs(java.util.List.of(first, new ParentTab(ParentTabId.random(), Layout.of(away))), first.id());
+        var work = new WorkspaceFile.TabRecord.Terminal("", "/work", "");
+        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(new WorkspaceFile.WindowRecord(Optional.empty(), 0, both,
+            Map.of(tab, work, away, new WorkspaceFile.TabRecord.Terminal("", "/away", "")), ToolWindows.BUILT_IN)));
+        var kept = new WorkspaceFile.Snapshot(new WorkspaceFile.WindowRecord(Optional.empty(), 0, ParentTabs.of(first), Map.of(tab, work),
+            ToolWindows.BUILT_IN));
         String original = Files.readString(file()).replace("item = \"" + away.value() + "\"", "item = 3");
         Files.writeString(file(), original);
         store();
@@ -360,7 +366,7 @@ class WorkspaceStoreTest {
         });
         write();
         assertThat(setAside).as("told once, for the notice").containsExactly(bad);
-        assertThat(Files.readString(bad)).as("the original text, with the window the reader dropped").isEqualTo(original);
+        assertThat(Files.readString(bad)).as("the original text, with the tab the reader dropped").isEqualTo(original);
         assertThat(codecLog.warnings()).as("the codec logs the copy it kept").contains("Kept a copy of the workspace state " + file() + " that dropped entries as " + bad);
     }
 

@@ -7,6 +7,7 @@ import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.notifications.Delivery;
 import dev.jasper.app.notifications.NotificationCenter;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.workspace.DesktopTestSupport;
@@ -64,28 +65,26 @@ class JasperApplicationWorkspaceTest {
         application.workspaceStore().written().get(5, TimeUnit.SECONDS);
     }
 
-    @Test void quitSavesEveryWindowAndTheNextStartRestoresThem() throws Exception {
+    @Test void quitSavesTheWindowAndTheNextStartRestoresIt() throws Exception {
         CountDownLatch terminated = new CountDownLatch(1);
         JasperApplication first = application(terminated::countDown);
         edt(() -> {
             JasperWindow main = first.openFirstWindow(List.of()).orElseThrow();
             main.content().newTab(home);
             main.content().split(Side.RIGHT);
-            first.windows().openWindow(home);
             first.quitNow();
         });
         launch();
         assertThat(terminated.await(5, TimeUnit.SECONDS)).as("Quit ends the process").isTrue();
-        assertThat(saved().windows().getFirst().layout().parentTabs()).as("its two tabs, the second split in two").hasSize(2);
-        assertThat(saved().windows().getFirst().layout().tabs()).hasSize(3);
-        assertThat(saved().windows().subList(1, saved().windows().size())).hasSize(1);
+        assertThat(saved().window().layout().parentTabs()).as("its two tabs, the second split in two").hasSize(2);
+        assertThat(saved().window().layout().tabs()).hasSize(3);
         JasperApplication second = application(() -> { });
         try {
             edt(() -> {
                 JasperWindow main = second.openFirstWindow(List.of()).orElseThrow();
                 assertThat(main.content().terminalTabs()).hasSize(3);
                 assertThat(main.content().windowLayout().parentTabs()).as("its tabs").hasSize(2);
-                assertThat(second.windows().windows().stream().skip(1).toList()).as("its full window").hasSize(1);
+                assertThat(second.windows().windows()).as("one window comes back").containsExactly(main);
             });
             launch();
         } finally {
@@ -93,38 +92,38 @@ class JasperApplicationWorkspaceTest {
         }
     }
 
-    @Test void goingToTheBackgroundSavesAndReopeningRestoresTheSameWindows() throws Exception {
+    @Test void goingToTheBackgroundSavesAndReopeningRestoresTheSameWindow() throws Exception {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
                 application.residency(true);
                 JasperWindow main = application.openFirstWindow(List.of()).orElseThrow();
                 main.content().newTab(home);
-                application.windows().openWindow(home);
                 application.toBackground();
                 assertThat(application.windows().isEmpty()).isTrue();
                 application.open(List.of(), "reopen");
-                assertThat(application.windows().windows().stream().findFirst().orElseThrow().content().terminalTabs()).hasSize(2);
-                assertThat(application.windows().windows().stream().skip(1).toList()).hasSize(1);
+                assertThat(application.windows().windows()).as("one window comes back").singleElement()
+                    .satisfies(window -> assertThat(window.content().terminalTabs()).hasSize(2));
             });
             launch();
             application.workspaceStore().written().get(5, TimeUnit.SECONDS);
-            assertThat(saved().windows().subList(1, saved().windows().size())).hasSize(1);
+            assertThat(saved().window().layout().tabs()).hasSize(2);
         } finally {
             quit(application);
         }
     }
 
-    @Test void aFullWindowTheUserClosesIsSavedWithoutIt() throws Exception {
+    @Test void aWindowTheUserClosesLeavesTheOtherOneSaved() throws Exception {
         JasperApplication application = application(() -> { });
         try {
+            var kept = new java.util.concurrent.atomic.AtomicReference<dev.jasper.app.layout.ParentTabs>();
             edt(() -> {
-                application.openFirstWindow(List.of()).orElseThrow();
+                kept.set(application.openFirstWindow(List.of()).orElseThrow().content().windowLayout());
                 application.windows().openWindow(home).orElseThrow().requestClose();
             });
             launch();
             application.workspaceStore().written().get(5, TimeUnit.SECONDS);
-            assertThat(saved().windows().subList(1, saved().windows().size())).isEmpty();
+            assertThat(saved().window().layout()).isEqualTo(kept.get());
         } finally {
             quit(application);
         }
@@ -157,14 +156,14 @@ class JasperApplicationWorkspaceTest {
     }
 
     @Test void anUnreadableWorkspaceStartsWithOneTabAndSaysWhereItWasKept() throws Exception {
-        Files.writeString(file(), "version = 1\n[[windows]]\nrole = ");
+        Files.writeString(file(), "version = 2\n[window]\nrole = ");
         JasperApplication application = application(() -> { });
         try {
             edt(() -> assertThat(application.openFirstWindow(List.of()).orElseThrow().content().terminalTabs()).hasSize(1));
             // The notice comes on the next turn, once the main window is open (workspace plan 6a Rulings 13).
             edt(() -> {
                 assertThat(application.notificationCenter().history()).anySatisfy(notice -> {
-                    assertThat(notice.request().title()).isEqualTo("Jasper could not restore your windows");
+                    assertThat(notice.request().title()).isEqualTo("Jasper could not restore your window");
                     assertThat(notice.request().content()).contains(home.resolve("workspace.toml.bad").toString());
                 });
             });
@@ -179,9 +178,9 @@ class JasperApplicationWorkspaceTest {
         var note = dev.jasper.app.layout.TabId.random();
         var one = dev.jasper.app.layout.Layout.of(shell);
         var tab = new dev.jasper.app.layout.ParentTab(dev.jasper.app.layout.ParentTabId.random(), one.split(note, one.activeGroup(), Side.RIGHT));
-        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(java.util.Optional.empty(), 0, dev.jasper.app.layout.ParentTabs.of(tab),
+        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(new WorkspaceFile.WindowRecord(java.util.Optional.empty(), 0, dev.jasper.app.layout.ParentTabs.of(tab),
             java.util.Map.of(shell, new WorkspaceFile.TabRecord.Terminal("", home.toString(), ""),
-                note, new WorkspaceFile.TabRecord.Content("todo.md", "dev.example.notes", "note", java.util.Map.of("name", "todo")))))));
+                note, new WorkspaceFile.TabRecord.Content("todo.md", "dev.example.notes", "note", java.util.Map.of("name", "todo"))), ToolWindows.BUILT_IN)));
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
@@ -211,8 +210,8 @@ class JasperApplicationWorkspaceTest {
         var saved = new WorkspaceFile.WindowRecord(java.util.Optional.empty(), 0,
             dev.jasper.app.layout.ParentTabs.of(tab), java.util.Map.of(shell, new WorkspaceFile.TabRecord.Terminal("", home.toString(), ""),
                 document, new WorkspaceFile.TabRecord.Content("notes.md", "dev.jasper.editor", "document",
-                    java.util.Map.of("key", "local:" + notes))));
-        WorkspaceFile.write(dirs.workspaceState(), new WorkspaceFile.Snapshot(List.of(saved)));
+                    java.util.Map.of("key", "local:" + notes))), ToolWindows.BUILT_IN);
+        WorkspaceFile.write(dirs.workspaceState(), new WorkspaceFile.Snapshot(saved));
         return new SavedEditor(saved, document);
     }
 
@@ -355,7 +354,7 @@ class JasperApplicationWorkspaceTest {
     }
 
     @Test void theWarmUpNeverReadsOrWritesTheWorkspace() throws Exception {
-        Files.writeString(file(), "version = 1\n[[windows]]\nrole = ");
+        Files.writeString(file(), "version = 2\n[window]\nrole = ");
         byte[] before = Files.readAllBytes(file());
         JasperApplication application = application(() -> { });
         try {
@@ -379,7 +378,7 @@ class JasperApplicationWorkspaceTest {
         });
         launch();
         saving.workspaceStore().written().get(5, TimeUnit.SECONDS);
-        assertThat(saved().windows().getFirst().layout().isEmpty()).as("the empty workspace was saved").isTrue();
+        assertThat(saved().window().layout().isEmpty()).as("the empty workspace was saved").isTrue();
         var trace = StartupTrace.detached();
         JasperApplication application = application(() -> { });
         try {
@@ -407,7 +406,7 @@ class JasperApplicationWorkspaceTest {
      * the file at its first reopen; the notice still waits for the main window and shows as a card when it is activated.
      */
     @Test void aSettledResidentJaspersFirstReopenShowsTheSetAsideNoticeAsACard() throws Exception {
-        Files.writeString(file(), "version = 1\n[[windows]]\nrole = ");
+        Files.writeString(file(), "version = 2\n[window]\nrole = ");
         var trace = StartupTrace.detached();
         trace.mark(StartupTrace.Milestone.WARMED_UP);
         JasperApplication application = application(() -> { });
@@ -425,7 +424,7 @@ class JasperApplicationWorkspaceTest {
             edt(() -> application.notificationCenter().focusReturned());
             assertThat(changes).filteredOn(NotificationCenter.Change.CardRequested.class::isInstance)
                 .extracting(change -> ((NotificationCenter.Change.CardRequested) change).notification().request().title())
-                .as("its card shows when the main window is activated").containsExactly("Jasper could not restore your windows");
+                .as("its card shows when the main window is activated").containsExactly("Jasper could not restore your window");
             launch();
         } finally {
             quit(application);

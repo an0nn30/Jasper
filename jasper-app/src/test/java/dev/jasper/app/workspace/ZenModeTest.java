@@ -10,6 +10,8 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.persistence.ToolWindowState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Rectangle;
@@ -47,7 +49,7 @@ class ZenModeTest {
 
     @Test void zenHidesAllSixDockSlotsAndRestoresTheirInstancesGeometryAndVisibility() throws Exception {
         edt(() -> {
-            var model = new Contributions(); var state = UiState.inMemory(); var owner = window();
+            var model = new Contributions(); var state = new ToolWindowState(ToolWindows.BUILT_IN, ""); var owner = window();
             owner.connectContributions(model, state); owner.setSize(1400, 900);
             var sites = new ArrayList<PanelSite>(); var notifications = new ArrayList<List<Boolean>>();
             for (Slot slot : Slot.values()) {
@@ -82,20 +84,23 @@ class ZenModeTest {
         });
     }
 
+    /** Full windows spec 6.1: each window has its own Zen; one closing in Zen saves its normal layout in its own state. */
     @Test void closingInZenPersistsNormalLayoutAndOtherWindowsStayNormal() throws Exception {
         edt(() -> {
-            var model = new Contributions(); var state = UiState.load(directory.resolve("ui-state.toml"));
+            var model = new Contributions(); var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             var first = window(); first.connectContributions(model, state);
             model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.RIGHT_BOTTOM, site -> new JLabel("panel"));
             show(model, first, "test.panel"); first.setRailVisible(true);
-            var second = window(); second.connectContributions(model, state);
+            var second = window(); second.connectContributions(model, state.forNewWindow());
             toggle(first);
+            assertThat(second.zenMode()).isFalse();
             assertThat(second.toolbar().isVisible()).isTrue();
             assertThat(second.area().content(Slot.RIGHT_BOTTOM)).isNotNull();
             first.close();
-            var saved = UiState.load(directory.resolve("ui-state.toml"));
-            assertThat(saved.panel("test.panel")).hasValue(new UiState.Panel(Slot.RIGHT_BOTTOM, 0, true));
-            assertThat(saved.railVisible()).isTrue();
+            assertThat(state.zenMode()).isTrue();
+            assertThat(state.panel("test.panel")).hasValue(new UiState.Panel(Slot.RIGHT_BOTTOM, 0, true));
+            assertThat(state.railVisible()).isTrue();
+            assertThat(second.toolWindows().zenMode()).as("the other window's own").isFalse();
             assertThat(second.area().content(Slot.RIGHT_BOTTOM)).isNotNull();
         });
     }
@@ -135,21 +140,20 @@ class ZenModeTest {
 
     @Test void zenOpenedPanelsAreNeverSavedAsVisibleWhileMovesAndSizesAre() throws Exception {
         edt(() -> {
-            var file = directory.resolve("ui-state.toml");
             var model = new Contributions();
             model.addPanel("test.a", "A", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("a"));
             model.addPanel("test.b", "B", new ImageIcon(), Slot.RIGHT_TOP, site -> new JLabel("b"));
-            var first = window(); first.connectContributions(model, UiState.load(file));
+            var saved = new ToolWindowState(ToolWindows.BUILT_IN, "");
+            var first = window(); first.connectContributions(model, saved);
             show(model, first, "test.a"); toggle(first); show(model, first, "test.b");
             first.dock().resize(Side.RIGHT, 333);
             first.dock().move("test.b", Slot.BOTTOM_LEFT, 0);
             first.close();
-            var saved = UiState.load(file);
             assertThat(saved.zenMode()).isTrue();
             assertThat(saved.panel("test.a")).hasValue(new UiState.Panel(Slot.LEFT_TOP, 0, true));
             assertThat(saved.panel("test.b")).hasValue(new UiState.Panel(Slot.BOTTOM_LEFT, 0, false));
             assertThat(saved.dock().rightWidth()).isEqualTo(333);
-            var restored = window(); restored.connectContributions(model, saved);
+            var restored = window(); restored.connectContributions(model, new ToolWindowState(saved.snapshot(), ""));
             assertThat(restored.area().content(Slot.LEFT_TOP)).isNull();
             show(model, restored, "test.b");
             assertThat((JLabel) restored.area().content(Slot.BOTTOM_LEFT)).extracting(JLabel::getText).isEqualTo("b");
@@ -292,16 +296,22 @@ class ZenModeTest {
 
     @Test void zenSavesImmediatelyRestoresBeforePanelCreationAndPersistsExit() throws Exception {
         edt(() -> {
-            var file = directory.resolve("ui-state.toml");
             var model = new Contributions(); var builds = new ArrayList<PanelSite>();
             model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> {
                 builds.add(site); return new JLabel("panel");
             });
-            var first = window(); first.connectContributions(model, UiState.load(file));
-            show(model, first, "test.panel"); toggle(first);
-            // Read from disk before close: the toggle itself must save.
-            var restored = window(); restored.connectContributions(model, UiState.load(file));
-            assertThat(UiState.load(file).panel("test.panel")).as("restoring in Zen keeps the panel saved as showing")
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
+            int[] changes = {0};
+            state.onChanged(() -> changes[0]++);
+            var first = window(); first.connectContributions(model, state);
+            show(model, first, "test.panel");
+            changes[0] = 0;
+            toggle(first);
+            // Read before close: the toggle itself must save.
+            assertThat(changes[0]).as("the toggle asks for a save").isPositive();
+            assertThat(state.zenMode()).isTrue();
+            var restored = window(); restored.connectContributions(model, new ToolWindowState(state.snapshot(), ""));
+            assertThat(restored.toolWindows().panel("test.panel")).as("restoring in Zen keeps the panel saved as showing")
                 .hasValueSatisfying(panel -> assertThat(panel.visible()).isTrue());
             assertThat(restored.zenMode()).isTrue();
             assertThat(restored.action(zenAction()).getValue(Action.SELECTED_KEY)).isEqualTo(true);
@@ -313,29 +323,26 @@ class ZenModeTest {
             assertThat(restored.chrome().search().isVisible()).isTrue();
             toggle(restored);
             assertThat(restored.area().content(Slot.LEFT_TOP)).isNotNull();
-            var normal = window(); normal.connectContributions(model, UiState.load(file));
+            var normal = window(); normal.connectContributions(model, new ToolWindowState(restored.toolWindows().snapshot(), ""));
             assertThat(normal.zenMode()).isFalse();
             assertThat(normal.area().content(Slot.LEFT_TOP)).isNotNull();
-            // Last-closed layout ownership includes its mode, even if another window toggled most recently.
+            // A window's own state keeps its mode, whichever window toggled most recently.
             first.close();
-            var last = window(); last.connectContributions(model, UiState.load(file));
+            var last = window(); last.connectContributions(model, new ToolWindowState(state.snapshot(), ""));
             assertThat(last.zenMode()).isTrue();
             assertThat(last.area().content(Slot.LEFT_TOP)).isNull();
         });
     }
 
-    @Test void absentOrMalformedSavedZenFallsBackWithoutLosingOtherLayout() throws Exception {
-        for (String value : new String[]{"", "zen_mode = 'yes'\n", "zen_mode = 42\n"}) {
-            var file = directory.resolve("legacy.toml");
-            java.nio.file.Files.writeString(file, "version = 2\nrail_visible = false\n" + value);
-            edt(() -> {
-                var owner = window(); owner.connectContributions(new Contributions(), UiState.load(file));
-                assertThat(owner.zenMode()).isFalse();
-                assertThat(owner.railVisible()).isFalse();
-                assertThat(owner.toolbar().isVisible()).isTrue();
-                assertThat(owner.status().isVisible()).isTrue();
-            });
-        }
+    /** A saved state out of Zen opens out of Zen with the rest of its layout (a malformed key: ToolWindowsTest, WorkspaceFileReadTest). */
+    @Test void aSavedStateOutOfZenOpensOutOfZenWithTheRestOfItsLayout() throws Exception {
+        edt(() -> {
+            var owner = window(); owner.connectContributions(new Contributions(), new ToolWindowState(new ToolWindows(false, false, Map.of()), ""));
+            assertThat(owner.zenMode()).isFalse();
+            assertThat(owner.railVisible()).isFalse();
+            assertThat(owner.toolbar().isVisible()).isTrue();
+            assertThat(owner.status().isVisible()).isTrue();
+        });
     }
 
     @Test void toolbarStyleAndPaletteRemainUsableWhileZenIsActive() throws Exception {
@@ -360,7 +367,7 @@ class ZenModeTest {
     @Test void savedZenAndTogglesPreserveTheStartupChromeMode() throws Exception {
         edt(() -> {
             for (ViewMode mode : ViewMode.values()) {
-                var state = UiState.inMemory(); state.setZenMode(true);
+                var state = new ToolWindowState(ToolWindows.BUILT_IN, ""); state.setZenMode(true);
                 var owner = window();
                 owner.applyConfiguration(ConfigSnapshot.defaults().toBuilder().viewMode(mode).build(), true);
                 owner.connectContributions(new Contributions(), state);

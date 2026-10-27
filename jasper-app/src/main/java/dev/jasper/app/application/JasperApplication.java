@@ -28,6 +28,8 @@ import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.notifications.NotificationRequest;
 import dev.jasper.app.notifications.Severity;
 import dev.jasper.app.notificationui.ErrorsView;
+import dev.jasper.app.persistence.ToolWindowState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.plugins.PluginRuntime;
@@ -521,8 +523,8 @@ public final class JasperApplication {
     WorkspaceStore workspaceStore() { return workspaceStore; }
 
     /**
-     * Saved windows did not all come back (spec 15): {@code workspace.toml} could not be read, its reader dropped a window,
-     * tab or item entry, or a window in it could not be restored; the saved windows were kept as {@code kept}. Told on the
+     * The saved window did not all come back (spec 15): {@code workspace.toml} could not be read, its reader dropped a tab
+     * or item entry, or the window could not be restored; the saved window was kept as {@code kept}. Told on the
      * next EDT turn: the file is read before the first window's opening counts, so a resident Jasper with no window would
      * still be idle and send the card to history unseen; by then the window is open and the card waits for it, as
      * at a cold start (workspace plan 6a Rulings 13).
@@ -530,10 +532,13 @@ public final class JasperApplication {
     private void workspaceSetAside(Path kept) {
         SwingUtilities.invokeLater(() -> {
             if (stopped) return;
-            notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.WARNING, "Jasper could not restore your windows")
-                .withContent("Jasper opened what it could and kept the saved windows in " + kept + "."));
+            notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.WARNING, "Jasper could not restore your window")
+                .withContent("Jasper opened what it could and kept the saved window in " + kept + "."));
         });
     }
+
+    /** The key of the look whose dock each window's tool windows read and write: empty for the default look. */
+    private String dockLook() { return presentation().projections().dockLayout().key(); }
 
     /** Tests replace the process-wide trace. EDT. */
     void trace(StartupTrace value) { trace = java.util.Objects.requireNonNull(value, "value"); }
@@ -589,9 +594,8 @@ public final class JasperApplication {
             // The first configuration a window takes keeps the start-up view mode, before any native chrome is installed.
             if (configuration != null) content.applyConfiguration(windowConfiguration(), macOs);
             if (configuration != null) configuration.register(content);
-            // A window beside another starts out of Zen with its floating tool windows hidden (Controller Ruling 10): the
-            // saved layout is shared, and the other window shows those already. This one is not among the windows yet.
-            content.connectContributions(contributions, uiState, true, !windows.isEmpty());
+            // Its own tool windows, under the look's dock (full windows spec 6.1): the opening says which it starts from.
+            content.connectContributions(contributions, uiState, new ToolWindowState(opening.tools(), dockLook()), true);
             // Each window's Float and Window tool windows open native windows of their own (floating tool windows spec).
             if (nativeToolWindows) content.detachedShells(DetachedFrame.shells(themes, windowLook()));
             if (WINDOWS) content.onManageCygwinPackages = cygwin::manage;
@@ -1227,17 +1231,14 @@ public final class JasperApplication {
         }
         // The pane's launch completion is queued, so this is in place before a failed launch could ask for a dialog.
         Rehearsal.silence(content);
-        // Discarded, not closed: never shown and at the default size, it must not become the last window closed.
+        // Discarded, not closed: never shown and at the default size, it must not ask for a save.
         Runnable close = () -> Rehearsal.closeAndDispose(() -> {
             content.forgetLayout();
             try { content.close(); } finally { window.discard(); }
         }, window.nativeWindow()::dispose);
-        // Its own layout state, in memory and never saved, carrying only Zen mode: it warms the Zen chrome when the next
-        // window will show it.
-        UiState rehearsalState = UiState.inMemory();
-        rehearsalState.setZenMode(uiState.zenMode());
+        // Its own state, in memory and never saved, with the built-in tool windows.
         try {
-            content.connectContributions(contributions, rehearsalState, false);
+            content.connectContributions(contributions, UiState.inMemory(), new ToolWindowState(ToolWindows.BUILT_IN, dockLook()), false);
         } catch (RuntimeException | Error failure) {
             try {
                 close.run();
@@ -1284,7 +1285,7 @@ public final class JasperApplication {
             selection = scanned;
         }
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal, buddy::pluginWorking);
-        uiState = UiState.load(dirs.uiState(), presentation().projections().dockLayout().key());
+        uiState = UiState.load(dirs.uiState());
         workspace(dirs.workspaceState());
         shells = new NativeShells(themes, uiState, this::nativeWindow, this::quit,
             dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));

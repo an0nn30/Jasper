@@ -4,6 +4,8 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.dock.ToolWindowMode;
+import dev.jasper.app.persistence.ToolWindowState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import java.awt.Component;
 import java.awt.Rectangle;
@@ -51,9 +53,9 @@ class PanelPlacementNotificationsTest {
         /** Run with each notification after it is recorded: where the panel's component is, or a nested change. */
         Consumer<PanelSite.Placement> during = placement -> { };
 
-        Fixture() { this(UiState.inMemory()); }
+        Fixture() { this(new ToolWindowState(ToolWindows.BUILT_IN, "")); }
 
-        Fixture(UiState state) {
+        Fixture(ToolWindowState state) {
             owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
             owner.connectContributions(model, state);
             TabDragTestSupport.frame(owner, 100, 50, 1200, 800);
@@ -119,7 +121,7 @@ class PanelPlacementNotificationsTest {
     /** Review focus 1: a panel built while it is detached (restored so at start-up) reads its slot and mode in its factory. */
     @Test void theFactoryReadsTheCurrentPlacement() throws Exception {
         edt(() -> {
-            var state = UiState.inMemory();
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             state.putPanel(A, new UiState.Panel(Slot.RIGHT_BOTTOM, 0, true, ToolWindowMode.FLOAT,
                 Optional.of(new UiState.Bounds(200, 150, 400, 300))));
             var fixture = new Fixture(state);

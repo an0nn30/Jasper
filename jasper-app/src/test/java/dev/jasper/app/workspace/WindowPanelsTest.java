@@ -11,13 +11,14 @@ import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.dock.ToolWindowMode;
+import dev.jasper.app.persistence.ToolWindowState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Component;
 import java.awt.Rectangle;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -81,7 +82,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             List<PanelSite> sites = new ArrayList<>();
             List<String> events = new ArrayList<>();
             var hostsView = new JLabel("hosts");
@@ -131,7 +132,7 @@ class WindowPanelsTest {
             var themes = ThemeTestSupport.controller(true);
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
             var model = new Contributions();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
             model.action("dev.x.hosts.toggle").orElseThrow().invoke(new Contributions.Invocation(owner.id(), Optional.empty()));
             assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
@@ -154,7 +155,7 @@ class WindowPanelsTest {
         var owner = flush
             ? DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true), DockChromeTest.classicDock())
             : window();
-        owner.connectContributions(model, UiState.inMemory());
+        owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
         model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
         return owner;
     }
@@ -251,7 +252,7 @@ class WindowPanelsTest {
             var themes = ThemeTestSupport.controller(true);
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
             var model = new Contributions();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             List<String> events = new ArrayList<>();
             // The selected tab is hosted content, so handing focus back runs this instead of focusing a terminal.
             model.tabs().open("dev.x", "doc", "Doc", owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
@@ -279,7 +280,7 @@ class WindowPanelsTest {
             var themes = ThemeTestSupport.controller(true);
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
             var model = new Contributions();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
             assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
             activatingShow(model, owner, "dev.x.hosts");
@@ -297,7 +298,7 @@ class WindowPanelsTest {
             var themes = ThemeTestSupport.controller(true);
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
             var model = new Contributions();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             List<String> events = new ArrayList<>();
             // The selected tab is hosted content, so handing focus back runs this instead of focusing a terminal.
             model.tabs().open("dev.x", "doc", "Doc", owner.id(), new JPanel()).focusTarget(() -> events.add("focus"));
@@ -321,7 +322,7 @@ class WindowPanelsTest {
             var themes = ThemeTestSupport.controller(true);
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
             var model = new Contributions();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
             toggle(model, owner, "dev.x.hosts");
             assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
@@ -336,7 +337,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             var sessions = new JLabel("sessions"); var sftp = new JLabel("sftp");
             model.addPanel("dev.x.sessions", "Sessions", new ImageIcon(), Slot.LEFT_TOP, site -> sessions);
             model.addPanel("dev.x.sftp", "SFTP", new ImageIcon(), Slot.LEFT_BOTTOM, site -> sftp);
@@ -359,9 +360,9 @@ class WindowPanelsTest {
     @Test void theStripeMenuMovesAWindowToAnyOfTheSixSlotsAndANewWindowRestoresIt() throws Exception {
         edt(() -> {
             var model = new Contributions();
-            Path file = dir.resolve("ui-state.toml");
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             WindowContent first = window();
-            first.connectContributions(model, UiState.load(file));
+            first.connectContributions(model, state);
             List<String> created = new ArrayList<>();
             List<String> visibility = new ArrayList<>();
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> {
@@ -377,10 +378,10 @@ class WindowPanelsTest {
             assertThat(first.leftStripe().buttons()).isEmpty();
             assertThat(tips(first.rightStripe())).containsExactly("Hosts");
             assertThat(visibility).as("a move is not a change of visibility").containsExactly("hosts:true");
-            assertThat(UiState.load(file).panel("dev.x.hosts")).hasValue(new UiState.Panel(Slot.RIGHT_BOTTOM, 0, true));
+            assertThat(state.panel("dev.x.hosts")).hasValue(new UiState.Panel(Slot.RIGHT_BOTTOM, 0, true));
 
             WindowContent second = window();
-            second.connectContributions(model, UiState.load(file));
+            second.connectContributions(model, new ToolWindowState(state.snapshot(), ""));
             assertThat(second.area().content(Slot.RIGHT_BOTTOM)).as("restored visible in the right side's lower half").isNotNull();
             assertThat(created).hasSize(2);
         });
@@ -390,7 +391,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             var view = new JTextField("hosts");
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> view);
             toggle(model, owner, "dev.x.hosts");
@@ -409,7 +410,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             var view = new JTextField("hosts");
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> view);
             toggle(model, owner, "dev.x.hosts");
@@ -431,7 +432,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             var theme = dev.jasper.app.appearance.ThemeTestSupport.generated(true);
             try (var bindings = new dev.jasper.app.appearance.AppearanceBindings(new dev.jasper.ui.theme.ThemePair(theme, theme),
                     failure -> { throw new AssertionError(failure); }, () -> false)) {
@@ -509,7 +510,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             List<String> events = new ArrayList<>();
             model.addPanel("dev.x.broken", "Broken", new ImageIcon(), Slot.BOTTOM_LEFT, site -> null);
             PanelEntry live = model.addPanel("dev.x.live", "Live", new ImageIcon(), Slot.RIGHT_TOP, site -> {
@@ -546,7 +547,7 @@ class WindowPanelsTest {
             edt(() -> {
                 var model = new Contributions();
                 WindowContent owner = window();
-                owner.connectContributions(model, UiState.inMemory());
+                owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
                 model.addPanel("dev.x.boom", "Boom", new ImageIcon(), Slot.RIGHT_TOP, site -> { throw new IllegalStateException("boom"); });
                 toggle(model, owner, "dev.x.boom");
                 assertThat(owner.area().content(Slot.RIGHT_TOP)).isInstanceOfSatisfying(JLabel.class,
@@ -569,7 +570,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             List<String> events = new ArrayList<>();
             // The selected tab is hosted content, so focusing the selection runs this instead of focusing a terminal.
             var doc = model.tabs().open("dev.x", "doc", "Doc", owner.id(), new JPanel());
@@ -593,7 +594,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             List<String> events = new ArrayList<>();
             List<PanelSite> sites = new ArrayList<>();
             model.addPanel("dev.x.shy", "Shy", new ImageIcon(), Slot.LEFT_TOP, site -> {
@@ -613,7 +614,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             List<String> events = new ArrayList<>();
             var once = new java.util.concurrent.atomic.AtomicBoolean(true);
             model.addPanel("dev.x.a", "A", new ImageIcon(), Slot.LEFT_TOP, site -> {
@@ -639,7 +640,7 @@ class WindowPanelsTest {
     @Test void railActionsAndTheRailToggleCommandHideAndShowBothStripes() throws Exception {
         edt(() -> {
             var model = new Contributions();
-            var state = UiState.inMemory();
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             WindowContent owner = window();
             owner.connectContributions(model, state);
             owner.setActive(true);
@@ -677,7 +678,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             model.addPanel("dev.x.logs", "Logs", new ImageIcon(), Slot.BOTTOM_LEFT, site -> new JLabel("logs"));
             toggle(model, owner, "dev.x.logs");
             var root = new javax.swing.JRootPane(); root.setContentPane(owner); root.setSize(1200, 800);
@@ -707,7 +708,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             ActionEntry open = model.addAction("dev.x.open", "Open Manager", new ImageIcon(), List.of(), Optional.empty(), invocation -> { });
             model.addRailAction("dev.x.open");
             AbstractButton button = owner.leftStripe().buttons().getFirst();
@@ -730,7 +731,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             model.addRailAction("dev.x.open");
             assertThat(owner.leftStripe().buttons()).as("nothing to show until the action exists").isEmpty();
 
@@ -749,7 +750,7 @@ class WindowPanelsTest {
         edt(() -> {
             var themes = ThemeTestSupport.controller(true);
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
-            var model = new Contributions(); owner.connectContributions(model, UiState.inMemory());
+            var model = new Contributions(); owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             var clicks = new java.util.concurrent.atomic.AtomicInteger();
             var button = new javax.swing.JButton("Plugin action");
             button.addActionListener(event -> clicks.incrementAndGet());
@@ -772,7 +773,7 @@ class WindowPanelsTest {
             var model = new Contributions();
             WindowContent owner = window();
             owner.newTab(DesktopTestSupport.HOME);
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             var left = new JLabel("left"); var right = new JLabel("right"); var bottom = new JLabel("bottom");
             model.addPanel("dev.x.left", "Left", new ImageIcon(), Slot.LEFT_TOP, site -> left);
             model.addPanel("dev.x.right", "Right", new ImageIcon(), Slot.RIGHT_TOP, site -> right);
@@ -803,13 +804,11 @@ class WindowPanelsTest {
     }
 
     @Test void aFirstInstallOpensSymmetricRailsPanelsAndPairedTools() throws Exception {
-        Path file = dir.resolve("first-install-ui-state.toml");
-        assertThat(file).doesNotExist();
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
             owner.applyConfiguration(dev.jasper.app.config.ConfigSnapshot.defaults(), true);
-            owner.connectContributions(model, UiState.load(file));
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             for (Slot slot : Slot.values()) {
                 String id = "dev.x." + slot.name().toLowerCase(java.util.Locale.ROOT);
                 model.addPanel(id, slot.name(), new ImageIcon(), slot, site -> {
@@ -854,11 +853,11 @@ class WindowPanelsTest {
     }
 
     @Test void draggingADividerSavesTheNewSideSize() throws Exception {
-        Path file = dir.resolve("ui-state.toml");
+        var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.load(file));
+            owner.connectContributions(model, state);
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
             toggle(model, owner, "dev.x.hosts");
             owner.setSize(1200, 800);
@@ -870,67 +869,32 @@ class WindowPanelsTest {
             mouse(divider, MouseEvent.MOUSE_RELEASED, 42, 50);
             assertThat(owner.dock().size(Side.LEFT)).isEqualTo(300);
         });
-        assertThat(UiState.load(file).dock().leftWidth()).isEqualTo(300);
-    }
-
-    @Test void aVersionOneLayoutOpensWhereItWas() throws Exception {
-        Path file = dir.resolve("ui-state.toml");
-        Files.writeString(file, """
-            version = 1
-            rail_visible = true
-
-            [panels."dev.x.hosts"]
-            region = "LEFT"
-            visible = true
-            size = 300
-
-            [windows."dev.x.manager"]
-            x = 10
-            y = 20
-            width = 640
-            height = 480
-            """);
-        edt(() -> {
-            var model = new Contributions();
-            WindowContent owner = window();
-            owner.connectContributions(model, UiState.load(file));
-            var hosts = new JLabel("hosts");
-            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.RIGHT_TOP, site -> hosts);
-            assertThat(owner.area().content(Slot.LEFT_TOP)).as("the saved place wins over the default").isSameAs(hosts);
-            assertThat(owner.dock().size(Side.LEFT)).isEqualTo(300);
-            owner.setSize(1200, 800);
-            LayoutTestSupport.layoutTree(owner);
-            assertThat(hosts.getParent().getWidth()).isEqualTo(UIScale.scale(300));
-        });
-        assertThat(Files.readString(file)).startsWith("version = 2\n")
-            .contains("left_width = 300", "slot = \"LEFT_TOP\"", "[windows.\"dev.x.manager\"]");
+        assertThat(state.dock().leftWidth()).isEqualTo(300);
     }
 
     @Test void theSavedOrderSurvivesAnyRegistrationOrder() throws Exception {
-        Path file = dir.resolve("ui-state.toml");
-        var saved = UiState.load(file);
+        var saved = new ToolWindowState(ToolWindows.BUILT_IN, "");
         saved.putPanel("dev.x.a", new UiState.Panel(Slot.LEFT_TOP, 0, false));
         saved.putPanel("dev.x.b", new UiState.Panel(Slot.LEFT_TOP, 1, false));
         saved.putPanel("dev.x.c", new UiState.Panel(Slot.LEFT_TOP, 2, false));
-        saved.save();
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.load(file));
+            owner.connectContributions(model, saved);
             for (String id : List.of("dev.x.c", "dev.x.b", "dev.x.a"))
                 model.addPanel(id, id.substring(6).toUpperCase(java.util.Locale.ROOT), new ImageIcon(), Slot.RIGHT_TOP, site -> new JLabel(id));
             model.addPanel("dev.x.new", "NEW", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("new"));
             assertThat(owner.dock().ids(Slot.LEFT_TOP)).containsExactly("dev.x.a", "dev.x.b", "dev.x.c", "dev.x.new");
             assertThat(tips(owner.leftStripe())).containsExactly("A", "B", "C", "NEW");
         });
-        assertThat(UiState.load(file).panel("dev.x.new")).hasValue(new UiState.Panel(Slot.LEFT_TOP, 3, false));
+        assertThat(saved.panel("dev.x.new")).hasValue(new UiState.Panel(Slot.LEFT_TOP, 3, false));
     }
 
     @Test void aReloadedPluginGoesBackWhereItWas() throws Exception {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             List<String> events = new ArrayList<>();
             model.addPanel("dev.x.a", "A", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("a"));
             PanelEntry b = model.addPanel("dev.x.b", "B", new ImageIcon(), Slot.LEFT_TOP, site -> {
@@ -951,23 +915,14 @@ class WindowPanelsTest {
         });
     }
 
-    @Test void aMigratedLayoutFollowsRegistrationOrder() throws Exception {
-        Path file = dir.resolve("ui-state.toml");
-        Files.writeString(file, """
-            version = 1
-            [panels."dev.x.a"]
-            region = "LEFT"
-            visible = false
-            size = 260
-            [panels."dev.x.b"]
-            region = "LEFT"
-            visible = false
-            size = 260
-            """);
+    @Test void panelsWithoutASavedOrderFollowRegistrationOrder() throws Exception {
+        var saved = new ToolWindowState(ToolWindows.BUILT_IN, "");
+        saved.putPanel("dev.x.a", new UiState.Panel(Slot.LEFT_TOP, UiState.Panel.LAST, false));
+        saved.putPanel("dev.x.b", new UiState.Panel(Slot.LEFT_TOP, UiState.Panel.LAST, false));
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.load(file));
+            owner.connectContributions(model, saved);
             model.addPanel("dev.x.b", "B", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("b"));
             model.addPanel("dev.x.c", "C", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("c"));
             model.addPanel("dev.x.a", "A", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("a"));
@@ -975,103 +930,101 @@ class WindowPanelsTest {
         });
     }
 
-    @Test void eachWindowKeepsItsOwnLayoutAndANewWindowTakesTheLastSaved() throws Exception {
+    /** Full windows spec 6.1: each window keeps its own layout; a new window starts from a copy of another's. */
+    @Test void eachWindowKeepsItsOwnLayoutAndANewWindowStartsFromACopy() throws Exception {
         edt(() -> {
             var model = new Contributions();
-            var state = UiState.inMemory();
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             WindowContent first = window(), second = window();
             first.connectContributions(model, state);
-            second.connectContributions(model, state);
+            second.connectContributions(model, state.forNewWindow());
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
             toggle(model, first, "dev.x.hosts");
             ToolWindowHeaderTest.item(first.area().headerOf(Slot.LEFT_TOP).menu(), "Right Top").doClick();
             assertThat(first.dock().slot("dev.x.hosts")).hasValue(Slot.RIGHT_TOP);
             assertThat(second.dock().slot("dev.x.hosts")).as("the other window keeps its own layout").hasValue(Slot.LEFT_TOP);
             assertThat(second.dock().visible("dev.x.hosts")).isFalse();
+            assertThat(second.toolWindows().panel("dev.x.hosts")).as("and its own state")
+                .hasValue(new UiState.Panel(Slot.LEFT_TOP, 0, false));
 
             WindowContent third = window();
-            third.connectContributions(model, state);
-            assertThat(third.dock().slot("dev.x.hosts")).as("a new window opens with the last saved layout").hasValue(Slot.RIGHT_TOP);
+            third.connectContributions(model, first.toolWindows().forNewWindow());
+            assertThat(third.dock().slot("dev.x.hosts")).as("a new window starts from the window it copies").hasValue(Slot.RIGHT_TOP);
             assertThat(third.dock().visible("dev.x.hosts")).isTrue();
         });
     }
 
-    @Test void theLastWindowClosedWinsEvenWhenAnotherWindowWasEditedLast() throws Exception {
-        Path file = dir.resolve("ui-state.toml");
+    /** Full windows spec 6.1: each window saves its own layout into its own state, a close included. */
+    @Test void eachWindowSavesItsOwnLayoutIntoItsOwnState() throws Exception {
         edt(() -> {
             var model = new Contributions();
-            var state = UiState.load(file);
+            ToolWindowState mine = new ToolWindowState(ToolWindows.BUILT_IN, ""), other = new ToolWindowState(ToolWindows.BUILT_IN, "");
             WindowContent first = window(), second = window();
-            first.connectContributions(model, state);
-            second.connectContributions(model, state);
+            first.connectContributions(model, mine);
+            second.connectContributions(model, other);
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
             var menu = first.leftStripe().buttons().getFirst().getComponentPopupMenu();
             ToolWindowHeaderTest.item(menu, "Right Top").doClick();
-            assertThat(UiState.load(file).panel("dev.x.hosts")).hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
+            assertThat(mine.panel("dev.x.hosts")).hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
             second.close();
-            assertThat(UiState.load(file).panel("dev.x.hosts")).as("the closing window saves its own layout")
+            assertThat(other.panel("dev.x.hosts")).as("the closing window saves its own layout")
                 .hasValue(new UiState.Panel(Slot.LEFT_TOP, 0, false));
+            assertThat(mine.panel("dev.x.hosts")).as("and leaves the other's").hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
             first.close();
-            assertThat(UiState.load(file).panel("dev.x.hosts")).as("the last window closed wins")
-                .hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
+            assertThat(mine.panel("dev.x.hosts")).hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
         });
     }
 
-    @Test void aDiscardedWindowSavesNothingSoTheLastWindowClosedStillWins() throws Exception {
+    @Test void aDiscardedWindowSavesNothing() throws Exception {
         // A window that failed to compose, or the warm-up rehearsal's, is discarded rather than closed.
-        Path file = dir.resolve("ui-state.toml");
         edt(() -> {
             var model = new Contributions();
-            var state = UiState.load(file);
-            WindowContent kept = window(), discarded = window();
-            kept.connectContributions(model, state);
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
+            int[] changes = {0};
+            state.onChanged(() -> changes[0]++);
+            WindowContent discarded = window();
             discarded.connectContributions(model, state);
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
-            var menu = kept.leftStripe().buttons().getFirst().getComponentPopupMenu();
+            var menu = discarded.leftStripe().buttons().getFirst().getComponentPopupMenu();
             ToolWindowHeaderTest.item(menu, "Right Top").doClick();
-            kept.close();
+            var before = state.snapshot();
+            changes[0] = 0;
             discarded.forgetLayout();
             discarded.close();
             assertThat(discarded.closed()).isTrue();
-            assertThat(UiState.load(file).panel("dev.x.hosts")).as("the discarded window wrote nothing")
-                .hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
-            assertThat(state.panel("dev.x.hosts")).as("nor changed the shared state")
-                .hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
+            assertThat(changes[0]).as("the discarded window asked for no save").isZero();
+            assertThat(state.snapshot()).as("nor changed its state").isEqualTo(before);
         });
     }
 
-    @Test void aWindowOpenedAfterEveryWindowClosedInTheSameProcessGetsTheLastLayout() throws Exception {
-        // Quit, and a resident Jasper's Quit to the background, close every window in the order they opened; a resident
-        // process then opens its next window from the same state, without reading the file again.
-        Path file = dir.resolve("ui-state.toml");
+    @Test void aWindowOpenedFromAClosedWindowsStateGetsItsLayout() throws Exception {
+        // Quit, and a resident Jasper's Quit to the background, close every window; the next window opens from the saved
+        // window's state.
         edt(() -> {
             var model = new Contributions();
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
-            var state = UiState.load(file);
-            WindowContent older = window(), newer = window();
-            older.connectContributions(model, state);
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
+            WindowContent newer = window();
             newer.connectContributions(model, state);
             toggle(model, newer, "dev.x.hosts");
             newer.dock().resize(Side.LEFT, 243);
-            older.close();
             newer.close();
             WindowContent reopened = window();
-            reopened.connectContributions(model, state);
+            reopened.connectContributions(model, new ToolWindowState(state.snapshot(), ""));
             assertThat(reopened.dock().visible("dev.x.hosts")).isTrue();
             assertThat(reopened.dock().size(Side.LEFT)).isEqualTo(243);
         });
     }
 
     @Test void closingAndReloadingRestoresTheWholeDockAndTerminalArea() throws Exception {
-        Path file = dir.resolve("ui-state.toml");
         edt(() -> {
             var model = new Contributions();
             for (Slot slot : Slot.values())
                 model.addPanel("dev.x." + slot.name().toLowerCase(java.util.Locale.ROOT), slot.name(), new ImageIcon(),
                     slot, site -> new JLabel("tool"));
-            var state = UiState.load(file);
+            ToolWindowState state = new ToolWindowState(ToolWindows.BUILT_IN, ""), others = new ToolWindowState(ToolWindows.BUILT_IN, "");
             WindowContent first = window(), last = window();
-            first.connectContributions(model, state);
+            first.connectContributions(model, others);
             last.connectContributions(model, state);
             last.setSize(1403, 907);
             for (var entry : model.panels()) toggle(model, last, entry.id());
@@ -1080,14 +1033,15 @@ class WindowPanelsTest {
             LayoutTestSupport.layoutTree(last);
             var terminal = new Rectangle(last.workspace().getBounds());
             var panels = state.panels(); var dock = state.dock();
-            // The other window edits last, but closes first.
+            // The other window edits last, in its own state.
             first.dock().resize(Side.LEFT, 499);
             first.setRailVisible(false);
             first.close(); last.close();
-            var loaded = UiState.load(file);
+            var loaded = new ToolWindowState(state.snapshot(), "");
             assertThat(loaded.dock()).isEqualTo(dock);
             assertThat(loaded.panels()).isEqualTo(panels);
             assertThat(loaded.railVisible()).isTrue();
+            assertThat(others.railVisible()).isFalse();
             WindowContent restored = window(); restored.setSize(1403, 907);
             restored.connectContributions(model, loaded);
             LayoutTestSupport.layoutTree(restored);
@@ -1099,7 +1053,7 @@ class WindowPanelsTest {
     @Test void closingTheWindowSavesShowingPanelsAsShowing() throws Exception {
         edt(() -> {
             var model = new Contributions();
-            var state = UiState.inMemory();
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             WindowContent owner = window();
             owner.connectContributions(model, state);
             List<String> events = new ArrayList<>();
@@ -1121,7 +1075,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             var icon = new ImageIcon(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB));
             PanelEntry notes = model.addPanel("dev.x.notes", "Notes", icon, Slot.RIGHT_TOP, site -> new JLabel("notes"));
             notes.setBadge(Optional.of(new PanelBadge(4, PanelBadge.Tone.ERROR, "4 unread notifications, 1 error")));
@@ -1145,7 +1099,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             var icon = new ImageIcon(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB));
             PanelEntry notes = model.addPanel("dev.x.notes", "Notes", icon, Slot.RIGHT_TOP, site -> new JLabel("notes"));
             AbstractButton button = owner.rightStripe().buttons().getFirst();
@@ -1180,7 +1134,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             model.addPanel("dev.x.sessions", "Sessions", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("sessions"));
             model.addPanel("dev.x.sftp", "SFTP", new ImageIcon(), Slot.LEFT_BOTTOM, site -> new JLabel("sftp"));
             var heard = new java.util.concurrent.atomic.AtomicInteger();
@@ -1207,7 +1161,7 @@ class WindowPanelsTest {
         edt(() -> {
             var model = new Contributions();
             WindowContent owner = window();
-            owner.connectContributions(model, UiState.inMemory());
+            owner.connectContributions(model, new ToolWindowState(ToolWindows.BUILT_IN, ""));
             // The window's ⋮ never gives way (workspace plan 7b Rulings 16 and 20), so the toolbar's side of the centred
             // header outgrows the bare workspace; without the toolbar the workspace decides the window's minimum width.
             owner.setToolbarMode(dev.jasper.app.config.ToolbarMode.HIDDEN);

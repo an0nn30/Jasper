@@ -1,21 +1,15 @@
 package dev.jasper.app.persistence;
 
 import dev.jasper.app.dock.DockState;
-import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.dock.ToolWindowMode;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.tomlj.Toml;
@@ -24,12 +18,11 @@ import org.tomlj.TomlParseResult;
 import org.tomlj.TomlTable;
 
 /**
- * Application-owned layout state: where each panel docks and the dock's sizes (the default look's, and each other look's
- * under {@code [look."<id>"]}), Zen mode, whether the stripes show, where main and auxiliary windows were, and where the
- * command palette was dragged. It is not user configuration. Caller-thread-confined. A bad panel or window entry or dock
- * key falls back alone; an unreadable file or an unknown version falls back to defaults rather than blocking
- * startup, and failed writes are only logged. Version 1 files (a region and a size per panel) are migrated on read;
- * saving writes version 2.
+ * Application-owned state that belongs to no one Jasper window: where auxiliary windows were, where the command palette
+ * and the Run window were dragged, and the file chooser's folders. It is not user configuration; each window's tool
+ * windows live in {@code workspace.toml} ({@link ToolWindows}). Caller-thread-confined. A bad window entry or key falls
+ * back alone; an unreadable file or another version (an older one included) falls back to defaults rather than blocking
+ * startup, and failed writes are only logged. Saving writes version 3.
  */
 public final class UiState {
     /**
@@ -115,7 +108,6 @@ public final class UiState {
     }
 
     private static final System.Logger LOG = System.getLogger(UiState.class.getName());
-    private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
     /** The longest window key kept. */
     public static final int WINDOW_KEY_LENGTH = 255;
     /**
@@ -124,54 +116,31 @@ public final class UiState {
      */
     private static final Pattern WINDOW_ID = Pattern.compile("[^\\p{Cntrl}\\p{Cs}]{1," + WINDOW_KEY_LENGTH + "}");
     private static final int MAX_BYTES = 256 * 1024;
-    /** One look's dock: where each panel docks, and the dock's sizes and ratios. */
-    private static final class Layout {
-        final Map<String, Panel> panels = new TreeMap<>();
-        Dock dock = Dock.DEFAULT;
-    }
+    /** The version {@link #save()} writes and {@link #load} reads; any other is read as defaults. */
+    private static final long VERSION = 3;
 
     private final Path file;
-    /** The look whose dock this state reads and writes: empty for the default look (spec 10.7). */
-    private final String look;
-    /** Each look's dock by its key, the default look's under the empty key. */
-    private final Map<String, Layout> layouts = new TreeMap<>();
     private final Map<String, Bounds> windows = new TreeMap<>();
-    private boolean railVisible = true;
-    private boolean zenMode;
     private static final int MAX_CHOOSER_PATHS = 50;
     private Chooser chooser = Chooser.DEFAULT;
     private PalettePosition palettePosition;
     private RunWindowPosition runWindowPosition;
 
-    private UiState(Path file, String look) {
-        this.file = file;
-        this.look = Objects.requireNonNull(look, "look");
-        if (!look.isEmpty() && !ID.matcher(look).matches()) throw new IllegalArgumentException("Not a look key: " + look);
-        layout("");
-    }
+    private UiState(Path file) { this.file = file; }
 
     /** State that lives only for this process: tests, and windows that were never connected to a file. */
-    public static UiState inMemory() { return inMemory(""); }
+    public static UiState inMemory() { return new UiState(null); }
 
-    /** The same under the look {@code look}: empty for the default look, else the providing plugin's id. */
-    public static UiState inMemory(String look) { return new UiState(null, look); }
-
-    /** The default look's state in {@code file}. */
-    public static UiState load(Path file) { return load(file, ""); }
-
-    /**
-     * The state in {@code file} under the look {@code look}: empty for the default look, whose dock is the file's
-     * {@code [dock]} and {@code [panels]}, else the providing plugin's id, whose dock is {@code [look."<id>"]}'s.
-     */
-    public static UiState load(Path file, String look) {
-        UiState state = new UiState(file, look);
+    /** The state in {@code file}. */
+    public static UiState load(Path file) {
+        UiState state = new UiState(file);
         try {
             Optional<String> text = TomlStateFile.readBounded(file, MAX_BYTES, "UI state");
             if (text.isPresent()) state.parse(text.get());
         } catch (IOException | RuntimeException invalid) {
             LOG.log(System.Logger.Level.WARNING, "Ignoring unreadable UI state " + file, invalid);
-            state.layouts.clear(); state.layout(""); state.windows.clear(); state.railVisible = true;
-            state.chooser = Chooser.DEFAULT; state.zenMode = false; state.palettePosition = null; state.runWindowPosition = null;
+            state.windows.clear();
+            state.chooser = Chooser.DEFAULT; state.palettePosition = null; state.runWindowPosition = null;
         }
         return state;
     }
@@ -180,11 +149,7 @@ public final class UiState {
         TomlParseResult toml = Toml.parse(text);
         if (toml.hasErrors()) throw new IOException("Invalid UI state format");
         Object version = toml.get(List.of("version"));
-        if (Long.valueOf(1).equals(version)) migrate(toml);
-        else if (Long.valueOf(2).equals(version)) readLayouts(toml);
-        else throw new IOException("Unknown UI state version: " + version);
-        if (toml.get(List.of("rail_visible")) instanceof Boolean visible) railVisible = visible;
-        zenMode = Boolean.TRUE.equals(toml.get(List.of("zen_mode")));
+        if (!Long.valueOf(VERSION).equals(version)) throw new IOException("Unknown UI state version: " + version);
         if (toml.get(List.of("windows")) instanceof TomlTable table)
             for (String id : table.keySet())
                 if (WINDOW_ID.matcher(id).matches() && table.get(List.of(id)) instanceof TomlTable entry)
@@ -200,86 +165,6 @@ public final class UiState {
         if (toml.get(List.of("chooser")) instanceof TomlTable table)
             chooser = new Chooser(strings(table, "recent"), strings(table, "pinned"),
                 Boolean.TRUE.equals(table.get(List.of("preview"))), !Boolean.FALSE.equals(table.get(List.of("show_hidden"))));
-    }
-
-    /** Version 2: the default look's dock at the top, then each look's under {@code [look."<id>"]}; a bad one falls back alone. */
-    private void readLayouts(TomlParseResult toml) {
-        readDock(toml, layout(""));
-        if (!(toml.get(List.of("look")) instanceof TomlTable looks)) return;
-        for (String key : looks.keySet())
-            if (ID.matcher(key).matches() && looks.get(List.of(key)) instanceof TomlTable entry) readDock(entry, layout(key));
-    }
-
-    /** One look's {@code dock} table and one entry per panel; a bad key or entry falls back alone. */
-    private static void readDock(TomlTable toml, Layout into) {
-        if (toml.get(List.of("dock")) instanceof TomlTable table)
-            into.dock = new Dock(size(table, "left_width", Dock.DEFAULT.leftWidth()), size(table, "right_width", Dock.DEFAULT.rightWidth()),
-                size(table, "bottom_height", Dock.DEFAULT.bottomHeight()), ratio(table, "left_ratio", Dock.DEFAULT.leftRatio()),
-                ratio(table, "right_ratio", Dock.DEFAULT.rightRatio()), ratio(table, "bottom_ratio", Dock.DEFAULT.bottomRatio()));
-        if (!(toml.get(List.of("panels")) instanceof TomlTable table)) return;
-        for (String id : table.keySet()) {
-            if (!ID.matcher(id).matches() || !(table.get(List.of(id)) instanceof TomlTable entry)) continue;
-            Optional<Slot> slot = slot(entry.get(List.of("slot")));
-            if (slot.isEmpty()) continue;
-            int order = entry.get(List.of("order")) instanceof Long value && value >= 0 && value <= Panel.LAST
-                ? value.intValue() : Panel.LAST;
-            Optional<Bounds> window = entry.get(List.of("window")) instanceof TomlTable own ? bounds(own) : Optional.empty();
-            into.panels.put(id, new Panel(slot.get(), order, Boolean.TRUE.equals(entry.get(List.of("visible"))), mode(entry.get(List.of("mode"))), window));
-        }
-    }
-
-    /** The detached mode a file's {@code mode} names (lower case, as saved); anything else, or none, is docked. */
-    private static ToolWindowMode mode(Object value) {
-        for (ToolWindowMode detached : ToolWindowMode.values()) if (detached.detached() && detached.name().toLowerCase(Locale.ROOT).equals(value)) return detached;
-        return ToolWindowMode.DOCKED;
-    }
-
-    /**
-     * Version 1 kept a region, a visibility and a size per panel. A region becomes its side's first slot, visibility
-     * carries over (the first visible panel of a region wins), and each side's size comes from the panel that showed
-     * there, else from the first panel there. Order follows registration.
-     */
-    private void migrate(TomlParseResult toml) {
-        if (!(toml.get(List.of("panels")) instanceof TomlTable table)) return;
-        var first = new EnumMap<Side, Integer>(Side.class);
-        var shown = new EnumMap<Side, Integer>(Side.class);
-        var taken = EnumSet.noneOf(Side.class);
-        for (String id : new TreeSet<>(table.keySet())) {
-            if (!ID.matcher(id).matches() || !(table.get(List.of(id)) instanceof TomlTable entry)) continue;
-            Optional<Side> side = side(entry.get(List.of("region")));
-            if (side.isEmpty()) continue;
-            boolean visible = Boolean.TRUE.equals(entry.get(List.of("visible"))) && taken.add(side.get());
-            if (entry.get(List.of("size")) instanceof Long size) {
-                int clamped = Math.clamp(size, DockState.MIN_SIZE, DockState.MAX_SIZE);
-                first.putIfAbsent(side.get(), clamped);
-                if (visible) shown.put(side.get(), clamped);
-            }
-            layout("").panels.put(id, new Panel(Slot.of(side.get(), false), Panel.LAST, visible));
-        }
-        layout("").dock = new Dock(migrated(Side.LEFT, shown, first, DockState.DEFAULT_SIDE), migrated(Side.RIGHT, shown, first, DockState.DEFAULT_SIDE),
-            migrated(Side.BOTTOM, shown, first, DockState.DEFAULT_BOTTOM), DockState.DEFAULT_RATIO, DockState.DEFAULT_RATIO, DockState.DEFAULT_RATIO);
-    }
-
-    private static int migrated(Side side, Map<Side, Integer> shown, Map<Side, Integer> first, int fallback) {
-        return shown.getOrDefault(side, first.getOrDefault(side, fallback));
-    }
-
-    private static Optional<Slot> slot(Object value) {
-        for (Slot slot : Slot.values()) if (slot.name().equals(value)) return Optional.of(slot);
-        return Optional.empty();
-    }
-
-    private static Optional<Side> side(Object value) {
-        for (Side side : Side.values()) if (side.name().equals(value)) return Optional.of(side);
-        return Optional.empty();
-    }
-
-    private static int size(TomlTable table, String key, int fallback) {
-        return table.get(List.of(key)) instanceof Long value && Dock.size(value) ? value.intValue() : fallback;
-    }
-
-    private static double ratio(TomlTable table, String key, double fallback) {
-        return table.get(List.of(key)) instanceof Double value && Dock.ratio(value) ? value : fallback;
     }
 
     /** One window's bounds, or empty when a key is missing, not an integer or the size is not positive: it falls back alone. */
@@ -299,25 +184,8 @@ public final class UiState {
         return array.toList().stream().filter(String.class::isInstance).map(String.class::cast).limit(MAX_CHOOSER_PATHS).toList();
     }
 
-    /** A look's dock, made empty the first time it is asked for. */
-    private Layout layout(String key) { return layouts.computeIfAbsent(key, ignored -> new Layout()); }
-
-    /** The look whose dock this state reads and writes: empty for the default look. */
-    public String look() { return look; }
-    /** The look's remembered place of a panel. */
-    public Optional<Panel> panel(String id) { return Optional.ofNullable(layout(look).panels.get(id)); }
-    /** Every panel the look remembers, by id, sorted by id. */
-    public Map<String, Panel> panels() { return Collections.unmodifiableMap(new TreeMap<>(layout(look).panels)); }
-    public void putPanel(String id, Panel value) { if (ID.matcher(id).matches()) layout(look).panels.put(id, Objects.requireNonNull(value)); }
-    /** The look's dock sizes and ratios. */
-    public Dock dock() { return layout(look).dock; }
-    public void setDock(Dock value) { layout(look).dock = Objects.requireNonNull(value); }
     public Optional<Bounds> window(String id) { return Optional.ofNullable(windows.get(id)); }
     public void putWindow(String id, Bounds value) { if (WINDOW_ID.matcher(id).matches()) windows.put(id, value); }
-    public boolean railVisible() { return railVisible; }
-    public void setRailVisible(boolean value) { railVisible = value; }
-    public boolean zenMode() { return zenMode; }
-    public void setZenMode(boolean value) { zenMode = value; }
     public Chooser chooser() { return chooser; }
     /** Where the command palette was dragged; empty while it keeps its default place. */
     public Optional<PalettePosition> palettePosition() { return Optional.ofNullable(palettePosition); }
@@ -329,13 +197,10 @@ public final class UiState {
     public void setRunWindowPosition(RunWindowPosition value) { runWindowPosition = value; }
     public void setChooser(Chooser value) { chooser = Objects.requireNonNull(value); }
 
-    /** Writes version 2. Look and panel ids are restricted to characters that need no TOML escaping; window keys are quoted. */
+    /** Writes version 3. Window keys are quoted. */
     public void save() {
         if (file == null) return;
-        var text = new StringBuilder("version = 2\nrail_visible = ").append(railVisible).append('\n');
-        text.append("zen_mode = ").append(zenMode).append('\n');
-        appendDock(text, "", layout(""));
-        layouts.forEach((key, layout) -> { if (!key.isEmpty()) appendDock(text, "look.\"" + key + "\".", layout); });
+        var text = new StringBuilder("version = ").append(VERSION).append('\n');
         windows.forEach((id, bounds) -> text.append("\n[windows.").append(quote(id)).append("]\nx = ").append(bounds.x())
             .append("\ny = ").append(bounds.y()).append("\nwidth = ").append(bounds.width()).append("\nheight = ").append(bounds.height()).append('\n'));
         if (palettePosition != null)
@@ -347,21 +212,6 @@ public final class UiState {
                 .append("\npreview = ").append(chooser.preview()).append("\nshow_hidden = ").append(chooser.showHidden()).append('\n');
         try { TomlStateFile.writeAtomically(file, ".ui-state-", text.toString()); }
         catch (IOException failure) { LOG.log(System.Logger.Level.WARNING, "Could not save UI state to " + file, failure); }
-    }
-
-    /** One look's {@code dock} table and panel entries, their table names under {@code prefix}. */
-    private static void appendDock(StringBuilder text, String prefix, Layout layout) {
-        Dock dock = layout.dock;
-        text.append("\n[").append(prefix).append("dock]\nleft_width = ").append(dock.leftWidth()).append("\nright_width = ").append(dock.rightWidth())
-            .append("\nbottom_height = ").append(dock.bottomHeight()).append("\nleft_ratio = ").append(dock.leftRatio())
-            .append("\nright_ratio = ").append(dock.rightRatio()).append("\nbottom_ratio = ").append(dock.bottomRatio()).append('\n');
-        layout.panels.forEach((id, panel) -> {
-            text.append("\n[").append(prefix).append("panels.\"").append(id).append("\"]\nslot = \"")
-                .append(panel.slot().name()).append("\"\norder = ").append(panel.order()).append("\nvisible = ").append(panel.visible()).append('\n');
-            if (panel.mode().detached()) text.append("mode = \"").append(panel.mode().name().toLowerCase(Locale.ROOT)).append("\"\n");
-            panel.window().ifPresent(bounds -> text.append("window = { x = ").append(bounds.x()).append(", y = ").append(bounds.y())
-                .append(", width = ").append(bounds.width()).append(", height = ").append(bounds.height()).append(" }\n"));
-        });
     }
 
     private static String array(List<String> values) {

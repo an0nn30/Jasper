@@ -11,6 +11,7 @@ import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.layout.TabRestore;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.persistence.WorkspaceFile;
 import java.awt.AWTEvent;
@@ -39,7 +40,7 @@ import javax.swing.SwingUtilities;
  * Jasper's windows (full windows spec 5): any number of {@link JasperWindow}s, all of one kind, in the order they opened
  * and the order they came to the front. It makes every window, in one place ({@link #open}); it sends anything with no
  * window of its own (a plugin's view without an owner, a handoff) to the most recently active window, restoring the saved
- * windows first when none is open ({@link #ensureWindow}); it closes a window a move leaves without a tab, and every
+ * window first when none is open ({@link #ensureWindow}); it closes a window a move leaves without a tab, and every
  * window on Quit. A window whose last tab closes keeps its empty workspace. The application owns it and asks it every
  * window question. EDT only.
  */
@@ -54,11 +55,15 @@ public final class WindowManager {
      *     for where the platform puts a new window, or where a restored window's saved place puts it
      * @param cursor where the cursor released that tab on screen, present with the bounds: the window opens on the
      *     display there
+     * @param tools the window's own tool windows (full windows spec 6.1): the saved window's for a restore,
+     *     {@link ToolWindows#BUILT_IN} for a first window with nothing saved, else a copy of the most recently active
+     *     window's for a new window ({@code ToolWindowState.forNewWindow})
      */
-    public record Opening(boolean empty, Path directory, String trigger, Optional<Rectangle> bounds, Optional<Point> cursor) {
-        /** Requires the trigger, and the bounds with the cursor or neither. */
+    public record Opening(boolean empty, Path directory, String trigger, Optional<Rectangle> bounds, Optional<Point> cursor, ToolWindows tools) {
+        /** Requires the trigger and the tool windows, and the bounds with the cursor or neither. */
         public Opening {
             Objects.requireNonNull(trigger, "trigger");
+            Objects.requireNonNull(tools, "tools");
             Objects.requireNonNull(bounds, "bounds"); Objects.requireNonNull(cursor, "cursor");
             if (bounds.isPresent() != cursor.isPresent())
                 throw new IllegalArgumentException("A window's bounds come with the cursor");
@@ -153,7 +158,7 @@ public final class WindowManager {
     };
     private boolean watchingFronts;
     private int openings;
-    /** While {@link #ensureWindow} restores the saved windows: one restore at a time (workspace plan 4a Rulings 24). */
+    /** While {@link #ensureWindow} restores the saved window: one restore at a time (workspace plan 4a Rulings 24). */
     private boolean restoring;
     /** Where the windows are saved; none in a test that does not save. */
     private WorkspaceStore store;
@@ -176,8 +181,8 @@ public final class WindowManager {
     public WindowManager(Contributions model, Hooks hooks) {
         this.model = Objects.requireNonNull(model, "model");
         this.hooks = Objects.requireNonNull(hooks, "hooks");
-        // A plugin's view opened with no window goes to the most recently active window, the saved windows restored first
-        // when none is open (full windows spec 5.2); while they are being restored it waits, until ensureWindow says they
+        // A plugin's view opened with no window goes to the most recently active window, the saved window restored first
+        // when none is open (full windows spec 5.2); while it is being restored it waits, until ensureWindow says it
         // opened or failed. A window a move empties closes after the move.
         model.tabs().windows(new TabRegistry.Windows(() -> restoring ? null : ensureWindow("plugin", null).map(JasperWindow::id)
             .orElseThrow(() -> new IllegalStateException(CLOSING)), this::moveToNewWindow, this::movedOut, this::emptyWindow));
@@ -202,7 +207,7 @@ public final class WindowManager {
      */
     public void workspace(WorkspaceStore value) { store = Objects.requireNonNull(value, "value"); }
 
-    /** Something {@code workspace.toml} saves changed: a layout, a tab's name or directory, where a window is. */
+    /** Something {@code workspace.toml} saves changed: a layout, a tab's name or directory, where a window is, its tool windows. */
     void changed() { if (store != null) store.changed(); }
 
     /** @return every open window, in the order they opened */
@@ -250,17 +255,17 @@ public final class WindowManager {
     }
 
     /**
-     * The most recently active window, the saved windows restored first when none is open (full windows spec 5.2: every
-     * request with no window of its own): as the store has them, each where it was with its tabs, splits and panes, the
-     * first in front; else a new window with one terminal tab. The tabs a plugin asked for while they were being restored
-     * open in the first once it shows, or go with it when it fails to open, their failures under its own.
+     * The most recently active window, the saved window restored first when none is open (full windows spec 5.2 and 6.1:
+     * every request with no window of its own): as the store has it, where it was with its tabs, splits and panes and its
+     * tool windows; else a new window with one terminal tab. The tabs a plugin asked for while it was being restored open
+     * in it once it shows, or go with it when it fails to open, their failures under its own.
      *
      * @param trigger what asked, for the new window's start-up timing line
-     * @param directory where a new window's terminal tab starts, or, when the windows are restored, where a terminal
-     *     starts in a new tab of the first after its restored ones; ignored while a window is open; null for where a new
-     *     shell starts, or no new tab
+     * @param directory where a new window's terminal tab starts, or, when the window is restored, where a terminal
+     *     starts in a new tab after its restored ones; ignored while a window is open; null for where a new shell starts,
+     *     or no new tab
      * @return the window; empty while Jasper quits, or every window closes
-     * @throws IllegalStateException when asked again while the saved windows are still being restored
+     * @throws IllegalStateException when asked again while the saved window is still being restored
      */
     public Optional<JasperWindow> ensureWindow(String trigger, Path directory) {
         requireEdt();
@@ -268,7 +273,7 @@ public final class WindowManager {
         if (open.isPresent()) return open;
         // A window that is closing is not absent: none opens while the last ones go, nor while every window closes.
         if (!windows.isEmpty() || closingAll) return Optional.empty();
-        if (restoring) throw new IllegalStateException("The windows are still being restored");
+        if (restoring) throw new IllegalStateException("The window is still being restored");
         restoring = true;
         Optional<JasperWindow> opened;
         try {
@@ -286,85 +291,53 @@ public final class WindowManager {
     }
 
     /**
-     * The windows as the store has them (workspace tabs spec 13; tabs and panes spec 12), in file order, each where it was
-     * with its tabs, splits and panes and its items, the first in front; with nothing to restore, or a first window that
-     * cannot be restored, a new window with one terminal tab in {@code directory}. A restored first window opens
-     * {@code directory} in a new tab after its own. A window that cannot be restored is not lost: the store keeps the saved
-     * windows as {@code workspace.toml.bad} and says so (spec 15). The store is read here, after {@link #ensureWindow}'s
-     * checks, since reading it ends its hold.
+     * The window as the store has it (workspace tabs spec 13; tabs and panes spec 12; full windows spec 6.1), where it
+     * was with its tabs, splits and panes, its items and its tool windows; with nothing to restore, or a window that
+     * cannot be restored, a new window with one terminal tab in {@code directory}. A restored window opens
+     * {@code directory} in a new tab after its own. A window that cannot be restored is not lost: the store keeps the
+     * saved window as {@code workspace.toml.bad} and says so (spec 15). The store is read here, after
+     * {@link #ensureWindow}'s checks, since reading it ends its hold.
      */
     private Optional<JasperWindow> restore(String trigger, Path directory) {
         WorkspaceFile.Loaded loaded = store == null ? new WorkspaceFile.Loaded.Fresh(Optional.empty()) : store.load();
-        if (!(loaded instanceof WorkspaceFile.Loaded.Restore restore)) return open(new Opening(false, directory, trigger, Optional.empty(), Optional.empty()));
+        if (!(loaded instanceof WorkspaceFile.Loaded.Restore restore))
+            return open(new Opening(false, directory, trigger, Optional.empty(), Optional.empty(), ToolWindows.BUILT_IN));
         WorkspaceFile.Snapshot saved = restore.snapshot();
         boolean[] restored = new boolean[1];
-        Optional<JasperWindow> opened = open(new Opening(true, null, trigger, Optional.empty(), Optional.empty()), window -> {
+        Optional<JasperWindow> opened = open(new Opening(true, null, trigger, Optional.empty(), Optional.empty(), saved.window().tools()), window -> {
                 try {
-                    window.restore(saved.windows().getFirst());
+                    window.restore(saved.window());
                     restored[0] = true;
                 } catch (RuntimeException | Error failure) {
                     // It opens as a new window instead, never discarded: the closed hook of the last window ends a Jasper
-                    // that is not resident. An Error too: the saved windows are kept aside before this window's first save
-                    // replaces them, so the next start does not meet it again (workspace plan 6a Rulings 20). Its restore
+                    // that is not resident. An Error too: the saved window is kept aside before this window's first save
+                    // replaces it, so the next start does not meet it again (workspace plan 6a Rulings 20). Its restore
                     // closed what it made.
-                    LOG.log(System.Logger.Level.WARNING, "Could not restore the first saved window; it opens as a new one", failure);
+                    LOG.log(System.Logger.Level.WARNING, "Could not restore the saved window; it opens as a new one", failure);
                     keepAside(saved);
                     window.content().newTab(directory);
                 }
                 return true;
             });
         if (opened.isEmpty() || !restored[0]) return opened;
-        // The first window has shown: from here a failure, an Error too, costs only what failed, never the window, nor the
+        // The window has shown: from here a failure, an Error too, costs only what failed, never the window, nor the
         // tabs that wait for it (workspace plan 6a Rulings 41).
-        boolean whole = true;
-        int back = 0;
-        for (WorkspaceFile.WindowRecord record : saved.windows().subList(1, saved.windows().size())) {
-            try {
-                if (restoreLater(record).isPresent()) back++;
-            } catch (RuntimeException | Error failure) {
-                // A window that cannot come back costs only itself, and the saved windows are kept.
-                LOG.log(System.Logger.Level.WARNING, "Could not restore a saved window", failure);
-                whole = false;
-            }
-        }
-        if (!whole) keepAside(saved);
         if (directory != null) {
             try { opened.get().content().newTab(directory); }
             catch (RuntimeException | Error failure) { LOG.log(System.Logger.Level.WARNING, "Could not open the requested directory in a new tab", failure); }
-        }
-        // In front when another window came back after it (workspace plan 6a Rulings 12), and so the most recently active
-        // until another comes to the front: a request with no window of its own goes to it (full windows spec 5.2).
-        if (back > 0) {
-            activations.remove(opened.get());
-            activations.addFirst(opened.get());
-            try { opened.get().toFront(); }
-            catch (RuntimeException | Error failure) { LOG.log(System.Logger.Level.WARNING, "Could not bring the first restored window to the front", failure); }
         }
         return opened;
     }
 
     /**
-     * A saved window after the first, where it was with its tabs and items; one with no item that can come back is left
-     * out, discarded unshown, and so is one whose failing restore emptied it before its frame exists. Its timing line says
-     * {@code restore}, which no benchmark reads as a menu's window (workspace plan 6a Rulings 16). Its saved place reaches
-     * its frame through its placement, checked against today's displays, never as a tear-out's workspace bounds, which its
-     * frame would grow by its chrome (workspace plan 6a Rulings 21).
-     *
-     * @return the window, once it shows; empty when it was left out
-     */
-    private Optional<JasperWindow> restoreLater(WorkspaceFile.WindowRecord record) {
-        return open(new Opening(true, null, "restore", Optional.empty(), Optional.empty()), window -> window.restore(record) > 0);
-    }
-
-    /**
-     * New Window (full windows spec 5.2): a new window with one terminal tab in {@code directory}, after the saved windows
-     * are restored when none is open, so that its first save does not replace them. It opens {@link #CASCADE} pixels below
-     * and right of the most recently active window, or of the window it opened last when no other came to the front
-     * since, on that window's display.
+     * New Window (full windows spec 5.2): a new window with one terminal tab in {@code directory}, after the saved window
+     * is restored when none is open. It opens {@link #CASCADE} pixels below and right of the most recently active window,
+     * or of the window it opened last when no other came to the front since, on that window's display, with a copy of the
+     * most recently active window's tool windows ({@link #newWindowTools()}).
      *
      * @param directory where its terminal tab starts; null for where a new shell starts
      * @return the window; empty while Jasper quits or every window closes
-     * @throws IllegalStateException when asked while the saved windows are being restored and none is open yet
+     * @throws IllegalStateException when asked while the saved window is being restored and none is open yet
      */
     public Optional<JasperWindow> openWindow(Path directory) {
         requireEdt();
@@ -372,12 +345,21 @@ public final class WindowManager {
         // The window this opened last, while no other came to the front since: a repeated New Window cascades on.
         Optional<JasperWindow> source = lastOpened != null && !lastOpened.closed() ? Optional.of(lastOpened) : lastActive();
         Optional<UiState.Bounds> from = source.flatMap(window -> window.placement().bounds());
-        Optional<JasperWindow> opened = open(new Opening(false, directory, "menu", Optional.empty(), Optional.empty()), window -> {
+        Optional<JasperWindow> opened = open(new Opening(false, directory, "menu", Optional.empty(), Optional.empty(), newWindowTools()), window -> {
             from.ifPresent(bounds -> window.placed(new JasperWindow.Placement(Optional.of(cascaded(bounds)), 0)));
             return true;
         });
         opened.ifPresent(window -> lastOpened = window);
         return opened;
+    }
+
+    /**
+     * A window opened while another is open starts from a copy of the most recently active window's tool windows, out of
+     * Zen and with its tool windows saved in Float or Window mode hidden, as that window shows them already (full windows
+     * plan 1 Controller Ruling 10); with none open, the built-in ones.
+     */
+    private ToolWindows newWindowTools() {
+        return lastActive().map(window -> window.content().toolWindows().forNewWindow().snapshot()).orElse(ToolWindows.BUILT_IN);
     }
 
     /** How far a new window sits below and right of the window it opens from (full windows spec 5.2), in unscaled pixels. */
@@ -389,8 +371,7 @@ public final class WindowManager {
     }
 
     /**
-     * Restores the saved windows when none is open, before a new window opens beside them (Controller Ruling 4): a new
-     * window alone would otherwise save over them.
+     * Restores the saved window when none is open, before a new window opens beside it (Controller Ruling 4).
      *
      * @return whether a window is open or was restored; false while Jasper quits or every window closes, as for
      *     {@link #ensureWindow}: none opens while the last ones go
@@ -400,12 +381,12 @@ public final class WindowManager {
     }
 
     /**
-     * Keeps the saved windows as {@code workspace.toml.bad} (workspace plan 6a Rulings 13); a failure there is logged, so
+     * Keeps the saved window as {@code workspace.toml.bad} (workspace plan 6a Rulings 13); a failure there is logged, so
      * it never costs the window that is opening.
      */
     private void keepAside(WorkspaceFile.Snapshot saved) {
         try { store.setAside(saved); }
-        catch (RuntimeException | Error failure) { LOG.log(System.Logger.Level.WARNING, "Could not keep the saved windows aside", failure); }
+        catch (RuntimeException | Error failure) { LOG.log(System.Logger.Level.WARNING, "Could not keep the saved window aside", failure); }
     }
 
     /**
@@ -727,7 +708,8 @@ public final class WindowManager {
     private Optional<JasperWindow> openEmpty(Rectangle bounds, Point cursor) {
         // A closing tab's listener asking for a window while every window closes gets none (spec 6.4).
         if (closingAll) return Optional.empty();
-        return open(new Opening(true, null, "menu", Optional.ofNullable(bounds).map(Rectangle::new), Optional.ofNullable(cursor).map(Point::new)));
+        return open(new Opening(true, null, "menu", Optional.ofNullable(bounds).map(Rectangle::new), Optional.ofNullable(cursor).map(Point::new),
+            newWindowTools()));
     }
 
     /** Composes, frames and shows one window; a failure on the way discards it and propagates. */
@@ -754,6 +736,8 @@ public final class WindowManager {
             window = new JasperWindow(this, content);
             windows.add(window);
             content.onLayoutChanged = this::changed;
+            // Its own tool windows are saved with it (full windows spec 6.1).
+            content.toolWindows().onChanged(this::changed);
             // A plugin's saved tab comes back through its plugin, or as a placeholder; one naming Jasper itself is left out
             // (workspace plan 6b Rulings 3 and 22).
             content.savedTabs = (tabId, saved) -> {
@@ -788,39 +772,37 @@ public final class WindowManager {
     }
 
     /**
-     * What {@code workspace.toml} saves now (workspace tabs spec 8 and 13; tabs and panes spec 12): every open window, the
-     * most recently active first ({@link #windowsByActivation}), each with where it is, what it holds (its parent tabs and
-     * the one that shows) and what each of its tabs needs to come back. A tab that cannot come back is taken out first, as
-     * closing it would take it out ({@code WorkspaceFile.keeping}): a parent tab left with none goes, and a window left
-     * with none is left out, unless every window is: then the most recently active is saved with its empty workspace
-     * ({@link #holding}). A window whose content has closed holds nothing, though it is listed until its closed hook runs.
+     * What {@code workspace.toml} saves now (workspace tabs spec 8 and 13; tabs and panes spec 12; full windows spec 6.1):
+     * the most recently active open window ({@link #windowsByActivation}), with where it is, what it holds (its parent
+     * tabs and the one that shows), what each of its tabs needs to come back and its tool windows. A tab that cannot come
+     * back is taken out first, as closing it would take it out ({@code WorkspaceFile.keeping}): a parent tab left with
+     * none goes, and a window left with none is saved with its empty workspace. A window whose content has closed holds
+     * nothing, though it is listed until its closed hook runs.
      *
-     * @return the snapshot; empty while no window is open, while the saved windows are restored, or once every open
+     * @return the snapshot; empty while no window is open, while the saved window is restored, or once every open
      *     window's content has closed
      */
     public Optional<WorkspaceFile.Snapshot> snapshot() {
         requireEdt();
         if (restoring) return Optional.empty();
-        var records = new ArrayList<WorkspaceFile.WindowRecord>();
-        for (JasperWindow window : windowsByActivation()) if (!window.content().closed()) records.add(windowRecord(window));
-        if (records.isEmpty()) return Optional.empty();
-        return Optional.of(fitted(holding(records)));
+        for (JasperWindow window : windowsByActivation())
+            if (!window.content().closed()) return Optional.of(fitted(windowRecord(window)));
+        return Optional.empty();
     }
 
     /**
-     * The windows as {@code records} save them, with items left out until the file fits {@link WorkspaceFile#MAX_BYTES},
+     * The window as {@code record} saves it, with items left out until the file fits {@link WorkspaceFile#MAX_BYTES},
      * which a read would otherwise set aside (workspace plan 6b Rulings 16): plugins' items first, then terminals, each the
      * largest first by the bytes the file writes for it, all counted in one pass ({@link WorkspaceFile#sizes}), so a save
      * under the limit writes no text here. Each is logged the first time, not at every save, and left out as closing it
-     * would (Rulings 21): a tab left with none goes, and a window left with none is left out ({@link #holding}).
+     * would (Rulings 21): a tab left with none goes.
      */
-    private WorkspaceFile.Snapshot fitted(List<WorkspaceFile.WindowRecord> records) {
-        var snapshot = new WorkspaceFile.Snapshot(records);
+    private WorkspaceFile.Snapshot fitted(WorkspaceFile.WindowRecord record) {
+        var snapshot = new WorkspaceFile.Snapshot(record);
         WorkspaceFile.Sizes sizes = WorkspaceFile.sizes(snapshot);
         long over = sizes.total() - WorkspaceFile.MAX_BYTES;
         if (over <= 0) return snapshot;
-        var ranked = new ArrayList<Map.Entry<TabId, WorkspaceFile.TabRecord>>();
-        for (WorkspaceFile.WindowRecord window : records) ranked.addAll(window.tabs().entrySet());
+        var ranked = new ArrayList<>(record.tabs().entrySet());
         ranked.sort(Comparator.comparing((Map.Entry<TabId, WorkspaceFile.TabRecord> item) -> !(item.getValue() instanceof WorkspaceFile.TabRecord.Content))
             .thenComparing(item -> sizes.items().getOrDefault(item.getKey(), 0L), Comparator.reverseOrder())
             .thenComparing(item -> item.getKey().value()));
@@ -832,9 +814,9 @@ public final class WindowManager {
                 out.add(item.getKey());
                 over -= sizes.items().getOrDefault(item.getKey(), 0L);
                 if (leftOut.add(item.getKey())) LOG.log(System.Logger.Level.WARNING, "Not saving the tab " + item.getValue().title()
-                    + ": the saved windows would pass workspace.toml's size limit");
+                    + ": the saved window would pass workspace.toml's size limit");
             }
-            snapshot = without(records, out);
+            snapshot = new WorkspaceFile.Snapshot(without(record, out));
             // What was counted leaves with each item, though a split it leaves may write its other panes' weights longer:
             // the file is checked once, and more items leave only when it still passes the limit.
             over = WorkspaceFile.encodedBytes(snapshot) - WorkspaceFile.MAX_BYTES;
@@ -842,33 +824,13 @@ public final class WindowManager {
         }
     }
 
-    /**
-     * {@code records} without the items {@code out} names, each window's taken out at once as closing them would
-     * ({@code WorkspaceFile.keeping}): a tab left with none goes, and a window left with none is left out ({@link #holding}).
-     */
-    private static WorkspaceFile.Snapshot without(List<WorkspaceFile.WindowRecord> records, Set<TabId> out) {
-        var windows = new ArrayList<WorkspaceFile.WindowRecord>();
-        for (WorkspaceFile.WindowRecord window : records) {
-            if (window.tabs().keySet().stream().noneMatch(out::contains)) {
-                windows.add(window);
-                continue;
-            }
-            ParentTabs kept = WorkspaceFile.keeping(window.layout(), tab -> !out.contains(tab));
-            var tabs = new HashMap<>(window.tabs());
-            tabs.keySet().removeAll(out);
-            windows.add(new WorkspaceFile.WindowRecord(window.bounds(), window.extendedState(), kept, tabs));
-        }
-        return new WorkspaceFile.Snapshot(holding(windows));
-    }
-
-    /**
-     * {@code records} without the windows that hold nothing that comes back, as a window that held none would come back
-     * with nothing (workspace plan 2 Rulings 20); when no window holds any, the first, the most recently active, with its
-     * empty workspace.
-     */
-    private static List<WorkspaceFile.WindowRecord> holding(List<WorkspaceFile.WindowRecord> records) {
-        List<WorkspaceFile.WindowRecord> held = records.stream().filter(record -> !record.layout().isEmpty()).toList();
-        return held.isEmpty() ? List.of(records.getFirst()) : held;
+    /** {@code record} without the items {@code out} names, taken out at once as closing them would ({@code WorkspaceFile.keeping}). */
+    private static WorkspaceFile.WindowRecord without(WorkspaceFile.WindowRecord record, Set<TabId> out) {
+        if (record.tabs().keySet().stream().noneMatch(out::contains)) return record;
+        ParentTabs kept = WorkspaceFile.keeping(record.layout(), tab -> !out.contains(tab));
+        var tabs = new HashMap<>(record.tabs());
+        tabs.keySet().removeAll(out);
+        return new WorkspaceFile.WindowRecord(record.bounds(), record.extendedState(), kept, tabs, record.tools());
     }
 
     private WorkspaceFile.WindowRecord windowRecord(JasperWindow window) {
@@ -876,7 +838,7 @@ public final class WindowManager {
         for (Tab tab : window.content().tabs()) tabRecord(tab).ifPresent(saved -> tabs.put(tab.id(), saved));
         ParentTabs kept = WorkspaceFile.keeping(window.content().windowLayout(), tabs::containsKey);
         JasperWindow.Placement placement = window.placement();
-        return new WorkspaceFile.WindowRecord(placement.bounds(), placement.extendedState(), kept, tabs);
+        return new WorkspaceFile.WindowRecord(placement.bounds(), placement.extendedState(), kept, tabs, window.content().toolWindows().snapshot());
     }
 
     /**
@@ -998,7 +960,7 @@ public final class WindowManager {
 
     /**
      * An empty window for a plugin's tab placed in a new window (workspace tabs spec 14's
-     * {@code TabPlacement.NEW_WINDOW}), after the saved windows are restored when none is open; null while they are being
+     * {@code TabPlacement.NEW_WINDOW}), after the saved window is restored when none is open; null while it is being
      * restored.
      */
     private UUID emptyWindow() {

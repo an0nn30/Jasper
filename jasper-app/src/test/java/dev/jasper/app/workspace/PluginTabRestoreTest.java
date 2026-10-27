@@ -19,6 +19,7 @@ import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.layout.TabRestore;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.terminals.SessionAttempt;
 import dev.jasper.app.terminals.SessionRequest;
@@ -77,14 +78,14 @@ class PluginTabRestoreTest {
 
     /** The main window, saved without a place, holding {@code tabs}, the first one shown. */
     private static WorkspaceFile.WindowRecord main(Map<TabId, WorkspaceFile.TabRecord> items, ParentTab... tabs) {
-        return new WorkspaceFile.WindowRecord(Optional.empty(), 0, new ParentTabs(List.of(tabs), tabs[0].id()), items);
+        return new WorkspaceFile.WindowRecord(Optional.empty(), 0, new ParentTabs(List.of(tabs), tabs[0].id()), items, ToolWindows.BUILT_IN);
     }
 
     /** The main window with one tab of two panes side by side: a terminal, then {@code record}'s item, whose pane is active. */
     private static WorkspaceFile.Snapshot mainWith(TabId shell, TabId saved, WorkspaceFile.TabRecord record) {
         Layout one = Layout.of(shell);
-        return new WorkspaceFile.Snapshot(List.of(main(Map.of(shell, SHELL, saved, record),
-            new ParentTab(ParentTabId.random(), one.split(saved, one.activeGroup(), Side.RIGHT)))));
+        return new WorkspaceFile.Snapshot(main(Map.of(shell, SHELL, saved, record),
+            new ParentTab(ParentTabId.random(), one.split(saved, one.activeGroup(), Side.RIGHT))));
     }
 
     /** The notes plugin's restorer: it opens the note its state names, under the saved title, in the window being restored. */
@@ -97,30 +98,25 @@ class PluginTabRestoreTest {
         }));
     }
 
-    @Test void aPluginsItemComesBackInItsSavedTabAndPaneInTheMainWindowAndAFullWindow() throws Exception {
-        TabId shell = TabId.random(), left = TabId.random(), right = TabId.random(), away = TabId.random();
+    @Test void aPluginsItemComesBackInItsSavedTabAndPane() throws Exception {
+        TabId shell = TabId.random(), left = TabId.random(), right = TabId.random();
         Group leftPane = new Group(GroupId.random(), List.of(left), Optional.of(left));
         Group rightPane = new Group(GroupId.random(), List.of(right), Optional.of(right));
         ParentTab shown = new ParentTab(ParentTabId.random(), Layout.of(shell));
         ParentTab hidden = new ParentTab(ParentTabId.random(), new Layout(new Split(Orientation.HORIZONTAL,
             List.of(new Child(leftPane, 0.5), new Child(rightPane, 0.5))), rightPane.id(), Optional.empty()));
         var mainRecord = main(Map.of(shell, SHELL, left, note("left"), right, note("right")), shown, hidden);
-        var full = new WorkspaceFile.WindowRecord(Optional.empty(), 0,
-            ParentTabs.of(new ParentTab(ParentTabId.random(), Layout.of(away))), Map.of(away, note("away")));
-        var saved = new WorkspaceFile.Snapshot(List.of(mainRecord, full));
+        var saved = new WorkspaceFile.Snapshot(mainRecord);
         windows(saved, Map.of(NOTES, "Notes"));
         notesRestorer();
         edt(() -> {
             JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
             assertThat(main.content().windowLayout()).as("the notes in the hidden tab's two panes, under their saved ids")
                 .isEqualTo(mainRecord.layout());
-            for (TabId note : List.of(left, right, away))
+            for (TabId note : List.of(left, right))
                 assertThat(windows.model.tabs().tab(note)).as("rebuilt by its plugin")
                     .hasValueSatisfying(tab -> assertThat(tab.kind()).isEqualTo(Tab.Kind.HOSTED));
-            List<JasperWindow> children = windows.others();
-            assertThat(children).hasSize(1);
-            assertThat(children.getFirst().content().windowLayout()).as("a full window").isEqualTo(full.layout());
-            assertThat(windows.model.tabs().tab(away).orElseThrow().window()).isEqualTo(children.getFirst().id());
+            assertThat(windows.others()).as("one window comes back").isEmpty();
             assertThat(windows.manager.snapshot()).as("saved again, it is what was read").contains(saved);
         });
         windows.launch();
@@ -176,11 +172,9 @@ class PluginTabRestoreTest {
      * windows are kept, not set aside.
      */
     @Test void aRestorerThatMovesItsItemAtStartLeavesItWhereItsWindowSavedIt() throws Exception {
-        TabId shell = TabId.random(), saved = TabId.random(), away = TabId.random();
-        var mainRecord = mainWith(shell, saved, NOTE).windows().getFirst();
-        var full = new WorkspaceFile.WindowRecord(Optional.empty(), 0,
-            ParentTabs.of(new ParentTab(ParentTabId.random(), Layout.of(away))), Map.of(away, note("away")));
-        var snapshot = new WorkspaceFile.Snapshot(List.of(mainRecord, full));
+        TabId shell = TabId.random(), saved = TabId.random();
+        var snapshot = mainWith(shell, saved, NOTE);
+        var mainRecord = snapshot.window();
         windows(snapshot, Map.of(NOTES, "Notes"));
         movingNotesRestorer(new boolean[]{true});
         try (var log = dev.jasper.app.testsupport.LogRecorder.of(WindowManager.class.getName())) {
@@ -188,15 +182,12 @@ class PluginTabRestoreTest {
                 JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
                 assertThat(main.content().windowLayout()).as("restored, not opened fresh").isEqualTo(mainRecord.layout());
                 assertThat(windows.model.tabs().tab(saved).orElseThrow().window()).isEqualTo(main.id());
-                assertThat(windows.others()).as("no window opened for a move").singleElement().satisfies(child -> {
-                    assertThat(child.content().windowLayout()).isEqualTo(full.layout());
-                    assertThat(windows.model.tabs().tab(away).orElseThrow().window()).isEqualTo(child.id());
-                });
+                assertThat(windows.others()).as("no window opened for a move").isEmpty();
                 assertThat(windows.manager.snapshot()).as("saved again, it is what was read").contains(snapshot);
             });
             assertThat(log.warnings()).as("nothing failed").isEmpty();
         }
-        assertThat(setAside).as("the saved windows are kept").isEmpty();
+        assertThat(setAside).as("the saved window is kept").isEmpty();
         windows.launch();
     }
 
@@ -237,7 +228,7 @@ class PluginTabRestoreTest {
             assertThat(content.retryable()).as("no Retry without its plugin").isFalse();
             assertThat(content.closeButton().isFocusable()).as("reached by keyboard").isTrue();
             assertThat(content.action()).as("its focus target, with no Retry").isSameAs(content.closeButton());
-            assertThat(windows.manager.snapshot().orElseThrow().windows().getFirst().tabs().get(saved)).as("saved again as it was").isEqualTo(NOTE);
+            assertThat(windows.manager.snapshot().orElseThrow().window().tabs().get(saved)).as("saved again as it was").isEqualTo(NOTE);
             assertThat(windows.terminals.tab(saved.value()).orElseThrow().kind()).as("a content item to plugins")
                 .isEqualTo(dev.jasper.app.terminals.TabEntry.Kind.CONTENT);
             content.closeButton().doClick();
@@ -282,7 +273,7 @@ class PluginTabRestoreTest {
             assertThat(main.content().tabs()).as("in the placeholder's place").extracting(Tab::id).containsExactly(shell, note.id());
             assertThat(main.content().workspace().model().groupOf(note.id())).as("in the placeholder's pane").contains(pane);
             assertThat(main.content().parentTabCount()).as("no tab opened for it").isEqualTo(1);
-            assertThat(windows.manager.snapshot().orElseThrow().windows().getFirst().tabs().get(note.id())).isEqualTo(NOTE);
+            assertThat(windows.manager.snapshot().orElseThrow().window().tabs().get(note.id())).isEqualTo(NOTE);
         });
         windows.launch();
     }
@@ -295,8 +286,8 @@ class PluginTabRestoreTest {
     @Test void aRestorersErrorLeavesAPlaceholderInItsPaneAndTheRestOfTheWorkspaceComesBack() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         Layout one = Layout.of(shell);
-        var snapshot = new WorkspaceFile.Snapshot(List.of(main(Map.of(shell, new WorkspaceFile.TabRecord.Terminal("build", HOME.toString(), ""),
-            saved, NOTE), new ParentTab(ParentTabId.random(), one.split(saved, one.activeGroup(), Side.RIGHT)))));
+        var snapshot = new WorkspaceFile.Snapshot(main(Map.of(shell, new WorkspaceFile.TabRecord.Terminal("build", HOME.toString(), ""),
+            saved, NOTE), new ParentTab(ParentTabId.random(), one.split(saved, one.activeGroup(), Side.RIGHT))));
         windows(snapshot, Map.of(NOTES, "Notes"));
         Tab[] opened = new Tab[1];
         edt(() -> windows.model.tabs().restorer(NOTES, "note", restoring -> {
@@ -309,7 +300,7 @@ class PluginTabRestoreTest {
             Tab placeholder = windows.model.tabs().tab(saved).orElseThrow();
             assertThat(placeholder.kind()).isEqualTo(Tab.Kind.PLACEHOLDER);
             assertThat(((PlaceholderContent) placeholder.content()).reason()).isEqualTo("Notes could not restore this tab: the note's index is broken.");
-            assertThat(main.content().windowLayout()).as("in its saved pane").isEqualTo(snapshot.windows().getFirst().layout());
+            assertThat(main.content().windowLayout()).as("in its saved pane").isEqualTo(snapshot.window().layout());
             assertThat(((TerminalContent) windows.model.tabs().tab(shell).orElseThrow().content()).renamed())
                 .as("the renamed terminal came back").contains("build");
             assertThat(setAside).as("nothing kept aside").isEmpty();
@@ -421,7 +412,7 @@ class PluginTabRestoreTest {
                 wide.restore(Optional.of(new TabRestore("big", Map.of("text", "\u4e2d".repeat(2000)))));
                 windows.manager.snapshot().orElseThrow();
                 WorkspaceFile.Snapshot snapshot = windows.manager.snapshot().orElseThrow();
-                WorkspaceFile.WindowRecord record = snapshot.windows().getFirst();
+                WorkspaceFile.WindowRecord record = snapshot.window();
                 assertThat(WorkspaceFile.encodedBytes(snapshot)).as("a read never sets it aside").isLessThanOrEqualTo(WorkspaceFile.MAX_BYTES);
                 assertThat(record.tabs()).as("terminals and the smaller plugins' items stay").containsKeys(shell, saved);
                 assertThat(record.tabs()).as("ranked by its bytes, not its characters").doesNotContainKey(wide.id());
@@ -436,14 +427,14 @@ class PluginTabRestoreTest {
                 items.put(next.id(), new WorkspaceFile.TabRecord.Content(next.title(), NOTES, "big", next.restore().orElseThrow().state()));
                 var tabs = new ArrayList<>(record.layout().parentTabs());
                 tabs.add(new ParentTab(ParentTabId.random(), Layout.of(next.id())));
-                var withNext = new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(record.bounds(),
-                    record.extendedState(), new ParentTabs(tabs, record.layout().active()), items)));
+                var withNext = new WorkspaceFile.Snapshot(new WorkspaceFile.WindowRecord(record.bounds(),
+                    record.extendedState(), new ParentTabs(tabs, record.layout().active()), items, ToolWindows.BUILT_IN));
                 assertThat(WorkspaceFile.encodedBytes(withNext)).as("one more would not fit").isGreaterThan(WorkspaceFile.MAX_BYTES);
                 leftOut[0] = 301 - kept;
             });
             assertThat(log.warnings()).as("two saves: each item left out logged once").doesNotHaveDuplicates().hasSize(leftOut[0])
-                .allSatisfy(line -> assertThat(line).startsWith("Not saving the tab ").endsWith(": the saved windows would pass workspace.toml's size limit"))
-                .contains("Not saving the tab Wide: the saved windows would pass workspace.toml's size limit");
+                .allSatisfy(line -> assertThat(line).startsWith("Not saving the tab ").endsWith(": the saved window would pass workspace.toml's size limit"))
+                .contains("Not saving the tab Wide: the saved window would pass workspace.toml's size limit");
         }
         windows.launch();
     }
@@ -459,7 +450,7 @@ class PluginTabRestoreTest {
             Tab errors = windows.model.tabs().open(TabRegistry.APP_OWNER, "errors", "Errors", main.id(), new javax.swing.JPanel());
             errors.restore(Optional.of(new TabRestore("errors", Map.of())));
             windows.model.tabs().restorer(TabRegistry.APP_OWNER, "errors", restoring -> Optional.empty());
-            var tabs = windows.manager.snapshot().orElseThrow().windows().getFirst().tabs();
+            var tabs = windows.manager.snapshot().orElseThrow().window().tabs();
             assertThat(tabs).containsOnlyKeys(shell, saved);
             assertThat(plain.closed() || unknown.closed() || errors.closed()).isFalse();
         });
@@ -475,7 +466,7 @@ class PluginTabRestoreTest {
                 JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
                 assertThat(main.content().tabs()).extracting(Tab::id).as("no placeholder").containsExactly(shell);
                 assertThat(windows.model.tabs().tab(errors)).isEmpty();
-                assertThat(windows.manager.snapshot().orElseThrow().windows().getFirst().tabs()).containsOnlyKeys(shell);
+                assertThat(windows.manager.snapshot().orElseThrow().window().tabs()).containsOnlyKeys(shell);
             });
             assertThat(log.warnings()).as("left out with a trace, naming its kind").singleElement().asString().contains("errors");
         }
@@ -529,7 +520,7 @@ class PluginTabRestoreTest {
             Runnable savedAsItWas = () -> {
                 assertThat(placeholder.closed()).isFalse();
                 assertThat(placeholder.kind()).isEqualTo(Tab.Kind.PLACEHOLDER);
-                assertThat(windows.manager.snapshot().orElseThrow().windows().getFirst().tabs().get(saved)).as("saved back as it was").isEqualTo(NOTE);
+                assertThat(windows.manager.snapshot().orElseThrow().window().tabs().get(saved)).as("saved back as it was").isEqualTo(NOTE);
             };
             window.split(Side.DOWN);
             assertThat(window.tabs()).as("a split beside it").hasSize(3);
@@ -547,7 +538,7 @@ class PluginTabRestoreTest {
             window.selectTab(placeholder);
             window.action(dev.jasper.app.commands.ActionId.CLOSE_PANE).actionPerformed(new java.awt.event.ActionEvent(window, 0, "close"));
             assertThat(placeholder.closed()).as("Close Pane closes it").isTrue();
-            assertThat(windows.manager.snapshot().orElseThrow().windows().getFirst().tabs()).doesNotContainKey(saved);
+            assertThat(windows.manager.snapshot().orElseThrow().window().tabs()).doesNotContainKey(saved);
         });
         windows.launch();
     }
@@ -555,8 +546,8 @@ class PluginTabRestoreTest {
     @Test void aSessionsItemComesBackThroughItsPluginAndConnectsWhenItsTabFirstShows() throws Exception {
         TabId shell = TabId.random(), saved = TabId.random();
         var record = new WorkspaceFile.TabRecord.Content("build-host", "dev.example.ssh", "ssh", Map.of("host", "build-host"));
-        windows(new WorkspaceFile.Snapshot(List.of(main(Map.of(shell, SHELL, saved, record),
-            new ParentTab(ParentTabId.random(), Layout.of(shell)), new ParentTab(ParentTabId.random(), Layout.of(saved))))),
+        windows(new WorkspaceFile.Snapshot(main(Map.of(shell, SHELL, saved, record),
+            new ParentTab(ParentTabId.random(), Layout.of(shell)), new ParentTab(ParentTabId.random(), Layout.of(saved)))),
             Map.of("dev.example.ssh", "SSH"));
         Queue<SessionAttempt> attempts = new ArrayDeque<>();
         boolean[] refused = {false};
@@ -576,7 +567,7 @@ class PluginTabRestoreTest {
             assertThat(session.kind()).isEqualTo(Tab.Kind.TERMINAL);
             assertThat(refused[0]).as("a second session in the window being restored").isTrue();
             assertThat(main.content().tabs()).hasSize(2);
-            assertThat(windows.manager.snapshot().orElseThrow().windows().getFirst().tabs().get(saved)).as("saved again through its plugin")
+            assertThat(windows.manager.snapshot().orElseThrow().window().tabs().get(saved)).as("saved again through its plugin")
                 .isEqualTo(new WorkspaceFile.TabRecord.Content(session.title(), "dev.example.ssh", "ssh", Map.of("host", "build-host")));
         });
         edt(() -> {
@@ -617,7 +608,7 @@ class PluginTabRestoreTest {
             assertThat(windows.terminals.tab(session.id().value())).as("a terminal to plugins, in its window")
                 .hasValueSatisfying(entry -> assertThat(entry.kind()).isEqualTo(dev.jasper.app.terminals.TabEntry.Kind.TERMINAL));
             assertThat(windows.terminals.tab(saved.value())).as("the placeholder gone from them").isEmpty();
-            assertThat(windows.manager.snapshot().orElseThrow().windows().getFirst().tabs().get(session.id())).as("saved through its plugin")
+            assertThat(windows.manager.snapshot().orElseThrow().window().tabs().get(session.id())).as("saved through its plugin")
                 .isEqualTo(new WorkspaceFile.TabRecord.Content(session.title(), "dev.example.ssh", "ssh", Map.of("host", "build-host")));
         });
         edt(() -> {

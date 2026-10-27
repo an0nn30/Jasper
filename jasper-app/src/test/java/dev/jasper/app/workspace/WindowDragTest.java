@@ -6,6 +6,8 @@ import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.contributions.PanelEntry;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.persistence.ToolWindowState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Component;
@@ -37,7 +39,7 @@ class WindowDragTest {
     /** A connected window in a root pane, with Sessions and Files on the left; events record what the plugins hear. */
     private static final class Fixture {
         final Contributions model;
-        final UiState state = UiState.inMemory();
+        final ToolWindowState state = new ToolWindowState(ToolWindows.BUILT_IN, "");
         final WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
         final JRootPane root = new JRootPane();
         final List<String> events = new ArrayList<>();

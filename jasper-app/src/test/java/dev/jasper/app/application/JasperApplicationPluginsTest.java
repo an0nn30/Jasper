@@ -128,7 +128,7 @@ class JasperApplicationPluginsTest {
 
     @Test void layoutStateIsLoadedForPluginsAndSavedAtShutdown() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
-        java.nio.file.Files.writeString(dirs.uiState(), "version = 1\nrail_visible = false\n");
+        java.nio.file.Files.writeString(dirs.uiState(), "version = 3\n[windows.\"dev.x.manager\"]\nx = 1\ny = 2\nwidth = 300\nheight = 200\n");
         var terminated = new CountDownLatch(1);
         JasperApplication[] application = new JasperApplication[1];
         edt(() -> {
@@ -140,7 +140,7 @@ class JasperApplicationPluginsTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         ApplicationPluginCleanup.await(application[0]);
         assertThat(dirs.uiState()).as("saved again at shutdown, keeping what was loaded").exists()
-            .content().contains("rail_visible = false");
+            .content().contains("[windows.\"dev.x.manager\"]");
     }
 
     @Test void theManagerIsAContributedActionInTheFileMenu() throws Exception {

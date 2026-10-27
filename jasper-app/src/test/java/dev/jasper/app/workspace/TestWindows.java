@@ -68,7 +68,8 @@ final class TestWindows {
         var content = DesktopTestSupport.track(new WindowContent(launcher, opening.directory(), opening.empty(),
             directory -> manager.openWindow(directory), () -> { }, ThemeTestSupport.controller(true),
             KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD));
-        content.connectContributions(model);
+        // Its own tool windows, as the opening says (full windows spec 6.1).
+        content.connectContributions(model, new dev.jasper.app.persistence.ToolWindowState(opening.tools(), ""));
         content.connectTerminals(terminals, () -> { });
         composed.accept(content);
         return content;

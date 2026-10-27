@@ -13,7 +13,9 @@ import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.persistence.ToolWindowState;
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
@@ -51,7 +53,7 @@ class WindowManagerTest {
     private boolean quitting, failFrames, reenter, failClosing, reenterAlways, failEarly;
     /** How many windows were composed. */
     private int compositions;
-    /** The tab a plugin asked for while the saved windows were being restored. */
+    /** The tab a plugin asked for while the saved window was being restored. */
     private Tab early;
     /** What the closed hook runs once it has recorded the window. */
     private Consumer<JasperWindow> whenClosed = window -> { };
@@ -108,14 +110,14 @@ class WindowManagerTest {
     private WindowContent compose(WindowManager.Opening opening) {
         if (quitting) return null;
         compositions++;
-        // A plugin opening its view while the saved windows are still being restored (a panel factory, say).
+        // A plugin opening its view while the saved window is still being restored (a panel factory, say).
         if (reenter || reenterAlways) {
             reenter = false;
             early = model.tabs().open("dev.example.editor", "early", "early.txt", null, new JPanel());
             if (failEarly) early.onClosed(() -> { throw new IllegalStateException("early failed to close"); });
             // Workspace plan 4a Rulings 24: the tab waits for the windows, and a nested request for them is still refused.
             assertThatThrownBy(() -> manager.ensureWindow("plugin", null)).isInstanceOf(IllegalStateException.class)
-                .hasMessage("The windows are still being restored");
+                .hasMessage("The window is still being restored");
         }
         var launcher = new ShellLauncher(pending::add, directory -> { started.add(directory); return IdleTerminalSession.start(); },
             "idle-test-session");
@@ -123,7 +125,7 @@ class WindowManagerTest {
         var content = DesktopTestSupport.track(new WindowContent(launcher, opening.directory(), opening.empty(),
             directory -> manager.openWindow(directory), () -> { }, ThemeTestSupport.controller(true),
             KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD));
-        content.connectContributions(model);
+        content.connectContributions(model, new ToolWindowState(opening.tools(), ""));
         return content;
     }
 
@@ -431,7 +433,7 @@ class WindowManagerTest {
             assertThat(second.content().parentTabCount()).as("a torn-out tab's window is a full window").isEqualTo(1);
             assertThat(events).as("placed before it shows").containsSubsequence("place w1 40,50 600x400 under 90,60", "show w1");
             assertThatThrownBy(() -> new WindowManager.Opening(true, null, "menu", Optional.of(new java.awt.Rectangle(40, 50, 600, 400)),
-                Optional.empty())).as("its bounds come with the cursor").isInstanceOf(IllegalArgumentException.class);
+                Optional.empty(), ToolWindows.BUILT_IN)).as("its bounds come with the cursor").isInstanceOf(IllegalArgumentException.class);
             assertThat(manager.windowsByActivation()).as("none came forward yet").containsExactly(first, second);
             second.events().activated().accept(true);
             assertThat(manager.windowsByActivation()).containsExactly(second, first);
@@ -801,15 +803,14 @@ class WindowManagerTest {
 
     @Test void twoRequestsWhileNoWindowIsOpenRestoreOnce(@TempDir Path folder) throws Exception {
         Path file = folder.resolve("workspace.toml");
-        dev.jasper.app.layout.TabId one = dev.jasper.app.layout.TabId.random(), two = dev.jasper.app.layout.TabId.random();
-        WorkspaceFile.write(file, new WorkspaceFile.Snapshot(List.of(savedWindow(one), savedWindow(two))));
+        dev.jasper.app.layout.TabId one = dev.jasper.app.layout.TabId.random();
+        WorkspaceFile.write(file, new WorkspaceFile.Snapshot(savedWindow(one)));
         edt(() -> {
             manager.workspace(new WorkspaceStore(file, manager::snapshot, (delay, task) -> () -> { }, Runnable::run, aside -> { }));
             JasperWindow first = manager.ensureWindow("handoff", null).orElseThrow();
             Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
-            assertThat(manager.windows()).as("the saved windows, each once").hasSize(2);
-            assertThat(manager.windows().getFirst()).isSameAs(first);
-            assertThat(events.stream().filter(event -> event.startsWith("opened")).toList()).containsExactly("opened w0", "opened w1");
+            assertThat(manager.windows()).as("the saved window, once").containsExactly(first);
+            assertThat(events.stream().filter(event -> event.startsWith("opened")).toList()).containsExactly("opened w0");
             assertThat(first.content().tabs()).extracting(Tab::id).contains(one);
             assertThat(notes.window()).as("in the first restored").isEqualTo(first.id());
         });
@@ -840,54 +841,98 @@ class WindowManagerTest {
         });
     }
 
-    @Test void savedWindowsComeBackInActivationOrderTheMostRecentInFront(@TempDir Path folder) throws Exception {
-        Path file = folder.resolve("workspace.toml");
-        WorkspaceFile.Snapshot[] saved = new WorkspaceFile.Snapshot[1];
-        JasperWindow[] w = new JasperWindow[3];
+    /** Full windows spec 6.1: what is saved is the most recently active window, with its own tool windows. */
+    @Test void theSnapshotIsTheMostRecentlyActiveWindowWithItsToolWindows() throws Exception {
         edt(() -> {
-            w[0] = manager.ensureWindow("cold", null).orElseThrow();
-            w[1] = manager.openWindow(null).orElseThrow();
-            w[2] = manager.openWindow(null).orElseThrow();
-            w[2].events().activated().accept(true);
-            w[1].events().activated().accept(true);
-            saved[0] = manager.snapshot().orElseThrow();
-            assertThat(saved[0].windows()).hasSize(3);
-            assertThat(saved[0].windows().getFirst().layout()).as("the window activated last first").isEqualTo(w[1].content().windowLayout());
-            assertThat(saved[0].windows().get(1).layout()).isEqualTo(w[2].content().windowLayout());
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            JasperWindow second = manager.openWindow(null).orElseThrow();
+            second.content().newTab(HOME);
+            second.content().toggleZenMode();
+            assertThat(first.content().toolWindows().zenMode()).as("each window's own").isFalse();
+            first.events().activated().accept(true);
+            assertThat(manager.snapshot().orElseThrow().window().layout()).isEqualTo(first.content().windowLayout());
+            assertThat(manager.snapshot().orElseThrow().window().tools().zenMode()).isFalse();
+            second.events().activated().accept(true);
+            WorkspaceFile.WindowRecord saved = manager.snapshot().orElseThrow().window();
+            assertThat(saved.tools().zenMode()).isTrue();
+            assertThat(saved.layout()).as("its tabs are the second window's").isEqualTo(second.content().windowLayout());
+            assertThat(saved.tools()).isEqualTo(second.content().toolWindows().snapshot());
         });
         launch();
-        WorkspaceFile.write(file, saved[0]);
-        TestWindows[] fresh = new TestWindows[1];
-        try {
-            edt(() -> {
-                fresh[0] = new TestWindows();
-                fresh[0].manager.workspace(new WorkspaceStore(file, fresh[0].manager::snapshot, (delay, task) -> () -> { }, Runnable::run,
-                    aside -> { }));
-                JasperWindow first = fresh[0].manager.ensureWindow("cold", null).orElseThrow();
-                assertThat(fresh[0].manager.windows()).hasSize(3);
-                assertThat(first.content().windowLayout()).isEqualTo(saved[0].windows().getFirst().layout());
-                assertThat(fresh[0].events).last().isEqualTo("front w0");
-            });
-            fresh[0].launch();
-        } finally {
-            edt(() -> { if (fresh[0] != null) fresh[0].manager.closeAll(); });
-        }
+    }
+
+    /** Full windows spec 6.1: a restore opens the one saved window, with its tool windows. */
+    @Test void aRestoreOpensOneWindowWithItsToolWindows(@TempDir Path folder) throws Exception {
+        Path file = folder.resolve("workspace.toml");
+        dev.jasper.app.layout.TabId one = dev.jasper.app.layout.TabId.random();
+        WorkspaceFile.WindowRecord window = savedWindow(one);
+        var tools = new ToolWindows(false, false, Map.of());
+        WorkspaceFile.write(file, new WorkspaceFile.Snapshot(new WorkspaceFile.WindowRecord(window.bounds(), window.extendedState(),
+            window.layout(), window.tabs(), tools)));
+        edt(() -> {
+            manager.workspace(new WorkspaceStore(file, manager::snapshot, (delay, task) -> () -> { }, Runnable::run, aside -> { }));
+            JasperWindow restored = manager.ensureWindow("cold", null).orElseThrow();
+            assertThat(manager.windows()).as("exactly one window").containsExactly(restored);
+            assertThat(restored.content().tabs()).extracting(Tab::id).containsExactly(one);
+            assertThat(restored.content().toolWindows().railVisible()).isFalse();
+            assertThat(restored.content().railVisible()).as("its stripes hidden").isFalse();
+        });
+        launch();
     }
 
     /**
-     * Controller Ruling 4: a new window while none is open restores the saved windows first, so its first save cannot
-     * replace them; New Window and a plugin's tab placed in a new window alike.
+     * Full windows plan 1 Controller Ruling 10, until plan 4: a window opened beside another takes a copy of the most
+     * recently active window's tool windows, out of Zen and with its floating ones hidden; that window keeps its own.
      */
-    @Test void aNewWindowWhileNoneIsOpenRestoresTheSavedWindowsFirst(@TempDir Path folder) throws Exception {
+    @Test void aNewWindowCopiesTheActiveWindowsToolWindowsForANewWindow() throws Exception {
+        var floating = new UiState.Panel(Slot.RIGHT_TOP, 0, true, dev.jasper.app.dock.ToolWindowMode.FLOAT,
+            Optional.of(new UiState.Bounds(10, 10, 300, 200)));
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            first.content().toolWindows().putPanel("dev.x.floating", floating);
+            first.content().toggleZenMode();
+            first.events().activated().accept(true);
+            JasperWindow opened = manager.openWindow(null).orElseThrow();
+            assertThat(opened.content().toolWindows()).isNotSameAs(first.content().toolWindows());
+            assertThat(opened.content().zenMode()).isFalse();
+            assertThat(opened.content().toolWindows().zenMode()).isFalse();
+            assertThat(opened.content().toolWindows().panel("dev.x.floating").orElseThrow().visible()).isFalse();
+            assertThat(opened.content().toolWindows().panel("dev.x.floating").orElseThrow().window()).contains(new UiState.Bounds(10, 10, 300, 200));
+            assertThat(first.content().zenMode()).as("the active window unchanged").isTrue();
+            assertThat(first.content().toolWindows().panel("dev.x.floating")).contains(floating);
+        });
+        launch();
+    }
+
+    /** Full windows spec 6.1: a change to a window's tool windows asks for a save, as a change to its tabs does. */
+    @Test void aToolWindowChangeAsksForASave(@TempDir Path folder) throws Exception {
+        List<Runnable> scheduled = new ArrayList<>();
+        edt(() -> {
+            manager.workspace(new WorkspaceStore(folder.resolve("workspace.toml"), manager::snapshot,
+                (delay, task) -> { scheduled.add(task); return () -> { }; }, Runnable::run, aside -> { }));
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            // The window's opening scheduled a save: it runs, and nothing waits.
+            List.copyOf(scheduled).forEach(Runnable::run);
+            scheduled.clear();
+            first.content().setRailVisible(false);
+            assertThat(scheduled).as("a save is scheduled").isNotEmpty();
+        });
+        launch();
+    }
+
+    /**
+     * Controller Ruling 4: a new window while none is open restores the saved window first; New Window and a plugin's
+     * tab placed in a new window alike.
+     */
+    @Test void aNewWindowWhileNoneIsOpenRestoresTheSavedWindowFirst(@TempDir Path folder) throws Exception {
         Path file = folder.resolve("workspace.toml");
-        dev.jasper.app.layout.TabId one = dev.jasper.app.layout.TabId.random(), two = dev.jasper.app.layout.TabId.random();
-        WorkspaceFile.write(file, new WorkspaceFile.Snapshot(List.of(savedWindow(one), savedWindow(two))));
+        dev.jasper.app.layout.TabId one = dev.jasper.app.layout.TabId.random();
+        WorkspaceFile.write(file, new WorkspaceFile.Snapshot(savedWindow(one)));
         edt(() -> {
             manager.workspace(new WorkspaceStore(file, manager::snapshot, (delay, task) -> () -> { }, Runnable::run, aside -> { }));
             JasperWindow opened = manager.openWindow(null).orElseThrow();
-            assertThat(manager.windows()).as("the two restored, then the new one").hasSize(3).last().isSameAs(opened);
-            assertThat(manager.windows().get(0).content().tabs()).extracting(Tab::id).containsExactly(one);
-            assertThat(manager.windows().get(1).content().tabs()).extracting(Tab::id).containsExactly(two);
+            assertThat(manager.windows()).as("the restored one, then the new one").hasSize(2).last().isSameAs(opened);
+            assertThat(manager.windows().getFirst().content().tabs()).extracting(Tab::id).containsExactly(one);
             assertThat(opened.content().tabCount()).isEqualTo(1);
             manager.closeAll();
         });
@@ -895,8 +940,8 @@ class WindowManagerTest {
         edt(() -> {
             assertThat(manager.isEmpty()).isTrue();
             Tab away = model.tabs().open("dev.example.editor", "away", "away.txt", null, new JPanel(), TabRegistry.Placement.NEW_WINDOW);
-            assertThat(manager.windows()).as("the three saved as every window closed, then the tab's own").hasSize(4);
-            assertThat(manager.windows().get(0).content().tabs()).extracting(Tab::id).containsExactly(one);
+            assertThat(manager.windows()).as("the one saved as every window closed, then the tab's own").hasSize(2);
+            assertThat(manager.windows().getFirst().content().tabs()).extracting(Tab::id).containsExactly(one);
             assertThat(away.window()).isEqualTo(manager.windows().getLast().id());
         });
         launch();
@@ -906,6 +951,6 @@ class WindowManagerTest {
     private static WorkspaceFile.WindowRecord savedWindow(dev.jasper.app.layout.TabId item) {
         var parentTab = new dev.jasper.app.layout.ParentTab(ParentTabId.random(), dev.jasper.app.layout.Layout.of(item));
         return new WorkspaceFile.WindowRecord(Optional.empty(), 0, new ParentTabs(List.of(parentTab), parentTab.id()),
-            java.util.Map.of(item, new WorkspaceFile.TabRecord.Terminal("", HOME.toString(), "")));
+            java.util.Map.of(item, new WorkspaceFile.TabRecord.Terminal("", HOME.toString(), "")), ToolWindows.BUILT_IN);
     }
 }

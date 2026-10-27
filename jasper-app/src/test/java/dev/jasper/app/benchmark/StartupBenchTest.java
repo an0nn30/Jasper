@@ -8,6 +8,7 @@ import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.startup.StartupTraceFile;
 import java.io.IOException;
@@ -158,16 +159,16 @@ class StartupBenchTest {
     }
 
     /**
-     * The saved windows AOT training and every run in an isolated home restore: one window with one terminal tab,
-     * byte for byte what {@link WorkspaceFile#write} writes for it, so the seed cannot drift from the format.
+     * The saved window AOT training and every run in an isolated home restore: one window with one terminal tab and the
+     * built-in tool windows, byte for byte what {@link WorkspaceFile#write} writes for it, so the seed cannot drift from the format.
      */
     @Test void theWorkspaceSeedIsWhatWorkspaceFileWritesForOneWindowWithOneTerminalTab() throws Exception {
         TabId item = TabId.parse("00000000-0000-4000-8000-000000000001");
         GroupId pane = GroupId.parse("00000000-0000-4000-9000-000000000001");
         ParentTabId tab = ParentTabId.parse("00000000-0000-4000-a000-000000000001");
-        var expected = new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(Optional.of(new UiState.Bounds(100, 100, 960, 600)), 0,
+        var expected = new WorkspaceFile.Snapshot(new WorkspaceFile.WindowRecord(Optional.of(new UiState.Bounds(100, 100, 960, 600)), 0,
             ParentTabs.of(new ParentTab(tab, new Layout(new Group(pane, List.of(item), Optional.of(item)), pane, Optional.empty()))),
-            Map.of(item, new WorkspaceFile.TabRecord.Terminal("", "", "")))));
+            Map.of(item, new WorkspaceFile.TabRecord.Terminal("", "", "")), ToolWindows.BUILT_IN));
         Path seed = temp.resolve("workspace.toml");
         Files.writeString(seed, seed(), StandardCharsets.UTF_8);
         assertThat(WorkspaceFile.read(seed)).isEqualTo(new WorkspaceFile.Loaded.Restore(expected, Optional.empty()));

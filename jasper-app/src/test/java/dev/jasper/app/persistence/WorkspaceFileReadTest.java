@@ -12,6 +12,7 @@ import static dev.jasper.app.persistence.WorkspaceFileTest.tab;
 import static dev.jasper.app.persistence.WorkspaceFileTest.terminals;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.layout.Child;
 import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.Orientation;
@@ -61,7 +62,7 @@ class WorkspaceFileReadTest {
         return new Loaded.Restore(snapshot, Optional.empty());
     }
 
-    /** A restore of {@code snapshot} that dropped a window or a tab entry and kept the original file as {@code workspace.toml.bad}. */
+    /** A restore of {@code snapshot} that dropped a tab or an item entry and kept the original file as {@code workspace.toml.bad}. */
     Loaded.Restore keptAside(Snapshot snapshot) {
         return new Loaded.Restore(snapshot, Optional.of(bad()));
     }
@@ -76,9 +77,9 @@ class WorkspaceFileReadTest {
         return tab.value().toString();
     }
 
-    /** {@link WorkspaceFileTest#snapshot()} with its first window's one parent tab, or what it keeps, changed. */
+    /** {@link WorkspaceFileTest#snapshot()} with its window's one parent tab, or what it keeps, changed. */
     static Snapshot withMain(Optional<UiState.Bounds> bounds, int extendedState, Layout layout, Map<TabId, TabRecord> tabs) {
-        return new Snapshot(List.of(new WindowRecord(bounds, extendedState, one(1, layout), tabs), snapshot().windows().get(1)));
+        return new Snapshot(new WindowRecord(bounds, extendedState, one(1, layout), tabs, ToolWindows.BUILT_IN));
     }
 
     /** The layout a window shows: its shown parent tab's. */
@@ -97,7 +98,7 @@ class WorkspaceFileReadTest {
     static WindowRecord window(int first, int second) {
         ParentTabs layout = one(first, new Layout(new Split(Orientation.HORIZONTAL, List.of(new Child(group(first, first), 0.5),
             new Child(group(second, second), 0.5))), groupId(first), Optional.empty()));
-        return new WindowRecord(Optional.of(BOUNDS), 0, layout, terminals(layout));
+        return new WindowRecord(Optional.of(BOUNDS), 0, layout, terminals(layout), ToolWindows.BUILT_IN);
     }
 
     @Test void aWrittenWorkspaceReadsBackEqual() throws Exception {
@@ -106,17 +107,17 @@ class WorkspaceFileReadTest {
     }
 
     @Test void theEmptyWorkspaceReadsBack() throws Exception {
-        var empty = new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 0, one(1, Layout.empty()), Map.of())));
+        var empty = new Snapshot(new WindowRecord(Optional.of(BOUNDS), 0, one(1, Layout.empty()), Map.of(), ToolWindows.BUILT_IN));
         WorkspaceFile.write(file(), empty);
         assertThat(WorkspaceFile.read(file())).isEqualTo(clean(empty));
     }
 
     @Test void stringsWithQuotesBackslashesNewlinesAndOddKeysRoundTrip() throws Exception {
         ParentTabs layout = window(1, 2).layout();
-        var odd = new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 0, layout, Map.of(
+        var odd = new Snapshot(new WindowRecord(Optional.of(BOUNDS), 0, layout, Map.of(
             tab(1), new TabRecord.Terminal("say \"hi\"\tnow\nplease", "C:\\Users\\me\\caf\u00e9", "pwsh 7"),
             tab(2), new TabRecord.Content("", "dev.jasper.sample", "about",
-                Map.of("a b", "x\\y", "dotted.key", "\"quoted\"", "plain", "line\nbreak", "_-9", ""))))));
+                Map.of("a b", "x\\y", "dotted.key", "\"quoted\"", "plain", "line\nbreak", "_-9", ""))), ToolWindows.BUILT_IN));
         WorkspaceFile.write(file(), odd);
         assertThat(Files.readString(file()))
             .contains("state = { _-9 = \"\", \"a b\" = \"x\\\\y\", \"dotted.key\" = \"\\\"quoted\\\"\", plain = \"line\\u000Abreak\" }");
@@ -127,7 +128,7 @@ class WorkspaceFileReadTest {
         Layout drifting = new Layout(new Split(Orientation.HORIZONTAL, List.of(new Child(group(1, 1), 1), new Child(group(2, 2), 1),
             new Child(new Split(Orientation.VERTICAL, List.of(new Child(group(3, 3), 0.1), new Child(group(4, 4), 0.2),
                 new Child(group(5, 5), 0.7))), 1))), groupId(1), Optional.empty());
-        var saved = new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 0, one(1, drifting), terminals(one(1, drifting)))));
+        var saved = new Snapshot(new WindowRecord(Optional.of(BOUNDS), 0, one(1, drifting), terminals(one(1, drifting)), ToolWindows.BUILT_IN));
         WorkspaceFile.write(file(), saved);
         String first = Files.readString(file());
         var restored = (Loaded.Restore) WorkspaceFile.read(file());
@@ -137,16 +138,16 @@ class WorkspaceFileReadTest {
     }
 
     @Test void weightsAreNormalizedOnRead() throws Exception {
-        String text = WorkspaceFile.encode(new Snapshot(List.of(window(1, 2))));
+        String text = WorkspaceFile.encode(new Snapshot(window(1, 2)));
         text = replaceOnce(text, "weight = 0.5\nitem = \"" + id(tab(1)), "weight = 3\nitem = \"" + id(tab(1)));
         text = replaceOnce(text, "weight = 0.5\nitem = \"" + id(tab(2)), "weight = 1.0\nitem = \"" + id(tab(2)));
         var restored = (Loaded.Restore) read(text);
-        assertThat(((Split) shown(restored.snapshot().windows().getFirst()).root()).children()).extracting(Child::weight).containsExactly(0.75, 0.25);
+        assertThat(((Split) shown(restored.snapshot().window()).root()).children()).extracting(Child::weight).containsExactly(0.75, 0.25);
     }
 
     @Test void boundsAndTheChoicesFallBackAlone() throws Exception {
         String text = WorkspaceFile.encode(snapshot());
-        WindowRecord main = snapshot().windows().getFirst();
+        WindowRecord main = snapshot().window();
         Layout layout = shown(main);
         String g1 = groupId(1).value().toString(), g2 = groupId(2).value().toString();
         assertThat(read(replaceOnce(text, "width = 1400", "width = 0"))).as("bounds")
@@ -161,7 +162,7 @@ class WorkspaceFileReadTest {
 
     @Test void aBadTabEntryIsDroppedAlone() throws Exception {
         String text = WorkspaceFile.encode(snapshot());
-        WindowRecord main = snapshot().windows().getFirst();
+        WindowRecord main = snapshot().window();
         String t1 = "id = \"" + id(tab(1)) + "\"\n";
         var droppedTerminal = keptAside(withMain(main.bounds(), 6, shown(main).remove(tab(1)), without(main.tabs(), tab(1))));
         for (String[] change : new String[][] {
@@ -181,13 +182,13 @@ class WorkspaceFileReadTest {
                 {kind, "\"content::document\""},
                 {kind, "\"content:dev.jasper.editor:\""}})
             assertThat(read(replaceOnce(text, change[0], change[1]))).as(change[1]).isEqualTo(droppedContent);
-        String second = "\n[[windows.items]]\nid = \"" + id(tab(2)) + "\"\nkind = \"terminal\"\ntitle = \"\"\ndirectory = \"\"\nprofile = \"\"\n";
-        assertThat(read(beforeSecondWindow(text, second)))
+        String second = "\n[[window.items]]\nid = \"" + id(tab(2)) + "\"\nkind = \"terminal\"\ntitle = \"\"\ndirectory = \"\"\nprofile = \"\"\n";
+        assertThat(read(text + second))
             .as("the first entry for an id wins; the second is a dropped entry").isEqualTo(keptAside(snapshot()));
     }
 
     @Test void aGroupEmptiedByADroppedTabGoesAsRemoveWould() throws Exception {
-        WindowRecord main = snapshot().windows().getFirst();
+        WindowRecord main = snapshot().window();
         Layout expected = shown(main).remove(tab(3));
         Split left = new Split(Orientation.VERTICAL, List.of(new Child(group(1, 1), 0.5), new Child(group(5, 2), 0.5)));
         assertThat(expected.root()).isEqualTo(new Split(Orientation.HORIZONTAL, List.of(new Child(left, 0.5), new Child(group(3, 4), 0.5))));
@@ -199,7 +200,7 @@ class WorkspaceFileReadTest {
     }
 
     @Test void aTabWithoutAnEntryIsDroppedAndAnEntryNoGroupListsIsIgnored() throws Exception {
-        WindowRecord main = snapshot().windows().getFirst();
+        WindowRecord main = snapshot().window();
         Layout expected = shown(main).remove(tab(4));
         Split left = new Split(Orientation.VERTICAL, List.of(new Child(group(1, 1), 0.5), new Child(group(5, 2), 0.5)));
         assertThat(expected.root()).isEqualTo(new Split(Orientation.HORIZONTAL, List.of(new Child(left, 0.5), new Child(group(2, 3), 0.5))));
@@ -207,138 +208,91 @@ class WorkspaceFileReadTest {
             .isEqualTo(keptAside(withMain(main.bounds(), 6, expected, without(main.tabs(), tab(4)))));
     }
 
-    @Test void aBrokenTreeDropsItsWindowAlone() throws Exception {
-        String text = WorkspaceFile.encode(new Snapshot(List.of(window(1, 2), window(3, 4))));
-        var firstOnly = keptAside(new Snapshot(List.of(window(1, 2))));
-        String g3 = groupId(3).value().toString(), g4 = groupId(4).value().toString(), t3 = id(tab(3)), t4 = id(tab(4));
-        String split = "kind = \"split\"\norientation = \"horizontal\"\nparent = \"\"\nweight = 1.0\n\n[[windows.tabs.nodes]]\nid = \"" + g3 + "\"";
-        String g4Node = "id = \"" + g4 + "\"\nkind = \"pane\"\nparent = \"" + WorkspaceFile.splitId("") + "\"";
-        String g4Weight = "weight = 0.5\nitem = \"" + t4 + "\"";
-        String g3Item = "item = \"" + t3 + "\"";
+    /** A tab whose tree is broken is dropped; the window's only tab gone, the window cannot be read and is set aside. */
+    @Test void aBrokenTreeSetsTheFileAside() throws Exception {
+        String text = WorkspaceFile.encode(new Snapshot(window(1, 2)));
+        var setAside = new Loaded.Fresh(Optional.of(bad()));
+        String g1 = groupId(1).value().toString(), g2 = groupId(2).value().toString(), t1 = id(tab(1)), t2 = id(tab(2));
+        String split = "kind = \"split\"\norientation = \"horizontal\"\nparent = \"\"\nweight = 1.0\n\n[[window.tabs.nodes]]\nid = \"" + g1 + "\"";
+        String g2Node = "id = \"" + g2 + "\"\nkind = \"pane\"\nparent = \"" + WorkspaceFile.splitId("") + "\"";
+        String g2Weight = "weight = 0.5\nitem = \"" + t2 + "\"";
+        String g1Item = "item = \"" + t1 + "\"";
         for (String[] change : new String[][] {
                 {split, split.replace("kind = \"split\"", "kind = \"group\"")},
                 {split, split.replace("horizontal", "diagonal")},
-                {g4Weight, g4Weight.replace("0.5", "-1.0")},
-                {g4Weight, g4Weight.replace("0.5", "\"half\"")},
-                {g4Node, "id = \"" + g4 + "\"\nkind = \"pane\"\nparent = \"\""},
-                {g4Node, "id = \"" + g4 + "\"\nkind = \"pane\"\nparent = \"" + g3 + "\""},
-                {g4Node, "id = \"" + g4 + "\"\nkind = \"pane\"\nparent = \"00000000-0000-4000-9000-000000000099\""},
-                {g3Item, "item = [\"" + t3 + "\"]"},
-                {g3Item, "item = 3"},
-                {g3Item, "item = \"three\""},
-                {g3Item, "item = \"\""},
-                {g3Item, "note = \"no item key\""},
-                {"id = \"" + g3 + "\"", "id = \"pane-three\""}})
-            assertThat(read(replaceOnce(text, change[0], change[1]))).as(change[1]).isEqualTo(firstOnly);
-        // After the items, these nodes still join the second window's last tab.
-        String cycle = "\n[[windows.tabs.nodes]]\nid = \"x\"\nkind = \"split\"\norientation = \"vertical\"\nparent = \"y\"\nweight = 0.5\n"
-            + "\n[[windows.tabs.nodes]]\nid = \"y\"\nkind = \"split\"\norientation = \"horizontal\"\nparent = \"x\"\nweight = 0.5\n";
-        assertThat(read(text + cycle)).as("a cycle under no root").isEqualTo(firstOnly);
+                {g2Weight, g2Weight.replace("0.5", "-1.0")},
+                {g2Weight, g2Weight.replace("0.5", "\"half\"")},
+                {g2Node, "id = \"" + g2 + "\"\nkind = \"pane\"\nparent = \"\""},
+                {g2Node, "id = \"" + g2 + "\"\nkind = \"pane\"\nparent = \"" + g1 + "\""},
+                {g2Node, "id = \"" + g2 + "\"\nkind = \"pane\"\nparent = \"00000000-0000-4000-9000-000000000099\""},
+                {g1Item, "item = [\"" + t1 + "\"]"},
+                {g1Item, "item = 3"},
+                {g1Item, "item = \"three\""},
+                {g1Item, "item = \"\""},
+                {g1Item, "note = \"no item key\""},
+                {"id = \"" + g1 + "\"", "id = \"pane-one\""}}) {
+            String broken = replaceOnce(text, change[0], change[1]);
+            assertThat(read(broken)).as(change[1]).isEqualTo(setAside);
+            assertThat(Files.readString(bad())).as(change[1]).isEqualTo(broken);
+        }
+        // After the items, these nodes still join the window's last tab.
+        String cycle = "\n[[window.tabs.nodes]]\nid = \"x\"\nkind = \"split\"\norientation = \"vertical\"\nparent = \"y\"\nweight = 0.5\n"
+            + "\n[[window.tabs.nodes]]\nid = \"y\"\nkind = \"split\"\norientation = \"horizontal\"\nparent = \"x\"\nweight = 0.5\n";
+        assertThat(read(text + cycle)).as("a cycle under no root").isEqualTo(setAside);
     }
 
-    @Test void aTreeDeeperThanTheLimitDropsItsWindow() throws Exception {
-        var main = new WindowRecord(Optional.of(BOUNDS), 0, one(1, Layout.of(tab(1))), Map.of(tab(1), new TabRecord.Terminal("", "/tmp", "")));
+    @Test void aTreeDeeperThanTheLimitDropsItsTab() throws Exception {
         for (int depth : new int[] {WorkspaceFile.MAX_DEPTH, WorkspaceFile.MAX_DEPTH + 1}) {
             Layout nested = Layout.of(tab(100));
             for (int i = 1; i <= depth; i++)
                 nested = nested.split(tab(100 + i), nested.groupOf(tab(99 + i)).orElseThrow(), i % 2 == 0 ? Side.RIGHT : Side.DOWN);
-            var saved = new Snapshot(List.of(main, new WindowRecord(Optional.empty(), 0, one(2, nested), terminals(one(2, nested)))));
+            var tabs = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(2), nested)), parentTabId(1));
+            var saved = new Snapshot(new WindowRecord(Optional.of(BOUNDS), 0, tabs, terminals(tabs), ToolWindows.BUILT_IN));
+            var kept = ParentTabs.of(new ParentTab(parentTabId(1), single(1)));
             WorkspaceFile.write(file(), saved);
             assertThat(WorkspaceFile.read(file())).as("depth %d", depth)
-                .isEqualTo(depth > WorkspaceFile.MAX_DEPTH ? keptAside(new Snapshot(List.of(main))) : clean(saved));
+                .isEqualTo(depth > WorkspaceFile.MAX_DEPTH
+                    ? keptAside(new Snapshot(new WindowRecord(Optional.of(BOUNDS), 0, kept, terminals(kept), ToolWindows.BUILT_IN))) : clean(saved));
         }
     }
 
-    @Test void windowsWhoseRootSplitsShareAnIdAreReadApart() throws Exception {
-        var both = new Snapshot(List.of(window(1, 2), window(3, 4)));
-        WorkspaceFile.write(file(), both);
-        assertThat(Files.readString(file()).split(Pattern.quote(WorkspaceFile.splitId("")), -1))
-            .as("each window's root split names itself and is the parent of its two groups").hasSize(7);
-        assertThat(WorkspaceFile.read(file())).isEqualTo(clean(both));
-    }
-
-    /** Full windows spec 5.1: any window may be empty, so a window whose every item is dropped keeps its empty workspace. */
-    @Test void aWindowEmptiedByDroppedItemsStaysAndAWindowHoldingAnotherWindowsTabIsDropped() throws Exception {
-        String text = WorkspaceFile.encode(snapshot());
-        var firstOnly = keptAside(new Snapshot(List.of(snapshot().windows().getFirst())));
+    /** Full windows spec 5.1: the window may be empty, so a window whose every item is dropped keeps its empty workspace. */
+    @Test void aWindowEmptiedByDroppedItemsKeepsItsEmptyWorkspace() throws Exception {
+        ParentTabs held = one(5, single(5));
+        String text = WorkspaceFile.encode(new Snapshot(new WindowRecord(Optional.of(BOUNDS), 0, held, terminals(held), ToolWindows.BUILT_IN)));
         String t5 = "id = \"" + id(tab(5)) + "\"\n";
         var emptied = (Loaded.Restore) read(replaceOnce(text, t5 + "kind = \"terminal\"", t5 + "kind = \"x\""));
         assertThat(emptied.keptAside()).as("a dropped item keeps the file aside").contains(bad());
-        assertThat(emptied.snapshot().windows()).hasSize(2);
-        assertThat(emptied.snapshot().windows().getFirst()).isEqualTo(snapshot().windows().getFirst());
-        assertThat(emptied.snapshot().windows().get(1).layout().isEmpty()).as("its empty workspace").isTrue();
-        assertThat(text.split(Pattern.quote(id(tab(5))), -1)).as("its pane's item and its entry").hasSize(3);
-        assertThat(read(text.replace(id(tab(5)), id(tab(1))))).as("a tab the first window holds").isEqualTo(firstOnly);
+        assertThat(emptied.snapshot().window().layout().isEmpty()).as("its empty workspace").isTrue();
     }
 
-    /** {@code text}, two windows, with the second listed first. */
-    static String secondFirst(String text) {
-        String head = "version = 1\n";
-        int second = secondWindow(text);
-        return head + text.substring(second) + text.substring(head.length(), second);
-    }
-
-    /** Where the second window's entry starts in {@code text}. */
-    static int secondWindow(String text) {
-        int first = text.indexOf("\n[[windows]]\n");
-        int second = text.indexOf("\n[[windows]]\n", first + 1);
-        assertThat(second).as("the second window's entry").isGreaterThan(first);
-        return second;
-    }
-
-    /** {@code text} with {@code insert} just before the second window's entry. */
-    static String beforeSecondWindow(String text, String insert) {
-        int second = secondWindow(text);
-        return text.substring(0, second) + insert + text.substring(second);
-    }
-
-    /** Workspace plan 6a Rulings 26: of two windows whose ids clash, the one listed later is dropped. */
-    @Test void ofTwoWindowsWhoseIdsClashTheOneListedLaterIsDropped() throws Exception {
-        String text = WorkspaceFile.encode(new Snapshot(List.of(window(1, 2), window(3, 4))));
-        assertThat(read(secondFirst(text))).as("no clash: both windows, in file order")
-            .isEqualTo(clean(new Snapshot(List.of(window(3, 4), window(1, 2)))));
-        var tabClash = (Loaded.Restore) read(secondFirst(text.replace(id(tab(3)), id(tab(1)))));
-        assertThat(tabClash.snapshot().windows()).as("a tab an earlier window holds").singleElement()
-            .satisfies(kept -> assertThat(kept.layout().tabs()).containsExactlyInAnyOrder(tab(1), tab(4)));
-        var groupClash = (Loaded.Restore) read(secondFirst(text.replace(groupId(3).value().toString(), groupId(1).value().toString())));
-        assertThat(groupClash.snapshot().windows()).as("a group an earlier window holds").singleElement()
-            .satisfies(kept -> assertThat(kept.layout().tabs()).containsExactlyInAnyOrder(tab(3), tab(4)));
-    }
-
-    @Test void aWindowSharingAGroupIdWithAnEarlierWindowIsDroppedAlone() throws Exception {
-        String text = WorkspaceFile.encode(new Snapshot(List.of(window(1, 2), window(3, 4))));
-        var firstOnly = keptAside(new Snapshot(List.of(window(1, 2))));
-        assertThat(read(text.replace(groupId(3).value().toString(), groupId(1).value().toString())))
-            .as("the groups clash and no tab does").isEqualTo(firstOnly);
-    }
-
-    /** Two windows, the second one's entry broken: only the first can be restored. */
-    static String secondWindowBroken() {
-        String text = WorkspaceFile.encode(new Snapshot(List.of(window(1, 2), window(3, 4))));
-        return replaceOnce(text, "item = \"" + id(tab(3)) + "\"", "item = 3");
+    /** {@link WorkspaceFileTest#parentTabs()}'s text, its first tab's only item an entry that cannot be read. */
+    static String firstTabBroken() {
+        String t1 = "id = \"" + id(tab(1)) + "\"\nkind = ";
+        return replaceOnce(WorkspaceFile.encode(parentTabs()), t1 + "\"terminal\"", t1 + "\"telnet\"");
     }
 
     @Test void aFileThatDroppedNothingKeepsNothingAside() throws Exception {
         WorkspaceFile.write(file(), snapshot());
         assertThat(WorkspaceFile.read(file())).isEqualTo(clean(snapshot()));
         assertThat(bad()).doesNotExist();
-        WindowRecord main = snapshot().windows().getFirst();
+        WindowRecord main = snapshot().window();
         assertThat(read(replaceOnce(WorkspaceFile.encode(snapshot()), "width = 1400", "width = 0"))).as("bounds fall back alone")
             .isEqualTo(clean(withMain(Optional.empty(), 6, shown(main), main.tabs())));
         assertThat(bad()).as("a fallback is not a drop").doesNotExist();
     }
 
-    @Test void aDroppedWindowKeepsTheOriginalFileAside() throws Exception {
-        String broken = secondWindowBroken();
+    @Test void aDroppedTabKeepsTheOriginalFileAside() throws Exception {
+        String broken = firstTabBroken();
         Files.writeString(bad(), "an older copy");
-        assertThat(read(broken)).isEqualTo(keptAside(new Snapshot(List.of(window(1, 2)))));
+        assertThat(read(broken)).isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(2), single(2))))));
         assertThat(Files.readString(bad())).as("the original text, replacing the older copy").isEqualTo(broken);
         assertThat(Files.readString(file())).as("the file itself is left in place").isEqualTo(broken);
     }
 
     @Test void aDroppedTabEntryOrATabWithoutOneKeepsTheOriginalFileAside() throws Exception {
         String text = WorkspaceFile.encode(snapshot());
-        WindowRecord main = snapshot().windows().getFirst();
+        WindowRecord main = snapshot().window();
         String badEntry = replaceOnce(text, "directory = \"/Users/me/src/jasper\"", "directory = 5");
         assertThat(read(badEntry)).isEqualTo(keptAside(withMain(main.bounds(), 6, shown(main).remove(tab(1)), without(main.tabs(), tab(1)))));
         assertThat(Files.readString(bad())).as("a bad tab entry").isEqualTo(badEntry);
@@ -349,14 +303,14 @@ class WorkspaceFileReadTest {
 
     @Test void aFailureToKeepTheCopyIsLoggedAndReportsNothing() throws Exception {
         Files.createDirectories(bad().resolve("occupied"));
-        assertThat(read(secondWindowBroken())).as("a directory stands where the copy would go")
-            .isEqualTo(clean(new Snapshot(List.of(window(1, 2)))));
+        assertThat(read(firstTabBroken())).as("a directory stands where the copy would go")
+            .isEqualTo(clean(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(2), single(2))))));
         assertThat(file()).exists();
     }
 
-    /** {@link WorkspaceFileTest#parentTabs()} with its first window's parent tabs changed. */
+    /** {@link WorkspaceFileTest#parentTabs()} with its window's parent tabs changed. */
     static Snapshot withParentTabs(ParentTabs main) {
-        return new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 0, main, terminals(main)), parentTabs().windows().get(1)));
+        return new Snapshot(new WindowRecord(Optional.of(BOUNDS), 0, main, terminals(main), ToolWindows.BUILT_IN));
     }
 
     @Test void parentTabsReadBackInBarOrderWithTheOneThatShows() throws Exception {
@@ -370,11 +324,7 @@ class WorkspaceFileReadTest {
             groupId(3), Optional.of(groupId(3)));
         var main = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(5)), new ParentTab(parentTabId(2), columns),
             new ParentTab(parentTabId(3), single(6))), parentTabId(2));
-        Layout rows = new Layout(new Split(Orientation.VERTICAL, List.of(new Child(group(7, 7), 0.25), new Child(group(8, 9), 0.75))),
-            groupId(8), Optional.empty());
-        var full = new ParentTabs(List.of(new ParentTab(parentTabId(4), single(10)), new ParentTab(parentTabId(5), rows)), parentTabId(5));
-        var saved = new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 6, main, terminals(main)),
-            new WindowRecord(Optional.empty(), 0, full, terminals(full))));
+        var saved = new Snapshot(new WindowRecord(Optional.of(BOUNDS), 6, main, terminals(main), ToolWindows.BUILT_IN));
         WorkspaceFile.write(file(), saved);
         String first = Files.readString(file());
         var restored = WorkspaceFile.read(file());
@@ -406,7 +356,7 @@ class WorkspaceFileReadTest {
             .as("its window keeps its other parent tab").isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(2), single(2))))));
     }
 
-    /** Workspace plan 6a Rulings 26: as with two windows, the later of two parent tabs whose ids clash is dropped alone. */
+    /** Workspace plan 6a Rulings 26: the later of two parent tabs whose ids clash is dropped alone. */
     @Test void aParentTabRepeatingAnEarlierOnesIdsIsDroppedAlone() throws Exception {
         String text = WorkspaceFile.encode(parentTabs());
         String p2 = parentTabId(2).value().toString(), g2 = groupId(2).value().toString(), t2 = id(tab(2));
@@ -417,7 +367,7 @@ class WorkspaceFileReadTest {
         cases.put("the first one's pane", text.replace(g2, groupId(1).value().toString()));
         cases.put("the first one's item", text.replace(t2, id(tab(1))));
         for (var change : cases.entrySet())
-            assertThat(read(change.getValue())).as("the first window keeps its first tab when its second repeats %s", change.getKey())
+            assertThat(read(change.getValue())).as("the window keeps its first tab when its second repeats %s", change.getKey())
                 .isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(1), single(1))))));
     }
 
@@ -429,17 +379,9 @@ class WorkspaceFileReadTest {
         String text = WorkspaceFile.encode(parentTabs());
         String t2 = id(tab(2));
         String twoItems = replaceOnce(text, "item = \"" + t2 + "\"", "item = [\"" + t2 + "\", \"" + id(tab(9)) + "\"]");
-        assertThat(read(twoItems)).as("the first window keeps its first tab, which shows")
+        assertThat(read(twoItems)).as("the window keeps its first tab, which shows")
             .isEqualTo(keptAside(withParentTabs(ParentTabs.of(new ParentTab(parentTabId(1), single(1))))));
         assertThat(Files.readString(bad())).isEqualTo(twoItems);
-    }
-
-    @Test void aWindowHoldingAParentTabAnEarlierWindowHoldsIsDropped() throws Exception {
-        String text = WorkspaceFile.encode(parentTabs());
-        String p3 = "id = \"" + parentTabId(3).value() + "\"\n";
-        assertThat(read(replaceOnce(text, p3, "id = \"" + parentTabId(1).value() + "\"\n")))
-            .as("parent tab ids are unique across windows (workspace plan 7b Rulings 10)")
-            .isEqualTo(keptAside(new Snapshot(List.of(parentTabs().windows().getFirst()))));
     }
 
     /**
@@ -448,9 +390,9 @@ class WorkspaceFileReadTest {
      */
     @Test void aFileInTheParentTabsWordsIsSetAside() throws Exception {
         String old = WorkspaceFile.encode(parentTabs())
-            .replace("[[windows.tabs]]", "[[windows.parent_tabs]]")
-            .replace("[[windows.tabs.nodes]]", "[[windows.parent_tabs.nodes]]")
-            .replace("[[windows.items]]", "[[windows.tabs]]")
+            .replace("[[window.tabs]]", "[[window.parent_tabs]]")
+            .replace("[[window.tabs.nodes]]", "[[window.parent_tabs.nodes]]")
+            .replace("[[window.items]]", "[[window.tabs]]")
             .replace("shown_tab = ", "active_parent_tab = ")
             .replace("active_pane = ", "active_group = ");
         assertThat(read(old)).isEqualTo(new Loaded.Fresh(Optional.of(bad())));
@@ -469,10 +411,11 @@ class WorkspaceFileReadTest {
         var cases = new LinkedHashMap<String, byte[]>();
         cases.put("not TOML", "not toml = = =".getBytes(StandardCharsets.UTF_8));
         cases.put("empty", new byte[0]);
-        cases.put("version 2", replaceOnce(valid, "version = 1", "version = 2").getBytes(StandardCharsets.UTF_8));
-        cases.put("no version", replaceOnce(valid, "version = 1\n", "").getBytes(StandardCharsets.UTF_8));
-        cases.put("no windows", "version = 1\n".getBytes(StandardCharsets.UTF_8));
-        cases.put("no window that reads", "version = 1\n\n[[windows]]\nx = 40\n".getBytes(StandardCharsets.UTF_8));
+        cases.put("version 3", replaceOnce(valid, "version = 2", "version = 3").getBytes(StandardCharsets.UTF_8));
+        cases.put("no version", replaceOnce(valid, "version = 2\n", "").getBytes(StandardCharsets.UTF_8));
+        cases.put("no window", "version = 2\n".getBytes(StandardCharsets.UTF_8));
+        cases.put("no window that reads", "version = 2\n\n[window]\nx = 40\n".getBytes(StandardCharsets.UTF_8));
+        cases.put("the window as an array", replaceOnce(valid, "\n[window]\n", "\n[[window]]\n").getBytes(StandardCharsets.UTF_8));
         cases.put("invalid UTF-8", new byte[] {'v', (byte) 0xC3, (byte) 0x28});
         for (var entry : cases.entrySet()) {
             Files.write(file(), entry.getValue());
@@ -483,7 +426,7 @@ class WorkspaceFileReadTest {
     }
 
     @Test void aNestingThatOverflowsTheParserIsSetAside() throws Exception {
-        String deep = "version = 1\nx = " + "[".repeat(250_000);
+        String deep = "version = 2\nx = " + "[".repeat(250_000);
         assertThat(deep.length()).as("under the cap: the parser, not the cap, refuses it").isLessThan(WorkspaceFile.MAX_BYTES);
         assertThat(read(deep)).isEqualTo(new Loaded.Fresh(Optional.of(bad())));
     }
@@ -494,5 +437,35 @@ class WorkspaceFileReadTest {
         assertThat(atCap.getBytes(StandardCharsets.UTF_8)).hasSize(WorkspaceFile.MAX_BYTES);
         assertThat(read(atCap)).isEqualTo(clean(snapshot()));
         assertThat(read(atCap.replace("#", "# "))).isEqualTo(new Loaded.Fresh(Optional.of(bad())));
+    }
+
+    /** Full windows spec 6.1: Jasper keeps no migration; a version 1 file (several windows) is no saved state, left as it is. */
+    @Test void aVersionOneFileIsReadAsNoSavedStateAndLeftInPlace() throws Exception {
+        String old = WorkspaceFile.encode(snapshot()).replace("version = 2\n", "version = 1\n")
+            .replace("\n[window.tool_windows]\nrail_visible = true\nzen_mode = false\n", "")
+            .replace("\n[window]\n", "\n[[windows]]\n").replace("[[window.", "[[windows.");
+        assertThat(old).startsWith("version = 1\n\n[[windows]]\n").doesNotContain("\n[window]", "[[window.", "tool_windows");
+        assertThat(read(old)).isEqualTo(new Loaded.Fresh(Optional.empty()));
+        assertThat(Files.readString(file())).as("left in place, unchanged").isEqualTo(old);
+        assertThat(bad()).doesNotExist();
+    }
+
+    /** Full windows spec 6.1: a bad tool-window entry falls back alone, as it did in ui-state.toml; nothing is kept aside. */
+    @Test void aBadToolWindowEntryFallsBackAlone() throws Exception {
+        WindowRecord main = snapshot().window();
+        var tools = new ToolWindows(false, false, Map.of("", new ToolWindows.Look(Map.of(
+            "dev.x.good", new UiState.Panel(Slot.LEFT_TOP, 0, true),
+            "dev.x.bad", new UiState.Panel(Slot.RIGHT_TOP, 1, true)), new UiState.Dock(300, 280, 180, 0.25, 0.5, 0.75))));
+        String text = WorkspaceFile.encode(new Snapshot(new WindowRecord(main.bounds(), main.extendedState(), main.layout(), main.tabs(), tools)));
+        String broken = replaceOnce(replaceOnce(text, "slot = \"RIGHT_TOP\"", "slot = \"NOWHERE\""), "left_width = 300", "left_width = \"wide\"");
+        var expected = new ToolWindows(false, false, Map.of("", new ToolWindows.Look(Map.of("dev.x.good", new UiState.Panel(Slot.LEFT_TOP, 0, true)),
+            new UiState.Dock(UiState.Dock.DEFAULT.leftWidth(), 280, 180, 0.25, 0.5, 0.75))));
+        assertThat(read(broken)).as("the panel with an unknown slot and the bad width fall back; the rest and the tabs come back")
+            .isEqualTo(clean(new Snapshot(new WindowRecord(main.bounds(), main.extendedState(), main.layout(), main.tabs(), expected))));
+        assertThat(read(replaceOnce(text, "zen_mode = false\n", "zen_mode = 5\n"))).as("a key of the wrong type")
+            .isEqualTo(clean(new Snapshot(new WindowRecord(main.bounds(), main.extendedState(), main.layout(), main.tabs(), tools))));
+        String scalar = replaceOnce(WorkspaceFile.encode(snapshot()), "\n[window.tool_windows]\nrail_visible = true\nzen_mode = false\n", "tool_windows = 5\n");
+        assertThat(read(scalar)).as("a scalar where the table belongs: the built-in tool windows").isEqualTo(clean(snapshot()));
+        assertThat(bad()).doesNotExist();
     }
 }

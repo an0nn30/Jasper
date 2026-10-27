@@ -36,13 +36,15 @@ import org.tomlj.TomlParseResult;
 import org.tomlj.TomlTable;
 
 /**
- * The saved workspace, {@code workspace.toml} in the Jasper home (workspace tabs spec, section 8; tabs and panes spec 12):
- * each Jasper window's bounds and maximized state, its tabs in strip order with the one it shows, each tab's split
- * layout of panes with its active pane, each pane's one item, and what each item needs to come back. The file says
- * window, tab, pane and item, as the spec does; the code calls a tab a parent tab, a pane a group and an item a tab
- * (workspace plan 8a Rulings 1). {@link #write} writes it atomically; {@link #read} never throws: it drops bad item, tab
- * and window entries alone, keeping a copy of the file as {@code workspace.toml.bad}, and sets an unreadable file aside
- * under that name. Stateless: the caller chooses the thread; the values are immutable.
+ * The saved workspace, {@code workspace.toml} in the Jasper home (workspace tabs spec, section 8; tabs and panes spec 12;
+ * full windows spec 6.1): one Jasper window's state, the last state: its bounds and maximized state, its tabs in strip
+ * order with the one it shows, each tab's split layout of panes with its active pane, each pane's one item, what each
+ * item needs to come back, and its tool windows. The file says window, tab, pane and item, as the spec does; the code
+ * calls a tab a parent tab, a pane a group and an item a tab (workspace plan 8a Rulings 1). {@link #write} writes it
+ * atomically; {@link #read} never throws: it drops bad item and tab entries alone, keeping a copy of the file as
+ * {@code workspace.toml.bad}, lets a bad tool-window entry fall back alone, sets an unreadable file aside under that
+ * name, and reads a version 1 file (several windows, no tool windows) as no saved state, leaving it in place.
+ * Stateless: the caller chooses the thread; the values are immutable.
  */
 public final class WorkspaceFile {
     /** What an item needs to come back (spec 13): a terminal's title, directory and profile, or a plugin's restore state. */
@@ -97,12 +99,15 @@ public final class WorkspaceFile {
      * @param layout what it holds (tabs and panes spec 4): its tabs, whose shown one is its active one; its only
      *     tab may be empty, the empty workspace
      * @param tabs a record for exactly each item of the layout
+     * @param tools its tool windows
      */
-    public record WindowRecord(Optional<UiState.Bounds> bounds, int extendedState, ParentTabs layout, Map<TabId, TabRecord> tabs) {
+    public record WindowRecord(Optional<UiState.Bounds> bounds, int extendedState, ParentTabs layout, Map<TabId, TabRecord> tabs,
+                               ToolWindows tools) {
         /** Copies the records and checks them against the layout. */
         public WindowRecord {
             Objects.requireNonNull(bounds, "bounds");
             Objects.requireNonNull(layout, "layout");
+            Objects.requireNonNull(tools, "tools");
             if ((extendedState & ~6) != 0) throw new IllegalArgumentException("Only the maximized bits are kept: " + extendedState);
             tabs = Map.copyOf(tabs);
             if (!tabs.keySet().equals(Set.copyOf(layout.tabs())))
@@ -111,28 +116,14 @@ public final class WorkspaceFile {
     }
 
     /**
-     * Every Jasper window to restore, in the order they come back: the first is the one brought to the front.
+     * The window to restore, the last state (full windows spec 6.1).
      *
-     * @param windows at least one window; no tab, pane or item in two windows
+     * @param window the window
      */
-    public record Snapshot(List<WindowRecord> windows) {
-        /** Copies the windows and checks the ids. */
+    public record Snapshot(WindowRecord window) {
+        /** Checks the window is present. */
         public Snapshot {
-            var ordered = List.copyOf(windows);
-            if (ordered.isEmpty()) throw new IllegalArgumentException("A workspace has at least one window");
-            var groups = new HashSet<GroupId>();
-            var tabs = new HashSet<TabId>();
-            var parentTabs = new HashSet<ParentTabId>();
-            for (WindowRecord window : ordered) {
-                for (GroupId group : groupIds(window.layout()))
-                    if (!groups.add(group)) throw new IllegalArgumentException("Group " + group + " is in two windows");
-                for (TabId tab : window.layout().tabs())
-                    if (!tabs.add(tab)) throw new IllegalArgumentException("Tab " + tab + " is in two windows");
-                // Parent tab ids stay unique across windows (workspace plan 7b Rulings 10).
-                for (ParentTabId parent : parentTabIds(window.layout()))
-                    if (!parentTabs.add(parent)) throw new IllegalArgumentException("Parent tab " + parent + " is in two windows");
-            }
-            windows = ordered;
+            Objects.requireNonNull(window, "window");
         }
     }
 
@@ -141,9 +132,9 @@ public final class WorkspaceFile {
         /**
          * The saved workspace, its bad entries dropped. A window whose only tab is empty restores the empty workspace.
          *
-         * @param snapshot the windows to restore
-         * @param keptAside where the original file was copied ({@code workspace.toml.bad} beside it) because a window, a
-         *     tab or an item entry was dropped, so the caller can tell the user and a later save does not lose the dropped
+         * @param snapshot the window to restore
+         * @param keptAside where the original file was copied ({@code workspace.toml.bad} beside it) because a tab or an
+         *     item entry was dropped, so the caller can tell the user and a later save does not lose the dropped
          *     text for good; empty when nothing was dropped or the copy failed
          */
         record Restore(Snapshot snapshot, Optional<Path> keptAside) implements Loaded {
@@ -158,7 +149,7 @@ public final class WorkspaceFile {
          * Nothing to restore: start with one terminal tab (spec 8).
          *
          * @param setAside where an unreadable file was moved ({@code workspace.toml.bad} beside it); empty when there was
-         *     no file or it could not be moved
+         *     no file, it was an older version's, or it could not be moved
          */
         record Fresh(Optional<Path> setAside) implements Loaded {
             /** Checks the value is present. */
@@ -168,6 +159,8 @@ public final class WorkspaceFile {
         }
     }
 
+    /** The version {@link #write} writes; a version 1 file is read as no saved state, any other is set aside. */
+    static final long VERSION = 2;
     /** The largest file read, in bytes: {@code ui-state.toml}'s cap (workspace plan 2, Rulings 15); a larger one is set aside. */
     public static final int MAX_BYTES = 256 * 1024;
     /** The deepest a saved tree may nest (workspace plan 2, Rulings 14); it bounds the reader's recursion. */
@@ -178,14 +171,14 @@ public final class WorkspaceFile {
      * Reads {@code file}; never throws, not even when tomlj's parser overflows the stack on deep nesting (workspace plan 2,
      * Rulings 13 and 14). A bad item entry, or an item a pane names without one, is dropped as
      * {@link Layout#remove(TabId)} drops it, and a tab it leaves with no item goes
-     * ({@link #keeping(ParentTabs, Predicate)}); a bad tab or window entry is dropped; bounds and choices fall
-     * back alone. When a window, a tab or an item entry was dropped, the original file is copied to
-     * {@code workspace.toml.bad} beside it,
-     * replacing an older one, and {@link Loaded.Restore#keptAside()} reports the copy. A file that cannot be read, does
-     * not parse, has another version or keeps no window is moved to {@code workspace.toml.bad} instead.
+     * ({@link #keeping(ParentTabs, Predicate)}); a bad tab entry is dropped; bounds, choices and tool-window entries
+     * fall back alone. When a tab or an item entry was dropped, the original file is copied to
+     * {@code workspace.toml.bad} beside it, replacing an older one, and {@link Loaded.Restore#keptAside()} reports the
+     * copy. A version 1 file is no saved state and stays where it is. A file that cannot be read, does not parse, has
+     * another version or keeps no readable window is moved to {@code workspace.toml.bad} instead.
      *
      * @param file the workspace file
-     * @return the windows to restore and any copy kept, or that Jasper starts fresh and what was set aside
+     * @return the window to restore and any copy kept, or that Jasper starts fresh and what was set aside
      */
     public static Loaded read(Path file) {
         String text;
@@ -203,10 +196,14 @@ public final class WorkspaceFile {
             // tomlj's parser has no nesting guard: deeply nested arrays overflow the stack inside Toml.parse.
             return setAside(file, invalid);
         }
+        if (parsed == null) {
+            LOG.log(System.Logger.Level.INFO, "Not restoring the workspace state " + file + ": an older version's");
+            return new Loaded.Fresh(Optional.empty());
+        }
         return new Loaded.Restore(parsed.snapshot(), parsed.dropped() ? keepCopy(file) : Optional.empty());
     }
 
-    /** What {@link #parse} read, and whether it dropped any window, tab or item entry. */
+    /** What {@link #parse} read, and whether it dropped any tab or item entry. */
     private record Parsed(Snapshot snapshot, boolean dropped) { }
 
     /** Copies the original file beside itself as {@code workspace.toml.bad}; empty, and logged, when that fails. */
@@ -245,43 +242,25 @@ public final class WorkspaceFile {
         return new Loaded.Fresh(Optional.of(bad));
     }
 
+    /** The file's window; null for a version 1 file, which is no saved state. */
     private static Parsed parse(String text) throws IOException {
         TomlParseResult toml = Toml.parse(text);
         if (toml.hasErrors()) throw new IOException("Invalid workspace state: " + toml.errors().getFirst());
         Object version = toml.get(List.of("version"));
-        if (!Long.valueOf(1).equals(version)) throw new IOException("Unknown workspace state version: " + version);
+        if (Long.valueOf(1).equals(version)) return null;
+        if (!Long.valueOf(VERSION).equals(version)) throw new IOException("Unknown workspace state version: " + version);
         var dropped = new ArrayList<String>();
-        var read = new ArrayList<WindowRecord>();
-        if (toml.get(List.of("windows")) instanceof TomlArray entries)
-            for (int i = 0; i < entries.size(); i++) window(entries.get(i), dropped).ifPresent(read::add);
-        var windows = new ArrayList<WindowRecord>();
-        var groups = new HashSet<GroupId>();
-        var tabs = new HashSet<TabId>();
-        var parentTabs = new HashSet<ParentTabId>();
-        for (WindowRecord window : read) {
-            List<GroupId> ids = groupIds(window.layout());
-            List<ParentTabId> parents = parentTabIds(window.layout());
-            if (ids.stream().anyMatch(groups::contains) || window.layout().tabs().stream().anyMatch(tabs::contains)
-                    || parents.stream().anyMatch(parentTabs::contains)) {
-                drop(dropped, "Dropping a window whose tabs, panes or items an earlier window holds");
-            } else {
-                groups.addAll(ids);
-                tabs.addAll(window.layout().tabs());
-                parentTabs.addAll(parents);
-                windows.add(window);
-            }
-        }
-        if (windows.isEmpty()) throw new IOException("The workspace state keeps no window");
-        return new Parsed(new Snapshot(windows), !dropped.isEmpty());
+        Optional<WindowRecord> window = toml.get(List.of("window")) instanceof TomlTable entry ? window(entry, dropped) : Optional.empty();
+        if (window.isEmpty()) throw new IOException("The workspace state keeps no window");
+        return new Parsed(new Snapshot(window.get()), !dropped.isEmpty());
     }
 
     /**
      * One window entry with its bad items dropped; empty when the entry itself is bad. Every drop is logged and recorded in
      * {@code dropped}.
      */
-    private static Optional<WindowRecord> window(Object value, List<String> dropped) {
+    private static Optional<WindowRecord> window(TomlTable entry, List<String> dropped) {
         try {
-            if (!(value instanceof TomlTable entry)) throw new IllegalArgumentException("a window entry is not a table");
             ParentTabs held = parentTabs(entry, dropped);
             Map<TabId, TabRecord> records = tabs(entry, dropped);
             for (TabId tab : held.tabs())
@@ -289,7 +268,8 @@ public final class WorkspaceFile {
             ParentTabs layout = keeping(held, records::containsKey);
             records.keySet().retainAll(Set.copyOf(layout.tabs()));
             int extendedState = UiState.number(entry, "extended_state").filter(state -> (state & ~6) == 0).orElse(0);
-            return Optional.of(new WindowRecord(UiState.bounds(entry), extendedState, layout, records));
+            ToolWindows tools = entry.get(List.of("tool_windows")) instanceof TomlTable table ? ToolWindows.read(table) : ToolWindows.BUILT_IN;
+            return Optional.of(new WindowRecord(UiState.bounds(entry), extendedState, layout, records, tools));
         } catch (RuntimeException bad) {
             drop(dropped, "Dropping a window from the workspace state: " + bad.getMessage());
             return Optional.empty();
@@ -311,7 +291,7 @@ public final class WorkspaceFile {
             try {
                 if (!(entries.get(i) instanceof TomlTable entry)) throw new IllegalArgumentException("a tab entry is not a table");
                 var parent = new ParentTab(ParentTabId.parse(string(entry, "id")), layout(entry));
-                // As with two windows, the later of two tabs whose ids clash is the one dropped (workspace plan 6a Rulings 26).
+                // The later of two tabs whose ids clash is the one dropped (workspace plan 6a Rulings 26).
                 if (ids.contains(parent.id()) || parent.layout().groups().stream().map(Group::id).anyMatch(groups::contains)
                         || parent.layout().tabs().stream().anyMatch(tabs::contains))
                     throw new IllegalArgumentException("tab " + parent.id() + " repeats an id an earlier tab holds");
@@ -362,16 +342,6 @@ public final class WorkspaceFile {
         Layout rest = layout;
         for (TabId tab : layout.tabs()) if (!kept.test(tab)) rest = rest.remove(tab);
         return rest;
-    }
-
-    /** Every pane a window holds: each tab's. */
-    private static List<GroupId> groupIds(ParentTabs layout) {
-        return layout.parentTabs().stream().flatMap(parent -> parent.layout().groups().stream()).map(Group::id).toList();
-    }
-
-    /** The tabs a window holds. */
-    private static List<ParentTabId> parentTabIds(ParentTabs layout) {
-        return layout.parentTabs().stream().map(ParentTab::id).toList();
     }
 
     /** A tab's tree from its flat nodes, with the active pane and the maximize falling back alone. */
@@ -514,7 +484,7 @@ public final class WorkspaceFile {
      * How many bytes {@link #write} writes for {@code snapshot}: more than {@link #MAX_BYTES} and the next read sets the file
      * aside (workspace plan 6b Rulings 16).
      *
-     * @param snapshot the windows
+     * @param snapshot the window
      * @return the encoded size in UTF-8 bytes
      */
     public static int encodedBytes(Snapshot snapshot) {
@@ -526,7 +496,7 @@ public final class WorkspaceFile {
      * Rulings 16): the whole file and, for each item, what leaving it out alone takes out of the file: its entry, its pane's
      * node and, when it is its tab's only item, that tab's own lines.
      *
-     * @param snapshot the windows
+     * @param snapshot the window
      * @return the sizes, in UTF-8 bytes
      */
     public static Sizes sizes(Snapshot snapshot) {
@@ -562,8 +532,8 @@ public final class WorkspaceFile {
     }
 
     /**
-     * The file's text: the windows in order; each window's tabs in strip order, each with its nodes, parents first; then
-     * the window's items in window order.
+     * The file's text: the window's keys and tool windows; its tabs in strip order, each with its nodes, parents first;
+     * then its items in window order.
      */
     static String encode(Snapshot snapshot) {
         var text = new StringBuilder();
@@ -573,22 +543,22 @@ public final class WorkspaceFile {
 
     /** Writes {@code snapshot}'s text into {@code text}; with {@code sizes} each part is counted there instead of kept. */
     private static void encode(Snapshot snapshot, StringBuilder text, Counted sizes) {
-        text.append("version = 1\n");
-        for (WindowRecord window : snapshot.windows()) {
-            text.append("\n[[windows]]\n");
-            window.bounds().ifPresent(bounds -> text.append("x = ").append(bounds.x()).append("\ny = ").append(bounds.y())
-                .append("\nwidth = ").append(bounds.width()).append("\nheight = ").append(bounds.height()).append('\n'));
-            text.append("extended_state = ").append(window.extendedState()).append('\n');
-            text.append("shown_tab = \"").append(window.layout().active()).append("\"\n");
-            for (ParentTab parent : window.layout().parentTabs()) {
-                counted(sizes, text, null);
-                text.append("\n[[windows.tabs]]\nid = \"").append(parent.id()).append("\"\n");
-                appendLayout(text, parent.layout(), "windows.tabs.nodes", sizes);
-            }
-            for (TabId tab : window.layout().tabs()) {
-                appendTab(text, tab, window.tabs().get(tab));
-                counted(sizes, text, tab);
-            }
+        text.append("version = ").append(VERSION).append('\n');
+        WindowRecord window = snapshot.window();
+        text.append("\n[window]\n");
+        window.bounds().ifPresent(bounds -> text.append("x = ").append(bounds.x()).append("\ny = ").append(bounds.y())
+            .append("\nwidth = ").append(bounds.width()).append("\nheight = ").append(bounds.height()).append('\n'));
+        text.append("extended_state = ").append(window.extendedState()).append('\n');
+        text.append("shown_tab = \"").append(window.layout().active()).append("\"\n");
+        window.tools().append(text, "window.tool_windows");
+        for (ParentTab parent : window.layout().parentTabs()) {
+            counted(sizes, text, null);
+            text.append("\n[[window.tabs]]\nid = \"").append(parent.id()).append("\"\n");
+            appendLayout(text, parent.layout(), "window.tabs.nodes", sizes);
+        }
+        for (TabId tab : window.layout().tabs()) {
+            appendTab(text, tab, window.tabs().get(tab));
+            counted(sizes, text, tab);
         }
         counted(sizes, text, null);
     }
@@ -636,7 +606,7 @@ public final class WorkspaceFile {
     }
 
     private static void appendTab(StringBuilder text, TabId id, TabRecord saved) {
-        text.append("\n[[windows.items]]\nid = \"").append(id.value()).append("\"\n");
+        text.append("\n[[window.items]]\nid = \"").append(id.value()).append("\"\n");
         switch (saved) {
             case TabRecord.Terminal terminal -> text.append("kind = \"terminal\"\ntitle = ").append(UiState.quote(terminal.title()))
                 .append("\ndirectory = ").append(UiState.quote(terminal.directory()))

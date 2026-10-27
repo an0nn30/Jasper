@@ -1,6 +1,6 @@
-version = 1
+version = 2
 
-[[windows]]
+[window]
 x = 100
 y = 100
 width = 960
@@ -8,19 +8,23 @@ height = 600
 extended_state = 0
 shown_tab = "00000000-0000-4000-a000-000000000001"
 
-[[windows.tabs]]
+[window.tool_windows]
+rail_visible = true
+zen_mode = false
+
+[[window.tabs]]
 id = "00000000-0000-4000-a000-000000000001"
 active_pane = "00000000-0000-4000-9000-000000000001"
 maximized = ""
 
-[[windows.tabs.nodes]]
+[[window.tabs.nodes]]
 id = "00000000-0000-4000-9000-000000000001"
 kind = "pane"
 parent = ""
 weight = 1.0
 item = "00000000-0000-4000-8000-000000000001"
 
-[[windows.items]]
+[[window.items]]
 id = "00000000-0000-4000-8000-000000000001"
 kind = "terminal"
 title = ""

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import dev.jasper.app.dock.Slot;
+import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.layout.Child;
 import dev.jasper.app.layout.Group;
 import dev.jasper.app.layout.GroupId;
@@ -71,8 +73,8 @@ class WorkspaceFileTest {
     }
 
     /**
-     * Spec 8's example as the first window's one parent tab: two columns, each in two rows, the right column's upper pane
-     * active and maximized; and a second window without bounds.
+     * Spec 8's example as the window's one parent tab: two columns, each in two rows, the right column's upper pane active
+     * and maximized.
      */
     static Snapshot snapshot() {
         Node left = new Split(Orientation.VERTICAL, List.of(new Child(group(1, 1), 0.5), new Child(group(5, 2), 0.5)));
@@ -82,27 +84,23 @@ class WorkspaceFileTest {
             tab(1), new TabRecord.Terminal("build", "/Users/me/src/jasper", "zsh"),
             tab(2), new TabRecord.Content("README.md", "dev.jasper.editor", "document", Map.of("path", "/Users/me/src/jasper/README.md")),
             tab(3), new TabRecord.Terminal("", "C:\\work", ""),
-            tab(4), new TabRecord.Content("Files \"prod\"", "dev.jasper.remote", "sftp", Map.of("remote path", "/srv/a", "host", "example"))));
-        var full = new WindowRecord(Optional.empty(), 0, one(5, new Layout(group(4, 5), groupId(4), Optional.empty())),
-            Map.of(tab(5), new TabRecord.Terminal("", "/tmp", "")));
-        return new Snapshot(List.of(main, full));
+            tab(4), new TabRecord.Content("Files \"prod\"", "dev.jasper.remote", "sftp", Map.of("remote path", "/srv/a", "host", "example"))), ToolWindows.BUILT_IN);
+        return new Snapshot(main);
     }
 
-    /** A window of two parent tabs, the second showing, and a second window of two, the first showing (parent tabs spec 9). */
+    /** A window of two parent tabs, the second showing (parent tabs spec 9). */
     static Snapshot parentTabs() {
         var main = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(2), single(2))), parentTabId(2));
-        var full = new ParentTabs(List.of(new ParentTab(parentTabId(3), single(3)), new ParentTab(parentTabId(4), single(4))), parentTabId(3));
-        return new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 0, main, terminals(main)),
-            new WindowRecord(Optional.empty(), 0, full, terminals(full))));
+        return new Snapshot(new WindowRecord(Optional.of(BOUNDS), 0, main, terminals(main), ToolWindows.BUILT_IN));
     }
 
-    @Test void writesSpecEightsWorkspaceWithAFullWindowExactly() throws Exception {
+    @Test void writesSpecEightsWorkspaceExactly() throws Exception {
         Path file = dir.resolve("nested/workspace.toml");
         WorkspaceFile.write(file, snapshot());
         assertThat(Files.readString(file)).isEqualTo("""
-            version = 1
+            version = 2
 
-            [[windows]]
+            [window]
             x = 40
             y = 60
             width = 1400
@@ -110,119 +108,100 @@ class WorkspaceFileTest {
             extended_state = 6
             shown_tab = "00000000-0000-4000-a000-000000000001"
 
-            [[windows.tabs]]
+            [window.tool_windows]
+            rail_visible = true
+            zen_mode = false
+
+            [[window.tabs]]
             id = "00000000-0000-4000-a000-000000000001"
             active_pane = "00000000-0000-4000-9000-000000000002"
             maximized = "00000000-0000-4000-9000-000000000002"
 
-            [[windows.tabs.nodes]]
+            [[window.tabs.nodes]]
             id = "e8b5eccb-037b-3d65-a6c6-5e4889602b31"
             kind = "split"
             orientation = "horizontal"
             parent = ""
             weight = 1.0
 
-            [[windows.tabs.nodes]]
+            [[window.tabs.nodes]]
             id = "92cc2645-e802-3d4b-aa67-3432c68ad0b2"
             kind = "split"
             orientation = "vertical"
             parent = "e8b5eccb-037b-3d65-a6c6-5e4889602b31"
             weight = 0.5
 
-            [[windows.tabs.nodes]]
+            [[window.tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000001"
             kind = "pane"
             parent = "92cc2645-e802-3d4b-aa67-3432c68ad0b2"
             weight = 0.5
             item = "00000000-0000-4000-8000-000000000001"
 
-            [[windows.tabs.nodes]]
+            [[window.tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000005"
             kind = "pane"
             parent = "92cc2645-e802-3d4b-aa67-3432c68ad0b2"
             weight = 0.5
             item = "00000000-0000-4000-8000-000000000002"
 
-            [[windows.tabs.nodes]]
+            [[window.tabs.nodes]]
             id = "59943c66-5e92-39d1-a8ea-1f88b440a667"
             kind = "split"
             orientation = "vertical"
             parent = "e8b5eccb-037b-3d65-a6c6-5e4889602b31"
             weight = 0.5
 
-            [[windows.tabs.nodes]]
+            [[window.tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000002"
             kind = "pane"
             parent = "59943c66-5e92-39d1-a8ea-1f88b440a667"
             weight = 0.75
             item = "00000000-0000-4000-8000-000000000003"
 
-            [[windows.tabs.nodes]]
+            [[window.tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000003"
             kind = "pane"
             parent = "59943c66-5e92-39d1-a8ea-1f88b440a667"
             weight = 0.25
             item = "00000000-0000-4000-8000-000000000004"
 
-            [[windows.items]]
+            [[window.items]]
             id = "00000000-0000-4000-8000-000000000001"
             kind = "terminal"
             title = "build"
             directory = "/Users/me/src/jasper"
             profile = "zsh"
 
-            [[windows.items]]
+            [[window.items]]
             id = "00000000-0000-4000-8000-000000000002"
             kind = "content:dev.jasper.editor:document"
             title = "README.md"
             state = { path = "/Users/me/src/jasper/README.md" }
 
-            [[windows.items]]
+            [[window.items]]
             id = "00000000-0000-4000-8000-000000000003"
             kind = "terminal"
             title = ""
             directory = "C:\\\\work"
             profile = ""
 
-            [[windows.items]]
+            [[window.items]]
             id = "00000000-0000-4000-8000-000000000004"
             kind = "content:dev.jasper.remote:sftp"
             title = "Files \\"prod\\""
             state = { host = "example", "remote path" = "/srv/a" }
-
-            [[windows]]
-            extended_state = 0
-            shown_tab = "00000000-0000-4000-a000-000000000005"
-
-            [[windows.tabs]]
-            id = "00000000-0000-4000-a000-000000000005"
-            active_pane = "00000000-0000-4000-9000-000000000004"
-            maximized = ""
-
-            [[windows.tabs.nodes]]
-            id = "00000000-0000-4000-9000-000000000004"
-            kind = "pane"
-            parent = ""
-            weight = 1.0
-            item = "00000000-0000-4000-8000-000000000005"
-
-            [[windows.items]]
-            id = "00000000-0000-4000-8000-000000000005"
-            kind = "terminal"
-            title = ""
-            directory = "/tmp"
-            profile = ""
             """);
         try (var listing = Files.list(file.getParent())) {
             assertThat(listing).as("no temporary file is left").containsExactly(file);
         }
     }
 
-    @Test void writesEveryParentTabOfEachWindowInBarOrder() {
+    @Test void writesEveryParentTabOfTheWindowInBarOrder() {
         assertThat(WorkspaceFile.encode(parentTabs())).isEqualTo("""
-            version = 1
+            version = 2
 
-            [[windows]]
+            [window]
             x = 40
             y = 60
             width = 1400
@@ -230,81 +209,43 @@ class WorkspaceFileTest {
             extended_state = 0
             shown_tab = "00000000-0000-4000-a000-000000000002"
 
-            [[windows.tabs]]
+            [window.tool_windows]
+            rail_visible = true
+            zen_mode = false
+
+            [[window.tabs]]
             id = "00000000-0000-4000-a000-000000000001"
             active_pane = "00000000-0000-4000-9000-000000000001"
             maximized = ""
 
-            [[windows.tabs.nodes]]
+            [[window.tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000001"
             kind = "pane"
             parent = ""
             weight = 1.0
             item = "00000000-0000-4000-8000-000000000001"
 
-            [[windows.tabs]]
+            [[window.tabs]]
             id = "00000000-0000-4000-a000-000000000002"
             active_pane = "00000000-0000-4000-9000-000000000002"
             maximized = ""
 
-            [[windows.tabs.nodes]]
+            [[window.tabs.nodes]]
             id = "00000000-0000-4000-9000-000000000002"
             kind = "pane"
             parent = ""
             weight = 1.0
             item = "00000000-0000-4000-8000-000000000002"
 
-            [[windows.items]]
+            [[window.items]]
             id = "00000000-0000-4000-8000-000000000001"
             kind = "terminal"
             title = ""
             directory = "/tmp"
             profile = ""
 
-            [[windows.items]]
+            [[window.items]]
             id = "00000000-0000-4000-8000-000000000002"
-            kind = "terminal"
-            title = ""
-            directory = "/tmp"
-            profile = ""
-
-            [[windows]]
-            extended_state = 0
-            shown_tab = "00000000-0000-4000-a000-000000000003"
-
-            [[windows.tabs]]
-            id = "00000000-0000-4000-a000-000000000003"
-            active_pane = "00000000-0000-4000-9000-000000000003"
-            maximized = ""
-
-            [[windows.tabs.nodes]]
-            id = "00000000-0000-4000-9000-000000000003"
-            kind = "pane"
-            parent = ""
-            weight = 1.0
-            item = "00000000-0000-4000-8000-000000000003"
-
-            [[windows.tabs]]
-            id = "00000000-0000-4000-a000-000000000004"
-            active_pane = "00000000-0000-4000-9000-000000000004"
-            maximized = ""
-
-            [[windows.tabs.nodes]]
-            id = "00000000-0000-4000-9000-000000000004"
-            kind = "pane"
-            parent = ""
-            weight = 1.0
-            item = "00000000-0000-4000-8000-000000000004"
-
-            [[windows.items]]
-            id = "00000000-0000-4000-8000-000000000003"
-            kind = "terminal"
-            title = ""
-            directory = "/tmp"
-            profile = ""
-
-            [[windows.items]]
-            id = "00000000-0000-4000-8000-000000000004"
             kind = "terminal"
             title = ""
             directory = "/tmp"
@@ -314,12 +255,12 @@ class WorkspaceFileTest {
 
     @Test void theEmptyWorkspaceWritesItsTabWithAPaneThatNamesNoItem() {
         Layout empty = new Layout(new Group(groupId(1), List.of(), Optional.empty()), groupId(1), Optional.empty());
-        assertThat(WorkspaceFile.encode(new Snapshot(List.of(new WindowRecord(Optional.of(new UiState.Bounds(0, 0, 800, 600)), 0,
-            one(1, empty), Map.of())))))
+        assertThat(WorkspaceFile.encode(new Snapshot(new WindowRecord(Optional.of(new UiState.Bounds(0, 0, 800, 600)), 0,
+            one(1, empty), Map.of(), ToolWindows.BUILT_IN))))
             .isEqualTo("""
-                version = 1
+                version = 2
 
-                [[windows]]
+                [window]
                 x = 0
                 y = 0
                 width = 800
@@ -327,12 +268,16 @@ class WorkspaceFileTest {
                 extended_state = 0
                 shown_tab = "00000000-0000-4000-a000-000000000001"
 
-                [[windows.tabs]]
+                [window.tool_windows]
+                rail_visible = true
+                zen_mode = false
+
+                [[window.tabs]]
                 id = "00000000-0000-4000-a000-000000000001"
                 active_pane = "00000000-0000-4000-9000-000000000001"
                 maximized = ""
 
-                [[windows.tabs.nodes]]
+                [[window.tabs.nodes]]
                 id = "00000000-0000-4000-9000-000000000001"
                 kind = "pane"
                 parent = ""
@@ -347,16 +292,16 @@ class WorkspaceFileTest {
      */
     @Test void sizesCountTheFilesBytesAndWhatLeavesWithEachItem() {
         assertThat(WorkspaceFile.sizes(snapshot()).total()).as("spec 8's file, splits and all").isEqualTo((long) WorkspaceFile.encodedBytes(snapshot()));
-        assertThat(WorkspaceFile.sizes(snapshot()).items()).containsOnlyKeys(tab(1), tab(2), tab(3), tab(4), tab(5));
+        assertThat(WorkspaceFile.sizes(snapshot()).items()).containsOnlyKeys(tab(1), tab(2), tab(3), tab(4));
         // Escaped, and wider in UTF-8 than in characters.
         var wide = new TabRecord.Content("\u4e2d\u6587 \"notes\"", "dev.jasper.editor", "document",
             Map.of("path", "/\u00e9t\u00e9/\uD83D\uDE00", "bell", "\u0007"));
         var two = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(2), single(2))), parentTabId(2));
         var items = new HashMap<>(terminals(two));
         items.put(tab(1), wide);
-        var both = new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 0, two, items)));
-        var without = new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 0,
-            ParentTabs.of(new ParentTab(parentTabId(2), single(2))), Map.of(tab(2), items.get(tab(2))))));
+        var both = new Snapshot(new WindowRecord(Optional.of(BOUNDS), 0, two, items, ToolWindows.BUILT_IN));
+        var without = new Snapshot(new WindowRecord(Optional.of(BOUNDS), 0,
+            ParentTabs.of(new ParentTab(parentTabId(2), single(2))), Map.of(tab(2), items.get(tab(2))), ToolWindows.BUILT_IN));
         WorkspaceFile.Sizes sizes = WorkspaceFile.sizes(both);
         assertThat(sizes.total()).as("the file's bytes").isEqualTo((long) WorkspaceFile.encodedBytes(both));
         assertThat(sizes.items().get(tab(1))).as("its entry, its pane and its tab")
@@ -373,37 +318,23 @@ class WorkspaceFileTest {
         ParentTabs held = one(1, Layout.of(tab(1)));
         Map<TabId, TabRecord> record = Map.of(tab(1), new TabRecord.Terminal("", "/tmp", ""));
         assertThatIllegalArgumentException().as("a tab without a record")
-            .isThrownBy(() -> new WindowRecord(Optional.empty(), 0, held, Map.of()));
+            .isThrownBy(() -> new WindowRecord(Optional.empty(), 0, held, Map.of(), ToolWindows.BUILT_IN));
         assertThatIllegalArgumentException().as("a record without a tab")
-            .isThrownBy(() -> new WindowRecord(Optional.empty(), 0, one(1, Layout.empty()), record));
+            .isThrownBy(() -> new WindowRecord(Optional.empty(), 0, one(1, Layout.empty()), record, ToolWindows.BUILT_IN));
         assertThatIllegalArgumentException().as("minimized is not kept")
-            .isThrownBy(() -> new WindowRecord(Optional.empty(), 1, held, record));
-        var main = new WindowRecord(Optional.empty(), 6, held, record);
-        var child = new WindowRecord(Optional.empty(), 0, one(2, Layout.of(tab(2))), Map.of(tab(2), new TabRecord.Terminal("", "", "")));
-        var other = new WindowRecord(Optional.empty(), 0, one(3, Layout.of(tab(3))),
-            Map.of(tab(3), new TabRecord.Terminal("", "", "")));
-        assertThat(new Snapshot(List.of(other, child, main)).windows()).as("in the order given").containsExactly(other, child, main);
-        assertThatIllegalArgumentException().as("no window").isThrownBy(() -> new Snapshot(List.of()));
-        assertThatIllegalArgumentException().as("one window twice").isThrownBy(() -> new Snapshot(List.of(main, main)));
-        assertThatIllegalArgumentException().as("a tab in two windows")
-            .isThrownBy(() -> new Snapshot(List.of(main, new WindowRecord(Optional.empty(), 0, one(2, Layout.of(tab(1))), record))));
-        Layout sameGroup = new Layout(new Group(held.activeParentTab().layout().activeGroup(), List.of(tab(2)), Optional.of(tab(2))),
-            held.activeParentTab().layout().activeGroup(), Optional.empty());
-        assertThatIllegalArgumentException().as("a group in two windows").isThrownBy(() -> new Snapshot(List.of(main,
-            new WindowRecord(Optional.empty(), 0, one(4, sameGroup), Map.of(tab(2), new TabRecord.Terminal("", "", ""))))));
-        assertThatIllegalArgumentException().as("a parent tab in two windows (workspace plan 7b Rulings 10)").isThrownBy(() -> new Snapshot(List.of(main,
-            new WindowRecord(Optional.empty(), 0, one(1, Layout.of(tab(2))), Map.of(tab(2), new TabRecord.Terminal("", "", ""))))));
+            .isThrownBy(() -> new WindowRecord(Optional.empty(), 1, held, record, ToolWindows.BUILT_IN));
+        assertThatNullPointerException().as("no tool windows").isThrownBy(() -> new WindowRecord(Optional.empty(), 0, held, record, null));
+        assertThatNullPointerException().as("no window").isThrownBy(() -> new Snapshot(null));
         assertThatIllegalArgumentException().isThrownBy(() -> new TabRecord.Content("", "", "document", Map.of()));
         assertThatIllegalArgumentException().isThrownBy(() -> new TabRecord.Content("", "dev.x:y", "document", Map.of()));
         assertThatIllegalArgumentException().isThrownBy(() -> new TabRecord.Content("", "dev.x", "", Map.of()));
         assertThatNullPointerException().isThrownBy(() -> new TabRecord.Terminal(null, "", ""));
     }
 
-    /** Full windows spec 5.1: any window's workspace may be empty, and no window's role is written. */
-    @Test void aWindowsLayoutMayBeEmptyAndRoleIsNotWritten() throws Exception {
+    /** Full windows spec 5.1: the window's workspace may be empty, and no window's role is written. */
+    @Test void theWindowsLayoutMayBeEmptyAndRoleIsNotWritten() throws Exception {
         Layout empty = new Layout(new Group(groupId(9), List.of(), Optional.empty()), groupId(9), Optional.empty());
-        var held = new WindowRecord(Optional.of(BOUNDS), 0, one(1, Layout.of(tab(1))), Map.of(tab(1), new TabRecord.Terminal("", "/tmp", "")));
-        var saved = new Snapshot(List.of(held, new WindowRecord(Optional.empty(), 0, one(2, empty), Map.of())));
+        var saved = new Snapshot(new WindowRecord(Optional.empty(), 0, one(2, empty), Map.of(), ToolWindows.BUILT_IN));
         String text = WorkspaceFile.encode(saved);
         assertThat(text).doesNotContain("role");
         Path file = dir.resolve("workspace.toml");
@@ -411,18 +342,39 @@ class WorkspaceFileTest {
         assertThat(WorkspaceFile.read(file)).isEqualTo(new WorkspaceFile.Loaded.Restore(saved, Optional.empty()));
     }
 
-    /** Full windows spec 5.1: a file written while windows had roles still reads; the key is ignored. */
-    @Test void aFileWithARoleKeyStillReads() throws Exception {
-        String text = WorkspaceFile.encode(snapshot());
-        int first = text.indexOf("\n[[windows]]\n");
-        int second = text.indexOf("\n[[windows]]\n", first + 1);
-        String header = "\n[[windows]]\n";
-        String roles = text.substring(0, first) + header + "role = \"main\"\n" + text.substring(first + header.length(), second)
-            + header + "role = \"full\"\n" + text.substring(second + header.length());
-        assertThat(roles).contains("role = \"main\"", "role = \"full\"");
+    /** Full windows spec 6.1: the window's tool windows, every look's, are saved with it. */
+    @Test void oneWindowWithItsToolWindowsRoundTrips() throws Exception {
+        var floating = new UiState.Panel(Slot.RIGHT_TOP, 0, true, ToolWindowMode.FLOAT, Optional.of(new UiState.Bounds(-1200, 40, 420, 610)));
+        var tools = new ToolWindows(false, true, Map.of(
+            "", new ToolWindows.Look(Map.of("dev.x.hosts", floating, "dev.x.files", new UiState.Panel(Slot.LEFT_BOTTOM, 1, false)),
+                new UiState.Dock(300, 280, 180, 0.25, 0.5, 0.75)),
+            "dev.jasper.enterprise", new ToolWindows.Look(Map.of("dev.x.hosts", new UiState.Panel(Slot.BOTTOM_LEFT, 0, true)), UiState.Dock.DEFAULT)));
+        WindowRecord window = snapshot().window();
+        var saved = new Snapshot(new WindowRecord(window.bounds(), window.extendedState(), window.layout(), window.tabs(), tools));
         Path file = dir.resolve("workspace.toml");
-        Files.writeString(file, roles);
-        assertThat(WorkspaceFile.read(file)).isEqualTo(new WorkspaceFile.Loaded.Restore(snapshot(), Optional.empty()));
+        WorkspaceFile.write(file, saved);
+        assertThat(Files.readString(file)).contains("""
+
+            [window.tool_windows]
+            rail_visible = false
+            zen_mode = true
+
+            [window.tool_windows.dock]
+            left_width = 300
+            """, """
+
+            [window.tool_windows.panels."dev.x.hosts"]
+            slot = "RIGHT_TOP"
+            order = 0
+            visible = true
+            mode = "float"
+            window = { x = -1200, y = 40, width = 420, height = 610 }
+            """, """
+
+            [window.tool_windows.look."dev.jasper.enterprise".panels."dev.x.hosts"]
+            slot = "BOTTOM_LEFT"
+            """);
+        assertThat(WorkspaceFile.read(file)).isEqualTo(new WorkspaceFile.Loaded.Restore(saved, Optional.empty()));
     }
 
     /** Workspace plan 6a Rulings 14: what stays of a window when only some of its tabs can stay, as closing the others would. */

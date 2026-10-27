@@ -7,6 +7,8 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelEntry;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.dock.ToolWindowMode;
+import dev.jasper.app.persistence.ToolWindowState;
+import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.ui.model.ControlState;
 import dev.jasper.ui.model.Nodes;
@@ -99,10 +101,10 @@ class DetachedToolWindowsTest {
      * A main window connected to {@code model} and {@code state} in a stand-in frame at {@link #MAIN} on the pretend
      * screen, ready to open windows on {@link #SCREEN}; no shells yet.
      */
-    private static WindowContent window(Contributions model, UiState state) { return window(model, state, false); }
+    private static WindowContent window(Contributions model, ToolWindowState state) { return window(model, state, false); }
 
     /** As above, under flush frames (Enterprise's classic dock) when {@code flush}, else the default look's standard ones. */
-    private static WindowContent window(Contributions model, UiState state, boolean flush) {
+    private static WindowContent window(Contributions model, ToolWindowState state, boolean flush) {
         WindowContent owner = flush
             ? DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), ThemeTestSupport.controller(true), DockChromeTest.classicDock())
             : DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
@@ -124,20 +126,20 @@ class DetachedToolWindowsTest {
     /** A main window with panel {@link #A} ("Alpha") in Left Top, holding {@code view}, and recording shells. */
     private static final class Fixture {
         final Contributions model = new Contributions();
-        final UiState state;
+        final ToolWindowState state;
         final WindowContent owner;
         final Shells shells = new Shells();
         final JComponent view;
         final PanelEntry entry;
         final List<String> closed = new ArrayList<>();
 
-        Fixture() { this(UiState.inMemory()); }
+        Fixture() { this(new ToolWindowState(ToolWindows.BUILT_IN, "")); }
 
-        Fixture(UiState state) { this(state, new JLabel("alpha"), true); }
+        Fixture(ToolWindowState state) { this(state, new JLabel("alpha"), true); }
 
-        Fixture(UiState state, JComponent view, boolean withShells) { this(state, view, withShells, false); }
+        Fixture(ToolWindowState state, JComponent view, boolean withShells) { this(state, view, withShells, false); }
 
-        Fixture(UiState state, JComponent view, boolean withShells, boolean flush) {
+        Fixture(ToolWindowState state, JComponent view, boolean withShells, boolean flush) {
             this.state = state;
             this.view = view;
             owner = window(model, state, flush);
@@ -233,7 +235,7 @@ class DetachedToolWindowsTest {
     @Test void viewModeFloatOrWindowFromAMenuFocusesTheWindow() throws Exception {
         edt(() -> {
             var list = new JList<>(new String[] {"Mac"});
-            var fixture = new Fixture(UiState.inMemory(), list, true);
+            var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), list, true);
             var focused = new ArrayList<Component>();
             fixture.owner.area().focuser = focused::add;
             fixture.toggle();
@@ -266,7 +268,7 @@ class DetachedToolWindowsTest {
     @Test void viewModeFloatOnAHiddenToolWindowOpensAndActivatesNothing() throws Exception {
         edt(() -> {
             var list = new JList<>(new String[] {"Mac"});
-            var fixture = new Fixture(UiState.inMemory(), list, true);
+            var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), list, true);
             var focused = new ArrayList<Component>();
             fixture.owner.area().focuser = focused::add;
             fixture.choose(fixture.stripeMenu(), "Float");
@@ -281,7 +283,7 @@ class DetachedToolWindowsTest {
     /** Fix round 2: a detached tool window restored from the saved state opens and shows, and is neither raised nor focused. */
     @Test void aRestoredDetachedToolWindowOpensWithoutBeingActivated() throws Exception {
         edt(() -> {
-            var state = UiState.inMemory();
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             var saved = new Rectangle(200, 150, 400, 300);
             state.putPanel(A, new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.FLOAT,
                 Optional.of(new UiState.Bounds(saved.x, saved.y, saved.width, saved.height))));
@@ -409,7 +411,7 @@ class DetachedToolWindowsTest {
             var theme = ThemeTestSupport.generated(true);
             try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
                  var view = new KitView(bindings.context(ThemeRoute.CHROME), spec("panel", "header"), event -> { })) {
-                var fixture = new Fixture(UiState.inMemory(), view, true);
+                var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), view, true);
                 fixture.toggle();
                 fixture.choose(fixture.stripeMenu(), "Float");
                 List<String> opened = fixture.shells.take();
@@ -431,16 +433,15 @@ class DetachedToolWindowsTest {
 
     @Test void modeAndBoundsAreSavedAndRestored() throws Exception {
         edt(() -> {
-            Path file = dir.resolve("ui-state.toml");
-            var fixture = new Fixture(UiState.load(file));
+            var fixture = new Fixture();
             Rectangle bounds = fixture.floated();
             var saved = new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.FLOAT,
                 Optional.of(new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height)));
-            assertThat(UiState.load(file).panel(A)).hasValue(saved);
+            assertThat(fixture.state.panel(A)).hasValue(saved);
             fixture.owner.close();
             assertThat(fixture.shells.take()).containsExactly("dispose " + A, "closed " + A);
 
-            WindowContent second = window(fixture.model, UiState.load(file));
+            WindowContent second = window(fixture.model, new ToolWindowState(fixture.state.snapshot(), ""));
             boolean[] showing = {false};
             second.detachedWindows().ready = () -> showing[0];
             var shells = new Shells();
@@ -461,7 +462,7 @@ class DetachedToolWindowsTest {
 
     @Test void restoredBoundsOnAGoneDisplayLandOnAConnectedOne() throws Exception {
         edt(() -> {
-            var state = UiState.inMemory();
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             state.putPanel(A, new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.FLOAT,
                 Optional.of(new UiState.Bounds(-1500, 100, 400, 300))));
             var fixture = new Fixture(state);
@@ -487,7 +488,7 @@ class DetachedToolWindowsTest {
 
     @Test void anAbsentPanelKeepsItsSavedModeAndBounds() throws Exception {
         edt(() -> {
-            var state = UiState.inMemory();
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             var gone = new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.WINDOW, Optional.of(new UiState.Bounds(10, 20, 300, 200)));
             state.putPanel("dev.x.gone", gone);
             var fixture = new Fixture(state);
@@ -510,7 +511,7 @@ class DetachedToolWindowsTest {
 
     @Test void withoutShellsNothingOpensUntilTheyAreGiven() throws Exception {
         edt(() -> {
-            var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), false);
+            var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), new JLabel("alpha"), false);
             fixture.toggle();
             Rectangle docked = fixture.owner.area().frameOnScreen(A).orElseThrow();
             fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
@@ -528,8 +529,7 @@ class DetachedToolWindowsTest {
      */
     @Test void aWindowThatFailsToBeMadeHidesItsToolWindowAndTheDockChangeCompletes() throws Exception {
         edt(() -> {
-            Path file = dir.resolve("ui-state.toml");
-            var fixture = new Fixture(UiState.load(file));
+            var fixture = new Fixture();
             String bravo = "dev.x.bravo";
             fixture.addPanel(bravo, "Bravo", Slot.RIGHT_TOP);
             fixture.toggle();
@@ -538,7 +538,7 @@ class DetachedToolWindowsTest {
 
             fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
             assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, docked));
-            assertHiddenAfterFailing(fixture, file, docked);
+            assertHiddenAfterFailing(fixture, docked);
 
             fixture.request(bravo, Contributions.PanelRequest.Op.SHOW);
             assertThat(fixture.shells.take()).as("the next dock change does not try again").isEmpty();
@@ -546,64 +546,60 @@ class DetachedToolWindowsTest {
 
             fixture.button().doClick();
             assertThat(fixture.shells.take()).as("a click tries again").containsExactly(open(ToolWindowMode.FLOAT, docked));
-            assertHiddenAfterFailing(fixture, file, docked);
+            assertHiddenAfterFailing(fixture, docked);
         });
     }
 
     /** Final review: a native window that fails to show is disposed, and its tool window hides as when it fails to be made. */
     @Test void aWindowThatFailsToShowIsDisposedAndItsToolWindowHides() throws Exception {
         edt(() -> {
-            Path file = dir.resolve("ui-state.toml");
-            var fixture = new Fixture(UiState.load(file));
+            var fixture = new Fixture();
             fixture.toggle();
             Rectangle docked = fixture.owner.area().frameOnScreen(A).orElseThrow();
             fixture.shells.duringShow = id -> { throw new IllegalStateException("Not shown"); };
 
             fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
             assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, docked), "show " + A, "dispose " + A);
-            assertHiddenAfterFailing(fixture, file, docked);
+            assertHiddenAfterFailing(fixture, docked);
         });
     }
 
     /** Final review: a window restored at start-up that fails to open is saved hidden, so the next start opens nothing. */
     @Test void aRestoredWindowThatFailsToOpenIsSavedHidden() throws Exception {
         edt(() -> {
-            Path file = dir.resolve("ui-state.toml");
             var saved = new Rectangle(200, 150, 400, 300);
-            var state = UiState.load(file);
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             state.putPanel(A, new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.FLOAT,
                 Optional.of(new UiState.Bounds(saved.x, saved.y, saved.width, saved.height))));
-            state.save();
-            var fixture = new Fixture(UiState.load(file), new JLabel("alpha"), false);
+            var fixture = new Fixture(new ToolWindowState(state.snapshot(), ""), new JLabel("alpha"), false);
             fixture.shells.duringApply = id -> { throw new IllegalStateException("No native window"); };
 
             fixture.owner.detachedShells(fixture.shells);
             assertThat(fixture.shells.take()).containsExactly(open(ToolWindowMode.FLOAT, saved));
-            assertHiddenAfterFailing(fixture, file, saved);
+            assertHiddenAfterFailing(fixture, saved);
         });
     }
 
     /** The tool window whose own window failed to open: hidden, still floating, its stripe button unselected, and saved so. */
-    private static void assertHiddenAfterFailing(Fixture fixture, Path file, Rectangle bounds) {
+    private static void assertHiddenAfterFailing(Fixture fixture, Rectangle bounds) {
         assertThat(fixture.owner.dock().visible(A)).isFalse();
         assertThat(fixture.owner.dock().mode(A)).as("still detached").isEqualTo(ToolWindowMode.FLOAT);
         assertThat(fixture.windows().showing(A)).isFalse();
         assertThat(fixture.button().isSelected()).as("the stripes rendered").isFalse();
-        assertThat(UiState.load(file).panel(A)).as("saved hidden").hasValue(new UiState.Panel(Slot.LEFT_TOP, 0, false,
+        assertThat(fixture.state.panel(A)).as("saved hidden").hasValue(new UiState.Panel(Slot.LEFT_TOP, 0, false,
             ToolWindowMode.FLOAT, Optional.of(new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height))));
     }
 
     /** Final review: a window that fails to dispose still goes, and the dock change that hid its tool window completes. */
     @Test void aWindowThatFailsToDisposeStillHidesItsToolWindow() throws Exception {
         edt(() -> {
-            Path file = dir.resolve("ui-state.toml");
-            var fixture = new Fixture(UiState.load(file));
+            var fixture = new Fixture();
             Rectangle bounds = fixture.floated();
             fixture.shells.duringDispose = id -> { throw new IllegalStateException("Not disposed"); };
 
             fixture.button().doClick();
             assertThat(fixture.shells.take()).containsExactly("dispose " + A);
-            assertHiddenAfterFailing(fixture, file, bounds);
+            assertHiddenAfterFailing(fixture, bounds);
         });
     }
 
@@ -634,7 +630,7 @@ class DetachedToolWindowsTest {
     @Test void underFlushFramesViewModeDockedInPlaceOfAnotherWindowKeepsItActive() throws Exception {
         try {
             edt(() -> {
-                var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), true, true);
+                var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), new JLabel("alpha"), true, true);
                 String charlie = "dev.x.charlie";
                 fixture.addPanel(charlie, "Charlie", Slot.LEFT_TOP);
                 var events = new ArrayList<String>();
@@ -671,7 +667,7 @@ class DetachedToolWindowsTest {
     @Test void aShownDetachedToolWindowWithoutItsWindowFollowsTheTheme() throws Exception {
         edt(() -> {
             var view = new CountedLabel("alpha");
-            var fixture = new Fixture(UiState.inMemory(), view, false);
+            var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), view, false);
             fixture.toggle();
             boolean dark = fixture.owner.theme().chrome().dark();
             int before = view.updates;
@@ -691,12 +687,12 @@ class DetachedToolWindowsTest {
             var shells = new Shells();
             WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
             owner.detachedShells(shells);
-            owner.connectContributions(new Contributions(), UiState.inMemory());
+            owner.connectContributions(new Contributions(), new ToolWindowState(ToolWindows.BUILT_IN, ""));
             assertThat(owner.detachedWindows().shells).isSameAs(shells);
 
             WindowContent child = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()),
                 DesktopTestSupport.HOME, false);
-            child.connectContributions(new Contributions(), UiState.inMemory());
+            child.connectContributions(new Contributions(), new ToolWindowState(ToolWindows.BUILT_IN, ""));
             child.detachedShells(shells);
             assertThat(child.detachedWindows()).as("every window's tool windows are its own").isNotNull().isNotSameAs(owner.detachedWindows());
         });
@@ -710,7 +706,7 @@ class DetachedToolWindowsTest {
     @Test void aStripeClickTogglesADetachedWindowAsItDoesADockedOne() throws Exception {
         edt(() -> {
             var list = new JList<>(new String[] {"Mac"});
-            var fixture = new Fixture(UiState.inMemory(), list, true);
+            var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), list, true);
             var focused = new ArrayList<Component>();
             fixture.owner.area().focuser = focused::add;
             fixture.choose(fixture.stripeMenu(), "Float");
@@ -775,7 +771,7 @@ class DetachedToolWindowsTest {
     @Test void underFlushFramesTheActivatingToggleOfADetachedWindowFollowsTheSameRule() throws Exception {
         try {
             edt(() -> {
-                var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), true, true);
+                var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), new JLabel("alpha"), true, true);
                 assertThat(fixture.owner.area().flush()).isTrue();
                 fixture.toggle();
                 fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
@@ -839,13 +835,13 @@ class DetachedToolWindowsTest {
     }
 
     /**
-     * Full windows plan 1 Controller Ruling 10: a window opened while another is open starts out of Zen, and its tool
-     * window saved showing in Window mode starts hidden, keeping its mode and bounds, so showing it opens its window
-     * there; the first window still opens it, and the shared saved state keeps it showing and Zen as it was.
+     * Full windows plan 1 Controller Ruling 10: a window opened while another is open takes a copy of that window's tool
+     * windows for a new window: out of Zen, its tool window saved showing in Window mode hidden, keeping its mode and
+     * bounds, so showing it opens its window there; the first window still opens it, and its own state keeps it showing.
      */
     @Test void aWindowOpenedBesideAnotherStartsOutOfZenWithItsDetachedToolWindowsHidden() throws Exception {
         edt(() -> {
-            var state = UiState.inMemory();
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             var saved = new Rectangle(200, 150, 400, 300);
             var showing = new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.WINDOW,
                 Optional.of(new UiState.Bounds(saved.x, saved.y, saved.width, saved.height)));
@@ -854,7 +850,7 @@ class DetachedToolWindowsTest {
             assertThat(first.shells.take()).as("the first window opens it").containsExactly(open(ToolWindowMode.WINDOW, saved), "show " + A);
 
             WindowContent second = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
-            second.connectContributions(first.model, state, true, true);
+            second.connectContributions(first.model, state.forNewWindow());
             TabDragTestSupport.frame(second, MAIN.x + 30, MAIN.y + 30, MAIN.width, MAIN.height);
             second.detachedWindows().ready = () -> true;
             second.detachedWindows().displays = () -> List.of(new WindowPlacement.Display(SCREEN, SCREEN));
@@ -866,7 +862,11 @@ class DetachedToolWindowsTest {
             assertThat(second.dock().visible(A)).isFalse();
             assertThat(second.dock().mode(A)).isEqualTo(ToolWindowMode.WINDOW);
             assertThat(second.dock().bounds(A)).hasValue(saved);
-            assertThat(state.panel(A)).as("still saved as showing").hasValue(showing);
+            assertThat(state.panel(A)).as("still saved as showing in the first window's state").hasValue(showing);
+            assertThat(second.toolWindows().panel(A)).as("saved hidden in its own").hasValueSatisfying(panel -> {
+                assertThat(panel.visible()).isFalse();
+                assertThat(panel.mode()).isEqualTo(ToolWindowMode.WINDOW);
+            });
 
             first.model.requestPanel(new Contributions.PanelRequest(second.id(), A, Contributions.PanelRequest.Op.SHOW));
             assertThat(shells.take()).as("showing it opens its window").startsWith(open(ToolWindowMode.WINDOW, saved), "show " + A);
@@ -874,23 +874,27 @@ class DetachedToolWindowsTest {
         });
     }
 
-    /** Controller Ruling 10: a window opened beside another starts out of Zen, and leaves the saved Zen mode alone. */
+    /** Controller Ruling 10: a window opened beside another starts out of Zen, and leaves the other window's Zen alone. */
     @Test void aWindowOpenedBesideAnotherStartsOutOfZen() throws Exception {
         edt(() -> {
-            var state = UiState.inMemory();
+            var state = new ToolWindowState(ToolWindows.BUILT_IN, "");
             state.setZenMode(true);
             var first = new Fixture(state);
             assertThat(first.owner.zenMode()).as("the first window restores Zen").isTrue();
 
             WindowContent second = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
-            second.connectContributions(first.model, state, true, true);
+            second.connectContributions(first.model, state.forNewWindow());
             assertThat(second.zenMode()).isFalse();
             first.model.requestPanel(new Contributions.PanelRequest(second.id(), A, Contributions.PanelRequest.Op.SHOW));
             assertThat(second.dock().visible(A)).isTrue();
-            assertThat(state.zenMode()).as("its own dock changes keep the saved Zen mode").isTrue();
+            assertThat(state.zenMode()).as("its dock changes leave the first window's Zen").isTrue();
+            assertThat(second.toolWindows().zenMode()).isFalse();
             second.toggleZenMode();
+            assertThat(second.toolWindows().zenMode()).as("its own Zen").isTrue();
+            assertThat(state.zenMode()).isTrue();
             second.toggleZenMode();
-            assertThat(state.zenMode()).as("until its own Zen changes").isFalse();
+            assertThat(second.toolWindows().zenMode()).isFalse();
+            assertThat(state.zenMode()).as("the first window's Zen, whatever the second's does").isTrue();
             second.close();
         });
     }
@@ -993,7 +997,7 @@ class DetachedToolWindowsTest {
     /** A later window in the sync's list whose frame a dock change made in the middle of the sync took opens no window. */
     @Test void aWindowWhoseFrameWentWhileAnEarlierOneOpenedOpensNoWindow() throws Exception {
         edt(() -> {
-            var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), false);
+            var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), new JLabel("alpha"), false);
             String bravo = "dev.x.bravo";
             fixture.addPanel(bravo, "Bravo", Slot.RIGHT_TOP);
             fixture.toggle();
@@ -1015,7 +1019,7 @@ class DetachedToolWindowsTest {
 
     @Test void aWindowHiddenWhileItsShellIsBeingMadeIsDisposedAtOnce() throws Exception {
         edt(() -> {
-            var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), false);
+            var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), new JLabel("alpha"), false);
             fixture.toggle();
             fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
             Rectangle bounds = fixture.owner.dock().bounds(A).orElseThrow();
@@ -1036,7 +1040,7 @@ class DetachedToolWindowsTest {
 
     @Test void aWindowHiddenInsideItsShowIsDisposedOnce() throws Exception {
         edt(() -> {
-            var fixture = new Fixture(UiState.inMemory(), new JLabel("alpha"), false);
+            var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), new JLabel("alpha"), false);
             fixture.toggle();
             fixture.choose(fixture.owner.area().headerOf(Slot.LEFT_TOP).menu(), "Float");
             Rectangle bounds = fixture.owner.dock().bounds(A).orElseThrow();
@@ -1054,7 +1058,7 @@ class DetachedToolWindowsTest {
             var theme = ThemeTestSupport.generated(true);
             try (var bindings = new AppearanceBindings(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); }, () -> false);
                  var view = new KitView(bindings.context(ThemeRoute.CHROME), spec("panel", "header"), event -> { })) {
-                var fixture = new Fixture(UiState.inMemory(), view, true);
+                var fixture = new Fixture(new ToolWindowState(ToolWindows.BUILT_IN, ""), view, true);
                 fixture.toggle();
                 fixture.choose(fixture.stripeMenu(), "Float");
                 fixture.shells.take();
