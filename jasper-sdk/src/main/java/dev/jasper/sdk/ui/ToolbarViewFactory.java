@@ -3,7 +3,7 @@ package dev.jasper.sdk.ui;
 import dev.jasper.sdk.terminal.WindowHandle;
 
 /**
- * Builds one window's toolbar view (see {@link ToolbarItem.View}); the main window is the only window with a toolbar.
+ * Builds one window's toolbar view (see {@link ToolbarItem.View}); every window has a toolbar.
  * The host calls it on the UI thread, once per window, when the window opens, and for every such window already open
  * from inside the {@code Toolbar.add} that registers it: finish
  * initialising whatever the factory reads before adding the view. A factory that throws is contained, is not asked again

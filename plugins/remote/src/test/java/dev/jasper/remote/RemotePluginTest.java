@@ -104,23 +104,19 @@ class RemotePluginTest {
         }
     }
 
-    /**
-     * Plan 4b's final review: a child window's panel request goes through {@code Panels.toggle} every time, which raises
-     * the main window; once built, the panel's own {@code show()} would change it behind the child window.
-     */
-    @Test void everyPanelRequestFromAChildWindowRaisesTheMainWindow(@TempDir Path dir) throws Exception {
+    /** Full windows spec 9: a panel request from a second window shows the panel there through {@code Panels.show}. */
+    @Test void everyPanelRequestFromASecondWindowRaisesNoOtherWindow(@TempDir Path dir) throws Exception {
         for (var layout : List.of(dev.jasper.remote.workstation.Layout.ROWS, dev.jasper.remote.workstation.Layout.CLASSIC)) try (var host = new FakePluginHost()) {
             if (layout == dev.jasper.remote.workstation.Layout.CLASSIC) host.setPresentation(FakePresentations.CLASSIC);
             host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin(dir.resolve("ssh-" + layout)));
             settle(host);
-            UUID main = host.addTerminalWindow(), child = host.addTerminalWindow();
-            int raised = 0;
+            host.addTerminalWindow();
+            UUID child = host.addTerminalWindow();
             for (String action : List.of(RemotePlugin.SFTP, dev.jasper.remote.ui.tunnels.TunnelsUi.SHOW, dev.jasper.remote.ui.transfers.TransferUi.SHOW))
                 for (int request = 1; request <= 2; request++) {
                     assertThat(Kits.value(() -> host.invoke(action, child, null))).isTrue();
                     settle(host);
-                    raised++;
-                    assertThat(host.openRequests()).as(layout + ": " + action + ", request " + request).containsOnly("front|" + main).hasSize(raised);
+                    assertThat(host.openRequests()).as(layout + ": " + action + ", request " + request).isEmpty();
                 }
             assertThat(host.failures()).isEmpty();
         }

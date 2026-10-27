@@ -143,8 +143,6 @@ class FakeTerminalsTest {
      */
     @Test void aMoveThatEmptiesTheActiveWindowReportsNoActivePaneThenClosesItAfterTheMove() {
         try (var host = new FakePluginHost()) {
-            // The main window outlives its last tab: the window the move empties is a child window.
-            host.addTerminalWindow();
             UUID first = host.addTerminalWindow(), moving = host.addTerminalTab(first, "build");
             host.addTerminalPane(moving, info("make"));
             UUID second = host.addTerminalWindow(), other = host.addTerminalTab(second, "zsh");

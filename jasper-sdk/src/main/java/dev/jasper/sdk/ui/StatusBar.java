@@ -14,7 +14,7 @@ public interface StatusBar {
 
     /**
      * Adds a progress control on the UI thread, initially indeterminate with empty text.
-     * It shares the status-item namespace and ordering; one handle drives it in the main window's status bar.
+     * It shares the status-item namespace and ordering; one handle drives it in every window's status bar.
      * @param spec identity and placement
      * @return the progress handle
      * @throws IllegalArgumentException for a foreign or duplicate id

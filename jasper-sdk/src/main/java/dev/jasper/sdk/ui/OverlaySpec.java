@@ -6,7 +6,7 @@ import java.util.Objects;
 /**
  * Centered, non-movable progress content inside a Jasper window; no native window is created.
  * @param title nonblank accessible title
- * @param owner an open Jasper window, the main window or a child window, from this host
+ * @param owner an open Jasper window from this host
  * @since 0.7.3
  */
 public record OverlaySpec(String title, WindowHandle owner) {

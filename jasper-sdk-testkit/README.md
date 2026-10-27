@@ -88,7 +88,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `status()`, `progress()` | Visible status items as `id\|side\|text\|tooltip\|actionId`; visible progress states by id |
 | `rail()` | Rail buttons' action ids |
 | `panels()` | Registered panels as `id\|title\|ANCHOR`, with `+split` for a panel that starts in the second half and `\|<action id>` for one that names its own toggle |
-| `openPanel(id)`, `panelView(id)`, `panelHeader(id)`, `placePanel(id, placement)`, `closePanel(id)` | Builds a panel as the main window showing it would, at its placement; its mounted view; its published header; moves the panel as a drag or View Mode would, open or not: an open panel's `PanelHost.placement()` becomes the `PanelPlacement` and a different one reaches each `onPlacement` handler once (a throwing one is recorded in `failures()`), and a panel that is not open is built there, also after `closePanel`; discards it as the main window would |
+| `openPanel(id)`, `openPanel(id, windowId)`, `panelView(id)`, `panelHeader(id)`, `placePanel(id, placement)`, `closePanel(id)`, `closePanel(id, windowId)` | Builds a panel as a window's dock showing it would, at its placement: the most recently active window's, or the named window's (each window's dock builds its own instance); its mounted view and its published header, in the most recently active window else the first built; moves the panel as a drag or View Mode would, open or not: each open instance's `PanelHost.placement()` becomes the `PanelPlacement` and a different one reaches each `onPlacement` handler once (a throwing one is recorded in `failures()`), and a panel that is not open is built there, also after `closePanel`; discards every instance, or the named window's, as their windows would when they close |
 | `windows()`, `windowView(pluginId, title)`, `windowContent(pluginId, title)` | Open dialogs and overlays as `id\|title\|shown` (a dialog's id is `dialog`, an overlay's `overlay`); the view or component mounted on one |
 | `dialogPresentation(pluginId, title)`, `dialogSwatch(pluginId, title)`, `popoverViews(pluginId)` | How an open dialog is presented and the hue of its title square; shown popovers' views |
 | `requestClose(windowId)` | Closes a dialog through its closing guards |
@@ -101,9 +101,9 @@ Jasper's is `<home>/plugins/<id>/data`.
 
 | Method | Returns or does |
 | --- | --- |
-| `addTerminalWindow()`, `addTerminalTab(windowId, title)`, `addTerminalPane(tabId, info)`, `addContentTab(windowId, title)` | Scripts the workspace (the first window added while no main window is open is the main window; a terminal tab has one pane); each announces itself on the terminal topics, delivered by `flush()` |
-| `moveTab(tabId, windowId)`, `closeTab(tabId)`, `windowTabs(windowId)`, `holdPane(paneId)` | Moves a tab the test added to another window, or closes it, as the user would (the last tab of a child window takes the window); a window's tabs, each its items pane by pane; holds a local pane `NOT_STARTED` until its tab is shown, as Jasper holds a restored one |
-| `activateTerminalWindow(id)`, `focusTerminalPane(id)`, `closeTerminalPane(id)` | The user turns to a window, focuses a pane or closes one (the last pane takes its tab, the last tab a child window) |
+| `addTerminalWindow()`, `addTerminalTab(windowId, title)`, `addTerminalPane(tabId, info)`, `addContentTab(windowId, title)` | Scripts the workspace (a terminal tab has one pane); each announces itself on the terminal topics, delivered by `flush()` |
+| `moveTab(tabId, windowId)`, `closeTab(tabId)`, `windowTabs(windowId)`, `holdPane(paneId)` | Moves a tab the test added to another window, or closes it, as the user would (a window keeps an empty workspace when its last tab closes, and closes when a move takes its last tab); a window's tabs, each its items pane by pane; holds a local pane `NOT_STARTED` until its tab is shown, as Jasper holds a restored one |
+| `activateTerminalWindow(id)`, `focusTerminalPane(id)`, `closeTerminalPane(id)` | The user turns to a window, focuses a pane or closes one (the last pane takes its tab) |
 | `setPaneInfo(id, info)`, `setSelection(id, text)`, `setForegroundJob(id, name)` | Changes what a pane reports, without an event |
 | `setTabNamePieces(tabId, builtIns)`, `tabNamePieces(tabId)`, `tabNamePieceSpecs()` | Scripts the built-in pieces (`dir`, `full`, `process`, `title`) a terminal tab reports through `TabHandle.namePieces()`; the values plugins' pieces hold for a tab; every plugin's piece |
 | `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` | Publish terminal events for a pane |
@@ -188,8 +188,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 - The fake has no active tool window: `Panels.toggle` and `PanelHost.show()` from a panel's own toggle action only
   toggle or show it, also under `FakePresentations.CLASSIC`, where Jasper activates a showing panel that is not the
   active tool window instead of hiding it.
-- A panel's window of its own exists only as its placement: a child window's `Panels.toggle` of a panel placed in one
-  shows it and records no `front|` request, where Jasper brings that window to the front.
+- A panel's window of its own exists only as its placement.
 - Custom content's font is set only when it is registered and by `FakeKit.contentFont`; Jasper also sets it at every
   update of the view and every theme change, so a font a plugin sets on its registered component lasts in the fake but
   not in Jasper.
@@ -197,8 +196,6 @@ Jasper's is `<home>/plugins/<id>/data`.
   events.
 - `restoreTab` puts the restored tab in a new tab at the end of the window's strip; Jasper places it where it was
   saved, in its tab and pane.
-- `toolbarViews` builds a window's toolbar views for any open window, a child window too; Jasper builds them only in
-  the main window, the only window with a toolbar.
 - A declared subcommand with no handler fails with a message naming the plugin's id; Jasper names the plugin.
 
 ## The contract suites

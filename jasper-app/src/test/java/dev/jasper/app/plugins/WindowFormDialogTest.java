@@ -110,7 +110,7 @@ class WindowFormDialogTest {
     @Test void aDialogClosesWithItsWindow() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try (var host = Host.start()) {
-                UUID child = host.fixture().addWindow();
+                UUID stays = host.fixture().addWindow(), child = host.fixture().addWindow();
                 UUID shell = host.fixture().addTab(child, "shell");
                 var owner = host.terminals().windowHandle(child);
                 int[] closed = {0};
@@ -121,7 +121,8 @@ class WindowFormDialogTest {
                     dialog.show();
                 }
                 var modeless = host.surface("Modeless"); var modal = host.surface("Modal");
-                host.fixture().closeTab(shell);
+                // Its window closes when a move takes its only tab (full windows spec 5.3).
+                host.fixture().moveTab(shell, stays);
                 assertThat(modeless.closed()).as("the modeless dialog").isTrue();
                 assertThat(modal.closed()).as("the modal dialog").isTrue();
                 assertThat(closed[0]).as("the plugin's close handlers ran").isEqualTo(2);

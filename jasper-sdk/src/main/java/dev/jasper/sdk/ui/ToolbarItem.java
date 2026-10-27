@@ -3,7 +3,7 @@ package dev.jasper.sdk.ui;
 import java.util.List;
 import java.util.Objects;
 
-/** Something a plugin places in the main toolbar. The application draws it in the toolbar's own style. */
+/** Something a plugin places in every window's toolbar. The application draws it in the toolbar's own style. */
 public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Dropdown, ToolbarItem.View {
     /**
      * A button for one action, using the action's title and icon.
@@ -33,8 +33,8 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
     }
 
     /**
-     * A small group of the plugin's own controls, one per window with a toolbar (the main window), such as a session
-     * choice with a Connect button. The factory runs when such a window opens, and for each one already open from
+     * A small group of the plugin's own controls, one per window, such as a session
+     * choice with a Connect button. The factory runs when a window opens, and for each one already open from
      * inside {@code add}, never for a window
      * nobody sees, and the view closes with its window or with this registration. Its root is an INLINE
      * {@link Nodes.Stack} of LABEL {@link Nodes.Text}s, DROPDOWN, SEARCHABLE or PICKER {@link Nodes.Choice}s, at most one
@@ -71,7 +71,7 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
     static ToolbarItem menu(String icon, String title, List<String> actionIds) { return new Dropdown(icon, title, actionIds); }
 
     /**
-     * A group of the plugin's own controls in the main window's toolbar.
+     * A group of the plugin's own controls in every window's toolbar.
      *
      * @param factory builds one window's view
      * @return the item

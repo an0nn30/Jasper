@@ -28,7 +28,7 @@ class FakePanelsAndWindowsTest {
                 panel -> { panels.add(panel); return KitFixtures.view(context); });
             host.addTerminalWindow();
             host.openPanel(id); host.openPanel(id);
-            assertThat(panels).as("one instance, in the main window").hasSize(1);
+            assertThat(panels).as("one instance, in the window").hasSize(1);
             var icon = "file";
             panels.getFirst().setHeader(new dev.jasper.sdk.ui.PanelHeader("5", false, List.of(
                 new dev.jasper.sdk.ui.PanelHeader.Action("Add", icon, () -> calls.add("first")),
@@ -124,32 +124,6 @@ class FakePanelsAndWindowsTest {
         }
     }); }
 
-    /**
-     * Floating tool windows plan 3's final review: a child window's toggle of a panel with a window of its own raises that
-     * window, which the fake has not, so it records no request to bring the main window forward.
-     */
-    @Test void aChildWindowsToggleOfAPanelWithAWindowOfItsOwnRaisesNoMainWindow() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
-        try (var host = new FakePluginHost()) {
-            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
-            List<PanelHost> instances = new ArrayList<>();
-            String id = "dev.x.tool.floating";
-            context.panels().register(new PanelSpec(id, "Floating", "file", Anchor.LEFT), panel -> { instances.add(panel); return KitFixtures.view(context); });
-            UUID main = host.addTerminalWindow(), child = host.addTerminalWindow();
-            var childWindow = context.terminals().window(child).orElseThrow();
-            host.placePanel(id, new dev.jasper.sdk.ui.PanelPlacement(Anchor.LEFT, false, dev.jasper.sdk.ui.PanelMode.FLOAT));
-            context.panels().toggle(id, childWindow);
-            context.panels().toggle(id, childWindow);
-            assertThat(instances).singleElement().satisfies(panel -> {
-                assertThat(panel.visible()).isTrue();
-                assertThat(panel.placement().ownWindow()).isTrue();
-            });
-            assertThat(host.openRequests()).as("its own window comes forward, not the main window").isEmpty();
-            host.placePanel(id, new dev.jasper.sdk.ui.PanelPlacement(Anchor.LEFT, false, dev.jasper.sdk.ui.PanelMode.DOCKED));
-            context.panels().toggle(id, childWindow);
-            assertThat(host.openRequests()).as("docked again, the main window comes forward").containsExactly("front|" + main);
-        }
-    }); }
-
     @Test void fileSelectionWorksForDialogsAndRequiresALiveShownOwner(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });
@@ -179,7 +153,7 @@ class FakePanelsAndWindowsTest {
             context.rail().add("dev.x.tool.open");
             assertThat(host.panels()).containsExactly("dev.x.tool.hosts|Hosts|RIGHT", "dev.x.tool.broken|Broken|LEFT");
             assertThat(host.rail()).containsExactly("dev.x.tool.open");
-            assertThat(host.openPanel("dev.x.tool.hosts")).as("no main window to show it in").isNull();
+            assertThat(host.openPanel("dev.x.tool.hosts")).as("no window to show it in").isNull();
             UUID window = host.addTerminalWindow();
             assertThat(host.openPanel("dev.x.tool.hosts")).isNotNull();
             assertThat(hosts.get(0).window().id()).isEqualTo(window);
@@ -217,27 +191,77 @@ class FakePanelsAndWindowsTest {
         }
     }); }
 
-    /** Workspace tabs spec 14: panels live in the main window; a child window's toggle shows the panel there. */
-    @Test void aChildWindowsToggleShowsThePanelInTheMainWindow() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+    /** Full windows spec 9: every window's dock builds its own instance of a panel, and each closes with its window. */
+    @Test void eachWindowGetsItsOwnPanelInstance() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            List<PanelHost> built = new ArrayList<>();
+            String id = "dev.x.tool.hosts";
+            context.panels().register(new PanelSpec(id, "Hosts", "file", Anchor.LEFT), panel -> { built.add(panel); return KitFixtures.view(context); });
+            UUID a = host.addTerminalWindow(), b = host.addTerminalWindow();
+            UUID only = host.addTerminalTab(a, "zsh");
+            host.addTerminalTab(b, "zsh");
+            var first = context.terminals().window(a).orElseThrow();
+            context.panels().show(id, first);
+            context.panels().show(id, context.terminals().window(b).orElseThrow());
+            context.panels().show(id, first);
+            assertThat(built).as("the factory ran once per window").hasSize(2);
+            assertThat(built.get(0).window()).isEqualTo(first);
+            assertThat(built.get(1).window().id()).isEqualTo(b);
+            var closed = new ArrayList<String>();
+            built.get(0).onClosed(() -> closed.add("a"));
+            built.get(1).onClosed(() -> closed.add("b"));
+            host.moveTab(only, b);
+            assertThat(first.isOpen()).as("a's only tab left it").isFalse();
+            assertThat(closed).as("a's instance closed with its window").containsExactly("a");
+            assertThat(built.get(0).visible()).isFalse();
+            assertThat(built.get(1).visible()).isTrue();
+            context.panels().show(id, first);
+            assertThat(built).as("a closed window's request has no effect").hasSize(2);
+        }
+    }); }
+
+    /** Full windows spec 9: a toggle acts on the instance of the window it names, building it there first. */
+    @Test void aToggleActsOnTheNamedWindowsInstance() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
             List<PanelHost> instances = new ArrayList<>();
-            context.panels().register(new PanelSpec("dev.x.tool.hosts", "Hosts", "file", Anchor.LEFT), panel -> { instances.add(panel); return KitFixtures.view(context); });
-            UUID main = host.addTerminalWindow(), child = host.addTerminalWindow();
-            context.panels().toggle("dev.x.tool.hosts", context.terminals().window(child).orElseThrow());
-            assertThat(instances).singleElement().satisfies(panel -> {
-                assertThat(panel.window().id()).isEqualTo(main);
-                assertThat(panel.window().isMain()).isTrue();
-                assertThat(panel.visible()).isTrue();
-            });
-            context.panels().toggle("dev.x.tool.hosts", context.terminals().window(child).orElseThrow());
-            assertThat(instances).as("a child window's toggle shows it again, as the application's does").singleElement()
-                .satisfies(panel -> assertThat(panel.visible()).isTrue());
-            context.panels().toggle("dev.x.tool.hosts", context.terminals().window(main).orElseThrow());
-            assertThat(instances).as("one instance, hidden by the main window's toggle").singleElement()
-                .satisfies(panel -> assertThat(panel.visible()).isFalse());
-            assertThat(host.openRequests()).as("each child window's toggle raises the main window; the main window's raises nothing")
-                .containsExactly("front|" + main, "front|" + main);
+            String id = "dev.x.tool.hosts";
+            context.panels().register(new PanelSpec(id, "Hosts", "file", Anchor.LEFT), panel -> { instances.add(panel); return KitFixtures.view(context); });
+            UUID a = host.addTerminalWindow(), b = host.addTerminalWindow();
+            context.panels().show(id, context.terminals().window(a).orElseThrow());
+            context.panels().toggle(id, context.terminals().window(b).orElseThrow());
+            assertThat(instances).hasSize(2);
+            assertThat(instances.get(1).window().id()).isEqualTo(b);
+            assertThat(instances.get(1).visible()).isTrue();
+            context.panels().toggle(id, context.terminals().window(b).orElseThrow());
+            assertThat(instances.get(1).visible()).as("b's toggle hides b's instance").isFalse();
+            assertThat(instances.get(0).visible()).as("a's is untouched").isTrue();
+            assertThat(host.openRequests()).as("no window is raised for another").isEmpty();
+            assertThatIllegalArgumentException().isThrownBy(() -> context.panels().show("dev.x.tool.absent", context.terminals().window(a).orElseThrow()));
+        }
+    }); }
+
+    /** Full windows spec 9: {@code moveToWindow} puts the tab at the end of that window's strip and shows it. */
+    @Test void moveToWindowPutsTheTabAtTheEndOfThatWindowsStrip() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            UUID a = host.addTerminalWindow(), b = host.addTerminalWindow();
+            host.addTerminalTab(a, "zsh");
+            UUID shell = host.addTerminalTab(b, "zsh");
+            var first = context.terminals().window(a).orElseThrow();
+            var second = context.terminals().window(b).orElseThrow();
+            var tab = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("manager", "Manager"), first, KitFixtures.view(context));
+            tab.moveToWindow(second);
+            assertThat(tab.window()).isEqualTo(second);
+            assertThat(host.windowTabs(b)).extracting(List::getFirst).hasSize(2).first().isEqualTo(shell);
+            assertThat(second.tabs().getLast().id()).isEqualTo(second.activeTab().orElseThrow().id());
+            tab.moveToWindow(second);
+            assertThat(host.windowTabs(b)).as("already there: nothing moves").hasSize(2);
+            assertThat(first.isOpen()).as("a keeps its terminal tab").isTrue();
+            tab.close();
+            tab.moveToWindow(first);
+            assertThat(tab.window()).as("a closed tab stays").isEqualTo(second);
         }
     }); }
 

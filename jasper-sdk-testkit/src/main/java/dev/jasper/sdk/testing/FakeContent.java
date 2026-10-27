@@ -12,7 +12,7 @@ import javax.swing.JComponent;
 /**
  * Recorded host content, retaining the actual component across moves. Its tab is a content tab of the scripted
  * workspace (workspace tabs spec 14): it opens, is selected, moves and closes on the tab topics like any tab, and moves to
- * a new child window or the main window as the application's do (spec 6.5).
+ * a new window or another window as the application's do (spec 6.5; full windows spec 9).
  */
 final class FakeContent implements ContentTab {
     final FakeUi ui;
@@ -53,13 +53,15 @@ final class FakeContent implements ContentTab {
     /** Splittable, not pinned by a modal prompt, and not a restorer's tab while its restore runs (6b Task 1's review). */
     private boolean movable(){return splittable()&&pins==0&&(ui.host.workspace.slot==null||ui.host.workspace.slot.taken!=tab);}
     public void moveToNewWindow(){
-        // A child window's only tab already is its own window.
-        if(!movable()||!tab.window.main&&tab.window.tabs.size()==1)return;
+        // A window's only tab already is its own window.
+        if(!movable()||tab.window.tabs.size()==1)return;
         moveTo(ui.host.workspace.addWindow());
     }
-    public void moveToMainWindow(){
-        if(!movable()||tab.window.main)return;
-        moveTo(ui.host.workspace.main().orElseGet(ui.host.workspace::addWindow));
+    public void moveToWindow(WindowHandle window){
+        Objects.requireNonNull(window,"window");
+        var to=ui.host.workspace.window(window.id());
+        if(!movable()||to.isEmpty()||to.get()==tab.window)return;
+        moveTo(to.get());
     }
     /** Tabs and panes spec 9: its tab's only pane, a pinned item and one waiting on a close decision stay. */
     public boolean mayMoveToNewTab(){return movable()&&tab.group.recent.size()>1;}

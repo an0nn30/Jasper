@@ -47,7 +47,7 @@ class WorkspaceContentRouteTest {
             var chrome = ThemeTestSupport.generated(false); var workspace = ThemeTestSupport.generated(true);
             var mixed = ThemeTestSupport.mixed(chrome, workspace);
             var containment = new Containment(() -> true); var model = new dev.jasper.app.contributions.Contributions();
-            var fixture = new TerminalFixture(); var main = fixture.addMainWindow(); var separate = fixture.addWindow();
+            var fixture = new TerminalFixture(); var main = fixture.addWindow(); var separate = fixture.addWindow();
             var mainHolder = new JPanel(); var separateHolder = new JPanel();
             model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, e -> mainHolder.add(e.component()), e -> mainHolder.remove(e.component()), e -> {}, () -> {}));
             model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(separate, e -> separateHolder.add(e.component()), e -> separateHolder.remove(e.component()), e -> {}, () -> {}));
@@ -106,7 +106,7 @@ class WorkspaceContentRouteTest {
             var chrome = ThemeTestSupport.generated(false); var workspace = ThemeTestSupport.generated(true);
             var mixed = ThemeTestSupport.mixed(chrome, workspace);
             var containment = new Containment(() -> true); var model = new dev.jasper.app.contributions.Contributions();
-            var fixture = new TerminalFixture(); var main = fixture.addMainWindow(); var holder = new JPanel();
+            var fixture = new TerminalFixture(); var main = fixture.addWindow(); var holder = new JPanel();
             var terminals = terminals(fixture, containment);
             model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main,
                 e -> { holder.add(e.component()); holder.remove(e.component()); throw new IllegalStateException("mount failed"); }, e -> {}, e -> {}, () -> {}));

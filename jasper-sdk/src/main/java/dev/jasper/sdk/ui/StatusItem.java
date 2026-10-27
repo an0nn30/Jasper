@@ -3,7 +3,7 @@ package dev.jasper.sdk.ui;
 import dev.jasper.sdk.Subscription;
 
 /**
- * A status bar item the application renders in the main window, the only window with a status bar. One handle
+ * A status bar item the application renders in every window's status bar. One handle
  * drives it; per-window content is not supported. Mutators are UI-thread only and do nothing after {@link #close()}.
  */
 public interface StatusItem extends Subscription {

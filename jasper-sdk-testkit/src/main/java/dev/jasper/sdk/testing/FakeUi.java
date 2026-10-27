@@ -161,7 +161,7 @@ final class FakeUi {
         toolbarBuilt.clear();
         host.splitItems.removeIf(item -> item.pluginId().equals(pluginId()));
         actions.clear(); toolbar.clear(); sections.clear(); topLevelIds.clear(); status.clear();
-        for (Panel panel : List.copyOf(panels)) if (panel.instance != null) panel.instance.close();
+        for (Panel panel : List.copyOf(panels)) panel.closeAll();
         panels.clear(); railActions.clear();
         for(var popup:List.copyOf(popovers))popup.close();
         for (FakeWindow window : List.copyOf(windows)) window.close();
@@ -317,16 +317,30 @@ final class FakeUi {
     }
 
     /**
-     * A registered panel and its instance in the main window, while one is built. Its placement is the dock's, built or
-     * not: its spec's anchor and half, docked, until a placement is driven, and kept across a {@code closePanel}, as the
-     * dock keeps a panel's place while the main window closes and opens anew.
+     * A registered panel and its instances, one per window whose dock built it (full windows spec 9). Its placement is the
+     * dock's, built or not: its spec's anchor and half, docked, until a placement is driven, and kept across a
+     * {@code closePanel}, as the dock keeps a panel's place while its window closes and opens anew.
      */
-    static final class Panel {
-        final PanelSpec spec; final PanelFactory factory; PanelInstance instance; dev.jasper.sdk.ui.PanelPlacement placement;
+    final class Panel {
+        final PanelSpec spec; final PanelFactory factory; dev.jasper.sdk.ui.PanelPlacement placement;
+        /** The built instances by window id, in the order they were built. */
+        final Map<UUID, PanelInstance> instances = new LinkedHashMap<>();
         Panel(PanelSpec spec, PanelFactory factory) {
             this.spec = spec; this.factory = factory;
             placement = new dev.jasper.sdk.ui.PanelPlacement(spec.defaultAnchor(), spec.split(), dev.jasper.sdk.ui.PanelMode.DOCKED);
         }
+        /** The instance the host's single-window accessors read: the most recently active window's, else the first built. */
+        PanelInstance shown() {
+            var recent = host.workspace.recent().map(window -> instances.get(window.id)).orElse(null);
+            return recent != null ? recent : instances.values().stream().findFirst().orElse(null);
+        }
+        /** Discards {@code windowId}'s instance, as that window closing does. */
+        void close(UUID windowId) {
+            var instance = instances.remove(windowId);
+            if (instance != null) instance.close();
+        }
+        /** Discards every instance, as the panel's removal does. */
+        void closeAll() { for (UUID windowId : List.copyOf(instances.keySet())) close(windowId); }
     }
 
     record SurfaceMount(FakeWindow surface) { }
@@ -480,38 +494,49 @@ final class FakeUi {
             for (Panel existing : panels) if (existing.spec.id().equals(spec.id())) throw new IllegalArgumentException("Panel already registered: " + spec.id());
             var panel = new Panel(spec, factory);
             panels.add(panel);
-            return () -> { if (panels.remove(panel) && panel.instance != null) { panel.instance.close(); panel.instance = null; } };
+            return () -> { if (panels.remove(panel)) panel.closeAll(); };
           }
+          // Every window's dock shows its own instance of the panel (full windows spec 9): a request acts on the instance
+          // of the window it names, building it there first; a closed window's has no effect.
           @Override public void toggle(String panelId, WindowHandle window) {
-            context.requireOpen();
-            requireNamespace(panelId, "A panel");
-            Panel panel = panels.stream().filter(p -> p.spec.id().equals(panelId)).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Panel not registered: " + panelId));
+            Panel panel = requirePanel(panelId);
             if (!window.isOpen()) return;
-            // Panels live in the main window's dock (workspace tabs spec 14): a child window's toggle shows the panel and
-            // raises the main window, as the application's does (workspace plan 4a's final review), or the panel's own
-            // window when it has one, which the fake has not, so it records nothing then; the main window's toggles it.
-            if (!window.isMain() && !panel.placement.ownWindow())
-                host.workspace.main().ifPresent(main -> host.workspace.openRequests.add("front|" + main.id));
-            if (panel.instance == null) openPanel(panelId);
-            else if (!window.isMain()) panel.instance.show();
-            else panel.instance.setVisible(!panel.instance.visible());
+            var instance = panel.instances.get(window.id());
+            if (instance == null) openPanel(panelId, window.id());
+            else instance.setVisible(!instance.visible());
+          }
+          @Override public void show(String panelId, WindowHandle window) {
+            requirePanel(panelId);
+            if (window.isOpen()) openPanel(panelId, window.id());
           }
         };
     }
 
-    /** Builds the panel in the main window at its placement, or shows it there; null without a main window or when the factory fails. */
-    JComponent openPanel(String panelId) {
-        var main = host.workspace.main().orElse(null);
-        if (main == null) return null;
+    /** The registered panel this plugin owns; refused as {@code Panels.toggle} refuses it. */
+    private Panel requirePanel(String panelId) {
+        context.requireOpen();
+        requireNamespace(panelId, "A panel");
+        return panels.stream().filter(p -> p.spec.id().equals(panelId)).findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Panel not registered: " + panelId));
+    }
+
+    /** Closes every panel's instance in {@code windowId}, as that window closing does. */
+    void closePanelsIn(UUID windowId) { for (Panel panel : List.copyOf(panels)) panel.close(windowId); }
+
+    /**
+     * Builds the panel in the window's dock at its placement, or shows the instance built there; null when the window is
+     * not open, there is no such panel or the factory fails.
+     */
+    JComponent openPanel(String panelId, UUID windowId) {
+        if (host.workspace.window(windowId).isEmpty()) return null;
         for (Panel panel : panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            var existing = panel.instance;
+            var existing = panel.instances.get(windowId);
             if (existing != null) { existing.show(); return existing.content; }
             try {
-                var instance = new PanelInstance(main.id, panel.placement);
+                var instance = new PanelInstance(windowId, panel.placement);
                 var view=context.kit().requireOwned(panel.factory.create(instance));view.mount(instance);instance.onClosed(view::close);instance.content = view.component;
-                if (instance.content != null) panel.instance = instance;
+                if (instance.content != null) panel.instances.put(windowId, instance);
                 return instance.content;
             } catch (RuntimeException | LinkageError failure) {
                 host.recordFailure(pluginId() + " panel " + panelId + ": " + failure);
@@ -606,11 +631,11 @@ final class FakeUi {
                 // plan 6b Rulings 24).
                 if (owner != null && host.workspace.slot != null && ((WindowHandle) owner).id().equals(host.workspace.slot.window.id)) owner = null;
                 if (owner == null || !((WindowHandle)owner).isOpen()) {
-                    // The main window, as the application restores it first when none is open (workspace tabs spec 6.4).
-                    var window = host.workspace.main().orElseGet(host.workspace::addWindow);
+                    // The most recently active window, a new one when none is open (full windows spec 5.2).
+                    var window = host.workspace.recent().orElseGet(host.workspace::addWindow);
                     owner = context.terminals.windowHandle(window.id);
                 }
-                // A plugin's content is a content tab of its window (workspace tabs spec 14), placed as asked: in a new child
+                // A plugin's content is a content tab of its window (workspace tabs spec 14), placed as asked: in a new
                 // window of its own, opened for it, the owner's window untouched.
                 var shown = placement == dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW ? host.workspace.addWindow()
                     : host.workspace.window(((WindowHandle) owner).id()).orElseThrow();

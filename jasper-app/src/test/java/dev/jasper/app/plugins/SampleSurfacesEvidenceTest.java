@@ -45,7 +45,7 @@ class SampleSurfacesEvidenceTest {
         var terminals = onEdtValue(TerminalFixture::new);
         var workspace = onEdtValue(() -> new javax.swing.JPanel(new java.awt.BorderLayout()));
         UUID main = onEdtValue(() -> {
-            UUID id = terminals.addMainWindow();
+            UUID id = terminals.addWindow();
             contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id,
                 tab -> workspace.add(tab.component()), tab -> workspace.remove(tab.component()), tab -> tab.active(true), () -> { }));
             return id;

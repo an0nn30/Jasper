@@ -277,8 +277,7 @@ public final class TunnelsUi implements AutoCloseable {
 
     private void reveal(WindowHandle window) {
         if (closed || !window.isOpen()) return;
-        // The panel shows in the main window; a child window's request goes through the toggle, which raises the main window.
-        if (panelHost == null || !window.isMain()) context.panels().toggle(PANEL, window); else panelHost.show();
+        context.panels().show(PANEL, window);
     }
 
     private void edit(WindowHandle window, Optional<Tunnel> editing, Optional<UUID> preferredHost) {

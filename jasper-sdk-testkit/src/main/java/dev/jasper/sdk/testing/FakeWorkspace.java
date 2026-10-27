@@ -12,8 +12,8 @@ import java.util.UUID;
 
 /**
  * The windows, tabs and panes a test scripts, with the application's rules (workspace tabs spec 6 and 15; tabs and panes
- * spec 4 and 13). The window opened while no main window is open is the main window, which stays open with an empty
- * workspace when its last tab leaves; any other window is a child window, which closes with its last tab. A window holds
+ * spec 4 and 13; full windows spec 5.3). No window is special: a window keeps an empty workspace when its last tab
+ * closes, and closes when a move takes its last tab to another window. A window holds
  * tabs in strip order, and a tab holds panes, each showing one item, which the SDK calls a tab ({@code TabHandle}); a
  * window lists its items tab by tab, then pane by pane. Whatever opens without a pane, a moved item included, opens in a
  * new tab at the end of the strip; a split or a placement beside a pane opens a new pane right after it, in its tab.
@@ -47,14 +47,11 @@ final class FakeWorkspace {
     }
     static final class Window {
         final UUID id = UUID.randomUUID();
-        /** Whether this is the main window, which outlives its last tab. */
-        final boolean main;
         /** Every item, tab by tab in strip order, then pane by pane. */
         final List<Tab> tabs = new ArrayList<>();
         /** The window's tabs, most recently shown first: the first is the shown tab. */
         final List<Group> recent = new ArrayList<>();
         Tab selected; boolean open = true;
-        Window(boolean main) { this.main = main; }
         /** @return the shown tab, or null in an empty workspace */
         Group active() { return recent.isEmpty() ? null : recent.getFirst(); }
     }
@@ -92,8 +89,10 @@ final class FakeWorkspace {
     List<Pane> everyOpenPane() { return everyPane.stream().filter(pane -> pane.open).toList(); }
 
     Optional<Window> window(UUID id) { return windows.stream().filter(window -> window.id.equals(id)).findFirst(); }
-    /** @return the main window, while it is open */
-    Optional<Window> main() { return windows.stream().filter(window -> window.main).findFirst(); }
+    /** @return the most recently active open window, else the one opened last; empty while none is open */
+    Optional<Window> recent() {
+        return lastActive != null && lastActive.open ? Optional.of(lastActive) : windows.isEmpty() ? Optional.empty() : Optional.of(windows.getLast());
+    }
     Optional<Tab> tab(UUID id) { return everyTab.stream().filter(tab -> tab.open && tab.id.equals(id)).findFirst(); }
     Optional<Pane> pane(UUID id) { return everyPane.stream().filter(pane -> pane.open && pane.id.equals(id)).findFirst(); }
     Optional<Pane> anyPane(UUID id) { return everyPane.stream().filter(pane -> pane.id.equals(id)).findFirst(); }
@@ -119,9 +118,9 @@ final class FakeWorkspace {
         host.publishApp(TerminalEvents.ACTIVE_PANE_CHANGED, new TerminalEvents.ActivePaneChanged(Optional.ofNullable(now)));
     }
 
-    /** A window: the main window when none is open, else a child window. */
+    /** A new window. */
     Window addWindow() {
-        var window = new Window(main().isEmpty());
+        var window = new Window();
         windows.add(window);
         host.publishApp(TerminalEvents.WINDOW_OPENED, new TerminalEvents.WindowEvent(window.id));
         return window;
@@ -251,7 +250,7 @@ final class FakeWorkspace {
     }
 
     /**
-     * Moves an item to a new tab at the end of another open window's strip, where it is selected; a child window left
+     * Moves an item to a new tab at the end of another open window's strip, where it is selected; a window left
      * with no item closes after the move is announced.
      */
     void move(Tab tab, Window to) {
@@ -263,7 +262,7 @@ final class FakeWorkspace {
         place(tab, to, null);
         host.publishApp(TerminalEvents.TAB_MOVED, new TerminalEvents.TabMoved(tab.id, from.id, to.id));
         select(tab);
-        if (from.tabs.isEmpty() && !from.main) closeWindow(from);
+        if (from.tabs.isEmpty()) closeWindow(from);
         refreshActive();
     }
 
@@ -318,7 +317,7 @@ final class FakeWorkspace {
     /** A pane closes with its item. */
     void close(Pane pane) { if (pane.open) close(pane.tab); }
 
-    /** Closes an item, its terminal pane with it; a child window's last item takes the window with it. */
+    /** Closes an item, its terminal pane with it; a window keeps an empty workspace when its last item closes. */
     void close(Tab tab) {
         if (!tab.open) return;
         Window window = tab.window;
@@ -333,7 +332,6 @@ final class FakeWorkspace {
         boolean selected = takeOut(tab);
         host.publishApp(TerminalEvents.TAB_CLOSED, new TerminalEvents.TabEvent(window.id, tab.id));
         if (selected) reselect(window);
-        if (window.tabs.isEmpty() && !window.main) closeWindow(window);
         refreshActive();
     }
 
@@ -358,6 +356,7 @@ final class FakeWorkspace {
         windows.remove(window);
         if (lastActive == window) lastActive = null;
         host.closeToolbarViews(window.id);
+        host.closePanelsIn(window.id);
         host.publishApp(TerminalEvents.WINDOW_CLOSED, new TerminalEvents.WindowEvent(window.id));
         refreshActive();
     }

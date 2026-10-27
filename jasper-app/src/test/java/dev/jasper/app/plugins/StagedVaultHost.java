@@ -78,7 +78,7 @@ final class StagedVaultHost implements AutoCloseable {
         onEdt(() -> {
             host.start(new HostedPlugin(VAULT, Set.of(), Set.of(), Set.of("dev.jasper.vault.api"), loader, () -> plugin));
             // The main window: the Vault's manager is a dialog over it.
-            opened.set(terminals.addMainWindow()); terminals.activateWindow(opened.get());
+            opened.set(terminals.addWindow()); terminals.activateWindow(opened.get());
         });
         window = opened.get();
     }

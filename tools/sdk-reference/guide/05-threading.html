@@ -75,7 +75,7 @@ asking, with {@link ContentTab#close()} or when the plugin stops. A plugin rarel
 closes whatever it left open, newest first. Close a subscription when the contribution should go away while the plugin
 keeps running, such as a menu entry for a host the user deleted, or rebuild a menu section with
 {@link PluginMenu#clear()} and {@link PluginMenu#add(String)}.</p>
-<p>Some handles end on their own: a {@link PanelHost} when the main window closes ({@link PanelHost#onClosed(Runnable)}), a
+<p>Some handles end on their own: a {@link PanelHost} when its window closes ({@link PanelHost#onClosed(Runnable)}), a
 {@link ContentTab} when the user closes it ({@link ContentTab#onClosed(Runnable)}), a {@link UiAnchor} when its control
 is hidden, disabled, made busy, removed or closed ({@link UiAnchor#onClosed(Runnable)}), and a dialog when the user or
 its window closes it ({@link WindowSurface#onClosed(Runnable)}). Pane, tab and window handles keep only an id: a closed target
@@ -93,7 +93,7 @@ nor move to another window.</li>
 <li>An overlay ({@link Windows#overlay(OverlaySpec)}) closes with its Jasper window.</li>
 <li>A file chooser ({@link Windows#choose(FileChoice)} and the {@code choose*} methods) is cancelled, and its result
 discarded, when its owner closes or the plugin stops.</li>
-<li>{@link Windows#openTab(ContentSpec,WindowOwner,UiView)} opens the tab in the owner's window, or the main window.</li>
+<li>{@link Windows#openTab(ContentSpec,WindowOwner,UiView)} opens the tab in the owner's window, or the most recently active window.</li>
 </ul>
 
 <h3>Shutdown</h3>

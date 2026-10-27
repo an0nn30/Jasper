@@ -154,10 +154,12 @@ class HostedTerminalsTest {
         WindowHandle windowHandle = tabHandle.window();
         assertThat(pane.info().title()).isEqualTo("make");
         assertThat(tabHandle.title()).isEqualTo("build");
+        UUID keep = fixture.addTab(window, "keep"), other = fixture.addWindow();
         fixture.closePane(only);
         assertThat(pane.isOpen()).isFalse();
         assertThat(tabHandle.isOpen()).isFalse();
-        assertThat(windowHandle.isOpen()).as("the last tab took the window with it").isFalse();
+        fixture.moveTab(keep, other);
+        assertThat(windowHandle.isOpen()).as("a move took its last tab, and the window with it").isFalse();
         assertThat(pane.info().title()).as("the last known value").isEqualTo("make");
         assertThat(tabHandle.title()).isEqualTo("build");
         assertThat(tabHandle.terminal()).isEmpty();

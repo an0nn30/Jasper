@@ -77,8 +77,9 @@ public interface ContractHarness extends AutoCloseable {
     List<String> panels();
 
     /**
-     * UI thread: invokes the panel's factory as the main window showing it would, at the panel's placement, or returns
-     * the panel built there; null when no main window is open, there is no such panel or the factory failed.
+     * UI thread: invokes the panel's factory as the most recently active window's dock showing it would, at the panel's
+     * placement, or returns the panel built there; null when no window is open, there is no such panel or the factory
+     * failed.
      */
     javax.swing.JComponent openPanel(String panelId);
 
@@ -93,13 +94,13 @@ public interface ContractHarness extends AutoCloseable {
     boolean runPanelHeaderAction(String panelId, String label);
 
     /**
-     * UI thread: discards the open panel as the main window would when it closes or the registration goes away; its
+     * UI thread: discards the open panel as its window would when it closes or the registration goes away; its
      * placement stays, as the dock keeps it, for the next {@link #openPanel}.
      */
     void closePanel(String panelId);
 
     /**
-     * UI thread: moves the panel as the main window would, open or not, to the side, half and mode the placement names.
+     * UI thread: moves the panel as its window would, open or not, to the side, half and mode the placement names.
      * A different placement is the open panel's {@code PanelHost.placement()} from then on and reaches each
      * {@code onPlacement} handler once; the same placement changes nothing; a panel that is not open hears nothing and
      * is built there by the next {@link #openPanel}.
@@ -128,8 +129,8 @@ public interface ContractHarness extends AutoCloseable {
     boolean requestQuit();
 
     /**
-     * UI thread: adds a Jasper window, which announces itself on the terminal topics: the main window when none is open,
-     * which stays open when its last tab leaves, else a child window, which closes with its last tab.
+     * UI thread: adds a Jasper window, which announces itself on the terminal topics. A window keeps an empty workspace
+     * when its last tab closes, and closes when a move takes its last tab to another window.
      */
     java.util.UUID addTerminalWindow();
 
@@ -151,7 +152,7 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: the user focused this pane, which selects its tab. */
     void focusTerminalPane(java.util.UUID paneId);
 
-    /** UI thread: closes a pane with its tab; a child window's last tab takes the window with it. */
+    /** UI thread: closes a pane with its tab; a window keeps an empty workspace when its last tab closes. */
     void closeTerminalPane(java.util.UUID paneId);
 
     /** UI thread: adds and selects a content tab, as the application or another plugin shows a document; it has no pane. */
@@ -163,7 +164,7 @@ public interface ContractHarness extends AutoCloseable {
      */
     List<List<java.util.UUID>> windowTabs(java.util.UUID windowId);
 
-    /** UI thread: moves a tab the test added to another open window, where it is selected; a child window left with no tab closes. */
+    /** UI thread: moves a tab the test added to another open window, where it is selected; a window left with no tab closes. */
     void moveTab(java.util.UUID tabId, java.util.UUID windowId);
 
     /**
@@ -179,7 +180,7 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: the restore state a tab gives, a content tab's or a provided session's; empty when it does not come back. */
     java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(java.util.UUID tabId);
 
-    /** UI thread: closes a tab the test added, of either kind, its pane with it; a child window's last tab takes the window with it. */
+    /** UI thread: closes a tab the test added, of either kind, its pane with it; a window keeps an empty workspace when its last tab closes. */
     void closeTab(java.util.UUID tabId);
 
     /** UI thread: sets the text selected in a pane. */

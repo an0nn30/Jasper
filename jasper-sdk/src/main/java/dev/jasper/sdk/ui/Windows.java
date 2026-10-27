@@ -28,7 +28,7 @@ public interface Windows {
      *
      * @param spec the tab's key and title
      * @param owner the window the tab opens in, or a content tab whose window it opens in; null, or a closed window, for
-     *              the main window
+     *              the most recently active window, opening one when none is open
      * @param content the plugin's owned view
      * @return the new tab, or the open tab with the same key, selected
      */
@@ -41,21 +41,21 @@ public interface Windows {
      *
      * @param spec the tab's key and title
      * @param owner the window the tab opens in, or a content tab whose window it opens in; null, or a closed window, for
-     *              the main window
+     *              the most recently active window, opening one when none is open
      * @param content the plugin's owned view
      * @param placement where a new tab goes; the open tab with the same key is selected where it is
      * @return the new tab, or the open tab with the same key, selected
      * @throws IllegalArgumentException for a foreign owner or a closed content tab
      * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread, or while the
-     *                               main window closes or Jasper quits
+     *                               windows close or Jasper quits
      * @since 0.20.0
      */
     ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content, TabPlacement placement);
 
     /**
      * Registers how this plugin rebuilds its tabs saved with restore state of {@code kind}.
-     * Register it in {@code start()}: Jasper restores its windows once every plugin has started, and again whenever the
-     * main window opens after it closed. A tab is saved only while its plugin has a restorer for its kind; a saved tab
+     * Register it in {@code start()}: Jasper restores its windows once every plugin has started, and again whenever a
+     * window opens while none is open. A tab is saved only while its plugin has a restorer for its kind; a saved tab
      * whose plugin is missing or disabled, or has no restorer for its kind any more, comes back as a placeholder that
      * says why.
      *

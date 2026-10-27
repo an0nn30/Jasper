@@ -52,11 +52,11 @@ class PresentationConformanceTest {
         var descriptor = DescriptorParser.parse(Files.readString(EnterpriseResources.RESOURCES.resolve("plugin.toml")));
         assertThat(descriptor.id()).isEqualTo("dev.jasper.enterprise");
         assertThat(descriptor.name()).isEqualTo("Enterprise");
-        assertThat(descriptor.version()).isEqualTo(Version.parse("0.3.0"));
+        assertThat(descriptor.version()).isEqualTo(Version.parse("0.4.0"));
         assertThat(descriptor.entry()).isEqualTo("dev.jasper.enterprise.EnterprisePlugin");
         assertThat(descriptor.capabilities()).containsExactly(DescriptorParser.PRESENTATION_PROVIDE);
         assertThat(descriptor.exports()).as("no API (plan 15a)").isEmpty();
-        assertThat(descriptor.sdk()).as("every bundled range (workspace plan 6a); the kit's plugin defaults need SDK 0.18.2 or later (Rulings 14)").isEqualTo(VersionRange.parse(">=0.22.0, <0.23"));
+        assertThat(descriptor.sdk()).as("every bundled range (workspace plan 6a); the kit's plugin defaults need SDK 0.18.2 or later (Rulings 14)").isEqualTo(VersionRange.parse(">=0.23.0, <0.24"));
         assertThat(descriptor.requires()).as("no requirements (spec 14.1)").isEmpty();
         assertThat(descriptor.presentation()).isEqualTo("presentation/enterprise.kit.toml");
         assertThat(descriptor.themes()).containsExactly("themes/enterprise.json");

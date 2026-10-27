@@ -153,9 +153,9 @@ public final class TerminalEvents {
         }
     }
 
-    /** A Jasper window, the main window or a child window, opened. */
+    /** A Jasper window opened. */
     public static final Topic<WindowEvent> WINDOW_OPENED = Topic.of(PREFIX + "window_opened", WindowEvent.class);
-    /** A Jasper window closed; the main window stays open when its last tab closes. */
+    /** A Jasper window closed; a window stays open when its last tab closes. */
     public static final Topic<WindowEvent> WINDOW_CLOSED = Topic.of(PREFIX + "window_closed", WindowEvent.class);
     /** The user turned to a Jasper window. */
     public static final Topic<WindowEvent> WINDOW_ACTIVATED = Topic.of(PREFIX + "window_activated", WindowEvent.class);

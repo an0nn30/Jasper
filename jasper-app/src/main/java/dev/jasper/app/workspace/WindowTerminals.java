@@ -29,7 +29,7 @@ final class WindowTerminals implements AutoCloseable {
     WindowTerminals(WindowContent owner, TerminalRegistry registry, Runnable toFront) {
         this.owner = owner; this.registry = registry;
         var entry = new WindowEntry(owner.id(), () -> owner.tabs().stream().map(this::entry).toList(),
-            () -> Optional.ofNullable(owner.selectedTab()).map(this::entry), owner::isActiveAndOpen, owner::firstWindow, toFront, this::openTab);
+            () -> Optional.ofNullable(owner.selectedTab()).map(this::entry), owner::isActiveAndOpen, toFront, this::openTab);
         registration = registry.addWindow(entry);
         registry.atomically(() -> {
             for (Tab tab : owner.tabs()) {

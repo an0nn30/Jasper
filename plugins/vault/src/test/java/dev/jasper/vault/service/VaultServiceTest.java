@@ -46,7 +46,6 @@ class VaultServiceTest {
             @Override public Optional<TabHandle> activeTab() { return Optional.empty(); }
             @Override public boolean isActive() { return true; }
             @Override public boolean isOpen() { return true; }
-            @Override public boolean isMain() { return true; }
             @Override public void toFront() { }
         };
     }
@@ -90,7 +89,6 @@ class VaultServiceTest {
             public Optional<TabHandle> activeTab() { return Optional.empty(); }
             public boolean isActive() { return false; }
             public boolean isOpen() { return firstOpen[0]; }
-            public boolean isMain() { return firstOpen[0]; }
             public void toFront() {}
         };
         var secondOwner = window();

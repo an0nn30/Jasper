@@ -41,7 +41,7 @@ class HostedChooserTest {
         var containment=new Containment(() -> true);
         var kit=new HostedKit("dev.x.tool",open::get,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
         java.util.function.Function<Boolean, UUID> window = first -> {
-            UUID id=first?fixture.addMainWindow():fixture.addWindow();contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id,e -> {},e -> {},e -> {},() -> {}));return id;
+            UUID id=fixture.addWindow();contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id,e -> {},e -> {},e -> {},() -> {}));return id;
         };
         UUID main=window.apply(true);
         contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, tab -> contributions.tabs().move(tab, window.apply(false))));
@@ -49,9 +49,9 @@ class HostedChooserTest {
         var view=kit.create(HostedKitTest.custom(dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"doc"),e -> {});
         view.registerContent(new dev.jasper.sdk.ui.CustomContent("doc",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea(),disposed::incrementAndGet));
         var tab=ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("doc","Document"),null,view);
-        during.set(() -> {tab.moveToNewWindow();assertThat(tab.window().isMain()).isTrue();assertThat(tab.requestClose().join()).isFalse();});
+        during.set(() -> {tab.moveToNewWindow();assertThat(tab.window().id()).isEqualTo(main);assertThat(tab.requestClose().join()).isFalse();});
         assertThat(ui.windows().chooseFiles(tab,"Choose",Optional.empty())).hasSize(2);
-        tab.moveToNewWindow();assertThat(tab.window().isMain()).isFalse();
+        tab.moveToNewWindow();assertThat(tab.window().id()).isNotEqualTo(main);
         during.set(tab::close);
         assertThat(ui.windows().chooseFiles(tab,"Choose",Optional.empty())).isEmpty();
         assertThat(disposed.get()).isEqualTo(1);kit.close();ui.closeAll();
@@ -80,9 +80,11 @@ class HostedChooserTest {
     }
 
     @Test void aJasperWindowOwnerClosingWhilePickerPumpsDisposesIt() {
-        var id = fixture.addWindow();
-        var pane = fixture.addPane(fixture.addTab(id, "Shell"), "Shell", null);
-        during.set(() -> { fixture.closePane(pane); assertThat(disposed).isTrue(); });
+        UUID stays = fixture.addWindow(), id = fixture.addWindow();
+        var tab = fixture.addTab(id, "Shell");
+        fixture.addPane(tab, "Shell", null);
+        // The owner closes when a move takes its only tab (full windows spec 5.3).
+        during.set(() -> { fixture.moveTab(tab, stays); assertThat(disposed).isTrue(); });
         assertThat(ui.windows().chooseFiles(terminals.windowHandle(id), "Upload", Optional.empty())).isEmpty();
     }
 

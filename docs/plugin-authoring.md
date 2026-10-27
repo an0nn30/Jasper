@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
-describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.22.0, task by task.
+describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.23.0, task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
   exported APIs.
@@ -64,7 +64,7 @@ id = "dev.example.tool"
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.22.0, <0.23"
+sdk = ">=0.23.0, <0.24"
 description = "Runs the tool from the command palette."
 vendor = "Example"
 homepage = "https://example.dev/tool"
@@ -90,7 +90,7 @@ summary = "Run the tool"
 | `name` | string | yes | Must show something: not only spaces, zero-width or bidi characters. It titles the plugin's row, Settings page and notification groups. |
 | `version` | string | yes | One to three numbers separated by dots, without leading zeros or a pre-release tag; missing numbers are 0, so `1.0` is `1.0.0`. |
 | `entry` | string | yes | The qualified name of the [entry class](#the-entry-point-and-lifecycle), which must be in a package. |
-| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.22.0 declares `sdk = ">=0.22.0, <0.23"`. |
+| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.23.0 declares `sdk = ">=0.23.0, <0.24"`. |
 | `description` | string | no | The Overview on the plugin's details in Settings › Plugins; searched there. |
 | `vendor` | string | no | Shown in the plugin list, its details and its review sheet. |
 | `homepage` | string | no | An absolute `http` or `https` address, linked as "Plugin homepage ↗" on the plugin's details. Anything else is ignored with a warning in the log. |
@@ -611,9 +611,9 @@ tab strip, the window and its menus, and in the main window the status bar; the 
   text is empty), be `dimmed` (painted in the disabled colour, still clickable), and carry a menu of
   [`ContentStatus.MenuEntry`](sdk-reference.html#dev.jasper.sdk.ui.ContentStatus.MenuEntry) items, check items and
   separator lines, which a click opens in place of `run`.
-- `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new child window
-  (a child window's only tab stays where it is) and `moveToMainWindow()` to the main window, keeping the view and its
-  state, and `window()` is the window that holds it (`WindowHandle.isMain()` tells the main window from a child window).
+- `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new window
+  (a window's only tab stays where it is) and `moveToWindow(window)` to the end of another window's strip, keeping the
+  view and its state, and `window()` is the window that holds it.
   `moveToNewTab()` gives its pane a tab of its own (`mayMoveToNewTab()` says whether it would, for a menu entry that
   shows disabled otherwise); `tabChoices()` lists the
   other tabs of its window as [`TabChoice`](sdk-reference.html#dev.jasper.sdk.ui.TabChoice)s, numbered as Select Tab
@@ -906,7 +906,7 @@ private static void installTerminalDemo(PluginContext context) {
 - **Finding.** [`Terminals`](sdk-reference.html#dev.jasper.sdk.terminal.Terminals): `activeWindow()` (the window used
   last, even with Jasper in the background), `activePane()`, `windows()`, and `window(id)`, `tab(id)` and `pane(id)`.
   [`WindowHandle`](sdk-reference.html#dev.jasper.sdk.terminal.WindowHandle): `tabs()` (every item, terminal or content,
-  tab by tab in strip order, then pane by pane), `activeTab()` (the focused pane's item in the shown tab), `isMain()`,
+  tab by tab in strip order, then pane by pane), `activeTab()` (the focused pane's item in the shown tab),
   `isActive()`, `toFront()`; it is also an owner for dialogs and pickers.
   [`TabHandle`](sdk-reference.html#dev.jasper.sdk.terminal.TabHandle): `kind()`, `terminal()` (a terminal's one pane),
   `window()`, `title()`, `select()`.

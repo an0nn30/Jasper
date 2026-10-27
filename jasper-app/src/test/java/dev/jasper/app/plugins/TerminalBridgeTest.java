@@ -78,11 +78,18 @@ class TerminalBridgeTest {
         heard.clear();
         fixture.closePane(pane);
         deliver();
-        assertThat(heard).containsExactly(new TerminalEvents.PaneEvent(tab, pane), new TerminalEvents.TabEvent(window, tab),
-            new TerminalEvents.WindowEvent(window), new TerminalEvents.ActivePaneChanged(Optional.empty()));
+        assertThat(heard).as("the window keeps its empty workspace").containsExactly(new TerminalEvents.PaneEvent(tab, pane),
+            new TerminalEvents.TabEvent(window, tab), new TerminalEvents.ActivePaneChanged(Optional.empty()));
+        UUID other = fixture.addWindow(), moving = fixture.addTab(window, "next");
+        deliver();
+        heard.clear();
+        fixture.moveTab(moving, other);
+        deliver();
+        assertThat(heard).as("a move that empties the window closes it").contains(new TerminalEvents.WindowEvent(window));
+        int heardBefore = heard.size();
         bridge.close();
         fixture.addWindow();
         deliver();
-        assertThat(heard).hasSize(4);
+        assertThat(heard).hasSize(heardBefore);
     }
 }

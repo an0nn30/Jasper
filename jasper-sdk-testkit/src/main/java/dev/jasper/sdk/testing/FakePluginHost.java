@@ -738,9 +738,8 @@ public final class FakePluginHost implements AutoCloseable {
      * UI thread: the toolbar views a Jasper window shows, in toolbar order. The window builds each registered
      * {@code ToolbarItem.View} once, the first time this is asked for it, as a window builds its views when it opens; a
      * view whose factory threw or whose tree the toolbar does not admit is left out and recorded in {@link #failures()}.
-     * A window that is not open, or whose views {@link #closeToolbarViews closed}, shows none and asks no factory. Jasper
-     * builds toolbar views only in the main window, the only window with a toolbar; the fake builds them for any open
-     * window, a child window too.
+     * A window that is not open, or whose views {@link #closeToolbarViews closed}, shows none and asks no factory. Every
+     * window has a toolbar.
      *
      * @param windowId a Jasper window
      * @return the live views
@@ -754,8 +753,8 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * UI thread: closes a window's toolbar views, as the window does when it closes; a fake child window does when its
-     * last tab closes or moves to another window; the main window stays open.
+     * UI thread: closes a window's toolbar views, as the window does when it closes; a fake window does when a move takes
+     * its last tab to another window.
      *
      * @param windowId a Jasper window
      * @since 0.18.0
@@ -1164,7 +1163,8 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Returns the header the open panel last published.
+     * Returns the header the open panel last published: its instance in the most recently active window, else the first
+     * one built.
      *
      * @param panelId panel identifier
      * @return header metadata, or an empty header if the panel is not open
@@ -1172,31 +1172,41 @@ public final class FakePluginHost implements AutoCloseable {
     public dev.jasper.sdk.ui.PanelHeader panelHeader(String panelId) {
         for (var context : contexts.values()) for (var panel : context.ui.panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            if (panel.instance != null) return panel.instance.header;
+            var instance = panel.shown();
+            if (instance != null) return instance.header;
         }
         return dev.jasper.sdk.ui.PanelHeader.EMPTY;
     }
 
     /**
-     * Discards the open panel as the main window would when it closes: its header clears, retained header callbacks
-     * become inert and its close handlers run. Its placement stays, as the dock keeps it, so {@link #openPanel} builds it
-     * there again. Nothing happens when the panel is not open.
+     * Discards every open instance of the panel, as their windows would when they close: each header clears, retained
+     * header callbacks become inert and close handlers run. Its placement stays, as the dock keeps it, so
+     * {@link #openPanel} builds it there again. Nothing happens when the panel is not open.
      *
      * @param panelId panel identifier
      */
     public void closePanel(String panelId) {
-        for (var context : contexts.values()) for (var panel : List.copyOf(context.ui.panels)) {
-            if (!panel.spec.id().equals(panelId)) continue;
-            var instance = panel.instance;
-            panel.instance = null;
-            if (instance != null) instance.close();
-        }
+        for (var context : contexts.values()) for (var panel : List.copyOf(context.ui.panels))
+            if (panel.spec.id().equals(panelId)) panel.closeAll();
     }
 
     /**
-     * Moves the panel as the main window would when the user drags it or gives it a View Mode, open or not: the
+     * Discards the panel's instance in one window, as that window would when it closes; the other windows' instances
+     * stay. Nothing happens when that window has none.
+     *
+     * @param panelId panel identifier
+     * @param windowId a Jasper window
+     * @since 0.23.0
+     */
+    public void closePanel(String panelId, UUID windowId) {
+        for (var context : contexts.values()) for (var panel : List.copyOf(context.ui.panels))
+            if (panel.spec.id().equals(panelId)) panel.close(windowId);
+    }
+
+    /**
+     * Moves the panel as its window would when the user drags it or gives it a View Mode, open or not: the
      * placement is where {@link #openPanel} builds it from then on, also after {@link #closePanel}, as the dock keeps a
-     * panel's place while the main window closes and opens anew. For the open panel a placement that differs from its
+     * panel's place while its window closes and opens anew. For each open instance a placement that differs from its
      * current one is what {@code PanelHost.placement()} returns from then on and reaches each {@code onPlacement} handler
      * once, a handler that throws being recorded in {@link #failures()} while the others still run, and one that closes
      * the panel ending the round. The same placement is silent, and so is a panel that is not open: its factory reads
@@ -1211,25 +1221,42 @@ public final class FakePluginHost implements AutoCloseable {
         for (var context : contexts.values()) for (var panel : List.copyOf(context.ui.panels)) {
             if (!panel.spec.id().equals(panelId)) continue;
             panel.placement = placement;
-            if (panel.instance != null) panel.instance.place(placement);
+            for (var instance : List.copyOf(panel.instances.values())) instance.place(placement);
         }
     }
 
     /**
-     * Invokes a panel's factory as the main window showing it would, at the panel's placement (its spec's anchor and
-     * half, docked, until {@link #placePanel} moves it), or shows the panel built there: panels live in the main window's
-     * dock. A factory failure is recorded.
+     * Invokes a panel's factory as the most recently active window showing it would (else the window opened last), at the
+     * panel's placement (its spec's anchor and half, docked, until {@link #placePanel} moves it), or shows the instance
+     * built there. A factory failure is recorded.
      *
      * @param panelId the panel to build
-     * @return the component, or null when no main window is open, there is no such panel or its factory failed
+     * @return the component, or null when no window is open, there is no such panel or its factory failed
      */
     public javax.swing.JComponent openPanel(String panelId) {
+        var window = workspace.recent();
+        return window.isEmpty() ? null : openPanel(panelId, window.get().id);
+    }
+
+    /**
+     * Invokes a panel's factory as {@code windowId}'s dock showing it would, at the panel's placement, or shows the
+     * instance built there: every window's dock builds its own instance. A factory failure is recorded.
+     *
+     * @param panelId the panel to build
+     * @param windowId a Jasper window
+     * @return the component, or null when that window is not open, there is no such panel or its factory failed
+     * @since 0.23.0
+     */
+    public javax.swing.JComponent openPanel(String panelId, UUID windowId) {
         for (FakePluginContext context : contexts.values()) {
-            javax.swing.JComponent built = context.ui.openPanel(panelId);
+            javax.swing.JComponent built = context.ui.openPanel(panelId, windowId);
             if (built != null) return built;
         }
         return null;
     }
+
+    /** Closes every plugin's panel instances in a window that closed. */
+    void closePanelsIn(UUID windowId) { for (FakePluginContext context : contexts.values()) context.ui.closePanelsIn(windowId); }
 
     /**
      * The mounted owned view of the open panel, when its content is a kit view.
@@ -1240,7 +1267,7 @@ public final class FakePluginHost implements AutoCloseable {
     public java.util.Optional<FakeKitView> panelView(String panelId) {
         for (var context : contexts.values()) for (var panel : context.ui.panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            var instance = panel.instance;
+            var instance = panel.shown();
             if (instance == null || instance.done) return java.util.Optional.empty();
             return context.kit().views().stream().filter(view -> view.component == instance.content).findFirst();
         }
@@ -1403,9 +1430,9 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Adds a Jasper window: the main window when none is open, which stays open when its last tab leaves, else a child
-     * window, which closes with its last tab. Windows, tabs and panes announce themselves on the terminal topics like the
-     * application's, delivered by {@link #flush()}.
+     * Adds a Jasper window. No window is special: a window keeps an empty workspace when its last tab closes, and closes
+     * when a move takes its last tab to another window. Windows, tabs and panes announce themselves on the terminal topics
+     * like the application's, delivered by {@link #flush()}.
      *
      * @return the new window's id
      */
@@ -1448,7 +1475,7 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public void focusTerminalPane(UUID paneId) { workspace.pane(paneId).ifPresent(workspace::focus); }
     /**
-     * Closes a pane with its tab; a child window's last tab takes the window with it.
+     * Closes a pane with its tab; a window keeps an empty workspace when its last tab closes.
      *
      * @param paneId the pane
      */
@@ -1484,8 +1511,8 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * Moves a tab the test added to a new tab at the end of another open window's strip, where it is selected, as
      * dragging it there does: a terminal tab's pane keeps its id and session with no {@code PANE_OPENED} or
-     * {@code PANE_CLOSED}, the move is announced on {@code TAB_MOVED}, and a child window left with no tab closes after
-     * it. A plugin moves its own content tab with {@code ContentTab.moveToNewWindow} or {@code moveToMainWindow}.
+     * {@code PANE_CLOSED}, the move is announced on {@code TAB_MOVED}, and a window left with no tab closes after
+     * it. A plugin moves its own content tab with {@code ContentTab.moveToNewWindow} or {@code moveToWindow}.
      *
      * @param tabId an open tab the test added
      * @param windowId another open window
@@ -1496,13 +1523,13 @@ public final class FakePluginHost implements AutoCloseable {
         var window = workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No such window: " + windowId));
         for (FakePluginContext context : contexts.values())
             if (context.ui.contents.stream().anyMatch(content -> content.tab == tab))
-                throw new IllegalArgumentException("A plugin moves its own content tab with ContentTab.moveToNewWindow or moveToMainWindow");
+                throw new IllegalArgumentException("A plugin moves its own content tab with ContentTab.moveToNewWindow or moveToWindow");
         workspace.move(tab, window);
     }
 
     /**
      * Closes a tab the test added, of either kind, as its close button does: a terminal tab's pane closes with it, and a
-     * child window's last tab takes the window with it. A plugin closes its own content tab with {@code ContentTab.close}
+     * window keeps an empty workspace when its last tab closes. A plugin closes its own content tab with {@code ContentTab.close}
      * or {@code requestClose}.
      *
      * @param tabId an open tab the test added
@@ -1571,7 +1598,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * What plugins asked to open or raise, in order.
      *
-     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program), {@code session-tab|<window id>|<session title>}, {@code session-split|<pane id>|<RIGHT or DOWN>|<session title>}, {@code beside|<content tab id>|<RIGHT or DOWN>} (a content tab's Terminal Right or Terminal Down) or {@code front|<window id>} (a window's {@code toFront()}, or the main window that a child window's toggle of a docked panel raises)
+     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile, then by {@code |run:<the command's words joined by spaces>} when it runs a program), {@code session-tab|<window id>|<session title>}, {@code session-split|<pane id>|<RIGHT or DOWN>|<session title>}, {@code beside|<content tab id>|<RIGHT or DOWN>} (a content tab's Terminal Right or Terminal Down) or {@code front|<window id>} (a window's {@code toFront()})
      */
     public List<String> openRequests() { return List.copyOf(workspace.openRequests); }
 
@@ -1973,8 +2000,8 @@ public final class FakePluginHost implements AutoCloseable {
     public dev.jasper.sdk.ui.ContentPresentation contentPresentation(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).presentation; }
     /**
      * The Jasper window a content tab is in: the window it opened in, or the one a move took it to. An owner
-     * that was a content tab resolves to that tab's window, and no owner or a closed window to the main window, or to a
-     * new main window when none is open.
+     * that was a content tab resolves to that tab's window, and no owner or a closed window to the most recently active
+     * window, or to a new window when none is open.
      *
      * @param tab handle from this host
      * @return originating owner */

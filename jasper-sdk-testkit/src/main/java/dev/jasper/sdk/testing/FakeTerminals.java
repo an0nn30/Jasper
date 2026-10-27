@@ -52,7 +52,6 @@ final class FakeTerminals implements Terminals {
         }
         @Override public boolean isActive() { context.requireOpen(); return workspace.lastActive != null && workspace.lastActive.open && workspace.lastActive.id.equals(id); }
         @Override public boolean isOpen() { context.requireOpen(); return workspace.window(id).isPresent(); }
-        @Override public boolean isMain() { context.requireOpen(); return workspace.window(id).map(window -> window.main).orElse(false); }
         @Override public void toFront() { context.requireOpen(); workspace.window(id).ifPresent(window -> workspace.openRequests.add("front|" + id)); }
         @Override public boolean equals(Object other) { return other instanceof WindowHandle handle && handle.id().equals(id); }
         @Override public int hashCode() { return id.hashCode(); }

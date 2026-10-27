@@ -30,7 +30,7 @@ class SftpPluginTest {
             host.setSetting("dev.jasper.remote","sftp.max_parallel_files",8L);host.setSetting("dev.jasper.remote","sftp.request_timeout_seconds",1L);
             assertThat(plugin.sftpSettings().maxParallelFiles()).isEqualTo(8);assertThat(plugin.sftpSettings().requestTimeout().toSeconds()).isEqualTo(1);
             UUID window=host.addTerminalWindow(),second=host.addTerminalWindow();dev.jasper.remote.testsupport.Kits.edt(()-> { host.invoke("dev.jasper.remote.transfers",window,null);host.invoke("dev.jasper.remote.transfers",second,null); });
-            assertThat(host.openRequests()).as("the child window's request raises the main window").containsExactly("front|"+window);assertThat(host.failures()).isEmpty();
+            assertThat(host.openRequests()).as("each window's request shows the panel there, raising no other window").isEmpty();assertThat(host.failures()).isEmpty();
             assertThat(host.windows()).as("showing transfers never opens the host chooser").isEmpty();
             dev.jasper.remote.testsupport.Kits.edt(()->host.openPanel(dev.jasper.remote.ui.sftp.SftpUi.PANEL));
             var sidebar=dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp());
@@ -112,24 +112,24 @@ class SftpPluginTest {
     }
 
     /**
-     * Plan 4b's final review: Open SFTP here from a child window with no SSH pane raises the main window and opens the host
-     * chooser over it, so the host chosen there browses in the main window's explorer after the child window closed.
+     * Full windows spec 9: Open SFTP here from a second window with no SSH pane shows the panel there, raising no other
+     * window, and the host chosen in its chooser browses in the explorer.
      */
-    @Test void theHostChooserAskedForFromAChildWindowBrowsesInTheMainWindow() throws Exception {
+    @Test void theHostChooserAskedForFromASecondWindowBrowsesInTheExplorer() throws Exception {
         try(var host=new FakePluginHost(root.resolve("home"))) {
             var plugin=new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
             host.start(RemotePluginTest.INFO,Set.of(),Set.of(),plugin);
             plugin.store().put(dev.jasper.remote.hosts.RemoteHost.create("second","second.invalid",22,"user",dev.jasper.remote.hosts.Auth.AGENT,"",Optional.empty()));
             RemotePluginTest.settle(host);
-            UUID main=host.addTerminalWindow(),child=host.addTerminalWindow(),tab=host.addTerminalTab(child,"zsh");
+            host.addTerminalWindow();
+            UUID child=host.addTerminalWindow();host.addTerminalTab(child,"zsh");
             dev.jasper.remote.testsupport.Kits.edt(()->assertThat(host.invoke(RemotePlugin.SFTP,child,null)).isTrue());
-            assertThat(host.openRequests()).containsExactly("front|"+main);
+            assertThat(host.openRequests()).isEmpty();
             var chooser=dev.jasper.remote.testsupport.Kits.value(()->host.windowView("dev.jasper.remote","Browse files on SSH host").orElseThrow());
-            dev.jasper.remote.testsupport.Kits.edt(()->host.closeTab(tab));
             dev.jasper.remote.ui.sftp.SftpTestAccess.browse(chooser);
             var sidebar=dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp());
             dev.jasper.remote.testsupport.Kits.await(host,()->dev.jasper.remote.testsupport.Kits.texts(sidebar.view()).contains("SSH agent not available"),
-                "the chosen host's connection attempt in the main window's explorer");
+                "the chosen host's connection attempt in the explorer");
             host.stopAll();
             assertThat(host.failures()).isEmpty();
         }

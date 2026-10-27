@@ -10,12 +10,12 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 <tbody>
 <tr><td>Actions</td><td>{@link Actions#register(ActionSpec,Consumer)}</td><td></td><td>The command palette of every window, Settings › Keymap and its default shortcut; then wherever the plugin places it</td></tr>
 <tr><td>Menu entries</td><td>{@link Menus#standard(StandardMenu)}, {@link Menus#create(String,String)}, {@link Menus#terminalContext()}</td><td></td><td>A section at the end of a built-in menu, a top-level menu of its own, the pane right-click menu</td></tr>
-<tr><td>Toolbar items</td><td>{@link Toolbar#add(ToolbarItem)}</td><td></td><td>In the main window's toolbar, after Jasper's Split and Maximize buttons and before Find and Settings</td></tr>
-<tr><td>Status items and progress</td><td>{@link StatusBar#add(StatusItemSpec)}, {@link StatusBar#addProgress(StatusItemSpec)}</td><td></td><td>Either end of the main window's status bar</td></tr>
+<tr><td>Toolbar items</td><td>{@link Toolbar#add(ToolbarItem)}</td><td></td><td>In every window's toolbar, after Jasper's Split and Maximize buttons and before Find and Settings</td></tr>
+<tr><td>Status items and progress</td><td>{@link StatusBar#add(StatusItemSpec)}, {@link StatusBar#addProgress(StatusItemSpec)}</td><td></td><td>Either end of every window's status bar</td></tr>
 <tr><td>Rail buttons</td><td>{@link Rail#add(String)}</td><td></td><td>The left tool window stripe, after the tool window buttons</td></tr>
-<tr><td>Tool windows</td><td>{@link Panels#register(PanelSpec,PanelFactory)}, {@link Panels#toggle(String,WindowHandle)}</td><td></td><td>A stripe button and a tool window in one of six dock slots of the main window or in a window of its own; View › Tool Windows</td></tr>
+<tr><td>Tool windows</td><td>{@link Panels#register(PanelSpec,PanelFactory)}, {@link Panels#toggle(String,WindowHandle)}, {@link Panels#show(String,WindowHandle)}</td><td></td><td>A stripe button and a tool window in one of six dock slots of every window or in a window of its own; View › Tool Windows</td></tr>
 <tr><td>Dialogs</td><td>{@link Windows#dialog(DialogSpec)}, {@link Windows#overlay(OverlaySpec)}, {@link Windows#popover(UiAnchor)}</td><td></td><td>Dialogs and sheets, in-window overlays, popovers below a control</td></tr>
-<tr><td>Content tabs</td><td>{@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)}</td><td></td><td>A document in a new tab, a new pane beside the focused one or a new child window, beside terminals</td></tr>
+<tr><td>Content tabs</td><td>{@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)}</td><td></td><td>A document in a new tab, a new pane beside the focused one or a new window, beside terminals</td></tr>
 <tr><td>Split items</td><td>{@link Windows#splitItem(SplitItemSpec,BiConsumer)}</td><td></td><td>Every Split list, after the terminal, with two bindable actions</td></tr>
 <tr><td>Restorers</td><td>{@link Windows#restorer(String,TabRestorer)}</td><td></td><td>The plugin's saved tabs coming back when Jasper restores its windows</td></tr>
 <tr><td>File choosers</td><td>{@link Windows#choose(FileChoice)}, {@link Windows#chooseFiles(WindowOwner,String,Optional)}, {@link Windows#chooseDirectory(WindowOwner,String,Optional)}, {@link Windows#chooseSaveFile(WindowOwner,String,Optional)}</td><td></td><td>Jasper's file chooser, over a Jasper window or one of the plugin's content tabs</td></tr>
@@ -86,7 +86,7 @@ rebuild it at any time with {@link PluginMenu#clear()}.</p>
 <h3>Toolbar</h3>
 <p>{@link ToolbarItem#action(String)} is a button for one action, {@link ToolbarItem#menu(String,String,List)} a button
 that opens a menu of actions, and {@link ToolbarItem#view(ToolbarViewFactory)} a small group of the plugin's own
-controls in the main window's toolbar (a child window has none). A toolbar view's root is an INLINE {@link Nodes.Stack} of LABEL texts, DROPDOWN,
+controls in every window's toolbar. A toolbar view's root is an INLINE {@link Nodes.Stack} of LABEL texts, DROPDOWN,
 SEARCHABLE or PICKER choices, at most one PRIMARY button, icon-only GHOST buttons (a blank label with an icon and a
 tooltip), menu buttons and separators; any other tree is refused, and the window shows
 no view.
@@ -97,22 +97,23 @@ When the toolbar is too narrow, buttons move into its "More actions" menu and a 
 status.setText("Deploys: 3");
 status.setTooltip("Run the deploy checks");
 status.setAction("dev.example.tool.run");</code></pre>
-<p>One handle drives the item in the main window's status bar; a child window has none. {@link Side#LEFT} items follow the shell and folder,
+<p>One handle drives the item in every window's status bar. {@link Side#LEFT} items follow the shell and folder,
 {@link Side#RIGHT} items precede the terminal size and configuration state, and items on a side are ordered by ascending
 priority. An item with an action is a button; without one it is plain text. {@link StatusBar#addProgress(StatusItemSpec)}
 adds a progress control that {@link StatusProgress#update(StatusProgressState)} drives, with a fraction or none and up to
 two actions.</p>
 
 <h3>Tool windows and the rail</h3>
-<p>A registered panel gets a stripe button in the main window, the only window with a dock: its icon, or under
-the Enterprise look's labelled stripes a label that starts with the icon and reads its title. Its {@link PanelFactory}
-builds its view on the UI thread the first time the panel shows, and again after the main window
-closed and opened anew; a toggle from a child window shows it and brings its window to the front, the main window or the
-panel's own. The {@link PanelSpec}'s anchor and {@link PanelSpec#withSplit()} pick the default slot (Left Top, Left Bottom,
+<p>Every window has a dock, status bar and toolbar. A registered panel gets a stripe button in every window: its icon, or
+under the Enterprise look's labelled stripes a label that starts with the icon and reads its title. Its
+{@link PanelFactory} builds a view on the UI thread once for each window whose dock shows the panel, the first time it
+shows there, and again for a window that opens later; keep the model outside the views, so that several windows show
+the same model. {@link Panels#toggle(String,WindowHandle)} and {@link Panels#show(String,WindowHandle)} act on the
+instance of the window they name. The {@link PanelSpec}'s anchor and {@link PanelSpec#withSplit()} pick the default slot (Left Top, Left Bottom,
 Bottom Left, Right Top, Right Bottom or Bottom Right); the user can move it with the header's Options menu, and Jasper
-remembers where. The menu's View Mode gives it a window of its own, {@link PanelMode#FLOAT} (above the main window and
+remembers where. The menu's View Mode gives it a window of its own, {@link PanelMode#FLOAT} (above its window and
 shown only with it) or {@link PanelMode#WINDOW} (an ordinary window), and {@link PanelMode#DOCKED} puts it back; dragging
-its button or header out of the main window gives it a Float window. A panel with a window of its own keeps its stripe
+its button or header out of its window gives it a Float window. A panel with a window of its own keeps its stripe
 button and its slot, where it docks again.
 Unless the spec names a toggle action of the plugin's own ({@link PanelSpec#withToggleActionId(String)}), Jasper
 registers {@code <panel id>.toggle}, titled "Toggle <i>title</i>", with no default shortcut, and View › Tool Windows lists
@@ -120,7 +121,8 @@ it. {@link PanelHost} is the panel's place: {@link PanelHost#show()}, {@link Pan
 {@link PanelHost#setHeader(PanelHeader)} for a detail, a status dot and icon actions in the header, and
 {@link PanelHost#placement()}, a {@link PanelPlacement} of the side and half and the mode, which
 {@link PanelHost#onPlacement(Consumer)} reports after each change, once the content is in its new place;
-{@link PanelHost#window()} stays the main window while the panel has a window of its own. A panel that lays itself out
+{@link PanelHost#window()} is the window whose dock holds the instance, also while it has a window of its own;
+{@link PanelHost#onClosed(Runnable)} runs when that window closes or the panel is removed. A panel that lays itself out
 another way in a window of its own describes the other {@link ViewSpec} and passes it to {@link UiView#update(ViewSpec)}.
 A factory that throws shows "This panel could not be loaded." Under the Enterprise look, whose tool windows are flush, the
 toggle action makes the tool window it shows the active one, which takes the keyboard, and activates a showing tool
@@ -146,8 +148,8 @@ Escape and clicks outside close it.</li>
 
 <h3>Content tabs</h3>
 <p>{@link Windows#openTab(ContentSpec,WindowOwner,UiView)} opens a view as a document in a new tab of the owner's window,
-or of the main window, as the Editor does; {@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)} opens it
-where a {@link TabPlacement} says: a new tab, a new pane beside the focused one, or a new child window. The {@link ContentSpec}'s key identifies the document: opening a key the plugin
+or of the most recently active window, as the Editor does; {@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)} opens it
+where a {@link TabPlacement} says: a new tab, a new pane beside the focused one, or a new window. The {@link ContentSpec}'s key identifies the document: opening a key the plugin
 already has open selects that tab and returns its handle. Through the {@link ContentTab} the plugin sets the tab's
 title, detail, icon, unsaved marker and location ({@link ContentTab#setPresentation(ContentPresentation)}), its commands
 ({@link ContentTab#setCommands(List)}), which its context menu lists and whose shortcuts apply while it is active, and
@@ -155,8 +157,8 @@ its status bar items ({@link ContentTab#setStatus(List)}). Commands with the ids
 {@code find-previous}, {@code copy}, {@code paste}, {@code font-bigger}, {@code font-smaller} and {@code font-reset}
 answer Jasper's own Find, Find Next, Find Previous, Copy, Paste, Increase Font Size, Decrease Font Size and Reset Font
 Size.
-The user can move the tab to a new window and back, as {@link ContentTab#moveToNewWindow()} and
-{@link ContentTab#moveToMainWindow()} do, give its pane a tab of its own ({@link ContentTab#moveToNewTab()}), and move
+The user can move the tab to a new window and to another window, as {@link ContentTab#moveToNewWindow()} and
+{@link ContentTab#moveToWindow(WindowHandle)} do, give its pane a tab of its own ({@link ContentTab#moveToNewTab()}), and move
 its pane into another tab of its window ({@link ContentTab#moveToTab(int)}, one of {@link ContentTab#tabChoices()}). A
 {@link TabChoice} carries its tab's title only when the plugin holds {@code terminal.observe} or the tab shows the
 plugin's own content; otherwise its title is empty and {@link TabChoice#label()} reads "Tab 2".

@@ -2,7 +2,7 @@ package dev.jasper.sdk.ui;
 
 /**
  * Rebuilds a plugin's saved tabs when Jasper restores its windows: at start, and whenever
- * the main window opens again after it closed. Registered with {@link Windows#restorer} for one restorer kind; called on
+ * a window opens while none is open. Registered with {@link Windows#restorer} for one restorer kind; called on
  * the UI thread for a saved tab of that kind:
  * <ul>
  *   <li>once for each saved tab while its window is restored, before that window shows;</li>
@@ -35,7 +35,7 @@ public interface TabRestorer {
      * throw is, while the other saved tabs and windows come back. A {@link VirtualMachineError} (such as
      * {@link OutOfMemoryError} or {@link StackOverflowError}) is not contained: the tab it opened is closed and the
      * error propagates, so the restore of that window fails. Jasper then keeps the saved windows aside and, for the
-     * main window, opens a new one in its place.
+     * first window, opens a new one in its place.
      *
      * @param request the window, the saved title and the restore state
      * @return empty once the tab is open again; else why it cannot come back, which its placeholder shows after

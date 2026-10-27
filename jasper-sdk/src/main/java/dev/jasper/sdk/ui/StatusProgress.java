@@ -3,7 +3,7 @@ package dev.jasper.sdk.ui;
 import dev.jasper.sdk.Subscription;
 
 /**
- * A host-rendered progress control in the main window's status bar. Mutators run on the UI thread and
+ * A host-rendered progress control in every window's status bar. Mutators run on the UI thread and
  * do nothing after close. Closing is idempotent and safe from any thread.
  * @since 0.7.5
  */

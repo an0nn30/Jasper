@@ -4,10 +4,10 @@ import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.WindowHandle;
 import java.util.function.Consumer;
 
-/** The panel's place: in the main window's dock or in a window of its own. All methods are UI-thread only. */
+/** One instance's place: in its window's dock or in a window of its own. All methods are UI-thread only. */
 public interface PanelHost {
     /**
-     * The main window, whose dock holds the panel, also while it has a window of its own
+     * The window whose dock holds this instance, also while it has a window of its own
      * ({@link PanelPlacement#ownWindow()}).
      *
      * @return the window
@@ -70,7 +70,7 @@ public interface PanelHost {
     Subscription onPlacement(Consumer<PanelPlacement> handler);
 
     /**
-     * Runs the handler when this instance is discarded because the main window closed or the panel was removed.
+     * Runs the handler when this instance is discarded: when that window closes or the panel is removed.
      *
      * @param handler cleanup for this instance
      * @return the registration

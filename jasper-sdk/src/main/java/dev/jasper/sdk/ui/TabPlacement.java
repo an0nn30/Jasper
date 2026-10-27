@@ -9,8 +9,8 @@ package dev.jasper.sdk.ui;
  */
 public enum TabPlacement {
     /**
-     * In a new tab of the owner's window, or of the main window when there is no owner: at the end of its tab strip and
-     * shown, the main window's empty workspace taking it in its place.
+     * In a new tab of the owner's window, or of the most recently active window when there is no owner: at the end of its
+     * tab strip and shown, the window's empty workspace taking it in its place.
      */
     NEW_TAB,
     /** In a new pane to the right of the focused pane of that window's shown tab. */
@@ -18,7 +18,7 @@ public enum TabPlacement {
     /** In a new pane below the focused pane of that window's shown tab. */
     SPLIT_DOWN,
     /**
-     * In a new child window of its own, opened for it; the owner's window is not touched. The topics report
+     * In a new window of its own, opened for it; the owner's window is not touched. The topics report
      * {@code WINDOW_OPENED}, then {@code TAB_OPENED} in the new window.
      */
     NEW_WINDOW

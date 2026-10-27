@@ -62,12 +62,11 @@ public final class VaultManagerDialog implements AutoCloseable {
     /** The plugin's kit, for the forms the manager owns. */
     public UiKit kit() { return context.kit(); }
     /**
-     * Opens the manager as a dialog over the main window, whichever window asked ({@code requester} when there is no main
-     * window), or raises the open one, with {@code selection} selected.
+     * Opens the manager as a dialog over the window that asked, or raises the open one, with {@code selection} selected.
      */
     public void show(WindowHandle requester, Optional<UUID> selection) {
         if (dialog != null) { changed(); selection.ifPresent(panel::select); raise(); return; }
-        owner = context.terminals().windows().stream().filter(WindowHandle::isMain).findFirst().orElse(requester);
+        owner = requester;
         var shown = new ManagerPanel(context.kit(), layout, manager::entry, this::add, this::edit, this::delete, this::copyPublic,
             grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
             () -> service.requestUnlock(owner), this::close);

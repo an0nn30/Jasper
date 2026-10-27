@@ -15,11 +15,11 @@ equal. A target can close at any moment: {@code isOpen()} tells, queries return 
 are ignored. A window holds tabs, each holding panes, and each pane one item: a terminal or a plugin's content tab.
 {@link WindowHandle#tabs()} lists the items tab by tab in strip order, then pane by pane, as {@link TabHandle}s;
 {@link TabHandle#kind()} says which kind an item is and {@link TabHandle#terminal()} is a terminal's one pane.
-{@link WindowHandle#isMain()} tells the main window, which keeps an empty workspace when its last tab closes, from a
-child window, which closes with its last tab. {@link PaneHandle#focus()} shows a pane's tab and focuses the pane,
+Every window keeps an empty workspace when its last tab closes, and closes when a move takes its last tab to another
+window. {@link PaneHandle#focus()} shows a pane's tab and focuses the pane,
 {@link TabHandle#select()} selects an item, and {@link WindowHandle#toFront()} raises a window. A window handle is also a
-{@link WindowOwner}, for dialogs and choosers over it. Jasper restores its windows at start and whenever the main window
-opens again: a restored terminal whose tab has not shown yet reports {@link SessionState#NOT_STARTED} until it first
+{@link WindowOwner}, for dialogs and choosers over it. Jasper restores its windows at start and whenever a window
+opens while none is open: a restored terminal whose tab has not shown yet reports {@link SessionState#NOT_STARTED} until it first
 shows, and an item Jasper closed with its windows comes back under the same id, so drop a handle on
 {@link TerminalEvents#TAB_CLOSED}.</p>
 
@@ -107,7 +107,7 @@ id and arrive later on the UI thread; there is no replay, so read the current st
 <table>
 <thead><tr><th>Topic</th><th>Payload</th><th>When</th></tr></thead>
 <tbody>
-<tr><td>{@link TerminalEvents#WINDOW_OPENED}, {@link TerminalEvents#WINDOW_CLOSED}, {@link TerminalEvents#WINDOW_ACTIVATED}</td><td>{@link TerminalEvents.WindowEvent}</td><td>A Jasper window, the main window or a child window, opened, closed or became the active one.</td></tr>
+<tr><td>{@link TerminalEvents#WINDOW_OPENED}, {@link TerminalEvents#WINDOW_CLOSED}, {@link TerminalEvents#WINDOW_ACTIVATED}</td><td>{@link TerminalEvents.WindowEvent}</td><td>A Jasper window opened, closed or became the active one.</td></tr>
 <tr><td>{@link TerminalEvents#TAB_OPENED}, {@link TerminalEvents#TAB_CLOSED}, {@link TerminalEvents#TAB_SELECTED}</td><td>{@link TerminalEvents.TabEvent}</td><td>An item, terminal or content, opened, closed or became its window's active one.</td></tr>
 <tr><td>{@link TerminalEvents#TAB_MOVED}</td><td>{@link TerminalEvents.TabMoved}</td><td>An item moved to another window, instead of a close and an open; a moved terminal keeps its pane's id.</td></tr>
 <tr><td>{@link TerminalEvents#PANE_OPENED}, {@link TerminalEvents#PANE_CLOSED}, {@link TerminalEvents#PANE_FOCUSED}, {@link TerminalEvents#BELL}</td><td>{@link TerminalEvents.PaneEvent}</td><td>A pane opened, closed, got focus or rang its bell.</td></tr>

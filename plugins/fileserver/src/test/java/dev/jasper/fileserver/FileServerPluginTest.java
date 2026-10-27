@@ -534,23 +534,25 @@ class FileServerPluginTest {
     }
 
     /**
-     * Plan 4b's final review: each serve from a child window shows the File Servers panel through {@code Panels.toggle},
-     * which raises the main window, the second time as the first.
+     * Full windows spec 9: each serve from a second window shows the File Servers panel there through
+     * {@code Panels.show}, raising no other window, the second time as the first.
      */
-    @Test void eachServeFromAChildWindowRaisesTheMainWindow() throws Exception {
+    @Test void eachServeFromASecondWindowShowsThePanelThere() throws Exception {
         Path project = Files.createDirectories(home.resolve("project"));
         try (var host = new FakePluginHost(root)) {
             var plugin = plugin(FileServerPlugin::portFree);
             host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
-            UUID main = host.addTerminalWindow(), child = host.addTerminalWindow(), tab = host.addTerminalTab(child, "zsh");
+            host.addTerminalWindow();
+            UUID child = host.addTerminalWindow(), tab = host.addTerminalTab(child, "zsh");
             UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
             for (int serve = 1; serve <= 2; serve++) {
                 UiTestAccess.edt(() -> assertThat(host.invoke(FileServerPlugin.SERVE_HTTP, child, local)).isTrue());
                 int served = serve;
                 await(host, () -> plugin.registry().servers().size() == served
                     && plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "start " + serve + " settles");
-                assertThat(host.openRequests()).as("serve " + serve).containsOnly("front|" + main).hasSize(serve);
+                assertThat(host.openRequests()).as("serve " + serve).isEmpty();
+                UiTestAccess.edt(() -> assertThat(host.panelView(FileServerPlugin.PANEL)).as("serve " + served + ": the panel shows").isPresent());
             }
             assertThat(plugin.panel().selected()).as("the panel selects the newest server")
                 .contains(plugin.registry().servers().get(1).definition().id());
@@ -602,9 +604,9 @@ class FileServerPluginTest {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
-            host.addTerminalWindow();
+            UUID stays = host.addTerminalWindow();
             UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
-            UUID pane = host.addTerminalPane(tab, pane(Optional.empty()));
+            host.addTerminalPane(tab, pane(Optional.empty()));
             var docs = http("docs", home, Ports.free(), Login.ANONYMOUS, false);
             plugin.store().put(docs);
             settle(host);
@@ -623,7 +625,8 @@ class FileServerPluginTest {
             UiTestAccess.edt(() -> plugin.edit(plugin.windowHandle(window), Optional.of(plugin.registry().server(docs.id()).orElseThrow().definition()), true));
             UiTestAccess.port(plugin.currentEditor()).setText(String.valueOf(Ports.free()));
             UiTestAccess.save(plugin.currentEditor()).doClick();
-            host.closeTerminalPane(pane);
+            // Its window closes when a move takes its only tab (full windows spec 5.3).
+            host.moveTab(tab, stays);
             settle(host);
             assertThat(host.windows()).as("no restart question over a closed window").noneMatch(line -> line.contains("Restart"));
             plugin.registry().stopAll();

@@ -112,12 +112,9 @@ public final class SftpUi implements AutoCloseable {
         host.onVisibility(visible->{controller.visible(visible);if(visible) activePane.apply(window).ifPresent(pane->controller.open(pane.pane(),pane.identity(),pane.directory(),false));});
         host.onClosed(()-> { if(layout==dev.jasper.remote.workstation.Layout.ROWS) releaseStrip.accept(window);cancelBrowse();if(explorer==view) explorer=null;controller.close();operations.close();panel.close(); });return panel.view();
     }
-    /**
-     * The explorer, shown in the main window. A child window's request always goes through the toggle, which raises the
-     * main window; the panel's own show would change it behind the child window.
-     */
+    /** The explorer, shown in {@code window}'s dock. */
     private View showView(WindowHandle window) {
-        if(explorer==null || !window.isMain()) context.panels().toggle(PANEL,window);else explorer.host().show();return explorer;
+        context.panels().show(PANEL,window);return explorer;
     }
     public void show(WindowHandle window) {
         if(closed) return;var view=showView(window);if(view==null) return;

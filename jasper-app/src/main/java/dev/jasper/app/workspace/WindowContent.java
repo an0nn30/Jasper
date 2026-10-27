@@ -1178,17 +1178,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Stable identity of this window for extensions; never a Swing object. */
     public UUID id() { return id; }
 
-    /**
-     * Until SDK 0.23.0 removes {@code WindowHandle.isMain()}: whether this is the first open window in opening order,
-     * which plugins still read as the main window.
-     *
-     * @return true for the first window of its window manager, and for a window outside one, which is alone
-     */
-    boolean firstWindow() {
-        if (manager == null) return !closed;
-        return !closed && manager.windows().stream().findFirst().map(JasperWindow::content).orElse(null) == this;
-    }
-
     /** Connects this window to the application-wide terminal registry, once. {@code toFront} raises the native window. */
     public void connectTerminals(TerminalRegistry registry, Runnable toFront) {
         if (closed || terminals != null) return;

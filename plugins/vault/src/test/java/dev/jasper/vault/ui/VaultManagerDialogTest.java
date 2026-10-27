@@ -87,7 +87,7 @@ class VaultManagerDialogTest {
         return new VaultService(f.lock, () -> context.terminals().window(main), unlock, p -> { }, p -> { }, new FakeNotifications().group(VAULT));
     }
 
-    @Test void theManagerIsOneModelessDialogOverTheMainWindowAndNeverATab() throws Exception {
+    @Test void theManagerIsOneModelessDialogOverTheWindowThatAskedAndNeverATab() throws Exception {
         edt(() -> {
             try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
                 var dialogs = new Dialogs();
@@ -98,8 +98,8 @@ class VaultManagerDialogTest {
                 f.manager.saveNote(new Note(id, "Recovery", "secret".toCharArray(), Instant.EPOCH)); f.drain();
                 manager.show(context.terminals().window(child).orElseThrow(), Optional.empty());
                 var spec = dialogs.spec(TITLE);
-                assertThat(spec.owner()).as("the main window owns it, though a child window asked").isEqualTo(context.terminals().window(main).orElseThrow());
-                assertThat(spec.modal()).as("it floats over the main window without blocking it").isFalse();
+                assertThat(spec.owner()).as("the window that asked owns it").isEqualTo(context.terminals().window(child).orElseThrow());
+                assertThat(spec.modal()).as("it floats over its window without blocking it").isFalse();
                 assertThat(spec.presentation()).isEqualTo(DialogSpec.Presentation.CENTERED);
                 assertThat(host.windows()).containsExactly("dialog|Credential Vault|true");
                 assertThat(host.windowView(VAULT, TITLE)).containsSame(fake(manager.panel.view()));
@@ -108,8 +108,8 @@ class VaultManagerDialogTest {
                 manager.show(context.terminals().window(main).orElseThrow(), Optional.of(id));
                 assertThat(dialogs.specs()).as("one dialog").hasSize(1);
                 assertThat(dialogs.calls()).as("the second request raises the open dialog").containsExactly("show|Credential Vault", "toFront|Credential Vault");
-                assertThat(host.openRequests()).as("each request first raises the main window, restoring it when minimized")
-                    .containsExactly("front|" + main, "front|" + main);
+                assertThat(host.openRequests()).as("each request first raises the dialog's window, restoring it when minimized")
+                    .containsExactly("front|" + child, "front|" + child);
                 assertThat(manager.panel.selected()).contains(id);
                 manager.close();
                 assertThat(host.windows()).isEmpty();
@@ -224,7 +224,6 @@ class VaultManagerDialogTest {
                     public Optional<dev.jasper.sdk.terminal.TabHandle> activeTab() { return terminal.activeTab(); }
                     public boolean isActive() { return true; }
                     public boolean isOpen() { return open[0]; }
-                    public boolean isMain() { return open[0]; }
                     public void toFront() {}
                 };
                 var windowRef = new AtomicReference<VaultManagerDialog>();
@@ -443,12 +442,13 @@ class VaultManagerDialogTest {
         });
     }
 
-    /** The passive Unlock asks over the main window, the dialog's owner, even when a child window asked for the manager. */
-    @Test void thePassiveUnlockAsksOverTheMainWindow() throws Exception {
+    /** The passive Unlock asks over the dialog's owner, the window that asked for the manager. */
+    @Test void thePassiveUnlockAsksOverTheDialogsWindow() throws Exception {
         edt(() -> {
             try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
                 PluginContext context = host.start(INFO, Set.of(), Set.of(), c -> { });
-                UUID main = host.addTerminalWindow(), child = host.addTerminalWindow();
+                host.addTerminalWindow();
+                UUID child = host.addTerminalWindow();
                 var owners = new java.util.ArrayList<UUID>();
                 var controller = new AtomicReference<VaultManagerDialog>();
                 var service = service(f, context, child, prompt -> { owners.add(prompt.owner().id()); controller.get().showUnlock(prompt); });
@@ -457,7 +457,7 @@ class VaultManagerDialogTest {
                 window.show(context.terminals().window(child).orElseThrow(), Optional.empty());
                 f.manager.invalidate(); f.lock.lock(); window.changed();
                 press(window.panel.view(), ManagerPanel.UNLOCK);
-                assertThat(owners).as("the prompt's owner").containsExactly(main);
+                assertThat(owners).as("the prompt's owner").containsExactly(child);
                 window.close();
                 assertThat(host.failures()).isEmpty();
             }

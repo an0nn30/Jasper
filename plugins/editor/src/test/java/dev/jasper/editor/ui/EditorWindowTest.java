@@ -387,15 +387,17 @@ class EditorWindowTest {
         var handle = host.contentTabs().getFirst();
         var component = host.contentComponent(handle);
         tab.area().append(" after");
+        var home = handle.window();
+        host.addTerminalTab(home.id(), "zsh"); // a window's only tab stays where it is
         handle.moveToNewWindow();
-        assertThat(handle.window().isMain()).isFalse();
+        assertThat(handle.window()).isNotEqualTo(home);
         assertThat(host.contentComponent(handle)).isSameAs(component);
         assertThat(tab.area().getText()).isEqualTo("before after");
         assertThat(tab.session().dirty()).isTrue();
         tab.area().undoLastAction();
         assertThat(tab.area().getText()).isEqualTo("before");
-        handle.moveToMainWindow();
-        assertThat(handle.window().isMain()).isTrue();
+        handle.moveToWindow(home);
+        assertThat(handle.window()).isEqualTo(home);
     }
 
     /**
@@ -414,15 +416,16 @@ class EditorWindowTest {
         assertThat(firstHandle.isActive()).as("the second is its window's active item").isFalse();
         assertThat(first.markdown().active()).as("the first is still hosted").isTrue();
         assertThat(second.markdown().active()).isTrue();
+        var home = firstHandle.window();
         firstHandle.moveToNewWindow();
-        assertThat(firstHandle.window().isMain()).isFalse();
+        assertThat(firstHandle.window()).isNotEqualTo(home);
         assertThat(first.markdown().active()).isTrue();
         assertThat(second.markdown().active()).as("the window it left keeps its tab active").isTrue();
         assertThat(first.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
         assertThat(first.area().getDocument()).isSameAs(document);
         assertThat(first.area().getText()).contains("dirty");
-        firstHandle.moveToMainWindow();
-        assertThat(firstHandle.window().isMain()).isTrue();
+        firstHandle.moveToWindow(home);
+        assertThat(firstHandle.window()).isEqualTo(home);
         assertThat(firstHandle.isActive()).isTrue();
         assertThat(secondHandle.isActive()).isFalse();
         assertThat(first.markdown().active()).isTrue();

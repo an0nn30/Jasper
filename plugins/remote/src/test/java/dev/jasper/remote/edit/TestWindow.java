@@ -13,6 +13,5 @@ record TestWindow(UUID id, AtomicBoolean open) implements WindowHandle {
     @Override public Optional<TabHandle> activeTab() { return Optional.empty(); }
     @Override public boolean isActive() { return open.get(); }
     @Override public boolean isOpen() { return open.get(); }
-    @Override public boolean isMain() { return open.get(); }
     @Override public void toFront() { }
 }

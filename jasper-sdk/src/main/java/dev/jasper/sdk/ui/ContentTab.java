@@ -34,8 +34,7 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     void setCommands(List<ContentCommand> commands);
     /**
-     * Replaces the items the main window's status bar shows while this tab is active there; a child window has no
-     * status bar. Ignored once the tab is closed.
+     * Replaces the items its window's status bar shows while this tab is active there. Ignored once the tab is closed.
      *
      * @param items immutable snapshot of status items
      */
@@ -58,20 +57,21 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
     /** Selects and raises the current host, focusing its content. */
     void select();
     /**
-     * A new child window takes the tab and its content. A child window's only tab, a tab with a modal prompt open and a
-     * tab being closed stay where they are.
+     * A new window takes the tab and its content. A window's only tab, a tab with a modal prompt open and a tab being
+     * closed stay where they are.
      *
      * @since 0.20.0
      */
     void moveToNewWindow();
     /**
-     * Move to Main Window: a new tab of the main window, at the end of its tab strip, takes the tab and its content, the
-     * main window restored first when none is open. A tab the main window holds, a tab with a modal prompt
-     * open and a tab being closed stay where they are.
+     * Move Tab to Window: moves the tab and its content to the end of {@code window}'s tab strip and shows it there. A tab
+     * already there, a pinned tab, a tab with a modal prompt open and a tab being closed stay where they are, and so does
+     * every tab when {@code window} is closed.
      *
-     * @since 0.20.0
+     * @param window the window to move the tab to
+     * @since 0.23.0
      */
-    void moveToMainWindow();
+    void moveToWindow(dev.jasper.sdk.terminal.WindowHandle window);
     /**
      * Move Pane to New Tab: the pane showing this item leaves its tab for a new tab right after it,
      * which shows; nothing closes or leaves the window. Its tab's only pane, an item with a modal prompt open and an
@@ -127,11 +127,10 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     void split(SplitChoice choice, dev.jasper.sdk.terminal.Direction direction);
     /**
-     * The window that holds the tab; {@link dev.jasper.sdk.terminal.WindowHandle#isMain()} tells the main window from a
-     * child window.
+     * The window that holds the tab.
      *
      * @return the window, or the last window that held the tab once it is closed; a window that is not open, with the id
-     *         {@code new UUID(0, 0)}, for a tab waiting for the main window to open or one no window could take back
+     *         {@code new UUID(0, 0)}, for a tab waiting for a window to open or one no window could take back
      * @since 0.20.0
      */
     dev.jasper.sdk.terminal.WindowHandle window();

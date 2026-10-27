@@ -207,7 +207,6 @@ class ConnectionsTest {
         public Optional<dev.jasper.sdk.terminal.TabHandle> activeTab() { return Optional.empty(); }
         public boolean isActive() { return false; }
         public boolean isOpen() { return open; }
-        public boolean isMain() { return open; }
         public void toFront() {}
     }
 

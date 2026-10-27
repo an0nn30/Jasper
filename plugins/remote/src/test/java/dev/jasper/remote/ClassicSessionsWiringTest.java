@@ -141,7 +141,7 @@ class ClassicSessionsWiringTest {
         }
     }
 
-    @Test void anotherWindowsChoiceLeavesTheMainWindowsTreeAlone(@TempDir Path dir) throws Exception {
+    @Test void anotherWindowsChoiceLeavesTheFirstWindowsTreeAlone(@TempDir Path dir) throws Exception {
         try (var host = new FakePluginHost()) {
             host.setPresentation(FakePresentations.CLASSIC);
             var plugin = plugin(dir.resolve("ssh"));
@@ -150,7 +150,7 @@ class ClassicSessionsWiringTest {
             plugin.store().put(mac); plugin.store().put(minecraft);
             settle(host);
             UUID main = host.addTerminalWindow(), child = host.addTerminalWindow();
-            Kits.edt(() -> host.openPanel(RemotePlugin.PANEL));
+            Kits.edt(() -> host.openPanel(RemotePlugin.PANEL, main));
             settle(host);
             assertThat(tree(plugin)).isEqualTo(row(mac));
 
@@ -158,7 +158,7 @@ class ClassicSessionsWiringTest {
             Kits.edt(() -> Kits.emit(view, new UiEvent.Selected(SessionsToolbar.CHOICE, Set.of(row(minecraft)))));
             settle(host);
             assertThat(combo(host, child)).as("the other window's own row").isEqualTo(row(minecraft));
-            assertThat(tree(plugin)).as("the main window's tree keeps its row").isEqualTo(row(mac));
+            assertThat(tree(plugin)).as("the first window's tree keeps its row").isEqualTo(row(mac));
             assertThat(combo(host, main)).isEqualTo(row(mac));
             host.stopAll();
             assertThat(host.failures()).isEmpty();

@@ -257,9 +257,10 @@ class FakeKitMountingTest {
                 var view=context.kit().create(new ViewSpec(new Nodes.Text("body",ControlState.READY,"Document",Nodes.TextRole.BODY)),e -> {});
                 var tab=context.windows().openTab(new ContentSpec("doc","Document"),null,view);
                 var selected=java.nio.file.Path.of("selected").toAbsolutePath();host.queuePathSelection(List.of(selected));
-                host.duringPathSelection(() -> {tab.moveToNewWindow();assertThat(tab.window().isMain()).isTrue();assertThat(tab.requestClose().join()).isFalse();});
+                var first=tab.window();host.addTerminalTab(first.id(),"zsh");
+                host.duringPathSelection(() -> {tab.moveToNewWindow();assertThat(tab.window()).isEqualTo(first);assertThat(tab.requestClose().join()).isFalse();});
                 assertThat(context.windows().chooseFiles(tab,"Choose",Optional.empty())).containsExactly(selected);
-                tab.moveToNewWindow();assertThat(tab.window().isMain()).isFalse();
+                tab.moveToNewWindow();assertThat(tab.window()).isNotEqualTo(first);
                 host.queuePathSelection(List.of(selected));host.duringPathSelection(tab::close);
                 assertThat(context.windows().chooseFiles(tab,"Choose",Optional.empty())).isEmpty();
                 assertThatThrownBy(view::spec).isInstanceOf(IllegalStateException.class);
@@ -322,7 +323,7 @@ class FakeKitMountingTest {
                     view.registerContent(new CustomContent("document",Nodes.CustomKind.EDITOR,new JTextArea(),disposed::incrementAndGet));views.add(view);return view;
                 });
                 host.addTerminalWindow();host.openPanel("test.panel.files");host.openPanel("test.panel.files");
-                assertThat(views).as("one view, in the main window").hasSize(1);registration.close();registration.close();assertThat(disposed.get()).isEqualTo(1);
+                assertThat(views).as("one view, in the window").hasSize(1);registration.close();registration.close();assertThat(disposed.get()).isEqualTo(1);
                 context.panels().register(new PanelSpec("test.panel.broken","Broken","folder",Anchor.LEFT),h -> {throw new IllegalStateException("failure");});
                 assertThat(host.openPanel("test.panel.broken")).isNull();assertThat(host.failures()).hasSize(1);
             }

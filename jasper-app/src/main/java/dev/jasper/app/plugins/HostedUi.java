@@ -511,6 +511,13 @@ final class HostedUi {
                 ? Contributions.PanelRequest.Op.ACTIVATING_TOGGLE : Contributions.PanelRequest.Op.TOGGLE;
             model.requestPanel(new Contributions.PanelRequest(window.id(), panelId, op));
           }
+          @Override public void show(String panelId, WindowHandle window) {
+            guard("show");
+            requireNamespace(panelId, "A panel");
+            if (model.panels().stream().noneMatch(panel -> panel.id().equals(panelId)))
+                throw new IllegalArgumentException("Panel not registered: " + panelId);
+            model.requestPanel(new Contributions.PanelRequest(window.id(), panelId, Contributions.PanelRequest.Op.SHOW));
+          }
         };
     }
 
@@ -648,8 +655,9 @@ final class HostedUi {
         public void setRestore(Optional<dev.jasper.sdk.RestoreState> state) { requireUi("content restore"); entry.restore(state.map(HostedUi::restore)); }
         public void select() { requireUi("select content"); entry.select(); }
         public void moveToNewWindow() { requireUi("move content"); entry.moveToNewWindow(); }
-        /** Until SDK 0.23.0 replaces it: the most recently active window takes the tab (full windows spec 5.2). */
-        public void moveToMainWindow() { requireUi("move content"); entry.moveToWindow(model.tabs().recentWindow()); }
+        public void moveToWindow(WindowHandle window) {
+            requireUi("move content"); java.util.Objects.requireNonNull(window, "window"); entry.moveToWindow(window.id());
+        }
         public void moveToNewTab() { requireUi("move content"); model.tabs().moveToNewTab(entry); }
         public boolean mayMoveToNewTab() { requireUi("move content"); return model.tabs().mayMoveToNewTab(entry); }
         /** Each tab's title goes to a plugin that observes terminals or whose own content the tab shows, and no other. */

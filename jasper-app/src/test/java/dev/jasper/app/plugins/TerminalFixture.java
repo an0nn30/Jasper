@@ -30,8 +30,8 @@ import dev.jasper.terminal.session.AttachedConnection;
  * selects its tab, and a pane closes with its tab. A window holds tabs, each holding panes, as the testkit's fake keeps
  * them (tabs and panes spec 4; the registry calls each pane's item a tab): its items are listed tab by tab, then pane
  * by pane, whatever opens without a pane opens in a new tab at the end of the strip, closing the selected item selects
- * the item its tab showed before it, and closing a tab's last pane shows the tab shown before it. A main window
- * ({@link #addMainWindow}) stays open when its last tab leaves; any other window closes with its last tab (spec 6.4). A
+ * the item its tab showed before it, and closing a tab's last pane shows the tab shown before it. A window keeps an
+ * empty workspace when its last tab closes, and closes when a move takes its last tab (full windows spec 5.3). A
  * plugin's tab is a content tab of its window, and a tab moved to another window is reported as a move. EDT only.
  */
 final class TerminalFixture {
@@ -47,7 +47,7 @@ final class TerminalFixture {
     }
     private static final class Tab { UUID id = UUID.randomUUID(); Window window; Group group; TabEntry.Kind kind = TabEntry.Kind.TERMINAL; Supplier<String> title; Pane pane; }
     private static final class Window {
-        UUID id = UUID.randomUUID(); boolean main; List<Tab> tabs = new ArrayList<>(); Tab selected; Subscription registration; Runnable closed = () -> { };
+        UUID id = UUID.randomUUID(); List<Tab> tabs = new ArrayList<>(); Tab selected; Subscription registration; Runnable closed = () -> { };
         /** The window's tabs, most recently shown first: the first is the shown tab. */
         final List<Group> recent = new ArrayList<>();
         Group active() { return recent.isEmpty() ? null : recent.getFirst(); }
@@ -102,19 +102,13 @@ final class TerminalFixture {
         return new TabEntry(tab.id, tab.window.id, tab.kind, () -> Optional.ofNullable(tab.pane).map(this::entry), tab.title, () -> select(tab));
     }
 
-    /** A child window, which closes with its last tab. */
-    UUID addWindow() { return addWindow(false); }
-
-    /** The main window, which stays open with an empty workspace when its last tab leaves. */
-    UUID addMainWindow() { return addWindow(true); }
-
-    private UUID addWindow(boolean main) {
+    /** A window. */
+    UUID addWindow() {
         var window = new Window();
-        window.main = main;
         windows.put(window.id, window);
         window.registration = registry.addWindow(new WindowEntry(window.id, () -> window.tabs.stream().map(this::entry).toList(),
             () -> Optional.ofNullable(window.selected).map(this::entry), () -> registry.activeWindow().map(WindowEntry::id).equals(Optional.of(window.id)),
-            () -> window.main, () -> opened.add("front|" + window.id), spec -> switch (spec) {
+            () -> opened.add("front|" + window.id), spec -> switch (spec) {
                 case OpenSpec.Local local -> {
                     opened.add("tab|" + window.id + "|" + local.directory().map(Path::toString).orElse("-")
                         + local.profile().map(profile -> "|" + profile).orElse("")
@@ -264,7 +258,7 @@ final class TerminalFixture {
         place(tab, to, null);
         registry.publish(new TerminalEvent.TabMoved(tab.id, from.id, to.id));
         select(tab);
-        if (from.tabs.isEmpty() && !from.main) closeWindow(from);
+        if (from.tabs.isEmpty()) closeWindow(from);
     }
 
     /** Closes a tab of any kind, a terminal tab's pane with it. */
@@ -277,6 +271,12 @@ final class TerminalFixture {
     void onWindowClosed(UUID windowId, Runnable closed) { windows.get(windowId).closed = closed; }
 
     void activateWindow(UUID windowId) { registry.windowActivated(windowId); }
+
+    /** The most recently active open window, else the one opened last, as the window manager's {@code lastActive()}. */
+    Optional<UUID> recentWindow() {
+        var active = registry.activeWindow().map(WindowEntry::id).filter(windows::containsKey);
+        return active.isPresent() ? active : windows.keySet().stream().reduce((first, second) -> second);
+    }
 
     /** Focusing a pane selects its tab, as in the application. */
     void focusPane(UUID paneId) {
@@ -291,7 +291,7 @@ final class TerminalFixture {
         if (pane != null) close(pane.tab);
     }
 
-    /** Closes a tab, its pane with it; a child window's last tab takes the window with it. */
+    /** Closes a tab, its pane with it; the window keeps an empty workspace when its last tab closes. */
     private void close(Tab tab) {
         if (tabs.remove(tab.id) == null) return;
         Window window = tab.window;
@@ -307,7 +307,6 @@ final class TerminalFixture {
             boolean selected = takeOut(tab);
             registry.publish(new TerminalEvent.TabClosed(window.id, tab.id));
             if (selected) reselect(window);
-            if (window.tabs.isEmpty() && !window.main) closeWindow(window);
         });
     }
 

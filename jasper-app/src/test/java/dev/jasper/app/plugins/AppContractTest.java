@@ -140,13 +140,10 @@ class AppContractTest extends PluginContractTest {
         // Every window is a workspace, as every application window is (workspace plan 3b Rulings 15): a plugin's tab is a
         // content tab of the window that shows it, the window it moves to reports the move, and a window whose last tab
         // left closes, taking its workspace with it.
-        // The window manager's part (workspace plan 4a): the window added while none is open is the main window, which
-        // outlives its last tab; every other window is a child window, whose only tab stays where it is.
-        UUID[] main = new UUID[1];
+        // The window manager's part (full windows spec 5): no window is special; a window outlives its last tab, closes
+        // when a move takes its last tab, and its only tab stays where it is when asked to move to a new window.
         java.util.function.Supplier<UUID> workspace = () -> {
-            boolean first = main[0] == null;
-            UUID id = first ? terminalFixture.addMainWindow() : terminalFixture.addWindow();
-            if (first) main[0] = id;
+            UUID id = terminalFixture.addWindow();
             var tabs = contributions.tabs();
             var registration = tabs.addHost(new dev.jasper.app.contributions.WorkspaceHost(id,
                 tab -> tab.movingFrom().ifPresentOrElse(from -> terminalFixture.moveTab(tab.id().value(), id),
@@ -168,22 +165,19 @@ class AppContractTest extends PluginContractTest {
                     if (terminalFixture.moveToTab(tab.id().value(), number))
                         for (var other : tabs.inWindow(id)) other.active(other == tab);
                 }));
-            terminalFixture.onWindowClosed(id, () -> {
-                registration.close();
-                if (id.equals(main[0])) main[0] = null;
-            });
+            terminalFixture.onWindowClosed(id, registration::close);
             return id;
         };
         onEdt(() -> contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(
-            () -> main[0] != null ? main[0] : workspace.get(),
+            () -> terminalFixture.recentWindow().orElseGet(workspace),
             tab -> {
                 boolean only = terminalFixture.registry.window(tab.window()).map(window -> window.tabs().get().size() == 1).orElse(false);
-                if (!tab.window().equals(main[0]) && only) return;
+                if (only) return;
                 contributions.tabs().move(tab, workspace.get());
             }, window -> { }, () -> {
-                // A tab placed in a new window while none is open: the main window first, then the tab's own, as the window
-                // manager's emptyWindow does (workspace plan 6b Rulings 25).
-                if (main[0] == null) workspace.get();
+                // A tab placed in a new window while none is open: a window first, then the tab's own, as the window
+                // manager's emptyWindow restores first (full windows plan 1, Task 2's Ruling 4).
+                if (terminalFixture.recentWindow().isEmpty()) workspace.get();
                 return workspace.get();
             })));
         // A restorer's session takes the saved tab's id in the window being restored, as WindowContent.openTerminal takes it
@@ -345,12 +339,21 @@ class AppContractTest extends PluginContractTest {
                         + (panel.defaultSlot().split() ? "+split" : "")
                         + (panel.namedToggle() ? "|" + panel.toggleActionId() : "")).toList());
             }
-            /** Open panels' sites, components and the header metadata each last published, keyed by panel id, as the main window keeps them. */
+            /**
+             * Open panels' sites and components, keyed by window id and panel id ({@code <window>|<panel>}), as each
+             * window's dock keeps its own instance (full windows spec 9), and the header metadata each panel last published.
+             */
             final java.util.Map<String, dev.jasper.app.contributions.PanelSite> sites = new java.util.HashMap<>();
             final java.util.Map<String, javax.swing.JComponent> components = new java.util.HashMap<>();
+            // A panel request (Panels.show and toggle) builds the panel in the window it names, as that window's dock does.
+            { onEdt(() -> contributions.onPanelRequest(request -> {
+                if (request.op() != dev.jasper.app.contributions.Contributions.PanelRequest.Op.HIDE
+                        && terminalFixture.registry.window(request.windowId()).isPresent())
+                    build(request.windowId(), request.panelId());
+            })); }
             final java.util.Map<String, dev.jasper.app.contributions.PanelHeaderState> headers = new java.util.HashMap<>();
             /**
-             * Each registered panel's place, one cell per panel id as the main window's dock keeps it, built or not and across
+             * Each registered panel's place, one cell per panel id as a window's dock keeps it, built or not and across
              * {@code closePanel}; the site reads it, {@code placePanel} moves it.
              */
             final java.util.Map<String, dev.jasper.app.contributions.PanelSite.Placement[]> placements = new java.util.HashMap<>();
@@ -361,21 +364,27 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public javax.swing.JComponent openPanel(String panelId) {
                 return onEdtValue(() -> {
-                    UUID window = main[0];
-                    if (window == null) return null;
-                    if (components.containsKey(panelId)) return components.get(panelId);
-                    return contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
-                        .map(panel -> {
-                            var current = placementOf(panel);
-                            var site = new dev.jasper.app.contributions.PanelSite(window, () -> { }, () -> { }, () -> true, header -> headers.put(panelId, header),
-                                () -> current[0]);
-                            var built = panel.factory().apply(site);
-                            if (built != null) { sites.put(panelId, site); components.put(panelId, built); }
-                            return built;
-                        })
-                        .orElse(null);
+                    UUID window = terminalFixture.recentWindow().orElse(null);
+                    return window == null ? null : build(window, panelId);
                 });
             }
+            /** UI thread: builds the panel in {@code window}'s dock, or returns the instance built there. */
+            javax.swing.JComponent build(UUID window, String panelId) {
+                String key = window + "|" + panelId;
+                if (components.containsKey(key)) return components.get(key);
+                return contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
+                    .map(panel -> {
+                        var current = placementOf(panel);
+                        var site = new dev.jasper.app.contributions.PanelSite(window, () -> { }, () -> { }, () -> true, header -> headers.put(panelId, header),
+                            () -> current[0]);
+                        var built = panel.factory().apply(site);
+                        if (built != null) { sites.put(key, site); components.put(key, built); }
+                        return built;
+                    })
+                    .orElse(null);
+            }
+            /** The keys of the panel's open instances, one per window. */
+            List<String> keysOf(String panelId) { return sites.keySet().stream().filter(key -> key.endsWith("|" + panelId)).toList(); }
             @Override public String panelHeader(String panelId) {
                 return onEdtValue(() -> {
                     var header = headers.getOrDefault(panelId, dev.jasper.app.contributions.PanelHeaderState.EMPTY);
@@ -393,7 +402,7 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((HostedKitView) view).component().route().name(); }
             @Override public void closePanel(String panelId) {
-                onEdt(() -> { components.remove(panelId); var site = sites.remove(panelId); if (site != null) site.notifyClosed(); });
+                onEdt(() -> { for (String key : keysOf(panelId)) { components.remove(key); sites.remove(key).notifyClosed(); } });
             }
             @Override public void placePanel(String panelId, dev.jasper.sdk.ui.PanelPlacement placement) {
                 onEdt(() -> {
@@ -406,8 +415,7 @@ class AppContractTest extends PluginContractTest {
                     if (value.equals(current[0])) return;
                     current[0] = value;
                     // A panel that is not open is built there and hears nothing, as the dock's.
-                    var site = sites.get(panelId);
-                    if (site != null) site.notifyPlacement(value);
+                    for (String key : keysOf(panelId)) sites.get(key).notifyPlacement(value);
                 });
             }
             /** Each toolbar view's instance per window, built once as a window builds it when it opens; empty when it failed. */
