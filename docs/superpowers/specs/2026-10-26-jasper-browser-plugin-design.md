@@ -1,6 +1,6 @@
 # Jasper Browser plugin (iTerm2 parity)
 
-Status: **Draft, 2026-10-26, awaiting the user's approval.** This spec replaces the
+Status: **Approved by the user on 2026-10-27** ("approved, rebase plan 3 and write the plans"). This spec replaces the
 [2026-10-21 browser design](2026-10-21-jasper-browser-plugin-design.md). The user narrowed the scope on 2026-10-26: "it
 should mirror the behavior of iTerms built-in browser. Nothing more nothing less. Oh and also using that browser engine
 to rework the markdown previewer." They also approved two proposals: mapping iTerm2's integrations onto Jasper features
