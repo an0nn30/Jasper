@@ -21,17 +21,18 @@ import org.tomlj.TomlTable;
 public final class ThirdPartyNotices {
     private static final String FOLDER = "/dev/jasper/app/about/licenses/";
     /** The SPDX ids the index may use, with the names the Licenses window shows. */
-    private static final Map<String, String> LICENSES = Map.of(
-        "PolyForm-Noncommercial-1.0.0", "PolyForm Noncommercial 1.0.0",
-        "Apache-2.0", "Apache License 2.0",
-        "MIT", "MIT License",
-        "BSD-2-Clause", "BSD 2-Clause License",
-        "BSD-3-Clause", "BSD 3-Clause License",
-        "EPL-1.0", "Eclipse Public License 1.0",
-        "OFL-1.1", "SIL Open Font License 1.1",
-        "GPL-2.0-only WITH Classpath-exception-2.0", "GNU GPL v2 with the Classpath Exception",
-        "LicenseRef-Nerd-Fonts", "Nerd Fonts licenses",
-        "LicenseRef-JogAmp", "JogAmp licenses (BSD 2-Clause and others)");
+    private static final Map<String, String> LICENSES = Map.ofEntries(
+        Map.entry("PolyForm-Noncommercial-1.0.0", "PolyForm Noncommercial 1.0.0"),
+        Map.entry("Apache-2.0", "Apache License 2.0"),
+        Map.entry("MIT", "MIT License"),
+        Map.entry("BSD-2-Clause", "BSD 2-Clause License"),
+        Map.entry("BSD-3-Clause", "BSD 3-Clause License"),
+        Map.entry("BSL-1.0", "Boost Software License 1.0"),
+        Map.entry("EPL-1.0", "Eclipse Public License 1.0"),
+        Map.entry("OFL-1.1", "SIL Open Font License 1.1"),
+        Map.entry("GPL-2.0-only WITH Classpath-exception-2.0", "GNU GPL v2 with the Classpath Exception"),
+        Map.entry("LicenseRef-Nerd-Fonts", "Nerd Fonts licenses"),
+        Map.entry("LicenseRef-JogAmp", "JogAmp licenses (BSD 2-Clause and others)"));
 
     private ThirdPartyNotices() {}
 

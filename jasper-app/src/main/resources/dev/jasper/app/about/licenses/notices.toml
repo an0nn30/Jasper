@@ -40,6 +40,21 @@ text = "apache-2.0.txt"
 notice = "mina-sshd.NOTICE.txt"
 
 [[component]]
+name = "Apache Thrift"
+version = "0.23.0"
+license = "Apache-2.0"
+homepage = "https://thrift.apache.org/"
+text = "apache-2.0.txt"
+notice = "thrift.NOTICE.txt"
+
+[[component]]
+name = "Boost"
+version = "1.91.0"
+license = "BSL-1.0"
+homepage = "https://www.boost.org/"
+text = "boost.LICENSE.txt"
+
+[[component]]
 name = "Bouncy Castle"
 version = "1.85"
 license = "MIT"

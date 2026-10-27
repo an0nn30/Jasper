@@ -111,6 +111,32 @@ class ThirdPartyNoticesTest {
         }
     }
 
+    /** The JCEF runtime's cef_server links Apache Thrift and Boost, and its jcef module carries a renamed copy of Thrift's Java runtime. */
+    @Test void thriftAndBoostInTheJcefRuntimeAreListed() {
+        var byName = ThirdPartyNotices.thirdParty().stream()
+            .collect(Collectors.toMap(ThirdPartyNotices.Component::name, component -> component));
+        assertThat(byName).containsKeys("Apache Thrift", "Boost");
+
+        var thrift = byName.get("Apache Thrift");
+        assertThat(thrift.version()).isEqualTo("0.23.0");
+        assertThat(thrift.license()).isEqualTo("Apache-2.0");
+        assertThat(thrift.homepage()).isEqualTo("https://thrift.apache.org/");
+        assertThat(thrift.modules()).isEmpty();
+        assertThat(ThirdPartyNotices.read(thrift.text())).contains("Apache License").contains("Version 2.0, January 2004");
+        assertThat(ThirdPartyNotices.read(thrift.notice().orElseThrow())).contains("Copyright (C) 2006 - 2019, The Apache Software Foundation",
+            "This product includes software developed at\nThe Apache Software Foundation", "com.jetbrains.cef.remote.thrift",
+            "lib/cpp/src/thrift/windows/SocketPair.cpp", "Copyright 2007 by Nathan C. Myers");
+
+        var boost = byName.get("Boost");
+        assertThat(boost.version()).isEqualTo("1.91.0");
+        assertThat(boost.license()).isEqualTo("BSL-1.0");
+        assertThat(boost.licenseName()).isEqualTo("Boost Software License 1.0");
+        assertThat(boost.homepage()).isEqualTo("https://www.boost.org/");
+        assertThat(boost.modules()).isEmpty();
+        assertThat(ThirdPartyNotices.read(boost.text())).startsWith("Boost Software License - Version 1.0 - August 17th, 2003\n")
+            .contains("The copyright notices in the Software and this entire statement");
+    }
+
     @Test void jaspersTextIsTheRootLicense() throws Exception {
         String root = Files.readString(ROOT.resolve("LICENSE.md"));
         assertThat(ThirdPartyNotices.read(ThirdPartyNotices.jasper("").text())).isEqualTo(root);
