@@ -47,17 +47,22 @@ sections 4 and 19. The facts below were gathered on 2026-10-27 from the reposito
 
 ## Prerequisites (the user, before Task 1)
 
-1. **The JCEF SDK on the dev Mac.**
-   - Replace `~/Library/Java/JavaVirtualMachines/jbrsdk-25.0.4.1-osx-aarch64-b583.48` with
-     `jbrsdk_jcef-25.0.4.1-osx-aarch64-b635.75`. The spike's copy at
-     `.claude/worktrees/browser-spike/tools/spikes/browser/.jdk/` can be moved, or a fresh download checked against
-     its `.checksum`.
-   - Both builds report vendor JetBrains and Java 25.0.4.1, so Gradle cannot tell them apart. With both installed it
-     may pick either.
-   - The JCEF build is a superset, so other branches keep building.
-2. **Permission to download** the five other platforms' archives (about 250 to 290 MB each), for Task 3's file lists
-   and Task 6's checksums. Agents only list their contents and never run anything from them.
-3. **Permission to fetch** the licence texts for Task 5.
+1. **The JCEF SDK on the dev Mac.** The user manages Java with SDKMAN. The steps given on 2026-10-27:
+   - copy the spike's full bundle to `~/Library/Java/JavaVirtualMachines/jbrsdk_jcef-25.0.4.1-osx-aarch64-b635.75`;
+   - register it as an SDKMAN local version, `sdk install java 25.0.4.1-jcef-b635 <bundle>/Contents/Home`, and make
+     it the default;
+   - `sdk uninstall java 25.0.4+1.58348-jbr`, and move the plain `jbrsdk-25.0.4.1-osx-aarch64-b583.48` out of
+     `~/Library/Java/JavaVirtualMachines`.
+
+   Why:
+   - **SDKMAN's own macOS install drops Chromium.** Its hook keeps only `Contents/Home` and discards
+     `Contents/Frameworks`, where Chromium is. Such a runtime compiles and tests but cannot package (Task 2).
+   - **Gradle cannot tell the builds apart.** Every JBR 25.0.4.1 reports vendor JetBrains and the same version, so
+     with several installed it may pick any of them. The JCEF build is a superset, so other branches keep building.
+2. **Downloads:** approved by the user on 2026-10-27 ("yes to the downloads"). That covers the five other platforms'
+   archives (about 250 to 290 MB each) for Task 3's file lists and Task 6's checksums, and the licence texts for
+   Task 5. Agents only list the archives' contents and never run anything from them.
+3. **Chromium's credits:** the user, 2026-10-27, "link to the credits is fine" (Task 5).
 
 ## Review Focus
 
@@ -177,7 +182,9 @@ assert macJcefPayload.size() == 5 && macJcefPayload.every { it.startsWith('cef_s
   ```
 
   `ditto` keeps the symlinks, the extended attributes and the nested signatures. `sdkHome` is `Contents/Home` of the
-  toolchain. Fail with "The JBR SDK has no Chromium framework at …" when the source folder is missing.
+  toolchain. When the source folder is missing, fail with "The JBR SDK has no Chromium framework at …; install the
+  full jbrsdk_jcef bundle (SDKMAN's macOS install keeps only Contents/Home)". Make the same check in `nativeContext`
+  on macOS, so packaging stops before jpackage runs.
 
 - [ ] **Step 5: Extend `verifyPackage`.**
   - **Every OS:** `MODULES` now matches the 44 or 45 modules (the existing comparison).
@@ -327,8 +334,7 @@ void chromiumAndItsJavaBindingAreListed() {
     - JOGL and GlueGen from the jmod manifests.
   - **Homepages:** the projects' sites.
   - **`chromium.NOTICE.txt`** says that Chromium includes third-party software under the licences it lists, and
-    gives the URL of Chromium's third-party credits for 150.0.7871.129. The user confirms at review that a link meets
-    their notice obligations.
+    gives the URL of Chromium's third-party credits for 150.0.7871.129. The user accepted a link on 2026-10-27.
 
 - [ ] **Step 4: Run** `./gradlew :jasper-app:test --tests '*ThirdPartyNoticesTest' :jasper-app:verifyThirdPartyNotices`.
   Expected: PASS.
