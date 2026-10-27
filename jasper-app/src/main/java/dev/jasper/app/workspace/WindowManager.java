@@ -163,6 +163,8 @@ public final class WindowManager {
     private final Set<TabId> leftOut = new HashSet<>();
     /** While {@link #closeAll()} runs: no window opens, so none outlives the others and no fresh one opens. */
     private boolean closingAll;
+    /** The window {@link #openWindow} opened last, until another window comes to the front: New Window cascades from it. */
+    private JasperWindow lastOpened;
 
     /**
      * The windows of the application whose contributions are {@code model}: its tab registry places a plugin's view
@@ -357,7 +359,8 @@ public final class WindowManager {
     /**
      * New Window (full windows spec 5.2): a new window with one terminal tab in {@code directory}, after the saved windows
      * are restored when none is open, so that its first save does not replace them. It opens {@link #CASCADE} pixels below
-     * and right of the most recently active window, on that window's display.
+     * and right of the most recently active window, or of the window it opened last when no other came to the front
+     * since, on that window's display.
      *
      * @param directory where its terminal tab starts; null for where a new shell starts
      * @return the window; empty while Jasper quits or every window closes
@@ -366,11 +369,15 @@ public final class WindowManager {
     public Optional<JasperWindow> openWindow(Path directory) {
         requireEdt();
         if (closingAll || !restoredFirst("menu")) return Optional.empty();
-        Optional<UiState.Bounds> from = lastActive().flatMap(window -> window.placement().bounds());
-        return open(new Opening(false, directory, "menu", Optional.empty(), Optional.empty()), window -> {
+        // The window this opened last, while no other came to the front since: a repeated New Window cascades on.
+        Optional<JasperWindow> source = lastOpened != null && !lastOpened.closed() ? Optional.of(lastOpened) : lastActive();
+        Optional<UiState.Bounds> from = source.flatMap(window -> window.placement().bounds());
+        Optional<JasperWindow> opened = open(new Opening(false, directory, "menu", Optional.empty(), Optional.empty()), window -> {
             from.ifPresent(bounds -> window.placed(new JasperWindow.Placement(Optional.of(cascaded(bounds)), 0)));
             return true;
         });
+        opened.ifPresent(window -> lastOpened = window);
+        return opened;
     }
 
     /** How far a new window sits below and right of the window it opens from (full windows spec 5.2), in unscaled pixels. */
@@ -385,10 +392,11 @@ public final class WindowManager {
      * Restores the saved windows when none is open, before a new window opens beside them (Controller Ruling 4): a new
      * window alone would otherwise save over them.
      *
-     * @return whether a window is open or was restored; false while Jasper quits or every window closes
+     * @return whether a window is open or was restored; false while Jasper quits or every window closes, as for
+     *     {@link #ensureWindow}: none opens while the last ones go
      */
     private boolean restoredFirst(String trigger) {
-        return !isEmpty() || ensureWindow(trigger, null).isPresent();
+        return ensureWindow(trigger, null).isPresent();
     }
 
     /**
@@ -671,7 +679,7 @@ public final class WindowManager {
 
     /**
      * Closes every window without asking any guard, the most recently active last (full windows spec 5.3): Quit and going
-     * to the background ask first ({@link #closeEveryWindow}). While every window is whole, the workspace store saves them
+     * to the background ask the tabs' guards first (the application's). While every window is whole, the workspace store saves them
      * all and then holds until they are restored, and the closing-all hook hears of it, once, before anything closes
      * (workspace tabs spec 6.4 and 13). Every window closes whatever closing another one throws, and no window opens
      * meanwhile; the first failure is rethrown once the last has closed, the others suppressed under it.
@@ -710,27 +718,6 @@ public final class WindowManager {
             failure = keep(failure, thrown);
         }
         return failure;
-    }
-
-    /**
-     * Quit and going to the background (full windows spec 5.3): every window's tabs' guards decide; when they agree, every
-     * window closes ({@link #closeAll}), and a refusal keeps every window. Residency then decides whether Jasper stays,
-     * through the closed hook.
-     *
-     * @return whether the windows closed
-     */
-    boolean closeEveryWindow() {
-        requireEdt();
-        if (isEmpty()) return true;
-        if (!model.tabs().mayClose(this::everyTab)) return false;
-        closeAll();
-        return true;
-    }
-
-    private List<Tab> everyTab() {
-        var all = new ArrayList<Tab>();
-        for (JasperWindow window : windows()) all.addAll(model.tabs().inWindow(window.id()));
-        return all;
     }
 
     /**
@@ -1021,6 +1008,7 @@ public final class WindowManager {
     }
 
     void activated(JasperWindow window) {
+        if (window != lastOpened) lastOpened = null;
         activations.remove(window);
         activations.addFirst(window);
         tabDrag.activated(window.content());
@@ -1041,6 +1029,7 @@ public final class WindowManager {
     /** A window closed or was discarded: it is forgotten first, so a failing hook cannot keep it. */
     void closed(JasperWindow window) {
         windows.remove(window);
+        if (window == lastOpened) lastOpened = null;
         activations.remove(window);
         if (watchingFronts && isEmpty()) {
             Toolkit.getDefaultToolkit().removeAWTEventListener(fronts);

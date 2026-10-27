@@ -55,6 +55,31 @@ class BuddyIntegrationTest {
         assertThat(attempts).hasValue(1);
         integration.close(); integration.close();
     }
+    /**
+     * Full windows plan 1 final review: the Buddy follows the most recently active window, and switching between two
+     * showing windows never hides it (the new window counts before the old one goes), so a shown bubble stays; following a
+     * minimized window, or none, hides it.
+     */
+    @Test void switchingBetweenShowingWindowsNeverHidesTheBuddy() {
+        var fixture = new BuddyTestSupport(); var shows = new AtomicInteger(); var hides = new AtomicInteger();
+        var integration = new BuddyIntegration(BuddyOptions.builder(font).build(), fixture.companion(), new BuddyVisibility(),
+            () -> { shows.incrementAndGet(); return true; }, hides::incrementAndGet, source -> true, listener -> () -> {});
+        var shown = new BuddyIntegration.WindowShown(true, false);
+        integration.follow(null, "first", shown);
+        var notice = new BuddyNotice(new BuddyNoticeId("test", 1), BuddyNotice.Kind.TASK, "build", BuddyNotice.State.RUNNING, () -> "busy", () -> {});
+        integration.companion().post(notice);
+        integration.follow("first", "second", shown);
+        integration.follow("second", "first", shown);
+        integration.follow("first", "first", shown);
+        assertThat(hides).as("never hidden on a switch").hasValue(0);
+        assertThat(shows).hasValue(4);
+        assertThat(fixture.notices()).as("the bubble's notice stays").containsExactly(notice);
+        integration.follow("first", "second", new BuddyIntegration.WindowShown(true, true));
+        assertThat(hides).as("a minimized window hides it").hasValue(1);
+        integration.follow("second", null, null);
+        assertThat(hides).as("and so does no window").hasValue(2);
+        integration.close();
+    }
     @Test void hideRetainsNoticesAndCloseUnregistersActivityExactlyOnce() {
         var fixture = new BuddyTestSupport(); var registrations = new AtomicInteger(); var removals = new AtomicInteger();
         var integration = new BuddyIntegration(BuddyOptions.builder(font).build(), fixture.companion(), new BuddyVisibility(),

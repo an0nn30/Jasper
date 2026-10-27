@@ -70,16 +70,26 @@ final class WindowContributions implements AutoCloseable {
     private final Map<String, PanelInstance> panels = new LinkedHashMap<>();
     /** In Zen, the panels that showed before it, which show again when it ends and stay saved as showing; else null. */
     private Set<String> beforeZen;
+    /**
+     * Opened while another window was open (Controller Ruling 10): its tool windows saved showing in Float or Window mode
+     * start hidden, as the other window's are open already; they stay saved as showing until one shows here.
+     */
+    private final boolean anotherOpen;
+    private final Set<String> heldBack = new LinkedHashSet<>();
+    /** Opened out of Zen beside another window: it saves no Zen mode of its own until its Zen changes. */
+    private boolean keepsSavedZen;
     private Subscription panelRequests;
     /** The detached tool windows' own windows. */
     private final DetachedToolWindows detached;
     /** Opens the detached windows that waited for this window to show (restored at start-up). */
     private final HierarchyListener showing = this::showingChanged;
 
-    WindowContributions(WindowContent owner, Contributions model, UiState state) {
+    WindowContributions(WindowContent owner, Contributions model, UiState state, boolean anotherOpen) {
         this.owner = owner;
         this.model = model;
         this.state = state;
+        this.anotherOpen = anotherOpen;
+        keepsSavedZen = anotherOpen;
         this.dock = owner.dock();
         // A window restored in Zen remembers its saved panels for leaving it instead of showing them.
         if (owner.zenMode()) beforeZen = new LinkedHashSet<>();
@@ -369,6 +379,7 @@ final class WindowContributions implements AutoCloseable {
         for (String id : List.copyOf(panels.keySet())) {
             if (current.containsKey(id)) continue;
             PanelInstance gone = panels.remove(id);
+            heldBack.remove(id);
             dock.remove(id);
             if (gone.site != null) gone.site.notifyClosed();
             owner.area().removeContent(id);
@@ -379,14 +390,16 @@ final class WindowContributions implements AutoCloseable {
             Optional<UiState.Panel> saved = state.panel(entry.id());
             Slot slot = saved.map(UiState.Panel::slot).orElse(entry.defaultSlot());
             boolean showed = saved.map(UiState.Panel::visible).orElse(false);
+            boolean held = showed && anotherOpen && saved.map(UiState.Panel::mode).filter(ToolWindowMode::detached).isPresent();
             // Remembered before docking: docking saves, and in Zen the saved visibility is the remembered one.
-            if (showed && beforeZen != null) beforeZen.add(entry.id());
+            if (held) heldBack.add(entry.id());
+            else if (showed && beforeZen != null) beforeZen.add(entry.id());
             dock.add(entry.id(), slot, insertionIndex(slot, saved.map(UiState.Panel::order).orElse(UiState.Panel.LAST)));
             // Its own window's bounds, then its mode, before it shows: a detached panel that showed opens its window there.
             saved.flatMap(UiState.Panel::window).ifPresent(window ->
                 dock.setBounds(entry.id(), new Rectangle(window.x(), window.y(), window.width(), window.height())));
             saved.map(UiState.Panel::mode).filter(ToolWindowMode::detached).ifPresent(mode -> dock.setMode(entry.id(), mode));
-            if (showed && beforeZen == null) dock.show(entry.id());
+            if (showed && !held && beforeZen == null) dock.show(entry.id());
         }
     }
 
@@ -413,6 +426,7 @@ final class WindowContributions implements AutoCloseable {
         // Read before the area lets go of the frames: a detached window that hid (closed, hidden, its plugin stopped)
         // leaves the focus where it is.
         boolean dockedHid = change.hidden().stream().anyMatch(id -> !dock.mode(id).detached() && owner.area().detachedFrame(id) == null);
+        heldBack.removeAll(change.shown());
         for (String id : change.shown()) build(id);
         if (change.layout()) owner.area().sync();
         detached.sync();
@@ -434,6 +448,7 @@ final class WindowContributions implements AutoCloseable {
      */
     void zenChanged() {
         if (owner.zenMode() == (beforeZen != null)) return;
+        keepsSavedZen = false;
         if (owner.zenMode()) {
             beforeZen = new LinkedHashSet<>();
             for (Slot slot : Slot.values()) dock.active(slot).ifPresent(beforeZen::add);
@@ -448,8 +463,10 @@ final class WindowContributions implements AutoCloseable {
         for (String id : restore) showPanel(id);
     }
 
-    /** Whether the saved layout has the panel showing: in Zen, whether it showed before Zen. */
-    private boolean savedVisible(String id) { return beforeZen != null ? beforeZen.contains(id) : dock.visible(id); }
+    /** Whether the saved layout has the panel showing: held back, or in Zen whether it showed before Zen. */
+    private boolean savedVisible(String id) {
+        return heldBack.contains(id) || (beforeZen != null ? beforeZen.contains(id) : dock.visible(id));
+    }
 
     /** Builds the panel's instance the first time it shows in this window; a failing factory yields a placeholder. */
     private void build(String id) {
@@ -530,7 +547,7 @@ final class WindowContributions implements AutoCloseable {
             }
         }
         state.setRailVisible(owner.railVisible());
-        state.setZenMode(owner.zenMode());
+        if (!keepsSavedZen) state.setZenMode(owner.zenMode());
         state.setDock(new UiState.Dock(dock.size(Side.LEFT), dock.size(Side.RIGHT), dock.size(Side.BOTTOM),
             dock.ratio(Side.LEFT), dock.ratio(Side.RIGHT), dock.ratio(Side.BOTTOM)));
         state.save();

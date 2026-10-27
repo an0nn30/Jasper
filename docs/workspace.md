@@ -29,7 +29,8 @@ the focus, and they act on that window.
 ## Windows
 
 **New Window** (File menu, the toolbar's New Window button, Cmd+N on macOS, Ctrl+Shift+N on Linux and
-Windows) opens a window with one terminal tab, with the tool windows of the default layout. Its shell starts in the focused pane's folder when Jasper knows
+Windows) opens a window with one terminal tab and the tool windows as Jasper last saved them; while another window is
+open it opens out of Zen, with Float and Window tool windows hidden. Its shell starts in the focused pane's folder when Jasper knows
 it, otherwise in your home folder. **Close Window** (File menu, Cmd+Shift+W on macOS, no default shortcut on Linux and
 Windows) closes the window it runs in, as its title-bar close button does.
 
@@ -45,7 +46,7 @@ goes to the most recently active window; when no window is open, Jasper restores
 **Move Tab to New Window** (the window's ⋮, a terminal's right-click menu, a tab's menu and the command palette; no
 default shortcut) moves the shown tab, or the tab whose menu it was, with all its panes into a new window, when
 its window holds two or more tabs. Dragging a tab out of every window does the same ([Tabs](#tabs)).
-**Move Tab to Window ▸** (the window's ⋮, a terminal's right-click menu and the command palette), while another window is
+**Move Tab to Window ▸** (the window's ⋮, a terminal's right-click menu, a tab's menu and the command palette), while another window is
 open, lists the other windows by their shown tab's title and moves the shown tab to the one you choose, which comes to the
 front; the command palette's moves it to the most recently active other window. A move keeps every shell, file and view
 as it was. Neither runs while a dialog is open in one of the panes it would move.
@@ -121,8 +122,8 @@ item shows ● before its title while it has unsaved changes. While one is activ
   **Reset Font Size** act on it; **Close Pane** closes it, and **Close Tab** its whole tab;
 - the header's search field shows its title and host, and the status bar shows its location and its own items.
 
-A tab's right-click menu has **Rename Tab** (for a terminal), **Move Tab to New Window**, **Move Tab Into**, **Close
-Tab**, then the active item's own commands.
+A tab's right-click menu has **Rename Tab** (for a terminal), **Move Tab to New Window**, **Move Tab Into**, **Move Tab
+to Window ▸** (while another window is open), **Close Tab**, then the active item's own commands.
 
 ## Panes and splits
 
@@ -180,7 +181,7 @@ The toolbar sits at the trailing end of the header:
 | Maximize Pane | **Maximize Pane** |
 | Plugin buttons | What plugins add, after their own separator. The Editor adds **New Editor Window**, which opens an untitled file in a new window; Remote adds a **Sessions** menu of your saved hosts, your WSL distributions on Windows, and **Manage Sessions…**. |
 | Find, Settings | **Find**, [Settings](#settings) |
-| ⋮ (View Options) | The window menu: **Move Tab to New Window** |
+| ⋮ (View Options) | The window menu: **Move Tab to New Window**, **Move Tab to Window ▸** |
 
 A button's tooltip names its action and current shortcut, for example "Find (Ctrl+Shift+F)" on Linux and Windows. When
 the header is too narrow, buttons move into **More actions** (⋯), the least important first; Find and Settings stay
@@ -260,7 +261,7 @@ On macOS, while the menus are in the screen menu bar, the application menu (Jasp
 | Where | Items |
 |---|---|
 | A terminal pane | Copy, Paste, Find, Clear Terminal, Split › (as in the Tab menu), Move Pane to New Tab, Move Pane to Tab ›, Maximize Pane, Close Pane, then the window menu's Move Tab to New Window and Move Tab to Window ›; then plugins' items: Remote's **Forward a Port...** and **Open SFTP here**, File Server's **Share Path** › HTTP, HTTPS, FTP, FTPS, SFTP, TFTP |
-| A tab's entry in the strip | Rename Tab (for a terminal), Move Tab to New Window, Move Tab Into ›, Close Tab, then the active item's own commands |
+| A tab's entry in the strip | Rename Tab (for a terminal), Move Tab to New Window, Move Tab Into ›, Move Tab to Window ›, Close Tab, then the active item's own commands |
 | A rail button, or a tool window's Options (⋮) button | View Mode › Docked, Float, Window (the current one checked); Move to › Left Top, Left Bottom, Bottom Left, Right Top, Right Bottom, Bottom Right (the current slot checked); Hide |
 
 ## Tool windows and the dock
@@ -374,7 +375,7 @@ next start uses the last saved layout.
 The header, toolbar and tabs stay. A tool window you open while in Zen shows in its slot as usual, without the
 rails. Leaving Zen hides those and shows the remembered ones again. View › Show/Hide › Status Bar and Rail, and their
 shortcuts, are unavailable in Zen. Zen is each window's own: a window opens in the Zen saved in
-`ui-state.toml` and saves it each time you toggle it there. The saved layout keeps the tool
+`ui-state.toml`, or out of Zen while another window is open, and saves it each time you toggle it there. The saved layout keeps the tool
 windows that showed before Zen, so one opened in Zen is not saved as showing.
 
 **Compact** (Settings › Appearance › View mode, `window.view_mode = "compact"`, after a restart) uses the system's

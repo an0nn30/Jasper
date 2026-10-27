@@ -10,7 +10,13 @@
 > tab to the most recently active other window; R7 Task 4 replaced the plugins' `isMain` branches with
 > `Panels.show(panelId, window)`, and Task 5 did their per-window instances; R8 the Task 4 review's leftovers (Editor API
 > Javadoc, Vault Javadoc, dead plugin fields, window assertions) went to Task 5; R9 Sessions was fixed in Task 5, and
-> File Server selects a server only in the window that asked.
+> File Server selects a server only in the window that asked. R10 a window opened while another is open starts out of
+> Zen and its Float and Window tool windows start hidden (mode, slot and bounds kept, still saved as showing); the first
+> window of a process keeps the saved state; R11 the final fix wave also took the minors (Buddy wording, `restoredFirst`
+> refuses while the last windows close, New Window cascades from the window it opened last, `closeEveryWindow` removed,
+> the "no window is special" gloss deleted). Final-review fix wave: the Buddy follows the next window before it lets the
+> old one go (`BuddyIntegration.follow`), so a window switch never hides it; workspace.md's New Window and Move Tab to
+> Window rows corrected.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

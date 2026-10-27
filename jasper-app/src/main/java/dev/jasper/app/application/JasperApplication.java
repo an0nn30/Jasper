@@ -588,7 +588,9 @@ public final class JasperApplication {
             // The first configuration a window takes keeps the start-up view mode, before any native chrome is installed.
             if (configuration != null) content.applyConfiguration(windowConfiguration(), macOs);
             if (configuration != null) configuration.register(content);
-            content.connectContributions(contributions, uiState);
+            // A window beside another starts out of Zen with its floating tool windows hidden (Controller Ruling 10): the
+            // saved layout is shared, and the other window shows those already. This one is not among the windows yet.
+            content.connectContributions(contributions, uiState, true, !windows.isEmpty());
             // Each window's Float and Window tool windows open native windows of their own (floating tool windows spec).
             if (nativeToolWindows) content.detachedShells(DetachedFrame.shells(themes, windowLook()));
             if (WINDOWS) content.onManageCygwinPackages = cygwin::manage;
@@ -1915,8 +1917,7 @@ public final class JasperApplication {
             notificationViews.detach(window.content());
         }
         windowStates.remove(window);
-        buddy.removeWindow(window);
-        if (buddyWindow == window) buddyWindow = null;
+        // The Buddy registers only the window it follows: following the next one lets this one go in the same step.
         followBuddy();
         if (windows.isEmpty()) activatedSinceOpen = false;
     }
@@ -1950,10 +1951,11 @@ public final class JasperApplication {
     private void followBuddy() {
         if (buddy == null) return;
         JasperWindow followed = windows.lastActive().orElse(null);
-        if (buddyWindow != null && buddyWindow != followed) buddy.removeWindow(buddyWindow);
-        buddyWindow = followed;
         WindowManager.State state = followed == null ? null : windowStates.get(followed);
-        if (state != null) buddy.window(followed, state.showing(), state.iconified());
+        // In one step, the new window before the old one goes: a switch between showing windows never hides the Buddy.
+        buddy.follow(buddyWindow, followed,
+            state == null ? null : new BuddyIntegration.WindowShown(state.showing(), state.iconified()));
+        buddyWindow = followed;
         updateBuddyActions();
     }
 

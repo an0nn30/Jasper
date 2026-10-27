@@ -838,6 +838,63 @@ class DetachedToolWindowsTest {
         });
     }
 
+    /**
+     * Full windows plan 1 Controller Ruling 10: a window opened while another is open starts out of Zen, and its tool
+     * window saved showing in Window mode starts hidden, keeping its mode and bounds, so showing it opens its window
+     * there; the first window still opens it, and the shared saved state keeps it showing and Zen as it was.
+     */
+    @Test void aWindowOpenedBesideAnotherStartsOutOfZenWithItsDetachedToolWindowsHidden() throws Exception {
+        edt(() -> {
+            var state = UiState.inMemory();
+            var saved = new Rectangle(200, 150, 400, 300);
+            var showing = new UiState.Panel(Slot.LEFT_TOP, 0, true, ToolWindowMode.WINDOW,
+                Optional.of(new UiState.Bounds(saved.x, saved.y, saved.width, saved.height)));
+            state.putPanel(A, showing);
+            var first = new Fixture(state);
+            assertThat(first.shells.take()).as("the first window opens it").containsExactly(open(ToolWindowMode.WINDOW, saved), "show " + A);
+
+            WindowContent second = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            second.connectContributions(first.model, state, true, true);
+            TabDragTestSupport.frame(second, MAIN.x + 30, MAIN.y + 30, MAIN.width, MAIN.height);
+            second.detachedWindows().ready = () -> true;
+            second.detachedWindows().displays = () -> List.of(new WindowPlacement.Display(SCREEN, SCREEN));
+            var shells = new Shells();
+            second.detachedShells(shells);
+            relayout(second);
+            PressedFrameTest.flushEdt();
+            assertThat(shells.take()).as("no second window of it opens").isEmpty();
+            assertThat(second.dock().visible(A)).isFalse();
+            assertThat(second.dock().mode(A)).isEqualTo(ToolWindowMode.WINDOW);
+            assertThat(second.dock().bounds(A)).hasValue(saved);
+            assertThat(state.panel(A)).as("still saved as showing").hasValue(showing);
+
+            first.model.requestPanel(new Contributions.PanelRequest(second.id(), A, Contributions.PanelRequest.Op.SHOW));
+            assertThat(shells.take()).as("showing it opens its window").startsWith(open(ToolWindowMode.WINDOW, saved), "show " + A);
+            second.close();
+        });
+    }
+
+    /** Controller Ruling 10: a window opened beside another starts out of Zen, and leaves the saved Zen mode alone. */
+    @Test void aWindowOpenedBesideAnotherStartsOutOfZen() throws Exception {
+        edt(() -> {
+            var state = UiState.inMemory();
+            state.setZenMode(true);
+            var first = new Fixture(state);
+            assertThat(first.owner.zenMode()).as("the first window restores Zen").isTrue();
+
+            WindowContent second = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            second.connectContributions(first.model, state, true, true);
+            assertThat(second.zenMode()).isFalse();
+            first.model.requestPanel(new Contributions.PanelRequest(second.id(), A, Contributions.PanelRequest.Op.SHOW));
+            assertThat(second.dock().visible(A)).isTrue();
+            assertThat(state.zenMode()).as("its own dock changes keep the saved Zen mode").isTrue();
+            second.toggleZenMode();
+            second.toggleZenMode();
+            assertThat(state.zenMode()).as("until its own Zen changes").isFalse();
+            second.close();
+        });
+    }
+
     /** Zen hides the detached windows' own windows with the docked ones and brings them back; they stay saved as showing. */
     @Test void zenHidesDetachedWindowsAndBringsThemBack() throws Exception {
         edt(() -> {

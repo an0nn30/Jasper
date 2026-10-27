@@ -346,6 +346,39 @@ class WindowManagerTest {
         launch();
     }
 
+    /** Full windows plan 1 final review: a repeated New Window with no window brought to the front between cascades on. */
+    @Test void repeatedNewWindowsCascadeFromTheOneOpenedLast() throws Exception {
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            first.placed(new JasperWindow.Placement(Optional.of(new UiState.Bounds(100, 100, 1200, 800)), 0));
+            first.events().activated().accept(true);
+            JasperWindow second = manager.openWindow(null).orElseThrow();
+            JasperWindow third = manager.openWindow(null).orElseThrow();
+            assertThat(second.placement().bounds()).contains(new UiState.Bounds(130, 130, 1200, 800));
+            assertThat(third.placement().bounds()).as("not stacked on the second").contains(new UiState.Bounds(160, 160, 1200, 800));
+            first.events().activated().accept(true);
+            JasperWindow fourth = manager.openWindow(null).orElseThrow();
+            assertThat(fourth.placement().bounds()).as("from the window brought to the front since")
+                .contains(new UiState.Bounds(130, 130, 1200, 800));
+        });
+        launch();
+    }
+
+    /** Full windows plan 1 final review: as for ensureWindow, New Window opens none while the last window closes. */
+    @Test void newWindowOpensNoneWhileTheLastWindowCloses() throws Exception {
+        List<Optional<JasperWindow>> asked = new ArrayList<>();
+        edt(() -> {
+            JasperWindow window = manager.ensureWindow("cold", null).orElseThrow();
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            notes.onClosed(() -> asked.add(manager.openWindow(null)));
+            window.requestClose();
+            assertThat(asked).as("a closing window is not absent").containsExactly(Optional.empty());
+            assertThat(manager.isEmpty()).isTrue();
+            assertThat(events.stream().filter(event -> event.startsWith("opened")).count()).as("no other window").isEqualTo(1);
+        });
+        launch();
+    }
+
     /** Workspace tabs spec 6.1: while the last window closes, a request opens no other beside it. */
     @Test void aRequestWhileTheLastWindowClosesOpensNoOther() throws Exception {
         List<Optional<JasperWindow>> asked = new ArrayList<>();
@@ -781,27 +814,6 @@ class WindowManagerTest {
             assertThat(notes.window()).as("in the first restored").isEqualTo(first.id());
         });
         launch();
-    }
-
-    @Test void quitAsksEveryWindowsGuardsAndARefusalKeepsThemAll() throws Exception {
-        boolean[] allow = {false};
-        JasperWindow[] w = new JasperWindow[2];
-        edt(() -> {
-            w[0] = manager.ensureWindow("cold", null).orElseThrow();
-            w[1] = manager.openWindow(null).orElseThrow();
-            model.tabs().open("dev.example.editor", "notes", "notes.txt", w[1].id(), new JPanel());
-            model.tabs().guard("dev.example.editor", (tabs, batch) -> CompletableFuture.completedFuture(allow[0]));
-        });
-        launch();
-        edt(() -> {
-            assertThat(manager.closeEveryWindow()).as("refused").isFalse();
-            assertThat(manager.windows()).containsExactly(w[0], w[1]);
-            assertThat(closings).isEmpty();
-            allow[0] = true;
-            assertThat(manager.closeEveryWindow()).isTrue();
-            assertThat(manager.isEmpty()).isTrue();
-            assertThat(closings).contains("closing w0", "closing w1");
-        });
     }
 
     @Test void moveTabToWindowPutsItAfterTheActiveTabAndRaisesTheTarget() throws Exception {

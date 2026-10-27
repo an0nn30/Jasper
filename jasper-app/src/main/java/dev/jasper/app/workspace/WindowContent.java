@@ -1216,12 +1216,21 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * it closes.
      */
     public void connectContributions(Contributions model, UiState state, boolean hostsContent) {
+        connectContributions(model, state, hostsContent, false);
+    }
+
+    /**
+     * As {@link #connectContributions(Contributions, UiState, boolean)}; a window opened while {@code anotherOpen} starts
+     * out of Zen, and its tool windows saved in Float or Window mode start hidden, keeping their mode and bounds
+     * (full windows plan 1 Controller Ruling 10): the saved state is the other window's too.
+     */
+    public void connectContributions(Contributions model, UiState state, boolean hostsContent, boolean anotherOpen) {
         if (closed || contributed != null) return;
         uiState = Objects.requireNonNull(state);
         railVisible = state.railVisible();
         // Restore before contributions can build or show saved panels.
-        setZenMode(state.zenMode());
-        contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
+        setZenMode(!anotherOpen && state.zenMode());
+        contributed = new WindowContributions(this, Objects.requireNonNull(model), state, anotherOpen);
         if (hostsContent) {
             // The window joins the application's registry, taking the tabs it already holds along (workspace plan 3a Rulings 3).
             TabRegistry shared = model.tabs();

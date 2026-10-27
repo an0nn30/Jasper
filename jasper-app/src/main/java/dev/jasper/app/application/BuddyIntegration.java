@@ -26,6 +26,7 @@ final class BuddyIntegration implements AutoCloseable {
     private final BuddyVisibility visibility;
     private BuddyOptions options;
     private BooleanSupplier show;
+    private final Runnable hide;
     private Predicate<Component> owns;
     private Function<AWTEventListener, Runnable> registerActivity;
     private Runnable removeActivity;
@@ -49,10 +50,18 @@ final class BuddyIntegration implements AutoCloseable {
     BuddyIntegration(BuddyOptions options, BuddyCompanion companion, BuddyVisibility visibility,
                      BooleanSupplier show, Predicate<Component> owns,
                      Function<AWTEventListener, Runnable> registerActivity) {
+        this(options, companion, visibility, show, null, owns, registerActivity);
+    }
+
+    /** As above; {@code hide} (null for the companion's own) lets a test count the hides. */
+    BuddyIntegration(BuddyOptions options, BuddyCompanion companion, BuddyVisibility visibility,
+                     BooleanSupplier show, Runnable hide, Predicate<Component> owns,
+                     Function<AWTEventListener, Runnable> registerActivity) {
         this.options = Objects.requireNonNull(options);
         this.companion = Objects.requireNonNull(companion);
         this.visibility = Objects.requireNonNull(visibility);
         this.show = show == null ? companion::show : show;
+        this.hide = hide == null ? companion::hide : hide;
         this.owns = Objects.requireNonNull(owns);
         this.registerActivity = Objects.requireNonNull(registerActivity);
     }
@@ -80,7 +89,19 @@ final class BuddyIntegration implements AutoCloseable {
     void window(Object key, boolean showing, boolean iconified) {
         if (closed) return; visibility.window(key, showing, iconified); sync();
     }
-    void removeWindow(Object key) { if (closed) return; visibility.remove(key); sync(); }
+    /**
+     * The Buddy follows {@code key} instead of {@code previous} (either may be null; {@code key} is left out without its
+     * state), in one step: the new window counts before the old one stops, so a switch between showing windows never
+     * hides it.
+     */
+    void follow(Object previous, Object key, WindowShown state) {
+        if (closed) return;
+        if (key != null && state != null) visibility.window(key, state.showing(), state.iconified());
+        if (previous != null && previous != key) visibility.remove(previous);
+        sync();
+    }
+    /** How a window the Buddy follows stands: whether it shows, and whether it is minimized. */
+    record WindowShown(boolean showing, boolean iconified) { }
     void appearance(Font font, boolean dark) {
         if (closed) return;
         options = options.toBuilder().primaryFont(font).dark(dark).build();
@@ -106,7 +127,7 @@ final class BuddyIntegration implements AutoCloseable {
     private void sync() {
         if (closed || unavailable) return;
         try {
-            if (!visibility.shown()) { companion.hide(); return; }
+            if (!visibility.shown()) { hide.run(); return; }
             if (!show.getAsBoolean()) { unavailable = true; return; }
             if (removeActivity == null) {
                 lastPokeNanos = System.nanoTime() - POKE_INTERVAL_NANOS;
