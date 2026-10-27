@@ -524,7 +524,7 @@ switch, Enter or Space starts or stops a tunnel; a double click edits a saved on
 asking. The row's tooltip carries its counters: open connections, bytes each way and uptime.
 
 The right-click menu offers **Start** or **Stop**, **Open in Browser** (a running local tunnel, at
-`http://localhost:<port>/`), **Copy Address**, and **Edit…**, **Duplicate** and **Delete…** for a saved tunnel or
+`http://localhost:<port>/`, in the web browser a plugin provides, else your browser), **Copy Address**, and **Edit…**, **Duplicate** and **Delete…** for a saved tunnel or
 **Save as Tunnel…** for a quick forward. Deleting a running tunnel stops it. A tunnel whose host was deleted stays,
 marked "Host missing · Edit to choose a host".
 

@@ -55,6 +55,7 @@ public final class TerminalView extends JComponent {
     private static final float MIN_FONT_SIZE = 6f;
     private static final float MAX_FONT_SIZE = 72f;
     private static final int RESIZE_SETTLE_MILLIS = 120;
+    private static final Consumer<TerminalLink> DESKTOP_BROWSER = link -> DesktopServices.openBrowser(link.url());
 
     private final TerminalSession session;
     private final TerminalAccess access;
@@ -86,7 +87,7 @@ public final class TerminalView extends JComponent {
     private Consumer<FindResult> findResultListener = result -> { };
     private Supplier<String> clipboardReader = DesktopServices::readClipboard;
     private Consumer<String> clipboardWriter = DesktopServices::writeClipboard;
-    private Consumer<String> linkOpener = DesktopServices::openBrowser;
+    private Consumer<TerminalLink> linkOpener = DESKTOP_BROWSER;
     private Consumer<FileLink> fileLinkHandler;
     private final java.util.List<Runnable> afterPaint = new java.util.ArrayList<>();
 
@@ -285,14 +286,30 @@ public final class TerminalView extends JComponent {
     /**
      * Receives the file a Cmd-click (macOS) or Ctrl-click (Linux and Windows) names: a path written in the output, such
      * as {@code src/Foo.java:42} or {@code Foo.cs(42,5)}, following soft wraps, or a {@code file:} link, OSC 8 or plain
-     * text, to this machine. A URL under the pointer still opens in the browser. Without a handler, the default, such a
-     * click starts a selection. The path is unauthenticated program output: an OSC 8 link's target can differ from the
-     * text shown. Called on the Event Dispatch Thread, so the handler must not block.
+     * text, to this machine. A URL under the pointer still goes to the link opener ({@link #setLinkOpener}). Without a
+     * handler, the default, such a click starts a selection. The path is unauthenticated program output: an OSC 8 link's
+     * target can differ from the text shown. Called on the Event Dispatch Thread, so the handler must not block.
      *
      * @param handler the receiver, or {@code null} for none
      */
     public void setFileLinkHandler(Consumer<FileLink> handler) {
         fileLinkHandler = handler;
+    }
+
+    /**
+     * Receives each link a Cmd-click (macOS) or Ctrl-click (Linux and Windows) opens, with the gesture that asked for it
+     * and the OSC 8 {@code target=} name its program gave it ({@link TerminalLink}): an {@code http}, {@code https} or
+     * {@code ftp} URL written in the output, following soft wraps, or an OSC 8 link whose address is {@code http},
+     * {@code https}, {@code ftp} or {@code mailto}, as the program wrote it. Adding Shift to the click makes the gesture
+     * {@link TerminalLink.Gesture#SPLIT}; {@link TerminalLink} states which platforms and mouse-report states allow it.
+     * The text is unauthenticated program output: an OSC 8 link's address can differ from the text shown, and it may not
+     * parse as a URI. Without an opener, the default, the desktop's browser opens the address whatever the gesture.
+     * Called on the Event Dispatch Thread, so the opener must not block.
+     *
+     * @param opener the receiver, or {@code null} for the desktop's browser
+     */
+    public void setLinkOpener(Consumer<TerminalLink> opener) {
+        this.linkOpener = opener == null ? DESKTOP_BROWSER : opener;
     }
 
     /** Current appearance and behavior, owned by the Event Dispatch Thread. */
@@ -601,10 +618,6 @@ public final class TerminalView extends JComponent {
             @Override public void alternateBufferChanged(boolean alternate) { reconcileRowsLater(generation); }
             @Override public void bell() { bells.signal(generation); }
         };
-    }
-
-    void setLinkOpener(Consumer<String> opener) {
-        this.linkOpener = opener;
     }
 
     long topRow() {

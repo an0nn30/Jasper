@@ -782,6 +782,98 @@ public abstract class PluginContractTest {
         assertThat(h.menu("TOOLS")).isEmpty();
     }
 
+    /**
+     * Browser plan 3b Task 6 (Review Focus 4): a web-address item shows in a pane's right-click menu only while the pane's
+     * selection, trimmed, is one http or https address with a host, and the action chosen from it hears that address.
+     */
+    @Test void aWebAddressItemShowsOnlyForAWebAddressSelection() {
+        List<Optional<java.net.URI>> heard = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.split", "Open URL in Split Right"), invoked -> heard.add(invoked.webAddress()));
+            context.menus().terminalContext().addForWebAddress("test.alpha.split");
+        });
+        UUID window = h.addTerminalWindow(), pane = h.addTerminalPane(h.addTerminalTab(window, "zsh"), "zsh", Path.of("/"));
+        assertThat(h.menu("context")).containsExactly("web-address:test.alpha.split");
+        assertThat(h.contextMenu(pane)).as("nothing selected").isEmpty();
+        assertThat(h.chooseFromContextMenu(pane, "test.alpha.split")).isFalse();
+
+        h.selectInPane(pane, "  https://example.com/x  ");
+        assertThat(h.contextMenu(pane)).containsExactly("web-address:test.alpha.split");
+        assertThat(h.chooseFromContextMenu(pane, "test.alpha.split")).isTrue();
+        assertThat(heard).containsExactly(Optional.of(java.net.URI.create("https://example.com/x")));
+
+        for (String almost : List.of("see https://example.com", "https://a.com https://b.com", "https://a.com\nmore",
+                "mailto:a@b.c", "ftp://h/x", "", "https:///x", "http://my_host/")) {
+            h.selectInPane(pane, almost);
+            assertThat(h.contextMenu(pane)).as(almost).isEmpty();
+            assertThat(h.chooseFromContextMenu(pane, "test.alpha.split")).as(almost).isFalse();
+        }
+        assertThat(heard).hasSize(1);
+
+        h.selectInPane(pane, "HTTP://Example.com/a\n");
+        assertThat(h.contextMenu(pane)).as("any case of the scheme; a line break at the end is trimmed")
+            .containsExactly("web-address:test.alpha.split");
+        assertThat(h.chooseFromContextMenu(pane, "test.alpha.split")).isTrue();
+        assertThat(heard.getLast()).contains(java.net.URI.create("HTTP://Example.com/a"));
+    }
+
+    /**
+     * Browser plan 3b Task 6: only an action chosen from a web-address item hears the address. A plain item of the same
+     * section, and the action run as a shortcut or the palette runs it, hear none while an address is selected. A submenu
+     * of the section takes web-address items too, and closing one's subscription removes it.
+     */
+    @Test void onlyAnActionChosenFromAWebAddressItemHearsTheAddress() {
+        List<String> heard = Collections.synchronizedList(new ArrayList<>());
+        var nested = new AtomicReference<Subscription>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            for (String id : List.of("test.alpha.plain", "test.alpha.split", "test.alpha.down"))
+                context.actions().register(ActionSpec.of(id, id), invoked -> heard.add(id + "|"
+                    + invoked.pane().map(chosen -> chosen.id().toString()).orElse("none") + "|"
+                    + invoked.webAddress().map(java.net.URI::toString).orElse("none")));
+            PluginMenu section = context.menus().terminalContext();
+            section.add("test.alpha.plain");
+            section.addForWebAddress("test.alpha.split");
+            nested.set(section.submenu("Open URL").addForWebAddress("test.alpha.down"));
+        });
+        UUID window = h.addTerminalWindow(), pane = h.addTerminalPane(h.addTerminalTab(window, "zsh"), "zsh", Path.of("/"));
+        h.selectInPane(pane, "https://example.com/x");
+        assertThat(h.contextMenu(pane)).containsExactly("item:test.alpha.plain", "web-address:test.alpha.split",
+            "submenu:Open URL", "  web-address:test.alpha.down");
+
+        assertThat(h.chooseFromContextMenu(pane, "test.alpha.plain")).isTrue();
+        assertThat(h.chooseFromContextMenu(pane, "test.alpha.down")).isTrue();
+        assertThat(h.invoke("test.alpha.split", window, pane)).as("as a shortcut or the palette runs it").isTrue();
+        assertThat(heard).containsExactly("test.alpha.plain|" + pane + "|none", "test.alpha.down|" + pane + "|https://example.com/x",
+            "test.alpha.split|" + pane + "|none");
+
+        // The model lines: the now empty submenu stays listed, though a right-click shows no submenu without items.
+        h.ui(() -> nested.get().close());
+        assertThat(h.contextMenu(pane)).as("the model, without the closed item").containsExactly("item:test.alpha.plain",
+            "web-address:test.alpha.split", "submenu:Open URL");
+        h.selectInPane(pane, "plain text");
+        assertThat(h.contextMenu(pane)).as("the model, a plain item listed whatever is selected")
+            .containsExactly("item:test.alpha.plain", "submenu:Open URL");
+    }
+
+    /** Browser plan 3b Task 6: web-address items belong to the terminal's right-click menu and name the plugin's own actions. */
+    @Test void addForWebAddressOutsideTheTerminalMenuThrows() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.split", "Open URL in Split Right"), invoked -> { });
+            for (PluginMenu elsewhere : List.of(context.menus().standard(StandardMenu.TOOLS), context.menus().create("test.alpha.menu", "Alpha"),
+                    context.menus().standard(StandardMenu.VIEW).submenu("More")))
+                assertThatIllegalStateException().isThrownBy(() -> elsewhere.addForWebAddress("test.alpha.split"))
+                    .withMessage("addForWebAddress belongs to the terminal's right-click menu");
+            PluginMenu section = context.menus().terminalContext();
+            assertThatIllegalArgumentException().as("an action the plugin did not register")
+                .isThrownBy(() -> section.addForWebAddress("test.alpha.absent"));
+            section.submenu("Open URL").addForWebAddress("test.alpha.split");
+        });
+        assertThat(h.active("test.alpha")).isTrue();
+        assertThat(h.menu("TOOLS")).isEmpty();
+        assertThat(h.menu("top:test.alpha.menu")).isEmpty();
+        assertThat(h.menu("context")).containsExactly("submenu:Open URL", "  web-address:test.alpha.split");
+    }
+
     @Test void statusItemsAreOrderedGlobalAndInertAfterClose() {
         var late = new AtomicReference<StatusItem>();
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
@@ -3992,6 +4084,169 @@ public abstract class PluginContractTest {
         }
         assertThat(calls).containsExactlyInAnyOrder("notes.txt", "declined.txt");
         assertThat(h.openedInEditor()).as("only the declined file reaches the desktop").containsExactly(HERE.resolve("declined.txt"));
+    }
+
+    /** A browser that records {@code <address>|<origin>|<window id or ->} and answers {@code answer}. */
+    private static dev.jasper.sdk.ui.WebBrowser recordingBrowser(List<String> calls, boolean answer) {
+        return link -> {
+            calls.add(link.address() + "|" + link.origin() + "|"
+                + link.window().map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-"));
+            return answer;
+        };
+    }
+
+    private static final java.net.URI PAGE = java.net.URI.create("https://example.com/page");
+
+    /** Opens a link as a plain click or an outside address does: in a tab, with no OSC 8 target. */
+    private boolean openLinkInATab(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, Optional<UUID> windowId) {
+        return h.openLink(address, origin, dev.jasper.sdk.ui.LinkPlacement.TAB, Optional.empty(), windowId);
+    }
+
+    /** Browser plan 3: the web browser role needs its capability, and one plugin provides it at a time. */
+    @Test void providingTheBrowserNeedsTheCapabilityAndOnePluginProvidesItAtATime() {
+        var bare = new AtomicReference<PluginContext>();
+        var a = new AtomicReference<PluginContext>();
+        var b = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.b", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), b::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).as("no plugin provides one").isFalse();
+        h.ui(() -> {
+            assertThatThrownBy(() -> bare.get().platform().browser(recordingBrowser(calls, true)))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("browser.provide"));
+            a.get().platform().browser(recordingBrowser(calls, true));
+            assertThatIllegalStateException().isThrownBy(() -> b.get().platform().browser(recordingBrowser(calls, true)))
+                .withMessage("The browser is already provided by test.a");
+            assertThatIllegalStateException().as("the same plugin twice").isThrownBy(() -> a.get().platform().browser(recordingBrowser(calls, true)))
+                .withMessage("The browser is already provided by test.a");
+            assertThatThrownBy(() -> a.get().platform().browser(null)).isInstanceOf(NullPointerException.class);
+        });
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.EXTERNAL, Optional.empty())).isTrue();
+        assertThat(calls).containsExactly(PAGE + "|CLICK|-", PAGE + "|EXTERNAL|-");
+    }
+
+    /** Browser plan 3: a bundled plugin's browser replaces another plugin's, and the role ends with its plugin. */
+    @Test void aBundledPluginsBrowserReplacesAnotherPluginsAndEndsWithItsPlugin() {
+        h.declareBundled("test.z");
+        var a = new AtomicReference<PluginContext>();
+        var z = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.z", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), z::set);
+        List<String> byA = new CopyOnWriteArrayList<>(), byZ = new CopyOnWriteArrayList<>();
+        var replaced = new AtomicReference<Subscription>();
+        h.ui(() -> {
+            replaced.set(a.get().platform().browser(recordingBrowser(byA, true)));
+            z.get().platform().browser(recordingBrowser(byZ, true));
+            assertThatIllegalStateException().isThrownBy(() -> a.get().platform().browser(recordingBrowser(byA, true)))
+                .withMessage("The browser is already provided by test.z");
+        });
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        h.ui(() -> replaced.get().close());
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.EXTERNAL, Optional.empty()))
+            .as("closing the replaced registration leaves the bundled one").isTrue();
+        assertThat(byA).isEmpty();
+        assertThat(byZ).containsExactly(PAGE + "|CLICK|-", PAGE + "|EXTERNAL|-");
+        h.stopAll();
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).as("the registration ends with its plugin").isFalse();
+    }
+
+    /** Browser plan 3, Review Focus 2: a browser that throws or declines gives false; one gets its plugin's window handle. */
+    @Test void aBrowserThatThrowsOrDeclinesGivesFalseAndOneGetsItsPluginsHandleForAnOpenWindow() {
+        UUID window = h.addTerminalWindow();
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        dev.jasper.sdk.ui.WebBrowser recording = recordingBrowser(calls, true);
+        h.ui(() -> a.get().platform().browser(link -> {
+            if (link.address().getPath().equals("/broken")) throw new IllegalStateException("the browser broke");
+            if (link.address().getPath().equals("/declined")) return false;
+            return recording.open(link);
+        }));
+        assertThat(openLinkInATab(java.net.URI.create("https://example.com/broken"), dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty()))
+            .as("a browser that throws").isFalse();
+        assertThat(openLinkInATab(java.net.URI.create("https://example.com/declined"), dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.of(window)))
+            .as("a browser that declines").isFalse();
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.of(window))).isTrue();
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.EXTERNAL, Optional.of(UUID.randomUUID())))
+            .as("a window that is not open is no window").isTrue();
+        assertThat(calls).containsExactly(PAGE + "|CLICK|" + window, PAGE + "|EXTERNAL|-");
+    }
+
+    /**
+     * Browser plan 3b: the browser hears the link's placement and OSC 8 target as one equal {@code WebLink}, with its own
+     * plugin's handle for the window.
+     */
+    @Test void aBrowserHearsThePlacementAndTarget() {
+        UUID window = h.addTerminalWindow();
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        List<dev.jasper.sdk.ui.WebLink> heard = new CopyOnWriteArrayList<>();
+        h.ui(() -> a.get().platform().browser(link -> heard.add(link)));
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.SPLIT_DOWN, Optional.of("docs"), Optional.of(window))).isTrue();
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.SPLIT_RIGHT, Optional.empty(), Optional.empty())).isTrue();
+        AtomicReference<dev.jasper.sdk.WindowOwner> own = new AtomicReference<>();
+        h.ui(() -> own.set(a.get().terminals().window(window).orElseThrow()));
+        assertThat(heard).containsExactly(
+            new dev.jasper.sdk.ui.WebLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.SPLIT_DOWN, Optional.of("docs"), Optional.of(own.get())),
+            new dev.jasper.sdk.ui.WebLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.SPLIT_RIGHT, Optional.empty(), Optional.empty()));
+    }
+
+    /** Browser plan 3b: a local file the user clicked reaches the browser as a {@code file:} link; a browser that declines it says so. */
+    @Test void aBrowserHearsALocalFileClick() {
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        List<dev.jasper.sdk.ui.WebLink> heard = new CopyOnWriteArrayList<>();
+        var answer = new java.util.concurrent.atomic.AtomicBoolean(true);
+        h.ui(() -> a.get().platform().browser(link -> {
+            heard.add(link);
+            return answer.get();
+        }));
+        java.net.URI file = HERE.resolve("site").resolve("index.html").toUri();
+        assertThat(openLinkInATab(file, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        answer.set(false);
+        assertThat(openLinkInATab(file, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).as("a browser that declines").isFalse();
+        assertThat(heard).extracting(dev.jasper.sdk.ui.WebLink::address).containsExactly(file, file);
+        assertThat(heard).allSatisfy(link -> {
+            assertThat(link.origin()).isEqualTo(dev.jasper.sdk.ui.LinkOrigin.CLICK);
+            assertThat(link.placement()).isEqualTo(dev.jasper.sdk.ui.LinkPlacement.TAB);
+        });
+    }
+
+    /**
+     * Browser plan 3, Review Focus 2: {@code openInBrowser} asks the provided browser as a click in the active window, and
+     * an address it declines reaches the system browser; {@code browse} never asks it.
+     */
+    @Test void openInBrowserAsksTheProvidedBrowserAsAClickInTheActiveWindowAndBrowseNever() {
+        UUID window = h.addTerminalWindow();
+        h.activateTerminalWindow(window);
+        var a = new AtomicReference<PluginContext>();
+        var user = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.user"), Set.of(), Set.of(), user::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        dev.jasper.sdk.ui.WebBrowser recording = recordingBrowser(calls, true);
+        h.ui(() -> a.get().platform().browser(link ->
+            recording.open(link) && !link.address().getPath().equals("/declined")));
+        java.net.URI declined = java.net.URI.create("https://example.com/declined");
+        java.net.URI direct = java.net.URI.create("http://localhost:5432/");
+        h.ui(() -> {
+            user.get().platform().openInBrowser(PAGE);
+            user.get().platform().openInBrowser(declined);
+            user.get().platform().browse(direct);
+            assertThatIllegalArgumentException().isThrownBy(() -> user.get().platform().openInBrowser(java.net.URI.create("mailto:someone@example.com")));
+            assertThatIllegalArgumentException().isThrownBy(() -> user.get().platform().openInBrowser(java.net.URI.create("/relative")));
+            assertThatIllegalArgumentException().as("no host").isThrownBy(() -> user.get().platform().openInBrowser(java.net.URI.create("http:/x")));
+            assertThatThrownBy(() -> user.get().platform().openInBrowser(null)).isInstanceOf(NullPointerException.class);
+        });
+        h.flush();
+        // Up to 10 s: the app host hops to the UI thread and then to the plugin's worker, which a loaded CI can delay.
+        for (int i = 0; i < 1000 && (calls.size() < 2 || h.browsed().size() < 2); i++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        assertThat(calls).containsExactly(PAGE + "|CLICK|" + window, declined + "|CLICK|" + window);
+        assertThat(h.browsed()).as("the declined address and browse reach the system browser").containsExactlyInAnyOrder(declined, direct);
     }
 
     @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {

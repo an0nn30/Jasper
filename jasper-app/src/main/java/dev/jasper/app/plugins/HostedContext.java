@@ -218,12 +218,20 @@ final class HostedContext implements PluginContext {
                 }
                 @Override public void browse(URI uri) {
                     requireOpen();
+                    systemBrowser(webAddress(uri));
+                }
+                @Override public void openInBrowser(URI uri) {
+                    requireOpen();
                     URI address = webAddress(uri);
-                    background().execute(() -> {
-                        try { host.environment.browser().accept(address); }
-                        catch (RuntimeException failure) {
-                            log().log(System.Logger.Level.WARNING, "Could not open " + address + " in a browser", failure);
-                            notifications.group().error("Could not open a web address", address.toString(), failure);
+                    if (address.getRawAuthority() == null || address.getRawAuthority().isEmpty())
+                        throw new IllegalArgumentException("Only an http or https address with a host opens in a browser: " + uri);
+                    host.environment.ui().accept(() -> {
+                        Optional<java.util.UUID> window = host.environment.terminals().activeWindow().map(dev.jasper.app.terminals.WindowEntry::id);
+                        if (host.webBrowsers.open(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.TAB,
+                            Optional.empty(), window)) return;
+                        try { systemBrowser(address); }
+                        catch (RejectedExecutionException stopped) {
+                            log().log(System.Logger.Level.WARNING, "Could not open a web address: the plugin stopped first");
                         }
                     });
                 }
@@ -259,6 +267,18 @@ final class HostedContext implements PluginContext {
                     // HostedUi.closeAll, which teardown runs, closes it when the plugin stops or fails to start.
                     return ui.tracked(registration::close);
                 }
+                @Override public Subscription browser(dev.jasper.sdk.ui.WebBrowser browser) {
+                    requireOpen();
+                    requireUi("Platform.browser");
+                    gate.require(Capabilities.BROWSER_PROVIDE);
+                    Objects.requireNonNull(browser, "browser");
+                    dev.jasper.app.lifecycle.Subscription registration = host.webBrowsers.register(id, browser,
+                        window -> host.environment.terminals().window(window)
+                            .<dev.jasper.sdk.WindowOwner>map(entry -> terminals.windowHandle(entry.id())));
+                    gate.audit(Capabilities.BROWSER_PROVIDE, "became the web browser Jasper opens web addresses with");
+                    // As the editor's: HostedUi.closeAll closes it when the plugin stops or fails to start.
+                    return ui.tracked(registration::close);
+                }
             };
         }
 
@@ -272,6 +292,21 @@ final class HostedContext implements PluginContext {
                 notifications.group().error("Could not copy", unavailable);
                 return false;
             }
+        }
+
+        /**
+         * Opens an address in the system browser on this plugin's worker; a failure is posted in its group, never thrown.
+         * The log names the failure's class only: the address may be program output, and the exception's message may repeat it.
+         */
+        private void systemBrowser(URI address) {
+            background().execute(() -> {
+                try { host.environment.browser().accept(address); }
+                catch (RuntimeException failure) {
+                    log().log(System.Logger.Level.WARNING,
+                        "Could not open a web address in the system browser: " + failure.getClass().getName());
+                    notifications.group().error("Could not open a web address", address.toString(), failure);
+                }
+            });
         }
 
         /** Only an absolute http or https address opens in a browser. */

@@ -263,7 +263,7 @@ stalled remote never blocks the EDT, and the connection's `close` must keep runn
 2. Change [DirectoryProvenance](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/shell/DirectoryProvenance.java)
    for local and remote classification, [PathDetector](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/PathDetector.java)
    for path syntax, [LinkDetector](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/LinkDetector.java)
-   for plain-text URLs, and `BufferQueries.linkAt`/`fileLinkAt` for OSC 8 targets and soft-wrap joining.
+   for plain-text URLs, and `BufferQueries.linkAt`/`fileLinkAt` for OSC 8 links and soft-wrap joining.
 3. Jasper's own rules stay in the app: `launch.LocalHostNames` gives the names passed as
    `localHostNames`, `LaunchSettings.localPaths` (with `WslPaths` and `UncHosts`) maps a local path,
    and `workspace.FileLinks` resolves a `FileLink` against the pane's local directory. Run

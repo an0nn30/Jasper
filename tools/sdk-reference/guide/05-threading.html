@@ -26,7 +26,7 @@ listed per type in the API reference; the main ones:</p>
 <tr><td>{@link TabNamePiece#set(TabHandle,String)}</td><td>Jasper applies the value on the UI thread.</td></tr>
 <tr><td>{@link PendingSession}</td><td>Every method, also after the plugin stopped.</td></tr>
 <tr><td>{@link CommandCall#out(String)}, {@link CommandCall#err(String)}</td><td>Write to the caller's terminal while the call runs.</td></tr>
-<tr><td>{@link Platform#openInEditor(Path)}, {@link Platform#browse(URI)}</td><td>They do their work in the background.</td></tr>
+<tr><td>{@link Platform#openInEditor(Path)}, {@link Platform#browse(URI)}, {@link Platform#openInBrowser(URI)}</td><td>They do their work in the background.</td></tr>
 <tr><td>{@link Appearance#variant()}, {@link Appearance#workspaceVariant()}</td><td>Whether the chrome or the workspace is dark or light.</td></tr>
 <tr><td>{@link Appearance#presentation()}</td><td>The look Jasper runs with, the same value until it restarts.</td></tr>
 <tr><td>{@link Appearance#terminalTypography()}</td><td>The saved terminal font; it already returns a new value when its change handlers run.</td></tr>

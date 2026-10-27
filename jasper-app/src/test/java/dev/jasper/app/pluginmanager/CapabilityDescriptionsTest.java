@@ -25,6 +25,12 @@ class CapabilityDescriptionsTest {
             .isEqualTo("Open terminal tabs, splits and windows, and run programs in them (terminal.open)");
     }
 
+    /** Browser plan 3: the review sheet says what the web browser role does. */
+    @Test void theBrowserCapabilityIsDescribed() {
+        assertThat(Capabilities.describe("browser.provide"))
+            .isEqualTo("Open the web addresses Jasper opens, such as links you click in a terminal (browser.provide)");
+    }
+
     @Test void theEnvironmentAndEditorCapabilitiesAreDescribed() {
         assertThat(Capabilities.describe("terminal.environment"))
             .isEqualTo("Set environment variables in new terminal shells (terminal.environment)");

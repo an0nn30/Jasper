@@ -288,7 +288,8 @@ A left press with Cmd+Option held (Ctrl+Alt on Linux and Windows) starts a
 Cmd-click (macOS) or Ctrl-click (Linux, Windows) opens what is under the pointer:
 
 1. An OSC 8 link whose target is `http`, `https`, `ftp` or `mailto` opens with the desktop's handler, normally your
-   browser. A link with any other target opens nothing as a web link, whatever its text says.
+   browser; when a plugin provides Jasper's web browser, an `http` or `https` link opens there first. A link with any
+   other target opens nothing as a web link, whatever its text says.
 2. A URL written as text, starting `http://`, `https://` or `ftp://`, opens the same way. It can wrap across rows; it
    ends at whitespace or at `<`, `>`, `"`, `'` or a backtick, and loses trailing `.,;:!?)]}'"`.
 3. Otherwise a file opens: an OSC 8 `file:` link, a `file://` URL written as text (which can end in `:LINE` or
@@ -311,7 +312,9 @@ extension (`Main.java` counts; `Makefile`, `.bashrc` and `1.2.3` do not). Drive 
 only on Windows. A relative path is resolved against the pane's working directory, and `~/` against your home.
 
 Only an existing regular file opens, in the editor **Default editor** chooses (the Jasper Editor unless you change it;
-see [Default editor](editor.md#default-editor)), at the line when the link gives one. Without the Editor plugin, the
+see [Default editor](editor.md#default-editor)), at the line when the link gives one. When a plugin provides Jasper's
+web browser, a file a browser displays (HTML, XML, SVG, CSS, JavaScript, PDF, and PNG, JPEG, GIF, WebP and HEIC images)
+is offered to it first, and opens in the editor only when the browser declines. Without the Editor plugin, the
 file opens with the desktop's edit action, else is shown in the file manager; it is never run. In a session a plugin
 provides, and while a pane's shell reports a directory on another machine, file paths open nothing. On Windows, a path
 on another computer's network share (`\\server\share`) opens nothing, because looking at it would make Windows sign in

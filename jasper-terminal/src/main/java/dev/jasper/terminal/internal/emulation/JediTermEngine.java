@@ -3,6 +3,7 @@ package dev.jasper.terminal.internal.emulation;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.internal.process.PtyChild;
 import dev.jasper.terminal.internal.shell.CompletedCommand;
+import dev.jasper.terminal.internal.shell.ShellIntegrationFilter;
 import dev.jasper.terminal.internal.text.AbsoluteRowState;
 import dev.jasper.terminal.internal.text.MouseInput;
 
@@ -49,6 +50,8 @@ public final class JediTermEngine implements AutoCloseable {
     private final Events events;
     private final java.util.concurrent.atomic.AtomicBoolean started = new java.util.concurrent.atomic.AtomicBoolean();
     private java.util.function.Consumer<List<String>> customCommands = args -> {};
+    /** The target the shell filter named for the OSC 8 that follows; the hyperlink filter takes it. Reader thread only. */
+    private String pendingLinkTarget;
     private Runnable discardUnusedPayload = () -> {};
     private final CompletableFuture<Integer> exit = new CompletableFuture<>();
     private final AbsoluteRowState rowState = new AbsoluteRowState();
@@ -103,9 +106,25 @@ public final class JediTermEngine implements AutoCloseable {
         });
         buffer.addModelListener(() -> events.screenChanged().run());
         queries = new BufferQueries(buffer, terminal, display, rowState, cells);
-        terminal.addCustomCommandListener(args -> customCommands.accept(args));
-        // Without a filter JediTerm drops OSC 8 links; one item spanning the whole URI makes it keep them.
-        terminal.setUrlHyperlinkFilter(uri -> new LinkResult(new LinkResultItem(0, uri.length(), new UriLink(uri))));
+        terminal.addCustomCommandListener(args -> {
+            if (args.size() > 1 && "jasper".equals(args.get(0)) && ShellIntegrationFilter.LINK_TARGET.equals(args.get(1))) {
+                // A program can send this command itself, so its target is checked here too. The filter's own command
+                // replaces it before any OSC 8 the filter rewrites; only an OSC 8 JediTerm reads without the filter
+                // (a C1-introduced one, or one numbered 08) can take it, as that program's own choice of target.
+                pendingLinkTarget = args.size() == 3 && ShellIntegrationFilter.isLinkTarget(args.get(2)) ? args.get(2) : null;
+            } else {
+                customCommands.accept(args);
+            }
+        });
+        // Without a filter JediTerm drops OSC 8 links; one item spanning the whole URI makes it keep them. JediTerm
+        // calls it on the reader thread for each OSC 8 that opens a link, right after the link-target command the
+        // shell filter put ahead of that OSC 8, and the filter clears a named target again after it, so each link
+        // takes its own target and leaves none for the next.
+        terminal.setUrlHyperlinkFilter(uri -> {
+            String target = pendingLinkTarget;
+            pendingLinkTarget = null;
+            return new LinkResult(new LinkResultItem(0, uri.length(), new UriLink(uri, target)));
+        });
         buffer.addChangesListener(new TextBufferChangesListener() {
             @Override
             public void linesDiscardedFromHistory(List<TerminalLine> lines) {

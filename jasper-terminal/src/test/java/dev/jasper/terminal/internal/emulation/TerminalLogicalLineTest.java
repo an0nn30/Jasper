@@ -1,5 +1,6 @@
 package dev.jasper.terminal.internal.emulation;
 
+import dev.jasper.terminal.internal.text.LinkHit;
 import dev.jasper.terminal.internal.text.Selection;
 import dev.jasper.terminal.session.TerminalSession;
 import dev.jasper.terminal.testsupport.Await;
@@ -27,8 +28,8 @@ class TerminalLogicalLineTest {
             String url = "https://example.com/" + "x".repeat(512 * 1024 - 20);
             connector.feed(url + "\r\nend\033]0;ready\007");
             Await.until(() -> session.title().equals("ready"), "complete boundary URL");
-            assertThat(session.internalAccess().linkAt(0, 0)).contains(url);
-            assertThat(session.internalAccess().linkAt(511, 500)).contains(url);
+            assertThat(session.internalAccess().linkAt(0, 0)).map(LinkHit::uri).contains(url);
+            assertThat(session.internalAccess().linkAt(511, 500)).map(LinkHit::uri).contains(url);
         }
     }
 

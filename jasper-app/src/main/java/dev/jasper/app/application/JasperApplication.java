@@ -40,6 +40,7 @@ import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.windows.NativeShells;
 import dev.jasper.app.workspace.DetachedFrame;
 import dev.jasper.app.workspace.JasperWindow;
+import dev.jasper.app.workspace.LinkClick;
 import dev.jasper.app.workspace.MainWindow;
 import dev.jasper.app.workspace.TerminalPane;
 import dev.jasper.app.workspace.WindowContent;
@@ -184,6 +185,11 @@ public final class JasperApplication {
      * virtual thread of its own.
      */
     Executor workspaceWriter = task -> Thread.ofVirtual().name("jasper-workspace-save").start(task);
+    /**
+     * Test seam: where a clicked or requested file's checks, browser offer and editor run. Production starts each on a
+     * virtual thread of its own.
+     */
+    Executor fileOpener = task -> Thread.ofVirtual().name("jasper-open-file").start(task);
     /** Test seams. Production plans from this process's own command line and starts a real process. */
     Function<RestartMode, Optional<List<String>>> restartPlanner = mode -> RestartCommand.current(mode, List.of());
     Consumer<List<String>> spawner = command -> {
@@ -194,6 +200,15 @@ public final class JasperApplication {
     private final dev.jasper.app.contributions.Contributions contributions = new dev.jasper.app.contributions.Contributions();
     /** Test seam: how a window's native frame is made. Production builds a {@link WindowFrame}. Before the manager, which reads it. */
     Function<JasperWindow, WindowShell> frames = this::frameOnScreen;
+    /** The system browser's opens still running, which shutdown waits for within its grace. Any thread. */
+    private final Set<CompletableFuture<?>> browserOpens = ConcurrentHashMap.newKeySet();
+    /**
+     * Test seam: how a web address opens in the system browser (browser plan 3). Production uses a virtual thread, which
+     * shutdown waits for. EDT.
+     */
+    Consumer<java.net.URI> systemBrowser = this::openInSystemBrowser;
+    /** Test seam: the desktop's browser, which {@code openInSystemBrowser} calls off the EDT. Production is {@link dev.jasper.app.platform.Browser#open}. */
+    Consumer<java.net.URI> desktop = dev.jasper.app.platform.Browser::open;
     /**
      * Test seam: whether the main window's detached tool windows get native windows ({@link DetachedFrame}): only where
      * windows can be made, as nothing native is made headless.
@@ -597,6 +612,8 @@ public final class JasperApplication {
             content.onInfo = (title, details) -> notificationViews.info(title, details, windowId);
             content.onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
             content.onOpenFile = (file, line) -> openFileAt(file, line, windowId);
+            content.onOpenClickedFile = (file, line) -> openClickedFile(file, line, windowId);
+            content.onOpenLink = click -> openLink(click, windowId);
             // File › Open File… (spec 13): the plugins' file chooser over this window; nothing before plugins start.
             content.fileChooser = folder -> auxiliary == null ? Optional.empty() : auxiliary.openFile(windowId, folder);
             if (main) notificationViews.attach(content);
@@ -727,10 +744,10 @@ public final class JasperApplication {
     }
 
     /**
-     * Opens a file that a Cmd-click in window {@code window} named, at {@code line} (0 for none), when it is an existing
-     * regular file: on a virtual thread, through the editor a plugin provides, else the desktop's edit or reveal action.
-     * The file's path is program output, so it is opened for editing only: never the desktop's open action, which runs
-     * programs and scripts. Anything else opens nothing and tells nobody. Reads {@link #plugins} when the thread runs.
+     * Opens a file that File › Open File… chose in window {@code window}, at {@code line} (0 for none), when it is an
+     * existing regular file: on a virtual thread, through the editor a plugin provides, else the desktop's edit or reveal
+     * action. Never the desktop's open action, which runs programs and scripts. Anything else opens nothing and tells
+     * nobody. Reads {@link #plugins} when the thread runs.
      */
     void openFileAt(Path file, int line, UUID window) {
         openFileAt(file, line, window, new dev.jasper.app.platform.ConfigEditor());
@@ -738,7 +755,26 @@ public final class JasperApplication {
 
     /** As {@link #openFileAt(Path, int, UUID)}, falling back to {@code desktop}; tests inject its actions. */
     void openFileAt(Path file, int line, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
-        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file");
+        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file", false);
+    }
+
+    /**
+     * Opens a file that a Cmd-click (Ctrl-click elsewhere) in a terminal of window {@code window} named, at {@code line}
+     * (0 for none), as {@link #openFileAt(Path, int, UUID)} does, except that a local web file (HTML, an image, a PDF and
+     * the like: {@link LocalWebFiles}) is offered to the web browser a plugin provides first, as a click on its
+     * {@code file:} link in a tab, and opens in the editor only when no browser takes it (browser plan 3b, spec 9). Only a
+     * terminal click asks the browser: a file named by Open File…, {@code jasper <file>}, the open-file event or a launch
+     * never does. The file's path is program output, so it is opened for editing only: never the desktop's open action,
+     * which runs programs and scripts. The file checks and the editor run on the virtual thread; the browser is asked on
+     * the UI thread, which the thread waits for.
+     */
+    void openClickedFile(Path file, int line, UUID window) {
+        openClickedFile(file, line, window, new dev.jasper.app.platform.ConfigEditor());
+    }
+
+    /** As {@link #openClickedFile(Path, int, UUID)}, falling back to {@code desktop}; tests inject its actions. */
+    void openClickedFile(Path file, int line, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
+        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file", true);
     }
 
     /**
@@ -753,20 +789,153 @@ public final class JasperApplication {
 
     /** As {@link #openRequestedFile(Path, UUID)}, falling back to {@code desktop}; tests inject its actions. */
     void openRequestedFile(Path file, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
-        openFile(file, 0, window, desktop::revealOnly, "Could not open a requested file");
+        openFile(file, 0, window, desktop::revealOnly, "Could not open a requested file", false);
     }
 
-    private void openFile(Path file, int line, UUID window, Consumer<Path> fallback, String failed) {
-        Thread.ofVirtual().name("jasper-open-file").start(() -> {
+    /** Opens {@code file} on a virtual thread; a local web file goes to the browser first only when {@code browserFirst}. */
+    private void openFile(Path file, int line, UUID window, Consumer<Path> fallback, String failed, boolean browserFirst) {
+        fileOpener.execute(() -> {
             try {
                 if (!java.nio.file.Files.isRegularFile(file)) return;
                 PluginRuntime runtime = plugins;
-                if (runtime == null) fallback.accept(file);
-                else runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), fallback);
+                if (runtime == null) {
+                    fallback.accept(file);
+                    return;
+                }
+                if (browserFirst && LocalWebFiles.matches(file) && browserTook(runtime, file, window)) return;
+                runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), fallback);
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, failed, failure);
             }
         });
+    }
+
+    /**
+     * Asks the web browser a plugin provides to open {@code file} on the UI thread, where it must be asked, and waits for
+     * its answer on the calling thread, which is never the UI thread: the browser does not block, so the wait is short.
+     * The file's address is made here, off the UI thread, because {@code Path.toUri} reads the file system.
+     */
+    private static boolean browserTook(PluginRuntime runtime, Path file, UUID window) {
+        java.net.URI address = file.toUri();
+        var answer = new java.util.concurrent.CompletableFuture<Boolean>();
+        SwingUtilities.invokeLater(() -> {
+            try { answer.complete(runtime.openLocalWebFile(address, Optional.of(window))); }
+            catch (Throwable failure) { answer.completeExceptionally(failure); throw failure; }
+        });
+        return answer.join();
+    }
+
+    /**
+     * Opens a link a Cmd-click (Ctrl-click elsewhere) in window {@code window} handed over, as the terminal read it
+     * (browser plan 3): a web address ({@code webAddress}) through the web browser a plugin provides, as a click from that
+     * window with the link's OSC 8 target, in a tab, or for a split click in a split of the clicked pane (browser plan 3b:
+     * to the right of a pane wider than it is tall, otherwise below it), else the system browser; any other link the
+     * terminal opens, an {@code ftp} URL or an OSC 8 {@code mailto} link, in the system browser, as before, whatever the
+     * gesture. A link that is not a URI opens nothing, and the log does not repeat it: it is program output. EDT.
+     */
+    void openLink(LinkClick click, UUID window) {
+        String link = click.link().url();
+        Optional<java.net.URI> address = webAddress(link);
+        if (address.isPresent()) {
+            openWebAddress(address.get(), placement(click), click.link().target(), Optional.of(window));
+            return;
+        }
+        try {
+            systemBrowser.accept(new java.net.URI(link));
+        } catch (java.net.URISyntaxException notALink) {
+            LOG.log(System.Logger.Level.INFO, "A clicked link is not a URI, so nothing opens");
+        }
+    }
+
+    /** Where a clicked link asks to open: a Cmd-click in a tab, a split click beside its pane, by the pane's shape. */
+    private static PluginRuntime.Placement placement(LinkClick click) {
+        return switch (click.link().gesture()) {
+            case OPEN -> PluginRuntime.Placement.TAB;
+            case SPLIT -> click.paneWide() ? PluginRuntime.Placement.SPLIT_RIGHT : PluginRuntime.Placement.SPLIT_DOWN;
+        };
+    }
+
+    /**
+     * Opens a web address the user asked for: the web browser a plugin provides, as a click from {@code window} in a tab
+     * with no target, else the system browser; before the plugins start, the system browser. EDT.
+     */
+    private void openWebAddress(java.net.URI address, Optional<UUID> window) {
+        openWebAddress(address, PluginRuntime.Placement.TAB, Optional.empty(), window);
+    }
+
+    /** As above, where {@code placement} and the OSC 8 {@code target} ask. EDT. */
+    private void openWebAddress(java.net.URI address, PluginRuntime.Placement placement, Optional<String> target,
+                                Optional<UUID> window) {
+        PluginRuntime runtime = plugins;
+        if (runtime == null) systemBrowser.accept(address);
+        else runtime.openLink(address, placement, target, window, systemBrowser);
+    }
+
+    /**
+     * As {@code openWebAddress}, for an address from outside Jasper ({@code jasper <address>}), which the browser hears as
+     * an external address's. EDT.
+     */
+    private void openExternalAddress(java.net.URI address, Optional<UUID> window) {
+        PluginRuntime runtime = plugins;
+        if (runtime == null) systemBrowser.accept(address);
+        else runtime.openExternalLink(address, window, systemBrowser);
+    }
+
+    /** The window holding the pane a {@code jasper} call ran in, while it is open; empty for a call from elsewhere. EDT. */
+    private Optional<UUID> windowOfPane(Optional<UUID> pane) {
+        return pane.flatMap(terminals::pane).flatMap(entry -> terminals.tab(entry.tabId())).map(dev.jasper.app.terminals.TabEntry::windowId);
+    }
+
+    /**
+     * The {@code jasper} command's arguments as web addresses (browser plan 3): present only when there is at least one
+     * and every one is a web address ({@code webAddress}); a call that mixes them with paths is a path call. Any thread.
+     */
+    static Optional<List<java.net.URI>> webAddresses(List<String> arguments) {
+        if (arguments.isEmpty()) return Optional.empty();
+        List<java.net.URI> addresses = new ArrayList<>();
+        for (String argument : arguments) {
+            Optional<java.net.URI> address = webAddress(argument);
+            if (address.isEmpty()) return Optional.empty();
+            addresses.add(address.get());
+        }
+        return Optional.of(List.copyOf(addresses));
+    }
+
+    /**
+     * {@code text} as a web address (browser plan 3): an absolute URI whose scheme is {@code http} or {@code https}, in
+     * any case, with an authority, such as {@code https://example.com/a}. Anything else is empty: another scheme, an
+     * opaque URI such as {@code https:example.com}, one without an authority such as {@code http:/notes}, a Windows path,
+     * and text that does not parse. Any thread.
+     */
+    static Optional<java.net.URI> webAddress(String text) {
+        try {
+            var address = new java.net.URI(text);
+            String scheme = address.getScheme();
+            boolean web = scheme != null && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"));
+            return web && !address.isOpaque() && address.getRawAuthority() != null ? Optional.of(address) : Optional.empty();
+        } catch (java.net.URISyntaxException notAnAddress) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * The system browser's open, on a virtual thread that shutdown waits for, so a Jasper the {@code jasper} command
+     * started without a window does not quit before the desktop took the address; a failure is logged without the
+     * address, which may be program output.
+     */
+    private void openInSystemBrowser(java.net.URI address) {
+        Consumer<java.net.URI> opener = desktop;
+        CompletableFuture<Void> open = CompletableFuture.runAsync(() -> {
+            try {
+                opener.accept(address);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "Could not open a web address in the system browser ("
+                    + failure.getClass().getSimpleName() + ")");
+            }
+        }, work -> Thread.ofVirtual().name("jasper-open-link").start(work));
+        // Added before its removal is registered: an open that finished already is removed at once.
+        browserOpens.add(open);
+        open.whenComplete((ignored, failure) -> browserOpens.remove(open));
     }
 
     /** What running plugins add to a new local shell, given Jasper's own environment; nothing before they start. EDT. */
@@ -783,7 +952,9 @@ public final class JasperApplication {
     }
 
     /**
-     * What the command socket runs (workspace-tabs spec 5.4): no arguments raises or opens a window, as a launch would;
+     * What the command socket runs (workspace-tabs spec 5.4): arguments that are all web addresses open each as an
+     * external address, in the calling pane's window (browser plan 3); otherwise no arguments raises or opens a window,
+     * as a launch would;
      * a subcommand a plugin declares runs in that plugin; otherwise arguments that all name existing files or folders
      * open as a launch's paths do ({@code commandPaths}), and a call whose first argument names one while others name
      * nothing says which ({@code missingPaths}). A raise or a path call is answered once it has run. A plugin's subcommand
@@ -792,6 +963,13 @@ public final class JasperApplication {
      */
     public CommandDispatcher commands() {
         return invocation -> {
+            List<String> arguments = invocation.arguments();
+            Optional<List<java.net.URI>> addresses = webAddresses(arguments);
+            if (addresses.isPresent())
+                return onEventThread(SwingUtilities::invokeLater, this::acceptsRequests, () -> {
+                    Optional<UUID> window = windowOfPane(invocation.pane());
+                    addresses.get().forEach(address -> openExternalAddress(address, window));
+                });
             PluginRuntime runtime = plugins;
             java.util.function.Predicate<String> subcommand = name -> runtime != null && runtime.declaresSubcommand(name);
             Optional<List<Path>> paths = commandPaths(invocation.workingDirectory(), invocation.arguments(), subcommand);
@@ -1550,12 +1728,16 @@ public final class JasperApplication {
                 });
         }
 
-        private void browse(java.net.URI uri) {
-            if (!supports(Desktop.Action.BROWSE)) return;
-            CompletableFuture.runAsync(() -> {
-                try { Desktop.getDesktop().browse(uri); }
-                catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
-            });
+        /**
+         * Opens one of Jasper's own web links (browser plan 3, the user's ruling): Settings' Help button, the Licenses
+         * window's homepages and the plugin manager's homepages. Their windows are not Jasper windows, so an http or https
+         * address goes to the web browser a plugin provides as a click from the active Jasper window, else to the system
+         * browser; any other address goes to the system browser. EDT.
+         */
+        void browse(java.net.URI uri) {
+            Optional<UUID> window = terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id);
+            if (webAddress(uri.toString()).isPresent()) openWebAddress(uri, window);
+            else systemBrowser.accept(uri);
         }
 
     /**
@@ -2334,6 +2516,8 @@ public final class JasperApplication {
         pending.add(history.closedFuture());
         // The last save (closing every window saved them) reaches the disk before the process ends.
         if (workspaceStore != null) pending.add(workspaceStore.written());
+        // An address the jasper command handed the system browser reaches it before a Jasper with no window ends.
+        pending.addAll(List.copyOf(browserOpens));
         shutdown.await(pending);
     }
 

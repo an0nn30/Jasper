@@ -128,6 +128,8 @@ final class PluginHost {
     final ShellContributions shellContributions;
     /** The editor a plugin provides ({@code Platform.editor}), which Jasper's own opens ask first. */
     final FileEditors fileEditors;
+    /** The web browser a plugin provides ({@code Platform.browser}), which Jasper's web addresses ask first. */
+    final WebBrowsers webBrowsers;
     /** The {@code jasper} command plugins see in {@code CommandLine.client()}; set before plugins start, read on any thread. */
     volatile Optional<Path> commandClient = Optional.empty();
     final EventBus bus;
@@ -146,6 +148,7 @@ final class PluginHost {
         this.commands = new PluginCommands(environment.ui(), containment);
         this.shellContributions = new ShellContributions(containment);
         this.fileEditors = new FileEditors(environment.ui(), environment.onUi(), containment);
+        this.webBrowsers = new WebBrowsers(containment, fileEditors::bundled);
         this.bus = new EventBus(environment.ui(), containment);
         this.activities = new ActivityHub(bus);
         this.connections = new ConnectionHub(bus);

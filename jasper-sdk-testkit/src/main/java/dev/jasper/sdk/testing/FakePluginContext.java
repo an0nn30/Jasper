@@ -133,6 +133,29 @@ public final class FakePluginContext implements PluginContext {
                     return host.provideEditor(FakePluginContext.this, editor);
                 }
                 @Override public void browse(java.net.URI uri) { requireOpen(); host.browsed.add(webAddress(uri)); }
+                @Override public void openInBrowser(java.net.URI uri) {
+                    requireOpen();
+                    java.net.URI address = webAddress(uri);
+                    if (address.getRawAuthority() == null || address.getRawAuthority().isEmpty())
+                        throw new IllegalArgumentException("Only an http or https address with a host opens in a browser: " + uri);
+                    // As the application: the browser a plugin provides first, as a click in a tab of the active window; here on the
+                    // caller's thread. An address no WebLink takes, such as http://my_host/, goes to the system browser, as there.
+                    boolean opened;
+                    try {
+                        opened = host.openLink(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.TAB,
+                            Optional.empty(), host.activeWindowId());
+                    } catch (IllegalArgumentException notAWebLink) {
+                        opened = false;
+                    }
+                    if (!opened) host.browsed.add(address);
+                }
+                @Override public Subscription browser(dev.jasper.sdk.ui.WebBrowser browser) {
+                    requireOpen();
+                    if (!info.capabilities().contains(dev.jasper.sdk.Capabilities.BROWSER_PROVIDE))
+                        throw new dev.jasper.sdk.MissingCapabilityException(info.id(), dev.jasper.sdk.Capabilities.BROWSER_PROVIDE);
+                    Objects.requireNonNull(browser, "browser");
+                    return host.provideBrowser(FakePluginContext.this, browser);
+                }
                 @Override public boolean copy(String text) { requireOpen(); return copied(text, false); }
                 @Override public boolean copySecret(String text) { requireOpen(); return copied(text, true); }
                 @Override public Optional<String> clipboardText() {

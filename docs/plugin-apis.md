@@ -9,8 +9,8 @@ APIs, and exports its own, through the same mechanism. Every type below is in th
 | Package | Provider | Version | Service | Published with | Bundled consumers |
 | --- | --- | --- | --- | --- | --- |
 | [`dev.jasper.vault.api`](sdk-reference.html#package-dev.jasper.vault.api) | Credential Vault, `dev.jasper.vault` | 0.7.0 | [`VaultApi`](sdk-reference.html#dev.jasper.vault.api.VaultApi) | `publishPerConsumer`: each consumer gets its own instance | Remote, File Server |
-| [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.16.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
-| [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api) | Remote, `dev.jasper.remote` | 0.17.0 | [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) | `publish` | Project Index |
+| [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.17.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
+| [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api) | Remote, `dev.jasper.remote` | 0.18.0 | [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) | `publish` | Project Index |
 | [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api) | Snippets, `dev.jasper.snippets` | 0.3.0 | [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) | `publish` | Shell History |
 
 Every bundled consumer declares its provider as an optional requirement and runs without it, except Shell History,
@@ -299,7 +299,7 @@ private void chooseCredential(WindowHandle window, UiView view, Optional<UUID> c
 ## Editor API
 
 Package [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api), from the Editor
-(`dev.jasper.editor`, 0.16.0). The user's side is in [Editor](editor.md).
+(`dev.jasper.editor`, 0.17.0). The user's side is in [Editor](editor.md).
 
 The Editor publishes one [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) for every consumer with `publish`.
 Call it on the UI thread only. Documents open as Editor tabs in a Jasper window; opening a document that is already
@@ -430,7 +430,7 @@ older than 0.11.0, which lack `RelativePaths` ([methods newer than the provider]
 ## Remote API
 
 Package [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api), from Remote (`dev.jasper.remote`,
-0.17.0). The user's side is in [Remote](remote.md).
+0.18.0). The user's side is in [Remote](remote.md).
 
 Remote publishes one [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) for every consumer
 with `publish`. Call every method on the UI thread. A stage completes on a worker thread once its remote work has

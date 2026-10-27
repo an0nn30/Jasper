@@ -14,7 +14,7 @@ import org.tomlj.TomlTable;
 final class DescriptorParser {
     static final Set<String> CAPABILITIES = Set.of("terminal.observe", "terminal.selection",
         "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen",
-        "clipboard.read", "terminal.environment", "editor.provide", "presentation.provide");
+        "clipboard.read", "terminal.environment", "editor.provide", "presentation.provide", "browser.provide");
     /** The capability that goes with the {@code presentation} key, and only with it. */
     static final String PRESENTATION_PROVIDE = "presentation.provide";
     private static final java.util.regex.Pattern SEGMENT = java.util.regex.Pattern.compile("[a-z0-9_.-]+");

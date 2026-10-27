@@ -3,10 +3,12 @@ package dev.jasper.terminal.internal.emulation;
 import dev.jasper.terminal.internal.rendering.ScreenSnapshot;
 import dev.jasper.terminal.internal.shell.CommandLocation;
 import dev.jasper.terminal.internal.text.AbsoluteRowState;
+import dev.jasper.terminal.internal.text.CellAttributes;
 import dev.jasper.terminal.internal.text.CommandCapture;
 import dev.jasper.terminal.internal.text.CursorRequest;
 import dev.jasper.terminal.internal.text.FileTarget;
 import dev.jasper.terminal.internal.text.LinkDetector;
+import dev.jasper.terminal.internal.text.LinkHit;
 import dev.jasper.terminal.internal.text.LogicalLine;
 import dev.jasper.terminal.internal.text.MouseGeometry;
 import dev.jasper.terminal.internal.text.PathDetector;
@@ -244,11 +246,11 @@ public final class BufferQueries {
     }
 
     /**
-     * The link at an absolute row and column: an OSC 8 hyperlink, or else a URL written in the text. A program chooses
-     * an OSC 8 target freely, so only http, https, ftp and mailto schemes are accepted; a cell whose OSC 8 target has any other scheme
-     * has no link at all, whatever its text says.
+     * The link at an absolute row and column: an OSC 8 hyperlink with the {@code target} its program named, or else a
+     * URL written in the text, which has no target. A program chooses an OSC 8 URI freely, so only http, https, ftp and
+     * mailto schemes are accepted; a cell whose OSC 8 URI has any other scheme has no link at all, whatever its text says.
      */
-    public Optional<String> linkAt(long absoluteRow, int column) {
+    public Optional<LinkHit> linkAt(long absoluteRow, int column) {
         buffer.lock();
         try {
             if (column < 0 || column >= buffer.getWidth()) return Optional.empty();
@@ -256,11 +258,12 @@ public final class BufferQueries {
             if (line == null) {
                 return Optional.empty();
             }
-            if (column < line.length()
-                && line.attributesAt(column).link() != null) {
-                return openableScheme(line.attributesAt(column).link()) ? Optional.of(line.attributesAt(column).link()) : Optional.empty();
+            CellAttributes cell = column < line.length() ? line.attributesAt(column) : CellAttributes.DEFAULT;
+            if (cell.link() != null) {
+                return openableScheme(cell.link())
+                    ? Optional.of(new LinkHit(cell.link(), Optional.ofNullable(cell.linkTarget()))) : Optional.empty();
             }
-            return urlAcrossWrappedRows(absoluteRow, column);
+            return urlAcrossWrappedRows(absoluteRow, column).map(url -> new LinkHit(url, Optional.empty()));
         } finally {
             buffer.unlock();
         }

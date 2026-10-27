@@ -172,6 +172,13 @@ class TunnelsPluginTest {
             host.searchScope(TunnelsScope.ID, "", started.window(), null);
             host.executeInScope(TunnelsScope.ID, "tunnel." + db.id(), "browse", started.window(), null);
             assertThat(host.browsed()).containsExactly(URI.create("http://127.0.0.1:" + port + "/"));
+            List<String> seen = new ArrayList<>();
+            host.start(new dev.jasper.sdk.PluginInfo("dev.example.browser", "Browser", "1.0.0", Set.of("browser.provide")), Set.of(), Set.of(),
+                context -> context.platform().browser(link -> { seen.add(link.address() + "|" + link.origin()); return true; }));
+            host.searchScope(TunnelsScope.ID, "", started.window(), null);
+            host.executeInScope(TunnelsScope.ID, "tunnel." + db.id(), "browse", started.window(), null);
+            assertThat(seen).as("browser plan 3: the provided browser first, as a click").containsExactly("http://127.0.0.1:" + port + "/|CLICK");
+            assertThat(host.browsed()).as("the system browser heard only the first").hasSize(1);
             host.searchScope(TunnelsScope.ID, "", started.window(), null);
             host.executeInScope(TunnelsScope.ID, "tunnel." + db.id(), "toggle", started.window(), null);
             assertThat(manager.state(db.id())).isEqualTo(TunnelState.STOPPED);

@@ -48,6 +48,12 @@ final class FakeUi {
     }
 
     static final class Menu implements PluginMenu {
+        /** An {@code addForWebAddress} item; identity, not value, decides removal. */
+        static final class WebAddressItem {
+            final String actionId;
+            WebAddressItem(String actionId) { this.actionId = actionId; }
+        }
+
         final String target; final String title; final Menu parent; final FakeUi ui;
         final List<Object> children = new ArrayList<>();
         Menu(FakeUi ui, Menu parent, String target, String title) { this.ui = ui; this.parent = parent; this.target = target; this.title = title; }
@@ -56,6 +62,15 @@ final class FakeUi {
             ui.context.requireOpen();
             ui.requireOwn(actionId);
             Object leaf = new String[]{actionId};
+            children.add(leaf);
+            return () -> children.remove(leaf);
+        }
+        /** A submenu shares its root's target, so the check holds in the terminal section's submenus too. */
+        @Override public Subscription addForWebAddress(String actionId) {
+            ui.context.requireOpen();
+            if (!target.equals("context")) throw new IllegalStateException("addForWebAddress belongs to the terminal's right-click menu");
+            ui.requireOwn(actionId);
+            Object leaf = new WebAddressItem(actionId);
             children.add(leaf);
             return () -> children.remove(leaf);
         }
@@ -78,15 +93,55 @@ final class FakeUi {
             else parent.children.remove(this);
         }
 
-        void render(List<String> lines, String indent) {
+        /** The entries as lines; {@code web-address:<id>} lines only when {@code webAddress} says they show. */
+        void render(List<String> lines, String indent, boolean webAddress) {
             for (Object child : children) {
-                if (child instanceof Menu menu) { lines.add(indent + "submenu:" + menu.title); menu.render(lines, indent + "  "); }
+                if (child instanceof Menu menu) { lines.add(indent + "submenu:" + menu.title); menu.render(lines, indent + "  ", webAddress); }
+                else if (child instanceof WebAddressItem item) {
+                    if (webAddress && ui.host.actionExists(item.actionId)) lines.add(indent + "web-address:" + item.actionId);
+                }
                 else {
                     String actionId = ((String[]) child)[0];
                     if (actionId == null) lines.add(indent + "---");
                     else if (ui.host.actionExists(actionId)) lines.add(indent + "item:" + actionId);
                 }
             }
+        }
+
+        /**
+         * The first entry, submenus in place, that shows an item for the action: a plain item, or a web-address item when
+         * {@code webAddress}; null when none does.
+         */
+        Object shown(String actionId, boolean webAddress) {
+            if (!ui.host.actionExists(actionId)) return null;
+            for (Object child : children) {
+                if (child instanceof Menu menu) {
+                    Object found = menu.shown(actionId, webAddress);
+                    if (found != null) return found;
+                } else if (child instanceof WebAddressItem item) {
+                    if (webAddress && item.actionId.equals(actionId)) return item;
+                } else if (actionId.equals(((String[]) child)[0])) return child;
+            }
+            return null;
+        }
+    }
+
+    /**
+     * A pane's selection as the one web address a web-address item shows for (browser plan 3b Task 6): without leading and
+     * trailing whitespace and with none inside, an absolute URI whose scheme is {@code http} or {@code https}, in either
+     * letter case, with a host; empty for anything else, and for no selection.
+     */
+    static Optional<java.net.URI> webAddress(String selection) {
+        if (selection == null) return Optional.empty();
+        String text = selection.strip();
+        if (text.codePoints().anyMatch(c -> Character.isWhitespace(c) || Character.isSpaceChar(c))) return Optional.empty();
+        try {
+            var address = new java.net.URI(text);
+            String scheme = address.getScheme();
+            boolean web = scheme != null && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"));
+            return web && address.getHost() != null ? Optional.of(address) : Optional.empty();
+        } catch (java.net.URISyntaxException notAnAddress) {
+            return Optional.empty();
         }
     }
 
@@ -167,7 +222,10 @@ final class FakeUi {
         for (FakeWindow window : List.copyOf(windows)) window.close();
     }
 
-    boolean invoke(String actionId, UUID windowId, UUID paneIdOrNull) {
+    boolean invoke(String actionId, UUID windowId, UUID paneIdOrNull) { return invoke(actionId, windowId, paneIdOrNull, Optional.empty()); }
+
+    /** As above; a right-click menu's web-address item gives the address it was chosen with. */
+    boolean invoke(String actionId, UUID windowId, UUID paneIdOrNull, Optional<java.net.URI> webAddress) {
         Action action = actions.get(actionId);
         if (action == null || !action.enabled) return false;
         WindowHandle window = context.terminals.windowHandle(windowId);
@@ -176,6 +234,7 @@ final class FakeUi {
             action.handler.accept(new ActionContext() {
                 @Override public WindowHandle window() { return window; }
                 @Override public Optional<PaneHandle> pane() { return pane; }
+                @Override public Optional<java.net.URI> webAddress() { return webAddress; }
             });
         } catch (RuntimeException | LinkageError failure) { host.recordFailure(pluginId() + " action " + actionId + ": " + failure); }
         return true;

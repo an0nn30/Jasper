@@ -122,8 +122,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.22.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
-  `sdk = ">=0.22.0, <0.23"`.
+- **SDK** `0.23.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.23.0, <0.24"`.
 - **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
   either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
   Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.
@@ -146,11 +146,11 @@ Bundled plugins, all enabled by default except Enterprise:
 | Plugin | Id | Version | Exports | Provides |
 | --- | --- | --- | --- | --- |
 | Credential Vault | `dev.jasper.vault` | 0.7.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
-| Editor | `dev.jasper.editor` | 0.15.0 | `dev.jasper.editor.api` | Local and remote text files in panes, several views of one file, Markdown preview; `jasper editor` |
+| Editor | `dev.jasper.editor` | 0.17.0 | `dev.jasper.editor.api` | Local and remote text files in panes, several views of one file, Markdown preview; `jasper editor` |
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | — | The Enterprise look and theme, as descriptor data |
 | File Server | `dev.jasper.fileserver` | 0.7.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
-| Remote | `dev.jasper.remote` | 0.17.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
+| Remote | `dev.jasper.remote` | 0.18.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
 | Sample | `dev.jasper.sample` | 0.5.0 | — | Exercises the plugin runtime; inert unless a `demo_*` setting is set |
 | Shell History | `dev.jasper.history` | 0.3.0 | — | Searching every shell's history from the palette |
 | Snippets | `dev.jasper.snippets` | 0.3.0 | `dev.jasper.snippets.api` | Saved commands in the palette |
@@ -602,6 +602,78 @@ declare it. The Editor's version is unchanged (0.16.0 on `main`). A new `EditorM
 0 errors, 29 skipped**. GUI check for the user: in
 a window with a terminal tab and an Editor file in another tab, the Editor's right-click Move Pane to Tab lists the
 terminal's tab by its title.
+
+**Browser plan 3: link routing — 2026-10-22** (`claude/browser-link-routing`, worktree
+`.claude/worktrees/browser-link-routing`, from `claude/browser-plugin-design`; not merged or pushed): Jasper routes web
+addresses through one plugin-provided web browser role, as it routes files through the editor role
+(`docs/superpowers/plans/2026-10-22-browser-3-link-routing.md`). The SDK, still 0.21.0, gains `WebBrowser`,
+`LinkOrigin` (`CLICK`, `PROGRAM`), `Platform.browser` (the thirteenth capability, `browser.provide`: one plugin at a
+time, a bundled plugin's replacing another's, ending with its plugin) and `Platform.openInBrowser` (the role first, as
+a click in the active window, then the system browser); `Platform.browse` still always opens the system browser. The
+testkit fakes the role (`FakePluginHost.openLink`, `browserPlugin`) and four contract cases pin it on both runtimes.
+`TerminalView.setLinkOpener` is public (`null` restores the desktop's browser). The application sends a pane's clicked
+`http` and `https` links to the role as clicks from the pane's window (`TabHost`, `WindowContent.onOpenLink`,
+`JasperApplication.openLink`, `PluginRuntime.openLink`, `plugins.WebBrowsers`), and `ftp` and OSC 8 `mailto` links, an
+address the role declines and every link before the plugins start to the system browser. Jasper's own web links
+(Settings' Help, the Licenses window's and the plugin manager's homepages, through `JasperApplication.browse`) go the
+same way as clicks from the active window, as the user asked ("route Help and About through it too"). `jasper <address>…`, when
+every argument is an absolute `http` or `https` address, goes to the role as clicks in the calling pane's window and
+`jasper open-url <address>` as a program's, both exiting 0; `open-url` without exactly one web address prints
+"jasper: open-url needs one web address (http or https)" and exits 2, and no plugin may declare it. The Editor's
+Markdown links (Editor 0.16.0) and Remote's Open in Browser (Remote 0.17.0) use `openInBrowser`. No bundled plugin
+provides the role yet, so every address still opens in the system browser. Moved to plan 4: `BROWSER` in local shells.
+For plan 4: `jasper <address>` and `open-url` answer 0 even when the system browser fails, which matters for `BROWSER`
+and Python's `webbrowser`; and Jasper's own Help and plugin-homepage links mostly come from the modal Settings dialog,
+so a browser tab or first-click prompt has to work while Settings is open. The spec records the deviations (sections
+6 and 13); the plan lists its rulings. `./gradlew check`: **12,848 tests, 0 failures, 0 errors, 29 skipped** (Python
+3.13); the example external plugin builds against `build/sdk-release`. GUI checks for the user: a Cmd-click
+(Ctrl-click) on an `https` link and on an OSC 8 `mailto` link in a terminal, `jasper https://example.com` and
+`jasper open-url https://example.com` in a Jasper shell, Settings' Help (?) button, a homepage in About › Licenses… and
+in Settings › Plugins, a Markdown preview's web link, and a running tunnel's Open in Browser, each reaching the default
+browser or mail program as before.
+Rebased on 2026-10-27 onto `claude/browser-plugin-design` at `0ad57a1e0` (`main` at `a67b37b14` plus the design
+docs), about 205 commits of `main` later: the SDK becomes 0.23.0 (every bundled range `>=0.23.0, <0.24`), the plan's
+SDK and testkit additions are `@since 0.23.0`, and Editor and Remote, which `main` had raised to 0.16.0 and 0.17.0
+meanwhile, become 0.17.0 and 0.18.0. `docs/sdk-reference.html` is regenerated. `./gradlew check --continue` (Python 3.13, JBR
+25.0.4.1 b635.75): **13,474 tests, 0 failures, 0 errors, 30 skipped**; the example external plugin builds against
+`build/sdk-release` (1 test, 0 failures). No GUI was launched.
+**Plan 3b, the routing amendment — 2026-10-27** (`claude/browser-routing-3b-b72db8`, worktree
+`.claude/worktrees/browser-routing-3b-b72db8`, from `claude/browser-link-routing` at `665d4bce5`; not merged or pushed):
+plan 3's routing brought in line with the approved iTerm2-parity design
+(`docs/superpowers/plans/2026-10-27-browser-3b-routing-amendment.md`). The SDK, still 0.23.0, replaces
+`LinkOrigin.PROGRAM` with `EXTERNAL` (`CLICK` stays) and gains `LinkPlacement` (`TAB`, `SPLIT_RIGHT`, `SPLIT_DOWN`) and
+`WebLink` (address, origin, placement, OSC 8 target, window); `WebBrowser.open` takes one `WebLink`. `jasper <address>…`
+reaches the role as `EXTERNAL` from the calling pane's window, and `jasper open-url` is gone (it answers as any unknown
+first word does). jasper-terminal keeps an OSC 8 link's `target=` (`ShellIntegrationFilter` forwards it as
+`OSC 1341;jasper;link-target;…` and follows the link with an empty one, so no target outlives its link), and
+`TerminalView.setLinkOpener` hears the public `view.TerminalLink` (address, `Gesture` `OPEN` or `SPLIT`, target): a
+Cmd+Shift-click (Ctrl+Shift-click on Windows and Linux, where it stays an ordinary open while a program asks for mouse
+reports) is the split. A terminal click reaches the role with its placement (a split goes to the right of a pane wider
+than it is tall, otherwise below it), its target and the pane's window, the clicked pane already the focused one.
+`PluginMenu.addForWebAddress` adds terminal right-click items shown only while the pane's selection is one `http` or
+`https` address with a host; the action reads it as `ActionContext.webAddress()`, and the testkit lists and chooses them
+(`FakePluginHost.contextMenu`, `chooseFromContextMenu`). A local web file clicked in a terminal (HTML, XML, SVG, CSS,
+JavaScript, PDF, PNG, JPEG, GIF, WebP, HEIC) is offered to the browser as a `file:` click before the Default editor;
+`jasper file.html` and Open File… are not. No browser plugin exists yet, so everything still opens as before. **The
+plan's own deviation from the spec:** section 23 puts the plugin-off notification for addresses from outside in this
+amendment; it needs the "is Jasper the system's default browser" check, which belongs with registering as a browser, so
+both move to plan 4, and until then `jasper <address>` with no browser provided opens the system browser. Other
+deviations from the plan's text (its banner lists them): the work ran on this branch, not `claude/browser-link-routing`;
+Task 1 also edited the app so it compiles and runs the new contract cases, and an address `WebLink` refuses
+(`http://my_host/`) goes to the system browser; `LinkHit` is in `dev.jasper.terminal.internal.text`; the shell filter
+also ends a held OSC at U+009C; the terminal's `supported` set gains only `view.TerminalLink`; terminal file clicks have
+their own `WindowContent.onOpenClickedFile`; `addForWebAddress` returns a `Subscription`; and the final whole-branch
+review (fixes in `60599de5d`) ran before this check. For plan 4: double-clicking a URL does not select it whole, though
+spec 9 says it should (word selection stays on one row, counts `.` as a word character and not `(`), so a double-click
+must select what `LinkDetector` finds, across soft wraps, before Open URL in Split Right/Down ships; web-address actions
+also appear in the palette and the Keymap, where `webAddress()` is empty; the `browser.provide` review sheet does not
+mention local files; and a file the browser hands back to the editor after an asynchronous prompt loses its line (an
+additive `openInEditor(Path, line)` would fix it). `./gradlew check --continue` (Python 3.13, JBR 25.0.4.1 b635.75, at
+`60599de5d`, 24 min 26 s): every task passed except `:jasper-app:verifyLauncherImage`, which fails on this JBR on every
+branch ("a cache that kills the JVM"; plan 2's `claude/browser-jcef-runtime-0c197e` fixes it); **13,538 tests, 0
+failures, 0 errors, 32 skipped** (the baseline was 13,474 and 30; the two extra skips are Linux-only view tests, which
+skip on the Mac). Source hygiene is clean over 3,042 Java files, and the example external plugin builds against
+`build/sdk-release` (1 test, 0 failures). No GUI was launched.
 
 **Staged Remote fixture waits for its transfer store — 2026-10-22** (`claude/staged-remote-sessions-flake`, worktree
 `.claude/worktrees/staged-remote-flake`, from `claude/workspace-tabs` at `6f66a3603`; not merged or pushed):

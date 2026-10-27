@@ -38,6 +38,7 @@ fewer keeps the consent. Bundled plugins and the {@code --plugin-dir} plugin nee
 <tr><td>{@code terminal.environment}</td><td>Set environment variables in new terminal shells</td><td>{@link Terminals#environment(Function)}</td><td>The registration</td></tr>
 <tr><td>{@code editor.provide}</td><td>Open the files Jasper opens for editing</td><td>{@link Platform#editor(FileEditor)}</td><td>The registration</td></tr>
 <tr><td>{@code presentation.provide}</td><td>Change Jasper's window chrome and controls after a restart</td><td>No call. It goes with the manifest's {@code presentation} key, each requiring the other; see <a href="looks.md">looks</a>.</td><td></td></tr>
+<tr><td>{@code browser.provide}</td><td>Open the web addresses Jasper opens, such as links you click in a terminal</td><td>{@link Platform#browser(WebBrowser)}</td><td>The registration</td></tr>
 </tbody>
 </table>
 <p>Finding windows, tabs and panes, focusing and selecting them, and reading an action's window and pane need no

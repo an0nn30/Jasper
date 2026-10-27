@@ -773,9 +773,12 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code TAB}, {@code TOOLS}, {@code SESSION},
      *     {@code TRANSFER}, {@code context} or {@code top:<menuId>}
-     * @return {@code item:id}, {@code ---} and {@code submenu:title} lines, children indented, sections separated by {@code ===}
+     * @return {@code item:id}, {@code web-address:id} (an {@code addForWebAddress} item), {@code ---} and
+     *     {@code submenu:title} lines, children indented, sections separated by {@code ===}
      */
-    public List<String> menu(String target) {
+    public List<String> menu(String target) { return menu(target, true); }
+
+    private List<String> menu(String target, boolean webAddress) {
         List<String> lines = new ArrayList<>();
         boolean first = true;
         for (FakePluginContext context : contexts.values()) {
@@ -783,10 +786,49 @@ public final class FakePluginHost implements AutoCloseable {
                 if (!section.target.equals(target)) continue;
                 if (!first) lines.add("===");
                 first = false;
-                section.render(lines, "");
+                section.render(lines, "", webAddress);
             }
         }
         return lines;
+    }
+
+    /**
+     * The terminal context menu's model lines for a pane, as {@link #menu(String) menu("context")} lists them, empty
+     * submenus and separators included.
+     *
+     * @param paneId a pane
+     * @return those lines, with each {@code web-address:id} line present only while the pane's selection
+     *     ({@link #setSelection}) is one web address; empty for a pane that is not open
+     * @since 0.23.0
+     */
+    public List<String> contextMenu(UUID paneId) {
+        return workspace.pane(paneId).map(pane -> menu("context", FakeUi.webAddress(pane.selection).isPresent())).orElse(List.of());
+    }
+
+    /**
+     * Runs the action of the first item {@link #contextMenu} lists for it, as choosing that item does: the action runs in
+     * the pane's window for that pane, and only a {@code web-address} item gives it the selected address as
+     * {@code ActionContext.webAddress()}.
+     *
+     * @param paneId a pane
+     * @param actionId the action
+     * @return whether an enabled action ran; false when {@link #contextMenu} lists no item for it
+     * @since 0.23.0
+     */
+    public boolean chooseFromContextMenu(UUID paneId, String actionId) {
+        var pane = workspace.pane(paneId);
+        if (pane.isEmpty()) return false;
+        Optional<java.net.URI> address = FakeUi.webAddress(pane.get().selection);
+        for (FakePluginContext context : contexts.values()) {
+            for (FakeUi.Menu section : context.ui.sections) {
+                if (!section.target.equals("context")) continue;
+                Object item = section.shown(actionId, address.isPresent());
+                if (item == null) continue;
+                return context.ui.invoke(actionId, pane.get().tab.window.id, paneId,
+                    item instanceof FakeUi.Menu.WebAddressItem ? address : Optional.empty());
+            }
+        }
+        return false;
     }
 
     /**
@@ -914,6 +956,8 @@ public final class FakePluginHost implements AutoCloseable {
         shellContributors.removeIf(entry -> entry.context() == context);
         ProvidedEditor provided = providedEditor;
         if (provided != null && provided.context() == context) providedEditor = null;
+        ProvidedBrowser browser = providedBrowser;
+        if (browser != null && browser.context() == context) providedBrowser = null;
         for (RunningCall running : List.copyOf(runningCalls))
             if (running.context() == context) running.call().stopped(running.name());
         notifications.stopped(context.plugin().id());
@@ -1936,7 +1980,8 @@ public final class FakePluginHost implements AutoCloseable {
         public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }
 
     /**
-     * Every web address a plugin asked to open in the browser.
+     * Every web address that reached the system browser: each {@code Platform.browse}, and each
+     * {@code Platform.openInBrowser} that no provided browser opened.
      *
      * @return the addresses in request order
      */
@@ -2255,8 +2300,9 @@ public final class FakePluginHost implements AutoCloseable {
     final Set<String> bundledPlugins = ConcurrentHashMap.newKeySet();
 
     /**
-     * Marks a plugin as one that ships with Jasper, before it starts: its {@code Platform.editor} registration replaces
-     * a non-bundled plugin's, and its split items come first in the Split lists, as the application's bundled plugins' do.
+     * Marks a plugin as one that ships with Jasper, before it starts: its {@code Platform.editor} and
+     * {@code Platform.browser} registrations replace a non-bundled plugin's, and its split items come first in the Split
+     * lists, as the application's bundled plugins' do.
      *
      * @param pluginId the plugin
      * @since 0.17.1
@@ -2319,6 +2365,71 @@ public final class FakePluginHost implements AutoCloseable {
      * @since 0.17.1
      */
     public Optional<String> editorPlugin() { return Optional.ofNullable(providedEditor).map(provided -> provided.context().plugin().id()); }
+
+    /** The web browser a plugin provides ({@code Platform.browser}) and the plugin that registered it. */
+    record ProvidedBrowser(FakePluginContext context, dev.jasper.sdk.ui.WebBrowser browser) { }
+    private volatile ProvidedBrowser providedBrowser;
+
+    /** Makes a plugin's browser the one web addresses open with, under the application's one-at-a-time rule. */
+    Subscription provideBrowser(FakePluginContext context, dev.jasper.sdk.ui.WebBrowser browser) {
+        String pluginId = context.plugin().id();
+        ProvidedBrowser current = providedBrowser;
+        if (current != null && (!bundledPlugins.contains(pluginId) || bundledPlugins.contains(current.context().plugin().id())))
+            throw new IllegalStateException("The browser is already provided by " + current.context().plugin().id());
+        var provided = new ProvidedBrowser(context, browser);
+        providedBrowser = provided;
+        Subscription subscription = () -> { if (providedBrowser == provided) providedBrowser = null; };
+        context.own(subscription);
+        return subscription;
+    }
+
+    /** The open window the user activated last, as {@code Platform.openInBrowser} reads it; empty when none is. */
+    Optional<UUID> activeWindowId() {
+        return Optional.ofNullable(workspace.lastActive).filter(window -> window.open).map(window -> window.id);
+    }
+
+    /**
+     * Opens a web address as Jasper's own routes do (a link clicked in a terminal, the {@code jasper} command): with the
+     * browser a plugin provides through {@code Platform.browser}, as a {@link dev.jasper.sdk.ui.WebLink} that carries
+     * that plugin's handle for {@code windowId} while the window is open.
+     *
+     * @param address an absolute http or https address with a host, or an absolute file address
+     * @param origin who asked for it
+     * @param placement where the link asks to open
+     * @param target the OSC 8 {@code target=} name the link carries, or empty
+     * @param windowId the Jasper window the address came from, or empty
+     * @return what the browser answered; false when no plugin provides one, or it threw, which {@link #failures()} records
+     * @throws IllegalArgumentException when the arguments do not make a {@link dev.jasper.sdk.ui.WebLink}
+     * @since 0.23.0
+     */
+    public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, dev.jasper.sdk.ui.LinkPlacement placement,
+                            Optional<String> target, Optional<UUID> windowId) {
+        Objects.requireNonNull(address, "address");
+        Objects.requireNonNull(origin, "origin");
+        Objects.requireNonNull(placement, "placement");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(windowId, "windowId");
+        // The same checks whether or not a plugin provides a browser.
+        new dev.jasper.sdk.ui.WebLink(address, origin, placement, target, Optional.empty());
+        ProvidedBrowser provided = providedBrowser;
+        if (provided == null) return false;
+        Optional<dev.jasper.sdk.WindowOwner> window = windowId.flatMap(id -> provided.context().terminals.window(id))
+            .map(handle -> (dev.jasper.sdk.WindowOwner) handle);
+        try {
+            return provided.browser().open(new dev.jasper.sdk.ui.WebLink(address, origin, placement, target, window));
+        } catch (RuntimeException failure) {
+            failures.add(provided.context().plugin().id() + " web browser: " + failure);
+            return false;
+        }
+    }
+
+    /**
+     * Which plugin provides the web browser now.
+     *
+     * @return its id, or empty
+     * @since 0.23.0
+     */
+    public Optional<String> browserPlugin() { return Optional.ofNullable(providedBrowser).map(provided -> provided.context().plugin().id()); }
 
     volatile Optional<Path> commandClient = Optional.empty();
 

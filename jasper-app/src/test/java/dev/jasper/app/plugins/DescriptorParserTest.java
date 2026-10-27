@@ -289,6 +289,18 @@ class DescriptorParserTest {
         assertThat(DescriptorParser.parse(HEAD).subcommands()).isEmpty();
     }
 
+    /** Browser plan 3b: {@code open-url} is no command of Jasper's, so a plugin may declare a subcommand of that name. */
+    @Test void aPluginMayDeclareASubcommandNamedOpenUrl() throws Exception {
+        PluginDescriptor descriptor = DescriptorParser.parse(HEAD + """
+
+            [[subcommands]]
+            name = "open-url"
+            summary = "Open an address"
+            """);
+        assertThat(descriptor.subcommands()).containsExactly(new PluginDescriptor.Subcommand("open-url", "Open an address"));
+        assertThat(DescriptorParser.RESERVED_SUBCOMMANDS).containsExactlyInAnyOrder("help", "version");
+    }
+
     @Test void malformedSubcommandsNameTheirProblem() {
         Map<String, String> cases = Map.of(
             "subcommands = \"editor\"\n", "subcommands must be an array of tables",
@@ -302,6 +314,12 @@ class DescriptorParserTest {
             "[[subcommands]]\nname = \"a\"\nsummary = \"   \"\n", "subcommands.summary must be one visible line: a");
         cases.forEach((tail, message) -> assertThatThrownBy(() -> DescriptorParser.parse(HEAD + tail)).as(tail)
             .isInstanceOf(DescriptorParser.InvalidDescriptor.class).hasMessageContaining(message));
+    }
+
+    /** Browser plan 3: the web browser role's capability. */
+    @Test void acceptsTheBrowserCapability() throws Exception {
+        PluginDescriptor descriptor = DescriptorParser.parse(FULL.replace("\"session.provide\"", "\"browser.provide\""));
+        assertThat(descriptor.capabilities()).contains("browser.provide");
     }
 
     @Test void acceptsTheEnvironmentAndEditorCapabilities() throws Exception {
