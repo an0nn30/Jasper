@@ -590,8 +590,7 @@ fixtures; `verifyPackage` checks a built image ([start-up performance](packaging
 - **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
   trained image, rebuild it. `trainAotCache` trains in a `ditto` copy of the image that it deletes before
   `verifyAotCache`, because JBR 25 gives cached classes the code source of the path they were trained at
-  (JDK-8376576): the build machine then runs the trained image as every user's Mac does. For the same reason Jasper
-  finds its own files with `CodeLocation`, never a code source. The training home's `workspace.toml` is
+  (JDK-8376576): the build machine then runs the trained image as every user's Mac does. The training home's `workspace.toml` is
   `startup-workspace.toml` beside `StartupRuns` (`aotTrainingWorkspace`), which the start-up benchmark also restores
   before each run; after a change to `workspace.toml`'s format, write it again with `WorkspaceFile.write`, as
   `StartupBenchTest` fails until it matches. Training opens a window: agents ask the user before `packageDist`,
