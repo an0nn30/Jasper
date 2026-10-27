@@ -24,7 +24,7 @@ class PaletteTest {
 
     @Test
     void firstSixteenIndexesComeFromTheTheme() {
-        assertThat(CellStyle.resolve(new CellAttributes(EmulationFixture.color(TerminalColor.index(1)), -1, 0, null), palette).foreground()).isEqualTo(palette.ansi().get(1));
+        assertThat(CellStyle.resolve(new CellAttributes(EmulationFixture.color(TerminalColor.index(1)), -1, 0, null, null), palette).foreground()).isEqualTo(palette.ansi().get(1));
         assertThat(palette.indexed(15)).isEqualTo(palette.ansi().get(15));
     }
 
@@ -44,7 +44,7 @@ class PaletteTest {
 
     @Test
     void rgbColorsPassThrough() {
-        assertThat(CellStyle.resolve(new CellAttributes(EmulationFixture.color(TerminalColor.rgb(10, 20, 30)), -1, 0, null), palette).foreground()).isEqualTo(new Color(10, 20, 30));
+        assertThat(CellStyle.resolve(new CellAttributes(EmulationFixture.color(TerminalColor.rgb(10, 20, 30)), -1, 0, null, null), palette).foreground()).isEqualTo(new Color(10, 20, 30));
     }
 
     @Test

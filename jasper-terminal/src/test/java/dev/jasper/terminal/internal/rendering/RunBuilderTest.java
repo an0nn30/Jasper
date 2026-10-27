@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class RunBuilderTest {
     private static final int WIDTH = 6;
-    private static final CellAttributes RED = new CellAttributes(1, -1, 0, null);
+    private static final CellAttributes RED = new CellAttributes(1, -1, 0, null, null);
 
     // No fallback fonts, so every code point uses the primary font and only styles split runs.
     private final Palette palette = Palette.jasperDark();

@@ -3,6 +3,7 @@ package dev.jasper.terminal.view;
 import dev.jasper.terminal.internal.text.MouseInput;
 
 import dev.jasper.terminal.internal.TerminalAccess;
+import dev.jasper.terminal.internal.text.LinkHit;
 import dev.jasper.terminal.internal.text.MouseGeometry;
 import dev.jasper.terminal.internal.text.MouseInput.Type;
 import java.awt.event.MouseEvent;
@@ -85,7 +86,7 @@ final class MouseController {
             // Command-click is deliberately local on macOS, even if the program requests reports.
             if (button == MouseInput.Button.LEFT && ((macOs && linkModifier)
                 || action == MouseRouting.Action.OPEN_LINK)) {
-                Optional<String> link = terminal.linkAt(absoluteRow, column);
+                Optional<String> link = terminal.linkAt(absoluteRow, column).map(LinkHit::uri);
                 Consumer<FileLink> files = openFile.get();
                 Optional<FileLink> file = link.isPresent() || files == null ? Optional.empty()
                     : terminal.fileLinkAt(absoluteRow, column, windows)

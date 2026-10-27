@@ -119,8 +119,9 @@ final class JediCellReader {
         if (style.hasOption(TextStyle.Option.INVERSE)) flags |= CellAttributes.INVERSE;
         if (style.hasOption(TextStyle.Option.DIM)) flags |= CellAttributes.DIM;
         if (style.hasOption(TextStyle.Option.HIDDEN)) flags |= CellAttributes.HIDDEN;
-        String link = style instanceof HyperlinkStyle h && h.getLinkInfo() instanceof UriLink u ? u.uri() : null;
-        return new CellAttributes(color(style.getForeground()), color(style.getBackground()), flags, link);
+        UriLink link = style instanceof HyperlinkStyle h && h.getLinkInfo() instanceof UriLink u ? u : null;
+        return new CellAttributes(color(style.getForeground()), color(style.getBackground()), flags,
+            link == null ? null : link.uri(), link == null ? null : link.target());
     }
     static int color(TerminalColor value) {
         if (value == null) return -1;

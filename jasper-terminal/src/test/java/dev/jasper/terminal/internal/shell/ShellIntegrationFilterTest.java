@@ -30,8 +30,73 @@ class ShellIntegrationFilterTest {
 
     @Test
     void otherOscSequencesPassUnchanged() {
-        String input = "\033]0;title\007\033]1341;other\007\033]13;x\007\033]8;;http://a\007link\033]8;;\007";
+        String input = "\033]0;title\007\033]1341;other\007\033]13;x\007\033]80;x\007";
         assertThat(run(input)).isEqualTo(input);
+    }
+
+    /** JediTerm's hyperlink filter sees only an OSC 8's URI, so the link's {@code target} parameter goes ahead of it. */
+    @Test
+    void anOsc8LinkIsPrecededByItsTarget() {
+        String input = "\033]8;id=1:target=docs;https://e.com\033\\";
+        String expected = "\033]1341;jasper;link-target;docs\007\033]8;id=1:target=docs;https://e.com\033\\";
+
+        assertThat(run(input)).isEqualTo(expected);
+        assertThat(runOneCharAtATime(input)).isEqualTo(expected);
+    }
+
+    @Test
+    void anOsc8LinkWithoutATargetClearsThePendingOne() {
+        String input = "\033]8;;https://e.com\007";
+        String expected = "\033]1341;jasper;link-target;\007\033]8;;https://e.com\007";
+
+        assertThat(run(input)).isEqualTo(expected);
+        assertThat(runOneCharAtATime(input)).isEqualTo(expected);
+    }
+
+    @Test
+    void aTargetWithAControlCharacterOrOver256CharactersIsDropped() {
+        assertThat(run("\033]8;target=" + "x".repeat(257) + ";https://e.com\007")).startsWith("\033]1341;jasper;link-target;\007");
+        assertThat(run("\033]8;target=a\001b;https://e.com\007")).startsWith("\033]1341;jasper;link-target;\007");
+    }
+
+    @Test
+    void aTargetOf256CharactersIsKept() {
+        String target = "x".repeat(256);
+        assertThat(run("\033]8;target=" + target + ";https://e.com\007")).startsWith(P + "link-target;" + target + "\007\033]8;");
+    }
+
+    @Test
+    void anOsc8ThatEndsALinkIsPrecededByAnEmptyTarget() {
+        String input = "\033]8;target=docs;https://e.com\007a\033]8;target=docs;\007b";
+        String expected = P + "link-target;docs\007\033]8;target=docs;https://e.com\007a"
+            + P + "link-target;\007\033]8;target=docs;\007b";
+
+        assertThat(run(input)).isEqualTo(expected);
+        assertThat(runOneCharAtATime(input)).isEqualTo(expected);
+    }
+
+    @Test
+    void osc8LinksSplitAcrossReadsKeepTheirOwnTargets() {
+        String input = "x\033]8;target=one;https://a.example\033\\A\033]8;;\033\\ \033]8;target=two;https://b.example\007B\033]8;;\007y";
+        String expected = "x" + P + "link-target;one\007\033]8;target=one;https://a.example\033\\A"
+            + P + "link-target;\007\033]8;;\033\\ "
+            + P + "link-target;two\007\033]8;target=two;https://b.example\007B"
+            + P + "link-target;\007\033]8;;\007y";
+
+        assertThat(run(input)).isEqualTo(expected);
+        assertThat(runOneCharAtATime(input)).isEqualTo(expected);
+    }
+
+    @Test
+    void anOverlongOsc8PassesUnchangedAfterAnEmptyTarget() {
+        String input = "\033]8;target=docs;https://e.com/" + "x".repeat(5000) + "\007";
+        assertThat(run(input)).isEqualTo(P + "link-target;\007" + input);
+    }
+
+    @Test
+    void anAbandonedOsc8PassesUnchangedAfterAnEmptyTarget() {
+        String input = "\033]8;target=docs;https://e.com\033[0mc";
+        assertThat(run(input)).isEqualTo(P + "link-target;\007" + input);
     }
 
     @Test
