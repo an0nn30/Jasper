@@ -159,8 +159,8 @@ All in `check`, on every OS:
   options that end with `exit` and with `_exit`, a launch without the watcher, a relative launcher path, a directory in
   the file's place, a home with a space and a non-ASCII home, an image that cannot start (the watcher's report), a
   diagnostic launch, the start-up cache's record and skip variable, and a cache that kills the JVM: `test/sealedprobe`
-  trained into a cache in one directory and run from a copy once that directory is gone, which fails while JBR has
-  JDK-8376576 and needs another such cache once it does not. On Windows it also checks the windowed launcher.
+  trained into a cache and run from a copy with `-XX:AOTMode=on` once a jar on the cache's class path has another
+  modification time. On Windows it also checks the windowed launcher.
 
 `verifyPackage` runs `testLauncherCore`, `testLauncherWatch` and `testWatcher` before it checks a package image; the
 Release workflow skips them because CI runs them.
