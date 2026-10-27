@@ -62,7 +62,7 @@ system = true
 # ./gradlew run development session uses its own home, is never resident and never registers a login item.
 # run_in_background = true
 # Live. What the window Jasper opens while none is open holds: "last_known_state" (the window you used
-# last) or "empty_state" (the built-in layout, where that window was).
+# last) or "empty_state" (the default layout, where that window was).
 reopen = "last_known_state"
 
 [palette]

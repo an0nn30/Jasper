@@ -189,7 +189,7 @@ and its tool windows; in the user's words: window, tab, pane, item). `WindowMana
 from the most recently active window, within a second of each change (a non-sliding timer on the EDT, the write on a
 virtual thread) and at once, from that window, when you close one, leaving items out until the file fits
 `WorkspaceFile.MAX_BYTES` (256 KiB); closing every window saves first and holds saving until the window comes back.
-`ensureWindow` restores the saved window when none is open (`system.reopen`: the saved window, or the built-in layout
+`ensureWindow` restores the saved window when none is open (`system.reopen`: the saved window, or the default layout
 at its place), with its place, tabs, items and tool windows; a restored terminal's shell starts when its tab first
 shows, and until then its pane reports
 `NOT_STARTED`; a plugin's item comes back through its plugin's restorer or as a placeholder (`PlaceholderContent`; see

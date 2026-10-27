@@ -1,5 +1,13 @@
 # Full windows 4: layouts Implementation Plan
 
+> **Status (2026-10-27):** Executed, Tasks 1-4, on `claude/full-windows` (not merged or pushed). Additions to the plan
+> text: `Saved` and `LayoutApplied` result enums; `LayoutsFile.fits` (the size check a save asks before it writes);
+> `LayoutPalette` in `workspace`, whose palette ids are digests of the layout names; `leftOutCount` (how many tabs a layout
+> leaves out, which the New Layout dialog states); a fresh start with nothing saved opens the default layout. Controller
+> Rulings: 1, a save that would pass the 256 KiB limit is refused with "This layout is too large to save."; 2, a fresh
+> start opens the default layout; 3, a failure partway through applying shows "Jasper could not apply the layout
+> “<name>”.", `openEmpty` is exact when no window is open, and `leftOutCount` counts what a layout leaves out.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A default layout for new windows and any number of named layouts, saved from the active window and applied

@@ -5,6 +5,7 @@
 and 20), the [parent tabs spec](2026-10-19-jasper-parent-tabs-design.md) and the
 [tabs and panes spec](2026-10-20-jasper-tabs-and-panes-design.md) (decision 4 and sections 6 and 7); this spec wins where
 they disagree. Choices the user did not state are marked *Ruling*, with the reason, for review.
+Amended 2026-10-27 (the user): status bar visibility stays the app-wide `window.status_bar` setting.
 
 ## 1. Intent
 
@@ -174,7 +175,7 @@ they start with `gradle/` or `jasper-sdk/`.
 - `WindowManager` holds a list of windows in opening order and their activation order. It makes every window, in one
   method; `verifyApplicationArchitecture`'s MainWindow rule becomes "a `JasperWindow` is made only in
   `WindowManager.open`". Its WindowManager and WindowFrame rules stay.
-- Each window has its own Zen mode, rail, status bar visibility, dock, tool window placements and detached tool windows.
+- Each window has its own Zen mode, rail, dock, tool window placements and detached tool windows.
   The View menu's toggles act on the window they are chosen in. `window.toolbar` and the other settings stay app-wide.
 - The Buddy follows the most recently active window. *Ruling:* nothing else in Jasper is special to one window any more.
 - Settings, About, Licenses and the file chooser stay single app-wide surfaces. The Errors tab opens in the most
@@ -239,7 +240,7 @@ working in, and the windows close together.
 ### 6.1 What is saved
 
 - A window's **state** is its bounds and maximised state, its tabs and panes (as `workspace.toml` keeps them today), and
-  its tool windows: Zen, rail and status bar visibility, the dock's sizes and ratios, each tool window's slot, order,
+  its tool windows: Zen and rail visibility, the dock's sizes and ratios, each tool window's slot, order,
   visibility, mode and own-window bounds. The dock keeps one entry per look it has been shown under, as `ui-state.toml`
   does today; a look the state has none for starts from that look's built-in dock.
 - `workspace.toml` keeps **one** window's state, the last state. It is written:

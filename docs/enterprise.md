@@ -69,7 +69,7 @@ Enterprise as skipped: "did not finish starting with this look last time".
 - **Menus** are in the screen menu bar on macOS, with **About Jasper** and **Settings…** in the application menu; in
   the window's title bar on Windows; and a row in the window on Linux, with **About Jasper** at the end of
   Help on both. The order is File, Edit, View, Session and Transfer (when a plugin fills them), the plugins' own menus,
-  Tools (when a plugin fills it), Window and Help. **Window** holds what the standard look's Tab menu holds, then the
+  Tools (when a plugin fills it), Window and Help. **Window** holds what the standard look's Tab menu holds, **Layouts ›**, then the
   tool window toggles, which the standard look keeps under View. On macOS the screen menu bar follows the focused window and its menus act on that window; auxiliary windows, such as About, show a
   short File menu in the screen menu bar on macOS and have none on Linux and Windows, where Ctrl+W still closes them.
 - **Toolbar row** under the title bar: **New Session**, **Split** (Split Right, Split Down), **Maximize**, the plugins'

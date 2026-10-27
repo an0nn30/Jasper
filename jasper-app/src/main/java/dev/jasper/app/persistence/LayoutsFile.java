@@ -119,7 +119,7 @@ public final class LayoutsFile {
     private static Optional<WindowRecord> layout(TomlTable entry, String what) {
         var dropped = new ArrayList<String>();
         Optional<WindowRecord> window = WorkspaceFile.window(entry, dropped);
-        // A layout that lost an entry is dropped whole, not half restored.
+        // A layout that lost an entry is kept without it.
         if (window.isPresent() && !dropped.isEmpty()) LOG.log(System.Logger.Level.WARNING, "Kept " + what + " without its bad entries");
         return window.map(LayoutsFile::asLayout);
     }

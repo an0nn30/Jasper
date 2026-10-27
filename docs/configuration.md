@@ -40,8 +40,9 @@ and never changes the login item, so the `system.run_in_background` in its file 
 | `plugins/<id>/` | A plugin's `<id>.toml` settings file, its `data/` folder and, for a plugin you installed, its `jars/` ([Plugins](plugins.md)). |
 | `plugins.toml`, `plugins.lock` | Which plugins are enabled and the capabilities you consented to; the lock held while that file changes. |
 | `themes/` | Imported themes, one `<id>.json` each ([Themes](themes.md)). |
-| `ui-state.toml`, `workspace.toml`, `command-history.toml`, `buddy.toml` | [Application state](#application-state-files). |
+| `ui-state.toml`, `workspace.toml`, `layouts.toml`, `command-history.toml`, `buddy.toml` | [Application state](#application-state-files). |
 | `workspace.toml.bad` | The saved window Jasper could not restore ([workspace.toml](#workspacetoml)). |
+| `layouts.toml.bad` | A `layouts.toml` Jasper could not read ([layouts.toml](#layoutstoml)). |
 | `logs/` | Jasper's log files ([Diagnostics](diagnostics.md)). |
 | `shell-integration/` | The [shell integration](#shell-integration) scripts, extracted at every start. |
 | `daemon/` | Owner-only on macOS and Linux. The instance lock (`instance.lock`, with the owner's process id in `instance.pid`) that the Jasper owning the home holds while it runs, resident or not ([one Jasper per home](command-line.md#one-jasper-per-home)); the handoff socket a second launch hands its request to (`socket`, with `token`); the `jasper` command's socket (`commands`, with `commands.token` and `commands.token.pid`); and `subcommands`, the plugin commands `jasper --help` lists. |
@@ -180,7 +181,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `notifications.system` | boolean | `true` | Also shows notifications as the operating system's own while Jasper is away | Live | Notifications › Show system notifications |
 | `notifications.groups` | table | `{}` | Group id to `"card"`, `"sticky"`, `"history"` or `"off"` ([Notification groups](#notification-groups)) | Live | Notifications › Groups |
 | `system.run_in_background` | boolean | `true` on macOS and Windows, `false` on Linux | [Background residency](#background-residency) | Restart; the login item at once | System Settings › Run in background |
-| `system.reopen` | string | `"last_known_state"` | `"last_known_state"` or `"empty_state"`: what the window Jasper opens while none is open holds, the window you used last or the built-in layout where it was | Live | System Settings › Reopen with |
+| `system.reopen` | string | `"last_known_state"` | `"last_known_state"` or `"empty_state"`: what the window Jasper opens while none is open holds, the window you used last or the default layout where it was | Live | System Settings › Reopen with |
 | `palette.visible_rows` | integer | `5`, or the [look's](#look-dependent-defaults) | 1–20 rows | Live | Command Palette › Visible rows |
 | `terminal.scrollback` | integer | `10000` | 0–1000000 lines; `0` keeps no scrollback | New panes | Terminal › Scrollback lines |
 | `terminal.option_as_meta` | string | `"left"` | `"left"`, `"right"`, `"both"`, `"none"`: which Option key sends Meta, on macOS only | Live | Terminal › Option key as Meta (Left Option, Right Option, Both, Neither); hidden on Linux and Windows |
@@ -355,7 +356,7 @@ closes, so the next window opens without a cold start; plugins keep running, but
 closes every window and leaves Jasper in the menu bar, whose item offers **New Window**, **Settings…** and
 **Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and **Quit Jasper**. Linux has
 no such icon, so the default there is off. [The workspace](workspace.md) describes quitting and reopening;
-`system.reopen` chooses whether the reopened window holds the window you used last or the built-in layout.
+`system.reopen` chooses whether the reopened window holds the window you used last or the default layout.
 
 Residency also starts Jasper in the background at login:
 
@@ -616,6 +617,7 @@ which is kept aside ([below](#workspacetoml)).
 |---|---|
 | `ui-state.toml` | Where dialogs, the palette and the file chooser's choices were ([below](#ui-statetoml)) |
 | `workspace.toml` | A window's place, tabs, panes and tool windows ([below](#workspacetoml)) |
+| `layouts.toml` | The default layout and the named layouts ([below](#layoutstoml)) |
 | `command-history.toml` | The command palette's recent commands and how often you used each result ([Command palette](command-palette.md)) |
 | `buddy.toml` | The desk buddy's position: `version = 1`, `x`, `y` |
 
@@ -643,8 +645,8 @@ saves it within a second of each change and of a window coming to the front, wit
 state; at once when you close a window, with that window's state; and on Quit or going to the background, with the
 most recently active window's. A window a move empties writes nothing at once, so the last window to close is the one
 saved. Whenever a window opens with none open, at start or after the last one closed, Jasper opens exactly one window,
-from what it saved last, else from the file; with `system.reopen` set to `empty_state` it opens the built-in layout
-(one terminal tab and the look's built-in tool windows) at the saved window's bounds instead. A
+from what it saved last, else from the file; with `system.reopen` set to `empty_state` it opens the [default layout](#layoutstoml)
+at the saved window's bounds instead. A
 window keeps its normal bounds while maximised or minimised and never comes back minimised; one that no longer fits an
 available display is fitted to a usable display. A terminal comes back with the name you gave it and its profile and a
 new shell in its last local directory, or where a new shell starts when that directory was on another host or is gone;
@@ -658,6 +660,14 @@ size limit, Jasper leaves out plugins' views and then terminals, the largest fir
 
 When the saved window does not all come back (the file cannot be read, has an unknown `version` (not 1 or 2) or keeps no
 window, an entry in it is bad, or the window cannot be restored), Jasper keeps it as `workspace.toml.bad`, opens what it could
-(the built-in layout when the file itself is unusable) and posts "Jasper could not restore your window". Quit Jasper
+(the default layout when the file itself is unusable) and posts "Jasper could not restore your window". Quit Jasper
 before changing the file: once Jasper has opened a window it restores from what it last saved, not from the file, and
 a later save may replace the change.
+
+### layouts.toml
+
+At most 256 KiB; `version = 1`. It keeps the optional default layout (`[default]`) and the named layouts (`[[layouts]]`,
+each with a `name` of 1 to 64 characters), saved through Window › Layouts ([Workspace](workspace.md#layouts)). A
+layout holds what a window in `workspace.toml` holds without `[window]`'s size and position: its tabs, panes and
+`tool_windows`. A save that would pass the limit is refused with "This layout is too large to save.". A file that cannot
+be read is kept as `layouts.toml.bad` and read as empty; a bad entry is dropped alone.
