@@ -7,7 +7,7 @@ import java.util.Optional;
 /**
  * Opens the web addresses Jasper opens, once a plugin registers it with {@link Platform#browser}.
  *
- * @since 0.21.0
+ * @since 0.23.0
  */
 @FunctionalInterface
 public interface WebBrowser {

@@ -70,7 +70,7 @@ public final class Capabilities {
     /**
      * Being the web browser Jasper opens web addresses with, through {@code Platform.browser}.
      *
-     * @since 0.21.0
+     * @since 0.23.0
      */
     public static final String BROWSER_PROVIDE = "browser.provide";
     /** Every capability this SDK version knows. */

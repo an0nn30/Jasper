@@ -38,7 +38,7 @@ public interface Platform {
      *
      * @param uri an absolute {@code http} or {@code https} address with a host
      * @throws IllegalArgumentException when the address is not an absolute http or https address with a host
-     * @since 0.21.0
+     * @since 0.23.0
      */
     void openInBrowser(URI uri);
 
@@ -120,7 +120,7 @@ public interface Platform {
      * @throws IllegalStateException when another plugin already provides the browser
      *     ({@code The browser is already provided by <plugin id>}), and off the UI thread
      * @throws dev.jasper.sdk.MissingCapabilityException without {@code browser.provide}
-     * @since 0.21.0
+     * @since 0.23.0
      */
     default Subscription browser(WebBrowser browser) {
         java.util.Objects.requireNonNull(browser, "browser");

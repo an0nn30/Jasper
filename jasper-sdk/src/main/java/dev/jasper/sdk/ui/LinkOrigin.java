@@ -3,7 +3,7 @@ package dev.jasper.sdk.ui;
 /**
  * Who asked Jasper to open a web address, as {@link WebBrowser#open} hears it.
  *
- * @since 0.21.0
+ * @since 0.23.0
  */
 public enum LinkOrigin {
     /**

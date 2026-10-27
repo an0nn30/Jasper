@@ -2355,7 +2355,7 @@ public final class FakePluginHost implements AutoCloseable {
      * @param origin who asked for it
      * @param windowId the Jasper window the address came from, or empty
      * @return what the browser answered; false when no plugin provides one, or it threw, which {@link #failures()} records
-     * @since 0.21.0
+     * @since 0.23.0
      */
     public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, Optional<UUID> windowId) {
         Objects.requireNonNull(address, "address");
@@ -2377,7 +2377,7 @@ public final class FakePluginHost implements AutoCloseable {
      * Which plugin provides the web browser now.
      *
      * @return its id, or empty
-     * @since 0.21.0
+     * @since 0.23.0
      */
     public Optional<String> browserPlugin() { return Optional.ofNullable(providedBrowser).map(provided -> provided.context().plugin().id()); }
 

@@ -122,8 +122,8 @@ plugins on the public plugin SDK. The [documentation index](README.md) lists eve
   `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
-- **SDK** `0.22.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
-  `sdk = ">=0.22.0, <0.23"`.
+- **SDK** `0.23.0` (`JasperSdk.VERSION`; no release carries it yet, `v1.0.0` has 0.18.1); every bundled plugin declares
+  `sdk = ">=0.23.0, <0.24"`.
 - **Themes.** Built in: Jasper Meadow (`jasper-meadow`, Dark and Light; the default theme of both appearances under
   either look), Slate Cobalt (Dark and Light; start-up falls back to its Dark variant when a theme cannot be applied),
   Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the Enterprise plugin adds the Enterprise theme.
@@ -146,11 +146,11 @@ Bundled plugins, all enabled by default except Enterprise:
 | Plugin | Id | Version | Exports | Provides |
 | --- | --- | --- | --- | --- |
 | Credential Vault | `dev.jasper.vault` | 0.7.0 | `dev.jasper.vault.api` | Logins, SSH keys and secure notes in one encrypted file; per-plugin grants |
-| Editor | `dev.jasper.editor` | 0.16.0 | `dev.jasper.editor.api` | Local and remote text files in panes, several views of one file, Markdown preview; `jasper editor` |
+| Editor | `dev.jasper.editor` | 0.17.0 | `dev.jasper.editor.api` | Local and remote text files in panes, several views of one file, Markdown preview; `jasper editor` |
 | Enterprise | `dev.jasper.enterprise` | 0.3.0 | — | The Enterprise look and theme, as descriptor data |
 | File Server | `dev.jasper.fileserver` | 0.7.0 | — | Sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP |
 | Project Index | `dev.jasper.indexer` | 0.3.0 | — | Indexing projects, local or on saved hosts, and finding their files from the palette |
-| Remote | `dev.jasper.remote` | 0.17.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
+| Remote | `dev.jasper.remote` | 0.18.0 | `dev.jasper.remote.api` | SSH, SFTP, transfers, tunnels, saved hosts and the Sessions tool window |
 | Sample | `dev.jasper.sample` | 0.5.0 | — | Exercises the plugin runtime; inert unless a `demo_*` setting is set |
 | Shell History | `dev.jasper.history` | 0.3.0 | — | Searching every shell's history from the palette |
 | Snippets | `dev.jasper.snippets` | 0.3.0 | `dev.jasper.snippets.api` | Saved commands in the palette |
@@ -631,6 +631,12 @@ so a browser tab or first-click prompt has to work while Settings is open. The s
 `jasper open-url https://example.com` in a Jasper shell, Settings' Help (?) button, a homepage in About › Licenses… and
 in Settings › Plugins, a Markdown preview's web link, and a running tunnel's Open in Browser, each reaching the default
 browser or mail program as before.
+Rebased on 2026-10-27 onto `claude/browser-plugin-design` at `0ad57a1e0` (`main` at `a67b37b14` plus the design
+docs), about 205 commits of `main` later: the SDK becomes 0.23.0 (every bundled range `>=0.23.0, <0.24`), the plan's
+SDK and testkit additions are `@since 0.23.0`, and Editor and Remote, which `main` had raised to 0.16.0 and 0.17.0
+meanwhile, become 0.17.0 and 0.18.0. `docs/sdk-reference.html` is regenerated. `./gradlew check --continue` (Python 3.13, JBR
+25.0.4.1 b635.75): **13,474 tests, 0 failures, 0 errors, 30 skipped**; the example external plugin builds against
+`build/sdk-release` (1 test, 0 failures). No GUI was launched.
 
 **Staged Remote fixture waits for its transfer store — 2026-10-22** (`claude/staged-remote-sessions-flake`, worktree
 `.claude/worktrees/staged-remote-flake`, from `claude/workspace-tabs` at `6f66a3603`; not merged or pushed):

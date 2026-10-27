@@ -4,8 +4,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CapabilitiesTest {
-    @Test void theSdkIsVersionTwentyOneWithTheBrowserCapability() {
-        assertThat(JasperSdk.VERSION).isEqualTo("0.22.0");
+    @Test void theSdkIsVersionTwentyThreeWithTheBrowserCapability() {
+        assertThat(JasperSdk.VERSION).isEqualTo("0.23.0");
         assertThat(Capabilities.NETWORK_LISTEN).isEqualTo("network.listen");
         assertThat(Capabilities.CLIPBOARD_READ).isEqualTo("clipboard.read");
         assertThat(Capabilities.TERMINAL_ENVIRONMENT).isEqualTo("terminal.environment");
