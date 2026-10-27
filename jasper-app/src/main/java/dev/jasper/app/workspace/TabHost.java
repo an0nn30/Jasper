@@ -158,7 +158,7 @@ final class TabHost {
             owner.chrome().contextMenu().show(pane.view(), event.getX(), event.getY());
         });
         pane.view().setFileLinkHandler(link -> openFileLink(pane, link));
-        pane.view().setLinkOpener(link -> owner.onOpenLink.accept(link));
+        pane.view().setLinkOpener(link -> owner.onOpenLink.accept(link.url()));
     }
 
     private static void unwire(TerminalPane pane) {
