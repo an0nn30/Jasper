@@ -1,10 +1,11 @@
 # Jasper — Status and Handoff
 
-**Linux residency design — 2026-10-27** (`codex/linux-residency-design`; [draft](superpowers/specs/2026-10-27-linux-residency-design.md)).
-User selected Java D-Bus tray integration with an X11 fallback, residency independent of tray availability, and Linux
-default-on residency with installed-app login startup while preserving explicit off. Draft covers XDG autostart,
-backend recovery, dependency/transport gates and desktop acceptance; awaiting design approval. No implementation,
-GUI, benchmark or AOT run. Next: approve the design, then write runnable-deliverable plans.
+**Linux residency plans — 2026-10-27** (`codex/linux-residency-design`; [approved design](superpowers/specs/2026-10-27-linux-residency-design.md)).
+[Plan 1](superpowers/plans/2026-10-27-linux-residency-1-autostart.md) covers default-on Linux residency, explicit-off
+preservation, XDG autostart and ordered login-setting writes. [Plan 2](superpowers/plans/2026-10-27-linux-residency-2-tray.md)
+covers Java D-Bus and X11 trays with dependency/AWT gates before dependent implementation. Both are written, not
+executed; no design deviations. Next: review plans, then execute Plan 1 with per-task implementer/reviewer work.
+No product changes, GUI, benchmark or AOT run; Linux transport/native acceptance remains pending.
 
 **Full windows plan 5 — 2026-10-27** (`claude/full-windows`, plans 1-5, start `c2c04684d`, head = this commit, not merged or pushed; [plan](superpowers/plans/2026-10-27-full-windows-5-drags.md), [spec](superpowers/specs/2026-10-26-jasper-full-windows-design.md) section 5.4; executed with per-task subagents). A pane dragged (Cmd+Option on macOS, Ctrl+Alt elsewhere) and released outside every Jasper window becomes a new full window at the cursor, sized as a torn-out tab's window, holding one tab with that pane (its session keeps running); the new window takes the default layout's tool windows (Zen off, Float and Window tool windows hidden while another window is open); the pane's tab closes in the source window when it was its last pane; the only pane of a window's only tab, and a pinned pane, never tear out (that window moves by its title bar); every window's empty workspace takes a dropped tab or pane anywhere over it (`WindowManager.movePaneToNewWindow`, `WindowContent.mayMovePaneToNewWindow`). This closes the full-windows series (plans 1-5). Deviation from the plan, in its status banner: the new window keeps the cursor at the same spot within the moved pane, sized to the whole tab's workspace. GUI checks for the user: Cmd+Option-drag (Ctrl+Alt-drag) a pane out of a split onto the desktop on macOS, Windows and Linux; drag it back into another window's pane, strip and empty workspace; try the only pane of the only tab. Plans 1-4's GUI checks are in their own entries below. The memory benchmark of an extra window (spec risk 2) is pending the user's go-ahead. No GUI launched.
 

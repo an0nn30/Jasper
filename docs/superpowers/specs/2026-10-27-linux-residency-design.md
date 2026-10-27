@@ -1,6 +1,6 @@
 # Linux background residency
 
-**Status:** Draft for user approval. Direction and default behavior agreed on 2026-10-27; implementation has not started.
+**Status:** Approved by the user on 2026-10-27. Implementation has not started. Plans: [1 — defaults and login startup](../plans/2026-10-27-linux-residency-1-autostart.md), [2 — modern and legacy trays](../plans/2026-10-27-linux-residency-2-tray.md).
 
 ## Intent and agreed behavior
 
@@ -16,7 +16,7 @@ The user chose Java D-Bus integration with an X11 tray fallback, and agreed that
 - Launching Jasper normally reopens it through the existing single-instance handoff. Quit inside the app exits it.
 - Residency continues when no tray host is available. Tray availability can change while Jasper runs.
 
-The proposals below are engineering decisions for approval with this document, not additional user requirements.
+The engineering decisions below were approved with this document; they are distinguished from the user's original requirements.
 
 ## Existing foundations and boundaries
 
@@ -101,7 +101,7 @@ If legacy capability changes cannot be reliably observed through public AWT APIs
 the builder chooses and tests a capped interval. Coalesce repeated failures and log backend transitions, without
 modal warnings or repeated notifications for an ordinary desktop with no tray.
 
-Proposed Linux menu: **Open Jasper**, **New Window**, **Settings...**, separator, **Quit Jasper**. Use existing
+Linux menu: **Open Jasper**, **New Window**, **Settings...**, separator, **Quit Jasper**. Use existing
 `ResidentTray.Actions` callbacks, not duplicate application logic. Open raises the most recently active window or
 reopens according to `system.reopen`; New Window follows the existing action's default-layout behavior. Settings
 uses the existing callback. Quit follows normal close guards and complete shutdown. A canceled Quit leaves the
@@ -196,7 +196,7 @@ No benchmark or GUI run is authorized by approval of this document alone.
 
 Implementation updates the existing configuration, workspace, packaging and maintenance guides wherever behavior
 changes, using small edits, plus settings help and generated SDK reference if its source guides change. Record plan
-deviations in each plan banner and `docs/STATUS.md`. This draft itself does not change current-behavior guides.
+deviations in each plan banner and `docs/STATUS.md`. This design record itself does not change current-behavior guides.
 
 ## Research references
 
