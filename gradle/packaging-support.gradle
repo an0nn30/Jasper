@@ -1,5 +1,6 @@
 import groovy.json.JsonException
 import groovy.json.JsonSlurper
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
@@ -135,8 +136,10 @@ ext.jcefPayload = { String os, String architecture ->
 // files of the jmod's lib/ section lose it and packageApp restores it on Linux. Windows needs no bit.
 ext.jcefLinuxHelpers = ['lib/jcef_helper', 'lib/cef_server']
 
-// chmod a+x on the helpers that runtimeHome has. A helper that is missing is verifyPackage's to report.
+// chmod a+x on the helpers that runtimeHome has. A helper that is missing is verifyPackage's to report. A file system
+// without POSIX permissions (Windows) has no execute bit to restore, so nothing happens there.
 ext.markJcefHelpersExecutable = { File runtimeHome ->
+    if (!FileSystems.default.supportedFileAttributeViews().contains('posix')) return
     jcefLinuxHelpers.collect { new File(runtimeHome, it).toPath() }.findAll { Files.isRegularFile(it) }.each { path ->
         Files.setPosixFilePermissions(path, (Files.getPosixFilePermissions(path) +
             [PosixFilePermission.OWNER_EXECUTE, PosixFilePermission.GROUP_EXECUTE, PosixFilePermission.OTHERS_EXECUTE]) as Set)

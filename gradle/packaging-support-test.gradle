@@ -667,7 +667,7 @@ verifySupport.configure {
             }
             assert !new File(linuxHome, 'lib/libcef.so').canExecute()
         }
-        markJcefHelpersExecutable(linuxHome)
+        markJcefHelpersExecutable(linuxHome) // a no-op where the file system has no POSIX permissions (Windows)
         assert jcefPayloadProblem(linuxHome, 'linux', 'x64') == null
         assert new File(linuxHome, 'lib/libcef.so').delete() && new File(linuxHome, 'lib/locales/af.pak').delete()
         String missing = jcefPayloadProblem(linuxHome, 'linux', 'x64')
