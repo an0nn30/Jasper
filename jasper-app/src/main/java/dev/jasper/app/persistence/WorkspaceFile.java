@@ -37,7 +37,7 @@ import org.tomlj.TomlTable;
 
 /**
  * The saved workspace, {@code workspace.toml} in the Jasper home (workspace tabs spec, section 8; tabs and panes spec 12):
- * each Jasper window's kind, bounds and maximized state, its tabs in strip order with the one it shows, each tab's split
+ * each Jasper window's bounds and maximized state, its tabs in strip order with the one it shows, each tab's split
  * layout of panes with its active pane, each pane's one item, and what each item needs to come back. The file says
  * window, tab, pane and item, as the spec does; the code calls a tab a parent tab, a pane a group and an item a tab
  * (workspace plan 8a Rulings 1). {@link #write} writes it atomically; {@link #read} never throws: it drops bad item, tab
@@ -45,14 +45,6 @@ import org.tomlj.TomlTable;
  * under that name. Stateless: the caller chooses the thread; the values are immutable.
  */
 public final class WorkspaceFile {
-    /** Whether a window is the main window or a child window, a full window. */
-    public enum Role {
-        /** The main window. */
-        MAIN,
-        /** Any other window. */
-        CHILD
-    }
-
     /** What an item needs to come back (spec 13): a terminal's title, directory and profile, or a plugin's restore state. */
     public sealed interface TabRecord permits TabRecord.Terminal, TabRecord.Content {
         /**
@@ -100,40 +92,34 @@ public final class WorkspaceFile {
     /**
      * One window as saved.
      *
-     * @param role main or child
      * @param bounds its normal bounds; empty places it as a new window
      * @param extendedState its maximized bits only (2 and 4): a window never comes back minimized
-     * @param layout what it holds (tabs and panes spec 4): its tabs, whose shown one is its active one; only the main
-     *     window's may be empty
+     * @param layout what it holds (tabs and panes spec 4): its tabs, whose shown one is its active one; its only
+     *     tab may be empty, the empty workspace
      * @param tabs a record for exactly each item of the layout
      */
-    public record WindowRecord(Role role, Optional<UiState.Bounds> bounds, int extendedState, ParentTabs layout, Map<TabId, TabRecord> tabs) {
+    public record WindowRecord(Optional<UiState.Bounds> bounds, int extendedState, ParentTabs layout, Map<TabId, TabRecord> tabs) {
         /** Copies the records and checks them against the layout. */
         public WindowRecord {
-            Objects.requireNonNull(role, "role");
             Objects.requireNonNull(bounds, "bounds");
             Objects.requireNonNull(layout, "layout");
             if ((extendedState & ~6) != 0) throw new IllegalArgumentException("Only the maximized bits are kept: " + extendedState);
             tabs = Map.copyOf(tabs);
             if (!tabs.keySet().equals(Set.copyOf(layout.tabs())))
                 throw new IllegalArgumentException("A window's tab records name exactly its layout's tabs");
-            if (role == Role.CHILD && layout.isEmpty())
-                throw new IllegalArgumentException("Only the main window's workspace may be empty");
         }
     }
 
     /**
-     * Every Jasper window to restore, the main window first.
+     * Every Jasper window to restore, in the order they come back: the first is the one brought to the front.
      *
-     * @param windows exactly one main window and any child windows; no tab, pane or item in two windows
+     * @param windows at least one window; no tab, pane or item in two windows
      */
     public record Snapshot(List<WindowRecord> windows) {
-        /** Puts the main window first and checks the ids. */
+        /** Copies the windows and checks the ids. */
         public Snapshot {
-            var ordered = new ArrayList<WindowRecord>();
-            for (WindowRecord window : windows) if (window.role() == Role.MAIN) ordered.add(window);
-            if (ordered.size() != 1) throw new IllegalArgumentException("A workspace has exactly one main window, not " + ordered.size());
-            for (WindowRecord window : windows) if (window.role() == Role.CHILD) ordered.add(window);
+            var ordered = List.copyOf(windows);
+            if (ordered.isEmpty()) throw new IllegalArgumentException("A workspace has at least one window");
             var groups = new HashSet<GroupId>();
             var tabs = new HashSet<TabId>();
             var parentTabs = new HashSet<ParentTabId>();
@@ -146,33 +132,14 @@ public final class WorkspaceFile {
                 for (ParentTabId parent : parentTabIds(window.layout()))
                     if (!parentTabs.add(parent)) throw new IllegalArgumentException("Parent tab " + parent + " is in two windows");
             }
-            windows = List.copyOf(ordered);
-        }
-
-        /**
-         * The main window.
-         *
-         * @return the first window
-         */
-        public WindowRecord main() {
-            return windows.getFirst();
-        }
-
-        /**
-         * The child windows.
-         *
-         * @return every window after the main window, in order
-         */
-        public List<WindowRecord> children() {
-            return windows.subList(1, windows.size());
+            windows = ordered;
         }
     }
 
     /** What {@link #read(Path)} found. */
     public sealed interface Loaded permits Loaded.Restore, Loaded.Fresh {
         /**
-         * The saved workspace, its bad entries dropped. A main window whose only tab is empty restores the empty
-         * workspace.
+         * The saved workspace, its bad entries dropped. A window whose only tab is empty restores the empty workspace.
          *
          * @param snapshot the windows to restore
          * @param keptAside where the original file was copied ({@code workspace.toml.bad} beside it) because a window, a
@@ -211,11 +178,11 @@ public final class WorkspaceFile {
      * Reads {@code file}; never throws, not even when tomlj's parser overflows the stack on deep nesting (workspace plan 2,
      * Rulings 13 and 14). A bad item entry, or an item a pane names without one, is dropped as
      * {@link Layout#remove(TabId)} drops it, and a tab it leaves with no item goes
-     * ({@link #keeping(ParentTabs, Predicate, boolean)}); a bad tab or window entry is dropped; bounds and choices fall
+     * ({@link #keeping(ParentTabs, Predicate)}); a bad tab or window entry is dropped; bounds and choices fall
      * back alone. When a window, a tab or an item entry was dropped, the original file is copied to
      * {@code workspace.toml.bad} beside it,
      * replacing an older one, and {@link Loaded.Restore#keptAside()} reports the copy. A file that cannot be read, does
-     * not parse, has another version or keeps no main window is moved to {@code workspace.toml.bad} instead.
+     * not parse, has another version or keeps no window is moved to {@code workspace.toml.bad} instead.
      *
      * @param file the workspace file
      * @return the windows to restore and any copy kept, or that Jasper starts fresh and what was set aside
@@ -287,8 +254,6 @@ public final class WorkspaceFile {
         var read = new ArrayList<WindowRecord>();
         if (toml.get(List.of("windows")) instanceof TomlArray entries)
             for (int i = 0; i < entries.size(); i++) window(entries.get(i), dropped).ifPresent(read::add);
-        // Main windows first, so that a child whose ids clash with the main window's is the one dropped.
-        read.sort(Comparator.comparing(window -> window.role() != Role.MAIN));
         var windows = new ArrayList<WindowRecord>();
         var groups = new HashSet<GroupId>();
         var tabs = new HashSet<TabId>();
@@ -296,9 +261,7 @@ public final class WorkspaceFile {
         for (WindowRecord window : read) {
             List<GroupId> ids = groupIds(window.layout());
             List<ParentTabId> parents = parentTabIds(window.layout());
-            if (window.role() == Role.MAIN && windows.stream().anyMatch(kept -> kept.role() == Role.MAIN)) {
-                drop(dropped, "Dropping a second main window from the workspace state");
-            } else if (ids.stream().anyMatch(groups::contains) || window.layout().tabs().stream().anyMatch(tabs::contains)
+            if (ids.stream().anyMatch(groups::contains) || window.layout().tabs().stream().anyMatch(tabs::contains)
                     || parents.stream().anyMatch(parentTabs::contains)) {
                 drop(dropped, "Dropping a window whose tabs, panes or items an earlier window holds");
             } else {
@@ -308,7 +271,7 @@ public final class WorkspaceFile {
                 windows.add(window);
             }
         }
-        if (windows.stream().noneMatch(kept -> kept.role() == Role.MAIN)) throw new IOException("The workspace state keeps no main window");
+        if (windows.isEmpty()) throw new IOException("The workspace state keeps no window");
         return new Parsed(new Snapshot(windows), !dropped.isEmpty());
     }
 
@@ -319,18 +282,14 @@ public final class WorkspaceFile {
     private static Optional<WindowRecord> window(Object value, List<String> dropped) {
         try {
             if (!(value instanceof TomlTable entry)) throw new IllegalArgumentException("a window entry is not a table");
-            Object name = entry.get(List.of("role"));
-            Role role = "main".equals(name) ? Role.MAIN : "full".equals(name) ? Role.CHILD : null;
-            if (role == null) throw new IllegalArgumentException("unknown window role " + name);
             ParentTabs held = parentTabs(entry, dropped);
             Map<TabId, TabRecord> records = tabs(entry, dropped);
             for (TabId tab : held.tabs())
                 if (!records.containsKey(tab)) drop(dropped, "Dropping item " + tab + " from the workspace state: it has no readable entry");
-            ParentTabs layout = keeping(held, records::containsKey, role == Role.MAIN)
-                .orElseThrow(() -> new IllegalArgumentException("a child window keeps no item"));
+            ParentTabs layout = keeping(held, records::containsKey);
             records.keySet().retainAll(Set.copyOf(layout.tabs()));
             int extendedState = UiState.number(entry, "extended_state").filter(state -> (state & ~6) == 0).orElse(0);
-            return Optional.of(new WindowRecord(role, UiState.bounds(entry), extendedState, layout, records));
+            return Optional.of(new WindowRecord(UiState.bounds(entry), extendedState, layout, records));
         } catch (RuntimeException bad) {
             drop(dropped, "Dropping a window from the workspace state: " + bad.getMessage());
             return Optional.empty();
@@ -376,18 +335,18 @@ public final class WorkspaceFile {
     }
 
     /**
+     *
      * {@code layout} with only the items {@code kept} keeps, as closing the others one by one would leave it (workspace
-     * tabs spec 7.3's {@code remove}; tabs and panes spec 4): a tab they all leave goes, and the one used before it shows
-     * when it showed; a window they all leave keeps nothing, except the main window, whose shown tab stays as its empty
-     * workspace. What a snapshot saves of a window, what the reader keeps of a window whose items lack entries, and what
-     * a window restores (workspace plan 6a Rulings 14).
+     * tabs spec 7.3's {@code remove}; tabs and panes spec 4): a tab they all leave goes, and the one used before it
+     * shows when it showed; a window they all leave keeps its shown tab as its empty workspace. What a snapshot saves
+     * of a window, what the reader keeps of a window whose items lack entries, and what a window restores (workspace
+     * plan 6a Rulings 14).
      *
      * @param layout a window's tabs
      * @param kept the items that stay
-     * @param main whether the window is the main window, whose workspace may be empty
-     * @return what stays; empty when no item does and the window is not the main window
+     * @return what stays
      */
-    public static Optional<ParentTabs> keeping(ParentTabs layout, Predicate<TabId> kept, boolean main) {
+    public static ParentTabs keeping(ParentTabs layout, Predicate<TabId> kept) {
         // The shown tab goes last, so that a window every item leaves keeps it as the empty workspace.
         var order = new ArrayList<>(layout.parentTabs());
         order.sort(Comparator.comparing(parent -> parent.id().equals(layout.active())));
@@ -396,7 +355,7 @@ public final class WorkspaceFile {
             Layout left = keeping(parent.layout(), kept);
             rest = left.isEmpty() && rest.parentTabs().size() > 1 ? rest.remove(parent.id()) : rest.replace(new ParentTab(parent.id(), left));
         }
-        return rest.isEmpty() && !main ? Optional.empty() : Optional.of(rest);
+        return rest;
     }
 
     private static Layout keeping(Layout layout, Predicate<TabId> kept) {
@@ -447,7 +406,7 @@ public final class WorkspaceFile {
         Object kind = table.get(List.of("kind"));
         if ("pane".equals(kind)) {
             if (children.containsKey(id)) throw new IllegalArgumentException("pane " + id + " is a parent");
-            // A pane holds one item (tabs and panes spec 2), or none in the main window's empty workspace.
+            // A pane holds one item (tabs and panes spec 2), or none in a window's empty workspace.
             if (!(table.get(List.of("item")) instanceof String item)) throw new IllegalArgumentException("pane " + id + " names no item");
             List<TabId> held = item.isEmpty() ? List.of() : List.of(TabId.parse(item));
             return new Group(GroupId.parse(id), held, held.stream().findFirst());
@@ -616,7 +575,7 @@ public final class WorkspaceFile {
     private static void encode(Snapshot snapshot, StringBuilder text, Counted sizes) {
         text.append("version = 1\n");
         for (WindowRecord window : snapshot.windows()) {
-            text.append("\n[[windows]]\nrole = \"").append(window.role() == Role.MAIN ? "main" : "full").append("\"\n");
+            text.append("\n[[windows]]\n");
             window.bounds().ifPresent(bounds -> text.append("x = ").append(bounds.x()).append("\ny = ").append(bounds.y())
                 .append("\nwidth = ").append(bounds.width()).append("\nheight = ").append(bounds.height()).append('\n'));
             text.append("extended_state = ").append(window.extendedState()).append('\n');

@@ -198,7 +198,7 @@ ext.aotTrainingConfig = { File shell ->
         '[terminal.shell]\nprogram = "/bin/sh"\nargs = ["' + path + '"]\n'
 }
 
-// The training launch's workspace.toml: one main window with one terminal tab, which it restores as a normal start
+// The training launch's workspace.toml: one window with one terminal tab, which it restores as a normal start
 // restores the saved windows, so the restore path's classes are in the cache. The start-up benchmark restores the same
 // file before each run (StartupRuns.WORKSPACE_SEED), and StartupBenchTest checks it is what WorkspaceFile writes.
 ext.aotTrainingWorkspace = project.file('src/main/resources/dev/jasper/app/benchmark/startup-workspace.toml')

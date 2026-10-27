@@ -187,7 +187,7 @@ class FileLinkClickTest {
     }
 
     private WindowContent window(ShellLauncher launcher) {
-        WindowContent owner = new WindowContent(launcher, directory, path -> { }, () -> { }, () -> { });
+        WindowContent owner = new WindowContent(launcher, directory, path -> { }, () -> { });
         owner.onOpenFile = (file, line) -> opened.add(file + ":" + line);
         windows.add(owner);
         return owner;

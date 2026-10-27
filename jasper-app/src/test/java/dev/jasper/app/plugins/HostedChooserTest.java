@@ -44,7 +44,7 @@ class HostedChooserTest {
             UUID id=first?fixture.addMainWindow():fixture.addWindow();contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id,e -> {},e -> {},e -> {},() -> {}));return id;
         };
         UUID main=window.apply(true);
-        contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> contributions.tabs().move(tab, window.apply(false))));
+        contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, tab -> contributions.tabs().move(tab, window.apply(false))));
         var disposed=new java.util.concurrent.atomic.AtomicInteger();
         var view=kit.create(HostedKitTest.custom(dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"doc"),e -> {});
         view.registerContent(new dev.jasper.sdk.ui.CustomContent("doc",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea(),disposed::incrementAndGet));

@@ -45,8 +45,8 @@ import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
 /**
- * The native window of one of the main window's detached tool windows (floating tool windows spec, The detached window),
- * the shell {@code DetachedToolWindows} drives: Float's modeless dialog owned by the main window's frame, or Window's
+ * The native window of one of a window's detached tool windows (floating tool windows spec, The detached window),
+ * the shell {@code DetachedToolWindows} drives: Float's modeless dialog owned by that window's frame, or Window's
  * ownerless frame, titled with the tool window's title and holding its frame. Its chrome follows the rules of auxiliary
  * windows ({@code NativeShells}) and the windows ({@link WindowContent#mount}): on macOS the unified title bar, a
  * dialog's row for Float and a window's for Window; without it, under a classic title IntelliJ Classic's band, and
@@ -90,7 +90,7 @@ public final class DetachedFrame {
     }
 
     /**
-     * Makes the main window's detached tool windows' native windows, for {@link WindowContent#detachedShells}. Never
+     * Makes a window's detached tool windows' native windows, for {@link WindowContent#detachedShells}. Never
      * used headless.
      *
      * @param themes the application's themes, which the windows follow

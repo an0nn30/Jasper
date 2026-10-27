@@ -36,7 +36,7 @@ class TabCommandsTest {
     /** Review Focus 1. */
     @Test void newTabInTheEmptyMainWorkspaceFillsItsOnlyTab() throws Exception {
         edt(() -> {
-            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, true, () -> { });
+            var main = content(idleLauncher(pending), HOME, true);
             main.invoke(ActionId.NEW_TAB);
             assertThat(main.parentTabCount()).isEqualTo(1);
             assertThat(main.tabCount()).isEqualTo(1);
@@ -100,7 +100,7 @@ class TabCommandsTest {
     /** Spec 4: either command closes the main window's only item and leaves its empty workspace, where neither acts. */
     @Test void closePaneAndCloseTabOnTheMainWindowsOnlyItemLeaveItsEmptyWorkspace() throws Exception {
         for (ActionId close : List.of(ActionId.CLOSE_PANE, ActionId.CLOSE_TAB)) edt(() -> {
-            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, false, () -> { });
+            var main = content(idleLauncher(pending), HOME, false);
             Tab only = main.selectedTab();
             main.invoke(close);
             assertThat(only.closed()).as("%s closes the only item", close).isTrue();
@@ -113,16 +113,16 @@ class TabCommandsTest {
         });
     }
 
-    /** Spec 4: Close Tab on a full window's last tab empties it, and its emptied handler closes it. */
-    @Test void closeTabOnAFullWindowsLastTabClosesTheWindow() throws Exception {
+    /** Spec 4; full windows spec 5.3: Close Tab on a window's last tab closes its panes and leaves its empty workspace. */
+    @Test void closeTabOnAWindowsLastTabLeavesItsEmptyWorkspace() throws Exception {
         edt(() -> {
-            int[] emptied = {0};
-            var full = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> emptied[0]++);
-            full.invoke(ActionId.SPLIT_RIGHT);
-            var doomed = List.copyOf(full.tabs());
-            full.invoke(ActionId.CLOSE_TAB);
+            var window = content(idleLauncher(pending), HOME, false);
+            window.invoke(ActionId.SPLIT_RIGHT);
+            var doomed = List.copyOf(window.tabs());
+            window.invoke(ActionId.CLOSE_TAB);
             assertThat(doomed).hasSize(2).allMatch(Tab::closed);
-            assertThat(emptied[0]).as("the window's emptied handler, once").isEqualTo(1);
+            assertThat(window.closed()).isFalse();
+            assertThat(window.workspace().emptyWorkspace()).as("its empty workspace").isNotNull();
         });
     }
 

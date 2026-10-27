@@ -140,17 +140,17 @@ class ParentTabsViewTest {
         });
     }
 
-    @Test void aChildWindowClosesWithItsLastParentTabsLastTab() throws Exception {
-        int[] emptied = {0};
+    /** Full windows spec 5.3: a window's last tab closing leaves its empty workspace. */
+    @Test void aWindowKeepsItsEmptyWorkspaceWhenItsLastParentTabsLastTabCloses() throws Exception {
         edt(() -> {
-            var child = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> emptied[0]++);
-            Tab a = child.selectedTab();
-            Tab b = open(child);
-            child.closeTab(a);
-            assertThat(child.parentTabCount()).isEqualTo(1);
-            assertThat(emptied[0]).as("its other parent tab keeps it open").isZero();
-            child.closeTab(b);
-            assertThat(emptied[0]).as("a full window closes with its last parent tab").isEqualTo(1);
+            var window = content(idleLauncher(pending), HOME, false);
+            Tab a = window.selectedTab();
+            Tab b = open(window);
+            window.closeTab(a);
+            assertThat(window.parentTabCount()).isEqualTo(1);
+            window.closeTab(b);
+            assertThat(window.closed()).as("the window stays").isFalse();
+            assertThat(window.workspace().emptyWorkspace()).as("its empty workspace shows").isNotNull();
         });
     }
 
@@ -190,7 +190,7 @@ class ParentTabsViewTest {
      */
     @Test void whatOpensWithoutAPaneOpensAsATabAndTheEmptyWorkspaceTakesTheFirst() throws Exception {
         edt(() -> {
-            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, true, () -> { });
+            var main = content(idleLauncher(pending), HOME, true);
             var model = new Contributions();
             main.connectContributions(model);
             Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", main.id(), new JPanel());

@@ -694,8 +694,8 @@ class DetachedToolWindowsTest {
             owner.connectContributions(new Contributions(), UiState.inMemory());
             assertThat(owner.detachedWindows().shells).isSameAs(shells);
 
-            WindowContent child = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), WindowRole.CHILD,
-                DesktopTestSupport.HOME, false, () -> { });
+            WindowContent child = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()),
+                DesktopTestSupport.HOME, false);
             child.connectContributions(new Contributions(), UiState.inMemory());
             child.detachedShells(shells);
             assertThat(child.detachedWindows()).as("every window's tool windows are its own").isNotNull().isNotSameAs(owner.detachedWindows());

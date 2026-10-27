@@ -28,7 +28,7 @@ class WindowChromeHintTest {
             edt(() -> {
                 var themes = ThemeTestSupport.controller(true);
                 controller[0] = new ConfigurationTestSupport(themes, service);
-                owner[0] = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {}, themes);
+                owner[0] = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, themes);
                 controller[0].register(owner[0]);
                 button[0] = (JButton) owner[0].toolbar().getComponent(0);
             });
@@ -56,7 +56,7 @@ class WindowChromeHintTest {
 
     @Test void loadedStatusDoesNotExposeTheObsoleteNotLoadedTooltip() throws Exception {
         edt(() -> {
-            try (var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {})) {
+            try (var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {})) {
                 owner.setConfigurationState(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), directory.resolve("config.toml"), true));
                 assertThat(owner.status().getToolTipText()).isNull();
                 assertThat(owner.status().configButton().getToolTipText()).isEqualTo(directory.resolve("config.toml").toString());

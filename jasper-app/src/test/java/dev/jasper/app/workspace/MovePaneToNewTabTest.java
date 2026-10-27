@@ -138,7 +138,7 @@ class MovePaneToNewTabTest {
             assertThat(window.windowLayout().parentTabs().get(1).layout().tabs()).containsExactly(view.id());
         });
         edt(() -> {
-            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, false, () -> { });
+            var main = content(idleLauncher(pending), HOME, false);
             main.invoke(ActionId.CLOSE_PANE);
             assertThat(main.workspace().emptyWorkspace()).as("its empty workspace shows").isNotNull();
             main.updateActions();

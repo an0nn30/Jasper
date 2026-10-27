@@ -147,7 +147,7 @@ class SplitListsTest {
         edt(() -> {
             item("dev.jasper.editor", "editor", "Editor", true);
             for (String side : List.of("Right", "Down")) {
-                WindowContent empty = content(idleLauncher(pending), WindowRole.MAIN, null, true, () -> { });
+                WindowContent empty = content(idleLauncher(pending), null, true);
                 empty.connectContributions(model);
                 assertThat(empty.parentTabs().isEmpty()).as("the empty workspace").isTrue();
                 entry(tabSplit(empty), "Editor " + side).doClick();

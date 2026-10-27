@@ -68,8 +68,8 @@ class TabDragWindowsTest {
     /** Each window a move brought to the front, in order. */
     private final List<WindowContent> raised = new ArrayList<>();
     private WindowManager manager;
-    private MainWindow main;
-    private ChildWindow child;
+    private JasperWindow main;
+    private JasperWindow child;
 
     @BeforeEach void windows() throws Exception {
         edt(() -> {
@@ -77,8 +77,8 @@ class TabDragWindowsTest {
             terminals.onEvent(facts::add);
             manager = new WindowManager(model, new WindowManager.Hooks(this::compose, this::frame, window -> { }, window -> { },
                 window -> { }, state -> { }, window -> { }, () -> { }));
-            main = manager.ensureMain("cold", null).orElseThrow();
-            child = manager.openTerminalWindow(null).orElseThrow();
+            main = manager.ensureWindow("cold", null).orElseThrow();
+            child = manager.openWindow(null).orElseThrow();
             place(frames.get(main.id()), 0, 0, 1208, 800);
             place(frames.get(child.id()), 1400, 100, 800, 600);
         });
@@ -100,8 +100,8 @@ class TabDragWindowsTest {
     private WindowContent compose(WindowManager.Opening opening) {
         var launcher = new ShellLauncher(pending::add, directory -> IdleTerminalSession.start(), "idle-test-session");
         boolean macOs = System.getProperty("os.name").startsWith("Mac");
-        var content = DesktopTestSupport.track(new WindowContent(opening.role(), launcher, opening.directory(), opening.empty(),
-            directory -> manager.openTerminalWindow(directory), () -> { }, opening.emptied(), ThemeTestSupport.controller(true),
+        var content = DesktopTestSupport.track(new WindowContent(launcher, opening.directory(), opening.empty(),
+            directory -> manager.openWindow(directory), () -> { }, ThemeTestSupport.controller(true),
             KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD));
         content.connectContributions(model);
         content.connectTerminals(terminals, () -> raised.add(content));
@@ -122,6 +122,9 @@ class TabDragWindowsTest {
     }
 
     private JPanel frameOf(JasperWindow window) { return frames.get(window.id()); }
+
+    /** Every window after the first, in opening order. */
+    private List<JasperWindow> others() { var all = manager.windows(); return all.subList(1, all.size()); }
 
     private static GroupId activeGroup(JasperWindow window) { return window.content().workspace().model().activeGroup(); }
 
@@ -375,7 +378,7 @@ class TabDragWindowsTest {
             assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.TearOut(expected, outside));
             assertThat(manager.tabDrag().overlay().getParent()).as("no landing in any window").isNull();
             mouse(source, MouseEvent.MOUSE_RELEASED, outside);
-            ChildWindow full = manager.children().getLast();
+            JasperWindow full = others().getLast();
             assertThat(full).isNotSameAs(child);
             assertThat(full.content().parentTabs().model()).as("a full window, the tab whole").isEqualTo(ParentTabs.of(new ParentTab(id[0], layout)));
             assertThat(placed).as("its workspace, which its frame grows by its title bar").containsExactly(expected);
@@ -402,7 +405,7 @@ class TabDragWindowsTest {
             Component source = start(from, moving, outside);
             assertThat(manager.tabDrag().target()).as("out of every window").containsInstanceOf(TabDrag.Target.TearOut.class);
             mouse(source, MouseEvent.MOUSE_RELEASED, outside);
-            ChildWindow full = manager.children().getLast();
+            JasperWindow full = others().getLast();
             assertThat(full).isNotSameAs(child);
             assertThat(child.closed()).as("the full window it left stays open").isFalse();
             assertThat(tabIds(from)).as("with its other tab").containsExactly(stays);
@@ -432,7 +435,7 @@ class TabDragWindowsTest {
             assertThat(manager.moveParentTab(from, only, to, before.size())).isTrue();
             assertThat(tabIds(to)).as("at the end of the main window's strip").containsExactly(before.get(0), before.get(1), only);
             assertThat(child.closed()).as("its last tab moved out").isTrue();
-            assertThat(manager.children()).isEmpty();
+            assertThat(others()).isEmpty();
             int moved = facts.indexOf(new TerminalEvent.TabMoved(moving.id().value(), child.id(), main.id()));
             int closed = facts.indexOf(new TerminalEvent.WindowClosed(child.id()));
             assertThat(moved).as("TAB_MOVED").isNotNegative();
@@ -440,8 +443,8 @@ class TabDragWindowsTest {
         });
     }
 
-    /** Workspace plan 7b Rulings 10: a move taking the main window's only tab leaves its empty workspace under a new id. */
-    @Test void aMoveThatEmptiesTheMainWindowGivesItsEmptyWorkspaceANewId() throws Exception {
+    /** Full windows spec 5.3: a move taking a window's only tab closes that window once the move has reported itself. */
+    @Test void aMoveThatEmptiesAWindowClosesIt() throws Exception {
         edt(() -> secondTab(child));
         launch();
         edt(() -> {
@@ -450,12 +453,9 @@ class TabDragWindowsTest {
             List<ParentTabId> before = tabIds(to);
             assertThat(manager.moveParentTab(from, only, to, 2)).isTrue();
             assertThat(tabIds(to)).as("at the end of its strip").containsExactly(before.get(0), before.get(1), only);
-            assertThat(main.closed()).as("the main window stays").isFalse();
-            assertThat(from.tabs()).isEmpty();
-            ParentTabId empty = from.activeParentTab();
-            assertThat(tabIds(from)).containsExactly(empty);
-            assertThat(empty).as("its empty workspace's id is new").isNotEqualTo(only);
-            assertThat(tabIds(to)).as("so no id is in two windows").doesNotContain(empty);
+            assertThat(main.closed()).as("the window it emptied closes").isTrue();
+            int moved = facts.indexOf(facts.stream().filter(TerminalEvent.TabMoved.class::isInstance).findFirst().orElseThrow());
+            assertThat(facts.indexOf(new TerminalEvent.WindowClosed(main.id()))).as("after the move").isGreaterThan(moved);
         });
     }
 
@@ -483,7 +483,7 @@ class TabDragWindowsTest {
                 assertThat(manager.tabDrag().target()).as("its own strip still takes it").contains(new TabDrag.Target.Bar(from, 1));
                 mouse(source, MouseEvent.MOUSE_RELEASED, past);
                 assertThat(tabIds(from)).containsExactly(ids[1], ids[0]);
-                assertThat(manager.children()).containsExactly(child);
+                assertThat(others()).containsExactly(child);
                 assertThat(moves()).isEmpty();
             } finally {
                 pin.close();
@@ -518,7 +518,7 @@ class TabDragWindowsTest {
                 assertThat(manager.tabDrag().target()).as("its own strip still takes it").isPresent();
                 mouse(source, MouseEvent.MOUSE_RELEASED, there);
                 assertThat(notes.window()).isEqualTo(main.id());
-                assertThat(manager.children()).containsExactly(child);
+                assertThat(others()).containsExactly(child);
                 assertThat(moves()).isEmpty();
             } finally {
                 answer.complete(false);
@@ -575,7 +575,7 @@ class TabDragWindowsTest {
             assertThat(manager.tabDrag().target()).as("over the child window's title bar").isEmpty();
             mouse(source, MouseEvent.MOUSE_RELEASED, title);
             assertThat(moving.window()).isEqualTo(main.id());
-            assertThat(manager.children()).containsExactly(child);
+            assertThat(others()).containsExactly(child);
             assertThat(placed).isEmpty();
             assertThat(moves()).isEmpty();
         });
@@ -603,7 +603,7 @@ class TabDragWindowsTest {
         });
     }
 
-    /** A command moving the item a dragged tab's entry shows (Move to Main Window from the keyboard) ends the drag. */
+    /** A command moving the item a dragged tab's entry shows (Move Tab to Window from the keyboard) ends the drag. */
     @Test void anItemMovedToAnotherWindowDuringTheDragEndsIt() throws Exception {
         ParentTabId[] id = new ParentTabId[1];
         edt(() -> id[0] = secondTab(child));
@@ -613,7 +613,7 @@ class TabDragWindowsTest {
             Point there = inside(band(main.content()), 0.5, 0.5);
             Component source = start(child.content(), moving, there);
             assertThat(manager.tabDrag().active()).isTrue();
-            model.tabs().moveToMainWindow(moving);
+            model.tabs().moveToWindow(moving, main.id());
             assertThat(manager.tabDrag().active()).isFalse();
             assertThat(manager.tabDrag().label().showing()).isFalse();
             assertThat(manager.tabDrag().overlay().getParent()).isNull();
@@ -721,7 +721,7 @@ class TabDragWindowsTest {
             mouse(source, MouseEvent.MOUSE_DRAGGED, before);
             mouse(source, MouseEvent.MOUSE_RELEASED, before);
             assertThat(tabIds(from)).as("the drag went on to its drop").containsExactly(id[0], other);
-            assertThat(manager.children()).isEmpty();
+            assertThat(others()).isEmpty();
             assertEnded(keys, listeners);
         }));
     }
@@ -740,7 +740,7 @@ class TabDragWindowsTest {
             assertThat(manager.tabDrag().active()).isTrue();
             assertThat(manager.tabDrag().target()).as("a window of Jasper's, outside any workspace").isEmpty();
             mouse(source, MouseEvent.MOUSE_RELEASED, overSettings);
-            assertThat(manager.children()).containsExactly(child);
+            assertThat(others()).containsExactly(child);
             assertThat(placed).isEmpty();
             assertThat(tab.window()).isEqualTo(main.id());
         });
@@ -973,7 +973,7 @@ class TabDragWindowsTest {
             dropPane(from, moving, right);
             assertThat(to.workspace().tabs()).containsExactly(there, moving);
             assertThat(child.closed()).as("its last pane moved out").isTrue();
-            assertThat(manager.children()).isEmpty();
+            assertThat(others()).isEmpty();
             int moved = facts.indexOf(new TerminalEvent.TabMoved(moving.id().value(), child.id(), main.id()));
             int closed = facts.indexOf(new TerminalEvent.WindowClosed(child.id()));
             assertThat(moved).as("TAB_MOVED").isNotNegative();
@@ -981,21 +981,15 @@ class TabDragWindowsTest {
         });
     }
 
-    /**
-     * Review Focus 5 and spec 4: the main window's only pane dropped beside another window's leaves the main window's
-     * empty workspace, under the id it had, which no other window holds.
-     */
-    @Test void theMainWindowsOnlyPaneLeavingLeavesItsEmptyWorkspace() throws Exception {
+    /** Review Focus 5; full windows spec 5.3: a window's only pane dropped beside another window's closes the window. */
+    @Test void aWindowsOnlyPaneLeavingClosesTheWindow() throws Exception {
         edt(() -> {
             WindowContent from = main.content(), to = child.content();
             Tab moving = from.selectedTab(), there = to.selectedTab();
-            ParentTabId emptied = from.activeParentTab();
             dropPane(from, moving, inside(pane(to, there.group().orElseThrow()), 0.5, 0.9));
             assertThat(to.workspace().tabs()).as("below it").containsExactly(there, moving);
-            assertThat(main.closed()).isFalse();
-            assertThat(from.parentTabs().isEmpty()).as("the main window's empty workspace").isTrue();
-            assertThat(tabIds(from)).as("its one tab, empty").containsExactly(emptied);
-            assertThat(tabIds(to)).as("no id in two windows").doesNotContain(emptied);
+            assertThat(main.closed()).as("the window it emptied closes").isTrue();
+            assertThat(manager.windows()).containsExactly(child);
         });
     }
 
@@ -1488,7 +1482,7 @@ class TabDragWindowsTest {
             assertThat(manager.moveTabInto(from, only, to, there.group().orElseThrow(), Side.LEFT)).isTrue();
             assertThat(to.workspace().tabs()).as("on its left").containsExactly(tabs.get(0), tabs.get(1), there);
             assertThat(child.closed()).as("its last tab moved out").isTrue();
-            assertThat(manager.children()).isEmpty();
+            assertThat(others()).isEmpty();
             int first = facts.indexOf(new TerminalEvent.TabMoved(tabs.get(0).id().value(), child.id(), main.id()));
             int last = facts.indexOf(new TerminalEvent.TabMoved(tabs.get(1).id().value(), child.id(), main.id()));
             int closed = facts.indexOf(new TerminalEvent.WindowClosed(child.id()));
@@ -1502,34 +1496,31 @@ class TabDragWindowsTest {
     }
 
     /**
-     * Pane flexibility spec 5 and workspace plan 9a Rulings 13: the main window's only tab merged into another window's
-     * leaves its empty workspace under new ids: the moved panes keep theirs in the other window, and no id is in two.
+     * Pane flexibility spec 5 and workspace plan 9a Rulings 13; full windows spec 5.3: a window's only tab merged into
+     * another window's closes the window, and the moved panes keep their ids in the other window.
      */
-    @Test void theMainWindowsOnlyTabMergedAwayLeavesItsEmptyWorkspaceUnderNewIds() throws Exception {
+    @Test void aWindowsOnlyTabMergedAwayClosesTheWindow() throws Exception {
         edt(() -> {
             WindowContent from = main.content(), to = child.content();
             ParentTabId only = from.activeParentTab();
             GroupId moved = from.workspace().model().activeGroup();
             Tab there = to.selectedTab();
             assertThat(manager.moveTabInto(from, only, to, there.group().orElseThrow(), Side.RIGHT)).isTrue();
-            assertThat(main.closed()).as("the main window stays").isFalse();
-            assertThat(from.parentTabs().isEmpty()).as("its empty workspace").isTrue();
-            assertThat(tabIds(from)).as("under a new id").doesNotContain(only);
+            assertThat(main.closed()).as("the window it emptied closes").isTrue();
             assertThat(groupIds(to)).as("the moved pane keeps its id there").contains(moved);
-            assertThat(groupIds(from)).as("no pane is in two windows").doesNotContainAnyElementsOf(groupIds(to));
         });
     }
 
     /**
-     * Workspace plan 9a's Task 6 review: the main window's empty workspace has a pane id but no pane to merge beside,
+     * Workspace plan 9a's Task 6 review: a window's empty workspace has a pane id but no pane to merge beside,
      * so the window manager refuses a tab merged into it, moving nothing; a drop there takes the tab in its place
      * instead.
      */
-    @Test void aTabMergedIntoTheMainWindowsEmptyWorkspaceIsRefused() throws Exception {
+    @Test void aTabMergedIntoAnEmptyWorkspaceIsRefused() throws Exception {
         edt(() -> {
             WindowContent empty = main.content(), from = child.content();
-            assertThat(manager.moveTabInto(empty, empty.activeParentTab(), from, activeGroup(child), Side.RIGHT)).isTrue();
-            assertThat(empty.parentTabs().isEmpty()).as("the main window's empty workspace").isTrue();
+            empty.closeTab(empty.selectedTab());
+            assertThat(empty.parentTabs().isEmpty()).as("the window's empty workspace").isTrue();
             ParentTabId only = from.activeParentTab();
             List<Tab> tabs = from.workspace().tabs();
             facts.clear();

@@ -69,7 +69,7 @@ class PaneDragTest {
             KeyboardFocusManager.setCurrentKeyboardFocusManager(keys);
             listeners = motionListeners();
             terminals.onEvent(facts::add);
-            owner = content(idleLauncher(pending), WindowRole.MAIN, null, true, () -> { });
+            owner = content(idleLauncher(pending), null, true);
             owner.setAnimations(new AnimationSettings(false, 0, 0, 0));
             owner.connectContributions(model);
             owner.connectTerminals(terminals, () -> { });

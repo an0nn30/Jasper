@@ -568,8 +568,8 @@ class DockDragDetachTest {
         edt(() -> {
             var f = fixture();
             Point overlap = f.zone(Slot.RIGHT_TOP);
-            WindowContent child = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), WindowRole.CHILD,
-                DesktopTestSupport.HOME, false, () -> { });
+            WindowContent child = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()),
+                DesktopTestSupport.HOME, false);
             TabDragTestSupport.frame(child, overlap.x - 50, overlap.y - 50, 400, 300);
             var byActivation = new ArrayList<WindowContent>();
             var shared = new TabDrag(() -> List.copyOf(byActivation));

@@ -43,7 +43,7 @@ class WorkspaceSnapshotTest {
         Path logs = Files.createDirectories(folder.resolve("logs"));
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", work).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", work).orElseThrow();
             Tab first = main.content().selectedTab();
             ParentTabId firstParent = main.content().activeParentTab();
             main.content().openTab(logs, null, Optional.of("zsh"));
@@ -52,23 +52,21 @@ class WorkspaceSnapshotTest {
             main.content().split(Side.RIGHT);
             main.content().newTab(work);
             main.placed(new JasperWindow.Placement(Optional.of(new UiState.Bounds(40, 60, 1400, 900)), 6));
-            ChildWindow full = windows.manager.openTerminalWindow(work).orElseThrow();
-            ChildWindow moved = windows.manager.moveToNewWindow(tail).orElseThrow();
+            JasperWindow full = windows.manager.openWindow(work).orElseThrow();
+            JasperWindow moved = windows.manager.moveToNewWindow(tail).orElseThrow();
             WorkspaceFile.Snapshot snapshot = windows.manager.snapshot().orElseThrow();
             assertThat(snapshot.windows()).hasSize(3);
-            WorkspaceFile.WindowRecord saved = snapshot.main();
-            assertThat(saved.role()).isEqualTo(WorkspaceFile.Role.MAIN);
+            WorkspaceFile.WindowRecord saved = snapshot.windows().getFirst();
             assertThat(saved.bounds()).contains(new UiState.Bounds(40, 60, 1400, 900));
             assertThat(saved.extendedState()).isEqualTo(6);
             assertThat(saved.layout()).as("its parent tabs in bar order, the one that shows, their splits, groups, order and selection")
                 .isEqualTo(main.content().windowLayout());
             assertThat(saved.layout().parentTabs()).extracting(ParentTab::id).first().isEqualTo(firstParent);
             assertThat(saved.tabs().get(first.id())).isEqualTo(new WorkspaceFile.TabRecord.Terminal("", work.toString(), ""));
-            assertThat(snapshot.children()).extracting(WorkspaceFile.WindowRecord::layout)
+            assertThat(snapshot.windows().subList(1, snapshot.windows().size())).extracting(WorkspaceFile.WindowRecord::layout)
                 .as("two full windows, in the order they opened")
                 .containsExactly(full.content().windowLayout(), moved.content().windowLayout());
-            WorkspaceFile.WindowRecord movedRecord = snapshot.children().get(1);
-            assertThat(movedRecord.role()).isEqualTo(WorkspaceFile.Role.CHILD);
+            WorkspaceFile.WindowRecord movedRecord = snapshot.windows().subList(1, snapshot.windows().size()).get(1);
             assertThat(movedRecord.tabs().get(tail.id())).as("renamed, in its directory, with its profile")
                 .isEqualTo(new WorkspaceFile.TabRecord.Terminal("tail", logs.toString(), "zsh"));
             assertThat(movedRecord.bounds()).as("its frame has not said where it is").isEmpty();
@@ -79,29 +77,29 @@ class WorkspaceSnapshotTest {
     @Test void tabsThatCannotComeBackAreTakenOutAsClosingThemWouldLeaveTheirWindows() throws Exception {
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
             Tab terminal = main.content().selectedTab();
             ParentTabId first = main.content().activeParentTab();
             Tab notes = windows.model.tabs().open("dev.example.notes", "todo", "Todo", main.id(), new javax.swing.JPanel());
             // Jasper's own Errors tab, alone in a full window (workspace plan 4b's app-owned tab).
             Tab errors = windows.model.tabs().open(TabRegistry.APP_OWNER, "errors", "Errors", main.id(), new javax.swing.JPanel());
             errors.moveToNewWindow();
-            assertThat(windows.manager.children()).hasSize(1);
+            assertThat(windows.others()).hasSize(1);
             main.content().newTab(folder);
             Tab other = main.content().selectedTab();
             Tab away = windows.model.tabs().open("dev.example.notes", "away", "Away", main.id(), new javax.swing.JPanel());
             main.content().closeTab(other);
             assertThat(main.content().parentTabCount()).as("the terminal's tab, and each plugin's item in a tab of its own").isEqualTo(3);
             WorkspaceFile.Snapshot snapshot = windows.manager.snapshot().orElseThrow();
-            var saved = snapshot.main().layout();
+            var saved = snapshot.windows().getFirst().layout();
             assertThat(saved.parentTabs()).as("a parent tab holding only such tabs is left out").extracting(ParentTab::id).containsExactly(first);
             assertThat(saved.active()).as("and the one used before it shows, as closing its tabs would").isEqualTo(first);
             assertThat(saved.tabs()).as("a plugin's tab with no restorer is not saved").containsExactly(terminal.id());
-            assertThat(snapshot.main().tabs()).containsOnlyKeys(terminal.id());
-            assertThat(snapshot.children()).as("a child window holding only Jasper's own tab is left out").isEmpty();
+            assertThat(snapshot.windows().getFirst().tabs()).containsOnlyKeys(terminal.id());
+            assertThat(snapshot.windows().subList(1, snapshot.windows().size())).as("a window holding only Jasper's own tab is left out").isEmpty();
             assertThat(List.of(notes, away, errors)).as("taking them out of what is saved closes nothing").noneMatch(Tab::closed);
             terminal.close();
-            assertThat(windows.manager.snapshot().orElseThrow().main().layout().isEmpty())
+            assertThat(windows.manager.snapshot().orElseThrow().windows().getFirst().layout().isEmpty())
                 .as("the main window may be saved empty").isTrue();
         });
         windows.launch();
@@ -111,14 +109,14 @@ class WorkspaceSnapshotTest {
     @Test void aWindowThatIsClosingIsNotInTheSnapshot() throws Exception {
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
-            ChildWindow child = windows.manager.openTerminalWindow(folder).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
+            JasperWindow child = windows.manager.openWindow(folder).orElseThrow();
             var during = new ArrayList<WorkspaceFile.Snapshot>();
             child.content().selectedTab().onClosed(() -> during.add(windows.manager.snapshot().orElseThrow()));
             child.requestClose();
-            assertThat(windows.manager.children()).isEmpty();
+            assertThat(windows.others()).isEmpty();
             assertThat(during).singleElement().as("taken as the closing window's tab closed")
-                .satisfies(snapshot -> assertThat(snapshot.children()).isEmpty());
+                .satisfies(snapshot -> assertThat(snapshot.windows().subList(1, snapshot.windows().size())).isEmpty());
             var closing = new ArrayList<Optional<WorkspaceFile.Snapshot>>();
             main.content().selectedTab().onClosed(() -> closing.add(windows.manager.snapshot()));
             windows.manager.closeAll();
@@ -131,10 +129,10 @@ class WorkspaceSnapshotTest {
         windows();
         edt(() -> {
             assertThat(windows.manager.snapshot()).as("no main window").isEmpty();
-            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
             main.content().openTab(folder, null, Optional.empty(), Optional.of(List.of("top")));
             Tab program = main.content().selectedTab();
-            assertThat(windows.manager.snapshot().orElseThrow().main().tabs().get(program.id()))
+            assertThat(windows.manager.snapshot().orElseThrow().windows().getFirst().tabs().get(program.id()))
                 .as("the program is not saved: the tab comes back as a plain shell")
                 .isEqualTo(new WorkspaceFile.TabRecord.Terminal("", folder.toString(), ""));
             windows.manager.closeAll();
@@ -153,10 +151,10 @@ class WorkspaceSnapshotTest {
             } catch (Exception failure) { throw new IllegalStateException(failure); }
         }));
         Tab[] tab = new Tab[1];
-        edt(() -> tab[0] = windows.manager.ensureMain("cold", folder).orElseThrow().content().selectedTab());
+        edt(() -> tab[0] = windows.manager.ensureWindow("cold", folder).orElseThrow().content().selectedTab());
         windows.launch();
         until(() -> ((TerminalContent) tab[0].content()).pane().snapshot().remoteDirectory().isPresent());
-        edt(() -> assertThat(windows.manager.snapshot().orElseThrow().main().tabs().get(tab[0].id()))
+        edt(() -> assertThat(windows.manager.snapshot().orElseThrow().windows().getFirst().tabs().get(tab[0].id()))
             .isEqualTo(new WorkspaceFile.TabRecord.Terminal("", "", "")));
     }
 }

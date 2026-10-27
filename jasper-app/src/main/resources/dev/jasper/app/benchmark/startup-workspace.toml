@@ -1,7 +1,6 @@
 version = 1
 
 [[windows]]
-role = "main"
 x = 100
 y = 100
 width = 960

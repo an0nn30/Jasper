@@ -158,15 +158,14 @@ class StartupBenchTest {
     }
 
     /**
-     * The saved windows AOT training and every run in an isolated home restore: one main window with one terminal tab,
+     * The saved windows AOT training and every run in an isolated home restore: one window with one terminal tab,
      * byte for byte what {@link WorkspaceFile#write} writes for it, so the seed cannot drift from the format.
      */
-    @Test void theWorkspaceSeedIsWhatWorkspaceFileWritesForOneMainWindowWithOneTerminalTab() throws Exception {
+    @Test void theWorkspaceSeedIsWhatWorkspaceFileWritesForOneWindowWithOneTerminalTab() throws Exception {
         TabId item = TabId.parse("00000000-0000-4000-8000-000000000001");
         GroupId pane = GroupId.parse("00000000-0000-4000-9000-000000000001");
         ParentTabId tab = ParentTabId.parse("00000000-0000-4000-a000-000000000001");
-        var expected = new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN,
-            Optional.of(new UiState.Bounds(100, 100, 960, 600)), 0,
+        var expected = new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(Optional.of(new UiState.Bounds(100, 100, 960, 600)), 0,
             ParentTabs.of(new ParentTab(tab, new Layout(new Group(pane, List.of(item), Optional.of(item)), pane, Optional.empty()))),
             Map.of(item, new WorkspaceFile.TabRecord.Terminal("", "", "")))));
         Path seed = temp.resolve("workspace.toml");

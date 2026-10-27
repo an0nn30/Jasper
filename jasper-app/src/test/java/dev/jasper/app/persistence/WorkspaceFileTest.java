@@ -16,7 +16,6 @@ import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.layout.TabId;
-import dev.jasper.app.persistence.WorkspaceFile.Role;
 import dev.jasper.app.persistence.WorkspaceFile.Snapshot;
 import dev.jasper.app.persistence.WorkspaceFile.TabRecord;
 import dev.jasper.app.persistence.WorkspaceFile.WindowRecord;
@@ -59,7 +58,7 @@ class WorkspaceFileTest {
         return new Layout(group(n, n), groupId(n), Optional.empty());
     }
 
-    /** A main or full window's only parent tab, {@code id}, holding {@code layout}. */
+    /** A window's only parent tab, {@code id}, holding {@code layout}. */
     static ParentTabs one(int id, Layout layout) {
         return ParentTabs.of(new ParentTab(parentTabId(id), layout));
     }
@@ -72,30 +71,29 @@ class WorkspaceFileTest {
     }
 
     /**
-     * Spec 8's example as the main window's one parent tab: two columns, each in two rows, the right column's upper pane
-     * active and maximized; and a full window without bounds. Listed full window first: the snapshot puts the main
-     * window first.
+     * Spec 8's example as the first window's one parent tab: two columns, each in two rows, the right column's upper pane
+     * active and maximized; and a second window without bounds.
      */
     static Snapshot snapshot() {
         Node left = new Split(Orientation.VERTICAL, List.of(new Child(group(1, 1), 0.5), new Child(group(5, 2), 0.5)));
         Node root = new Split(Orientation.HORIZONTAL, List.of(new Child(left, 0.5),
             new Child(new Split(Orientation.VERTICAL, List.of(new Child(group(2, 3), 0.75), new Child(group(3, 4), 0.25))), 0.5)));
-        var main = new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 6, one(1, new Layout(root, groupId(2), Optional.of(groupId(2)))), Map.of(
+        var main = new WindowRecord(Optional.of(BOUNDS), 6, one(1, new Layout(root, groupId(2), Optional.of(groupId(2)))), Map.of(
             tab(1), new TabRecord.Terminal("build", "/Users/me/src/jasper", "zsh"),
             tab(2), new TabRecord.Content("README.md", "dev.jasper.editor", "document", Map.of("path", "/Users/me/src/jasper/README.md")),
             tab(3), new TabRecord.Terminal("", "C:\\work", ""),
             tab(4), new TabRecord.Content("Files \"prod\"", "dev.jasper.remote", "sftp", Map.of("remote path", "/srv/a", "host", "example"))));
-        var full = new WindowRecord(Role.CHILD, Optional.empty(), 0, one(5, new Layout(group(4, 5), groupId(4), Optional.empty())),
+        var full = new WindowRecord(Optional.empty(), 0, one(5, new Layout(group(4, 5), groupId(4), Optional.empty())),
             Map.of(tab(5), new TabRecord.Terminal("", "/tmp", "")));
-        return new Snapshot(List.of(full, main));
+        return new Snapshot(List.of(main, full));
     }
 
-    /** A main window of two parent tabs, the second showing, and a full window of two, the first showing (parent tabs spec 9). */
+    /** A window of two parent tabs, the second showing, and a second window of two, the first showing (parent tabs spec 9). */
     static Snapshot parentTabs() {
         var main = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(2), single(2))), parentTabId(2));
         var full = new ParentTabs(List.of(new ParentTab(parentTabId(3), single(3)), new ParentTab(parentTabId(4), single(4))), parentTabId(3));
-        return new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 0, main, terminals(main)),
-            new WindowRecord(Role.CHILD, Optional.empty(), 0, full, terminals(full))));
+        return new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 0, main, terminals(main)),
+            new WindowRecord(Optional.empty(), 0, full, terminals(full))));
     }
 
     @Test void writesSpecEightsWorkspaceWithAFullWindowExactly() throws Exception {
@@ -105,7 +103,6 @@ class WorkspaceFileTest {
             version = 1
 
             [[windows]]
-            role = "main"
             x = 40
             y = 60
             width = 1400
@@ -194,7 +191,6 @@ class WorkspaceFileTest {
             state = { host = "example", "remote path" = "/srv/a" }
 
             [[windows]]
-            role = "full"
             extended_state = 0
             shown_tab = "00000000-0000-4000-a000-000000000005"
 
@@ -222,12 +218,11 @@ class WorkspaceFileTest {
         }
     }
 
-    @Test void writesEveryParentTabOfTheMainWindowAndAFullWindowInBarOrder() {
+    @Test void writesEveryParentTabOfEachWindowInBarOrder() {
         assertThat(WorkspaceFile.encode(parentTabs())).isEqualTo("""
             version = 1
 
             [[windows]]
-            role = "main"
             x = 40
             y = 60
             width = 1400
@@ -274,7 +269,6 @@ class WorkspaceFileTest {
             profile = ""
 
             [[windows]]
-            role = "full"
             extended_state = 0
             shown_tab = "00000000-0000-4000-a000-000000000003"
 
@@ -318,15 +312,14 @@ class WorkspaceFileTest {
             """);
     }
 
-    @Test void theEmptyMainWorkspaceWritesItsTabWithAPaneThatNamesNoItem() {
+    @Test void theEmptyWorkspaceWritesItsTabWithAPaneThatNamesNoItem() {
         Layout empty = new Layout(new Group(groupId(1), List.of(), Optional.empty()), groupId(1), Optional.empty());
-        assertThat(WorkspaceFile.encode(new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(new UiState.Bounds(0, 0, 800, 600)), 0,
+        assertThat(WorkspaceFile.encode(new Snapshot(List.of(new WindowRecord(Optional.of(new UiState.Bounds(0, 0, 800, 600)), 0,
             one(1, empty), Map.of())))))
             .isEqualTo("""
                 version = 1
 
                 [[windows]]
-                role = "main"
                 x = 0
                 y = 0
                 width = 800
@@ -361,8 +354,8 @@ class WorkspaceFileTest {
         var two = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(2), single(2))), parentTabId(2));
         var items = new HashMap<>(terminals(two));
         items.put(tab(1), wide);
-        var both = new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 0, two, items)));
-        var without = new Snapshot(List.of(new WindowRecord(Role.MAIN, Optional.of(BOUNDS), 0,
+        var both = new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 0, two, items)));
+        var without = new Snapshot(List.of(new WindowRecord(Optional.of(BOUNDS), 0,
             ParentTabs.of(new ParentTab(parentTabId(2), single(2))), Map.of(tab(2), items.get(tab(2))))));
         WorkspaceFile.Sizes sizes = WorkspaceFile.sizes(both);
         assertThat(sizes.total()).as("the file's bytes").isEqualTo((long) WorkspaceFile.encodedBytes(both));
@@ -380,34 +373,56 @@ class WorkspaceFileTest {
         ParentTabs held = one(1, Layout.of(tab(1)));
         Map<TabId, TabRecord> record = Map.of(tab(1), new TabRecord.Terminal("", "/tmp", ""));
         assertThatIllegalArgumentException().as("a tab without a record")
-            .isThrownBy(() -> new WindowRecord(Role.MAIN, Optional.empty(), 0, held, Map.of()));
+            .isThrownBy(() -> new WindowRecord(Optional.empty(), 0, held, Map.of()));
         assertThatIllegalArgumentException().as("a record without a tab")
-            .isThrownBy(() -> new WindowRecord(Role.MAIN, Optional.empty(), 0, one(1, Layout.empty()), record));
-        assertThatIllegalArgumentException().as("an empty full window")
-            .isThrownBy(() -> new WindowRecord(Role.CHILD, Optional.empty(), 0, one(2, Layout.empty()), Map.of()));
+            .isThrownBy(() -> new WindowRecord(Optional.empty(), 0, one(1, Layout.empty()), record));
         assertThatIllegalArgumentException().as("minimized is not kept")
-            .isThrownBy(() -> new WindowRecord(Role.MAIN, Optional.empty(), 1, held, record));
-        var main = new WindowRecord(Role.MAIN, Optional.empty(), 6, held, record);
-        var child = new WindowRecord(Role.CHILD, Optional.empty(), 0, one(2, Layout.of(tab(2))), Map.of(tab(2), new TabRecord.Terminal("", "", "")));
-        var other = new WindowRecord(Role.CHILD, Optional.empty(), 0, one(3, Layout.of(tab(3))),
+            .isThrownBy(() -> new WindowRecord(Optional.empty(), 1, held, record));
+        var main = new WindowRecord(Optional.empty(), 6, held, record);
+        var child = new WindowRecord(Optional.empty(), 0, one(2, Layout.of(tab(2))), Map.of(tab(2), new TabRecord.Terminal("", "", "")));
+        var other = new WindowRecord(Optional.empty(), 0, one(3, Layout.of(tab(3))),
             Map.of(tab(3), new TabRecord.Terminal("", "", "")));
-        assertThat(new Snapshot(List.of(other, child, main)).windows()).as("the main window first").containsExactly(main, other, child);
-        assertThat(new Snapshot(List.of(child, main)).main()).isEqualTo(main);
-        assertThat(new Snapshot(List.of(child, main, other)).children()).containsExactly(child, other);
-        assertThatIllegalArgumentException().as("no main window").isThrownBy(() -> new Snapshot(List.of(child)));
-        assertThatIllegalArgumentException().as("two main windows").isThrownBy(() -> new Snapshot(List.of(main, main)));
+        assertThat(new Snapshot(List.of(other, child, main)).windows()).as("in the order given").containsExactly(other, child, main);
+        assertThatIllegalArgumentException().as("no window").isThrownBy(() -> new Snapshot(List.of()));
+        assertThatIllegalArgumentException().as("one window twice").isThrownBy(() -> new Snapshot(List.of(main, main)));
         assertThatIllegalArgumentException().as("a tab in two windows")
-            .isThrownBy(() -> new Snapshot(List.of(main, new WindowRecord(Role.CHILD, Optional.empty(), 0, one(2, Layout.of(tab(1))), record))));
+            .isThrownBy(() -> new Snapshot(List.of(main, new WindowRecord(Optional.empty(), 0, one(2, Layout.of(tab(1))), record))));
         Layout sameGroup = new Layout(new Group(held.activeParentTab().layout().activeGroup(), List.of(tab(2)), Optional.of(tab(2))),
             held.activeParentTab().layout().activeGroup(), Optional.empty());
         assertThatIllegalArgumentException().as("a group in two windows").isThrownBy(() -> new Snapshot(List.of(main,
-            new WindowRecord(Role.CHILD, Optional.empty(), 0, one(4, sameGroup), Map.of(tab(2), new TabRecord.Terminal("", "", ""))))));
+            new WindowRecord(Optional.empty(), 0, one(4, sameGroup), Map.of(tab(2), new TabRecord.Terminal("", "", ""))))));
         assertThatIllegalArgumentException().as("a parent tab in two windows (workspace plan 7b Rulings 10)").isThrownBy(() -> new Snapshot(List.of(main,
-            new WindowRecord(Role.CHILD, Optional.empty(), 0, one(1, Layout.of(tab(2))), Map.of(tab(2), new TabRecord.Terminal("", "", ""))))));
+            new WindowRecord(Optional.empty(), 0, one(1, Layout.of(tab(2))), Map.of(tab(2), new TabRecord.Terminal("", "", ""))))));
         assertThatIllegalArgumentException().isThrownBy(() -> new TabRecord.Content("", "", "document", Map.of()));
         assertThatIllegalArgumentException().isThrownBy(() -> new TabRecord.Content("", "dev.x:y", "document", Map.of()));
         assertThatIllegalArgumentException().isThrownBy(() -> new TabRecord.Content("", "dev.x", "", Map.of()));
         assertThatNullPointerException().isThrownBy(() -> new TabRecord.Terminal(null, "", ""));
+    }
+
+    /** Full windows spec 5.1: any window's workspace may be empty, and no window's role is written. */
+    @Test void aWindowsLayoutMayBeEmptyAndRoleIsNotWritten() throws Exception {
+        Layout empty = new Layout(new Group(groupId(9), List.of(), Optional.empty()), groupId(9), Optional.empty());
+        var held = new WindowRecord(Optional.of(BOUNDS), 0, one(1, Layout.of(tab(1))), Map.of(tab(1), new TabRecord.Terminal("", "/tmp", "")));
+        var saved = new Snapshot(List.of(held, new WindowRecord(Optional.empty(), 0, one(2, empty), Map.of())));
+        String text = WorkspaceFile.encode(saved);
+        assertThat(text).doesNotContain("role");
+        Path file = dir.resolve("workspace.toml");
+        WorkspaceFile.write(file, saved);
+        assertThat(WorkspaceFile.read(file)).isEqualTo(new WorkspaceFile.Loaded.Restore(saved, Optional.empty()));
+    }
+
+    /** Full windows spec 5.1: a file written while windows had roles still reads; the key is ignored. */
+    @Test void aFileWithARoleKeyStillReads() throws Exception {
+        String text = WorkspaceFile.encode(snapshot());
+        int first = text.indexOf("\n[[windows]]\n");
+        int second = text.indexOf("\n[[windows]]\n", first + 1);
+        String header = "\n[[windows]]\n";
+        String roles = text.substring(0, first) + header + "role = \"main\"\n" + text.substring(first + header.length(), second)
+            + header + "role = \"full\"\n" + text.substring(second + header.length());
+        assertThat(roles).contains("role = \"main\"", "role = \"full\"");
+        Path file = dir.resolve("workspace.toml");
+        Files.writeString(file, roles);
+        assertThat(WorkspaceFile.read(file)).isEqualTo(new WorkspaceFile.Loaded.Restore(snapshot(), Optional.empty()));
     }
 
     /** Workspace plan 6a Rulings 14: what stays of a window when only some of its tabs can stay, as closing the others would. */
@@ -415,13 +430,12 @@ class WorkspaceFileTest {
         // Shown in turn 3, 1 and 2: the one used before 2 is 1, while 3 is next to 2 in the bar.
         ParentTabs window = new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(2), single(2)),
             new ParentTab(parentTabId(3), single(3))), parentTabId(3)).select(parentTabId(1)).select(parentTabId(2));
-        assertThat(WorkspaceFile.keeping(window, tab -> !tab.equals(tab(2)), false)).as("the shown one goes: the one used before it shows")
-            .contains(new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(3), single(3))), parentTabId(1)));
-        assertThat(WorkspaceFile.keeping(window, tab -> false, true)).as("the main window keeps its shown parent tab, empty")
-            .contains(ParentTabs.of(new ParentTab(parentTabId(2), single(2).remove(tab(2)))));
-        assertThat(WorkspaceFile.keeping(window, tab -> false, false)).as("a full window keeps nothing").isEmpty();
+        assertThat(WorkspaceFile.keeping(window, tab -> !tab.equals(tab(2)))).as("the shown one goes: the one used before it shows")
+            .isEqualTo(new ParentTabs(List.of(new ParentTab(parentTabId(1), single(1)), new ParentTab(parentTabId(3), single(3))), parentTabId(1)));
+        assertThat(WorkspaceFile.keeping(window, tab -> false)).as("every window keeps its shown parent tab, empty")
+            .isEqualTo(ParentTabs.of(new ParentTab(parentTabId(2), single(2).remove(tab(2)))));
         Layout two = single(4).split(tab(5), groupId(4), Side.RIGHT);
-        assertThat(WorkspaceFile.keeping(one(4, two), tab -> !tab.equals(tab(5)), false)).as("a full window keeps the pane that stays")
-            .contains(one(4, two.remove(tab(5))));
+        assertThat(WorkspaceFile.keeping(one(4, two), tab -> !tab.equals(tab(5)))).as("a window keeps the pane that stays")
+            .isEqualTo(one(4, two.remove(tab(5))));
     }
 }

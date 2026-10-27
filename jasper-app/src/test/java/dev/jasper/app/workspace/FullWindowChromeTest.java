@@ -38,12 +38,12 @@ class FullWindowChromeTest {
 
     @Test void everyWindowHasTheHeaderStatusBarDockAndStripes() throws Exception {
         edt(() -> {
-            for (WindowRole role : WindowRole.values()) {
-                var window = content(idleLauncher(pending), role, HOME, false, () -> { });
-                assertThat(SwingUtilities.isDescendingFrom(window.chrome().header(), window)).as(role + " header").isTrue();
-                assertThat(SwingUtilities.isDescendingFrom(window.status(), window)).as(role + " status bar").isTrue();
-                assertThat(SwingUtilities.isDescendingFrom(window.workspace(), window.area())).as(role + " dock centre").isTrue();
-                assertThat(SwingUtilities.isDescendingFrom(window.leftStripe(), window)).as(role + " stripes").isTrue();
+            for (var window : java.util.List.of(content(idleLauncher(pending), HOME, false), content(idleLauncher(pending), HOME, true))) {
+                String which = window.tabCount() == 0 ? "an empty window" : "a window";
+                assertThat(SwingUtilities.isDescendingFrom(window.chrome().header(), window)).as(which + " header").isTrue();
+                assertThat(SwingUtilities.isDescendingFrom(window.status(), window)).as(which + " status bar").isTrue();
+                assertThat(SwingUtilities.isDescendingFrom(window.workspace(), window.area())).as(which + " dock centre").isTrue();
+                assertThat(SwingUtilities.isDescendingFrom(window.leftStripe(), window)).as(which + " stripes").isTrue();
             }
         });
         launch();
@@ -55,13 +55,13 @@ class FullWindowChromeTest {
             int[] asked = {0};
             model.addToolbar(new ToolbarEntry.View(window -> { asked[0]++; return Optional.empty(); }));
             model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
-            for (WindowRole role : WindowRole.values()) {
+            for (String which : java.util.List.of("the first window", "the second window")) {
                 int before = asked[0];
-                var window = content(idleLauncher(pending), role, HOME, false, () -> { });
+                var window = content(idleLauncher(pending), HOME, false);
                 window.connectContributions(model);
                 window.connectTerminals(new TerminalRegistry(), () -> { });
-                assertThat(asked[0]).as(role + " builds its toolbar view once").isEqualTo(before + 1);
-                assertThat(window.dock().slot("test.panel")).as(role + " docks panels").contains(Slot.LEFT_TOP);
+                assertThat(asked[0]).as(which + " builds its toolbar view once").isEqualTo(before + 1);
+                assertThat(window.dock().slot("test.panel")).as(which + " docks panels").contains(Slot.LEFT_TOP);
             }
         });
         launch();
@@ -69,8 +69,8 @@ class FullWindowChromeTest {
 
     @Test void zenRailAndStatusBarToggleOnlyTheirOwnWindow() throws Exception {
         edt(() -> {
-            var first = content(idleLauncher(pending), WindowRole.MAIN, HOME, false, () -> { });
-            var second = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { });
+            var first = content(idleLauncher(pending), HOME, false);
+            var second = content(idleLauncher(pending), HOME, false);
             for (var window : java.util.List.of(first, second)) {
                 window.updateActions();
                 assertThat(window.action(ActionId.TOGGLE_ZEN_MODE).isEnabled()).as("Zen").isTrue();
@@ -92,10 +92,10 @@ class FullWindowChromeTest {
         launch();
     }
 
-    /** In the standard look a child window holding one tab shows no strip, as the main window does; a second tab shows it. */
-    @Test void aChildWindowsOnlyTabShowsNoStrip() throws Exception {
+    /** In the standard look a window holding one tab shows no strip; a second tab shows it. */
+    @Test void aWindowsOnlyTabShowsNoStrip() throws Exception {
         WindowContent[] child = new WindowContent[1];
-        edt(() -> child[0] = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { }));
+        edt(() -> child[0] = content(idleLauncher(pending), HOME, false));
         launch();
         edt(() -> {
             assertThat(child[0].tabCount()).isEqualTo(1);
@@ -106,11 +106,11 @@ class FullWindowChromeTest {
         launch();
     }
 
-    /** Workspace tabs spec 6.3: a child window's workspace has the same translucency as the main window's. */
-    @Test void aChildWindowsWorkspaceIsGlassAsTheMainWindowsIs() throws Exception {
+    /** Workspace tabs spec 6.3: every window's workspace takes the terminal background's translucency. */
+    @Test void everyWindowsWorkspaceIsGlass() throws Exception {
         edt(() -> {
-            // An empty child window: nothing but the centre surface paints the middle of its workspace.
-            var child = content(idleLauncher(pending), WindowRole.CHILD, HOME, true, () -> { });
+            // An empty window: nothing but the centre surface paints the middle of its workspace.
+            var child = content(idleLauncher(pending), HOME, true);
             child.setSize(900, 600);
             LayoutTestSupport.layoutTree(child);
             LayoutTestSupport.layoutTree(child);
@@ -119,7 +119,7 @@ class FullWindowChromeTest {
             Point middle = SwingUtilities.convertPoint(workspace, workspace.getWidth() / 2, workspace.getHeight() / 2, child);
             assertThat(alpha(child, middle)).as("opaque").isEqualTo(255);
             child.applyBackgroundOpacity(0.5);
-            assertThat(alpha(child, middle)).as("glass of the terminal background, as in the main window").isEqualTo(128);
+            assertThat(alpha(child, middle)).as("glass of the terminal background").isEqualTo(128);
             child.applyBackgroundOpacity(1);
             assertThat(alpha(child, middle)).isEqualTo(255);
         });
@@ -132,34 +132,32 @@ class FullWindowChromeTest {
         return new Color(image.getRGB(at.x, at.y), true).getAlpha();
     }
 
-    @Test void aChildWindowTakesTheKeymapAndThePalette() throws Exception {
+    @Test void everyWindowTakesTheKeymapAndThePalette() throws Exception {
         WindowContent[] child = new WindowContent[1];
-        edt(() -> child[0] = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { }));
+        edt(() -> child[0] = content(idleLauncher(pending), HOME, false));
         launch();
         edt(() -> {
             var root = WindowCommandPaletteTest.install(child[0]);
             KeyStroke newTab = child[0].bindings().strokeFor(ActionId.NEW_TAB).orElseThrow();
-            assertThat(root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(newTab)).as("the Keymap on the child's own root")
+            assertThat(root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(newTab)).as("the Keymap on the window's own root")
                 .isEqualTo(ActionId.NEW_TAB.id());
             assertThat(child[0].dispatchShortcut(newTab, child[0])).isTrue();
             assertThat(child[0].tabCount()).isEqualTo(2);
             child[0].commandPalette().toggle();
-            assertThat(child[0].commandPalette().isOpen()).as("the palette opens over the child window").isTrue();
+            assertThat(child[0].commandPalette().isOpen()).as("the palette opens over the window").isTrue();
             child[0].commandPalette().dismiss();
         });
         launch();
     }
 
-    @Test void theMainWorkspaceCanBeEmptyAndOffersANewTerminalTabAndOpenFile() throws Exception {
+    @Test void everyWorkspaceCanBeEmptyAndOffersANewTerminalTabAndOpenFile() throws Exception {
         WindowContent[] main = new WindowContent[1];
-        int[] emptied = {0};
-        edt(() -> main[0] = content(idleLauncher(pending), WindowRole.MAIN, HOME, false, () -> emptied[0]++));
+        edt(() -> main[0] = content(idleLauncher(pending), HOME, false));
         launch();
         edt(() -> {
             main[0].closeTab(main[0].selectedTab());
             assertThat(main[0].tabCount()).isZero();
             assertThat(main[0].closed()).as("the empty workspace stays").isFalse();
-            assertThat(emptied[0]).as("its owner hears it").isEqualTo(1);
             EmptyWorkspace empty = main[0].workspace().emptyWorkspace();
             assertThat(empty).as("New Terminal Tab and Open File show").isNotNull();
             assertThat(SwingUtilities.isDescendingFrom(empty, main[0].workspace())).isTrue();
@@ -181,7 +179,7 @@ class FullWindowChromeTest {
         WindowContent[] main = new WindowContent[1];
         Color[] dark = new Color[1];
         edt(() -> {
-            main[0] = content(idleLauncher(pending), WindowRole.MAIN, HOME, true, () -> { });
+            main[0] = content(idleLauncher(pending), HOME, true);
             dark[0] = main[0].workspace().emptyWorkspace().shortcut(ActionId.NEW_TAB).getForeground();
             main[0].invoke(ActionId.NEW_TAB);
             assertThat(main[0].workspace().emptyWorkspace()).as("a tab takes its place").isNull();
@@ -206,7 +204,7 @@ class FullWindowChromeTest {
      */
     @Test void theEmptyWorkspaceIsAWorkspaceZone() throws Exception {
         edt(() -> {
-            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, true, () -> { });
+            var main = content(idleLauncher(pending), HOME, true);
             EmptyWorkspace empty = main.workspace().emptyWorkspace();
             assertThat(empty.getClientProperty("Jasper.zone")).as("made as one").isEqualTo("workspace");
             var chrome = ThemeTestSupport.generated(true);
@@ -221,7 +219,7 @@ class FullWindowChromeTest {
     @Test void theEmptyWorkspacesCaptionsFollowTheKeymap() throws Exception {
         boolean macOs = System.getProperty("os.name").startsWith("Mac");
         edt(() -> {
-            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, true, () -> { });
+            var main = content(idleLauncher(pending), HOME, true);
             JLabel caption = main.workspace().emptyWorkspace().shortcut(ActionId.NEW_TAB);
             String before = caption.getText();
             main.setBindings(KeyBindings.withOverrides(macOs, Map.of("new_tab", "alt+shift+y")));
@@ -232,18 +230,6 @@ class FullWindowChromeTest {
             main.setBindings(KeyBindings.withOverrides(macOs, Map.of("new_tab", "none")));
             assertThat(caption.getText()).isEmpty();
             assertThat(caption.isVisible()).as("an unbound command shows no caption").isFalse();
-        });
-    }
-
-    @Test void aChildWindowIsNeverEmpty() throws Exception {
-        WindowContent[] child = new WindowContent[1];
-        int[] emptied = {0};
-        edt(() -> child[0] = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> emptied[0]++));
-        launch();
-        edt(() -> {
-            child[0].closeTab(child[0].selectedTab());
-            assertThat(emptied[0]).as("its last tab closed: its window closes it").isEqualTo(1);
-            assertThat(child[0].workspace().emptyWorkspace()).as("no empty state in a child window").isNull();
         });
     }
 }

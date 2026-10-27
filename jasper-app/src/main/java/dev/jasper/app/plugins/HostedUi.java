@@ -648,7 +648,8 @@ final class HostedUi {
         public void setRestore(Optional<dev.jasper.sdk.RestoreState> state) { requireUi("content restore"); entry.restore(state.map(HostedUi::restore)); }
         public void select() { requireUi("select content"); entry.select(); }
         public void moveToNewWindow() { requireUi("move content"); entry.moveToNewWindow(); }
-        public void moveToMainWindow() { requireUi("move content"); entry.moveToMainWindow(); }
+        /** Until SDK 0.23.0 replaces it: the most recently active window takes the tab (full windows spec 5.2). */
+        public void moveToMainWindow() { requireUi("move content"); entry.moveToWindow(model.tabs().recentWindow()); }
         public void moveToNewTab() { requireUi("move content"); model.tabs().moveToNewTab(entry); }
         public boolean mayMoveToNewTab() { requireUi("move content"); return model.tabs().mayMoveToNewTab(entry); }
         /** Each tab's title goes to a plugin that observes terminals or whose own content the tab shows, and no other. */

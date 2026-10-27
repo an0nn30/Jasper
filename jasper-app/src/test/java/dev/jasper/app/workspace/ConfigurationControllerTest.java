@@ -72,7 +72,7 @@ class ConfigurationControllerTest {
     }
     WindowContent owner() { return owner(launcher(pending)); }
     WindowContent owner(ShellLauncher launcher) {
-        var result = new WindowContent(launcher, HOME, path -> {}, () -> {}, () -> {}, themes);
+        var result = new WindowContent(launcher, HOME, path -> {}, () -> {}, themes);
         owners.add(result); controller.register(result); return result;
     }
     void reload(String text) throws Exception {

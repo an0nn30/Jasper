@@ -59,7 +59,7 @@ class ConfiguredTerminalBehaviorTest {
                         """)).environment(System.getenv()).workingDirectory(path).grid(new GridSize(80, 24)).scrollback(100).build());
                 } catch (Exception failure) { throw new CompletionException(failure); }
             }, "controlled-sh");
-            owner = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {}, themes);
+            owner = new WindowContent(launcher, directory, path -> {}, () -> {}, themes);
             controller.register(owner);
         });
         pending.remove().run();

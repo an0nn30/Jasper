@@ -261,12 +261,22 @@ class ShellExitBehaviorTest {
                     return session;
                 } catch (Exception failure) { throw new CompletionException(failure); }
             }, "controlled-sh");
-            owner = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {
-                assertThat(SwingUtilities.isEventDispatchThread()).isTrue(); empty.incrementAndGet();
-            }, themes);
+            owner = new WindowContent(launcher, directory, path -> {}, () -> {}, themes);
+            watchEmpty(owner);
             owner.onError = (title, message) -> failures.add(message);
             controller.register(owner);
         });
+    }
+
+    /** Counts {@code window}'s workspace becoming empty, which its last tab closing leaves (full windows spec 5.3). */
+    private void watchEmpty(WindowContent window) {
+        boolean[] wasEmpty = {window.tabCount() == 0};
+        window.onLayoutChanged = () -> {
+            assertThat(SwingUtilities.isEventDispatchThread()).isTrue();
+            boolean now = window.tabCount() == 0;
+            if (now && !wasEmpty[0]) empty.incrementAndGet();
+            wasEmpty[0] = now;
+        };
     }
 
     private void deliver() throws Exception { pending.remove().run(); edt(() -> {}); }
@@ -308,9 +318,8 @@ class ShellExitBehaviorTest {
                         return session;
                     } catch (Exception failure) { throw new CompletionException(failure); }
                 });
-            owner = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {
-                assertThat(SwingUtilities.isEventDispatchThread()).isTrue(); empty.incrementAndGet();
-            }, themes);
+            owner = new WindowContent(launcher, directory, path -> {}, () -> {}, themes);
+            watchEmpty(owner);
             owner.onError = (title, message) -> failures.add(message);
             controller.register(owner);
         });

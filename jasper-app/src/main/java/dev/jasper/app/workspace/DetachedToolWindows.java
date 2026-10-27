@@ -25,11 +25,11 @@ import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
 
 /**
- * The main window's detached tool windows' own windows (floating tool windows spec, The detached window): one native
+ * A window's detached tool windows' own windows (floating tool windows spec, The detached window): one native
  * window per shown detached tool window that has a frame in the window's {@link ToolWindowArea}, opened, moved, reopened
  * in its other mode and disposed so that they match the area after each dock change ({@link #sync}). The native windows
  * are {@link Shell}s that {@link #shells} makes ({@link DetachedFrame} in the application), as {@link WindowShell} is
- * for workspace windows; without shells (headless) or before the main window shows ({@link #ready}) windows wait, and
+ * for workspace windows; without shells (headless) or before their window shows ({@link #ready}) windows wait, and
  * open on the next sync. A window opens at the bounds its tool window has in the dock, kept on today's displays by
  * {@link WindowPlacement#restore}'s rule, and reports moves back to the dock, which saves them with its next change. A
  * window that fails to open hides its tool window, and one that fails to dispose goes all the same: each is logged, and
@@ -51,7 +51,7 @@ final class DetachedToolWindows implements AutoCloseable {
      * @param mode {@link ToolWindowMode#FLOAT} (a dialog owned by {@code owner}) or {@link ToolWindowMode#WINDOW} (a frame)
      * @param bounds where the window opens, in screen coordinates
      * @param frame the tool window's frame, its header over its content, which the window holds
-     * @param owner the main window's native window, Float's owner; null while it has none (a headless test)
+     * @param owner their window's native window, Float's owner; null while it has none (a headless test)
      * @param keys binds Jasper's shortcuts on the window's root pane; the handle it returns unbinds them
      */
     record Opening(String id, String title, ToolWindowMode mode, Rectangle bounds, JComponent frame, Window owner,
@@ -101,7 +101,7 @@ final class DetachedToolWindows implements AutoCloseable {
 
     /** Makes a tool window's native window; null while there are none (the headless default), and windows wait. */
     BiFunction<Opening, Events, Shell> shells;
-    /** Whether windows may open: by default, while the main window's content is showing, which a Float needs for its owner. */
+    /** Whether windows may open: by default, while their window's content is showing, which a Float needs for its owner. */
     BooleanSupplier ready;
     /** Today's displays, whole and usable, the default display first; empty when none is known (headless). */
     Supplier<List<WindowPlacement.Display>> displays = WindowFrame::displays;
@@ -116,10 +116,10 @@ final class DetachedToolWindows implements AutoCloseable {
     private boolean closed;
 
     /**
-     * The detached tool windows of the main window whose content is {@code owner}: its {@link WindowContent#dock() dock}
+     * The detached tool windows of the window whose content is {@code owner}: its {@link WindowContent#dock() dock}
      * says which show, its {@link WindowContent#area() area} holds their frames, and its native window owns a Float.
      *
-     * @param owner the main window's content
+     * @param owner the window's content
      * @param titles a tool window's title, its window's
      * @param hide hides a tool window: its window was closed, or its keys' Close Pane, Close Tab or Close Window
      * @param keys binds Jasper's shortcuts on a window's root pane, the second argument hiding its tool window; the handle
@@ -139,8 +139,8 @@ final class DetachedToolWindows implements AutoCloseable {
     /**
      * Brings the windows in line with the area: a window whose tool window no longer shows detached with a frame is
      * disposed; one whose mode changed is disposed and opens again in the new mode at the same bounds; one whose frame
-     * the area remounted takes the new frame; one whose dock bounds changed (a drop outside the main window) moves there;
-     * a shown detached tool window without a window opens, when there are shells and the main window is ready. A shell's
+     * the area remounted takes the new frame; one whose dock bounds changed (a drop outside their window) moves there;
+     * a shown detached tool window without a window opens, when there are shells and their window is ready. A shell's
      * function may change the dock at once (a window event, a listener), which runs another sync inside this one: each
      * step reads again what the nested sync may have changed, and a tool window it took the frame or the window of is
      * left alone.
@@ -186,7 +186,7 @@ final class DetachedToolWindows implements AutoCloseable {
 
     /**
      * Where a tool window's own window first opens when it has never had one: its docked frame's place and size on
-     * screen, or while it is hidden the size it would dock at centred on the main window; at least the minimum, and kept
+     * screen, or while it is hidden the size it would dock at centred on their window; at least the minimum, and kept
      * on the usable part of the display holding its centre (the default display when none does).
      */
     Rectangle initialBounds(String id) {
@@ -302,10 +302,10 @@ final class DetachedToolWindows implements AutoCloseable {
         }
     }
 
-    /** The main window's native window, or null when its content is in none (a headless test). */
+    /** Their window's native window, or null when its content is in none (a headless test). */
     private Window ownerWindow() { return SwingUtilities.getWindowAncestor(owner); }
 
-    /** The main window on screen: its native window, or in a headless test the stand-in frame its content sits in. */
+    /** Their window on screen: its native window, or in a headless test the stand-in frame its content sits in. */
     private Rectangle mainOnScreen() {
         Component top = owner;
         while (!(top instanceof Window) && top.getParent() != null) top = top.getParent();

@@ -78,7 +78,7 @@ final class StartupRuns {
     }
 
     /**
-     * The saved windows every run in an isolated home restores, a resource beside this class: one main window with one
+     * The saved windows every run in an isolated home restores, a resource beside this class: one window with one
      * terminal tab, the file AOT training restores too ({@code aotTrainingWorkspace} in
      * {@code gradle/packaging-support.gradle}).
      */

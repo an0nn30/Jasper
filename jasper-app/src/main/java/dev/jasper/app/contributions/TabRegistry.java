@@ -18,7 +18,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
@@ -34,7 +33,7 @@ public final class TabRegistry {
     private static final System.Logger LOG = System.getLogger(TabRegistry.class.getName());
     private final Map<UUID, WorkspaceHost> hosts = new LinkedHashMap<>();
     private final List<Tab> tabs = new ArrayList<>();
-    /** The tabs asked for while the main window was being composed, in the order they were asked for. */
+    /** The tabs asked for while the saved windows were being restored, in the order they were asked for. */
     private final List<Tab> waiting = new ArrayList<>();
     private final Map<String, BiFunction<List<Tab>, Boolean, CompletableFuture<Boolean>>> guards = new HashMap<>();
     /** The owner of Jasper's own content tabs, such as the Errors tab; a plugin's id is never {@code jasper}. */
@@ -89,75 +88,60 @@ public final class TabRegistry {
         SPLIT_RIGHT,
         /** In a new pane below the window's focused pane. */
         SPLIT_DOWN,
-        /** In a new child window of its own, opened empty for it: the owner's window is not touched. */
+        /** In a new window of its own, opened empty for it: the owner's window is not touched. */
         NEW_WINDOW
     }
 
     /**
-     * How the registry reaches the windows (workspace tabs spec 6.4 and 6.5); the window manager gives it.
+     * How the registry reaches the windows (full windows spec 5.2); the window manager gives it.
      *
-     * @param main the main window's id, restored first when none is open; null while the main window is being composed,
-     *     and a plugin's tab asked for then opens there once it is up
-     * @param isMain whether a window is the main window
-     * @param newWindow moves a tab into a new full window of its own, or leaves it where it is
+     * @param window the id of the window a tab with no window of its own goes to, the most recently active, the saved
+     *     windows restored first when none is open; null while they are being restored, and a plugin's tab asked for then
+     *     opens in the first once it is up
+     * @param newWindow moves a tab into a new window of its own, or leaves it where it is
      * @param movedOut a move of a tab out of this window has ended, whether or not the tab left, or a tab placed in it
-     *     failed to show: the window manager closes a child window left empty now, never in the middle of the move
-     * @param emptyWindow opens an empty child window for a tab placed in a new window and gives its id; null when none
-     *     opens (the main window is being composed, or a test plays the windows), and the tab then opens where an
+     *     failed to show: the window manager closes a window left without a tab now, never in the middle of the move
+     * @param emptyWindow opens an empty window for a tab placed in a new window and gives its id; null when none opens
+     *     (the saved windows are being restored, or a test plays the windows), and the tab then opens where an
      *     {@link Placement#NEW_TAB} one would
      */
-    public record Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow, Consumer<UUID> movedOut,
-                          Supplier<UUID> emptyWindow) {
+    public record Windows(Supplier<UUID> window, Consumer<Tab> newWindow, Consumer<UUID> movedOut, Supplier<UUID> emptyWindow) {
         /** Requires every function. */
         public Windows {
-            Objects.requireNonNull(main, "main"); Objects.requireNonNull(isMain, "isMain"); Objects.requireNonNull(newWindow, "newWindow");
+            Objects.requireNonNull(window, "window"); Objects.requireNonNull(newWindow, "newWindow");
             Objects.requireNonNull(movedOut, "movedOut"); Objects.requireNonNull(emptyWindow, "emptyWindow");
         }
 
         /**
          * Windows as a test plays them, where a move closes no window.
          *
-         * @param main the main window's id
-         * @param isMain whether a window is the main window
-         * @param newWindow moves a tab into a new full window of its own, or leaves it where it is
+         * @param window the id of the window a tab with no window of its own goes to
+         * @param newWindow moves a tab into a new window of its own, or leaves it where it is
          */
-        public Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow) {
-            this(main, isMain, newWindow, window -> { }, () -> null);
+        public Windows(Supplier<UUID> window, Consumer<Tab> newWindow) {
+            this(window, newWindow, closed -> { }, () -> null);
         }
 
         /**
          * Windows as a test plays them, where no window opens for a tab placed in a new window: it opens where an
          * {@link Placement#NEW_TAB} one would.
          *
-         * @param main the main window's id
-         * @param isMain whether a window is the main window
-         * @param newWindow moves a tab into a new full window of its own, or leaves it where it is
+         * @param window the id of the window a tab with no window of its own goes to
+         * @param newWindow moves a tab into a new window of its own, or leaves it where it is
          * @param movedOut a move of a tab out of a window has ended, whether or not the tab left
          */
-        public Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow, Consumer<UUID> movedOut) {
-            this(main, isMain, newWindow, movedOut, () -> null);
+        public Windows(Supplier<UUID> window, Consumer<Tab> newWindow, Consumer<UUID> movedOut) {
+            this(window, newWindow, movedOut, () -> null);
         }
     }
 
     /**
-     * Where a plugin's view without a window goes and how a tab moves to a new window or the main window. Until the window
-     * manager gives this, the first registered workspace counts as the main window and no tab moves to a new window.
+     * Where a plugin's view without a window goes and how a tab moves to a new window. Until the window manager gives
+     * this, the first registered workspace takes a tab with no window of its own and no tab moves to a new window.
      *
      * @param value the window manager's part
      */
     public void windows(Windows value) { windows = Objects.requireNonNull(value, "value"); }
-
-    /**
-     * Whether {@code window} is the main window.
-     *
-     * @param window a window's id, or null
-     * @return true for the main window
-     */
-    public boolean isMain(UUID window) {
-        if (window == null) return false;
-        if (windows != null) return windows.isMain().test(window);
-        return hosts.keySet().stream().findFirst().map(window::equals).orElse(false);
-    }
 
     /**
      * Registers a window's workspace. Closing the subscription removes, so disposes, the tabs that window still holds,
@@ -238,11 +222,12 @@ public final class TabRegistry {
     }
 
     /**
-     * Opens a plugin's view in a new tab of {@code owner}'s window, or of the main window when {@code owner} is null or
-     * not registered, and shows it (tabs and panes spec 13). A (plugin, key) already open is selected again, and
-     * attached to a window again when it lost its own. Asked for the main window while none is open, it restores the windows
-     * first, so an item that restore brings back under the same (plugin, key) is the one selected, never a second. While
-     * the main window is being composed, a tab for it waits ({@link #mainOpened}, {@link #mainFailed}).
+     * Opens a plugin's view in a new tab of {@code owner}'s window, or of the most recently active window when
+     * {@code owner} is null or not registered, and shows it (tabs and panes spec 13; full windows spec 5.2). A (plugin, key)
+     * already open is selected again, and attached to a window again when it lost its own. Asked for a window while none
+     * is open, it restores the windows first, so an item that restore brings back under the same (plugin, key) is the one
+     * selected, never a second. While the saved windows are being restored, a tab for them waits
+     * ({@link #windowOpened}, {@link #windowFailed}).
      */
     public Tab open(String plugin, String key, String title, UUID owner, JComponent component) {
         return open(plugin, key, title, owner, component, Placement.NEW_TAB);
@@ -250,22 +235,23 @@ public final class TabRegistry {
 
     /**
      * As {@link #open(String, String, String, UUID, JComponent)}, the new tab where {@code placement} puts it: in a new
-     * tab of that window or a new pane beside its focused pane, or in a new child window of its own (workspace tabs spec
-     * 14). A (plugin, key) already open is selected where it is. One asked for while the main window is being composed
-     * waits for it and opens in a new tab of it, whatever its placement.
+     * tab of that window or a new pane beside its focused pane, or in a new window of its own (workspace tabs spec 14). A
+     * (plugin, key) already open is selected where it is. One asked for while the saved windows are being restored waits
+     * for them and opens in a new tab of the first, whatever its placement.
      */
     public Tab open(String plugin, String key, String title, UUID owner, JComponent component, Placement placement) {
         requireEdt();
         Objects.requireNonNull(placement, "placement");
-        // An open for the main window while none is open restores it first, before the (plugin, key) is looked for: an item
-        // that restore brought back is selected, never opened twice (workspace plan 6b's final review, I1).
-        if (restoresMainFirst(owner, placement)) main();
+        // An open with no window of its own asks for its window first, which restores the windows when none is open, before
+        // the (plugin, key) is looked for: an item that restore brought back is selected, never opened twice (workspace
+        // plan 6b's final review, I1).
+        if (restoresFirst(owner, placement)) target();
         for (var tab : tabs) if (tab.kind() == Tab.Kind.HOSTED && tab.plugin().equals(plugin) && tab.key().equals(key)) {
             if (tab.window() == null) {
                 // While a saved tab is rebuilt there, the window being restored takes no other tab (workspace plan 6b Rulings 24).
                 WorkspaceHost retry = owner != null && !restoring(owner) ? hosts.get(owner) : null;
-                if (retry == null) retry = main();
-                if (retry == null) { waitForMain(tab); return tab; }
+                if (retry == null) retry = target();
+                if (retry == null) { waitForWindow(tab); return tab; }
                 tab.window(retry.id());
                 try { retry.attach().accept(tab); }
                 catch (RuntimeException | Error failure) {
@@ -280,7 +266,7 @@ public final class TabRegistry {
         if (slot != null && slot.taken == null && slot.plugin.equals(plugin) && tab(slot.id).isEmpty()) {
             // A saved tab its plugin's restorer rebuilds (workspace tabs spec 13): under its saved id, straight into the
             // window being restored, as add registers a restored terminal tab; that window places it with its other saved
-            // tabs. No placement applies, and it never waits for a main window being composed (workspace plan 6b Rulings 4
+            // tabs. No placement applies, and it never waits for the windows being restored (workspace plan 6b Rulings 4
             // and 23).
             var restored = new Tab(this, slot.id, Tab.Kind.HOSTED, plugin, key, title, new HostedContent(Objects.requireNonNull(component)));
             tabs.add(restored);
@@ -292,12 +278,12 @@ public final class TabRegistry {
         // While a saved tab is rebuilt there, the window being restored takes no other tab: it goes where an owner-less
         // tab goes (workspace plan 6b Rulings 24).
         WorkspaceHost host = owner != null && !restoring(owner) ? hosts.get(owner) : null;
-        // A new child window of its own, opened empty for the tab: the owner's window is not touched (workspace tabs plan 4b).
+        // A new window of its own, opened empty for the tab: the owner's window is not touched (workspace tabs plan 4b).
         UUID child = placement == Placement.NEW_WINDOW && windows != null ? windows.emptyWindow().get() : null;
         if (child != null) host = Objects.requireNonNull(hosts.get(child), "The new window registered no workspace");
-        if (host == null) host = main();
+        if (host == null) host = target();
         tabs.add(tab);
-        if (host == null) { waitForMain(tab); return tab; }
+        if (host == null) { waitForWindow(tab); return tab; }
         tab.window(host.id());
         try {
             switch (placement) {
@@ -311,7 +297,7 @@ public final class TabRegistry {
             tabs.remove(tab);
             try { tab.dispose(); }
             catch (RuntimeException | Error cleanup) { Tab.keep(failure, cleanup); }
-            // The child window opened for the tab is left empty: it closes, its failure kept behind the attach's.
+            // The window opened for the tab is left empty: it closes, its failure kept behind the attach's.
             if (child != null) {
                 try { windows.movedOut().accept(child); }
                 catch (RuntimeException | Error closing) { Tab.keep(failure, closing); }
@@ -323,13 +309,12 @@ public final class TabRegistry {
     }
 
     /**
-     * Whether an open goes to the main window while none is open, so that asking for the main window restores it (workspace
-     * tabs spec 6.4): it names no live owner window and no new window, and no saved tab is being restored.
+     * Whether an open goes to the most recently active window, so that asking for it first restores the windows when none
+     * is open (full windows spec 5.2): it names no live owner window and no new window, and no saved tab is being restored.
      */
-    private boolean restoresMainFirst(UUID owner, Placement placement) {
+    private boolean restoresFirst(UUID owner, Placement placement) {
         if (windows == null || slot != null || placement == Placement.NEW_WINDOW) return false;
-        if (owner != null && hosts.containsKey(owner)) return false;
-        return hosts.keySet().stream().noneMatch(windows.isMain());
+        return owner == null || !hosts.containsKey(owner);
     }
 
     private static void rollbackAttach(WorkspaceHost host, Tab tab, Throwable failure) {
@@ -338,40 +323,52 @@ public final class TabRegistry {
     }
 
     /**
-     * The main window's workspace, restored first by the window manager when none is open (workspace tabs spec 6.4); null
-     * while the main window is being composed.
+     * The workspace of the window a tab with no window of its own goes to, the most recently active, the saved windows
+     * restored first by the window manager when none is open (full windows spec 5.2); null while they are being restored.
      */
-    private WorkspaceHost main() {
-        UUID id = windows != null ? windows.main().get()
+    private WorkspaceHost target() {
+        UUID id = windows != null ? windows.window().get()
             : hosts.keySet().stream().findFirst().orElseThrow(() -> new IllegalStateException("No workspace host available"));
         if (id == null) return null;
-        return Objects.requireNonNull(hosts.get(id), "The main window registered no workspace");
+        return Objects.requireNonNull(hosts.get(id), "The window registered no workspace");
     }
 
-    /** A tab asked for while the main window is being composed (a panel factory, say) waits for it (spec 6.4). */
-    private void waitForMain(Tab tab) { if (!waiting.contains(tab)) waiting.add(tab); }
+    /**
+     * The window a tab with no window of its own goes to now: the most recently active (full windows spec 5.2), the saved
+     * windows restored first when none is open.
+     *
+     * @return its id; null while the saved windows are being restored
+     */
+    public UUID recentWindow() {
+        requireEdt();
+        WorkspaceHost host = target();
+        return host == null ? null : host.id();
+    }
+
+    /** A tab asked for while the saved windows are being restored (a panel factory, say) waits for them (spec 6.4). */
+    private void waitForWindow(Tab tab) { if (!waiting.contains(tab)) waiting.add(tab); }
 
     /**
-     * The main window has opened (workspace tabs spec 6.4): the tabs that waited for it open there, in the order they
-     * were asked for, and the last one that opened is selected. One that fails to open there is removed, so disposed;
+     * The first restored window has opened (workspace tabs spec 6.4): the tabs that waited for it open there, in the order
+     * they were asked for, and the last one that opened is selected. One that fails to open there is removed, so disposed;
      * its failure, like a failing selection's, is logged as a warning, since its caller has already returned, and keeps
-     * no other tab out. When the main window closes again while they open, the tabs not yet shown wait for the next one.
+     * no other tab out. When the window closes again while they open, the tabs not yet shown wait for the next one.
      *
-     * @param main the main window's id
+     * @param window the window's id
      */
-    public void mainOpened(UUID main) {
+    public void windowOpened(UUID window) {
         requireEdt();
-        Objects.requireNonNull(main, "main");
+        Objects.requireNonNull(window, "window");
         var batch = List.copyOf(waiting);
         waiting.clear();
-        if (!batch.isEmpty()) Objects.requireNonNull(hosts.get(main), "The main window registered no workspace");
+        if (!batch.isEmpty()) Objects.requireNonNull(hosts.get(window), "The window registered no workspace");
         Tab opened = null;
         for (var tab : batch) {
             // One closed, or given a window of its own meanwhile, no longer waits.
             if (tab.closed() || !tabs.contains(tab) || tab.window() != null) continue;
-            // Looked up for each tab: an earlier one's opening may have closed the main window again.
-            WorkspaceHost host = hosts.get(main);
-            if (host == null) { waitForMain(tab); continue; }
+            // Looked up for each tab: an earlier one's opening may have closed the window again.
+            WorkspaceHost host = hosts.get(window);
+            if (host == null) { waitForWindow(tab); continue; }
             try {
                 tab.window(host.id());
                 host.attach().accept(tab);
@@ -381,25 +378,25 @@ public final class TabRegistry {
                 tabs.remove(tab);
                 try { tab.dispose(); }
                 catch (RuntimeException | Error cleanup) { Tab.keep(failure, cleanup); }
-                LOG.log(System.Logger.Level.WARNING, "A tab that waited for the main window failed to open there",
+                LOG.log(System.Logger.Level.WARNING, "A tab that waited for a window failed to open there",
                     failure);
             }
         }
         if (opened == null) return;
         try { select(opened); }
         catch (RuntimeException | Error failure) {
-            LOG.log(System.Logger.Level.WARNING, "A tab that waited for the main window failed to be selected there",
+            LOG.log(System.Logger.Level.WARNING, "A tab that waited for a window failed to be selected there",
                 failure);
         }
     }
 
     /**
-     * The main window failed to open (workspace tabs spec 6.4): the tabs that waited for it are removed, so disposed,
-     * whatever removing another one throws, and nothing asks for the main window again for them.
+     * The saved windows failed to open (workspace tabs spec 6.4): the tabs that waited for them are removed, so disposed,
+     * whatever removing another one throws, and nothing asks for a window again for them.
      *
-     * @param failure the main window's failure, which keeps theirs suppressed under it; the window manager rethrows it
+     * @param failure the window's failure, which keeps theirs suppressed under it; the window manager rethrows it
      */
-    public void mainFailed(Throwable failure) {
+    public void windowFailed(Throwable failure) {
         requireEdt();
         Objects.requireNonNull(failure, "failure");
         var batch = List.copyOf(waiting);
@@ -443,8 +440,8 @@ public final class TabRegistry {
     public boolean splittable(Tab tab) { return tabs.contains(tab) && !tab.closed() && !pending.contains(tab); }
 
     /**
-     * {@code ContentTab.moveToNewWindow()} (tabs and panes spec 13): the window manager opens a full window holding the
-     * tab, or leaves it where it is (a child window's only tab). A pinned tab, one being closed or a restorer's item while
+     * {@code ContentTab.moveToNewWindow()} (tabs and panes spec 13): the window manager opens a window holding the tab, or
+     * leaves it where it is (a window's only tab). A pinned tab, one being closed or a restorer's item while
      * its restore runs stays.
      *
      * @param tab the tab
@@ -456,17 +453,17 @@ public final class TabRegistry {
     }
 
     /**
-     * {@code ContentTab.moveToMainWindow()} (workspace tabs spec 6.5): the end of the active pane of the main window's
-     * shown parent tab. A pinned tab, one being closed, a restorer's item while its restore runs or one the main window
-     * holds stays.
+     * Moves {@code tab} to {@code window} (full windows spec 5.4), as {@link #move(Tab, UUID)} does: in a new tab of that
+     * window, selected there. A pinned tab, one being closed, a restorer's item while its restore runs or one already
+     * there stays, and so does every tab when no workspace {@code window} is registered.
      *
      * @param tab the tab
+     * @param window the window to move it to
      */
-    public void moveToMainWindow(Tab tab) {
+    public void moveToWindow(Tab tab, UUID window) {
         requireEdt();
-        if (tab.closed() || tab.pinned() || pending.contains(tab) || held(tab) || isMain(tab.window())) return;
-        WorkspaceHost target = main();
-        if (target != null) move(tab, target.id());
+        if (window == null || !hosts.containsKey(window)) return;
+        move(tab, window);
     }
 
     /**
@@ -627,7 +624,7 @@ public final class TabRegistry {
         } finally {
             tab.movingFrom = null;
         }
-        // The window the tab left hears of it only now: a child window the move emptied closes after the move has
+        // The window the tab left hears of it only now: a window the move emptied closes after the move has
         // reported itself, never midway, so a failed attach could still go back to it (workspace plan 4a).
         if (windows != null) {
             try { windows.movedOut().accept(old.id()); }

@@ -177,7 +177,7 @@ class HostedContentTest {
                 created[0] = content(launcher(new ArrayDeque<>()));
                 created[0].connectContributions(model, UiState.inMemory());
                 return created[0].id();
-            }, id -> created[0] != null && created[0].id().equals(id), tab -> { }));
+            }, tab -> { }));
             var entry = model.tabs().open("dev.editor", "a", "A", null, new JPanel());
             assertThat(created[0]).as("a real window was asked for").isNotNull();
             assertThat(entry.window()).isEqualTo(created[0].id());
@@ -187,7 +187,7 @@ class HostedContentTest {
     @Test void anEmptyWorkspaceDoesNotScheduleATerminalLaunch() throws Exception {
         edt(() -> {
             var pending = new ArrayDeque<Runnable>();
-            try (var owner = new WindowContent(launcher(pending), null, path -> {}, () -> {}, () -> {})) {
+            try (var owner = new WindowContent(launcher(pending), null, path -> {}, () -> {})) {
                 assertThat(pending).isEmpty();
                 assertThat(owner.terminalTabs()).isEmpty();
                 assertThat(owner.currentPane()).isNull();

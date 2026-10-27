@@ -100,11 +100,11 @@ class PluginPaneAppearanceTest {
             var themes = ThemeTestSupport.controller(false);
             themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            var detached = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {}, () -> {},
+            var detached = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {},
                 ThemeTestSupport.controller(true));
             var contributions = new Contributions(); owner.connectContributions(contributions);
             detached.connectContributions(contributions);
-            contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(owner::id, owner.id()::equals,
+            contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(owner::id,
                 tab -> contributions.tabs().move(tab, detached.id())));
             var moved = new JPanel(); var movedList = new JList<>(new String[] {"move"}); moved.add(movedList);
             var entry = contributions.tabs().open("fixture", "move", "Move", owner.id(), moved);
@@ -133,11 +133,11 @@ class PluginPaneAppearanceTest {
             var firstTheme = ThemeTestSupport.controller(false);
             firstTheme.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
             var first = content(launcher(new ArrayDeque<>()), firstTheme);
-            var second = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {}, () -> {},
+            var second = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {},
                 // One installed look per process: the second window shows the same variant.
                 ThemeTestSupport.controller(true));
             var contributions = new Contributions(); first.connectContributions(contributions); second.connectContributions(contributions);
-            contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(first::id, first.id()::equals,
+            contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(first::id,
                 tab -> contributions.tabs().move(tab, second.id())));
             var text = new JTextArea("before"); var document = text.getDocument();
             var undo = new javax.swing.undo.UndoManager(); document.addUndoableEditListener(undo);
@@ -149,7 +149,7 @@ class PluginPaneAppearanceTest {
             assertThat(text.getDocument()).isSameAs(document);
             assertThat(undo.canUndo()).isTrue();
             assertThat(text.getSelectedText()).isEqualTo("efo");
-            contributions.tabs().moveToMainWindow(entry);
+            contributions.tabs().moveToWindow(entry, first.id());
             assertThat(dev.jasper.app.platform.ThemeZone.theme(text)).isSameAs(firstTheme.current().workspace());
             assertThat(text.getDocument()).isSameAs(document);
             assertThat(undo.canUndo()).isTrue();

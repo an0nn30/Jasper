@@ -43,7 +43,7 @@ class RunWindowWorkspaceRenderTest {
                 var look = WindowLook.of(projections);
                 assertThat(look.chrome().palette()).as("the classic chrome's palette is the Run window").isEqualTo(PaletteLook.RUN_WINDOW);
                 var owner = DesktopTestSupport.track(new WindowContent(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), DesktopTestSupport.HOME,
-                    false, path -> { }, () -> { }, () -> { }, themes, KeyBindings.defaults(true), new CommandHistory(), true, look.chrome()));
+                    false, path -> { }, () -> { }, themes, KeyBindings.defaults(true), new CommandHistory(), true, look.chrome()));
                 // The mock's tool windows, so the left and right stripes and the bottom strip the home measures from are there.
                 var model = new Contributions();
                 owner.connectContributions(model, UiState.inMemory(projections.dockLayout().key()));

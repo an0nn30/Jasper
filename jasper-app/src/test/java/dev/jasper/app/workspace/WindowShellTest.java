@@ -16,7 +16,7 @@ class WindowShellTest {
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
     static WindowContent window(boolean macOs, WorkspaceChrome chrome) {
-        var owner = new WindowContent(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), DesktopTestSupport.HOME, false, path -> {}, () -> {}, () -> {},
+        var owner = new WindowContent(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), DesktopTestSupport.HOME, false, path -> {}, () -> {},
             ThemeTestSupport.controller(true), dev.jasper.app.config.KeyBindings.defaults(macOs), new dev.jasper.app.commands.CommandHistory(), macOs, chrome);
         DesktopTestSupport.track(owner);
         return owner;

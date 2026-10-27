@@ -87,7 +87,7 @@ class WorkspaceRestoreTest {
 
     /** A main window saved without a place, holding {@code tabs} with the first showing. */
     private static WorkspaceFile.WindowRecord mainWindow(Map<TabId, WorkspaceFile.TabRecord> items, ParentTab... tabs) {
-        return new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN, Optional.empty(), 0, new ParentTabs(List.of(tabs), tabs[0].id()), items);
+        return new WorkspaceFile.WindowRecord(Optional.empty(), 0, new ParentTabs(List.of(tabs), tabs[0].id()), items);
     }
 
     /** A main window saved without a place, holding one tab whose one pane holds {@code item}. */
@@ -105,16 +105,16 @@ class WorkspaceRestoreTest {
         var split = new Layout(new Split(Orientation.HORIZONTAL, List.of(new Child(left, 0.3), new Child(rows, 0.7))), lower.id(), Optional.empty());
         ParentTab first = tab(split), second = tab(Layout.of(hidden));
         var mainTabs = new ParentTabs(List.of(first, second), first.id());
-        var main = new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN, Optional.of(new UiState.Bounds(40, 60, 1400, 900)), 6, mainTabs,
+        var main = new WorkspaceFile.WindowRecord(Optional.of(new UiState.Bounds(40, 60, 1400, 900)), 6, mainTabs,
             Map.of(build, shell("build", work, "zsh"), tail, shell("tail", logs, ""), shell, shell("", work, ""), hidden, shell("", logs, "")));
         ParentTab fullFirst = tab(Layout.of(away)), fullSecond = tab(Layout.of(other));
-        var full = new WorkspaceFile.WindowRecord(WorkspaceFile.Role.CHILD, Optional.of(new UiState.Bounds(900, 100, 800, 600)), 0,
+        var full = new WorkspaceFile.WindowRecord(Optional.of(new UiState.Bounds(900, 100, 800, 600)), 0,
             new ParentTabs(List.of(fullFirst, fullSecond), fullSecond.id()), Map.of(away, shell("", logs, ""), other, shell("", work, "")));
         var saved = new WorkspaceFile.Snapshot(List.of(main, full));
         WorkspaceFile.write(file(), saved);
         windows();
         edt(() -> {
-            MainWindow restored = windows.manager.ensureMain("cold", null).orElseThrow();
+            JasperWindow restored = windows.manager.ensureWindow("cold", null).orElseThrow();
             assertThat(restored.content().windowLayout()).as("its tabs in strip order, the one that shows, their splits, panes and active panes")
                 .isEqualTo(mainTabs);
             assertThat(restored.placement()).isEqualTo(new JasperWindow.Placement(Optional.of(new UiState.Bounds(40, 60, 1400, 900)), 6));
@@ -123,13 +123,13 @@ class WorkspaceRestoreTest {
             var titles = restored.content().tabs().stream().map(item -> ((TerminalContent) item.content()).renamed().orElse("")).toList();
             assertThat(titles).containsExactly("build", "tail", "", "");
             assertThat(((TerminalContent) restored.content().tabs().getFirst().content()).pane().profile()).contains("zsh");
-            List<ChildWindow> children = windows.manager.children();
+            List<JasperWindow> children = windows.others();
             assertThat(children).hasSize(1);
             assertThat(children.getFirst().content().windowLayout()).as("a full window, the tab it showed shown").isEqualTo(full.layout());
             assertThat(children.getFirst().placement().bounds()).contains(new UiState.Bounds(900, 100, 800, 600));
             assertThat(windows.manager.snapshot()).as("saved again, it is what was read").contains(saved);
             assertThat(windows.events).as("every frame shown, the main window brought to the front last")
-                .containsSubsequence("show main", "opened main", "show child", "opened child", "front main");
+                .containsSubsequence("show w0", "opened w0", "show w1", "opened w1", "front w0");
         });
         windows.launch();
         assertThat(windows.started).as("every pane of each window's shown tab: build, tail and shell, then the full window's other")
@@ -152,7 +152,7 @@ class WorkspaceRestoreTest {
         windows();
         Tab[] waiting = new Tab[1];
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
             assertThat(main.content().windowLayout().parentTabs().get(1).layout().maximized()).as("the hidden tab keeps its maximize").isPresent();
             waiting[0] = main.content().tabs().get(1);
             var pane = ((TerminalContent) waiting[0].content()).pane();
@@ -162,7 +162,7 @@ class WorkspaceRestoreTest {
         });
         windows.launch();
         assertThat(windows.started).as("only the shown tab's").containsExactly(work);
-        edt(() -> windows.manager.main().orElseThrow().content().selectTab(waiting[0]));
+        edt(() -> windows.first().content().selectTab(waiting[0]));
         windows.launch();
         assertThat(windows.started).as("shown, both of its panes start, the one the maximize hides too").containsExactly(work, logs, logs);
     }
@@ -171,17 +171,17 @@ class WorkspaceRestoreTest {
         TabId item = TabId.random();
         WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(mainWindow(item, shell("", folder.resolve("deleted"), "")))));
         windows();
-        edt(() -> windows.manager.ensureMain("cold", null).orElseThrow());
+        edt(() -> windows.manager.ensureWindow("cold", null).orElseThrow());
         windows.launch();
         assertThat(windows.started).containsExactly(HOME);
-        edt(() -> assertThat(windows.manager.main().orElseThrow().content().tabCount()).as("the item stays").isEqualTo(1));
+        edt(() -> assertThat(windows.first().content().tabCount()).as("the item stays").isEqualTo(1));
     }
 
     @Test void aFreshStartOpensOneTerminalTabAndAnUnreadableFileIsSetAsideAndTold() throws Exception {
         Path work = Files.createDirectories(folder.resolve("work"));
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", work).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", work).orElseThrow();
             assertThat(main.content().tabCount()).isEqualTo(1);
             windows.manager.closeAll();
         });
@@ -191,7 +191,7 @@ class WorkspaceRestoreTest {
         Files.writeString(file(), "version = 1\n[[windows]]\nrole = ");
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
             assertThat(main.content().tabCount()).isEqualTo(1);
         });
         assertThat(setAside).containsExactly(folder.resolve("workspace.toml.bad"));
@@ -202,11 +202,11 @@ class WorkspaceRestoreTest {
     /** Tabs and panes spec 4 and 12: the main window saved as its empty workspace comes back empty, under its saved ids. */
     @Test void theEmptyWorkspaceComesBack() throws Exception {
         var empty = ParentTabs.of(tab(Layout.empty()));
-        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN, Optional.empty(),
+        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(Optional.empty(),
             0, empty, Map.of()))));
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
             assertThat(main.content().windowLayout()).isEqualTo(empty);
             assertThat(main.content().tabCount()).isZero();
             assertThat(main.content().workspace().emptyWorkspace()).as("New Terminal Tab and Open File show").isNotNull();
@@ -225,11 +225,11 @@ class WorkspaceRestoreTest {
         Path asked = Files.createDirectories(folder.resolve("asked"));
         TabId back = TabId.random(), front = TabId.random();
         ParentTab hidden = tab(Layout.of(back)), shown = tab(Layout.of(front));
-        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN, Optional.empty(), 0,
+        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(new WorkspaceFile.WindowRecord(Optional.empty(), 0,
             new ParentTabs(List.of(hidden, shown), shown.id()), Map.of(back, shell("", logs, ""), front, shell("", work, ""))))));
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", asked).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", asked).orElseThrow();
             assertThat(main.content().tabs()).extracting(Tab::id).as("after the restored ones").startsWith(back, front).hasSize(3);
             assertThat(main.content().parentTabCount()).as("in a tab of its own").isEqualTo(3);
             assertThat(main.content().selectedTab()).as("which shows").isSameAs(main.content().tabs().getLast());
@@ -241,13 +241,13 @@ class WorkspaceRestoreTest {
     @Test void aFullWindowHoldingOnlyAMissingPluginsItemComesBackWithItsPlaceholder() throws Exception {
         TabId item = TabId.random(), document = TabId.random();
         var plugin = (WorkspaceFile.TabRecord) new WorkspaceFile.TabRecord.Content("notes.md", "dev.example.editor", "document", Map.of("path", "/notes.md"));
-        var full = new WorkspaceFile.WindowRecord(WorkspaceFile.Role.CHILD, Optional.empty(), 0, ParentTabs.of(tab(Layout.of(document))),
+        var full = new WorkspaceFile.WindowRecord(Optional.empty(), 0, ParentTabs.of(tab(Layout.of(document))),
             Map.of(document, plugin));
         WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(mainWindow(item, shell("", folder, "")), full)));
         windows();
         edt(() -> {
-            windows.manager.ensureMain("cold", null).orElseThrow();
-            assertThat(windows.manager.children()).as("a full window holding its plugin's item as a placeholder").singleElement()
+            windows.manager.ensureWindow("cold", null).orElseThrow();
+            assertThat(windows.others()).as("a full window holding its plugin's item as a placeholder").singleElement()
                 .satisfies(child -> assertThat(child.content().tabs()).extracting(Tab::id, Tab::kind)
                     .containsExactly(org.assertj.core.groups.Tuple.tuple(document, Tab.Kind.PLACEHOLDER)));
         });
@@ -263,7 +263,7 @@ class WorkspaceRestoreTest {
         Files.writeString(file(), text.replace("item = \"" + second.value() + "\"", "item = 3"));
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
             assertThat(main.content().windowLayout().parentTabs()).extracting(ParentTab::id).containsExactly(kept.id());
             assertThat(main.content().tabs()).extracting(Tab::id).containsExactly(first);
         });
@@ -293,11 +293,11 @@ class WorkspaceRestoreTest {
         windows();
         edt(() -> {
             taken(item);
-            MainWindow main = windows.manager.ensureMain("cold", work).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", work).orElseThrow();
             assertThat(main.content().tabs()).hasSize(1);
             assertThat(main.content().tabs().getFirst().id()).isNotEqualTo(item);
             assertThat(windows.events).as("it opens as a new main window, never closed: the last window's closed hook can end Jasper")
-                .containsExactly("show main", "opened main");
+                .containsExactly("show w0", "opened w0");
         });
         assertThat(setAside).as("told, for the notice").containsExactly(folder.resolve("workspace.toml.bad"));
         assertThat(keptAside()).as("not lost to the next save").isEqualTo(saved);
@@ -308,15 +308,15 @@ class WorkspaceRestoreTest {
     @Test void aChildWindowThatCannotBeRestoredIsLeftOutAndTheSavedWindowsAreKept() throws Exception {
         TabId shell = TabId.random(), away = TabId.random();
         var saved = new WorkspaceFile.Snapshot(List.of(mainWindow(shell, shell("", folder, "")),
-            new WorkspaceFile.WindowRecord(WorkspaceFile.Role.CHILD, Optional.empty(), 0, ParentTabs.of(tab(Layout.of(away))),
+            new WorkspaceFile.WindowRecord(Optional.empty(), 0, ParentTabs.of(tab(Layout.of(away))),
                 Map.of(away, shell("", folder, "")))));
         WorkspaceFile.write(file(), saved);
         windows();
         edt(() -> {
             taken(away);
-            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
             assertThat(main.content().tabs()).extracting(Tab::id).containsExactly(shell);
-            assertThat(windows.manager.children()).isEmpty();
+            assertThat(windows.others()).isEmpty();
         });
         assertThat(setAside).containsExactly(folder.resolve("workspace.toml.bad"));
         assertThat(keptAside()).isEqualTo(saved);
@@ -326,19 +326,20 @@ class WorkspaceRestoreTest {
     /** A main window and a full window, each saved with one terminal in {@code folder}. */
     private WorkspaceFile.Snapshot mainAndFullWindow(TabId shell, TabId away) {
         return new WorkspaceFile.Snapshot(List.of(mainWindow(shell, shell("", folder, "")),
-            new WorkspaceFile.WindowRecord(WorkspaceFile.Role.CHILD, Optional.empty(), 0, ParentTabs.of(tab(Layout.of(away))),
+            new WorkspaceFile.WindowRecord(Optional.empty(), 0, ParentTabs.of(tab(Layout.of(away))),
                 Map.of(away, shell("", folder, "")))));
     }
 
     /**
-     * The restore of the main window, or of a full window, fails once its items are mounted, as a listener's bug would:
+     * The restore of the first window, or of a later one, fails once its items are mounted, as a listener's bug would:
      * its first title change while it holds an item throws {@code failure}, once.
      */
-    private void failOnceMounted(boolean main, Throwable failure) {
+    private void failOnceMounted(boolean first, Throwable failure) {
         java.util.function.Consumer<WindowContent> before = windows.composed;
+        int[] composed = {0};
         windows.composed = content -> {
             before.accept(content);
-            if (content.isMain() != main) return;
+            if ((composed[0]++ == 0) != first) return;
             boolean[] armed = {true};
             content.onTitle = title -> {
                 if (!armed[0] || content.tabCount() == 0) return;
@@ -360,11 +361,11 @@ class WorkspaceRestoreTest {
         windows();
         edt(() -> {
             failOnceMounted(false, new IllegalStateException("a listener's bug"));
-            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
             assertThat(main.content().tabs()).extracting(Tab::id).containsExactly(shell);
-            assertThat(windows.manager.children()).isEmpty();
+            assertThat(windows.others()).isEmpty();
             assertThat(windows.events).as("no closing hook for a window that never opened")
-                .containsExactly("show main", "opened main", "closed child");
+                .containsExactly("show w0", "opened w0", "closed w1");
             assertThat(windows.model.tabs().tab(away)).as("its item went with it").isEmpty();
         });
         assertThat(setAside).containsExactly(folder.resolve("workspace.toml.bad"));
@@ -384,13 +385,13 @@ class WorkspaceRestoreTest {
         windows();
         Tab[] early = new Tab[1];
         edt(() -> {
-            // Asked for while the main window is composed, it waits for it (TabRegistry.mainOpened).
+            // Asked for while the first window is composed, it waits for it (TabRegistry.windowOpened).
             windows.composed = content -> {
-                if (content.isMain()) early[0] = windows.model.tabs().open("dev.example.editor", "early", "early.txt", null, new javax.swing.JPanel());
+                if (early[0] == null) early[0] = windows.model.tabs().open("dev.example.editor", "early", "early.txt", null, new javax.swing.JPanel());
             };
             failOnceMounted(false, new AssertionError("a bug"));
-            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
-            assertThat(windows.manager.children()).isEmpty();
+            JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
+            assertThat(windows.others()).isEmpty();
             assertThat(early[0].closed()).as("the tab that waited for the main window").isFalse();
             assertThat(early[0].window()).as("opened there").isEqualTo(main.id());
             assertThat(main.content().tabs()).extracting(Tab::id).containsExactly(shell, early[0].id());
@@ -412,12 +413,12 @@ class WorkspaceRestoreTest {
         windows();
         edt(() -> {
             failOnceMounted(true, new AssertionError("a bug"));
-            MainWindow main = windows.manager.ensureMain("cold", work).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", work).orElseThrow();
             assertThat(main.content().tabs()).hasSize(1);
             assertThat(main.content().tabs().getFirst().id()).isNotEqualTo(item);
             assertThat(main.content().isPreferredSizeSet()).as("sized as a new main window is").isFalse();
             assertThat(windows.events).as("never discarded: the last window's closed hook can end Jasper")
-                .containsExactly("show main", "opened main");
+                .containsExactly("show w0", "opened w0");
         });
         assertThat(setAside).containsExactly(folder.resolve("workspace.toml.bad"));
         assertThat(keptAside()).isEqualTo(saved);
@@ -442,7 +443,7 @@ class WorkspaceRestoreTest {
                 threw[0] = true;
                 throw new AssertionError("a launch that throws");
             };
-            windows.manager.ensureMain("cold", null).orElseThrow();
+            windows.manager.ensureWindow("cold", null).orElseThrow();
         });
         windows.launch();
         assertThat(threw[0]).as("the first pane's start threw").isTrue();
@@ -454,45 +455,48 @@ class WorkspaceRestoreTest {
         WorkspaceFile.write(file(), mainAndFullWindow(TabId.random(), TabId.random()));
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", null).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
             assertThat(main.content().isPreferredSizeSet()).isFalse();
-            assertThat(windows.manager.children()).singleElement()
+            assertThat(windows.others()).singleElement()
                 .satisfies(child -> assertThat(child.content().isPreferredSizeSet()).isFalse());
         });
         windows.launch();
     }
 
     /**
-     * Workspace plan 6a Rulings 31: Move to Main Window moves a full window's tabs one at a time, each showing for an
-     * instant; only the one that shows when the move ends starts, and the tabs it passed over still wait.
+     * Workspace plan 6a Rulings 31: Move Tab to Window, for each of a window's tabs in one turn, shows each for an instant;
+     * only the one that shows when the moves end starts, and the tabs it passed over still wait.
      */
-    @Test void movingARestoredFullWindowToTheMainWindowStartsOnlyTheTabThatShowsThere() throws Exception {
+    @Test void movingARestoredWindowsTabsToAnotherWindowStartsOnlyTheTabThatShowsThere() throws Exception {
         TabId front = TabId.random(), first = TabId.random(), second = TabId.random(), third = TabId.random();
         ParentTab one = tab(Layout.of(first)), two = tab(Layout.of(second)), three = tab(Layout.of(third));
         WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(List.of(mainWindow(front, shell("", folder, "")),
-            new WorkspaceFile.WindowRecord(WorkspaceFile.Role.CHILD, Optional.empty(), 0, new ParentTabs(List.of(one, two, three), one.id()),
+            new WorkspaceFile.WindowRecord(Optional.empty(), 0, new ParentTabs(List.of(one, two, three), one.id()),
                 Map.of(first, shell("", folder, ""), second, shell("", folder, ""), third, shell("", folder, ""))))));
         windows();
-        edt(() -> windows.manager.ensureMain("cold", null).orElseThrow());
+        edt(() -> windows.manager.ensureWindow("cold", null).orElseThrow());
         windows.launch();
         assertThat(windows.started).as("each window's shown tab").hasSize(2);
         edt(() -> {
-            MainWindow main = windows.manager.main().orElseThrow();
-            assertThat(windows.manager.moveToMainWindow(windows.manager.children().getFirst().content())).containsSame(main);
+            JasperWindow main = windows.first();
+            var full = windows.others().getFirst().content();
+            // Every tab, the one it shows last, in one turn: the shown tab follows each move until the last.
+            for (ParentTab moving : List.of(three, two, one)) assertThat(windows.manager.moveTabToWindow(full, moving.id(), main.content())).isTrue();
             assertThat(main.content().selectedTab().id()).as("the tab the full window showed shows").isEqualTo(first);
         });
         windows.launch();
         assertThat(windows.started).as("the tabs the move passed over never started").hasSize(2);
-        edt(() -> assertThat(windows.manager.main().orElseThrow().content().tabs().stream()
+        edt(() -> assertThat(windows.first().content().tabs().stream()
             .map(item -> ((TerminalContent) item.content()).pane().waiting()).toList())
-            .as("front and first started at the restore; second and third wait to be shown").containsExactly(false, false, true, true));
+            .as("front and first started at the restore; third and second, moved before it, wait to be shown")
+            .containsExactly(false, true, true, false));
     }
 
     /** Workspace plan 6a Rulings 17: only the panes of the tab that shows count, the maximized one alone while one is. */
     @Test void aWindowShowsNoTerminalWhenAMaximizedPaneOrAHiddenTabHidesTheOneThatStarted() throws Exception {
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
             assertThat(main.content().showsNoTerminal()).isFalse();
             Tab notes = windows.model.tabs().open("dev.example.editor", "notes", "notes.md", main.id(), new javax.swing.JPanel(),
                 dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT);
@@ -512,19 +516,19 @@ class WorkspaceRestoreTest {
         windows();
         TabId[] saved = new TabId[3];
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", work).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", work).orElseThrow();
             main.content().newTab(work);
             main.content().split(Side.RIGHT);
             saved[0] = main.content().tabs().get(0).id();
             saved[1] = main.content().tabs().get(1).id();
             saved[2] = main.content().tabs().get(2).id();
-            windows.manager.openTerminalWindow(work);
+            windows.manager.openWindow(work);
             windows.manager.closeAll();
             assertThat(store.held()).as("closing every window saved them first").isTrue();
-            MainWindow again = windows.manager.ensureMain("reopen", null).orElseThrow();
+            JasperWindow again = windows.manager.ensureWindow("reopen", null).orElseThrow();
             assertThat(again.content().tabs()).extracting(Tab::id).containsExactly(saved);
             assertThat(again.content().windowLayout().parentTabs()).as("its tabs, the second split in two").hasSize(2);
-            assertThat(windows.manager.children()).as("its full window").hasSize(1);
+            assertThat(windows.others()).as("its full window").hasSize(1);
         });
     }
 }

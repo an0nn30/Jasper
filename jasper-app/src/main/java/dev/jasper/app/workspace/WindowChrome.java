@@ -171,8 +171,7 @@ final class WindowChrome {
 
     /**
      * The classic ⋮ (parent tabs spec 6; workspace plan 7b Rulings 16): a 22 px classic icon button that opens
-     * {@code owner}'s window menu, with no label in any toolbar mode and no overflow entry. The classic row ends with it,
-     * and so does a child window's title row under a classic title.
+     * {@code owner}'s window menu, with no label in any toolbar mode and no overflow entry. The classic row ends with it.
      */
     static ClassicToolbarButton classicWindowMenu(WindowContent owner) {
         var button = new ClassicToolbarButton(null, WindowMenuButton.LABEL, false, AppIcons.semantic("more.vertical"));

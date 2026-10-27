@@ -175,7 +175,7 @@ class AppContractTest extends PluginContractTest {
             return id;
         };
         onEdt(() -> contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(
-            () -> main[0] != null ? main[0] : workspace.get(), id -> id.equals(main[0]),
+            () -> main[0] != null ? main[0] : workspace.get(),
             tab -> {
                 boolean only = terminalFixture.registry.window(tab.window()).map(window -> window.tabs().get().size() == 1).orElse(false);
                 if (!tab.window().equals(main[0]) && only) return;

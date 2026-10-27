@@ -31,7 +31,7 @@ class WindowCommandPaletteTest {
     }
     static WindowContent owner(CommandHistory history) {
         return new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
-            path -> {}, () -> {}, () -> {}, ThemeTestSupport.controller(true), KeyBindings.defaults(true), history, true);
+            path -> {}, () -> {}, ThemeTestSupport.controller(true), KeyBindings.defaults(true), history, true);
     }
     static Command command(String id, Runnable run) {
         return new Command(id, new AbstractAction(id) {
@@ -484,7 +484,7 @@ class WindowCommandPaletteTest {
             var themes = ThemeTestSupport.controller(true);
             themes.configureAnimations(false);
             try (var owner = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
-                    path -> {}, () -> {}, () -> {}, themes, KeyBindings.defaults(true), new CommandHistory(), true)) {
+                    path -> {}, () -> {}, themes, KeyBindings.defaults(true), new CommandHistory(), true)) {
                 var palette = owner.commandPalette();
                 var root = install(owner);
                 owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
@@ -500,7 +500,7 @@ class WindowCommandPaletteTest {
         DesktopTestSupport.edt(() -> {
             var themes = ThemeTestSupport.controller(true);
             try (var owner = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
-                    path -> {}, () -> {}, () -> {}, themes, KeyBindings.defaults(true), new CommandHistory(), true)) {
+                    path -> {}, () -> {}, themes, KeyBindings.defaults(true), new CommandHistory(), true)) {
                 var root = install(owner);
                 owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
@@ -682,15 +682,16 @@ class WindowCommandPaletteTest {
                     DesktopTestSupport.launcher(new ArrayDeque<>()), history[0]);
                 WindowContent[] content = new WindowContent[1];
                 content[0] = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
-                    path -> {}, () -> { content[0].close(); application.quit(); },
-                    () -> { content[0].close(); ApplicationTestSupport.windowClosed(application, null); }, ThemeTestSupport.controller(true),
+                    path -> {}, () -> { content[0].close(); application.quit(); }, ThemeTestSupport.controller(true),
                     KeyBindings.defaults(true), history[0], true);
                 install(content[0]); content[0].commandPalette().toggle();
                 dev.jasper.app.palette.PaletteTestSupport.query(content[0].commandPalette().component()).setText(quit ? "quit" : "close tab");
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(content[0].commandPalette().component());
+                // Its last tab closed, the window keeps its empty workspace (full windows spec 5.3): the user closes it.
+                if (!quit) { content[0].close(); ApplicationTestSupport.windowClosed(application, null); }
                 assertThat(history[0].recent()).containsExactly(quit ? "quit" : "close_tab");
                 assertThat(history[0].closedFuture()).isNotDone();
-                assertThat(application.windows().openTerminalWindow(DesktopTestSupport.HOME)).isEmpty();
+                assertThat(application.windows().openWindow(DesktopTestSupport.HOME)).isEmpty();
                 application.quit(); // Repeated shutdown requests retain the accepted dispatch.
             });
             history[0].closedFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);

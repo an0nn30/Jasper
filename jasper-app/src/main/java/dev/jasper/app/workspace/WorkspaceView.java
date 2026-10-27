@@ -44,9 +44,9 @@ final class WorkspaceView extends JPanel {
     private final Map<List<Integer>, SplitContainer> splits = new HashMap<>();
     private Layout layout = Layout.empty();
     private Object shape;
-    /** The shape of the main window's empty workspace, which shows {@link #empty} (workspace tabs spec 10). */
+    /** The shape of a window's empty workspace, which shows {@link #empty} (workspace tabs spec 10). */
     private static final Object EMPTY = new Object();
-    /** The main window's empty state, made the first time its workspace is empty. */
+    /** The window's empty state, made the first time its workspace is empty. */
     private EmptyWorkspace empty;
     private boolean glass, closed;
 
@@ -247,8 +247,8 @@ final class WorkspaceView extends JPanel {
         for (Group group : layout.groups()) groups.get(group.id()).display(group.selected().map(tabs::get).orElse(null));
         dimPanes();
         Node shown = layout.maximized().<Node>map(id -> layout.group(id).orElseThrow()).orElse(layout.root());
-        // The main window's empty workspace shows New Terminal Tab and Open File in place of its empty pane (spec 10).
-        boolean showEmpty = layout.isEmpty() && owner.isMain();
+        // A window's empty workspace shows New Terminal Tab and Open File in place of its empty pane (spec 10).
+        boolean showEmpty = layout.isEmpty();
         Object next = showEmpty ? EMPTY : shape(shown);
         if (!next.equals(shape)) {
             shape = next;
@@ -272,7 +272,7 @@ final class WorkspaceView extends JPanel {
         return empty;
     }
 
-    /** The main window's empty state while it shows; null otherwise. */
+    /** The window's empty state while it shows; null otherwise. */
     EmptyWorkspace emptyWorkspace() { return shape == EMPTY ? empty : null; }
 
     /** The tree's shape without its weights: what a rebuild depends on. */

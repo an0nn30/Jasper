@@ -47,7 +47,7 @@ class MovePaneToTabTest {
         edt(() -> {
             ThemeTestSupport.install(true);
             terminals.onEvent(facts::add);
-            owner = content(idleLauncher(pending), WindowRole.MAIN, null, true, () -> { });
+            owner = content(idleLauncher(pending), null, true);
             owner.setAnimations(new AnimationSettings(false, 0, 0, 0));
             owner.connectContributions(model);
             owner.connectTerminals(terminals, () -> { });
@@ -231,7 +231,7 @@ class MovePaneToTabTest {
             answer.complete(false);
             assertThat(closing).isCompletedWithValue(false);
             assertThat(owner.paneTargets(b)).extracting(OtherTab::number).containsExactly(2, 3);
-            var lone = content(idleLauncher(pending), WindowRole.CHILD, null, true, () -> { });
+            var lone = content(idleLauncher(pending), null, true);
             lone.connectContributions(model);
             Tab only = model.tabs().open("dev.example.notes", "only", "only", lone.id(), new JPanel(), TabRegistry.Placement.NEW_TAB);
             assertThat(lone.paneTargets(only)).as("a window of one tab").isEmpty();

@@ -233,7 +233,7 @@ class CommandPaletteShortcutsTest {
                                 "stty -echo -icanon min 1 time 0; : > \"$JASPER_READY\"; dd bs=1 count=1 of=\"$JASPER_RECEIVED\" 2>/dev/null")).environment(environment).workingDirectory(directory).grid(new GridSize(80, 24)).scrollback(100).build());
                         } catch (java.io.IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
                     }, "controlled input fixture");
-                    owner[0] = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {},
+                    owner[0] = new WindowContent(launcher, directory, path -> {}, () -> {},
                         ThemeTestSupport.controller(true), KeyBindings.defaults(mac), new CommandHistory(), mac);
                     install(owner[0]);
                 });
@@ -297,7 +297,7 @@ class CommandPaletteShortcutsTest {
 
     static int primary(boolean mac) { return mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK; }
     static WindowContent owner(boolean mac) {
-        return new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
+        return new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {},
             ThemeTestSupport.controller(true), KeyBindings.defaults(mac), new CommandHistory(), mac);
     }
     static JRootPane install(WindowContent owner) {

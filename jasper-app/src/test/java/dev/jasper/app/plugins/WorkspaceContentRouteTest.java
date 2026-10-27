@@ -51,7 +51,7 @@ class WorkspaceContentRouteTest {
             var mainHolder = new JPanel(); var separateHolder = new JPanel();
             model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, e -> mainHolder.add(e.component()), e -> mainHolder.remove(e.component()), e -> {}, () -> {}));
             model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(separate, e -> separateHolder.add(e.component()), e -> separateHolder.remove(e.component()), e -> {}, () -> {}));
-            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> model.tabs().move(tab, separate)));
+            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, tab -> model.tabs().move(tab, separate)));
             var ui = new HostedUi("test.kit", model, containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(), () -> dev.jasper.sdk.Variant.LIGHT,
                 h -> () -> {}, AppContractTest.headlessWindows(), terminals(fixture, containment), () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}),
                 new GlassSource(c -> SwingUtilities.isDescendingFrom(c, separateHolder) ? .4 : 1, h -> new dev.jasper.app.lifecycle.Subscription(() -> {})));
@@ -110,7 +110,7 @@ class WorkspaceContentRouteTest {
             var terminals = terminals(fixture, containment);
             model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main,
                 e -> { holder.add(e.component()); holder.remove(e.component()); throw new IllegalStateException("mount failed"); }, e -> {}, e -> {}, () -> {}));
-            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> { }));
+            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, tab -> { }));
             var ui = new HostedUi("test.kit", model, containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(), () -> dev.jasper.sdk.Variant.LIGHT,
                 h -> () -> {}, AppContractTest.headlessWindows(), terminals, () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}), GlassSource.NONE);
             var kit = new HostedKit("test.kit", () -> true, ui::kitThemes, ui.appearance(), containment); ui.kit(kit);

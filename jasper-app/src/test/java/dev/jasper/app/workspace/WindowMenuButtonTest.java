@@ -11,7 +11,6 @@ import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.MacTitleBand;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
-import java.awt.BorderLayout;
 import java.awt.Container;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -27,18 +26,11 @@ import javax.swing.JRootPane;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-/** Parent tabs spec 6: every window's ⋮, at the trailing end of the main window's toolbar or of a child window's title row. */
+/** Parent tabs spec 6: every window's ⋮, at the trailing end of its toolbar. */
 class WindowMenuButtonTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
     private static JComponent menuIn(Container parent) { return WindowTabsTest.named(parent, WindowMenuButton.NAME); }
-
-    /** The ⋮ at the trailing end of the row at the top of a child window's content (macOS under the system's title bar). */
-    private static JComponent rowMenu(WindowContent child) {
-        var row = (JComponent) ((BorderLayout) child.getLayout()).getLayoutComponent(BorderLayout.NORTH);
-        assertThat(row.getName()).isEqualTo("windowBar");
-        return (JComponent) ((BorderLayout) row.getLayout()).getLayoutComponent(BorderLayout.EAST);
-    }
 
     /** What a click on a ⋮ asked its window to show: the menu, under the ⋮. */
     private record Shown(JComponent invoker, JPopupMenu menu) { }

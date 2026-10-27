@@ -90,7 +90,7 @@ public final class WorkspaceSurfacePreview {
             var launcher = new ShellLauncher(pending::add, directory -> shell(screenshots, prompts), "zsh");
             var themes = ThemeTestSupport.controller(true);
             themes.configure(dark, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
-            var owner = new WindowContent(launcher, screenshots, path -> { }, () -> { }, () -> { }, themes,
+            var owner = new WindowContent(launcher, screenshots, path -> { }, () -> { }, themes,
                 KeyBindings.defaults(true), new CommandHistory(), true);
             owner.applyConfiguration(fixtureConfiguration(), true);
             owner.setAnimations(new AnimationSettings(false, 80, 100, 130));

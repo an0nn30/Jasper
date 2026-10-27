@@ -60,9 +60,8 @@ import dev.jasper.app.terminals.SessionRequest;
 public final class WindowContent extends JPanel implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(WindowContent.class.getName());
     private final ShellLauncher launcher;
-    private final Consumer<Path> newTerminalWindow;
+    private final Consumer<Path> newWindow;
     private final Runnable quit;
-    private final Runnable onEmpty;
     /** Each tab this window shows, with its change listener. */
     private final Map<Tab, Subscription> tabListeners = new IdentityHashMap<>();
     /** This window's side of its terminal tabs (workspace tabs spec 9.3). */
@@ -106,8 +105,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private Runnable bringToFront = () -> {};
     /** The window manager that opened this window, which moves its tabs to other windows (tabs and panes spec 6); else null. */
     private WindowManager manager;
-    /** The main window, with Jasper's chrome, or a child window, a workspace alone (workspace tabs spec 6). */
-    private final WindowRole role;
     /**
      * The window's tabs, each holding panes in splits, under the window's one strip (workspace tabs spec 10; parent tabs
      * spec 4), where the terminal column stood.
@@ -292,65 +289,51 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
 
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty) {
-        this(launcher, directory, newTerminalWindow, quit, onEmpty, new ThemeController(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit) {
+        this(launcher, directory, newWindow, quit, new ThemeController(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH));
     }
 
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes) {
-        this(launcher, directory, newTerminalWindow, quit, onEmpty, themes,
-            KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac")));
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, ThemeController themes) {
+        this(launcher, directory, newWindow, quit, themes, KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac")));
     }
 
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes, KeyBindings bindings) {
-        this(launcher, directory, newTerminalWindow, quit, onEmpty, themes, bindings,
-            new CommandHistory(), System.getProperty("os.name").startsWith("Mac"));
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, ThemeController themes,
+                  KeyBindings bindings) {
+        this(launcher, directory, newWindow, quit, themes, bindings, new CommandHistory(), System.getProperty("os.name").startsWith("Mac"));
     }
 
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
-        this(launcher, directory, directory == null, newTerminalWindow, quit, onEmpty, themes, bindings, history, macOs);
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, ThemeController themes,
+                  KeyBindings bindings, CommandHistory history, boolean macOs) {
+        this(launcher, directory, directory == null, newWindow, quit, themes, bindings, history, macOs);
     }
 
     /**
      * An {@code empty} window starts with no tab; any other starts one tab in {@code directory}, where null means where a
-     * new shell starts. {@code newTerminalWindow} receives null the same way.
+     * new shell starts. {@code newWindow} receives null the same way.
      */
-    WindowContent(ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty,
+    WindowContent(ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newWindow, Runnable quit,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
-        this(launcher, directory, empty, newTerminalWindow, quit, onEmpty, themes, bindings, history, macOs, WorkspaceChrome.STANDARD);
-    }
-
-    /** As above, as the main window, under the look's workspace chrome (Enterprise presentation spec 9.1). */
-    WindowContent(ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newTerminalWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs, WorkspaceChrome look) {
-        this(WindowRole.MAIN, launcher, directory, empty, newTerminalWindow, quit, onEmpty, themes, bindings, history, macOs, look);
+        this(launcher, directory, empty, newWindow, quit, themes, bindings, history, macOs, WorkspaceChrome.STANDARD);
     }
 
     /**
-     * A window's content in {@code role} (workspace tabs spec 6): the main window's shows Jasper's chrome around its
-     * workspace; a child window's shows its workspace alone, with the same actions, menus, keymap and palette, and docks
-     * no tool window.
+     * A window's content (full windows spec 5.1): Jasper's chrome around its workspace, which its last tab leaves empty
+     * rather than closed, with its actions, menus, keymap, palette and dock.
      *
-     * @param role the main window or a child window
      * @param launcher starts the window's shells
      * @param directory where the first tab starts, or null for where a new shell starts
      * @param empty whether the window starts without a tab
-     * @param newTerminalWindow opens a window with a terminal tab in a directory, or where a new shell starts when it is null
+     * @param newWindow opens a window with a terminal tab in a directory, or where a new shell starts when it is null
      * @param quit quits Jasper
-     * @param onEmpty runs when the window's last tab has closed or moved out
      * @param themes the application's look
      * @param bindings the keymap until a configuration arrives
      * @param history the shared command history
      * @param macOs whether the keymap and shortcut text are macOS's
      * @param look the workspace's chrome under the look
      */
-    public WindowContent(WindowRole role, ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newTerminalWindow,
-                         Runnable quit, Runnable onEmpty, ThemeController themes, KeyBindings bindings, CommandHistory history,
-                         boolean macOs, WorkspaceChrome look) {
+    public WindowContent(ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newWindow, Runnable quit,
+                         ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs, WorkspaceChrome look) {
         super(new BorderLayout());
-        this.role = Objects.requireNonNull(role, "role");
         this.look = Objects.requireNonNull(look, "look");
         setFocusTraversalPolicyProvider(true);
         setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
@@ -366,7 +349,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         this.bindings = bindings;
         this.macOs = macOs;
         this.themes = themes;
-        this.launcher = launcher; this.newTerminalWindow = newTerminalWindow; this.quit = quit; this.onEmpty = onEmpty;
+        this.launcher = launcher; this.newWindow = newWindow; this.quit = quit;
         workspaceActions = new WorkspaceActions(this);
         windowCommands = new WindowCommands(this, commands);
         chrome = new WindowChrome(this);
@@ -441,7 +424,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * classic title, IntelliJ Classic's band in the toolbar's colour above that row on macOS and FlatLaf's title pane with
      * the menus and the title on Windows. Either way the menu bar is the root's (the unified bar's {@code setMenuBar} puts
      * it there too); on macOS the screen menu bar shows it while the look keeps that on, and otherwise it is a row in the
-     * window or of the Windows title bar. The main window's frame and the chrome renders share this path. Returns the
+     * window or of the Windows title bar. Every window's frame and the chrome renders share this path. Returns the
      * unified bar, or null.
      */
     static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
@@ -652,7 +635,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private static final Set<String> CLOSE_KEYS = Set.of(ActionId.CLOSE_PANE.id(), ActionId.CLOSE_TAB.id(), ActionId.CLOSE_WINDOW.id());
 
     /**
-     * Binds every keymap stroke on the root pane of one of this main window's detached tool windows (floating tool
+     * Binds every keymap stroke on the root pane of one of this window's detached tool windows (floating tool
      * windows spec, The detached window), each resolved from the focus owner as on this window's root: a stroke that
      * resolves to Close Pane, Close Tab or Close Window runs {@code hide} unless the window is recording shortcuts, and
      * closes nothing of this window; while this window's modal overlay is open it holds every other key; otherwise a
@@ -1020,8 +1003,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean settingsConnected() { return openSettingsAt != null; }
     void openWindowSettings() { if (openSettingsAt != null) openSettingsAt.accept("window"); }
     void reloadConfiguration() { reloadConfiguration.run(); }
-    /** New Terminal Window (workspace tabs spec 6.5): a child window with a terminal tab where a tab from here starts. */
-    void requestNewTerminalWindow() { newTerminalWindow.accept(directory()); }
+    /** New Terminal Window (full windows spec 5.2): a new window with a terminal tab where a tab from here starts. */
+    void requestNewTerminalWindow() { newWindow.accept(directory()); }
     /** Close Window (workspace tabs spec 6.4 and 11): this window, as its title bar's close button closes it. */
     void requestCloseWindow() { onCloseWindow.run(); }
     /**
@@ -1031,8 +1014,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void moveTabToNewWindow(Tab tab) {
         if (manager != null && tab != null) parentTabOf(tab).ifPresent(parentTab -> manager.moveTabToNewWindow(this, parentTab));
     }
-    /** Move to Main Window: this full window's parent tabs join the main window's bar. */
-    void moveToMainWindow() { if (manager != null) manager.moveToMainWindow(this); }
+    /**
+     * The Move to Main Window action, until Move Tab to Window replaces it: the shown parent tab moves to the first other
+     * window in opening order ({@link #firstOtherWindow}).
+     */
+    void moveToOtherWindow() { firstOtherWindow().ifPresent(to -> manager.moveTabToWindow(this, activeParentTab(), to)); }
+
+    /** The first open window in opening order other than this one; empty outside a window manager or with no other. */
+    private Optional<WindowContent> firstOtherWindow() {
+        if (closed || manager == null) return Optional.empty();
+        return manager.windows().stream().map(JasperWindow::content).filter(other -> other != this && !other.closed()).findFirst();
+    }
     /** File › Open File…: {@link #fileChooser} from the active pane's folder, then the route a Cmd-click takes, at no line. */
     void openFile() { fileChooser.apply(java.util.Optional.ofNullable(directory())).ifPresent(file -> onOpenFile.accept(file, 0)); }
     void requestQuit() { quit.run(); }
@@ -1172,11 +1164,16 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Stable identity of this window for extensions; never a Swing object. */
     public UUID id() { return id; }
 
-    /** @return this window's role: the main window or a child window (workspace tabs spec 6) */
-    public WindowRole role() { return role; }
-
-    /** @return whether this is the main window, which has Jasper's chrome and dock and whose workspace may be empty */
-    public boolean isMain() { return role == WindowRole.MAIN; }
+    /**
+     * Until SDK 0.23.0 removes {@code WindowHandle.isMain()}: whether this is the first open window in opening order,
+     * which plugins still read as the main window.
+     *
+     * @return true for the first window of its window manager, and for a window outside one, which is alone
+     */
+    boolean firstWindow() {
+        if (manager == null) return !closed;
+        return !closed && manager.windows().stream().findFirst().map(JasperWindow::content).orElse(null) == this;
+    }
 
     /** Connects this window to the application-wide terminal registry, once. {@code toFront} raises the native window. */
     public void connectTerminals(TerminalRegistry registry, Runnable toFront) {
@@ -1209,9 +1206,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void forgetLayout() { rememberLayout = false; }
 
     /**
+     *
      * As {@link #connectContributions(Contributions, UiState)}. A window that does not {@code hostsContent} is wired to
-     * the model but never registered as a place where plugin content opens, so the tab registry cannot choose it as
-     * the main window: the warm-up rehearsal is such a window, and content opened in it would vanish when it closes.
+     * the model but never registered as a place where plugin content opens, so the tab registry cannot choose it for a
+     * tab with no window of its own: the warm-up rehearsal is such a window, and content opened in it would vanish when
+     * it closes.
      */
     public void connectContributions(Contributions model, UiState state, boolean hostsContent) {
         if (closed || contributed != null) return;
@@ -1254,8 +1253,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * Shows an item in this window, in a new tab at the end of the strip and shown, which the main window's empty
-     * workspace takes in its place (tabs and panes spec 13; workspace plan 8a Rulings 3): one the registry placed here, or
+     * Shows an item in this window, in a new tab at the end of the strip and shown, which the window's empty workspace
+     * takes in its place (tabs and panes spec 13; workspace plan 8a Rulings 3): one the registry placed here, or
      * one this window opened. A failure leaves nothing mounted, takes back what the terminal registry heard, and
      * propagates.
      */
@@ -1275,7 +1274,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             tabHost.attach(tab, opened);
             // An item a move between windows brings in lands in the tab chosen for it (workspace plan 7b Rulings 6).
             if (beside == null && landing != null && tab.moving()) parentTabs.land(tab, landing.parentTab(), landing.index());
-            // Whatever opens without a pane opens as a new tab; the main window's empty workspace takes it in its place.
+            // Whatever opens without a pane opens as a new tab; the window's empty workspace takes it in its place.
             else if (beside == null && parentTabs.isEmpty()) workspace().open(tab);
             else if (beside == null) parentTabs.openParentTab(tab);
             else parentTabs.holding(beside).orElseThrow(() -> new IllegalArgumentException("Group " + beside + " is not in this window"))
@@ -1302,8 +1301,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Takes a tab out of this window once it has closed (the registry disposes it first) or as it moves to another window:
-     * a closing tab is announced closed here, and the window closes when its last tab has left. A tab whose attach failed
-     * has nothing to take out.
+     * a closing tab is announced closed here, and the window keeps its empty workspace when its last tab has closed
+     * (full windows spec 5.3). A tab whose attach failed has nothing to take out.
      */
     private void detach(Tab tab) {
         var listener = tabListeners.remove(tab);
@@ -1319,8 +1318,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         WorkspaceTheme.clear(tab.component());
         update();
         if (backgroundOpacity < 1) glassListener.run();
-        // A move empties a window only once it has reported itself: the window manager closes it then (TabRegistry.Windows).
-        if (parentTabs.isEmpty() && !tab.moving()) onEmpty.run();
+        // A move that empties the window closes it once the move has reported itself: the window manager's (TabRegistry.Windows).
     }
 
     /**
@@ -1401,11 +1399,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 };
                 tab.ifPresent(found -> restored.put(saved, found));
             }
-            Optional<ParentTabs> shown = WorkspaceFile.keeping(record.layout(), restored::containsKey, isMain());
-            if (shown.isEmpty()) return 0;
+            ParentTabs shown = WorkspaceFile.keeping(record.layout(), restored::containsKey);
             Runnable show = () -> {
                 for (Tab tab : restored.values()) mount(tab);
-                parentTabs.restore(shown.get(), restored);
+                parentTabs.restore(shown, restored);
             };
             if (terminals != null) terminals.atomically(show); else show.run();
         } catch (RuntimeException | Error failure) {
@@ -1548,10 +1545,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * Whether Move to Main Window may take this window's tabs: a full window's that the window manager opened, every one
-     * of which may move (Rulings 7).
+     *
+     * Whether the Move to Main Window action may take the shown parent tab: one holding tabs that may all move, while
+     * another window is open (Rulings 7).
      */
-    boolean mayMoveToMainWindow() { return !closed && manager != null && !isMain() && movable(tabs()); }
+    boolean mayMoveToOtherWindow() {
+        return firstOtherWindow().isPresent() && parentTabs.view(activeParentTab()).filter(view -> !view.isEmpty())
+            .map(view -> movable(view.tabs())).orElse(false);
+    }
 
     /**
      * Whether Move Pane to New Tab may take {@code tab} (tabs and panes spec 9; workspace plan 8b Rulings 9): an item of
@@ -1747,7 +1748,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * Takes {@code moving}, other windows' tabs, into this window's parent tab {@code parentTab} through the tab registry,
      * one move each, so each keeps its content and session and reports {@code TAB_MOVED} once (parent tabs spec 5;
      * workspace plan 7b Rulings 6). A parent tab this window lacks opens under that id at {@code index} of the bar, in
-     * place of the window's empty workspace (the main window's, or a new full window's). That parent tab then takes
+     * place of the window's empty workspace (its own, or a new window's). That parent tab then takes
      * {@code arranged} ({@link WorkspaceView#rearrange}) and shows, and {@code arranged}'s active tab is selected, focused
      * and raised. A tab the registry does not move stays where it was; the first failure propagates once the others have
      * moved. While such a tab stays in its window (a listener pinned it mid-move, or its move failed), the tabs that
@@ -1864,13 +1865,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * The window menu's entries (tabs and panes spec 6; workspace plan 8a Rulings 7): Move Tab to New Window in every
-     * window, then Move to Main Window in a full window.
+     * The window menu's entries (tabs and panes spec 6; workspace plan 8a Rulings 7): Move Tab to New Window, then the
+     * Move to Main Window action while another window is open.
      *
      * @return the entries in menu order
      */
     java.util.List<ActionId> windowMenuItems() {
-        return isMain() ? java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW)
+        return firstOtherWindow().isEmpty() ? java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW)
             : java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TO_MAIN_WINDOW);
     }
 
@@ -1896,14 +1897,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private JMenuItem windowItem(ActionId id, Tab tab) {
         Runnable run = switch (id) {
             case MOVE_TAB_TO_NEW_WINDOW -> () -> moveTabToNewWindow(tab);
-            case MOVE_TO_MAIN_WINDOW -> this::moveToMainWindow;
+            case MOVE_TO_MAIN_WINDOW -> this::moveToOtherWindow;
             default -> throw new IllegalArgumentException("Not a window menu entry: " + id);
         };
         var item = tabMenuItem(id.label(), id, run);
         // Enabled only while every tab the entry would move may move (workspace plan 7b Rulings 7).
         item.setEnabled(switch (id) {
             case MOVE_TAB_TO_NEW_WINDOW -> parentTabOf(tab).map(this::mayMoveTabToNewWindow).orElse(false);
-            case MOVE_TO_MAIN_WINDOW -> mayMoveToMainWindow();
+            case MOVE_TO_MAIN_WINDOW -> mayMoveToOtherWindow();
             default -> false;
         });
         return item;
@@ -1923,8 +1924,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     DockState dock() { return dock; }
 
     /**
-     * Gives the main window's detached tool windows (Float and Window) their native windows, and opens those that wait;
-     * a child window has none. Given before contributions connect, they are used once they do. EDT.
+     * Gives this window's detached tool windows (Float and Window) their native windows, and opens those that wait. Given
+     * before contributions connect, they are used once they do. EDT.
      */
     public void detachedShells(java.util.function.BiFunction<DetachedToolWindows.Opening, DetachedToolWindows.Events,
                                    DetachedToolWindows.Shell> shells) {
@@ -1935,7 +1936,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         windows.sync();
     }
 
-    /** The main window's detached tool windows' own windows; null in a child window, or before contributions connect. */
+    /** This window's detached tool windows' own windows; null before contributions connect. */
     DetachedToolWindows detachedWindows() { return contributed == null ? null : contributed.detached(); }
 
     /** Whether the panel is one of this window's tool windows detached into a window of its own, showing or not. */
@@ -2020,7 +2021,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * New Tab (tabs and panes spec 10): a terminal in a new tab at the end of the strip, shown, starting in
-     * {@code directory}. The main window's empty workspace takes it in its only tab, the one tab that may be empty
+     * {@code directory}. The window's empty workspace takes it in its only tab, the one tab that may be empty
      * (workspace plan 7a Rulings 7).
      *
      * @param directory where its shell starts; null means where a new shell starts

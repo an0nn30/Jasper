@@ -39,12 +39,10 @@ import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.windows.NativeShells;
 import dev.jasper.app.workspace.DetachedFrame;
 import dev.jasper.app.workspace.JasperWindow;
-import dev.jasper.app.workspace.MainWindow;
 import dev.jasper.app.workspace.TerminalPane;
 import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.app.workspace.WindowFrame;
 import dev.jasper.app.workspace.WindowManager;
-import dev.jasper.app.workspace.WindowRole;
 import dev.jasper.app.workspace.WindowShell;
 import dev.jasper.app.workspace.WorkspaceActivity;
 import dev.jasper.app.workspace.WorkspaceStore;
@@ -82,8 +80,8 @@ import dev.jasper.app.terminals.TabEntry;
 import dev.jasper.app.terminals.TerminalRegistry;
 
 /**
- * The application: its windows (through its {@link WindowManager}: one main window and any number of child windows), its
- * shells, plugins, configuration, notifications and residency.
+ * The application: its windows (through its {@link WindowManager}: any number of windows, all of one kind), its shells,
+ * plugins, configuration, notifications and residency.
  */
 public final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
@@ -194,23 +192,27 @@ public final class JasperApplication {
     /** Test seam: how a window's native frame is made. Production builds a {@link WindowFrame}. Before the manager, which reads it. */
     Function<JasperWindow, WindowShell> frames = this::frameOnScreen;
     /**
-     * Test seam: whether the main window's detached tool windows get native windows ({@link DetachedFrame}): only where
+     * Test seam: whether each window's detached tool windows get native windows ({@link DetachedFrame}): only where
      * windows can be made, as nothing native is made headless.
      */
     boolean nativeToolWindows = !GraphicsEnvironment.isHeadless();
     /**
-     * Every window: the main window and the child windows (workspace tabs spec 6.1). EDT. Its closing hooks are empty: no
-     * frame keeps where its window was, the window does (workspace plan 6a Rulings 7 and 10).
+     * Every window (full windows spec 5.1). EDT. Its closing hooks are empty: no frame keeps where its window was, the
+     * window does (workspace plan 6a Rulings 7 and 10).
      */
     private final WindowManager windows = new WindowManager(contributions, new WindowManager.Hooks(this::composeContent,
         window -> frames.apply(window), this::windowOpened, this::windowActivated, this::windowClosed, this::windowStateChanged,
         window -> { }, () -> { }));
+    /** Each open window as it was last shown, minimized or restored, for the Buddy ({@link #followBuddy}). EDT. */
+    private final Map<JasperWindow, WindowManager.State> windowStates = new HashMap<>();
+    /** The window the Buddy follows now; null before any window has shown. EDT. */
+    private JasperWindow buddyWindow;
     private ActivityNotifier activityNotifier;
     private final NotificationCenter notificationCenter;
     private final NotificationsFeature notificationViews;
     private final Incidents incidents;
     private final IncidentNotices incidentNotices;
-    /** Built once plugins start; its tab opens in the main window. */
+    /** Built once plugins start; its tab opens in the most recently active window. */
     private ErrorsTab errorsTab;
     /** Built with the Errors tab, once plugins start. */
     private AboutWindows aboutWindows;
@@ -487,10 +489,12 @@ public final class JasperApplication {
     }
 
     /**
+     *
      * Saves the windows to {@code file} (workspace tabs spec 13), within a second of each change and whenever a window
-     * closes, written by {@link #workspaceWriter}, and restores them whenever the main window opens: as this process last
-     * saved them, else as {@code file} has them. Saved windows that do not all come back are kept aside and a notice names
-     * where. The warm-up rehearsal never reaches it: it bypasses the window manager. Before the first window. EDT.
+     * closes, written by {@link #workspaceWriter}, and restores them whenever a window opens while none is: as this
+     * process last saved them, else as {@code file} has them. Saved windows that do not all come back are kept aside
+     * and a notice names where. The warm-up rehearsal never reaches it: it bypasses the window manager. Before the
+     * first window. EDT.
      */
     void workspace(Path file) {
         workspaceStore = new WorkspaceStore(file, windows::snapshot, JasperApplication::afterDelay, workspaceWriter,
@@ -518,8 +522,8 @@ public final class JasperApplication {
     /**
      * Saved windows did not all come back (spec 15): {@code workspace.toml} could not be read, its reader dropped a window,
      * tab or item entry, or a window in it could not be restored; the saved windows were kept as {@code kept}. Told on the
-     * next EDT turn: the file is read before the main window's opening counts, so a resident Jasper with no window would
-     * still be idle and send the card to history unseen; by then the main window is open and the card waits for it, as
+     * next EDT turn: the file is read before the first window's opening counts, so a resident Jasper with no window would
+     * still be idle and send the card to history unseen; by then the window is open and the card waits for it, as
      * at a cold start (workspace plan 6a Rulings 13).
      */
     private void workspaceSetAside(Path kept) {
@@ -560,10 +564,10 @@ public final class JasperApplication {
     }
 
     /**
+     *
      * A window's content for {@code opening}, wired to this application: its launcher, configuration, contributions,
-     * notifications, terminal registry, glass and timing; the main window's alone gets the notification layer and the
-     * saved dock layout. Null while the application quits, and then no window opens. A failure closes what was made and
-     * propagates. EDT.
+     * notifications, terminal registry, glass and timing, the notification layer and the saved dock layout. Null while
+     * the application quits, and then no window opens. A failure closes what was made and propagates. EDT.
      */
     private WindowContent composeContent(WindowManager.Opening opening) {
         if (quitting || stopped) return null;
@@ -579,9 +583,8 @@ public final class JasperApplication {
         boolean macOs = com.formdev.flatlaf.util.SystemInfo.isMacOS;
         WindowContent content = null;
         try {
-            content = new WindowContent(opening.role(), launcher, opening.directory(), opening.empty(),
-                directory -> windows.openTerminalWindow(directory), this::quitRequested, opening.emptied(), themes,
-                KeyBindings.defaults(macOs), history, macOs, windowLook().chrome());
+            content = new WindowContent(launcher, opening.directory(), opening.empty(), directory -> windows.openWindow(directory),
+                this::quitRequested, themes, KeyBindings.defaults(macOs), history, macOs, windowLook().chrome());
             // The first configuration a window takes keeps the start-up view mode, before any native chrome is installed.
             if (configuration != null) content.applyConfiguration(windowConfiguration(), macOs);
             if (configuration != null) configuration.register(content);
@@ -671,10 +674,11 @@ public final class JasperApplication {
         WindowTrace windowTrace = windowTraces.remove(window.id());
         if (windowTrace != null) windowTrace.mark(WindowTrace.Milestone.SHOWN);
         trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
-        // A main window that shows no terminal once its opening's turn ends (a request's new tab or file comes after this
-        // in the same turn) paints none at once: its own first paint is the start-up's, which proves the look and settles
-        // residency (workspace plan 6a Rulings 17 and 42).
-        if (window.isMain()) SwingUtilities.invokeLater(() -> {
+        // The first of the windows (the first a process opens, or the first after every window closed) that shows no terminal
+        // once its opening's turn ends (a request's new tab or file comes after this in the same turn) paints none at once:
+        // its own first paint is the start-up's, which proves the look and settles residency (workspace plan 6a Rulings 17
+        // and 42).
+        if (windows.windows().indexOf(window) == 0) SwingUtilities.invokeLater(() -> {
             if (!window.closed() && window.content().showsNoTerminal()) window.content().afterNextPaint(() -> {
                 if (windowTrace != null) windowTrace.mark(WindowTrace.Milestone.FIRST_PAINT);
                 trace.mark(StartupTrace.Milestone.FIRST_PAINT);
@@ -784,7 +788,7 @@ public final class JasperApplication {
      * a subcommand a plugin declares runs in that plugin; otherwise arguments that all name existing files or folders
      * open as a launch's paths do ({@code commandPaths}), and a call whose first argument names one while others name
      * nothing says which ({@code missingPaths}). A raise or a path call is answered once it has run. A plugin's subcommand
-     * that will run (its plugin has registered its handler) first restores the windows when no main window is open; one
+     * that will run (its plugin has registered its handler) first restores the windows when none is open; one
      * whose plugin does not run answers that it is unavailable and opens no window. Called on listener threads.
      */
     public CommandDispatcher commands() {
@@ -803,7 +807,7 @@ public final class JasperApplication {
                 invocation.err("jasper: Jasper's plugins are not running\n");
                 return CompletableFuture.completedFuture(1);
             }
-            // A plugin's subcommand while no main window is open restores the windows first, as every request does (spec
+            // A plugin's subcommand while no window is open restores the windows first, as every request does (spec
             // 6.4), so the restore never runs inside the plugin's own call (workspace plan 6b's final review, I1). Only one
             // that will run does: a call that answers "unavailable" opens no window (the residual round, item 1).
             if (!invocation.arguments().isEmpty() && runtime.runsSubcommand(invocation.arguments().getFirst()))
@@ -813,10 +817,8 @@ public final class JasperApplication {
         };
     }
 
-    /** The main window and its full windows, restored as {@link #open} restores them when none is open (or it closes). EDT. */
-    private void restoreForSubcommand() {
-        if (windows.main().filter(window -> !window.closed()).isEmpty()) windows.ensureMain(HANDOFF, null);
-    }
+    /** The saved windows, restored as {@link #open} restores them when none is open (or every one closes). EDT. */
+    private void restoreForSubcommand() { windows.ensureWindow(HANDOFF, null); }
 
     /**
      * Runs {@code open} on the event thread once {@code accepting} says this process still takes requests, and answers 0
@@ -997,19 +999,19 @@ public final class JasperApplication {
     }
 
     /**
-     * The menu bar item's New Terminal Window: a child window with a terminal tab, after the main window is restored
-     * (workspace tabs spec 6.4 and 6.5), in front of other applications. EDT.
+     * The menu bar item's New Terminal Window: a new window with a terminal tab, after the saved windows are restored
+     * when none is open (workspace tabs spec 6.4 and 6.5), in front of other applications. EDT.
      */
     private void newTerminalWindowFromMenuBar() {
         if (quitting || stopped) return;
-        windows.openTerminalWindow(null);
+        if (windows.ensureWindow("menu", null).isPresent()) windows.openWindow(null);
         requestForeground();
     }
 
-    /** The menu bar item's Settings\u2026: over the window used last, after the main window is restored (spec 6.4). EDT. */
+    /** The menu bar item's Settings\u2026: over the window used last, restored first when none is open (spec 6.4). EDT. */
     private void settingsFromMenuBar() {
         if (quitting || stopped) return;
-        windows.ensureMain("menu", null);
+        windows.ensureWindow("menu", null);
         requestForeground();
         openSettings(null, null);
     }
@@ -1032,10 +1034,11 @@ public final class JasperApplication {
 
     /**
      * Every outside request to show Jasper ends here: a second launch's handoff, the {@code jasper} command, the macOS
-     * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3, 5.4, 6.4 and 13). The main window is
-     * restored first when none is open, with its full windows as this process last saved them, else as
-     * {@code workspace.toml} has them, and the first directory the request names opens in a new tab after the restored
-     * ones (with nothing to restore, a new main window opens there); an open main window is raised. Each other directory opens as a new terminal tab and each
+     * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3, 5.4, 6.4 and 13; full windows spec 5.2).
+     * The saved windows are restored first when none is open, as this process last saved them, else as
+     * {@code workspace.toml} has them, and the first directory the request names opens in a new tab of the first after
+     * its restored ones (with nothing to restore, a new window opens there); otherwise the most recently active window
+     * is raised. Each other directory opens as a new terminal tab and each
      * file in the editor a plugin provides, else revealed ({@code openRequestedFile}) ({@code OpenPlan}). {@code trigger}
      * names the caller for start-up timing. EDT.
      *
@@ -1044,35 +1047,36 @@ public final class JasperApplication {
      */
     public void open(List<Path> paths, String trigger) {
         if (quitting || stopped) return;
-        // A closing main window is not open, and none is restored while it closes (Rulings 25): nothing goes into it.
-        Optional<MainWindow> current = windows.main().filter(window -> !window.closed());
+        // A closing window is not open, and none is restored while the last ones close (Rulings 25): nothing goes into them.
+        Optional<JasperWindow> current = windows.lastActive();
         OpenPlan plan = OpenPlan.of(paths, current.isPresent(), java.nio.file.Files::isDirectory, java.nio.file.Files::isRegularFile);
-        Optional<MainWindow> target = current.isPresent() ? current : windows.ensureMain(trigger, plan.windowDirectory());
+        Optional<JasperWindow> target = current.isPresent() ? current : windows.ensureWindow(trigger, plan.windowDirectory());
         if (target.isEmpty()) return;
         if (current.isPresent()) target.get().toFront();
         openRest(target.get(), plan);
     }
 
     /**
-     * A launch's main window, timed as a cold start unless a {@code --background} launch warmed up: restored with its full
-     * windows as this process last saved them, else as {@code workspace.toml} has them (workspace tabs spec 13), the first
-     * directory {@code paths} names opening in a new tab after the restored ones; with nothing to restore, a new main window whose tab starts in that
-     * directory, else where a new shell starts. The rest of the paths open in it as {@link #open} opens them (plan Ruling
-     * 13). EDT.
+     *
+     * A launch's first window, timed as a cold start unless a {@code --background} launch warmed up: the saved windows
+     * restored as this process last saved them, else as {@code workspace.toml} has them (workspace tabs spec 13), the
+     * first directory {@code paths} names opening in a new tab of the first after its restored ones; with nothing to
+     * restore, a new window whose tab starts in that directory, else where a new shell starts. The rest of the paths
+     * open in it as {@link #open} opens them (plan Ruling 13). EDT.
      *
      * @param paths the launch's absolute paths
-     * @return the main window; empty while the application is quitting
+     * @return the window; empty while the application is quitting
      */
-    public Optional<MainWindow> openFirstWindow(List<Path> paths) {
-        boolean open = windows.main().isPresent();
+    public Optional<JasperWindow> openFirstWindow(List<Path> paths) {
+        boolean open = windows.lastActive().isPresent();
         OpenPlan plan = OpenPlan.of(paths, open, java.nio.file.Files::isDirectory, java.nio.file.Files::isRegularFile);
-        Optional<MainWindow> window = windows.ensureMain(
+        Optional<JasperWindow> window = windows.ensureWindow(
             windowTrigger(windowsOpened, trace.millis(StartupTrace.Milestone.WARMED_UP).isPresent()), plan.windowDirectory());
-        window.ifPresent(main -> openRest(main, plan));
+        window.ifPresent(first -> openRest(first, plan));
         return window;
     }
 
-    private void openRest(MainWindow target, OpenPlan plan) {
+    private void openRest(JasperWindow target, OpenPlan plan) {
         for (Path directory : plan.tabs()) target.content().newTab(directory);
         for (Path file : plan.files()) openRequestedFile(file, target.id());
     }
@@ -1200,10 +1204,10 @@ public final class JasperApplication {
      * configuration or its frame fails, its content closes and the failure propagates; nothing was shown. EDT.
      */
     private Rehearsal.Stage rehearsalWindow(Rehearsal.Feed feed, ConfigSnapshot snapshot) {
-        // A main window's content and frame, made here and nowhere else: the window manager never hears of it.
+        // A window's content and frame, made here and nowhere else: the window manager never hears of it.
         boolean macOs = com.formdev.flatlaf.util.SystemInfo.isMacOS;
-        var content = new WindowContent(WindowRole.MAIN, Rehearsal.launcher(feed), null, false, directory -> { }, () -> { },
-            () -> { }, themes, KeyBindings.defaults(macOs), new CommandHistory(), macOs, windowLook().chrome());
+        var content = new WindowContent(Rehearsal.launcher(feed), null, false, directory -> { }, () -> { }, themes,
+            KeyBindings.defaults(macOs), new CommandHistory(), macOs, windowLook().chrome());
         WindowFrame window;
         try {
             content.applyConfiguration(snapshot, macOs);
@@ -1561,7 +1565,7 @@ public final class JasperApplication {
      * because incidents raised while the application was built are recorded later through {@code invokeLater}, in a
      * {@code --background} launch with the process already resident and windowless: they must wait for the first window
      * like the problems posted directly. With only an auxiliary window open Jasper is not idle, because cards target
-     * the main window: the next one still shows what waited. EDT.
+     * a workspace window: the next one still shows what waited. EDT.
      */
     private Delivery.Presence presence() {
         boolean residentIdle = resident && startupSettled && !windowsOpen() && windows.opening() == 0;
@@ -1651,7 +1655,7 @@ public final class JasperApplication {
             : Optional.of(outcome.message() == null ? "" : outcome.message())));
     }
 
-    /** Show more… on an incident's notification: the Errors tab, in the main window, with that incident selected. */
+    /** Show more… on an incident's notification: the Errors tab, in the most recently active window, with that incident selected. */
     private void showErrors(UUID incident) {
         if (errorsTab != null && !quitting && !stopped) errorsTab.show(Optional.of(incident));
     }
@@ -1910,7 +1914,10 @@ public final class JasperApplication {
             windowTraces.remove(window.id());
             notificationViews.detach(window.content());
         }
+        windowStates.remove(window);
         buddy.removeWindow(window);
+        if (buddyWindow == window) buddyWindow = null;
+        followBuddy();
         if (windows.isEmpty()) activatedSinceOpen = false;
     }
 
@@ -1930,20 +1937,34 @@ public final class JasperApplication {
         }
     }
 
-    /** The Buddy is the main window's (workspace tabs spec 6.2): it shows while the main window does. */
+    /** A window was shown, minimized or restored: the Buddy follows the most recently active window (full windows spec 5.1). */
     private void windowStateChanged(WindowManager.State state) {
-        if (!state.window().isMain()) return;
-        buddy.window(state.window(), state.showing(), state.iconified());
+        windowStates.put(state.window(), state);
+        followBuddy();
+    }
+
+    /**
+     * The Buddy shows while the most recently active window does (full windows spec 5.1), asked again whenever a window
+     * is shown, minimized, restored, comes to the front or closes. EDT.
+     */
+    private void followBuddy() {
+        if (buddy == null) return;
+        JasperWindow followed = windows.lastActive().orElse(null);
+        if (buddyWindow != null && buddyWindow != followed) buddy.removeWindow(buddyWindow);
+        buddyWindow = followed;
+        WindowManager.State state = followed == null ? null : windowStates.get(followed);
+        if (state != null) buddy.window(followed, state.showing(), state.iconified());
         updateBuddyActions();
     }
 
     /** Coming back to a Jasper window is attention: the buddy wakes and waves. */
     void windowActivated(JasperWindow window) {
         activatedSinceOpen = true;
-        // The cards live in the main window (workspace tabs spec 6.2): coming back to any window shows those that waited.
-        windows.main().ifPresent(main -> notificationViews.activated(main.content()));
+        // Coming back to any window shows the cards that waited, there.
+        notificationViews.activated(window.content());
         systemNotices.focused();
         terminals.windowActivated(window.id());
+        followBuddy();
         if (buddy != null && !quitting && !stopped) buddy.greet();
     }
 
@@ -1960,20 +1981,22 @@ public final class JasperApplication {
 
     /**
      * Brings a window to the front for a click on an OS notification: the notification's window while it is open (the
-     * window holding its pane now, {@link #holderOf}), else the one used last, and with none open the main window,
-     * restored first. Names the window; empty while Jasper quits.
+     * window holding its pane now, {@link #holderOf}), else the one used last, the saved windows restored first when none
+     * is open. Names the window; empty while Jasper quits.
      */
     private Optional<UUID> raiseFor(Optional<UUID> target) {
         if (quitting || stopped) return Optional.empty();
-        Optional<JasperWindow> window = target.flatMap(windows::window).or(windows::lastActive)
-            .or(() -> windows.ensureMain("notification", null));
+        Optional<JasperWindow> window = target.flatMap(windows::window).or(() -> windows.ensureWindow("notification", null));
         window.ifPresent(JasperWindow::toFront);
         return window.map(JasperWindow::id);
     }
 
-    /** The Notifications panel is the main window's (workspace tabs spec 6.2): it shows there, whichever window a click raised. */
+    /**
+     * The Notifications panel, in {@code window} while it is open, else in the most recently active window, the saved
+     * windows restored first when none is open.
+     */
     private void showHistory(UUID window) {
-        MainWindow target = windows.main().orElse(null);
+        JasperWindow target = windows.window(window).or(() -> windows.ensureWindow("notification", null)).orElse(null);
         if (target == null) { notificationViews.showHistory(window); return; }
         if (!target.id().equals(window)) target.toFront();
         notificationViews.showHistory(target.id());
@@ -2205,7 +2228,7 @@ public final class JasperApplication {
         if (!windowsMayClose()) return;
         Throwable failure = null;
         try {
-            // Every child window, then the main window (workspace tabs spec 6.4).
+            // Every window, the most recently active last (full windows spec 5.3).
             windows.closeAll();
         } catch (RuntimeException | Error thrown) {
             failure = thrown;

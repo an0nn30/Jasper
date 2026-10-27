@@ -75,7 +75,7 @@ class TabMergeTest {
             KeyboardFocusManager.setCurrentKeyboardFocusManager(keys);
             listeners = motionListeners();
             terminals.onEvent(facts::add);
-            owner = content(idleLauncher(pending), WindowRole.MAIN, null, true, () -> { });
+            owner = content(idleLauncher(pending), null, true);
             owner.setAnimations(new AnimationSettings(false, 0, 0, 0));
             owner.connectContributions(model);
             owner.connectTerminals(terminals, () -> { });
@@ -605,7 +605,7 @@ class TabMergeTest {
                 held.close();
             }
             assertThat(tabMoves(owner, d).isEnabled()).isTrue();
-            var lone = content(idleLauncher(pending), WindowRole.CHILD, null, true, () -> { });
+            var lone = content(idleLauncher(pending), null, true);
             lone.connectContributions(model);
             Tab only = model.tabs().open("dev.example.notes", "only", "only", lone.id(), new JPanel(), TabRegistry.Placement.NEW_TAB);
             assertThat(lone.tabTargets(lone.activeParentTab())).isEmpty();

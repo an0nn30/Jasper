@@ -74,18 +74,18 @@ class WorkspaceSavingTest {
     private WorkspaceFile.Snapshot saved() { return ((WorkspaceFile.Loaded.Restore) WorkspaceFile.read(file())).snapshot(); }
 
     /** The saved main window's shown parent tab's layout. */
-    private Layout shown() { return saved().main().layout().activeParentTab().layout(); }
+    private Layout shown() { return saved().windows().getFirst().layout().activeParentTab().layout(); }
 
     @Test void everyChangeToWhatIsSavedIsSavedWithinASecond() throws Exception {
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
             second();
-            assertThat(saved().main().layout()).as("the window opening").isEqualTo(main.content().windowLayout());
+            assertThat(saved().windows().getFirst().layout()).as("the window opening").isEqualTo(main.content().windowLayout());
             Tab first = main.content().selectedTab();
             main.content().newTab(folder);
             second();
-            assertThat(saved().main().layout().tabs()).as("a tab opening").hasSize(2);
+            assertThat(saved().windows().getFirst().layout().tabs()).as("a tab opening").hasSize(2);
             main.content().split(Side.RIGHT);
             second();
             assertThat(shown().groups()).as("a split").hasSize(2);
@@ -103,15 +103,15 @@ class WorkspaceSavingTest {
             var terminal = (TerminalContent) first.content();
             terminal.rename("build");
             second();
-            assertThat(saved().main().tabs().get(first.id()).title()).as("a rename").isEqualTo("build");
+            assertThat(saved().windows().getFirst().tabs().get(first.id()).title()).as("a rename").isEqualTo("build");
             terminal.pane().onDirectoryChanged.accept(Optional.of(folder), Optional.empty());
             second();
             main.placed(new JasperWindow.Placement(Optional.of(new UiState.Bounds(10, 20, 1200, 800)), 0));
             second();
-            assertThat(saved().main().bounds()).as("the window moving").contains(new UiState.Bounds(10, 20, 1200, 800));
+            assertThat(saved().windows().getFirst().bounds()).as("the window moving").contains(new UiState.Bounds(10, 20, 1200, 800));
             main.content().closeTab(first);
             second();
-            assertThat(saved().main().layout().tabs()).as("a tab closing").doesNotContain(first.id());
+            assertThat(saved().windows().getFirst().layout().tabs()).as("a tab closing").doesNotContain(first.id());
             main.content().newTab(folder);
             main.content().newTab(folder);
             assertThat(due).as("changes within the second join one save").hasSize(1);
@@ -120,25 +120,25 @@ class WorkspaceSavingTest {
             int count = main.content().parentTabCount();
             main.content().newTab(folder);
             second();
-            assertThat(saved().main().layout().parentTabs()).as("a tab opening").hasSize(count + 1);
+            assertThat(saved().windows().getFirst().layout().parentTabs()).as("a tab opening").hasSize(count + 1);
             main.content().selectParentTab(shown);
             second();
-            assertThat(saved().main().layout().active()).as("a tab showing").isEqualTo(shown);
-            ParentTabId opened = saved().main().layout().parentTabs().getLast().id();
+            assertThat(saved().windows().getFirst().layout().active()).as("a tab showing").isEqualTo(shown);
+            ParentTabId opened = saved().windows().getFirst().layout().parentTabs().getLast().id();
             main.content().parentTabs().reorder(shown, count);
             second();
-            assertThat(saved().main().layout().parentTabs().get(count).id()).as("a tab moving along its strip").isEqualTo(shown);
+            assertThat(saved().windows().getFirst().layout().parentTabs().get(count).id()).as("a tab moving along its strip").isEqualTo(shown);
             main.content().closeParentTab(opened);
             second();
-            assertThat(saved().main().layout().parentTabs()).as("a tab closing").hasSize(count);
-            ChildWindow full = windows.manager.moveToNewWindow(main.content().selectedTab()).orElseThrow();
+            assertThat(saved().windows().getFirst().layout().parentTabs()).as("a tab closing").hasSize(count);
+            JasperWindow full = windows.manager.moveToNewWindow(main.content().selectedTab()).orElseThrow();
             second();
-            assertThat(saved().children()).as("an item moving into a window of its own").singleElement()
+            assertThat(saved().windows().subList(1, saved().windows().size())).as("an item moving into a window of its own").singleElement()
                 .satisfies(record -> assertThat(record.layout()).isEqualTo(full.content().windowLayout()));
-            windows.manager.moveToMainWindow(full.content());
-            assertThat(saved().children()).as("Move to Main Window: its window closing is saved at once").isEmpty();
+            windows.manager.moveTabToWindow(full.content(), full.content().activeParentTab(), main.content());
+            assertThat(saved().windows().subList(1, saved().windows().size())).as("Move Tab to Window: its window closing is saved at once").isEmpty();
             second();
-            assertThat(saved().main().layout()).as("and where its tab came back, within the second").isEqualTo(main.content().windowLayout());
+            assertThat(saved().windows().getFirst().layout()).as("and where its tab came back, within the second").isEqualTo(main.content().windowLayout());
         });
         windows.launch();
     }
@@ -146,12 +146,12 @@ class WorkspaceSavingTest {
     @Test void aChildWindowClosedAloneIsSavedWithoutItAtOnce() throws Exception {
         windows();
         edt(() -> {
-            windows.manager.ensureMain("cold", folder).orElseThrow();
-            ChildWindow child = windows.manager.openTerminalWindow(folder).orElseThrow();
+            windows.manager.ensureWindow("cold", folder).orElseThrow();
+            JasperWindow child = windows.manager.openWindow(folder).orElseThrow();
             second();
-            assertThat(saved().children()).hasSize(1);
+            assertThat(saved().windows().subList(1, saved().windows().size())).hasSize(1);
             child.requestClose();
-            assertThat(saved().children()).as("saved at once, its tabs closed with it").isEmpty();
+            assertThat(saved().windows().subList(1, saved().windows().size())).as("saved at once, its tabs closed with it").isEmpty();
             assertThat(due).isEmpty();
         });
         windows.launch();
@@ -163,10 +163,10 @@ class WorkspaceSavingTest {
             store = new WorkspaceStore(file(), () -> { throw new IllegalStateException("a window cannot say what it holds"); },
                 (Duration delay, Runnable task) -> { due.add(task); return () -> due.remove(task); }, Runnable::run, kept -> { });
             windows.manager.workspace(store);
-            windows.manager.ensureMain("cold", folder).orElseThrow();
-            windows.manager.openTerminalWindow(folder).orElseThrow().requestClose();
+            windows.manager.ensureWindow("cold", folder).orElseThrow();
+            windows.manager.openWindow(folder).orElseThrow().requestClose();
             windows.manager.closeAll();
-            assertThat(windows.events).as("the closed hook heard every window").contains("closed child", "closed main");
+            assertThat(windows.events).as("the closed hook heard every window").contains("closed w1", "closed w0");
             assertThat(windows.manager.isEmpty()).isTrue();
             assertThat(store.held()).isTrue();
         });
@@ -179,15 +179,15 @@ class WorkspaceSavingTest {
     @Test void closingEveryWindowSavesThemFirstAndThenNothing() throws Exception {
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
-            windows.manager.openTerminalWindow(folder).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
+            windows.manager.openWindow(folder).orElseThrow();
             main.content().newTab(folder);
             main.content().newTab(folder);
             windows.manager.moveToNewWindow(main.content().selectedTab()).orElseThrow();
             windows.manager.closeAll();
             assertThat(due).as("the save it waited for is done").isEmpty();
-            assertThat(saved().children()).as("both child windows, saved before they closed").hasSize(2);
-            assertThat(saved().main().layout().tabs()).hasSize(2);
+            assertThat(saved().windows().subList(1, saved().windows().size())).as("both child windows, saved before they closed").hasSize(2);
+            assertThat(saved().windows().getFirst().layout().tabs()).hasSize(2);
             assertThat(store.held()).as("closing their tabs is not saved").isTrue();
         });
         windows.launch();
@@ -206,9 +206,9 @@ class WorkspaceSavingTest {
     @Test void aWindowPlacedWhereItAlreadyIsIsNoChange() throws Exception {
         windows();
         var place = new JasperWindow.Placement(Optional.of(new UiState.Bounds(10, 20, 1200, 800)), 0);
-        MainWindow[] main = new MainWindow[1];
+        JasperWindow[] main = new JasperWindow[1];
         edt(() -> {
-            main[0] = windows.manager.ensureMain("cold", folder).orElseThrow();
+            main[0] = windows.manager.ensureWindow("cold", folder).orElseThrow();
             second();
             main[0].placed(place);
             second();
@@ -224,18 +224,18 @@ class WorkspaceSavingTest {
     @Test void aMoveBetweenWindowsIsSavedAndAClosedWindowChangesNothing() throws Exception {
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
-            ChildWindow full = windows.manager.openTerminalWindow(folder).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
+            JasperWindow full = windows.manager.openWindow(folder).orElseThrow();
             main.content().newTab(folder);
             Tab moving = main.content().selectedTab();
             second();
             windows.model.tabs().move(moving, full.id());
             second();
-            assertThat(saved().children()).singleElement().as("the window it moved to")
+            assertThat(saved().windows().subList(1, saved().windows().size())).singleElement().as("the window it moved to")
                 .satisfies(record -> assertThat(record.layout()).isEqualTo(full.content().windowLayout()));
-            assertThat(saved().main().tabs()).as("the window it left").doesNotContainKey(moving.id());
+            assertThat(saved().windows().getFirst().tabs()).as("the window it left").doesNotContainKey(moving.id());
             full.requestClose();
-            assertThat(saved().children()).isEmpty();
+            assertThat(saved().windows().subList(1, saved().windows().size())).isEmpty();
             full.content().layoutChanged();
             full.placed(new JasperWindow.Placement(Optional.of(new UiState.Bounds(10, 20, 1200, 800)), 0));
             assertThat(due).as("a closed window's layout or place").isEmpty();
@@ -247,7 +247,7 @@ class WorkspaceSavingTest {
     @Test void aLayoutChangeIsSavedWhateverAListenerAfterTheModelThrows() throws Exception {
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
             Tab first = main.content().selectedTab();
             main.content().newTab(folder);
             second();
@@ -268,8 +268,8 @@ class WorkspaceSavingTest {
     @Test void aSnapshotThatThrowsMidMoveCostsOnlyThatSave() throws Exception {
         windows();
         edt(() -> {
-            MainWindow main = windows.manager.ensureMain("cold", folder).orElseThrow();
-            ChildWindow full = windows.manager.openTerminalWindow(folder).orElseThrow();
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
+            JasperWindow full = windows.manager.openWindow(folder).orElseThrow();
             main.content().newTab(folder);
             main.content().split(Side.RIGHT);
             ParentTabId moving = main.content().activeParentTab();
@@ -289,7 +289,7 @@ class WorkspaceSavingTest {
             assertThat(store.held()).isFalse();
             second();
             assertThat(saved()).as("the next save writes the windows").isEqualTo(windows.manager.snapshot().orElseThrow());
-            assertThat(saved().children().getFirst().layout().parentTabs()).extracting(p -> p.id()).contains(moving);
+            assertThat(saved().windows().subList(1, saved().windows().size()).getFirst().layout().parentTabs()).extracting(p -> p.id()).contains(moving);
         });
         assertThat(storeLog.records()).as("logged, not swallowed").singleElement().satisfies(record -> {
             assertThat(record.getLevel()).isEqualTo(Level.WARNING);

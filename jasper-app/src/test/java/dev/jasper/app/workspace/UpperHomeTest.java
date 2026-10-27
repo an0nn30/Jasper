@@ -34,7 +34,7 @@ class UpperHomeTest {
 
     /** A window under {@link #chrome(PaletteLook)}, through plan 6a's constructor. */
     static WindowContent owner(PaletteLook look) {
-        return new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME, false, path -> { }, () -> { }, () -> { },
+        return new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME, false, path -> { }, () -> { },
             ThemeTestSupport.controller(true), KeyBindings.defaults(true), new CommandHistory(), true, chrome(look));
     }
 

@@ -41,23 +41,23 @@ class WindowMenuTest {
         throw new AssertionError("no " + text + " in " + texts(menu));
     }
 
-    /** Spec 6 and this plan's Rulings 6 and 7: each kind of window has its entries, enabled as its actions are. */
-    @Test void theWindowMenuOffersEachKindOfWindowItsEntries() throws Exception {
+    /** Spec 6 and this plan's Rulings 6 and 7: a window has its entries, enabled as its actions are, while another is open. */
+    @Test void theWindowMenuOffersItsEntriesWhileAnotherWindowIsOpen() throws Exception {
         edt(() -> {
-            var main = windows.main().content();
-            assertThat(main.windowMenuItems()).containsExactly(ActionId.MOVE_TAB_TO_NEW_WINDOW);
+            var main = windows.first().content();
+            assertThat(main.windowMenuItems()).as("no other window is open").containsExactly(ActionId.MOVE_TAB_TO_NEW_WINDOW);
             assertThat(texts(main.windowMenu())).containsExactly("Move Tab to New Window");
             main.updateActions();
-            assertThat(main.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("the main window's only tab stays").isFalse();
+            assertThat(main.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("a window's only tab stays").isFalse();
             main.newTab(HOME);
             main.updateActions();
             assertThat(main.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("from two tabs").isTrue();
             assertThat(main.action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isFalse();
-            var full = windows.manager.openTerminalWindow(null).orElseThrow().content();
+            var full = windows.manager.openWindow(null).orElseThrow().content();
             assertThat(full.windowMenuItems()).containsExactly(ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TO_MAIN_WINDOW);
             assertThat(texts(full.windowMenu())).containsExactly("Move Tab to New Window", "Move to Main Window");
             full.updateActions();
-            assertThat(full.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("a full window's only tab stays").isFalse();
+            assertThat(full.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("its only tab stays").isFalse();
             assertThat(full.action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isTrue();
             full.newTab(HOME);
             full.updateActions();
@@ -69,9 +69,9 @@ class WindowMenuTest {
     /** Workspace plan 7b Rulings 7: while an item they would move is pinned, the commands are disabled wherever they are offered. */
     @Test void aPinnedItemDisablesTheCommandsThatWouldMoveIt() throws Exception {
         edt(() -> {
-            var main = windows.main().content();
+            var main = windows.first().content();
             main.newTab(HOME);
-            var full = windows.manager.openTerminalWindow(null).orElseThrow().content();
+            var full = windows.manager.openWindow(null).orElseThrow().content();
             full.newTab(HOME);
             Tab inMain = main.selectedTab();
             Tab inFull = full.selectedTab();
@@ -97,10 +97,10 @@ class WindowMenuTest {
         edt(() -> {
             var main = content(launcher(new ArrayDeque<>()));
             main.newTab(HOME);
-            var full = content(launcher(new ArrayDeque<>()), WindowRole.CHILD, HOME, false, () -> { });
+            var full = content(launcher(new ArrayDeque<>()), HOME, false);
             full.newTab(HOME);
             full.split(Side.RIGHT);
-            assertThat(full.windowMenuItems()).containsExactly(ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TO_MAIN_WINDOW);
+            assertThat(full.windowMenuItems()).as("no other window is open").containsExactly(ActionId.MOVE_TAB_TO_NEW_WINDOW);
             for (var window : List.of(main, full)) {
                 window.updateActions();
                 for (ActionId id : window.windowMenuItems()) assertThat(window.action(id).isEnabled()).as("%s", id).isFalse();
@@ -114,7 +114,7 @@ class WindowMenuTest {
     /** Spec 6: in the main window's empty workspace the window menu's entry shows disabled. */
     @Test void theMainWindowsEmptyWorkspaceShowsItsWindowMenuEntryDisabled() throws Exception {
         edt(() -> {
-            var main = windows.main().content();
+            var main = windows.first().content();
             main.closeTab(main.selectedTab());
             assertThat(main.workspace().emptyWorkspace()).as("the empty workspace").isNotNull();
             assertThat(texts(main.windowMenu())).containsExactly("Move Tab to New Window");
@@ -127,11 +127,11 @@ class WindowMenuTest {
     /** Spec 6: the actions move the shown tab to a new window, and a full window's tabs back. */
     @Test void theActionsMoveATabToANewWindowAndBack() throws Exception {
         edt(() -> {
-            var main = windows.main().content();
+            var main = windows.first().content();
             main.newTab(HOME);
             ParentTabId moving = main.activeParentTab();
             main.invoke(ActionId.MOVE_TAB_TO_NEW_WINDOW);
-            ChildWindow full = windows.manager.children().getLast();
+            JasperWindow full = windows.others().getLast();
             assertThat(full.content().activeParentTab()).isEqualTo(moving);
             assertThat(main.parentTabCount()).isEqualTo(1);
             full.content().invoke(ActionId.MOVE_TO_MAIN_WINDOW);
@@ -145,14 +145,14 @@ class WindowMenuTest {
     /** Spec 6: the strip's entry menu acts on its own tab, though another one shows. */
     @Test void theStripsEntryMenuActsOnItsOwnTab() throws Exception {
         edt(() -> {
-            var main = windows.main().content();
+            var main = windows.first().content();
             ParentTabId first = main.activeParentTab();
             Tab left = main.selectedTab();
             main.newTab(HOME);
             var menu = main.tabMenu(left);
             assertThat(texts(menu)).containsExactly("Rename Tab", "Move Tab to New Window", "Move Tab Into", "---", "Close Tab");
             item(menu, "Move Tab to New Window").doClick();
-            ChildWindow full = windows.manager.children().getLast();
+            JasperWindow full = windows.others().getLast();
             assertThat(full.content().activeParentTab()).as("the tab the entry stands for").isEqualTo(first);
             assertThat(full.content().tabs()).containsExactly(left);
             assertThat(main.parentTabCount()).isEqualTo(1);
@@ -163,9 +163,9 @@ class WindowMenuTest {
     /** Spec 6 and this plan's Rulings 7: a terminal's context menu ends with the window menu's entries. */
     @Test void aTerminalsContextMenuEndsWithTheWindowMenu() throws Exception {
         edt(() -> {
-            var main = windows.main().content();
+            var main = windows.first().content();
             assertThat(texts(main.chrome().contextMenu())).endsWith("---", "Move Tab to New Window");
-            var full = windows.manager.openTerminalWindow(null).orElseThrow().content();
+            var full = windows.manager.openWindow(null).orElseThrow().content();
             assertThat(texts(full.chrome().contextMenu())).endsWith("---", "Move Tab to New Window", "Move to Main Window");
         });
         windows.launch();
@@ -174,7 +174,7 @@ class WindowMenuTest {
     /** Spec 10: the commands are in the palette under their ids; the old ids are gone, a clean break. */
     @Test void theCommandsAreInThePaletteUnderTheirIds() throws Exception {
         edt(() -> {
-            var main = windows.main().content();
+            var main = windows.first().content();
             for (String id : List.of("move_tab_to_new_window", "move_to_main_window"))
                 assertThat(main.commands().find(id)).as(id).isPresent();
             for (String id : List.of("pop_out_tab", "pop_out_pane", "pop_out_parent_tab", "bring_back", "move_tab_to_main_window"))

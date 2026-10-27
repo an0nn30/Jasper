@@ -88,8 +88,8 @@ class TabMenuTest {
                 "Move Tab Into", "Close Tab", "Save");
             item(hosted, "Save").doClick();
             assertThat(saved[0]).isEqualTo(1);
-            var full = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { });
-            assertThat(full.windowMenuItems()).as("a full window's window menu").contains(ActionId.MOVE_TO_MAIN_WINDOW);
+            var full = content(idleLauncher(pending), HOME, false);
+            assertThat(full.windowMenuItems()).as("a window with no other open").containsExactly(ActionId.MOVE_TAB_TO_NEW_WINDOW);
             assertThat(titles(full.tabMenu(full.selectedTab()))).as("Move to Main Window moves the whole window: not here")
                 .containsExactly("Rename Tab", "Move Tab to New Window", "Move Tab Into", "Close Tab");
         });
@@ -175,14 +175,11 @@ class TabMenuTest {
         });
     }
 
-    @Test void aBatchCloseThatEmptiesTheWindowRunsItsEmptyHandlingAndKeepsOtherClosesWorking() throws Exception {
-        var emptied = new ArrayList<String>();
+    /** Full windows spec 5.3: a batch close that empties the window leaves its empty workspace, and other closes still run. */
+    @Test void aBatchCloseThatEmptiesTheWindowLeavesItsEmptyWorkspaceAndKeepsOtherClosesWorking() throws Exception {
         WindowContent[] owners = new WindowContent[2];
         edt(() -> {
-            owners[0] = track(new WindowContent(idleLauncher(pending), HOME, path -> {}, () -> {}, () -> {
-                emptied.add("empty");
-                throw new IllegalStateException("window teardown failed");
-            }));
+            owners[0] = track(new WindowContent(idleLauncher(pending), HOME, path -> {}, () -> {}));
             owners[0].connectContributions(model);
             owners[1] = content(idleLauncher(pending), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             owners[1].connectContributions(model);
@@ -195,10 +192,11 @@ class TabMenuTest {
             Tab elsewhere = beside(owners[1], "elsewhere");
             model.tabs().guard("dev.example.editor", (tabs, batch) -> CompletableFuture.completedFuture(true));
             var logged = registryLog(() -> window.closeParentTab(window.activeParentTab()));
-            assertThat(emptied).as("the window's empty handling ran").containsExactly("empty");
             assertThat(terminal.closed()).isTrue();
             assertThat(view.closed()).isTrue();
-            assertThat(logged).singleElement().satisfies(record -> assertThat(record.getThrown()).hasMessage("window teardown failed"));
+            assertThat(logged).as("nothing failed").isEmpty();
+            assertThat(window.closed()).as("the window stays").isFalse();
+            assertThat(window.workspace().emptyWorkspace()).as("with its empty workspace").isNotNull();
             assertThat(elsewhere.requestClose()).as("a close in another window still runs").isCompletedWithValue(true);
             assertThat(elsewhere.closed()).isTrue();
         });

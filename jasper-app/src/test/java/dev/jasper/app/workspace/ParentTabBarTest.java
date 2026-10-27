@@ -318,8 +318,7 @@ class ParentTabBarTest {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
                 boolean macOs = System.getProperty("os.name").startsWith("Mac");
-                var main = track(new WindowContent(WindowRole.MAIN, idleLauncher(pending), null, true, path -> { }, () -> { },
-                    () -> { }, themes, KeyBindings.defaults(macOs), new CommandHistory(), macOs, ClassicTabsTest.classic()));
+                var main = track(new WindowContent(idleLauncher(pending), null, true, path -> { }, () -> { }, themes, KeyBindings.defaults(macOs), new CommandHistory(), macOs, ClassicTabsTest.classic()));
                 var strip = (ClassicTabs) main.tabBar();
                 assertThat(strip.isVisible()).as("over the empty workspace").isTrue();
                 assertThat(strip.entries()).as("no tab: the + alone").isEmpty();

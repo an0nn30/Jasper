@@ -9,8 +9,6 @@ import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.workspace.DesktopTestSupport;
 import dev.jasper.app.workspace.JasperWindow;
-import dev.jasper.app.workspace.MainWindow;
-import dev.jasper.app.workspace.WindowRole;
 import dev.jasper.app.workspace.WindowShell;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -22,8 +20,9 @@ import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 
 /**
- * Workspace tabs spec 6.4 through the application, with stand-in frames: every request restores the main window first,
- * and closing the main window closes its child windows, after which residency decides.
+ * Full windows spec 5.2 and 5.3 through the application, with stand-in frames: a request with no window of its own goes
+ * to the most recently active window, restored first when none is open, and closing the last window leaves residency to
+ * decide.
  */
 class JasperApplicationWindowsTest {
     private final ArrayDeque<Runnable> pending = new ArrayDeque<>();
@@ -34,7 +33,8 @@ class JasperApplicationWindowsTest {
         edt(() -> {
             held[0] = new JasperApplication(null, DesktopTestSupport.idleLauncher(pending), new CommandHistory(), null, terminate);
             held[0].frames = window -> {
-                String name = window.isMain() ? "main" : "child";
+                int index = held[0].windows().windows().indexOf(window);
+                String name = "w" + (index < 0 ? "?" : index);
                 return new WindowShell(() -> frames.add("show " + name), () -> frames.add("front " + name),
                     () -> frames.add("dispose " + name), () -> frames.add("discard " + name), () -> null,
                     component -> SwingUtilities.isDescendingFrom(component, window.content()));
@@ -43,26 +43,25 @@ class JasperApplicationWindowsTest {
         return held[0];
     }
 
-    @Test void everyRequestRestoresTheMainWindowFirst() throws Exception {
+    @Test void everyRequestWithNoWindowOfItsOwnRestoresTheWindowsFirst() throws Exception {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
                 application.residency(true);
                 application.open(List.of(), JasperApplication.HANDOFF);
-                MainWindow main = application.windows().main().orElseThrow();
-                assertThat(application.windows().windows()).as("a handoff with no window restores the main window").containsExactly(main);
+                JasperWindow first = application.windows().windows().getFirst();
+                assertThat(application.windows().windows()).as("a handoff with no window restores one").containsExactly(first);
                 application.open(List.of(HOME), JasperApplication.HANDOFF);
-                assertThat(main.content().terminalTabs()).as("a folder opens as a terminal tab in the main window").hasSize(2);
-                assertThat(frames).contains("front main");
+                assertThat(first.content().terminalTabs()).as("a folder opens as a terminal tab in the most recently active window").hasSize(2);
+                assertThat(frames).contains("front w0");
                 application.windows().closeAll();
                 assertThat(application.windows().isEmpty()).isTrue();
-                application.windows().openTerminalWindow(null);
-                assertThat(application.windows().windows()).as("New Terminal Window from the menu bar item restores the main window first")
-                    .extracting(JasperWindow::role).containsExactly(WindowRole.MAIN, WindowRole.CHILD);
+                application.windows().openWindow(null);
+                assertThat(application.windows().windows()).as("New Window opens one window").hasSize(1);
                 application.windows().closeAll();
                 var tab = application.contributions().tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
-                assertThat(tab.window()).as("a plugin's tab with no window open goes to a restored main window")
-                    .isEqualTo(application.windows().main().orElseThrow().id());
+                assertThat(tab.window()).as("a plugin's tab with no window open goes to a restored window")
+                    .isEqualTo(application.windows().windows().stream().findFirst().orElseThrow().id());
             });
         } finally {
             edt(application::quitNow);
@@ -70,8 +69,8 @@ class JasperApplicationWindowsTest {
     }
 
     /**
-     * Floating tool windows plan 1 Task 8: the main window's detached tool windows get native windows only where windows
-     * can be made; headless they get none and wait, and a child window has no detached tool windows.
+     * Floating tool windows plan 1 Task 8: every window's detached tool windows get native windows only where windows can
+     * be made; headless they get none and wait.
      */
     @Test void everyWindowsDetachedToolWindowsGetNativeWindowsAndNoneHeadless() throws Exception {
         JasperApplication application = application(() -> { });
@@ -79,16 +78,16 @@ class JasperApplicationWindowsTest {
             edt(() -> {
                 application.residency(true);
                 application.open(List.of(), JasperApplication.HANDOFF);
-                assertThat(DesktopTestSupport.detachedShells(application.windows().main().orElseThrow().content()))
+                assertThat(DesktopTestSupport.detachedShells(application.windows().windows().stream().findFirst().orElseThrow().content()))
                     .as("headless, nothing native is made").isFalse();
                 application.windows().closeAll();
                 application.nativeToolWindows = true;
                 application.open(List.of(), JasperApplication.HANDOFF);
-                assertThat(DesktopTestSupport.detachedShells(application.windows().main().orElseThrow().content()))
+                assertThat(DesktopTestSupport.detachedShells(application.windows().windows().stream().findFirst().orElseThrow().content()))
                     .as("where windows can be made, a window's detached tool windows get them").isTrue();
-                application.windows().openTerminalWindow(null);
-                JasperWindow child = application.windows().windows().stream().filter(window -> !window.isMain()).findFirst().orElseThrow();
-                assertThat(DesktopTestSupport.detachedShells(child.content())).as("a second window's detached tool windows get them too").isTrue();
+                application.windows().openWindow(null);
+                JasperWindow second = application.windows().windows().getLast();
+                assertThat(DesktopTestSupport.detachedShells(second.content())).as("a second window's detached tool windows get them too").isTrue();
             });
         } finally {
             edt(application::quitNow);
@@ -96,12 +95,12 @@ class JasperApplicationWindowsTest {
     }
 
     /**
-     * Workspace tabs spec 6.1, one main window per process: the main window, its manager and the native frames are made
-     * only where the application says, each with an explicit {@code new} (a constructor reference would hide the site).
+     * Full windows spec 5.1, one kind of window: every window, its manager and the native frames are made only where the
+     * application says, each with an explicit {@code new} (a constructor reference would hide the site).
      * {@code verifyApplicationArchitecture} checks the same with javap.
      */
-    @Test void theMainWindowItsManagerAndTheFramesAreMadeOnlyWhereTheApplicationSays() throws Exception {
-        var pinned = java.util.Set.of("dev/jasper/app/workspace/MainWindow", "dev/jasper/app/workspace/WindowManager",
+    @Test void theWindowsTheirManagerAndTheFramesAreMadeOnlyWhereTheApplicationSays() throws Exception {
+        var pinned = java.util.Set.of("dev/jasper/app/workspace/JasperWindow", "dev/jasper/app/workspace/WindowManager",
             "dev/jasper/app/workspace/WindowFrame");
         var sites = new java.util.TreeMap<String, List<String>>();
         var classes = java.nio.file.Path.of(JasperApplication.class.getProtectionDomain().getCodeSource().getLocation().toURI());
@@ -125,22 +124,22 @@ class JasperApplicationWindowsTest {
             }
         }
         assertThat(sites).containsOnlyKeys(pinned);
-        assertThat(sites.get("dev/jasper/app/workspace/MainWindow")).hasSize(1)
-            .allMatch(site -> site.matches("dev/jasper/app/workspace/WindowManager\\.(ensureMain|lambda\\$ensureMain\\$\\d+)"));
+        assertThat(sites.get("dev/jasper/app/workspace/JasperWindow")).hasSize(1)
+            .allMatch(site -> site.matches("dev/jasper/app/workspace/WindowManager\\.(open|lambda\\$open\\$\\d+)"));
         assertThat(sites.get("dev/jasper/app/workspace/WindowManager")).containsExactly("dev/jasper/app/application/JasperApplication.<init>");
         assertThat(sites.get("dev/jasper/app/workspace/WindowFrame")).hasSize(2)
             .anyMatch(site -> site.matches("dev/jasper/app/application/JasperApplication\\.(frameOnScreen|lambda\\$frameOnScreen\\$\\d+)"))
             .anyMatch(site -> site.matches("dev/jasper/app/application/JasperApplication\\.(rehearsalWindow|lambda\\$rehearsalWindow\\$\\d+)"));
     }
 
-    /** Tabs and panes spec 13: a request's folder opens as a new tab of the main window, at the end of its strip, shown. */
-    @Test void aRequestOpensANewTabInTheMainWindow() throws Exception {
+    /** Tabs and panes spec 13: a request's folder opens as a new tab of the window, at the end of its strip, shown. */
+    @Test void aRequestOpensANewTabInTheWindow() throws Exception {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
                 application.residency(true);
                 application.open(List.of(), JasperApplication.HANDOFF);
-                var main = application.windows().main().orElseThrow().content();
+                var main = application.windows().windows().stream().findFirst().orElseThrow().content();
                 main.newTab(HOME);
                 application.open(List.of(HOME), JasperApplication.HANDOFF);
                 ParentTabs parents = main.windowLayout();
@@ -153,20 +152,23 @@ class JasperApplicationWindowsTest {
         }
     }
 
-    /** Rulings 20: an outside request raises the main window and opens there, though a child window was used last. */
-    @Test void aRequestTargetsTheMainWindowThoughAChildWindowWasUsedLast() throws Exception {
+    /** Full windows spec 5.2: an outside request raises the most recently active window and opens there. */
+    @Test void aRequestTargetsTheMostRecentlyActiveWindow() throws Exception {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
                 application.residency(true);
-                var child = application.windows().openTerminalWindow(null).orElseThrow();
-                child.events().activated().accept(true);
-                assertThat(application.windows().lastActive()).as("the child window was used last").contains(child);
+                application.open(List.of(), JasperApplication.HANDOFF);
+                var first = application.windows().windows().getFirst();
+                var second = application.windows().openWindow(null).orElseThrow();
+                second.events().activated().accept(true);
+                first.events().activated().accept(true);
+                assertThat(application.windows().lastActive()).as("the first window was used last").contains(first);
                 frames.clear();
                 application.open(List.of(HOME), JasperApplication.HANDOFF);
-                assertThat(frames).as("the main window comes forward, not the child window").containsExactly("front main");
-                assertThat(application.windows().main().orElseThrow().content().terminalTabs()).as("the folder opens there").hasSize(2);
-                assertThat(child.content().terminalTabs()).as("and not in the child window").hasSize(1);
+                assertThat(frames).as("the window used last comes forward").containsExactly("front w0");
+                assertThat(first.content().terminalTabs()).as("the folder opens there").hasSize(2);
+                assertThat(second.content().terminalTabs()).as("and not in the window opened last").hasSize(1);
             });
         } finally {
             edt(application::quitNow);
@@ -174,10 +176,10 @@ class JasperApplicationWindowsTest {
     }
 
     /**
-     * Rulings 25: a request made while the main window closes (here a panel's close listener, as the window lets its
-     * panels go) adds nothing to the closing window and opens no second one.
+     * Rulings 25: a request made while the last window closes (here a panel's close listener, as the window lets its
+     * panels go) adds nothing to the closing window and opens no other.
      */
-    @Test void aRequestWhileTheMainWindowClosesAddsNothingToItAndOpensNoSecondOne() throws Exception {
+    @Test void aRequestWhileTheLastWindowClosesAddsNothingToItAndOpensNoOther() throws Exception {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
@@ -187,51 +189,56 @@ class JasperApplicationWindowsTest {
                     dev.jasper.app.dock.Slot.RIGHT_TOP, site -> {
                         site.onClosed(() -> {
                             application.open(List.of(HOME), JasperApplication.HANDOFF);
-                            application.windows().main().ifPresent(main -> tabsDuringClose.add(main.content().terminalTabs().size()));
+                            application.windows().windows().stream().findFirst().ifPresent(main -> tabsDuringClose.add(main.content().terminalTabs().size()));
                         });
                         return new javax.swing.JLabel("notes");
                     });
                 application.open(List.of(), JasperApplication.HANDOFF);
                 // A panel's instance is built the first time it shows in a window.
                 application.contributions().requestPanel(new dev.jasper.app.contributions.Contributions.PanelRequest(
-                    application.windows().main().orElseThrow().id(), "dev.example.notes",
+                    application.windows().windows().stream().findFirst().orElseThrow().id(), "dev.example.notes",
                     dev.jasper.app.contributions.Contributions.PanelRequest.Op.SHOW));
                 application.windows().closeAll();
-                assertThat(tabsDuringClose).as("the panel went while the main window closed, and the request added no tab to it")
+                assertThat(tabsDuringClose).as("the panel went while the window closed, and the request added no tab to it")
                     .containsExactly(1);
-                assertThat(application.windows().isEmpty()).as("and opened no second main window").isTrue();
+                assertThat(application.windows().isEmpty()).as("and opened no other window").isTrue();
             });
         } finally {
             edt(application::quitNow);
         }
     }
 
-    @Test void closingTheMainWindowClosesItsChildWindowsAndThenTheProcess() throws Exception {
+    @Test void closingOneWindowLeavesTheOtherAndClosingTheLastEndsTheProcess() throws Exception {
         CountDownLatch terminated = new CountDownLatch(1);
         JasperApplication application = application(terminated::countDown);
         edt(() -> {
-            application.windows().openTerminalWindow(null);
+            var first = application.windows().openWindow(null).orElseThrow();
+            var second = application.windows().openWindow(null).orElseThrow();
             frames.clear();
-            application.windows().main().orElseThrow().requestClose();
+            first.requestClose();
+            assertThat(application.windows().windows()).as("the other window stays").containsExactly(second);
+            assertThat(terminated.getCount()).isEqualTo(1);
+            second.requestClose();
             assertThat(application.windows().isEmpty()).isTrue();
-            assertThat(frames).as("every child window, then the main window").containsExactly("dispose child", "dispose main");
+            assertThat(frames).containsExactly("dispose w0", "dispose w1");
         });
         assertThat(terminated.await(5, TimeUnit.SECONDS)).as("not resident: the last window ends the process").isTrue();
     }
 
-    @Test void aResidentProcessOutlivesItsWindowsAndRestoresTheMainWindowOnRequest() throws Exception {
+    @Test void aResidentProcessOutlivesItsWindowsAndRestoresThemOnRequest() throws Exception {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
                 application.residency(true);
-                application.windows().openTerminalWindow(null);
+                application.open(List.of(), JasperApplication.HANDOFF);
+                application.windows().openWindow(null);
                 frames.clear();
                 application.toBackground();
-                assertThat(frames).as("as closing the main window: the child windows first").containsExactly("dispose child", "dispose main");
+                assertThat(frames).as("every window, the most recently active last").containsExactly("dispose w1", "dispose w0");
                 assertThat(application.windows().isEmpty()).isTrue();
                 assertThat(application.acceptsRequests()).as("still running in the background").isTrue();
                 application.open(List.of(), "reopen");
-                assertThat(application.windows().main()).isPresent();
+                assertThat(application.windows().windows().stream().findFirst()).isPresent();
             });
         } finally {
             edt(application::quitNow);
@@ -250,13 +257,14 @@ class JasperApplicationWindowsTest {
             var standIn = application.frames;
             application.frames = window -> {
                 WindowShell shell = standIn.apply(window);
-                if (window.isMain()) return shell;
+                if (application.windows().windows().indexOf(window) == 0) return shell;
                 return new WindowShell(shell.show(), shell.toFront(), () -> {
-                    throw new IllegalStateException("the child window's frame failed to close");
+                    throw new IllegalStateException("the second window's frame failed to close");
                 }, shell.discard(), shell.window(), shell.owns());
             };
-            application.windows().openTerminalWindow(null);
-            assertThatThrownBy(application::quitNow).hasMessage("the child window's frame failed to close");
+            application.windows().openWindow(null);
+            application.windows().openWindow(null);
+            assertThatThrownBy(application::quitNow).hasMessage("the second window's frame failed to close");
             assertThat(application.windows().isEmpty()).as("every window closed whatever one threw").isTrue();
         });
         assertThat(terminated.await(5, TimeUnit.SECONDS)).as("resident, and Quit still ends the process").isTrue();

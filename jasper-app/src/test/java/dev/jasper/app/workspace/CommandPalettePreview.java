@@ -148,7 +148,7 @@ public final class CommandPalettePreview {
                 }, "sh");
                 var themes = ThemeTestSupport.controller(true);
                 var history = new CommandHistory();
-                var owner = new WindowContent(launcher, DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
+                var owner = new WindowContent(launcher, DesktopTestSupport.HOME, path -> {}, () -> {},
                     themes, KeyBindings.defaults(true), history, true);
                 var root = new JRootPane();
                 var titleBar = WindowContent.installTitleBar(root, owner, true, title -> {});

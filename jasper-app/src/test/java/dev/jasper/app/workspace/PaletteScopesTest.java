@@ -515,7 +515,7 @@ class PaletteScopesTest {
 
     @Test void aStepReplacesTheListCompletesWithValuesAndReopensWhereTheScopeAsks() throws Exception {
         edt(() -> {
-            try (var owner = new WindowContent(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
+            try (var owner = new WindowContent(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), DesktopTestSupport.HOME, path -> {}, () -> {},
                 ThemeTestSupport.controller(false),
                 dev.jasper.app.config.KeyBindings.defaults(true), new dev.jasper.app.commands.CommandHistory(), true)) {
                 var root = install(owner); var fake = new FakeScope(); owner.scopes().register(fake);
@@ -561,7 +561,7 @@ class PaletteScopesTest {
 
     @Test void escapeLeavesAStepWithTheQueryIntactAndScopeShortcutsOrDoneDismissIt() throws Exception {
         edt(() -> {
-            try (var owner = new WindowContent(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
+            try (var owner = new WindowContent(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), DesktopTestSupport.HOME, path -> {}, () -> {},
                 ThemeTestSupport.controller(false),
                 dev.jasper.app.config.KeyBindings.defaults(true), new dev.jasper.app.commands.CommandHistory(), true)) {
                 install(owner); var fake = new FakeScope(); owner.scopes().register(fake);

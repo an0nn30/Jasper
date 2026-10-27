@@ -87,7 +87,7 @@ class WorkspaceStoreTest {
     /** A workspace of one main window holding one terminal tab in {@code directory}. */
     private static WorkspaceFile.Snapshot workspace(String directory) {
         TabId tab = TabId.random();
-        return new WorkspaceFile.Snapshot(java.util.List.of(new WorkspaceFile.WindowRecord(WorkspaceFile.Role.MAIN, Optional.empty(), 0,
+        return new WorkspaceFile.Snapshot(java.util.List.of(new WorkspaceFile.WindowRecord(Optional.empty(), 0,
             only(tab), Map.of(tab, new WorkspaceFile.TabRecord.Terminal("", directory, "")))));
     }
 
@@ -349,9 +349,8 @@ class WorkspaceStoreTest {
     @Test void aFileThatDroppedAWindowOnReadingIsKeptAsideAsItWasAndToldOnce() throws Exception {
         WorkspaceFile.Snapshot kept = workspace("/work");
         TabId away = TabId.random();
-        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(java.util.List.of(kept.main(), new WorkspaceFile.WindowRecord(
-            WorkspaceFile.Role.CHILD, Optional.empty(), 0, only(away), Map.of(away, new WorkspaceFile.TabRecord.Terminal("", "/away", ""))))));
-        String original = Files.readString(file()).replace("role = \"full\"", "role = \"side\"");
+        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(java.util.List.of(kept.windows().getFirst(), new WorkspaceFile.WindowRecord(Optional.empty(), 0, only(away), Map.of(away, new WorkspaceFile.TabRecord.Terminal("", "/away", ""))))));
+        String original = Files.readString(file()).replace("item = \"" + away.value() + "\"", "item = 3");
         Files.writeString(file(), original);
         store();
         Path bad = dir.resolve("workspace.toml.bad");

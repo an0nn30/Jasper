@@ -22,9 +22,9 @@ class TabRegistryTest {
         registry.windows(windows(main, detached));
     }
 
-    /** The window manager's part as a test plays it: {@code main} is the main window, and a new window is {@code separate}. */
+    /** The window manager's part as a test plays it: {@code main} takes a tab with no window of its own, and a new window is {@code separate}. */
     private TabRegistry.Windows windows(UUID main, UUID separate) {
-        return new TabRegistry.Windows(() -> main, main::equals, tab -> registry.move(tab, separate));
+        return new TabRegistry.Windows(() -> main, tab -> registry.move(tab, separate));
     }
 
     /**
@@ -97,7 +97,7 @@ class TabRegistryTest {
 
     /**
      * Workspace plan 4a: the window a move leaves hears of it only after the move has reported itself, so a failed attach
-     * can still go back to it; the window manager then closes a child window the move left empty.
+     * can still go back to it; the window manager then closes a window the move left empty.
      */
     @Test void theWindowAMoveLeavesHearsOfItAfterTheMoveAndAFailedMoveGoesBackToIt() {
         var heard = new ArrayList<String>();
@@ -106,11 +106,11 @@ class TabRegistryTest {
         registry.addHost(new WorkspaceHost(main, tab -> heard.add("attach main"), tab -> heard.add("detach main"), tab -> {}, () -> {}));
         registry.addHost(new WorkspaceHost(child, tab -> heard.add("attach child"), tab -> heard.add("detach child"), tab -> {}, () -> {}));
         registry.addHost(new WorkspaceHost(bad, tab -> { throw new IllegalStateException("destination failed"); }, tab -> {}, tab -> {}, () -> {}));
-        registry.windows(new TabRegistry.Windows(() -> main, main::equals, tab -> {},
+        registry.windows(new TabRegistry.Windows(() -> main, tab -> {},
             window -> heard.add("moved out of " + (window.equals(child) ? "child" : "main"))));
         var tab = registry.open("plugin.file", "one", "One", child, new JPanel());
         heard.clear();
-        tab.moveToMainWindow();
+        tab.moveToWindow(main);
         assertThat(heard).containsExactly("detach child", "attach main", "moved out of child");
         registry.move(tab, child);
         heard.clear();
@@ -125,7 +125,7 @@ class TabRegistryTest {
             tab -> heard.add("select " + tab.title()), () -> {}, tab -> Optional.empty(),
             (tab, group, side) -> heard.add("beside " + tab.title() + " " + side + (group == null ? " of the active group" : ""))));
         registry.addHost(new WorkspaceHost(detached, tab -> heard.add("new window " + tab.title()), mounted::remove, tab -> {}, () -> {}));
-        registry.windows(new TabRegistry.Windows(() -> main, main::equals, tab -> registry.move(tab, detached), window -> {}, () -> detached));
+        registry.windows(new TabRegistry.Windows(() -> main, tab -> registry.move(tab, detached), window -> {}, () -> detached));
         registry.open("plugin.file", "right", "Right", main, new JPanel(), TabRegistry.Placement.SPLIT_RIGHT);
         registry.open("plugin.file", "down", "Down", main, new JPanel(), TabRegistry.Placement.SPLIT_DOWN);
         var here = registry.open("plugin.file", "here", "Here", main, new JPanel());
@@ -145,7 +145,7 @@ class TabRegistryTest {
         var heard = new ArrayList<String>();
         registry.addHost(new WorkspaceHost(main, mounted::add, mounted::remove, tab -> {}, () -> {}));
         registry.addHost(new WorkspaceHost(detached, tab -> { throw new IllegalStateException("show failed"); }, tab -> {}, tab -> {}, () -> {}));
-        registry.windows(new TabRegistry.Windows(() -> main, main::equals, tab -> {}, window -> {
+        registry.windows(new TabRegistry.Windows(() -> main, tab -> {}, window -> {
             heard.add(window.equals(detached) ? "the new window closes" : "main");
             throw new IllegalStateException("close failed");
         }, () -> detached));
@@ -157,29 +157,29 @@ class TabRegistryTest {
     }
 
     /**
-     * Workspace plan 4a's re-review: a tab that waited for a main window that closed again while an earlier waiting tab
-     * opened there is shown by the next main window, not by the closed one.
+     * Workspace plan 4a's re-review: a tab that waited for a window that closed again while an earlier waiting tab
+     * opened there is shown by the next window, not by the closed one.
      */
-    @Test void aWaitingTabWhoseMainWindowClosedMeanwhileWaitsForTheNextOne() {
+    @Test void aWaitingTabWhoseWindowClosedMeanwhileWaitsForTheNextOne() {
         UUID[] up = {null};
         var next = UUID.randomUUID();
-        registry.windows(new TabRegistry.Windows(() -> up[0], id -> id.equals(up[0]), tab -> {}));
+        registry.windows(new TabRegistry.Windows(() -> up[0], tab -> {}));
         var first = registry.open("plugin.file", "first", "First", null, new JPanel());
         var second = registry.open("plugin.file", "second", "Second", null, new JPanel(), TabRegistry.Placement.SPLIT_RIGHT);
         var registration = new ArrayList<dev.jasper.app.lifecycle.Subscription>();
-        // The main window closes as its first waiting tab opens there.
+        // The window closes as its first waiting tab opens there.
         registration.add(registry.addHost(new WorkspaceHost(main, tab -> { if (tab == first) registration.getFirst().close(); },
             tab -> {}, tab -> {}, () -> {})));
         up[0] = main;
-        registry.mainOpened(main);
-        assertThat(first.closed()).as("it went with the main window").isTrue();
+        registry.windowOpened(main);
+        assertThat(first.closed()).as("it went with the window").isTrue();
         assertThat(second.window()).as("not shown in a closed window").isNull();
         assertThat(second.closed()).isFalse();
         registry.addHost(new WorkspaceHost(next, mounted::add, mounted::remove, tab -> {}, () -> {}, tab -> Optional.empty(),
             (tab, group, side) -> { throw new AssertionError("a tab that waited opens in the active group"); }));
         up[0] = next;
-        registry.mainOpened(next);
-        assertThat(second.window()).as("the next main window shows it").isEqualTo(next);
+        registry.windowOpened(next);
+        assertThat(second.window()).as("the next window shows it").isEqualTo(next);
         assertThat(mounted).as("at the end of its active group, as a tab that waited opens").containsExactly(second);
     }
 
@@ -194,23 +194,25 @@ class TabRegistryTest {
         assertThat(tab.active()).as("as active as before the move").isTrue();
     }
 
-    @Test void withoutTheWindowManagerTheFirstWorkspaceIsTheMainWindowAndNothingMovesToANewWindow() {
+    @Test void withoutTheWindowManagerTheFirstWorkspaceTakesAViewWithoutAWindowAndNothingMovesToANewWindow() {
         var other = UUID.randomUUID();
         registry.addHost(new WorkspaceHost(main, mounted::add, mounted::remove, tab -> {}, () -> {}));
         registry.addHost(new WorkspaceHost(other, mounted::add, mounted::remove, tab -> {}, () -> {}));
         var tab = registry.open("plugin.file", "one", "One", null, new JPanel());
-        assertThat(tab.window()).as("a view without a window goes to the main window").isEqualTo(main);
-        assertThat(registry.isMain(tab.window())).isTrue();
+        assertThat(tab.window()).as("a view without a window goes to the first workspace").isEqualTo(main);
+        assertThat(registry.recentWindow()).isEqualTo(main);
         tab.moveToNewWindow();
         assertThat(tab.window()).isEqualTo(main);
         registry.move(tab, other);
-        assertThat(registry.isMain(tab.window())).isFalse();
-        tab.moveToMainWindow();
+        assertThat(tab.window()).isEqualTo(other);
+        tab.moveToWindow(main);
         assertThat(tab.window()).isEqualTo(main);
+        tab.moveToWindow(UUID.randomUUID());
+        assertThat(tab.window()).as("no such window: it stays").isEqualTo(main);
     }
 
     /**
-     * Workspace plan 4a's final review: the tabs that waited for the main window open there in the order they were
+     * Workspace plan 4a's final review: the tabs that waited for the window open there in the order they were
      * asked for once it is up, and the last one is selected; one that fails to open there goes and keeps no other out.
      */
     @Test void theTabsThatWaitedForTheMainWindowOpenThereInOrderAndAFailureKeepsNoneOut() {
@@ -220,13 +222,13 @@ class TabRegistryTest {
             heard.add("attach " + tab.key());
             if (tab.key().equals("bad")) throw new IllegalStateException("attach failed");
         }, tab -> heard.add("detach " + tab.key()), tab -> heard.add("select " + tab.key()), () -> {}));
-        registry.windows(new TabRegistry.Windows(() -> up[0], main::equals, tab -> {}));
+        registry.windows(new TabRegistry.Windows(() -> up[0], tab -> {}));
         var first = registry.open("plugin.file", "first", "First", null, new JPanel());
         var bad = registry.open("plugin.file", "bad", "Bad", null, new JPanel());
         var last = registry.open("plugin.file", "last", "Last", null, new JPanel());
         assertThat(heard).as("they wait for it").isEmpty();
         up[0] = main;
-        registry.mainOpened(main);
+        registry.windowOpened(main);
         assertThat(heard).containsExactly("attach first", "attach bad", "detach bad", "attach last", "select last");
         assertThat(first.window()).isEqualTo(main);
         assertThat(last.window()).isEqualTo(main);
@@ -243,7 +245,7 @@ class TabRegistryTest {
             tab -> { heard.add("detach source"); throw new IllegalStateException("detach failed"); }, tab -> {}, () -> {}));
         registry.addHost(new WorkspaceHost(target, tab -> heard.add("attach target"), tab -> heard.add("detach target"),
             tab -> heard.add("select target"), () -> {}));
-        registry.windows(new TabRegistry.Windows(() -> source, source::equals, tab -> {},
+        registry.windows(new TabRegistry.Windows(() -> source, tab -> {},
             window -> heard.add("moved out of " + (window.equals(source) ? "source" : "target"))));
         var tab = registry.open("plugin.file", "one", "One", source, new JPanel());
         heard.clear();
@@ -271,7 +273,7 @@ class TabRegistryTest {
             heard.add("attach target");
             if (failAttach[0]) throw new IllegalStateException("destination failed");
         }, tab -> heard.add("detach target"), tab -> heard.add("select target"), () -> {}));
-        registry.windows(new TabRegistry.Windows(() -> source, source::equals, tab -> {}, window -> {
+        registry.windows(new TabRegistry.Windows(() -> source, tab -> {}, window -> {
             if (failClose[0]) throw new IllegalStateException("close failed");
         }));
         var tab = registry.open("plugin.file", "one", "One", source, new JPanel());
@@ -441,7 +443,7 @@ class TabRegistryTest {
         assertThat(tab.window()).isEqualTo(detached);
         assertThat(tab.component()).isSameAs(panel);
         assertThat(disposed[0]).isZero();
-        registry.moveToMainWindow(tab);
+        registry.moveToWindow(tab, main);
         assertThat(tab.window()).isEqualTo(main);
         tab.close(); tab.close();
         assertThat(disposed[0]).isEqualTo(1);
@@ -562,11 +564,11 @@ class TabRegistryTest {
         Tab pair = registry.restore(TabId.random(), "plugin.notes",
             new TabRegistry.Restoring(detached, "Pair", new dev.jasper.app.layout.TabRestore("pair", Map.of()))).tab().orElseThrow();
         assertThat(pair.window()).isEqualTo(detached);
-        assertThat(extra[0].window()).as("where an owner-less tab goes: the main window").isEqualTo(main);
+        assertThat(extra[0].window()).as("where an owner-less tab goes: the most recently active window").isEqualTo(main);
         assertThat(mounted).containsExactly(extra[0]);
         assertThat(registry.restoring(detached)).as("only while the restorer runs").isFalse();
         // So does a tab of the same key that waits for its window: it keeps waiting, out of the window being restored.
-        registry.windows(new TabRegistry.Windows(() -> null, main::equals, ignored -> { }));
+        registry.windows(new TabRegistry.Windows(() -> null, ignored -> { }));
         Tab waiting = registry.open("plugin.notes", "wait", "Wait", null, new JPanel());
         registry.restorer("plugin.notes", "wait", restoring -> {
             registry.open("plugin.notes", "wait", "Wait", restoring.window(), new JPanel());
@@ -599,7 +601,7 @@ class TabRegistryTest {
             Tab opened = registry.open("plugin.notes", "note:" + restoring.title(), restoring.title(), null, new JPanel());
             movable.add(registry.movable(opened));
             opened.moveToNewWindow();
-            opened.moveToMainWindow();
+            opened.moveToWindow(main);
             registry.move(opened, restoring.window().equals(main) ? detached : main);
             registry.moveToNewTab(opened);
             return Optional.empty();
@@ -619,23 +621,23 @@ class TabRegistryTest {
     }
 
     /**
-     * Workspace plan 6b's final review I1: a plugin's tab asked for while no main window is open restores the main window
+     * Workspace plan 6b's final review I1: a plugin's tab asked for while no window is open restores the windows
      * first, before the registry looks for that (plugin, key): the item that restore brought back is selected, never
      * opened a second time.
      */
-    @Test void aRestoreInsideAnOpenForTheMainWindowLeavesOneItemPerPluginAndKey() {
+    @Test void aRestoreInsideAnOpenWithNoWindowOfItsOwnLeavesOneItemPerPluginAndKey() {
         TabId saved = TabId.random();
         UUID[] open = {null};
         registry.addHost(new WorkspaceHost(detached, mounted::add, mounted::remove, tab -> {}, () -> {}));
         registry.windows(new TabRegistry.Windows(() -> {
             if (open[0] == null) {
-                // The window manager restores the main window, whose saved item comes back through its plugin.
+                // The window manager restores the windows, whose saved item comes back through its plugin.
                 registry.addHost(new WorkspaceHost(main, mounted::add, mounted::remove, tab -> {}, () -> {}));
                 open[0] = main;
                 registry.restore(saved, "plugin.notes", new TabRegistry.Restoring(main, "Todo", new dev.jasper.app.layout.TabRestore("note", Map.of())));
             }
             return open[0];
-        }, window -> window.equals(open[0]), tab -> {}));
+        }, tab -> {}));
         registry.restorer("plugin.notes", "note", restoring -> {
             registry.open("plugin.notes", "note:todo", restoring.title(), restoring.window(), new JPanel());
             return Optional.empty();
@@ -853,12 +855,12 @@ class TabRegistryTest {
         var first = counted(disposed, window);
         var second = counted(disposed, window);
         first.onClosed(() -> { throw new IllegalStateException("close failed"); });
-        assertThat(registry.isMain(window)).as("registered").isTrue();
+        assertThat(registry.recentWindow()).as("registered").isEqualTo(window);
         assertThatThrownBy(registration::close).isInstanceOf(IllegalStateException.class).hasMessage("close failed");
         assertThat(disposed[0]).as("the other tab was removed too").isEqualTo(2);
         assertThat(detachedTabs).containsExactly(first, second);
         assertThat(registry.tabs()).isEmpty();
-        assertThat(registry.isMain(window)).as("the host is forgotten").isFalse();
+        assertThatThrownBy(registry::recentWindow).as("the host is forgotten").hasMessage("No workspace host available");
         assertThatCode(() -> registry.addHost(new WorkspaceHost(window, tab -> {}, tab -> {}, tab -> {}, () -> {})))
             .as("its id is free again").doesNotThrowAnyException();
     }

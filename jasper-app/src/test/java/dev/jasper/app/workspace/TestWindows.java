@@ -47,12 +47,26 @@ final class TestWindows {
             window -> events.add("closed " + name(window)), state -> { }, window -> events.add("closing " + name(window)), () -> { }));
     }
 
-    static String name(JasperWindow window) { return window.isMain() ? "main" : "child"; }
+    /** Each window's name, {@code "w0"}, {@code "w1"}, …: its index in {@code windows()} when this first named it. */
+    private final java.util.Map<JasperWindow, String> names = new java.util.IdentityHashMap<>();
+
+    String name(JasperWindow window) {
+        return names.computeIfAbsent(window, named -> {
+            int index = manager.windows().indexOf(named);
+            return "w" + (index < 0 ? names.size() : index);
+        });
+    }
+
+    /** @return every window after the first, in opening order */
+    java.util.List<JasperWindow> others() { var all = manager.windows(); return all.isEmpty() ? java.util.List.of() : all.subList(1, all.size()); }
+
+    /** @return the first window in opening order */
+    JasperWindow first() { return manager.windows().getFirst(); }
 
     private WindowContent compose(WindowManager.Opening opening) {
         boolean macOs = System.getProperty("os.name").startsWith("Mac");
-        var content = DesktopTestSupport.track(new WindowContent(opening.role(), launcher, opening.directory(), opening.empty(),
-            directory -> manager.openTerminalWindow(directory), () -> { }, opening.emptied(), ThemeTestSupport.controller(true),
+        var content = DesktopTestSupport.track(new WindowContent(launcher, opening.directory(), opening.empty(),
+            directory -> manager.openWindow(directory), () -> { }, ThemeTestSupport.controller(true),
             KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD));
         content.connectContributions(model);
         content.connectTerminals(terminals, () -> { });

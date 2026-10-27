@@ -45,8 +45,8 @@ final class MovesFixture implements AutoCloseable {
     private WindowContent compose(WindowManager.Opening opening) {
         var launcher = new ShellLauncher(pending::add, directory -> IdleTerminalSession.start(), "idle-test-session");
         boolean macOs = System.getProperty("os.name").startsWith("Mac");
-        var content = DesktopTestSupport.track(new WindowContent(opening.role(), launcher, opening.directory(), opening.empty(),
-            directory -> manager.openTerminalWindow(directory), () -> { }, opening.emptied(), ThemeTestSupport.controller(true),
+        var content = DesktopTestSupport.track(new WindowContent(launcher, opening.directory(), opening.empty(),
+            directory -> manager.openWindow(directory), () -> { }, ThemeTestSupport.controller(true),
             KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD));
         content.connectContributions(model);
         content.connectTerminals(terminals, () -> { });
@@ -59,8 +59,11 @@ final class MovesFixture implements AutoCloseable {
             component -> SwingUtilities.isDescendingFrom(component, window.content()));
     }
 
-    /** The main window, opened with one terminal tab when none is open. */
-    MainWindow main() { return manager.ensureMain("cold", null).orElseThrow(); }
+    /** The first window in opening order, opened with one terminal tab when none is open. */
+    JasperWindow first() { return manager.windows().isEmpty() ? manager.ensureWindow("cold", null).orElseThrow() : manager.windows().getFirst(); }
+
+    /** Every window after the first, in opening order. */
+    List<JasperWindow> others() { var all = manager.windows(); return all.isEmpty() ? List.of() : all.subList(1, all.size()); }
 
     /** Starts every shell asked for so far; off the EDT. */
     void launch() { while (!pending.isEmpty()) pending.remove().run(); }

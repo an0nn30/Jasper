@@ -24,7 +24,7 @@ class TabShortcutsTest {
     @Test void platformDefaultsSwitchTabs() throws Exception {
         for (boolean mac : new boolean[]{true, false}) edt(() -> {
             var keys = KeyBindings.defaults(mac);
-            var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
+            var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {},
                     ThemeTestSupport.controller(true), keys);
             try {
                 int primary = mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
@@ -106,7 +106,7 @@ class TabShortcutsTest {
     @Test void braceOverrideUsesSameDispatchAndKeepsNativeEditingExemption() throws Exception {
         edt(() -> {
             var bindings = KeyBindings.withOverrides(false, Map.of("previous_tab", "alt+{", "next_tab", "alt+}"));
-            try (var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
+            try (var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {},
                     ThemeTestSupport.controller(true), bindings)) {
                 var first = owner.currentTerminal(); owner.invoke(ActionId.NEW_TAB);
                 assertThat(owner.dispatchShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET,
@@ -127,7 +127,7 @@ class TabShortcutsTest {
             var manager = new CommandPaletteShortcutsTest.RecordingFocusManager();
             KeyboardFocusManager.setCurrentKeyboardFocusManager(manager);
             var keys = KeyBindings.withOverrides(false, Map.of("next_tab", "ctrl+tab", "previous_tab", "ctrl+shift+tab"));
-            try (var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
+            try (var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {},
                     ThemeTestSupport.controller(true), keys, new CommandHistory(), false)) {
                 var model = new Contributions(); owner.connectContributions(model);
                 var editor = new JPanel(); var area = new JTextArea(); var field = new JTextField();

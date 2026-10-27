@@ -12,19 +12,19 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.dock.Slot;
-import dev.jasper.app.dock.ToolWindowMode;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.persistence.WorkspaceFile;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.testsupport.IdleTerminalSession;
-import java.awt.Rectangle;
-import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -39,7 +39,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Workspace tabs spec 6.1, 6.4, 6.5 and 17: one main window, child windows and their lifecycle, headless. */
+/** Full windows spec 5: one kind of window, any number of them, and their lifecycle, headless. */
 class WindowManagerTest {
     private final ArrayDeque<Runnable> pending = new ArrayDeque<>();
     private final Contributions model = new Contributions();
@@ -49,14 +49,14 @@ class WindowManagerTest {
     /** What the closing hooks heard, with whether the window's content was still whole. */
     private final List<String> closings = new ArrayList<>();
     private boolean quitting, failFrames, reenter, failClosing, reenterAlways, failEarly;
-    /** The chrome the main window is composed with; child windows always compose with the standard one. */
-    private WorkspaceChrome mainChrome = WorkspaceChrome.STANDARD;
-    /** How many times the main window was composed. */
-    private int mainCompositions;
-    /** The tab a plugin asked for while the main window was being composed. */
+    /** How many windows were composed. */
+    private int compositions;
+    /** The tab a plugin asked for while the saved windows were being restored. */
     private Tab early;
     /** What the closed hook runs once it has recorded the window. */
     private Consumer<JasperWindow> whenClosed = window -> { };
+    /** Each window's name, {@code "w0"}, {@code "w1"}, …: its index in {@code windows()} when it was first named. */
+    private final Map<JasperWindow, String> names = new IdentityHashMap<>();
     private WindowManager manager;
 
     @BeforeEach void manager() throws Exception {
@@ -65,6 +65,7 @@ class WindowManagerTest {
             window -> { events.add("closed " + name(window)); whenClosed.accept(window); }, state -> { },
             window -> {
                 closings.add("closing " + name(window) + (window.content().closed() ? " (closed)" : ""));
+                events.add("closing " + name(window));
                 if (failClosing) throw new IllegalStateException("closing failed");
             },
             () -> closings.add("closing all"))));
@@ -72,7 +73,7 @@ class WindowManagerTest {
 
     @Test void buddyWatchesOnlyShowingNonIconifiedWindowsEvenBeforeDeactivation() throws Exception {
         edt(() -> {
-            var window = manager.ensureMain("cold", null).orElseThrow();
+            var window = manager.ensureWindow("cold", null).orElseThrow();
             var presentations = new ArrayList<WorkspaceActivity.Presentation>();
             window.content().activity(event -> {
                 if (event instanceof WorkspaceActivity.Presentation value) presentations.add(value);
@@ -97,27 +98,31 @@ class WindowManagerTest {
         closeOwners();
     }
 
-    private static String name(JasperWindow window) { return window.isMain() ? "main" : "child"; }
+    private String name(JasperWindow window) {
+        return names.computeIfAbsent(window, named -> {
+            int index = manager.windows().indexOf(named);
+            return "w" + (index < 0 ? names.size() : index);
+        });
+    }
 
     private WindowContent compose(WindowManager.Opening opening) {
         if (quitting) return null;
-        if (opening.role() == WindowRole.MAIN) mainCompositions++;
-        // A plugin opening its view while the main window is still being composed (a panel factory, say).
+        compositions++;
+        // A plugin opening its view while the saved windows are still being restored (a panel factory, say).
         if (reenter || reenterAlways) {
             reenter = false;
             early = model.tabs().open("dev.example.editor", "early", "early.txt", null, new JPanel());
             if (failEarly) early.onClosed(() -> { throw new IllegalStateException("early failed to close"); });
-            // Workspace plan 4a Rulings 24: the tab waits for the main window, and a nested request for it is still refused.
-            assertThatThrownBy(() -> manager.ensureMain("plugin", null)).isInstanceOf(IllegalStateException.class)
-                .hasMessage("The main window is still opening");
+            // Workspace plan 4a Rulings 24: the tab waits for the windows, and a nested request for them is still refused.
+            assertThatThrownBy(() -> manager.ensureWindow("plugin", null)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("The windows are still being restored");
         }
         var launcher = new ShellLauncher(pending::add, directory -> { started.add(directory); return IdleTerminalSession.start(); },
             "idle-test-session");
         boolean macOs = System.getProperty("os.name").startsWith("Mac");
-        var content = DesktopTestSupport.track(new WindowContent(opening.role(), launcher, opening.directory(), opening.empty(),
-            directory -> manager.openTerminalWindow(directory), () -> { }, opening.emptied(), ThemeTestSupport.controller(true),
-            KeyBindings.defaults(macOs), new CommandHistory(), macOs,
-            opening.role() == WindowRole.MAIN ? mainChrome : WorkspaceChrome.STANDARD));
+        var content = DesktopTestSupport.track(new WindowContent(launcher, opening.directory(), opening.empty(),
+            directory -> manager.openWindow(directory), () -> { }, ThemeTestSupport.controller(true),
+            KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD));
         content.connectContributions(model);
         return content;
     }
@@ -133,178 +138,83 @@ class WindowManagerTest {
 
     private void launch() { while (!pending.isEmpty()) pending.remove().run(); }
 
-    @Test void theMainWindowIsMadeOnlyWhenNoneIsOpen() throws Exception {
-        edt(() -> {
-            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
-            assertThat(manager.ensureMain("handoff", null)).containsSame(main);
-            assertThat(manager.main()).containsSame(main);
-            assertThat(manager.windows()).containsExactly(main);
-            assertThat(main.role()).isEqualTo(WindowRole.MAIN);
-            assertThat(main.content().isMain()).isTrue();
-            assertThat(events).containsExactly("show main", "opened main");
-            assertThat(manager.opening()).isZero();
-        });
-        launch();
-    }
-
     /** Workspace tabs spec 13: a window keeps where its frame last said it is, which workspace.toml saves. */
     @Test void aWindowKeepsWhereItsFrameSaysItIs() throws Exception {
         edt(() -> {
-            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
-            assertThat(main.placement()).isEqualTo(JasperWindow.Placement.NONE);
+            JasperWindow window = manager.ensureWindow("cold", null).orElseThrow();
+            assertThat(window.placement()).isEqualTo(JasperWindow.Placement.NONE);
             var placed = new JasperWindow.Placement(Optional.of(new UiState.Bounds(40, 60, 1400, 900)), 6);
-            main.placed(placed);
-            assertThat(main.placement()).isEqualTo(placed);
+            window.placed(placed);
+            assertThat(window.placement()).isEqualTo(placed);
             assertThatThrownBy(() -> new JasperWindow.Placement(Optional.empty(), java.awt.Frame.ICONIFIED))
                 .as("never saved minimized").isInstanceOf(IllegalArgumentException.class);
-            main.requestClose();
-            main.placed(JasperWindow.Placement.NONE);
-            assertThat(main.placement()).as("a closed window keeps its last place").isEqualTo(placed);
+            window.requestClose();
+            window.placed(JasperWindow.Placement.NONE);
+            assertThat(window.placement()).as("a closed window keeps its last place").isEqualTo(placed);
         });
         launch();
     }
 
-    @Test void theMainWindowsConstructorIsPackagePrivate() {
-        assertThat(MainWindow.class.getDeclaredConstructors()).allSatisfy(constructor ->
-            assertThat(Modifier.isPublic(constructor.getModifiers()) || Modifier.isProtected(constructor.getModifiers())).isFalse());
-    }
-
-    @Test void aNewTerminalWindowIsAChildWindowInTheGivenDirectoryAfterTheMainWindow(@TempDir Path folder) throws Exception {
-        Path directory = Files.createDirectories(folder.resolve("work"));
-        edt(() -> {
-            ChildWindow child = manager.openTerminalWindow(directory).orElseThrow();
-            assertThat(manager.main()).as("restored first").isPresent();
-            assertThat(manager.windows()).containsExactly(manager.main().orElseThrow(), child);
-            assertThat(child.role()).isEqualTo(WindowRole.CHILD);
-            assertThat(child.content().isMain()).isFalse();
-            assertThat(child.content().tabCount()).isEqualTo(1);
-            assertThat(events).containsExactly("show main", "opened main", "show child", "opened child");
-        });
-        launch();
-        assertThat(started).as("the main window's tab where a new shell starts, then the child's").containsExactly(HOME, directory);
-    }
-
-    @Test void aChildWindowClosesWhenItsLastTabCloses() throws Exception {
-        ChildWindow[] child = new ChildWindow[1];
-        edt(() -> child[0] = manager.openTerminalWindow(null).orElseThrow());
-        launch();
-        edt(() -> {
-            var terminals = new dev.jasper.app.terminals.TerminalRegistry();
-            for (JasperWindow window : manager.windows()) window.content().connectTerminals(terminals, () -> { });
-            terminals.windowActivated(child[0].id());
-            var facts = new ArrayList<dev.jasper.app.terminals.TerminalEvent>();
-            terminals.onEvent(facts::add);
-            events.clear();
-            Tab tab = child[0].content().selectedTab();
-            child[0].content().closeTab(tab);
-            assertThat(child[0].closed()).isTrue();
-            assertThat(manager.children()).isEmpty();
-            assertThat(events).containsExactly("dispose child", "closed child");
-            // Plan 3a's accepted order (its final review, M3): the window closes inside the tab's close, and the active
-            // pane is reported once that change is complete.
-            assertThat(facts).as("the last tab's close, then its window's, then no active pane").endsWith(
-                new dev.jasper.app.terminals.TerminalEvent.TabClosed(child[0].id(), tab.id().value()),
-                new dev.jasper.app.terminals.TerminalEvent.WindowClosed(child[0].id()),
-                new dev.jasper.app.terminals.TerminalEvent.ActivePaneChanged(Optional.empty()));
-        });
-    }
-
-    @Test void theMainWindowStaysWithAnEmptyWorkspace() throws Exception {
-        MainWindow[] main = new MainWindow[1];
-        edt(() -> main[0] = manager.ensureMain("cold", null).orElseThrow());
-        launch();
-        edt(() -> {
-            main[0].content().closeTab(main[0].content().selectedTab());
-            assertThat(main[0].closed()).isFalse();
-            assertThat(manager.main()).containsSame(main[0]);
-            assertThat(main[0].content().workspace().emptyWorkspace()).isNotNull();
-        });
-    }
-
-    @Test void closingTheMainWindowAsksEveryWindowsGuardsThenClosesTheChildWindowsFirst() throws Exception {
+    @Test void aWindowClosedByItsUserClosesItsTabsAfterTheirGuards() throws Exception {
         boolean[] allow = {false};
-        int[] asked = {0};
-        ChildWindow[] child = new ChildWindow[1];
+        JasperWindow[] w = new JasperWindow[2];
         Tab[] notes = new Tab[1];
         edt(() -> {
-            child[0] = manager.openTerminalWindow(null).orElseThrow();
-            notes[0] = model.tabs().open("dev.example.editor", "notes", "notes.txt", child[0].id(), new JPanel());
-            model.tabs().guard("dev.example.editor", (tabs, batch) -> { asked[0]++; return CompletableFuture.completedFuture(allow[0]); });
-        });
-        launch();
-        edt(() -> {
-            MainWindow main = manager.main().orElseThrow();
-            events.clear();
-            main.requestClose();
-            assertThat(asked[0]).as("the child window's tab was asked").isEqualTo(1);
-            assertThat(manager.windows()).as("a refusal closes nothing").containsExactly(main, child[0]);
-            assertThat(events).isEmpty();
-            allow[0] = true;
-            main.requestClose();
-            assertThat(manager.isEmpty()).isTrue();
-            assertThat(notes[0].closed()).isTrue();
-            assertThat(events).containsExactly("dispose child", "closed child", "dispose main", "closed main");
-        });
-    }
-
-    @Test void aChildWindowClosedByItsUserClosesItsTabsAfterTheirGuards() throws Exception {
-        boolean[] allow = {false};
-        ChildWindow[] child = new ChildWindow[1];
-        Tab[] notes = new Tab[1];
-        edt(() -> {
-            child[0] = manager.openTerminalWindow(null).orElseThrow();
-            notes[0] = model.tabs().open("dev.example.editor", "notes", "notes.txt", child[0].id(), new JPanel());
+            w[0] = manager.ensureWindow("cold", null).orElseThrow();
+            w[1] = manager.openWindow(null).orElseThrow();
+            notes[0] = model.tabs().open("dev.example.editor", "notes", "notes.txt", w[1].id(), new JPanel());
             model.tabs().guard("dev.example.editor", (tabs, batch) -> CompletableFuture.completedFuture(allow[0]));
         });
         launch();
         edt(() -> {
-            child[0].requestClose();
-            assertThat(child[0].closed()).as("an unsaved document keeps it open").isFalse();
+            w[1].requestClose();
+            assertThat(w[1].closed()).as("an unsaved document keeps it open").isFalse();
             allow[0] = true;
-            child[0].requestClose();
-            assertThat(child[0].closed()).isTrue();
+            w[1].requestClose();
+            assertThat(w[1].closed()).isTrue();
             assertThat(notes[0].closed()).isTrue();
-            assertThat(manager.main()).as("the main window stays").isPresent();
+            assertThat(manager.windows()).as("the other window stays").containsExactly(w[0]);
         });
     }
 
     @Test void aTerminalTabMovedToANewWindowAndBackKeepsItsSession() throws Exception {
-        MainWindow[] main = new MainWindow[1];
+        JasperWindow[] first = new JasperWindow[1];
         edt(() -> {
-            main[0] = manager.ensureMain("cold", null).orElseThrow();
-            main[0].content().newTab(HOME);
+            first[0] = manager.ensureWindow("cold", null).orElseThrow();
+            first[0].content().newTab(HOME);
         });
         launch();
         edt(() -> {
-            Tab tab = main[0].content().selectedTab();
+            Tab tab = first[0].content().selectedTab();
             var pane = ((TerminalContent) tab.content()).pane();
             var session = pane.session();
             assertThat(session).isNotNull();
-            ChildWindow child = manager.moveToNewWindow(tab).orElseThrow();
-            assertThat(tab.window()).isEqualTo(child.id());
-            assertThat(child.content().selectedTab()).isSameAs(tab);
-            assertThat(main[0].content().tabCount()).as("the main window keeps its other tab").isEqualTo(1);
-            assertThat(manager.moveToNewWindow(tab)).as("a child window's only tab stays where it is").isEmpty();
-            assertThat(manager.children()).containsExactly(child);
-            model.tabs().moveToMainWindow(tab);
-            assertThat(tab.window()).isEqualTo(main[0].id());
-            assertThat(child.closed()).as("emptied, it closed").isTrue();
-            assertThat(manager.children()).isEmpty();
+            JasperWindow second = manager.moveToNewWindow(tab).orElseThrow();
+            assertThat(tab.window()).isEqualTo(second.id());
+            assertThat(second.content().selectedTab()).isSameAs(tab);
+            assertThat(first[0].content().tabCount()).as("the first window keeps its other tab").isEqualTo(1);
+            assertThat(manager.moveToNewWindow(tab)).as("a window's only tab stays where it is").isEmpty();
+            assertThat(manager.windows()).containsExactly(first[0], second);
+            model.tabs().moveToWindow(tab, first[0].id());
+            assertThat(tab.window()).isEqualTo(first[0].id());
+            assertThat(second.closed()).as("emptied, it closed").isTrue();
+            assertThat(manager.windows()).containsExactly(first[0]);
             assertThat(pane.session()).as("the same session throughout").isSameAs(session);
             assertThat(session.exitFuture()).isNotDone();
         });
     }
 
-    @Test void aPluginsViewWithNoWindowOpensTheMainWindowFirst() throws Exception {
+    @Test void aPluginsViewWithNoWindowOpensAWindowFirst() throws Exception {
         edt(() -> {
             assertThat(manager.isEmpty()).isTrue();
             Tab tab = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
-            MainWindow main = manager.main().orElseThrow();
-            assertThat(tab.window()).isEqualTo(main.id());
+            JasperWindow first = manager.windows().getFirst();
+            assertThat(manager.windows()).containsExactly(first);
+            assertThat(tab.window()).isEqualTo(first.id());
             manager.closeAll();
             assertThat(manager.isEmpty()).isTrue();
-            MainWindow again = manager.ensureMain("reopen", null).orElseThrow();
-            assertThat(again).as("a fresh main window").isNotSameAs(main);
+            JasperWindow again = manager.ensureWindow("reopen", null).orElseThrow();
+            assertThat(again).as("a fresh window").isNotSameAs(first);
         });
         launch();
     }
@@ -312,265 +222,123 @@ class WindowManagerTest {
     @Test void aPluginsTabMovesThroughTheRegistryToANewWindowAndBack() throws Exception {
         edt(() -> {
             Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
-            MainWindow main = manager.main().orElseThrow();
-            assertThat(manager.isMain(notes.window())).isTrue();
+            JasperWindow first = manager.windows().getFirst();
+            assertThat(notes.window()).isEqualTo(first.id());
             notes.moveToNewWindow();
-            ChildWindow child = manager.children().getFirst();
-            assertThat(notes.window()).isEqualTo(child.id());
-            assertThat(manager.isMain(notes.window())).isFalse();
-            assertThat(child.content().parentTabCount()).as("a full window, the item in a tab of its own (spec 13)").isEqualTo(1);
-            assertThat(child.content().selectedTab()).isSameAs(notes);
+            JasperWindow second = manager.windows().getLast();
+            assertThat(second).isNotSameAs(first);
+            assertThat(notes.window()).isEqualTo(second.id());
+            assertThat(second.content().parentTabCount()).as("a full window, the item in a tab of its own (spec 13)").isEqualTo(1);
+            assertThat(second.content().selectedTab()).isSameAs(notes);
             notes.moveToNewWindow();
-            assertThat(manager.children()).as("a child window's only tab stays").containsExactly(child);
-            notes.moveToMainWindow();
-            assertThat(notes.window()).isEqualTo(main.id());
-            assertThat(child.closed()).isTrue();
+            assertThat(manager.windows()).as("a window's only tab stays").containsExactly(first, second);
+            notes.moveToWindow(first.id());
+            assertThat(notes.window()).isEqualTo(first.id());
+            assertThat(second.closed()).isTrue();
         });
         launch();
     }
 
-    @Test void aPluginsTabPlacedBesideOpensAGroupAndOnePlacedInANewWindowAChildWindow() throws Exception {
+    @Test void aPluginsTabPlacedBesideOpensAGroupAndOnePlacedInANewWindowANewWindow() throws Exception {
         edt(() -> {
             Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
-            MainWindow main = manager.main().orElseThrow();
-            assertThat(main.content().workspace().model().groups()).hasSize(1);
+            JasperWindow first = manager.windows().getFirst();
+            assertThat(first.content().workspace().model().groups()).hasSize(1);
             Tab beside = model.tabs().open("dev.example.editor", "beside", "beside.txt", null, new JPanel(),
                 TabRegistry.Placement.SPLIT_RIGHT);
-            assertThat(main.content().workspace().model().groups()).as("a new group").hasSize(2);
+            assertThat(first.content().workspace().model().groups()).as("a new group").hasSize(2);
             assertThat(beside.group()).isNotEqualTo(notes.group());
-            Tab selected = main.content().selectedTab();
+            Tab selected = first.content().selectedTab();
             Tab away = model.tabs().open("dev.example.editor", "away", "away.txt", null, new JPanel(), TabRegistry.Placement.NEW_WINDOW);
-            assertThat(away.window()).isEqualTo(manager.children().getFirst().id());
-            assertThat(manager.children().getFirst().content().tabCount()).isEqualTo(1);
-            assertThat(main.content().workspace().model().groups()).as("the main window is not touched").hasSize(2);
-            assertThat(main.content().selectedTab()).isSameAs(selected);
+            assertThat(manager.windows()).hasSize(2);
+            assertThat(away.window()).isEqualTo(manager.windows().get(1).id());
+            assertThat(manager.windows().get(1).content().tabCount()).isEqualTo(1);
+            assertThat(first.content().workspace().model().groups()).as("the first window is not touched").hasSize(2);
+            assertThat(first.content().selectedTab()).isSameAs(selected);
         });
         launch();
     }
 
-    /** Tabs and panes spec 13: a plugin's tab with no window opens as a new tab of the main window; new windows are full. */
-    @Test void aPluginsTabOpensANewTabOfTheMainWindowAndNewWindowsAreFullWindows() throws Exception {
+    /** Tabs and panes spec 13: a plugin's tab with no window opens as a new tab of its window; new windows are full. */
+    @Test void aPluginsTabOpensANewTabOfItsWindowAndNewWindowsAreFullWindows() throws Exception {
         edt(() -> {
-            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
-            var content = main.content();
-            ParentTabId first = content.activeParentTab();
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            var content = first.content();
+            ParentTabId shown = content.activeParentTab();
             content.newTab(HOME);
-            content.selectParentTab(first);
+            content.selectParentTab(shown);
             Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
-            assertThat(content.parentTabCount()).as("a new tab of the main window").isEqualTo(3);
+            assertThat(content.parentTabCount()).as("a new tab of the window").isEqualTo(3);
             assertThat(content.activeParentTab()).as("at the end of its strip, shown").isEqualTo(content.parentTabOf(notes).orElseThrow())
                 .isEqualTo(content.windowLayout().parentTabs().getLast().id());
             Tab away = model.tabs().open("dev.example.editor", "away", "away.txt", null, new JPanel(), TabRegistry.Placement.NEW_WINDOW);
-            ChildWindow child = manager.children().getFirst();
-            assertThat(child.content().windowLayout()).as("TabPlacement.NEW_WINDOW opens a full window").isInstanceOf(ParentTabs.class);
-            assertThat(child.content().parentTabOf(away)).isPresent();
-            child.content().newTab(HOME);
-            assertThat(child.content().parentTabCount()).as("which opens parent tabs of its own").isEqualTo(2);
-            ChildWindow terminal = manager.openTerminalWindow(null).orElseThrow();
-            assertThat(terminal.content().windowLayout()).as("New Terminal Window too").isInstanceOf(ParentTabs.class);
-            assertThat(content.parentTabCount()).as("the main window is not touched").isEqualTo(3);
+            JasperWindow second = manager.windows().get(1);
+            assertThat(second.content().windowLayout()).as("TabPlacement.NEW_WINDOW opens a full window").isInstanceOf(ParentTabs.class);
+            assertThat(second.content().parentTabOf(away)).isPresent();
+            second.content().newTab(HOME);
+            assertThat(second.content().parentTabCount()).as("which opens parent tabs of its own").isEqualTo(2);
+            JasperWindow terminal = manager.openWindow(null).orElseThrow();
+            assertThat(terminal.content().windowLayout()).as("New Window too").isInstanceOf(ParentTabs.class);
+            assertThat(content.parentTabCount()).as("the first window is not touched").isEqualTo(3);
         });
         launch();
     }
 
     @Test void theWindowCommandsOpenCloseAndMoveWindows(@TempDir Path folder) throws Exception {
         Path directory = Files.createDirectories(folder.resolve("work"));
-        MainWindow[] main = new MainWindow[1];
+        JasperWindow[] first = new JasperWindow[1];
         edt(() -> {
-            main[0] = manager.ensureMain("cold", null).orElseThrow();
-            main[0].content().newTab(directory);
+            first[0] = manager.ensureWindow("cold", null).orElseThrow();
+            first[0].content().newTab(directory);
         });
         launch();
-        edt(() -> main[0].content().invoke(ActionId.NEW_TERMINAL_WINDOW));
+        edt(() -> first[0].content().invoke(ActionId.NEW_TERMINAL_WINDOW));
         launch();
-        assertThat(started).as("New Terminal Window: in the current terminal's directory").last().isEqualTo(directory);
+        assertThat(started).as("New Window: in the current terminal's directory").last().isEqualTo(directory);
         edt(() -> {
-            ChildWindow child = manager.children().getFirst();
-            child.content().invoke(ActionId.CLOSE_WINDOW);
-            assertThat(child.closed()).as("Close Window").isTrue();
-            main[0].content().newTab(directory);
-            ParentTabId moving = main[0].content().activeParentTab();
-            main[0].content().invoke(ActionId.MOVE_TAB_TO_NEW_WINDOW);
-            ChildWindow moved = manager.children().getFirst();
+            JasperWindow opened = manager.windows().get(1);
+            opened.content().invoke(ActionId.CLOSE_WINDOW);
+            assertThat(opened.closed()).as("Close Window").isTrue();
+            first[0].content().newTab(directory);
+            ParentTabId moving = first[0].content().activeParentTab();
+            first[0].content().invoke(ActionId.MOVE_TAB_TO_NEW_WINDOW);
+            JasperWindow moved = manager.windows().get(1);
             assertThat(moved.content().activeParentTab()).isEqualTo(moving);
             moved.content().updateActions();
             assertThat(moved.content().action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("its only tab stays").isFalse();
-            assertThat(moved.content().action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isTrue();
+            assertThat(moved.content().action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).as("another window is open").isTrue();
             moved.content().invoke(ActionId.MOVE_TO_MAIN_WINDOW);
-            assertThat(main[0].content().parentTabs().view(moving)).as("back in the main window").isPresent();
+            assertThat(first[0].content().parentTabs().view(moving)).as("back in the first window").isPresent();
             assertThat(moved.closed()).isTrue();
-            main[0].content().updateActions();
-            assertThat(main[0].content().action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isFalse();
-            main[0].content().invoke(ActionId.CLOSE_WINDOW);
-            assertThat(manager.isEmpty()).as("Close Window on the main window closes it").isTrue();
+            first[0].content().updateActions();
+            assertThat(first[0].content().action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).as("no other window").isFalse();
+            first[0].content().invoke(ActionId.CLOSE_WINDOW);
+            assertThat(manager.isEmpty()).as("Close Window on the last window closes it").isTrue();
         });
     }
 
-    /** Workspace plan 8a Rulings 8: a child window's entry menu leaves Move to Main Window to the ⋮. */
-    @Test void aChildWindowsTabMenuLeavesMoveToMainWindowToItsWindowMenu() throws Exception {
-        edt(() -> {
-            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
-            var menu = child.content().tabMenu(child.content().selectedTab());
-            var titles = new ArrayList<String>();
-            for (var item : menu.getComponents()) if (item instanceof javax.swing.JMenuItem entry) titles.add(entry.getText());
-            assertThat(titles).containsExactly("Rename Tab", "Move Tab to New Window", "Move Tab Into", "Close Tab");
-            assertThat(child.content().windowMenuItems()).contains(ActionId.MOVE_TO_MAIN_WINDOW);
-        });
-        launch();
-    }
-
-    @Test void aChildWindowsPanelRequestGoesToTheMainWindow() throws Exception {
+    /** Full windows spec 5.1: each window has its own dock, and a panel request for a window shows the panel there. */
+    @Test void aSecondWindowsPanelRequestShowsThePanelInThatWindow() throws Exception {
         edt(() -> {
             model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
-            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
-            MainWindow main = manager.main().orElseThrow();
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            JasperWindow second = manager.openWindow(null).orElseThrow();
             events.clear();
-            model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
-            assertThat(main.content().dock().visible("test.panel")).as("the main window has the dock").isTrue();
-            assertThat(events).as("and comes forward to show it").containsExactly("front main");
+            model.requestPanel(new Contributions.PanelRequest(second.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
+            assertThat(second.content().dock().visible("test.panel")).as("in the window it was asked for").isTrue();
+            assertThat(first.content().dock().visible("test.panel")).as("not in the other").isFalse();
+            assertThat(events).as("no other window comes forward").doesNotContain("front w0");
         });
         launch();
     }
 
-    /**
-     * A tool window toggle from a child window shows the panel in the main window, as IntelliJ's does from a detached
-     * editor.
-     */
-    @Test void aPanelToggleFromAChildWindowShowsThePanel() throws Exception {
+    /** Workspace tabs spec 6.1: while the last window closes, a request opens no other beside it. */
+    @Test void aRequestWhileTheLastWindowClosesOpensNoOther() throws Exception {
+        List<Optional<JasperWindow>> asked = new ArrayList<>();
         edt(() -> {
-            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
-            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
-            MainWindow main = manager.main().orElseThrow();
-            model.requestPanel(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
-            assertThat(main.content().dock().visible("test.panel")).isTrue();
-            events.clear();
-            model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
-            assertThat(main.content().dock().visible("test.panel")).as("still showing").isTrue();
-            assertThat(events).as("and the main window comes forward").containsExactly("front main");
-        });
-        launch();
-    }
-
-    /**
-     * A user's View toggle from a child window reaches the main window as an activating show: under flush frames the panel
-     * becomes the active tool window there, and a second toggle never hides it.
-     */
-    @Test void anActivatingPanelToggleFromAChildWindowShowsAndActivatesThePanel() throws Exception {
-        mainChrome = DockChromeTest.classicDock();
-        edt(() -> {
-            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
-            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
-            MainWindow main = manager.main().orElseThrow();
-            assertThat(main.content().dock().visible("test.panel")).isFalse();
-            events.clear();
-            model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
-            assertThat(main.content().dock().visible("test.panel")).as("shown in the main window").isTrue();
-            assertThat(main.content().area().focusedSlot()).as("and the active tool window there").hasValue(Slot.LEFT_TOP);
-            assertThat(events).as("the main window comes forward").containsExactly("front main");
-            events.clear();
-            model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
-            assertThat(main.content().dock().visible("test.panel")).as("a routed toggle never hides").isTrue();
-            assertThat(main.content().area().focusedSlot()).hasValue(Slot.LEFT_TOP);
-            assertThat(events).containsExactly("front main");
-        });
-        launch();
-    }
-
-    /**
-     * A child window's request for a tool window detached into a window of its own raises that window, not the main window:
-     * the request reaches the main window as an activating show, which the window's own shell raises.
-     */
-    @Test void aChildWindowsRequestForADetachedPanelRaisesItsWindowNotTheMainWindow() throws Exception {
-        edt(() -> {
-            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
-            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
-            MainWindow main = manager.main().orElseThrow();
-            var windows = main.content().detachedWindows();
-            windows.ready = () -> true;
-            var screen = new Rectangle(0, 0, 1920, 1080);
-            windows.displays = () -> List.of(new WindowPlacement.Display(screen, screen));
-            main.content().detachedShells((opening, heard) -> new DetachedToolWindows.Shell(() -> events.add("show panel window"),
-                () -> events.add("front panel window"), () -> events.add("dispose panel window"), () -> false, bounds -> { }, frame -> { }));
-            main.content().dock().setBounds("test.panel", new Rectangle(100, 100, 400, 300));
-            main.content().dock().setMode("test.panel", ToolWindowMode.FLOAT);
-            assertThat(main.content().panelDetached("test.panel")).as("detached while it is hidden").isTrue();
-            List<Contributions.PanelRequest> heard = new ArrayList<>();
-            var probe = model.onPanelRequest(heard::add);
-            try {
-                events.clear();
-                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
-                assertThat(heard).containsExactly(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_SHOW));
-                assertThat(main.content().dock().visible("test.panel")).isTrue();
-                assertThat(events).as("its own window opens and comes forward; the main window does not").containsExactly("show panel window", "front panel window");
-
-                events.clear();
-                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_TOGGLE));
-                assertThat(main.content().dock().visible("test.panel")).as("a routed toggle never hides").isTrue();
-                assertThat(events).as("raised again").containsExactly("front panel window");
-
-                events.clear();
-                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.HIDE));
-                assertThat(events).containsExactly("dispose panel window");
-                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
-                assertThat(main.content().dock().visible("test.panel")).isTrue();
-                assertThat(events).as("a plain toggle shows its window and fronts no main window").doesNotContain("front main");
-            } finally { probe.close(); }
-        });
-        launch();
-    }
-
-    /**
-     * Floating tool windows plan 3's final review: a child window's plain toggle or show of a tool window whose own window
-     * is open raises that window, as its activating toggle does, and leaves the main window where it is.
-     */
-    @Test void aChildWindowsPlainToggleOfAnOpenDetachedPanelRaisesItsWindow() throws Exception {
-        edt(() -> {
-            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
-            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
-            MainWindow main = manager.main().orElseThrow();
-            var windows = main.content().detachedWindows();
-            windows.ready = () -> true;
-            var screen = new Rectangle(0, 0, 1920, 1080);
-            windows.displays = () -> List.of(new WindowPlacement.Display(screen, screen));
-            main.content().detachedShells((opening, heard) -> new DetachedToolWindows.Shell(() -> events.add("show panel window"),
-                () -> events.add("front panel window"), () -> events.add("dispose panel window"), () -> false, bounds -> { }, frame -> { }));
-            main.content().dock().setBounds("test.panel", new Rectangle(100, 100, 400, 300));
-            main.content().dock().setMode("test.panel", ToolWindowMode.WINDOW);
-            model.requestPanel(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
-            assertThat(events).as("its own window is open").contains("show panel window");
-            List<Contributions.PanelRequest> heard = new ArrayList<>();
-            var probe = model.onPanelRequest(heard::add);
-            try {
-                events.clear();
-                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
-                assertThat(heard).as("routed as an activating show")
-                    .containsExactly(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.ACTIVATING_SHOW));
-                assertThat(main.content().dock().visible("test.panel")).as("a routed toggle never hides").isTrue();
-                assertThat(events).as("its own window comes forward; the main window does not").containsExactly("front panel window");
-
-                events.clear();
-                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
-                assertThat(events).as("a plain show raises it too").containsExactly("front panel window");
-
-                events.clear();
-                heard.clear();
-                main.content().dock().setMode("test.panel", ToolWindowMode.DOCKED);
-                model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
-                assertThat(heard).as("docked, a plain toggle stays a plain show")
-                    .containsExactly(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
-                assertThat(events).containsExactly("dispose panel window", "front main");
-            } finally { probe.close(); }
-        });
-        launch();
-    }
-
-    /** Workspace tabs spec 6.1: while the main window closes, a request for it opens no second one beside it. */
-    @Test void aRequestWhileTheMainWindowClosesOpensNoSecondOne() throws Exception {
-        List<Optional<MainWindow>> asked = new ArrayList<>();
-        edt(() -> {
-            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
-            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", main.id(), new JPanel());
-            notes.onClosed(() -> asked.add(manager.ensureMain("plugin", null)));
+            JasperWindow window = manager.ensureWindow("cold", null).orElseThrow();
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            notes.onClosed(() -> asked.add(manager.ensureWindow("plugin", null)));
             List<String> refused = new ArrayList<>();
             notes.onClosed(() -> {
                 try {
@@ -580,11 +348,11 @@ class WindowManagerTest {
                 }
             });
             manager.closeAll();
-            assertThat(asked).as("a closing main window is not absent").containsExactly(Optional.empty());
-            assertThat(refused).as("a plugin's tab with no window, while the main window closes")
-                .containsExactly("The main window is closing or Jasper is quitting");
+            assertThat(asked).as("a closing window is not absent").containsExactly(Optional.empty());
+            assertThat(refused).as("a plugin's tab with no window, while the last window closes")
+                .containsExactly("Every window is closing or Jasper is quitting");
             assertThat(manager.isEmpty()).isTrue();
-            assertThat(events.stream().filter("opened main"::equals).count()).as("no second main window").isEqualTo(1);
+            assertThat(events.stream().filter(event -> event.startsWith("opened")).count()).as("no other window").isEqualTo(1);
         });
         launch();
     }
@@ -592,12 +360,13 @@ class WindowManagerTest {
     /** For plan 6: the hooks hear of every window while it is whole, and of closing them all once before any closes. */
     @Test void theClosingHooksHearOfEachWindowWhileItIsWholeAndOfClosingThemAllFirst() throws Exception {
         edt(() -> {
-            manager.openTerminalWindow(null).orElseThrow().requestClose();
-            assertThat(closings).containsExactly("closing child");
-            manager.openTerminalWindow(null).orElseThrow();
+            manager.ensureWindow("cold", null).orElseThrow();
+            manager.openWindow(null).orElseThrow().requestClose();
+            assertThat(closings).containsExactly("closing w1");
+            manager.openWindow(null).orElseThrow();
             closings.clear();
             manager.closeAll();
-            assertThat(closings).containsExactly("closing all", "closing child", "closing main");
+            assertThat(closings).as("the most recently active last").containsExactly("closing all", "closing w1", "closing w0");
             manager.closeAll();
             assertThat(closings).as("nothing is left to close").hasSize(3);
         });
@@ -607,37 +376,38 @@ class WindowManagerTest {
     /** For plan 5: a torn-out tab's window opens at its bounds, and the window on top comes first. */
     @Test void aTornOutTabsWindowOpensAtItsBoundsAndTheWindowsListTheLastActiveFirst() throws Exception {
         edt(() -> {
-            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
-            main.content().newTab(HOME);
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            first.content().newTab(HOME);
             events.clear();
-            ChildWindow child = manager.moveTabToNewWindow(main.content(), main.content().activeParentTab(),
+            JasperWindow second = manager.moveTabToNewWindow(first.content(), first.content().activeParentTab(),
                 new java.awt.Rectangle(40, 50, 600, 400), new java.awt.Point(90, 60)).orElseThrow();
-            assertThat(child.content().parentTabCount()).as("a torn-out tab's window is a full window").isEqualTo(1);
-            assertThat(events).as("placed before it shows").containsSubsequence("place child 40,50 600x400 under 90,60", "show child");
-            assertThatThrownBy(() -> new WindowManager.Opening(WindowRole.CHILD, true, null, "menu", () -> { },
-                Optional.of(new java.awt.Rectangle(40, 50, 600, 400)), Optional.empty()))
-                .as("its bounds come with the cursor").isInstanceOf(IllegalArgumentException.class);
-            assertThat(manager.windowsByActivation()).as("none came forward yet").containsExactly(main, child);
-            child.events().activated().accept(true);
-            assertThat(manager.windowsByActivation()).containsExactly(child, main);
-            main.events().activated().accept(true);
-            assertThat(manager.windowsByActivation()).containsExactly(main, child);
-            child.requestClose();
-            assertThat(manager.windowsByActivation()).containsExactly(main);
+            assertThat(second.content().parentTabCount()).as("a torn-out tab's window is a full window").isEqualTo(1);
+            assertThat(events).as("placed before it shows").containsSubsequence("place w1 40,50 600x400 under 90,60", "show w1");
+            assertThatThrownBy(() -> new WindowManager.Opening(true, null, "menu", Optional.of(new java.awt.Rectangle(40, 50, 600, 400)),
+                Optional.empty())).as("its bounds come with the cursor").isInstanceOf(IllegalArgumentException.class);
+            assertThat(manager.windowsByActivation()).as("none came forward yet").containsExactly(first, second);
+            second.events().activated().accept(true);
+            assertThat(manager.windowsByActivation()).containsExactly(second, first);
+            first.events().activated().accept(true);
+            assertThat(manager.windowsByActivation()).containsExactly(first, second);
+            second.requestClose();
+            assertThat(manager.windowsByActivation()).containsExactly(first);
         });
         launch();
     }
 
     @Test void theWindowThatCameToTheFrontLastIsTheLastActive() throws Exception {
         edt(() -> {
-            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
-            MainWindow main = manager.main().orElseThrow();
-            assertThat(manager.lastActive()).as("none came forward yet: the main window").containsSame(main);
-            child.events().activated().accept(true);
-            assertThat(manager.lastActive()).containsSame(child);
-            assertThat(child.content().isActiveAndOpen()).isTrue();
-            child.requestClose();
-            assertThat(manager.lastActive()).containsSame(main);
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            JasperWindow second = manager.openWindow(null).orElseThrow();
+            assertThat(manager.lastActive()).as("none came forward yet: the one opened last").containsSame(second);
+            first.events().activated().accept(true);
+            assertThat(manager.lastActive()).containsSame(first);
+            assertThat(first.content().isActiveAndOpen()).isTrue();
+            first.requestClose();
+            assertThat(manager.lastActive()).containsSame(second);
+            second.requestClose();
+            assertThat(manager.lastActive()).isEmpty();
         });
         launch();
     }
@@ -645,36 +415,36 @@ class WindowManagerTest {
     @Test void nothingOpensWhileJasperQuits() throws Exception {
         edt(() -> {
             quitting = true;
-            assertThat(manager.ensureMain("handoff", null)).isEmpty();
-            assertThat(manager.openTerminalWindow(null)).isEmpty();
+            assertThat(manager.ensureWindow("handoff", null)).isEmpty();
+            assertThat(manager.openWindow(null)).isEmpty();
             assertThat(manager.opening()).isZero();
             assertThat(events).isEmpty();
         });
     }
 
     /**
-     * Workspace tabs spec 6.4: a plugin's tab asked for while the main window is being composed waits for it and opens
-     * there as soon as it is up, with no later turn.
+     * Workspace tabs spec 6.4: a plugin's tab asked for while the saved windows are being restored waits for them and
+     * opens in the first as soon as it is up, with no later turn.
      */
-    @Test void aPluginsTabAskedForWhileTheMainWindowOpensOpensThereOnceItIsUp() throws Exception {
+    @Test void aPluginsTabAskedForWhileTheWindowsAreRestoredOpensInTheFirstOnceItIsUp() throws Exception {
         edt(() -> {
             reenter = true;
-            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
-            assertThat(manager.windows()).as("no second main window").containsExactly(main);
-            assertThat(early.window()).as("the tab waited for the main window and opened there").isEqualTo(main.id());
-            assertThat(main.content().selectedTab()).isSameAs(early);
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            assertThat(manager.windows()).as("no second window").containsExactly(first);
+            assertThat(early.window()).as("the tab waited for the window and opened there").isEqualTo(first.id());
+            assertThat(first.content().selectedTab()).isSameAs(early);
         });
         launch();
     }
 
-    /** A tab that waited for a main window that failed to open goes with it, its failure under the main window's. */
-    @Test void aTabThatWaitedForAMainWindowThatFailedToOpenGoesWithIt() throws Exception {
+    /** A tab that waited for a window that failed to open goes with it, its failure under the window's. */
+    @Test void aTabThatWaitedForAWindowThatFailedToOpenGoesWithIt() throws Exception {
         edt(() -> {
             reenter = true;
             failEarly = true;
             failFrames = true;
             try {
-                assertThatThrownBy(() -> manager.ensureMain("cold", null)).hasMessage("no frame").satisfies(failure ->
+                assertThatThrownBy(() -> manager.ensureWindow("cold", null)).hasMessage("no frame").satisfies(failure ->
                     assertThat(failure.getSuppressed()).extracting(Throwable::getMessage)
                         .containsExactly("early failed to close"));
             } finally {
@@ -684,33 +454,33 @@ class WindowManagerTest {
             assertThat(early.closed()).as("removed, so disposed").isTrue();
             assertThat(model.tabs().tabs()).doesNotContain(early);
         });
-        edt(() -> assertThat(manager.main()).as("nothing asks for the main window again").isEmpty());
+        edt(() -> assertThat(manager.windows()).as("nothing asks for a window again").isEmpty());
     }
 
-    /** Composition that asks for a tab with no window, against a main window that fails every time, is tried once. */
-    @Test void aMainWindowThatFailsEveryTimeIsComposedOnceForTheTabThatWaitsForIt() throws Exception {
+    /** Composition that asks for a tab with no window, against a window that fails every time, is tried once. */
+    @Test void aWindowThatFailsEveryTimeIsComposedOnceForTheTabThatWaitsForIt() throws Exception {
         edt(() -> {
             reenterAlways = true;
             failFrames = true;
-            assertThatThrownBy(() -> manager.ensureMain("cold", null)).hasMessage("no frame");
+            assertThatThrownBy(() -> manager.ensureWindow("cold", null)).hasMessage("no frame");
         });
         try {
             edt(() -> { });
             edt(() -> {
-                assertThat(mainCompositions).as("one composition, not a loop").isEqualTo(1);
-                assertThat(early.closed()).as("the waiting tab went with the main window").isTrue();
+                assertThat(compositions).as("one composition, not a loop").isEqualTo(1);
+                assertThat(early.closed()).as("the waiting tab went with the window").isTrue();
             });
         } finally {
             edt(() -> { reenterAlways = false; failFrames = false; });
         }
     }
 
-    /** While every window closes, a closed hook that asks for the main window gets none: no fresh one opens. */
-    @Test void noMainWindowOpensWhileEveryWindowCloses() throws Exception {
-        List<Optional<MainWindow>> asked = new ArrayList<>();
+    /** While every window closes, a closed hook that asks for a window gets none: no fresh one opens. */
+    @Test void noWindowOpensWhileEveryWindowCloses() throws Exception {
+        List<Optional<JasperWindow>> asked = new ArrayList<>();
         edt(() -> {
-            manager.ensureMain("cold", null).orElseThrow();
-            whenClosed = window -> asked.add(manager.ensureMain("plugin", null));
+            manager.ensureWindow("cold", null).orElseThrow();
+            whenClosed = window -> asked.add(manager.ensureWindow("plugin", null));
             try {
                 manager.closeAll();
             } finally {
@@ -718,30 +488,238 @@ class WindowManagerTest {
             }
             assertThat(asked).containsExactly(Optional.empty());
             assertThat(manager.isEmpty()).isTrue();
-            assertThat(events.stream().filter("opened main"::equals).count()).as("no fresh main window").isEqualTo(1);
+            assertThat(events.stream().filter(event -> event.startsWith("opened")).count()).as("no fresh window").isEqualTo(1);
         });
         launch();
     }
 
+    @Test void aWindowWhoseFrameFailsIsDiscardedAndLeavesNoTabBehind() throws Exception {
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            events.clear();
+            failFrames = true;
+            assertThatThrownBy(() -> manager.openWindow(null)).isInstanceOf(IllegalStateException.class).hasMessage("no frame");
+            failFrames = false;
+            assertThat(manager.windows()).containsExactly(first);
+            assertThat(manager.opening()).isZero();
+            assertThat(events).containsExactly("closed w1");
+            assertThat(model.tabs().tabs()).as("the first window's tab, and none left without a window").singleElement()
+                .satisfies(tab -> assertThat(tab.window()).isEqualTo(first.id()));
+        });
+        launch();
+    }
+
+    /** One window's failing close leaves none of the others open; the first failure propagates, the later ones under it. */
+    @Test void closingEveryWindowClosesThemAllWhateverOneOfThemThrows() throws Exception {
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            JasperWindow second = manager.openWindow(null).orElseThrow();
+            // Guard-less tabs whose disposing fails.
+            model.tabs().open("dev.example.editor", "notes", "notes.txt", first.id(), new JPanel())
+                .onClosed(() -> { throw new IllegalStateException("notes failed to close"); });
+            model.tabs().open("dev.example.editor", "todo", "todo.txt", second.id(), new JPanel())
+                .onClosed(() -> { throw new IllegalStateException("todo failed to close"); });
+            first.events().activated().accept(true);
+            events.clear();
+            assertThatThrownBy(manager::closeAll).as("the most recently active closes last").hasMessage("todo failed to close")
+                .satisfies(failure -> assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("notes failed to close"));
+            assertThat(manager.isEmpty()).as("every window closed").isTrue();
+            assertThat(first.closed() && second.closed()).isTrue();
+            assertThat(events).containsExactly("closing w1", "dispose w1", "closed w1", "closing w0", "dispose w0", "closed w0");
+        });
+        launch();
+    }
+
+    /** A window's close keeps the closing hook's failure, with its content's under it, and still forgets the window. */
+    @Test void aWindowsCloseKeepsTheFirstFailure() throws Exception {
+        edt(() -> {
+            JasperWindow window = manager.ensureWindow("cold", null).orElseThrow();
+            model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel())
+                .onClosed(() -> { throw new IllegalStateException("notes failed to close"); });
+            failClosing = true;
+            try {
+                assertThatThrownBy(window::requestClose).hasMessage("closing failed").satisfies(failure ->
+                    assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("notes failed to close"));
+            } finally {
+                failClosing = false;
+            }
+            assertThat(window.closed()).isTrue();
+            assertThat(manager.windows()).isEmpty();
+        });
+        launch();
+    }
+
+    /** A failed move to a new window keeps its own failure when closing the window it left empty fails too. */
+    @Test void aFailedMoveToANewWindowKeepsTheMovesFailure() throws Exception {
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", first.id(), new JPanel());
+            boolean[] fail = {true};
+            notes.onActive(active -> { if (!active && fail[0]) throw new IllegalStateException("move failed"); });
+            failClosing = true;
+            try {
+                assertThatThrownBy(() -> manager.moveToNewWindow(notes)).hasMessage("move failed").satisfies(failure ->
+                    assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("closing failed"));
+            } finally {
+                failClosing = false;
+                fail[0] = false;
+            }
+            assertThat(manager.windows()).as("the window it left empty went").containsExactly(first);
+            assertThat(notes.window()).isEqualTo(first.id());
+        });
+        launch();
+    }
+
+    /** A change listener that throws as a tab moving to a new window changes owner leaves the tab where it was. */
+    @Test void aMoveToANewWindowThatAChangeListenerRefusesKeepsTheTab() throws Exception {
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", first.id(), new JPanel());
+            boolean[] fail = {true};
+            notes.onChanged(() -> {
+                if (fail[0] && !first.id().equals(notes.window())) throw new IllegalStateException("listener failed");
+            });
+            try {
+                assertThatThrownBy(() -> manager.moveToNewWindow(notes)).hasMessage("listener failed");
+            } finally {
+                fail[0] = false;
+            }
+            assertThat(notes.closed()).as("the tab is not disposed").isFalse();
+            assertThat(notes.window()).isEqualTo(first.id());
+            assertThat(first.content().selectedTab()).isSameAs(notes);
+            assertThat(manager.windows()).as("the window it left empty went").containsExactly(first);
+        });
+        launch();
+    }
+
+    /** While every window closes, no window opens: a closing tab's listener cannot leave one behind. */
+    @Test void noWindowOpensForAClosingTabWhileEveryWindowCloses() throws Exception {
+        List<Optional<JasperWindow>> asked = new ArrayList<>();
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            JasperWindow second = manager.openWindow(null).orElseThrow();
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", second.id(), new JPanel());
+            Tab todo = model.tabs().open("dev.example.editor", "todo", "todo.txt", first.id(), new JPanel());
+            notes.onClosed(() -> asked.add(manager.openWindow(null)));
+            notes.onClosed(() -> asked.add(manager.moveToNewWindow(todo)));
+            manager.closeAll();
+            assertThat(asked).containsExactly(Optional.empty(), Optional.empty());
+            assertThat(manager.isEmpty()).as("no window outlives the others").isTrue();
+            assertThat(events.stream().filter(event -> event.startsWith("opened")).count()).isEqualTo(2);
+        });
+        launch();
+    }
+
+    /** A window's requests and the panel route belong to the EDT. */
+    @Test void aWindowsRequestsAndThePanelRouteBelongToTheEdt() throws Exception {
+        JasperWindow[] window = new JasperWindow[1];
+        edt(() -> window[0] = manager.ensureWindow("cold", null).orElseThrow());
+        assertThatThrownBy(() -> model.panelRoute(request -> request)).isInstanceOf(IllegalStateException.class)
+            .hasMessage("Contributions belong to the EDT");
+        assertThatThrownBy(() -> window[0].events().activated().accept(true)).isInstanceOf(IllegalStateException.class)
+            .hasMessage("Windows belong to the EDT");
+        assertThatThrownBy(window[0]::requestClose).isInstanceOf(IllegalStateException.class).hasMessage("Windows belong to the EDT");
+        edt(() -> assertThat(window[0].closed()).isFalse());
+        launch();
+    }
+
+    @Test void aWindowWhoseFrameFailsIsDiscardedAndForgotten() throws Exception {
+        edt(() -> {
+            failFrames = true;
+            assertThatThrownBy(() -> manager.ensureWindow("cold", null)).isInstanceOf(IllegalStateException.class).hasMessage("no frame");
+            assertThat(manager.windows()).isEmpty();
+            assertThat(manager.opening()).isZero();
+            assertThat(events).containsExactly("closed w0");
+            failFrames = false;
+            assertThat(manager.ensureWindow("cold", null)).as("the next request opens one").isPresent();
+        });
+        launch();
+    }
+
+    @Test void ensureWindowOpensOneWindowOnlyWhenNoneIsOpen() throws Exception {
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            assertThat(manager.ensureWindow("handoff", null)).containsSame(first);
+            assertThat(manager.windows()).containsExactly(first);
+            assertThat(events).containsExactly("show w0", "opened w0");
+        });
+        launch();
+    }
+
+    @Test void newWindowOpensAFullWindowInTheGivenDirectory(@TempDir Path folder) throws Exception {
+        Path directory = Files.createDirectories(folder.resolve("work"));
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            JasperWindow second = manager.openWindow(directory).orElseThrow();
+            assertThat(manager.windows()).containsExactly(first, second);
+            assertThat(SwingUtilities.isDescendingFrom(second.content().status(), second.content())).as("full chrome").isTrue();
+            assertThat(second.content().tabCount()).isEqualTo(1);
+        });
+        launch();
+        assertThat(started).containsExactly(HOME, directory);
+    }
+
+    @Test void closingOneOfSeveralWindowsLeavesTheOthersOpen() throws Exception {
+        JasperWindow[] w = new JasperWindow[2];
+        edt(() -> { w[0] = manager.ensureWindow("cold", null).orElseThrow(); w[1] = manager.openWindow(null).orElseThrow(); });
+        launch();
+        edt(() -> {
+            events.clear();
+            w[0].requestClose();
+            assertThat(w[0].closed()).isTrue();
+            assertThat(manager.windows()).containsExactly(w[1]);
+            assertThat(events).containsExactly("closing w0", "dispose w0", "closed w0");
+        });
+    }
+
+    @Test void closingTheLastWindowReachesTheClosedHookWithNoWindowLeft() throws Exception {
+        JasperWindow[] w = new JasperWindow[1];
+        edt(() -> w[0] = manager.ensureWindow("cold", null).orElseThrow());
+        launch();
+        List<String> heard = new ArrayList<>();
+        edt(() -> {
+            whenClosed = window -> heard.add(manager.windows().size() + " left, empty " + manager.isEmpty());
+            try {
+                w[0].requestClose();
+            } finally {
+                whenClosed = window -> { };
+            }
+            assertThat(w[0].closed()).isTrue();
+            assertThat(heard).containsExactly("0 left, empty true");
+        });
+    }
+
+    @Test void everyWindowStaysWithAnEmptyWorkspace() throws Exception {
+        JasperWindow[] w = new JasperWindow[2];
+        edt(() -> { w[0] = manager.ensureWindow("cold", null).orElseThrow(); w[1] = manager.openWindow(null).orElseThrow(); });
+        launch();
+        edt(() -> {
+            w[1].content().closeTab(w[1].content().selectedTab());
+            assertThat(w[1].closed()).isFalse();
+            assertThat(manager.windows()).containsExactly(w[0], w[1]);
+            assertThat(w[1].content().workspace().emptyWorkspace()).isNotNull();
+        });
+    }
+
     /**
-     * Workspace tabs spec 6.4: a child window a move empties closes once the move has reported itself. The active window
-     * reports no active pane as it lets the tab go, then the move, the main window's selection and the close: the order
-     * the testkit's FakeWorkspace follows (pre-flight F3).
+     * Full windows spec 5.3: a window a move empties closes once the move has reported itself. The active window reports
+     * no active pane as it lets the tab go, then the move, the other window's selection and the close: the order the
+     * testkit's FakeWorkspace follows (pre-flight F3).
      */
-    @Test void aChildWindowAMoveEmptiesClosesAfterTheMoveIsReported() throws Exception {
-        ChildWindow[] child = new ChildWindow[1];
+    @Test void aWindowAMoveEmptiesClosesAfterTheMoveIsReported() throws Exception {
+        JasperWindow[] w = new JasperWindow[2];
         dev.jasper.app.terminals.TerminalRegistry[] terminals = new dev.jasper.app.terminals.TerminalRegistry[1];
         edt(() -> {
-            child[0] = manager.openTerminalWindow(null).orElseThrow();
+            w[0] = manager.ensureWindow("cold", null).orElseThrow();
+            w[1] = manager.openWindow(null).orElseThrow();
             terminals[0] = new dev.jasper.app.terminals.TerminalRegistry();
             for (JasperWindow window : manager.windows()) window.content().connectTerminals(terminals[0], () -> { });
         });
         launch();
         edt(() -> {
-            terminals[0].windowActivated(child[0].id());
-            var mainId = manager.main().orElseThrow().id();
-            Tab tab = child[0].content().selectedTab();
-            Function<UUID, String> window = id -> id.equals(mainId) ? "main" : id.equals(child[0].id()) ? "child" : "another window";
+            terminals[0].windowActivated(w[0].id());
+            Tab tab = w[0].content().selectedTab();
+            Function<UUID, String> window = id -> id.equals(w[0].id()) ? "first" : id.equals(w[1].id()) ? "second" : "another window";
             Function<UUID, String> which = id -> id.equals(tab.id().value()) ? "it" : "another tab";
             List<String> heard = new ArrayList<>();
             // Every event on the topics FakeTerminalsTest records, as it records them.
@@ -757,154 +735,125 @@ class WindowManagerTest {
                     default -> { }
                 }
             });
-            model.tabs().moveToMainWindow(tab);
-            assertThat(heard).containsExactly("no active pane", "it moved from child to main", "main selects it", "child closed");
-            assertThat(child[0].closed()).isTrue();
-            assertThat(tab.window()).isEqualTo(manager.main().orElseThrow().id());
+            assertThat(manager.moveTabToWindow(w[0].content(), w[0].content().activeParentTab(), w[1].content())).isTrue();
+            assertThat(heard).containsSubsequence("it moved from first to second", "first closed");
+            assertThat(w[0].closed()).isTrue();
+            assertThat(tab.window()).isEqualTo(w[1].id());
         });
         launch();
     }
 
-    @Test void aChildWindowWhoseFrameFailsIsDiscardedAndLeavesNoTabBehind() throws Exception {
+    @Test void aPluginsTabWithNoOwnerOpensInTheMostRecentlyActiveWindow() throws Exception {
         edt(() -> {
-            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            JasperWindow second = manager.openWindow(null).orElseThrow();
+            first.events().activated().accept(true);
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
+            assertThat(notes.window()).as("not the window opened last").isEqualTo(first.id()).isNotEqualTo(second.id());
+        });
+        launch();
+    }
+
+    @Test void twoRequestsWhileNoWindowIsOpenRestoreOnce(@TempDir Path folder) throws Exception {
+        Path file = folder.resolve("workspace.toml");
+        dev.jasper.app.layout.TabId one = dev.jasper.app.layout.TabId.random(), two = dev.jasper.app.layout.TabId.random();
+        WorkspaceFile.write(file, new WorkspaceFile.Snapshot(List.of(savedWindow(one), savedWindow(two))));
+        edt(() -> {
+            manager.workspace(new WorkspaceStore(file, manager::snapshot, (delay, task) -> () -> { }, Runnable::run, aside -> { }));
+            JasperWindow first = manager.ensureWindow("handoff", null).orElseThrow();
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
+            assertThat(manager.windows()).as("the saved windows, each once").hasSize(2);
+            assertThat(manager.windows().getFirst()).isSameAs(first);
+            assertThat(events.stream().filter(event -> event.startsWith("opened")).toList()).containsExactly("opened w0", "opened w1");
+            assertThat(first.content().tabs()).extracting(Tab::id).contains(one);
+            assertThat(notes.window()).as("in the first restored").isEqualTo(first.id());
+        });
+        launch();
+    }
+
+    @Test void quitAsksEveryWindowsGuardsAndARefusalKeepsThemAll() throws Exception {
+        boolean[] allow = {false};
+        JasperWindow[] w = new JasperWindow[2];
+        edt(() -> {
+            w[0] = manager.ensureWindow("cold", null).orElseThrow();
+            w[1] = manager.openWindow(null).orElseThrow();
+            model.tabs().open("dev.example.editor", "notes", "notes.txt", w[1].id(), new JPanel());
+            model.tabs().guard("dev.example.editor", (tabs, batch) -> CompletableFuture.completedFuture(allow[0]));
+        });
+        launch();
+        edt(() -> {
+            assertThat(manager.closeEveryWindow()).as("refused").isFalse();
+            assertThat(manager.windows()).containsExactly(w[0], w[1]);
+            assertThat(closings).isEmpty();
+            allow[0] = true;
+            assertThat(manager.closeEveryWindow()).isTrue();
+            assertThat(manager.isEmpty()).isTrue();
+            assertThat(closings).contains("closing w0", "closing w1");
+        });
+    }
+
+    @Test void moveTabToWindowPutsItAfterTheActiveTabAndRaisesTheTarget() throws Exception {
+        JasperWindow[] w = new JasperWindow[2];
+        ParentTabId[] a = new ParentTabId[1], b = new ParentTabId[1], c = new ParentTabId[1];
+        edt(() -> {
+            w[0] = manager.ensureWindow("cold", null).orElseThrow();
+            a[0] = w[0].content().activeParentTab();
+            w[0].content().newTab(HOME);
+            b[0] = w[0].content().activeParentTab();
+            w[0].content().selectParentTab(a[0]);
+            w[1] = manager.openWindow(null).orElseThrow();
+            c[0] = w[1].content().activeParentTab();
+        });
+        launch();
+        edt(() -> {
             events.clear();
-            failFrames = true;
-            assertThatThrownBy(() -> manager.openTerminalWindow(null)).isInstanceOf(IllegalStateException.class).hasMessage("no frame");
-            failFrames = false;
-            assertThat(manager.windows()).containsExactly(main);
-            assertThat(manager.opening()).isZero();
-            assertThat(events).containsExactly("closed child");
-            assertThat(model.tabs().tabs()).as("the main window's tab, and none left without a window").singleElement()
-                .satisfies(tab -> assertThat(tab.window()).isEqualTo(main.id()));
+            assertThat(manager.moveTabToWindow(w[1].content(), c[0], w[0].content())).isTrue();
+            assertThat(w[0].content().windowLayout().parentTabs()).extracting(dev.jasper.app.layout.ParentTab::id).containsExactly(a[0], c[0], b[0]);
+            assertThat(w[0].content().activeParentTab()).isEqualTo(c[0]);
+            assertThat(events.stream().filter(event -> event.startsWith("front")).toList()).last().isEqualTo("front w0");
+            assertThat(w[1].closed()).as("emptied by the move").isTrue();
+            assertThat(manager.moveTabToWindow(w[0].content(), a[0], w[0].content())).as("not into its own window").isFalse();
         });
-        launch();
     }
 
-    /** One window's failing close leaves none of the others open; the first failure propagates, the later ones under it. */
-    @Test void closingEveryWindowClosesThemAllWhateverOneOfThemThrows() throws Exception {
+    @Test void savedWindowsComeBackInActivationOrderTheMostRecentInFront(@TempDir Path folder) throws Exception {
+        Path file = folder.resolve("workspace.toml");
+        WorkspaceFile.Snapshot[] saved = new WorkspaceFile.Snapshot[1];
+        JasperWindow[] w = new JasperWindow[3];
         edt(() -> {
-            ChildWindow first = manager.openTerminalWindow(null).orElseThrow();
-            ChildWindow second = manager.openTerminalWindow(null).orElseThrow();
-            // Guard-less tabs whose disposing fails.
-            model.tabs().open("dev.example.editor", "notes", "notes.txt", first.id(), new JPanel())
-                .onClosed(() -> { throw new IllegalStateException("notes failed to close"); });
-            model.tabs().open("dev.example.editor", "todo", "todo.txt", second.id(), new JPanel())
-                .onClosed(() -> { throw new IllegalStateException("todo failed to close"); });
-            events.clear();
-            assertThatThrownBy(manager::closeAll).hasMessage("notes failed to close").satisfies(failure ->
-                assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("todo failed to close"));
-            assertThat(manager.isEmpty()).as("every window closed").isTrue();
-            assertThat(first.closed() && second.closed()).isTrue();
-            assertThat(events).containsExactly("dispose child", "closed child", "dispose child", "closed child", "dispose main",
-                "closed main");
+            w[0] = manager.ensureWindow("cold", null).orElseThrow();
+            w[1] = manager.openWindow(null).orElseThrow();
+            w[2] = manager.openWindow(null).orElseThrow();
+            w[2].events().activated().accept(true);
+            w[1].events().activated().accept(true);
+            saved[0] = manager.snapshot().orElseThrow();
+            assertThat(saved[0].windows()).hasSize(3);
+            assertThat(saved[0].windows().getFirst().layout()).as("the window activated last first").isEqualTo(w[1].content().windowLayout());
+            assertThat(saved[0].windows().get(1).layout()).isEqualTo(w[2].content().windowLayout());
         });
         launch();
-    }
-
-    /** A window's close keeps the closing hook's failure, with its content's under it, and still forgets the window. */
-    @Test void aWindowsCloseKeepsTheFirstFailure() throws Exception {
-        edt(() -> {
-            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
-            model.tabs().open("dev.example.editor", "notes", "notes.txt", child.id(), new JPanel())
-                .onClosed(() -> { throw new IllegalStateException("notes failed to close"); });
-            failClosing = true;
-            try {
-                assertThatThrownBy(child::requestClose).hasMessage("closing failed").satisfies(failure ->
-                    assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("notes failed to close"));
-            } finally {
-                failClosing = false;
-            }
-            assertThat(child.closed()).isTrue();
-            assertThat(manager.children()).isEmpty();
-        });
-        launch();
-    }
-
-    /** A failed move to a new window keeps its own failure when closing the window it left empty fails too. */
-    @Test void aFailedMoveToANewWindowKeepsTheMovesFailure() throws Exception {
-        edt(() -> {
-            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
-            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", main.id(), new JPanel());
-            boolean[] fail = {true};
-            notes.onActive(active -> { if (!active && fail[0]) throw new IllegalStateException("move failed"); });
-            failClosing = true;
-            try {
-                assertThatThrownBy(() -> manager.moveToNewWindow(notes)).hasMessage("move failed").satisfies(failure ->
-                    assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("closing failed"));
-            } finally {
-                failClosing = false;
-                fail[0] = false;
-            }
-            assertThat(manager.children()).as("the window it left empty went").isEmpty();
-            assertThat(notes.window()).isEqualTo(main.id());
-        });
-        launch();
-    }
-
-    /** A change listener that throws as a tab moving to a new window changes owner leaves the tab where it was. */
-    @Test void aMoveToANewWindowThatAChangeListenerRefusesKeepsTheTab() throws Exception {
-        edt(() -> {
-            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
-            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", main.id(), new JPanel());
-            boolean[] fail = {true};
-            notes.onChanged(() -> {
-                if (fail[0] && !main.id().equals(notes.window())) throw new IllegalStateException("listener failed");
+        WorkspaceFile.write(file, saved[0]);
+        TestWindows[] fresh = new TestWindows[1];
+        try {
+            edt(() -> {
+                fresh[0] = new TestWindows();
+                fresh[0].manager.workspace(new WorkspaceStore(file, fresh[0].manager::snapshot, (delay, task) -> () -> { }, Runnable::run,
+                    aside -> { }));
+                JasperWindow first = fresh[0].manager.ensureWindow("cold", null).orElseThrow();
+                assertThat(fresh[0].manager.windows()).hasSize(3);
+                assertThat(first.content().windowLayout()).isEqualTo(saved[0].windows().getFirst().layout());
+                assertThat(fresh[0].events).last().isEqualTo("front w0");
             });
-            try {
-                assertThatThrownBy(() -> manager.moveToNewWindow(notes)).hasMessage("listener failed");
-            } finally {
-                fail[0] = false;
-            }
-            assertThat(notes.closed()).as("the tab is not disposed").isFalse();
-            assertThat(notes.window()).isEqualTo(main.id());
-            assertThat(main.content().selectedTab()).isSameAs(notes);
-            assertThat(manager.children()).as("the window it left empty went").isEmpty();
-        });
-        launch();
+            fresh[0].launch();
+        } finally {
+            edt(() -> { if (fresh[0] != null) fresh[0].manager.closeAll(); });
+        }
     }
 
-    /** While every window closes, no child window opens: a closing tab's listener cannot leave one behind. */
-    @Test void noChildWindowOpensWhileEveryWindowCloses() throws Exception {
-        List<Optional<ChildWindow>> asked = new ArrayList<>();
-        edt(() -> {
-            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
-            MainWindow main = manager.main().orElseThrow();
-            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", child.id(), new JPanel());
-            Tab todo = model.tabs().open("dev.example.editor", "todo", "todo.txt", main.id(), new JPanel());
-            notes.onClosed(() -> asked.add(manager.openTerminalWindow(null)));
-            notes.onClosed(() -> asked.add(manager.moveToNewWindow(todo)));
-            manager.closeAll();
-            assertThat(asked).containsExactly(Optional.empty(), Optional.empty());
-            assertThat(manager.isEmpty()).as("no window outlives the main window").isTrue();
-            assertThat(events.stream().filter("opened child"::equals).count()).isEqualTo(1);
-        });
-        launch();
-    }
-
-    /** A window's requests and the panel route belong to the EDT. */
-    @Test void aWindowsRequestsAndThePanelRouteBelongToTheEdt() throws Exception {
-        ChildWindow[] child = new ChildWindow[1];
-        edt(() -> child[0] = manager.openTerminalWindow(null).orElseThrow());
-        assertThatThrownBy(() -> model.panelRoute(request -> request)).isInstanceOf(IllegalStateException.class)
-            .hasMessage("Contributions belong to the EDT");
-        assertThatThrownBy(() -> child[0].events().activated().accept(true)).isInstanceOf(IllegalStateException.class)
-            .hasMessage("Windows belong to the EDT");
-        assertThatThrownBy(child[0]::requestClose).isInstanceOf(IllegalStateException.class).hasMessage("Windows belong to the EDT");
-        edt(() -> assertThat(child[0].closed()).isFalse());
-        launch();
-    }
-
-    @Test void aWindowWhoseFrameFailsIsDiscardedAndForgotten() throws Exception {
-        edt(() -> {
-            failFrames = true;
-            assertThatThrownBy(() -> manager.ensureMain("cold", null)).isInstanceOf(IllegalStateException.class).hasMessage("no frame");
-            assertThat(manager.main()).isEmpty();
-            assertThat(manager.opening()).isZero();
-            assertThat(events).containsExactly("closed main");
-            failFrames = false;
-            assertThat(manager.ensureMain("cold", null)).as("the next request opens one").isPresent();
-        });
-        launch();
+    /** A window saved without a place, holding one terminal tab {@code item}. */
+    private static WorkspaceFile.WindowRecord savedWindow(dev.jasper.app.layout.TabId item) {
+        var parentTab = new dev.jasper.app.layout.ParentTab(ParentTabId.random(), dev.jasper.app.layout.Layout.of(item));
+        return new WorkspaceFile.WindowRecord(Optional.empty(), 0, new ParentTabs(List.of(parentTab), parentTab.id()),
+            java.util.Map.of(item, new WorkspaceFile.TabRecord.Terminal("", HOME.toString(), "")));
     }
 }

@@ -17,7 +17,7 @@ class KitMountingTest {
             var failMain=new java.util.concurrent.atomic.AtomicBoolean();var holder=new JPanel();
             model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, e -> {if(failMain.get())throw new IllegalStateException("recovery failed");holder.add(e.component());},e -> holder.remove(e.component()),e -> {},() -> {}));
             model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(separate, e -> {throw new IllegalStateException("destination failed");},e -> {},e -> {},() -> {}));
-            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> model.tabs().move(tab, separate)));
+            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, tab -> model.tabs().move(tab, separate)));
             var terminals=new HostedTerminals("test.kit",new CapabilityGate("test.kit",java.util.Set.of()),fixture.registry,Runnable::run,() -> true,() -> true,new HostedSessions("test.kit",containment,Runnable::run,id -> null, name -> new javax.swing.ImageIcon()));
             var ui=new HostedUi("test.kit",model,containment,Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},AppContractTest.headlessWindows(),terminals);
             var kit=new HostedKit("test.kit",() -> true,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);

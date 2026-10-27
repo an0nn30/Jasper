@@ -73,7 +73,7 @@ final class WindowContributions implements AutoCloseable {
     private Subscription panelRequests;
     /** The detached tool windows' own windows. */
     private final DetachedToolWindows detached;
-    /** Opens the detached windows that waited for the main window to show (restored at start-up). */
+    /** Opens the detached windows that waited for this window to show (restored at start-up). */
     private final HierarchyListener showing = this::showingChanged;
 
     WindowContributions(WindowContent owner, Contributions model, UiState state) {
@@ -132,7 +132,7 @@ final class WindowContributions implements AutoCloseable {
     }
 
     /**
-     * The main window showed or hid: the detached windows sync after this event, not inside the main window's own show,
+     * This window showed or hid: the detached windows sync after this event, not inside the window's own show,
      * which dispatches it under the AWT tree lock before that show has finished.
      */
     private void showingChanged(HierarchyEvent event) {
@@ -238,16 +238,15 @@ final class WindowContributions implements AutoCloseable {
     /**
      * A toggle by a user gesture, a stripe click: a panel it shows becomes the active tool window under flush frames (plan 12
      * Rulings 18). A detached tool window toggles as a docked one does: shown, it hides; hidden, it shows and its own window
-     * comes forward. The click made the main window the active one, so no detached window's being the active one is asked
+     * comes forward. The click made this window the active one, so no detached window's being the active one is asked
      * (floating tool windows spec, Stripe buttons and requests).
      */
     private void toggleAndActivate(String id) { changeAndActivate(id, () -> dock.toggle(id)); }
 
     /**
-     * A show by the panel's own toggle action (plan 15b Rulings 1), or for a user gesture in another window, a child
-     * window's View toggle, or any child window's show or toggle of a detached tool window (which
-     * {@code WindowManager.routePanel} sends so): the panel becomes the active tool window under flush frames, and a
-     * detached one's own window comes forward, also when it already showed.
+     * A show by the panel's own toggle action (plan 15b Rulings 1), or for a user gesture in another window: the panel
+     * becomes the active tool window under flush frames, and a detached one's own window comes forward, also when it
+     * already showed.
      */
     private void showAndActivate(String id) { changeAndActivate(id, () -> dock.show(id)); }
 
@@ -570,7 +569,7 @@ final class WindowContributions implements AutoCloseable {
 
     /**
      * Panel content outside every window's component tree must be updated by hand: a hidden panel's, and a shown detached
-     * one's whose own window has not opened (no shells yet, or the main window not showing). A docked panel that shows is
+     * one's whose own window has not opened (no shells yet, or this window not showing). A docked panel that shows is
      * updated with this window, and a detached one in its own window with that window ({@link DetachedFrame}).
      */
     void refreshTheme() {

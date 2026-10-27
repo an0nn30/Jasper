@@ -61,7 +61,7 @@ final class WorkspaceActions {
             case NEW_TERMINAL_WINDOW -> owner.requestNewTerminalWindow();
             case CLOSE_WINDOW -> owner.requestCloseWindow();
             case MOVE_TAB_TO_NEW_WINDOW -> owner.moveTabToNewWindow(owner.selectedTab());
-            case MOVE_TO_MAIN_WINDOW -> owner.moveToMainWindow();
+            case MOVE_TO_MAIN_WINDOW -> owner.moveToOtherWindow();
             case MOVE_PANE_TO_NEW_TAB -> owner.moveToNewTab(owner.selectedTab());
             case MOVE_PANE_TO_TAB_1, MOVE_PANE_TO_TAB_2, MOVE_PANE_TO_TAB_3, MOVE_PANE_TO_TAB_4, MOVE_PANE_TO_TAB_5,
                  MOVE_PANE_TO_TAB_6, MOVE_PANE_TO_TAB_7, MOVE_PANE_TO_TAB_8, MOVE_PANE_TO_TAB_9 ->
@@ -144,7 +144,7 @@ final class WorkspaceActions {
                     // A window's only parent tab stays (workspace plan 8a Rulings 6).
                     case MOVE_TAB_TO_NEW_WINDOW -> owner.mayMoveTabToNewWindow(owner.activeParentTab());
                     // A parent tab or a window moves whole or not at all (workspace plan 7b Rulings 7).
-                    case MOVE_TO_MAIN_WINDOW -> owner.mayMoveToMainWindow();
+                    case MOVE_TO_MAIN_WINDOW -> owner.mayMoveToOtherWindow();
                     // A tab's only pane, a pinned item and one being closed stay (workspace plan 8b Rulings 9).
                     case MOVE_PANE_TO_NEW_TAB -> owner.mayMoveToNewTab(owner.selectedTab());
                     // Its own tab's number, a number no tab has and a pane that may not move do nothing (pane

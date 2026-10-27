@@ -104,13 +104,13 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                         "Application bypasses supported terminal API"
                     }
                 }
-                // Workspace tabs spec 6.1, one main window per process: MainWindow, its WindowManager and the native
+                // Full windows spec 5.1, one kind of window: JasperWindow, its WindowManager and the native
                 // WindowFrame are each made only at the sites below, with an explicit `new`, the type's own code
                 // included: its `new` names the class, where javap prints its own constructor calls unqualified, and a
                 // this(...) or super(...) call is no `new`. The constant pool (javap -v) also shows a constructor
                 // reference (X::new), which javap -c alone would miss; it counts as a site.
                 val pinned = mapOf(
-                    "dev/jasper/app/workspace/MainWindow" to listOf("dev.jasper.app.workspace.WindowManager.ensureMain"),
+                    "dev/jasper/app/workspace/JasperWindow" to listOf("dev.jasper.app.workspace.WindowManager.open"),
                     "dev/jasper/app/workspace/WindowManager" to listOf("dev.jasper.app.application.JasperApplication.<init>"),
                     "dev/jasper/app/workspace/WindowFrame" to listOf("dev.jasper.app.application.JasperApplication.frameOnScreen",
                         "dev.jasper.app.application.JasperApplication.rehearsalWindow"))
