@@ -363,6 +363,8 @@ def packageApp = tasks.register('packageApp') {
                 removePluginClasspath(new File(imageDir, 'Jasper/lib/app/Jasper.cfg'))
                 installCommandClient(new File(imageDir, 'Jasper'), 'linux')
                 installWatcher(new File(imageDir, 'Jasper'), 'linux')
+                // jlink took the execute bit from Chromium's helpers, which sit in the runtime's lib/.
+                markJcefHelpersExecutable(new File(imageDir, 'Jasper/lib/runtime'))
             } else {
                 removePluginClasspath(new File(imageDir, 'Jasper/app/Jasper.cfg'))
                 installBundledNatives(new File(imageDir, 'Jasper/app'), context.host)
@@ -496,6 +498,11 @@ def verifyPackage = tasks.register('verifyPackage') {
         File config = new File(appDir, 'Jasper.cfg')
         [image, appDir, runtimeHome, nativeLauncher, config].each { candidate ->
             if (!candidate.exists()) throw new GradleException("Package verification failed: missing ${candidate}")
+        }
+        // Chromium's files, which jlink took from jcef.jmod (macOS's framework is checked in its own section below).
+        if (context.host.os != 'macos') {
+            String jcefProblem = jcefPayloadProblem(runtimeHome, context.host.os, context.host.architecture)
+            if (jcefProblem != null) throw new GradleException("Package verification failed: ${jcefProblem}")
         }
         // Jasper's launcher (gradle/launcher.gradle), not jpackage's own: its watch module names the skip variable.
         if (!new String(Files.readAllBytes(nativeLauncher.toPath()), StandardCharsets.ISO_8859_1).contains('JASPER_VM_OPTIONS_SKIP')) {

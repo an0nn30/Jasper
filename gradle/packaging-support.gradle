@@ -3,6 +3,7 @@ import groovy.json.JsonSlurper
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.PosixFilePermission
 import java.util.concurrent.TimeUnit
 import java.util.jar.Attributes
 import java.util.jar.JarFile
@@ -118,6 +119,42 @@ ext.requireMacJcefFrameworks = { File sdkHome ->
         throw new GradleException("The JBR SDK has no Chromium framework at ${frameworks}; install the full jbrsdk_jcef bundle (SDKMAN's macOS install keeps only Contents/Home)")
     }
     frameworks
+}
+
+// On Windows and Linux Chromium's files come inside jcef.jmod, so jlink puts them in the runtime: packaging/jcef/
+// <os>-<architecture>.txt (windows or linux; x64 or aarch64) lists them as paths under the runtime home, one per line,
+// '#' lines being comments. verifyPackage requires each (jcefPayloadProblem). macOS has no list: its Chromium is a
+// framework (macJcefPayload).
+ext.jcefPayload = { String os, String architecture ->
+    File list = rootProject.file("packaging/jcef/${os}-${architecture}.txt")
+    if (!list.isFile()) throw new GradleException("There is no JCEF file list ${list} for ${os} on ${architecture}")
+    list.readLines('UTF-8').collect { it.trim() }.findAll { !it.isEmpty() && !it.startsWith('#') }
+}
+
+// Chromium starts these two as child processes. jlink sets the execute bit on a jmod's bin/ commands only, so these
+// files of the jmod's lib/ section lose it and packageApp restores it on Linux. Windows needs no bit.
+ext.jcefLinuxHelpers = ['lib/jcef_helper', 'lib/cef_server']
+
+// chmod a+x on the helpers that runtimeHome has. A helper that is missing is verifyPackage's to report.
+ext.markJcefHelpersExecutable = { File runtimeHome ->
+    jcefLinuxHelpers.collect { new File(runtimeHome, it).toPath() }.findAll { Files.isRegularFile(it) }.each { path ->
+        Files.setPosixFilePermissions(path, (Files.getPosixFilePermissions(path) +
+            [PosixFilePermission.OWNER_EXECUTE, PosixFilePermission.GROUP_EXECUTE, PosixFilePermission.OTHERS_EXECUTE]) as Set)
+    }
+}
+
+// Why runtimeHome lacks what a Windows or Linux package needs of JCEF, or null: every jcefPayload file, all named in
+// one message (the first twenty, then a count), and on Linux executable helpers.
+ext.jcefPayloadProblem = { File runtimeHome, String os, String architecture ->
+    List<String> payload = jcefPayload(os, architecture)
+    List<String> missing = payload.findAll { !new File(runtimeHome, it).isFile() }
+    if (missing) {
+        String named = missing.take(20).join(', ') + (missing.size() > 20 ? ", and ${missing.size() - 20} more" : '')
+        return "JCEF's files are missing from ${runtimeHome}: ${missing.size()} of ${payload.size()}: ${named}".toString()
+    }
+    List<String> locked = os == 'linux' ?
+        jcefLinuxHelpers.findAll { !Files.isExecutable(new File(runtimeHome, it).toPath()) } : []
+    locked ? "JCEF's helpers are not executable in ${runtimeHome}: ${locked.join(', ')}".toString() : null
 }
 
 // No --bind-services: the roots name every provider Jasper wants. --generate-cds-archive writes the runtime's default

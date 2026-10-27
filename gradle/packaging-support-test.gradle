@@ -616,3 +616,75 @@ MODULES="java.base java.desktop jdk.jpackage"
         logger.lifecycle('Verified the JCEF runtime check')
     }
 }
+
+// Windows and Linux get Chromium from the runtime's own jcef.jmod: packaging/jcef lists its files as paths inside the
+// runtime, and verifyPackage requires every one. jlink drops the execute bit of the Linux helpers.
+verifySupport.configure {
+    doLast {
+        boolean windowsHost = System.getProperty('os.name').toLowerCase().contains('windows')
+        Map<String, Integer> sizes = ['windows-x64': 240, 'windows-aarch64': 238, 'linux-x64': 236, 'linux-aarch64': 236]
+        sizes.each { String platform, Integer size ->
+            def (os, arch) = platform.tokenize('-')
+            List<String> files = jcefPayload(os, arch)
+            assert files.size() == size : "${platform} lists ${files.size()} files"
+            assert files == files.toUnique() && files == files.toSorted()
+            assert files.every { !it.startsWith('/') && !it.contains('\\') && !it.tokenize('/').any { part -> part in ['.', '..'] } }
+            String dir = os == 'windows' ? 'bin' : 'lib'
+            assert files.any { it.endsWith(os == 'windows' ? 'libcef.dll' : 'libcef.so') }
+            assert files.any { it.endsWith(os == 'windows' ? 'jcef_helper.exe' : 'jcef_helper') }
+            ['libcef', 'jcef_helper', 'icudtl.dat', 'resources.pak', 'v8_context_snapshot.bin', 'chrome_100_percent.pak',
+                'chrome_200_percent.pak', 'locales/en-US.pak'].each { String name ->
+                assert files.any { it.startsWith("${dir}/${name}") } : "${platform} lacks ${name}"
+            }
+            List<String> locales = files.findAll { it.startsWith("${dir}/locales/") }
+            assert locales.size() > 50 && locales.every { it.endsWith('.pak') }
+            assert files.every { !it.startsWith('#') && !it.isBlank() }
+        }
+        assert jcefPayload('linux', 'x64').containsAll(jcefLinuxHelpers) && jcefPayload('linux', 'aarch64').containsAll(jcefLinuxHelpers)
+        assert !jcefPayload('windows', 'x64').any { it.endsWith('/libcef.so') }
+        try {
+            jcefPayload('macos', 'aarch64')
+            assert false : 'macOS has no list: its Chromium is a framework'
+        } catch (GradleException expected) {
+            assert expected.message.contains('macos-aarch64.txt')
+        }
+
+        // The package check on a runtime folder built from a list: complete, then missing files named in one message.
+        File linuxHome = new File(temporaryDir, 'jcef-runtime-linux')
+        delete(linuxHome)
+        jcefPayload('linux', 'x64').each { new File(linuxHome, it).with { parentFile.mkdirs(); text = 'x' } }
+        if (!windowsHost) {
+            // jlink's files come without it; markJcefHelpersExecutable gives the helpers owner, group and other execute and
+            // leaves the other files alone.
+            String locked = jcefPayloadProblem(linuxHome, 'linux', 'x64')
+            assert locked != null && locked.contains('lib/jcef_helper') && locked.contains('lib/cef_server') && locked.contains('not executable')
+            markJcefHelpersExecutable(linuxHome)
+            jcefLinuxHelpers.each { String helper ->
+                File file = new File(linuxHome, helper)
+                assert file.canExecute()
+                assert java.nio.file.Files.getPosixFilePermissions(file.toPath())*.name().containsAll(
+                    ['OWNER_EXECUTE', 'GROUP_EXECUTE', 'OTHERS_EXECUTE'])
+            }
+            assert !new File(linuxHome, 'lib/libcef.so').canExecute()
+        }
+        markJcefHelpersExecutable(linuxHome)
+        assert jcefPayloadProblem(linuxHome, 'linux', 'x64') == null
+        assert new File(linuxHome, 'lib/libcef.so').delete() && new File(linuxHome, 'lib/locales/af.pak').delete()
+        String missing = jcefPayloadProblem(linuxHome, 'linux', 'x64')
+        assert missing.contains('lib/libcef.so') && missing.contains('lib/locales/af.pak') && missing.contains('2 of 236')
+        assert missing.contains(linuxHome.toString())
+        linuxHome.toPath().resolve('lib/locales').toFile().listFiles().each { it.delete() }
+        String many = jcefPayloadProblem(linuxHome, 'linux', 'x64')
+        assert many.contains('lib/libcef.so') && many.contains('and 201 more') && many.contains('221 of 236')
+        // Windows has no helper bit to check; a file of another architecture's list is missing from this one.
+        File windowsHome = new File(temporaryDir, 'jcef-runtime-windows')
+        delete(windowsHome)
+        jcefPayload('windows', 'aarch64').each { new File(windowsHome, it).with { parentFile.mkdirs(); text = 'x' } }
+        assert jcefPayloadProblem(windowsHome, 'windows', 'aarch64') == null
+        assert new File(windowsHome, 'bin/jcef_helper.exe').delete()
+        assert jcefPayloadProblem(windowsHome, 'windows', 'aarch64').contains('bin/jcef_helper.exe')
+        assert jcefPayloadProblem(windowsHome, 'windows', 'x64').contains('bin/dxil.dll') // another architecture's list
+        delete(linuxHome, windowsHome)
+        logger.lifecycle('Verified the JCEF payload lists and their package check')
+    }
+}
