@@ -40,12 +40,19 @@ public final class Contributions {
      */
     public enum Kind { ACTIONS, TOOLBAR, MENUS, STATUS, PANELS, RAIL, BADGES, SCOPES }
 
-    /** Where an action was invoked: the window, and the pane it concerns if the window has one. */
-    public record Invocation(UUID windowId, Optional<UUID> paneId) {
+    /**
+     * Where an action was invoked: the window, the pane it concerns if the window has one, and the web address selected
+     * there when it was chosen from a right-click menu's {@link MenuEntry.WebAddressItem} (browser plan 3b Task 6).
+     */
+    public record Invocation(UUID windowId, Optional<UUID> paneId, Optional<java.net.URI> webAddress) {
         public Invocation {
             Objects.requireNonNull(windowId, "windowId");
             Objects.requireNonNull(paneId, "paneId");
+            Objects.requireNonNull(webAddress, "webAddress");
         }
+
+        /** An invocation with no web address: from anywhere but a web-address item. */
+        public Invocation(UUID windowId, Optional<UUID> paneId) { this(windowId, paneId, Optional.empty()); }
     }
 
     private static final System.Logger LOG = System.getLogger(Contributions.class.getName());

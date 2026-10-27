@@ -8,7 +8,7 @@ and when a user installs the plugin's zip. The file may be at most 64 KiB.</p>
 name = "Example Tool"
 version = "1.2.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = "&gt;=0.23.0, &lt;0.24"
+sdk = "&gt;=0.24.0, &lt;0.25"
 description = "Runs the team's deploy checks from the command palette."
 vendor = "Example"
 homepage = "https://example.dev/tool"
@@ -35,7 +35,7 @@ summary = "Run the deploy checks for the current folder"</code></pre>
 <tr><td>{@code sdk}</td><td>string</td><td>yes</td><td>The SDK versions the plugin runs on, as a range (see <a href="#versions">Versions</a>). A plugin whose range excludes this Jasper's SDK does not load.</td></tr>
 <tr><td>{@code description}</td><td>string</td><td>no</td><td>Shown on the plugin's Overview tab in Settings › Plugins and matched by its search.</td></tr>
 <tr><td>{@code vendor}</td><td>string</td><td>no</td><td>Shown in the plugin list, its details and the review and install sheets ("From <i>vendor</i>").</td></tr>
-<tr><td>{@code capabilities}</td><td>array of strings</td><td>no</td><td>Each one of the twelve names in <a href="#capabilities">Capabilities</a>; an unknown name makes the manifest invalid. A user-installed plugin loads only after the user allows all of them.</td></tr>
+<tr><td>{@code capabilities}</td><td>array of strings</td><td>no</td><td>Each one of the thirteen names in <a href="#capabilities">Capabilities</a>; an unknown name makes the manifest invalid. A user-installed plugin loads only after the user allows all of them.</td></tr>
 <tr><td>{@code exports}</td><td>array of strings</td><td>no</td><td>Package names ({@code [a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)*}) other plugins may use. Each names exactly one package; a subpackage is exported only when it is listed too. {@code dev.jasper.sdk}, {@code dev.jasper.app}, {@code dev.jasper.terminal}, {@code dev.jasper.buddy}, {@code java}, {@code javax}, {@code jdk} and their subpackages are reserved. See <a href="#services">Services</a>.</td></tr>
 <tr><td>{@code requires}</td><td>array of tables</td><td>no</td><td>Other plugins this one uses; see <a href="#manifest-requires">below</a>.</td></tr>
 <tr><td>{@code icon}</td><td>string</td><td>no</td><td>The path of an {@code .svg} or {@code .png} file in the plugin's jars, at most 256 KiB. Another extension is logged and ignored; a missing, empty or larger file shows the generic plugin icon. See <a href="sdk-icons.md">plugin icons</a>.</td></tr>

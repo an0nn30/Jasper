@@ -71,7 +71,7 @@ lives in `internal.process.PtyChild` and an attached connection's in
 | `JediTermEngine` | Reader, emulator/display, protocol input, locked reset and vendor translation |
 | `BufferQueries`, `JediCellReader` | Locked buffer reads and vendor-free row capture; no Swing state |
 | `AbsoluteRowState` | Discard count and prompt rows coordinated with buffer mutations; volatile/atomic and copied publication for readers |
-| `ShellIntegrationFilter` | Streaming rewrite of OSC 7 and OSC 133 into `OSC 1341;jasper;…`, plus a `cursor-reset` command after DECSCUSR 0, across read-chunk boundaries; drops `q`-final CSI without a space intermediate |
+| `ShellIntegrationFilter` | Streaming rewrite of OSC 7 and OSC 133 into `OSC 1341;jasper;…`, a `link-target` command before each OSC 8, plus a `cursor-reset` command after DECSCUSR 0, across read-chunk boundaries; drops `q`-final CSI without a space intermediate |
 | `ShellCommandTracker` | Ordered shell marks, command text, cwd and monotonic duration |
 | `DirectoryProvenance` | Classifies OSC 7 reports and clicked `file:` links as local or remote and applies the local path mapper |
 | `LinkDetector`, `PathDetector` | Plain-text URLs and file paths in a soft-wrap-joined row |
@@ -119,11 +119,16 @@ A mouse event an earlier listener consumed, such as the application's pane drag,
 is not the terminal's: the view neither reports nor selects with it.
 Without reporting, the wheel scrolls the view three lines per notch, or sends Up/Down arrow
 keys on the alternate screen; on macOS a Shift-wheel is ignored.
-A Cmd-click (Ctrl-click elsewhere) opens the URL under the pointer in the browser;
-otherwise, once the application set `setFileLinkHandler`, it reports the path or
+A Cmd-click (Ctrl-click elsewhere) hands the URL under the pointer to the link opener
+as a `TerminalLink`, the desktop's browser unless the application set `setLinkOpener`; otherwise, once the
+application set `setFileLinkHandler`, it reports the path or
 local `file:` link there as a `FileLink`; otherwise it starts a selection. On macOS
 a Cmd-click stays local even while the program asks for mouse reports; on Linux and
 Windows a Ctrl-click is reported to such a program unless Shift is held.
+Adding Shift makes the `TerminalLink`'s gesture `SPLIT` instead of `OPEN`
+(`MouseRouting.linkGesture`); on Linux and Windows, while the program asks for reports, Shift is
+what keeps the click local, so the gesture stays `OPEN`. A path or `file:` link reaches
+the `FileLink` handler with no gesture: Shift does not split it.
 `internal.text.PathDetector` reads the soft-wrap-joined row, which `BufferQueries`
 captures under the buffer lock and matches after releasing it.
 
@@ -196,11 +201,14 @@ sequenceDiagram
 
 OSC 7 and 133 are rewritten because the pinned emulator swallows them. OSC 8
 links use the installed hyperlink filter: `http`, `https`, `ftp` and `mailto`
-targets open in the browser, a `file:` target that the OSC 7 host rule places on
-this machine is a file link, and other targets open nothing. CSI `q` lacking a space intermediate
+URIs go to the link opener, a `file:` URI that the OSC 7 host rule places on
+this machine is a file link, and other URIs open nothing. That filter sees only the URI, so the shell filter puts
+`OSC 1341;jasper;link-target;<name>` before each OSC 8, naming its `target=` parameter (empty when it has none or the
+OSC 8 ends a link), and an empty one after an OSC 8 that names one; the engine gives the name to the link the OSC 8
+opens, and a click reports it as `TerminalLink.target()`. The filter ends an OSC where JediTerm does, at BEL, `ESC \` or the C1 ST U+009C. CSI `q` lacking a space intermediate
 is dropped so XTVERSION/DECLL cannot override the configured cursor. DECSCUSR 0
 is followed by a cursor-reset command that restores the configured cursor. An OSC 7 or 133 sequence longer than 4096
-held characters passes through unrewritten. Keep split-chunk parsing and payload
+held characters passes through unrewritten, and an OSC 8 that long has an empty `link-target`. Keep split-chunk parsing and payload
 bounds. Do not infer a command's duration from session exit; commands run inside
 one long-lived shell session.
 
@@ -277,7 +285,7 @@ directory.
 | Exit future | Local: completes with the exit code after output ends, the child wait and the `[process exited with code N]` line's rendering into the buffer. Attached: completes with the connection's status, or exceptionally after a transport failure or without a status; no exit line. Continuation thread unspecified |
 | Attached I/O | Reader thread reads `output`; one writer thread delivers writes (each flushed) and resizes; callers only enqueue |
 | Foreground process lookup | Query off EDT; caller rejects stale results |
-| Browser | Shared lazy worker, queue capacity 8; fixed logs, no raw target in logs |
+| Browser | Shared lazy worker, queue capacity 8; fixed logs, no raw address in logs |
 | Child creation/waiting | Startup off EDT; close starts bounded asynchronous native cleanup |
 | Named threads | `jasper-session-reader` (daemon, one per session), `jasper-session-writer` (daemon, one per attached session), `jasper-terminal-search` (daemon, one per view, idles out after a second), `jasper-terminal-browser` (daemon, shared), `jasper-pty-close` (non-daemon, so closing the last window cannot end the JVM before the force-kill fallback) |
 

@@ -355,7 +355,7 @@ public final class TunnelsUi implements AutoCloseable {
     private boolean taken(String name) { return store.tunnels().stream().anyMatch(tunnel -> tunnel.name().equalsIgnoreCase(name)); }
 
     private void browse(Tunnel tunnel) {
-        TunnelRows.browseUri(tunnel, manager.state(tunnel.id())).ifPresent(uri -> context.platform().browse(uri));
+        TunnelRows.browseUri(tunnel, manager.state(tunnel.id())).ifPresent(uri -> context.platform().openInBrowser(uri));
     }
 
     private void copyAddress(Tunnel tunnel) {

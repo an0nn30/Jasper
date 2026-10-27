@@ -4,10 +4,12 @@ package dev.jasper.terminal.internal.shell;
  * Rewrites the shell-integration sequences JediTerm ignores into its OSC 1341 custom commands,
  * which JediTerm hands to {@code TerminalCustomCommandListener}s in emulator order:
  * <pre>
- *   OSC 7 ; data ST        →  OSC 1341 ; jasper ; cwd ; data BEL
- *   OSC 133 ; data ST      →  OSC 1341 ; jasper ; mark ; data BEL
- *   CSI 0 SP q, CSI SP q   →  unchanged, then OSC 1341 ; jasper ; cursor-reset BEL
- *   CSI ... q without SP   →  dropped
+ *   OSC 7 ; data ST          →  OSC 1341 ; jasper ; cwd ; data BEL
+ *   OSC 133 ; data ST        →  OSC 1341 ; jasper ; mark ; data BEL
+ *   OSC 8 ; params ; uri ST  →  OSC 1341 ; jasper ; link-target ; target BEL, then unchanged, then
+ *                               OSC 1341 ; jasper ; link-target ; BEL when target is not empty
+ *   CSI 0 SP q, CSI SP q     →  unchanged, then OSC 1341 ; jasper ; cursor-reset BEL
+ *   CSI ... q without SP     →  dropped
  * </pre>
  * The last rule is a guard rather than an integration: only {@code CSI ... SP q} is DECSCUSR, but
  * JediTerm reads every CSI ending in {@code q} as one, so the XTVERSION query {@code CSI > q} that
@@ -15,14 +17,27 @@ package dev.jasper.terminal.internal.shell;
  * outrank the configured shape for the rest of the session. JediTerm answers none of these queries,
  * so dropping them costs nothing.
  * <p>
- * Everything else passes through unchanged. Reader thread only.
+ * JediTerm's hyperlink filter sees only an OSC 8's URI, so every OSC 8 is preceded by the {@code target} its
+ * {@code key=value} parameters (separated by {@code :}) name, for the engine to give the link it opens. The target is
+ * empty when the OSC 8 opens no link (an empty URI ends one), names none, or names one that {@link #isLinkTarget}
+ * refuses; an OSC 8 longer than 4096 held characters, or abandoned before its terminator, passes through unchanged
+ * after an empty one. An OSC 8 that names a target is followed by an empty one too, so a target the filter names is
+ * set only while JediTerm reads its OSC 8, and only the link that OSC 8 opens can take it.
+ * <p>
+ * ST is {@code ESC \} or the C1 string terminator U+009C: JediTerm ends an OSC at either, and at BEL, so each sequence
+ * the filter holds ends where JediTerm ends it. Everything else passes through unchanged. Reader thread only.
  */
 public final class ShellIntegrationFilter {
     public static final String PREFIX = "\033]1341;jasper;";
+    /** The command naming the target of the OSC 8 that follows it; empty when it has none. */
+    public static final String LINK_TARGET = "link-target";
 
     private static final char ESC = '\033';
     private static final char BEL = '\007';
+    private static final char C1_ST = (char) 0x9C;
     private static final int MAX_HELD = 4096;
+    private static final int MAX_LINK_TARGET = 256;
+    private static final String TARGET_PARAMETER = "target=";
 
     /** Streaming parser states retained across read-chunk boundaries. */
     private enum State { TEXT, ESCAPE, OSC_NUMBER, OSC_DATA, OSC_DATA_ESCAPE, CSI }
@@ -73,11 +88,11 @@ public final class ShellIntegrationFilter {
                 if (c >= '0' && c <= '9') {
                     oscNumber.append(c);
                     String number = oscNumber.toString();
-                    if (!"7".startsWith(number) && !"133".startsWith(number)) {
+                    if (!"7".startsWith(number) && !"133".startsWith(number) && !"8".startsWith(number)) {
                         pass(out);
                     }
-                } else if (c == ';' && (isNumber("7") || isNumber("133"))) {
-                    command = isNumber("7") ? "cwd" : "mark";
+                } else if (c == ';' && (isNumber("7") || isNumber("133") || isNumber("8"))) {
+                    command = isNumber("7") ? "cwd" : isNumber("133") ? "mark" : LINK_TARGET;
                     dataStart = held.length();
                     state = State.OSC_DATA;
                 } else {
@@ -85,7 +100,7 @@ public final class ShellIntegrationFilter {
                 }
             }
             case OSC_DATA -> {
-                if (c == BEL) {
+                if (c == BEL || c == C1_ST) {
                     complete(out, held.substring(dataStart, held.length() - 1));
                 } else if (c == ESC) {
                     state = State.OSC_DATA_ESCAPE;
@@ -129,12 +144,46 @@ public final class ShellIntegrationFilter {
     }
 
     private void complete(StringBuilder out, String data) {
-        out.append(PREFIX).append(command).append(';').append(data).append(BEL);
+        if (isHyperlink()) {
+            String target = linkTarget(data);
+            out.append(PREFIX).append(LINK_TARGET).append(';').append(target).append(BEL).append(held);
+            if (!target.isEmpty()) out.append(PREFIX).append(LINK_TARGET).append(';').append(BEL);
+        } else {
+            out.append(PREFIX).append(command).append(';').append(data).append(BEL);
+        }
         reset();
     }
 
-    /** Not one of ours: release the held characters unchanged, keeping a trailing ESC as a possible new start. */
+    private boolean isHyperlink() {
+        return LINK_TARGET.equals(command);
+    }
+
+    /**
+     * The target an OSC 8 names for the link it opens, or empty. It opens one only when a URI follows its parameters,
+     * read as JediTerm reads it: up to the next {@code ;}.
+     */
+    private static String linkTarget(String data) {
+        int parametersEnd = data.indexOf(';');
+        boolean opens = parametersEnd >= 0 && parametersEnd + 1 < data.length() && data.charAt(parametersEnd + 1) != ';';
+        if (!opens) return "";
+        String target = "";
+        for (String parameter : data.substring(0, parametersEnd).split(":")) {
+            if (parameter.startsWith(TARGET_PARAMETER)) target = parameter.substring(TARGET_PARAMETER.length());
+        }
+        return isLinkTarget(target) ? target : "";
+    }
+
+    /** Whether a name can be an OSC 8 link's target: 1 to 256 characters with no control character, as the SDK's WebLink requires. */
+    public static boolean isLinkTarget(String name) {
+        return !name.isEmpty() && name.length() <= MAX_LINK_TARGET && name.chars().noneMatch(Character::isISOControl);
+    }
+
+    /**
+     * Not one of ours: release the held characters unchanged, keeping a trailing ESC as a possible new start. An OSC 8
+     * released this way still reaches JediTerm as a link, so an empty target goes ahead of it.
+     */
     private void pass(StringBuilder out) {
+        if (isHyperlink()) out.append(PREFIX).append(LINK_TARGET).append(';').append(BEL);
         int last = held.length() - 1;
         if (last > 0 && held.charAt(last) == ESC) {
             out.append(held, 0, last);

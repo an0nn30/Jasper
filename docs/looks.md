@@ -102,7 +102,7 @@ id = "dev.example.harbour"
 name = "Harbour"
 version = "1.0.0"
 entry = "dev.example.harbour.HarbourPlugin"
-sdk = ">=0.23.0, <0.24"
+sdk = ">=0.24.0, <0.25"
 capabilities = ["presentation.provide"]
 presentation = "presentation/harbour.kit.toml"
 themes = ["themes/harbour.json"]
@@ -187,7 +187,7 @@ The base gives every key its starting value (the columns below) and also decides
 | `status_bar` | `segments`, `cells` | `segments` | `cells` | Slash-separated segments, or ruled cells. |
 | `palette` | `anchored`, `run_window` | `anchored` | `run_window` | The command palette card under the title field, or the Run window, which opens centred across the upper part of the workspace until it has a saved place, with **▶ Run…** leading the status bar ([the Run window](command-palette.md#the-run-window)). |
 | `dialogs` | `as_requested`, `classic` | `as_requested` | `classic` | Dialogs as each one asks ([`DialogSpec.Presentation`](sdk-reference.html#dev.jasper.sdk.ui.DialogSpec.Presentation)), or overlay and attached-sheet dialogs drawn inside their window as classic dialogs. |
-| `motion` | `standard`, `none` | `standard` | `none` | Motion as `ui.animations.enabled` says, or none in the windows; `none` hides that setting. The [Meadow splash](#branding)'s turtle follows the setting under either value. |
+| `motion` | `standard`, `none` | `standard` | `none` | Motion as `ui.animations.enabled` says, or none in the windows; `none` hides that setting. The [fallback splash](#branding)'s turtle follows the setting under either value. |
 | `icons` | `new_ui`, `classic` | `new_ui` | `classic` | The workspace chrome's icons: the New UI artwork, or IntelliJ's classic icons. `classic` draws them for add, split, maximize, settings, new window and search in each window's header and status bar, in tool window headers and in plugins' toolbar views (the New UI artwork for the rest, and a panel's or window's body keeps its own), and on a labelled stripe draws IntelliJ's classic tool-window icons for `network`, `folder`, `tunnel`, `download`, `server` and `bell` and any other icon as a monochrome glyph in the label's colour (an identity name such as `more.vertical` keeps its authored art). Under `new_ui` a stripe label draws what the icon rails draw. |
 | `toolbar_search` | `field`, `icon` | `field` | `field` | Under a `native` or `classic` title bar: the toolbar's "Search everywhere" field with the palette's shortcut, or IntelliJ Classic's **Search Everywhere** button, an icon-only magnifier before **Settings…** whose tooltip names the palette's shortcut, icon-only in every `window.toolbar` mode. Either opens the palette. `icon` needs `palette = "run_window"` and `title_bar = "native"` or `"classic"`. |
 
@@ -381,9 +381,11 @@ The splash art must be an `svg` document without a DOCTYPE, processing instructi
 fragments in the file, `\` or `@` in an attribute value or a `<style>` element, or nesting deeper than 128 elements.
 
 A look without `[branding]`, such as the default look or Enterprise, keeps Jasper's Shell Prompt icon and shows
-Jasper's Meadow splash, the same in every theme: a meadow landscape with the Desk Buddy turtle, "Jasper", "Make
-yourself at 127.0.0.1", the version, the step and "Your infrastructure. One workspace.", over a moss progress bar. The
-turtle is animated unless `ui.animations.enabled = false`, whatever the look's `motion` says.
+a still landscape and turtle illustration for the saved interface theme active at startup: Jasper Meadow, Slate
+Cobalt, Ubuntu Yaru or one of Catppuccin's four flavours. Custom themes and Desktop colors use Meadow art. A theme
+change chooses new artwork on the next launch. Runtime text shows "Jasper", "Make yourself at 127.0.0.1", the version,
+the step and "Your infrastructure. One workspace.", above the progress bar. If an illustration cannot be drawn, the
+original Meadow splash draws instead; its turtle is animated unless `ui.animations.enabled = false`.
 
 ### Messages
 

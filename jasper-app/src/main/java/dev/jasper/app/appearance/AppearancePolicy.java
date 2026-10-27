@@ -1,15 +1,15 @@
-package dev.jasper.app.application;
+package dev.jasper.app.appearance;
 
 import dev.jasper.app.config.AppearanceMode;
 import dev.jasper.app.platform.SystemAppearance;
 
 /** One rule for start-up, saved configuration and OS observations: the UI variant for {@code ui.appearance}. */
-final class AppearancePolicy {
+public final class AppearancePolicy {
     private static final System.Logger LOG = System.getLogger(AppearancePolicy.class.getName());
     private AppearancePolicy() { }
 
     /** Whether the UI is Dark: the chosen variant, or with {@code SYSTEM} the operating system's, Dark when unknown. */
-    static boolean dark(AppearanceMode mode, SystemAppearance.Observation observation) {
+    public static boolean dark(AppearanceMode mode, SystemAppearance.Observation observation) {
         return switch (mode) {
             case DARK -> true;
             case LIGHT -> false;

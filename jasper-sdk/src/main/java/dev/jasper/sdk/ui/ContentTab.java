@@ -69,7 +69,7 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      * every tab when {@code window} is closed.
      *
      * @param window the window to move the tab to
-     * @since 0.23.0
+     * @since 0.24.0
      */
     void moveToWindow(dev.jasper.sdk.terminal.WindowHandle window);
     /**

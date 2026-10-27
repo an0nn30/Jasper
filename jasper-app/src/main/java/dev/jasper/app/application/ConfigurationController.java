@@ -1,5 +1,6 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.appearance.AppearancePolicy;
 import dev.jasper.app.config.KeyBindings;
 import java.util.Map;
 import java.util.Optional;

@@ -4,7 +4,8 @@ import java.util.List;
 
 /**
  * The capability names a plugin declares in {@code plugin.toml} and the user consents to. They cover effects the user
- * cannot see, and the roles one plugin at a time may take over ({@code editor.provide}, {@code presentation.provide});
+ * cannot see, and the roles one plugin at a time may take over ({@code editor.provide}, {@code browser.provide},
+ * {@code presentation.provide});
  * contributions to the window need none. They are not a sandbox.
  */
 public final class Capabilities {
@@ -66,9 +67,15 @@ public final class Capabilities {
      * @since 0.18.0
      */
     public static final String PRESENTATION_PROVIDE = "presentation.provide";
+    /**
+     * Being the web browser Jasper opens web addresses with, through {@code Platform.browser}.
+     *
+     * @since 0.23.0
+     */
+    public static final String BROWSER_PROVIDE = "browser.provide";
     /** Every capability this SDK version knows. */
     public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE, FILES_SOURCE, NETWORK_LISTEN, CLIPBOARD_READ,
-        TERMINAL_ENVIRONMENT, EDITOR_PROVIDE, PRESENTATION_PROVIDE);
+        TERMINAL_ENVIRONMENT, EDITOR_PROVIDE, PRESENTATION_PROVIDE, BROWSER_PROVIDE);
 
     private Capabilities() { }
 }

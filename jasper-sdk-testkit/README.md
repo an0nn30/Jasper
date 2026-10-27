@@ -84,7 +84,8 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `invoke(actionId, windowId, paneIdOrNull)` | Runs an action as a window would; false when it is disabled or unknown |
 | `toolbar()` | The plugin toolbar section as `button:<id>`, `menu:<title>:<id>,<id>` and `view` |
 | `toolbarViews(windowId)`, `closeToolbarViews(windowId)` | Builds a window's toolbar views, as the window does when it opens; closes them, as closing the window does |
-| `menu(target)` | One menu's contributed entries (`FILE`, `EDIT`, `VIEW`, `TAB`, `TOOLS`, `SESSION`, `TRANSFER`, `context` or `top:<menuId>`) as `item:<id>`, `---` and `submenu:<title>` lines, children indented, sections separated by `===` |
+| `menu(target)` | One menu's contributed entries (`FILE`, `EDIT`, `VIEW`, `TAB`, `TOOLS`, `SESSION`, `TRANSFER`, `context` or `top:<menuId>`) as `item:<id>`, `web-address:<id>` (an `addForWebAddress` item), `---` and `submenu:<title>` lines, children indented, sections separated by `===` |
+| `contextMenu(paneId)`, `chooseFromContextMenu(paneId, actionId)` | The terminal context menu's model lines for a pane, as `menu("context")` lists them (empty submenus and separators included), with each `web-address:<id>` line present only while the pane's selection (`setSelection`) is one web address; runs the action of the first item listed there for it, for that pane, and only a `web-address` item gives the handler the address as `webAddress()`; false when none is listed |
 | `status()`, `progress()` | Visible status items as `id\|side\|text\|tooltip\|actionId`; visible progress states by id |
 | `rail()` | Rail buttons' action ids |
 | `panels()` | Registered panels as `id\|title\|ANCHOR`, with `+split` for a panel that starts in the second half and `\|<action id>` for one that names its own toggle |
@@ -126,8 +127,9 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `queueFileChoice(list)`, `fileChoices()` | What the next `Windows.choose` returns; every choice asked for |
 | `queueFileSelection(path)`, `queuePathSelection(list)`, `duringPathSelection(action)` | What the next file, folder or save chooser returns (an empty value cancels); something to run while it is open |
 | `clipboard()` | The `FakeClipboard` every plugin's `Platform` writes to |
-| `browsed()`, `openedInEditor()` | Addresses plugins opened in the browser; files opened in an editor that no provided editor took |
-| `edit(file, line, windowId)`, `editorPlugin()`, `declareBundled(id)` | Opens a file as Jasper's own opens do, through the editor a plugin provides; which plugin provides it; marks a plugin as bundled before it starts, so its editor replaces another's |
+| `browsed()`, `openedInEditor()` | Addresses that reached the system browser (each `browse`, and each `openInBrowser` no provided browser took); files opened in an editor that no provided editor took |
+| `edit(file, line, windowId)`, `editorPlugin()`, `declareBundled(id)` | Opens a file as Jasper's own opens do, through the editor a plugin provides; which plugin provides it; marks a plugin as bundled before it starts, so its editor and browser replace another's |
+| `openLink(address, origin, placement, target, windowId)`, `browserPlugin()` | Opens a web link as Jasper's own routes do (a clicked terminal link is `LinkOrigin.CLICK`, an address given to `jasper` is `EXTERNAL`), through the browser a plugin provides, and answers what it answered; which plugin provides it |
 | `setCommandClient(path)` | What `CommandLine.client()` returns |
 | `declareSubcommand(pluginId, name, summary)`, `call(name, arguments, workingDirectory[, paneId])` | Declares a subcommand as `[[subcommands]]` would, before the plugin starts; calls it as `jasper <name> …` would and returns a `FakeCommandCall` |
 

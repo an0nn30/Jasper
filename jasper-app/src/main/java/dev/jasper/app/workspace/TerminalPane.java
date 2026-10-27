@@ -668,7 +668,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         closedHook.run();
         if (findBar != null) findBar.dispose();
         if (view != null) {
-            view.setShortcutHandler(null); view.setContextMenuHandler(null); view.setFileLinkHandler(null); view.setOnCloseRequest(() -> {});
+            view.setShortcutHandler(null); view.setContextMenuHandler(null); view.setFileLinkHandler(null); view.setLinkOpener(null); view.setOnCloseRequest(() -> {});
         }
         if (attempt != null) attempt.cancel();
         droppedTimer.stop();

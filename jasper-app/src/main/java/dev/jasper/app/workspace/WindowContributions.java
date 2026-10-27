@@ -144,6 +144,22 @@ final class WindowContributions implements AutoCloseable {
     /** The window's action for a contributed id, or null when the contributor removed it. */
     Action action(String id) { return actions.get(id); }
 
+    /**
+     * For a right-click menu's web-address item (browser plan 3b Task 6): the contributed action, titled and enabled as the
+     * window's own is when the menu is built, invoked with the web address the menu found selected; null when the
+     * contributor removed it.
+     */
+    Action action(String id, java.net.URI webAddress) {
+        Action own = actions.get(id);
+        if (own == null) return null;
+        Action action = new AbstractAction((String) own.getValue(Action.NAME)) {
+            @Override public void actionPerformed(ActionEvent event) { invoke(id, Optional.of(webAddress)); }
+        };
+        for (String key : new String[]{Action.SMALL_ICON, Action.ACCELERATOR_KEY}) action.putValue(key, own.getValue(key));
+        action.setEnabled(own.isEnabled());
+        return action;
+    }
+
     /** Contributed actions in registration order, which is plugin load order: the keybinding precedence. */
     List<KeyBindings.Extension> extensions() {
         List<KeyBindings.Extension> result = new ArrayList<>();
@@ -187,11 +203,14 @@ final class WindowContributions implements AutoCloseable {
     }
 
     /** From a shortcut, the palette, a menu, the toolbar or a status item. */
-    void invoke(String id) {
+    void invoke(String id) { invoke(id, Optional.empty()); }
+
+    /** As {@link #invoke(String)}; a right-click menu's web-address item gives the address it was chosen with. */
+    private void invoke(String id, Optional<java.net.URI> webAddress) {
         if (dev.jasper.app.platform.WindowInput.blocked(owner)) return;
         if (owner.closed() || owner.commandPalette() != null && owner.commandPalette().blocksActions()) return;
         Optional<java.util.UUID> pane = Optional.ofNullable(owner.currentPane()).map(TerminalPane::id);
-        model.action(id).ifPresent(entry -> entry.invoke(new Contributions.Invocation(owner.id(), pane)));
+        model.action(id).ifPresent(entry -> entry.invoke(new Contributions.Invocation(owner.id(), pane, webAddress)));
     }
 
     /** Whether the contributed action exists and is enabled, so its shortcut takes the key. */

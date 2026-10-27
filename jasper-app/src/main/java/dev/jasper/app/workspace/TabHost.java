@@ -5,6 +5,7 @@ import dev.jasper.app.config.TabNames;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.terminal.view.FileLink;
+import dev.jasper.terminal.view.TerminalLink;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
@@ -12,9 +13,9 @@ import java.util.UUID;
 import javax.swing.KeyStroke;
 
 /**
- * One window's side of the terminal tabs it shows (workspace tabs spec 9.3): the shortcut, context-menu and file-link
- * handlers a pane's view gets, the window its activity and terminal-registry facts report from, the window's theme and
- * opacity, and focus. A tab moving to another window is detached from this host and attached to the next window's; its
+ * One window's side of the terminal tabs it shows (workspace tabs spec 9.3): the shortcut, context-menu, file-link and
+ * link handlers a pane's view gets, the window its activity and terminal-registry facts report from, the window's
+ * theme and opacity, and focus. A tab moving to another window is detached from this host and attached to the next window's; its
  * session is never touched (spec 2.3). A "go to" callback selects its tab through the registry when it runs, so it
  * follows the tab to whichever window holds it then. EDT only.
  */
@@ -149,7 +150,7 @@ final class TabHost {
         pane.setShellExitBehavior(configured.terminal().onExit());
     }
 
-    /** The view's shortcut, context-menu and file-link handlers, and its launch focus, go to this window. */
+    /** The view's shortcut, context-menu, file-link and link handlers, and its launch focus, go to this window. */
     private void bind(Tab tab, TerminalPane pane) {
         pane.allowLaunchFocus = () -> owner.commandPalette() == null || !owner.commandPalette().blocksActions();
         pane.view().setShortcutHandler(event -> owner.dispatchShortcut(KeyStroke.getKeyStrokeForEvent(event), pane.view()));
@@ -158,6 +159,17 @@ final class TabHost {
             owner.chrome().contextMenu().show(pane.view(), event.getX(), event.getY());
         });
         pane.view().setFileLinkHandler(link -> openFileLink(pane, link));
+        pane.view().setLinkOpener(link -> openLink(tab, pane, link));
+    }
+
+    /**
+     * A link clicked in {@code pane} (browser plan 3b, Review Focus 1): its tab becomes the window's active tab and its
+     * group the active group at once, as focus going into the pane makes them, since the focus events of the click arrive
+     * later and a split click splits the pane clicked; then the window's {@code onOpenLink} hears it with the pane's shape.
+     */
+    private void openLink(Tab tab, TerminalPane pane, TerminalLink link) {
+        owner.tabFocused(tab);
+        owner.onOpenLink.accept(new LinkClick(link, pane.getWidth() > pane.getHeight()));
     }
 
     private static void unwire(TerminalPane pane) {
@@ -176,18 +188,19 @@ final class TabHost {
         pane.allowLaunchFocus = () -> true;
         if (pane.view() != null) {
             pane.view().setShortcutHandler(null); pane.view().setContextMenuHandler(null); pane.view().setFileLinkHandler(null);
+            pane.view().setLinkOpener(null);
         }
     }
 
     /**
      * A Cmd-click on a file in {@code pane}: resolved against the pane's local directory and given to the window's
-     * {@code onOpenFile}. A provided session, or a shell that reports a directory on another host, opens nothing.
+     * {@code onOpenClickedFile}. A provided session, or a shell that reports a directory on another host, opens nothing.
      */
     private void openFileLink(TerminalPane pane, FileLink link) {
         Optional<Path> local = pane.localDirectory();
         if (local.isEmpty()) return;
         FileLinks.resolve(link.path(), local, Path.of(System.getProperty("user.home")),
                 System.getProperty("os.name", "").startsWith("Windows"), pane.wsl())
-            .ifPresent(file -> owner.onOpenFile.accept(file, link.line()));
+            .ifPresent(file -> owner.onOpenClickedFile.accept(file, link.line()));
     }
 }

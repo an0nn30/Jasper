@@ -269,7 +269,9 @@ ext.runAotTraining = { File launcher, File work, Long settleSeconds, Long exitSe
             }
             if (settled?.settled == true) {
                 problem = trainingTraceProblem(settled, process.pid())
-                break
+                // A start slower than the trace's 10 s cap settles before its milestones, and Jasper rewrites the
+                // trace as each one arrives: wait for them until the deadline.
+                if (problem == null || !problem.startsWith('start-up settled without') || System.nanoTime() > deadline) break
             }
             if (!process.isAlive()) throw new GradleException("AOT training: Jasper exited (${process.exitValue()}) before start-up settled\n${tail()}")
             if (System.nanoTime() > deadline) throw new GradleException("AOT training: start-up did not settle within ${settleSeconds} s\n${tail()}")

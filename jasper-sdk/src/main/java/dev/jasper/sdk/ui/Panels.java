@@ -42,7 +42,7 @@ public interface Panels {
      * @param window the window whose dock shows the panel
      * @throws IllegalArgumentException when the panel is not registered by this plugin
      * @throws IllegalStateException when the context is closed or the caller is off the UI thread
-     * @since 0.23.0
+     * @since 0.24.0
      */
     void show(String panelId, WindowHandle window);
 }

@@ -65,7 +65,7 @@ import javax.swing.JComponent;
  * registration happens on the UI thread through an open context, and handlers are contained.
  */
 final class HostedUi {
-    private record Context(WindowHandle window, Optional<PaneHandle> pane) implements ActionContext { }
+    private record Context(WindowHandle window, Optional<PaneHandle> pane, Optional<java.net.URI> webAddress) implements ActionContext { }
 
     private volatile dev.jasper.app.appearance.ResolvedTheme appearanceSnapshot;
     private final List<Consumer<Variant>> themeHandlers = new ArrayList<>();
@@ -261,7 +261,8 @@ final class HostedUi {
                 invocation -> containment.run(pluginId, "action " + spec.id(), () -> {
                     String previous = running;
                     running = spec.id();
-                    try { handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle))); }
+                    try { handler.accept(new Context(terminals.windowHandle(invocation.windowId()),
+                        invocation.paneId().map(terminals::paneHandle), invocation.webAddress())); }
                     finally { running = previous; }
                 }));
             ownActions.add(spec.id());

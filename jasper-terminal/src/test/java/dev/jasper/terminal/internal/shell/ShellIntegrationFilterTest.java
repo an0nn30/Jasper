@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ShellIntegrationFilterTest {
     private static final String P = ShellIntegrationFilter.PREFIX;
+    private static final String C1_ST = String.valueOf((char) 0x9C);
 
     @Test
     void plainTextPassesThrough() {
@@ -30,8 +31,97 @@ class ShellIntegrationFilterTest {
 
     @Test
     void otherOscSequencesPassUnchanged() {
-        String input = "\033]0;title\007\033]1341;other\007\033]13;x\007\033]8;;http://a\007link\033]8;;\007";
+        String input = "\033]0;title\007\033]1341;other\007\033]13;x\007\033]80;x\007";
         assertThat(run(input)).isEqualTo(input);
+    }
+
+    /** JediTerm's hyperlink filter sees only an OSC 8's URI, so the link's {@code target} parameter goes ahead of it. */
+    @Test
+    void anOsc8LinkIsPrecededByItsTarget() {
+        String input = "\033]8;id=1:target=docs;https://e.com\033\\";
+        String expected = "\033]1341;jasper;link-target;docs\007\033]8;id=1:target=docs;https://e.com\033\\"
+            + "\033]1341;jasper;link-target;\007";
+
+        assertThat(run(input)).isEqualTo(expected);
+        assertThat(runOneCharAtATime(input)).isEqualTo(expected);
+    }
+
+    @Test
+    void anOsc8LinkWithoutATargetClearsThePendingOne() {
+        String input = "\033]8;;https://e.com\007";
+        String expected = "\033]1341;jasper;link-target;\007\033]8;;https://e.com\007";
+
+        assertThat(run(input)).isEqualTo(expected);
+        assertThat(runOneCharAtATime(input)).isEqualTo(expected);
+    }
+
+    @Test
+    void aTargetWithAControlCharacterOrOver256CharactersIsDropped() {
+        assertThat(run("\033]8;target=" + "x".repeat(257) + ";https://e.com\007")).startsWith("\033]1341;jasper;link-target;\007");
+        assertThat(run("\033]8;target=a\001b;https://e.com\007")).startsWith("\033]1341;jasper;link-target;\007");
+    }
+
+    @Test
+    void aTargetOf256CharactersIsKept() {
+        String target = "x".repeat(256);
+        assertThat(run("\033]8;target=" + target + ";https://e.com\007")).startsWith(P + "link-target;" + target + "\007\033]8;");
+    }
+
+    @Test
+    void anOsc8ThatEndsALinkIsPrecededByAnEmptyTarget() {
+        String input = "\033]8;target=docs;https://e.com\007a\033]8;target=docs;\007b";
+        String expected = P + "link-target;docs\007\033]8;target=docs;https://e.com\007" + P + "link-target;\007a"
+            + P + "link-target;\007\033]8;target=docs;\007b";
+
+        assertThat(run(input)).isEqualTo(expected);
+        assertThat(runOneCharAtATime(input)).isEqualTo(expected);
+    }
+
+    @Test
+    void osc8LinksSplitAcrossReadsKeepTheirOwnTargets() {
+        String input = "x\033]8;target=one;https://a.example\033\\A\033]8;;\033\\ \033]8;target=two;https://b.example\007B\033]8;;\007y";
+        String expected = "x" + P + "link-target;one\007\033]8;target=one;https://a.example\033\\" + P + "link-target;\007A"
+            + P + "link-target;\007\033]8;;\033\\ "
+            + P + "link-target;two\007\033]8;target=two;https://b.example\007" + P + "link-target;\007B"
+            + P + "link-target;\007\033]8;;\007y";
+
+        assertThat(run(input)).isEqualTo(expected);
+        assertThat(runOneCharAtATime(input)).isEqualTo(expected);
+    }
+
+    /**
+     * JediTerm also ends an OSC at the C1 string terminator U+009C. An OSC 8 the filter read past it would name a target
+     * for a link JediTerm never opens, which the next OSC 8 the filter does not see (such as {@code OSC 08}) would take.
+     */
+    @Test
+    void anOsc8EndsAtTheC1StringTerminatorAsInJediTerm() {
+        String ended = "\033]8;target=evil;" + C1_ST + "\007";
+        String endedInItsParameters = "\033]8;id=" + C1_ST + ":target=evil;https://x.example\007";
+        String opened = "\033]8;target=docs;https://e.com" + C1_ST + "z";
+
+        assertThat(run(ended)).isEqualTo(P + "link-target;\007" + ended);
+        assertThat(runOneCharAtATime(ended)).isEqualTo(P + "link-target;\007" + ended);
+        assertThat(run(endedInItsParameters)).isEqualTo(P + "link-target;\007" + endedInItsParameters);
+        assertThat(run(opened)).isEqualTo(P + "link-target;docs\007\033]8;target=docs;https://e.com" + C1_ST
+            + P + "link-target;\007z");
+        assertThat(runOneCharAtATime(opened)).isEqualTo(run(opened));
+    }
+
+    @Test
+    void osc7WithTheC1StringTerminatorBecomesACwdCommand() {
+        assertThat(run("\033]7;file:///x" + C1_ST + "y")).isEqualTo(P + "cwd;file:///x\007y");
+    }
+
+    @Test
+    void anOverlongOsc8PassesUnchangedAfterAnEmptyTarget() {
+        String input = "\033]8;target=docs;https://e.com/" + "x".repeat(5000) + "\007";
+        assertThat(run(input)).isEqualTo(P + "link-target;\007" + input);
+    }
+
+    @Test
+    void anAbandonedOsc8PassesUnchangedAfterAnEmptyTarget() {
+        String input = "\033]8;target=docs;https://e.com\033[0mc";
+        assertThat(run(input)).isEqualTo(P + "link-target;\007" + input);
     }
 
     @Test

@@ -258,10 +258,22 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public java.util.function.BooleanSupplier anyWindowActive = () -> true;
     /**
      * A Cmd-click (Ctrl-click elsewhere) named a file in one of this window's local panes: the resolved path, and the
-     * line written after it, 0 for none. The application checks the file off the EDT and opens it; by default nothing
-     * opens. EDT.
+     * line written after it, 0 for none. The application checks the file off the EDT and opens it, offering a web page to
+     * the browser first (browser plan 3b); by default nothing opens. EDT.
+     */
+    public java.util.function.BiConsumer<Path, Integer> onOpenClickedFile = (file, line) -> { };
+    /**
+     * File › Open File… chose a file: the path, and 0 for no line. The application checks the file off the EDT and opens
+     * it in the Default editor; by default nothing opens. EDT.
      */
     public java.util.function.BiConsumer<Path, Integer> onOpenFile = (file, line) -> { };
+    /**
+     * A Cmd-click (Ctrl-click elsewhere) or a split click opened a URL in one of this window's panes: the link as the
+     * terminal read it, an {@code http}, {@code https} or {@code ftp} URL or an OSC 8 {@code mailto} link, which may not
+     * parse as a URI, with its gesture, its OSC 8 target and whether the clicked pane is wider than it is tall. The clicked
+     * pane is the active one by then. The application opens it; by default nothing opens. EDT.
+     */
+    public java.util.function.Consumer<LinkClick> onOpenLink = click -> { };
     /**
      * File › Open File…'s chooser: given the active pane's folder, the file the person chose, or empty when they cancelled.
      * The application shows its file chooser over this window; by default nothing is chosen. EDT.
@@ -2840,7 +2852,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
-        onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; fileChooser = folder -> java.util.Optional.empty();
+        onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; onOpenClickedFile = (file, line) -> {}; onOpenLink = click -> {}; fileChooser = folder -> java.util.Optional.empty();
         onLayoutChanged = () -> {};
         activityListeners.clear();
         anyWindowActive = () -> false;

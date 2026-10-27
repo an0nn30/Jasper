@@ -18,6 +18,7 @@ final class Capabilities {
             case "terminal.environment" -> "Set environment variables in new terminal shells";
             case "editor.provide" -> "Open the files Jasper opens for editing";
             case "presentation.provide" -> "Change Jasper's window chrome and controls after a restart";
+            case "browser.provide" -> "Open the web addresses Jasper opens, such as links you click in a terminal";
             default -> null;
         };
         return meaning == null ? capability : meaning + " (" + capability + ")";

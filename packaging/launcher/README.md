@@ -158,9 +158,9 @@ All in `check`, on every OS:
   corrupted file, the skip variable, an ignored line without a dash, the fallback start with the arguments intact for
   options that end with `exit` and with `_exit`, a launch without the watcher, a relative launcher path, a directory in
   the file's place, a home with a space and a non-ASCII home, an image that cannot start (the watcher's report), a
-  diagnostic launch, the start-up cache's record and skip variable, and a cache that kills the JVM: `test/sealedprobe`
-  trained into a cache in one directory and run from a copy once that directory is gone, which fails while JBR has
-  JDK-8376576 and needs another such cache once it does not. On Windows it also checks the windowed launcher.
+  diagnostic launch, the start-up cache's record and skip variable, and a cache that kills the JVM: the probe's trained cache with
+  everything after its first 64 KiB zeroed, which ends the JVM with SIGSEGV before the VM exists and needs another such
+  cache once the JVM survives it. On Windows it also checks the windowed launcher.
 
 `verifyPackage` runs `testLauncherCore`, `testLauncherWatch` and `testWatcher` before it checks a package image; the
 Release workflow skips them because CI runs them.

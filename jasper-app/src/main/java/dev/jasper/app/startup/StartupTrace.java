@@ -154,7 +154,10 @@ public final class StartupTrace {
     /** The look {@link #look(String)} last recorded. */
     public String look() { return look; }
 
-    /** Records {@code milestone} now unless it was already recorded; settles once both settling milestones exist. */
+    /**
+     * Records {@code milestone} now unless it was already recorded; settles once both settling milestones exist, and
+     * rewrites the trace file for a milestone marked after settling.
+     */
     public void mark(Milestone milestone) {
         Objects.requireNonNull(milestone, "milestone");
         if (!marks.compareAndSet(milestone.ordinal(), UNSET, environment.nanos().getAsLong())) return;
@@ -169,7 +172,12 @@ public final class StartupTrace {
                 }
             }
         }
-        if (marked(Milestone.PLUGINS_BOUND) && (marked(Milestone.OUTPUT_PAINTED) || marked(Milestone.WARMED_UP))) settle();
+        if (settling.get()) {
+            // The cap settled first (a slow start): keep the file current for readers that need this milestone.
+            environment.background().execute(this::writeFile);
+        } else if (marked(Milestone.PLUGINS_BOUND) && (marked(Milestone.OUTPUT_PAINTED) || marked(Milestone.WARMED_UP))) {
+            settle();
+        }
     }
 
     /** Adds the time from {@code startNanos} ({@link System#nanoTime}) to now under {@code name}; repeats accumulate. */

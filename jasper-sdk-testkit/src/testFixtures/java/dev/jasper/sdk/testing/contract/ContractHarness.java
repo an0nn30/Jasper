@@ -61,10 +61,25 @@ public interface ContractHarness extends AutoCloseable {
     /**
      * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code TAB}, {@code TOOLS},
      * {@code SESSION}, {@code TRANSFER}, {@code context},
-     * {@code top:<menuId>}): {@code item:id}, {@code ---}, {@code submenu:title}, children indented two
-     * spaces, sections separated by {@code ===}; items of closed actions omitted.
+     * {@code top:<menuId>}): {@code item:id}, {@code web-address:id} (an {@code addForWebAddress} item), {@code ---},
+     * {@code submenu:title}, children indented two spaces, sections separated by {@code ===}; items of closed actions
+     * omitted.
      */
     List<String> menu(String target);
+
+    /**
+     * The terminal context menu's model lines for a pane: the lines {@link #menu} gives for {@code context}, empty
+     * submenus and separators included, with each {@code web-address:id} line present only while the pane's selection is
+     * one web address; empty for a pane that is not open.
+     */
+    List<String> contextMenu(java.util.UUID paneId);
+
+    /**
+     * Runs the action of the first item {@link #contextMenu} lists for it, as choosing that item does, and waits: the
+     * action runs in the pane's window for that pane, and hears the selected address only from a {@code web-address} item.
+     * True when an enabled action ran; false when {@link #contextMenu} lists no item for it.
+     */
+    boolean chooseFromContextMenu(java.util.UUID paneId, String actionId);
 
     /** Visible status items as {@code id|side|text|tooltip|actionId}, ascending priority. */
     List<String> status();
@@ -309,7 +324,10 @@ public interface ContractHarness extends AutoCloseable {
         /** UI thread: clicks the body of the newest notification with this title; false when there is none or it expired. */
         boolean clickNotification(String title);
         List<java.nio.file.Path> openedInEditor();
-        /** Every web address a plugin asked to open in the browser, in request order. */
+        /**
+         * Every web address that reached the system browser: each {@code Platform.browse}, and each
+         * {@code Platform.openInBrowser} that no provided browser opened.
+         */
         List<java.net.URI> browsed();
         /** What the clipboard holds now; empty when it holds no text. */
         java.util.Optional<String> clipboard();
@@ -334,13 +352,23 @@ public interface ContractHarness extends AutoCloseable {
         java.util.Map<String, String> shellVariables(java.util.Map<String, String> jasperEnvironment);
         /** The values plugins' tab name pieces hold for a tab, by piece name; asked on the UI thread. */
         java.util.Map<String, String> tabNamePieces(java.util.UUID tabId);
-        /** Marks a plugin as one that ships with Jasper, whose editor replaces a non-bundled plugin's; before that plugin starts. */
+        /**
+         * Marks a plugin as one that ships with Jasper, whose editor and browser replace a non-bundled plugin's; before that
+         * plugin starts.
+         */
         void declareBundled(String pluginId);
         /**
          * Opens a file as Jasper's own opens do, with the editor a plugin provides; false when none does, or it declined or
          * threw. Asked on the UI thread.
          */
         boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId);
+        /**
+         * Opens a web address as Jasper's own routes do (a link clicked in a terminal, the {@code jasper} command), with the
+         * browser a plugin provides, as a {@code WebLink} of these parts; false when none does, or it declined or threw.
+         * Asked on the UI thread.
+         */
+        boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, dev.jasper.sdk.ui.LinkPlacement placement,
+                         java.util.Optional<String> target, java.util.Optional<java.util.UUID> windowId);
         /** Sets the {@code jasper} command {@code CommandLine.client()} names, as the application names its installed or built one. */
         void commandClient(java.nio.file.Path client);
 }

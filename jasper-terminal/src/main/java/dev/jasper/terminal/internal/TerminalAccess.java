@@ -6,6 +6,7 @@ import dev.jasper.terminal.internal.process.PtyChild;
 import dev.jasper.terminal.internal.rendering.ScreenSnapshot;
 import dev.jasper.terminal.internal.shell.ShellCommandTracker;
 import dev.jasper.terminal.internal.text.FileTarget;
+import dev.jasper.terminal.internal.text.LinkHit;
 import dev.jasper.terminal.internal.text.MouseGeometry;
 import dev.jasper.terminal.internal.text.MouseInput;
 import dev.jasper.terminal.internal.text.SelectedCells;
@@ -89,11 +90,11 @@ public final class TerminalAccess implements AutoCloseable {
     /** Unsupported module collaboration API; used only by terminal owners. */
     public List<TerminalSearch.Match> search(SearchQuery query) { return queries.search(query.text(), query.regex(), query.caseSensitive()); }
     /**
-     * The link at an absolute row and column: an OSC 8 hyperlink, or else a URL written in the text. A program chooses
-     * an OSC 8 target freely, so only http, https, ftp and mailto schemes are accepted; a cell whose OSC 8 target has any other scheme
-     * has no link at all, whatever its text says.
+     * The link at an absolute row and column: an OSC 8 hyperlink with the {@code target} its program named, or else a
+     * URL written in the text, which has no target. A program chooses an OSC 8 URI freely, so only http, https, ftp and
+     * mailto schemes are accepted; a cell whose OSC 8 URI has any other scheme has no link at all, whatever its text says.
      Unsupported module collaboration API. */
-    public Optional<String> linkAt(long absoluteRow, int column) { return queries.linkAt(absoluteRow, column); }
+    public Optional<LinkHit> linkAt(long absoluteRow, int column) { return queries.linkAt(absoluteRow, column); }
     /**
      * The file a click at an absolute row and column names: an OSC 8 or plain-text {@code file} link that this session's
      * directory rule places on this machine (a plain-text one with the line and column that end it), else a path

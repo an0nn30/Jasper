@@ -56,6 +56,8 @@ class FakeContractTest extends PluginContractTest {
                 throw new AssertionError("No toolbar view button " + buttonId + " in " + windowId);
             }
             @Override public List<String> menu(String target) { return host.menu(target); }
+            @Override public List<String> contextMenu(java.util.UUID paneId) { return host.contextMenu(paneId); }
+            @Override public boolean chooseFromContextMenu(java.util.UUID paneId, String actionId) { return host.chooseFromContextMenu(paneId, actionId); }
             @Override public List<String> status() { return host.status(); }
             @Override public List<String> panels() { return host.panels(); }
             @Override public javax.swing.JComponent openPanel(String panelId) { return host.openPanel(panelId); }
@@ -153,6 +155,10 @@ class FakeContractTest extends PluginContractTest {
             @Override public void declareBundled(String pluginId) { host.declareBundled(pluginId); }
             @Override public boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId) {
                 return host.edit(file, line, windowId);
+            }
+            @Override public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, dev.jasper.sdk.ui.LinkPlacement placement,
+                                              java.util.Optional<String> target, java.util.Optional<java.util.UUID> windowId) {
+                return host.openLink(address, origin, placement, target, windowId);
             }
             @Override public void commandClient(java.nio.file.Path client) { host.setCommandClient(client); }
             @Override public void close() { host.close(); }

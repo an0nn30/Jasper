@@ -70,7 +70,7 @@ class ApplicationCommandsTest {
         JasperApplication application = application(() -> { });
         Files.writeString(dir.resolve("notes.txt"), "");
         DesktopTestSupport.edt(application::quitNow);
-        for (List<String> arguments : List.of(List.<String>of(), List.of("notes.txt"))) {
+        for (List<String> arguments : List.of(List.<String>of(), List.of("notes.txt"), List.of("https://example.com/a"))) {
             var err = new StringBuilder();
             var answer = application.commands().dispatch(new Invocation(arguments, dir, Optional.empty(), text -> { }, err::append));
             assertThatThrownBy(() -> answer.toCompletableFuture().get(5, TimeUnit.SECONDS))
@@ -143,6 +143,86 @@ class ApplicationCommandsTest {
         var exit = application.commands().dispatch(new Invocation(List.of("notes.txt", "gone.txt"), dir, Optional.empty(), text -> { }, err::append));
         assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
         assertThat(err).hasToString("jasper: no such file or folder: gone.txt\n");
+        DesktopTestSupport.edt(application::quitNow);
+    }
+
+    /** Browser plan 3, Review Focus 5: only an absolute http or https address with an authority is a web address. */
+    @Test void onlyAnAbsoluteHttpOrHttpsAddressWithAnAuthorityIsAWebAddress() {
+        assertThat(JasperApplication.webAddress("https://example.com/a?b=1")).contains(java.net.URI.create("https://example.com/a?b=1"));
+        assertThat(JasperApplication.webAddress("HTTP://Example.com")).as("the scheme in any case").contains(java.net.URI.create("HTTP://Example.com"));
+        assertThat(JasperApplication.webAddress("http://under_score:8080/")).as("a host Java reads as a registry name").isPresent();
+        for (String text : List.of("C:\\Users\\me\\notes.txt", "c:/Users/me/notes.txt", "\\\\server\\share\\notes.txt",
+                "./https://example.com", "https:example.com", "http:/notes", "ftp://files.example.com/x", "mailto:someone@example.com",
+                "file:///etc/hosts", "example.com", "https://exa mple.com", ""))
+            assertThat(JasperApplication.webAddress(text)).as(text).isEmpty();
+        assertThat(JasperApplication.webAddresses(List.of("https://example.com/a", "http://localhost:8080/")))
+            .contains(List.of(java.net.URI.create("https://example.com/a"), java.net.URI.create("http://localhost:8080/")));
+        assertThat(JasperApplication.webAddresses(List.of("https://example.com/a", "notes.txt"))).as("a mixed call").isEmpty();
+        assertThat(JasperApplication.webAddresses(List.of())).as("no arguments: a raise").isEmpty();
+    }
+
+    /** Browser plan 3, Review Focus 3: before the plugins start, jasper's addresses reach the system browser, and each call answers 0. */
+    @Test void everyArgumentAWebAddressOpensEachAndAnswersZero() throws Exception {
+        JasperApplication application = application(() -> { });
+        var opened = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        DesktopTestSupport.edt(() -> application.systemBrowser = address -> opened.add(address.toString()));
+        var err = new StringBuilder();
+        var addresses = application.commands().dispatch(new Invocation(List.of("https://example.com/a", "HTTP://Example.com/b"), dir,
+            Optional.of(UUID.randomUUID()), text -> { }, err::append));
+        assertThat(addresses.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
+        assertThat(opened).containsExactly("https://example.com/a", "HTTP://Example.com/b");
+        assertThat(err).isEmpty();
+        DesktopTestSupport.edt(application::quitNow);
+    }
+
+    /**
+     * Browser plan 3b (R5): {@code open-url} is no command of Jasper's. {@code jasper open-url https://example.com} is the
+     * arguments {@code open-url} and the address, which any other first word would be: with no plugins running, "Jasper's
+     * plugins are not running"; with a file named {@code open-url} in the folder, a path call that names the address as
+     * the missing path. Nothing opens either way.
+     */
+    @Test void openUrlIsNoLongerACommand() throws Exception {
+        JasperApplication application = application(() -> { });
+        var opened = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        DesktopTestSupport.edt(() -> application.systemBrowser = address -> opened.add(address.toString()));
+        var err = new StringBuilder();
+        var exit = application.commands().dispatch(new Invocation(List.of("open-url", "https://example.com"), dir, Optional.empty(),
+            text -> { }, err::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
+        assertThat(err).as("as any other unknown first word").hasToString("jasper: Jasper's plugins are not running\n");
+        var other = new StringBuilder();
+        exit = application.commands().dispatch(new Invocation(List.of("open-ur", "https://example.com"), dir, Optional.empty(),
+            text -> { }, other::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
+        assertThat(other).hasToString(err.toString());
+
+        Files.writeString(dir.resolve("open-url"), "");
+        var path = new StringBuilder();
+        exit = application.commands().dispatch(new Invocation(List.of("open-url", "https://example.com"), dir, Optional.empty(),
+            text -> { }, path::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
+        assertThat(path).as("a file named open-url is a path").hasToString("jasper: no such file or folder: https://example.com\n");
+        assertThat(opened).isEmpty();
+        DesktopTestSupport.edt(application::quitNow);
+    }
+
+    /** Browser plan 3, Review Focus 5: a call that mixes paths and addresses keeps today's answers. */
+    @Test void aCallThatMixesPathsAndAddressesKeepsItsAnswer() throws Exception {
+        Files.writeString(dir.resolve("notes.txt"), "");
+        JasperApplication application = application(() -> { });
+        var opened = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        DesktopTestSupport.edt(() -> application.systemBrowser = address -> opened.add(address.toString()));
+        var pathFirst = new StringBuilder();
+        var exit = application.commands().dispatch(new Invocation(List.of("notes.txt", "https://example.com/a"), dir, Optional.empty(),
+            text -> { }, pathFirst::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
+        assertThat(pathFirst).hasToString("jasper: no such file or folder: https://example.com/a\n");
+        var addressFirst = new StringBuilder();
+        exit = application.commands().dispatch(new Invocation(List.of("https://example.com/a", "notes.txt"), dir, Optional.empty(),
+            text -> { }, addressFirst::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
+        assertThat(addressFirst).hasToString("jasper: Jasper's plugins are not running\n");
+        assertThat(opened).isEmpty();
         DesktopTestSupport.edt(application::quitNow);
     }
 

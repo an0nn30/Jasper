@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -226,19 +227,38 @@ class TerminalViewInteractionTest {
 
     @Test
     void theLinkModifierOpensTheLinkUnderThePointer() throws Exception {
-        AtomicReference<String> opened = new AtomicReference<>();
+        AtomicReference<TerminalLink> opened = new AtomicReference<>();
         view.setLinkOpener(opened::set);
         show("go https://m.dev x", 0, "go https://m.dev x");
 
         view.handleMouse(press(8, 0, 1, LINK));
 
-        assertThat(opened.get()).isEqualTo("https://m.dev");
+        assertThat(opened.get()).isEqualTo(open("https://m.dev"));
+    }
+
+    /** Browser plan 3: the link opener is public, and null puts the desktop's browser back. */
+    @Test
+    void aNullLinkOpenerRestoresTheDesktopDefault() throws Exception {
+        assumeTrue(java.awt.GraphicsEnvironment.isHeadless());
+        assertThat(TerminalView.class.getMethod("setLinkOpener", java.util.function.Consumer.class)).as("app-facing").isNotNull();
+        List<TerminalLink> opened = new ArrayList<>();
+        view.setLinkOpener(opened::add);
+        show("go https://m.dev x", 0, "go https://m.dev x");
+
+        view.handleMouse(press(8, 0, 1, LINK));
+        view.handleMouse(release(8, 0));
+        view.setLinkOpener(null);
+        view.handleMouse(press(8, 0, 1, LINK));
+        view.handleMouse(release(8, 0));
+
+        assertThat(opened).as("the second click went to the desktop's browser, which a headless test cannot open")
+            .containsExactly(open("https://m.dev"));
     }
 
     @Test
     void commandClickOpensALinkEvenWhenTheProgramWantsTheMouse() throws Exception {
         assumeTrue(MAC);
-        AtomicReference<String> opened = new AtomicReference<>();
+        AtomicReference<TerminalLink> opened = new AtomicReference<>();
         view.setLinkOpener(opened::set);
         enableSgrMouse();
         show("go https://m.dev x", 0, "go https://m.dev x");
@@ -247,8 +267,85 @@ class TerminalViewInteractionTest {
         view.handleMouse(new MouseEvent(view, MouseEvent.MOUSE_RELEASED, 0, InputEvent.META_DOWN_MASK,
             x(8), y(0), 1, false, MouseEvent.BUTTON1));
 
-        assertThat(opened.get()).isEqualTo("https://m.dev");
+        assertThat(opened.get()).isEqualTo(open("https://m.dev"));
         assertThat(connector.written()).isEmpty();
+    }
+
+    /** Browser plan 3b: Cmd+Shift-click is the split gesture on macOS, where Cmd-click is local even under reports. */
+    @Test
+    void cmdShiftClickIsASplitOnMacOs() throws Exception {
+        assumeTrue(MAC);
+        List<TerminalLink> opened = new ArrayList<>();
+        view.setLinkOpener(opened::add);
+        show("go https://m.dev x", 0, "go https://m.dev x");
+
+        view.handleMouse(press(8, 0, 1, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        view.handleMouse(release(8, 0));
+        enableSgrMouse();
+        view.handleMouse(press(8, 0, 1, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        view.handleMouse(release(8, 0));
+
+        assertThat(opened).as("without and with mouse reports")
+            .containsExactly(split("https://m.dev"), split("https://m.dev"));
+        assertThat(connector.written()).isEmpty();
+    }
+
+    @Test
+    void ctrlShiftClickIsASplitOnLinuxWithoutMouseReports() throws Exception {
+        assumeFalse(MAC);
+        AtomicReference<TerminalLink> opened = new AtomicReference<>();
+        view.setLinkOpener(opened::set);
+        show("go https://m.dev x", 0, "go https://m.dev x");
+
+        view.handleMouse(press(8, 0, 1, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        view.handleMouse(release(8, 0));
+
+        assertThat(opened.get()).isEqualTo(split("https://m.dev"));
+    }
+
+    /** Shift is how a Ctrl-click stays local under reports, so there it cannot also ask for a split. */
+    @Test
+    void ctrlShiftClickStaysAnOpenOnLinuxWhileAProgramAsksForMouseReports() throws Exception {
+        assumeFalse(MAC);
+        List<TerminalLink> opened = new ArrayList<>();
+        view.setLinkOpener(opened::add);
+        enableSgrMouse();
+        show("go https://m.dev x", 0, "go https://m.dev x");
+
+        view.handleMouse(press(8, 0, 1, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        view.handleMouse(release(8, 0));
+
+        assertThat(opened).containsExactly(open("https://m.dev"));
+        assertThat(connector.written()).isEmpty();
+    }
+
+    @Test
+    void cmdClickIsAnOpenAndCarriesTheTarget() throws Exception {
+        List<TerminalLink> opened = new ArrayList<>();
+        view.setLinkOpener(opened::add);
+        show("\033]8;target=docs;https://a.example\007A\033]8;;\007", 0, "A");
+
+        view.handleMouse(press(0, 0, 1, LINK));
+        view.handleMouse(release(0, 0));
+
+        assertThat(opened).containsExactly(
+            new TerminalLink("https://a.example", TerminalLink.Gesture.OPEN, Optional.of("docs")));
+    }
+
+    /** A split click on a file path is today's file click: the file handler gets it and the link opener does not. */
+    @Test
+    void aSplitClickOnAFilePathOpensTheFileAsToday() throws Exception {
+        List<FileLink> clicked = new ArrayList<>();
+        List<TerminalLink> opened = new ArrayList<>();
+        view.setFileLinkHandler(clicked::add);
+        view.setLinkOpener(opened::add);
+        show("src/A.java:42:5", 0, "src/A.java:42:5");
+
+        view.handleMouse(press(2, 0, 1, LINK | InputEvent.SHIFT_DOWN_MASK));
+        view.handleMouse(release(2, 0));
+
+        assertThat(clicked).containsExactly(new FileLink("src/A.java", 42, 5));
+        assertThat(opened).isEmpty();
     }
 
     @Test
@@ -286,7 +383,7 @@ class TerminalViewInteractionTest {
     @Test
     void anOsc8FileLinkReachesTheFileLinkHandlerWithItsDecodedPathAndNoLine() throws Exception {
         List<FileLink> clicked = new ArrayList<>();
-        List<String> opened = new ArrayList<>();
+        List<TerminalLink> opened = new ArrayList<>();
         view.setFileLinkHandler(clicked::add);
         view.setLinkOpener(opened::add);
         show("\033]8;;file://localhost/tmp/My%20Notes.txt\007notes\033]8;;\007 "
@@ -306,7 +403,7 @@ class TerminalViewInteractionTest {
     @Test
     void aPlainTextFileUrlReachesTheFileLinkHandlerWithItsLineAndColumn() throws Exception {
         List<FileLink> clicked = new ArrayList<>();
-        List<String> opened = new ArrayList<>();
+        List<TerminalLink> opened = new ArrayList<>();
         view.setFileLinkHandler(clicked::add);
         view.setLinkOpener(opened::add);
         show("e: file:///tmp/Foo.kt:12:5 boom", 1, "t:12:5 boom");
@@ -321,7 +418,7 @@ class TerminalViewInteractionTest {
     /** Review Focus 5: a URL still opens the browser, and the file link handler hears nothing. */
     @Test
     void aUrlStillOpensTheBrowserWhenFileLinksAreHandled() throws Exception {
-        AtomicReference<String> opened = new AtomicReference<>();
+        AtomicReference<TerminalLink> opened = new AtomicReference<>();
         AtomicReference<FileLink> clicked = new AtomicReference<>();
         view.setLinkOpener(opened::set);
         view.setFileLinkHandler(clicked::set);
@@ -329,7 +426,7 @@ class TerminalViewInteractionTest {
 
         view.handleMouse(press(15, 0, 1, LINK));
 
-        assertThat(opened.get()).isEqualTo("https://m.dev/a.txt");
+        assertThat(opened.get()).isEqualTo(open("https://m.dev/a.txt"));
         assertThat(clicked.get()).isNull();
     }
 
@@ -585,14 +682,14 @@ class TerminalViewInteractionTest {
         assumeTrue(MAC);
         show("https://m.dev", 0, "https://m.dev");
         enableSgrMouse();
-        AtomicReference<String> opened = new AtomicReference<>();
+        AtomicReference<TerminalLink> opened = new AtomicReference<>();
         view.setLinkOpener(opened::set);
         view.handleMouse(press(2, 0, 1, InputEvent.META_DOWN_MASK));
         view.handleMouse(mouse(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON3, 1, InputEvent.BUTTON3_DOWN_MASK, false));
         view.handleMouse(mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON3, 1, 0, false));
         view.handleMouse(mouse(MouseEvent.MOUSE_DRAGGED, MouseEvent.NOBUTTON, 4, InputEvent.BUTTON1_DOWN_MASK, false));
         view.handleMouse(release(4, 0));
-        assertThat(opened.get()).isEqualTo("https://m.dev");
+        assertThat(opened.get()).isEqualTo(open("https://m.dev"));
         assertThat(connector.written()).isEqualTo("\033[<2;2;1M\033[<2;2;1m");
         assertThat(view.hasSelection()).isFalse();
     }
@@ -629,6 +726,14 @@ class TerminalViewInteractionTest {
         view.handleMouse(mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, 0,
             InputEvent.SHIFT_DOWN_MASK, false));
         assertThat(connector.written()).isEqualTo("\033[<0;1;1M\033[<0;1;1m");
+    }
+
+    private static TerminalLink open(String url) {
+        return new TerminalLink(url, TerminalLink.Gesture.OPEN, Optional.empty());
+    }
+
+    private static TerminalLink split(String url) {
+        return new TerminalLink(url, TerminalLink.Gesture.SPLIT, Optional.empty());
     }
 
     private MouseEvent mouse(int type, int button, int column, int modifiers, boolean popup) {

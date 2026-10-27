@@ -323,9 +323,44 @@ class AppContractTest extends PluginContractTest {
                         if (!key.equals(target)) continue;
                         if (!first) lines.add("===");
                         first = false;
-                        render(contributions, section.entries(), "", lines);
+                        render(contributions, section.entries(), "", lines, true);
                     }
                     return lines;
+                });
+            }
+            @Override public List<String> contextMenu(UUID paneId) {
+                return onEdtValue(() -> {
+                    var pane = terminalFixture.registry.pane(paneId);
+                    if (pane.isEmpty()) return List.<String>of();
+                    // The application's rule, as the window reads it while it builds the menu.
+                    boolean webAddress = pane.get().selection().get().flatMap(dev.jasper.app.contributions.MenuEntry.WebAddressItem::addressIn).isPresent();
+                    List<String> lines = new java.util.ArrayList<>();
+                    boolean first = true;
+                    for (var section : contributions.menus()) {
+                        if (section.target().type() != dev.jasper.app.contributions.MenuTarget.Type.CONTEXT) continue;
+                        if (!first) lines.add("===");
+                        first = false;
+                        render(contributions, section.entries(), "", lines, webAddress);
+                    }
+                    return lines;
+                });
+            }
+            @Override public boolean chooseFromContextMenu(UUID paneId, String actionId) {
+                return onEdtValue(() -> {
+                    var pane = terminalFixture.registry.pane(paneId);
+                    if (pane.isEmpty()) return false;
+                    UUID windowId = terminalFixture.registry.tab(pane.get().tabId()).orElseThrow().windowId();
+                    Optional<java.net.URI> address = pane.get().selection().get().flatMap(dev.jasper.app.contributions.MenuEntry.WebAddressItem::addressIn);
+                    for (var section : contributions.menus()) {
+                        if (section.target().type() != dev.jasper.app.contributions.MenuTarget.Type.CONTEXT) continue;
+                        Optional<dev.jasper.app.contributions.MenuEntry> item = shown(contributions, section.entries(), actionId, address.isPresent());
+                        if (item.isEmpty()) continue;
+                        var action = contributions.action(actionId).filter(dev.jasper.app.contributions.ActionEntry::enabled);
+                        action.ifPresent(entry -> entry.invoke(new Contributions.Invocation(windowId, Optional.of(paneId),
+                            item.get() instanceof dev.jasper.app.contributions.MenuEntry.WebAddressItem ? address : Optional.empty())));
+                        return action.isPresent();
+                    }
+                    return false;
                 });
             }
             @Override public List<String> status() {
@@ -664,6 +699,10 @@ class AppContractTest extends PluginContractTest {
             @Override public boolean edit(Path file, java.util.OptionalInt line, Optional<UUID> windowId) {
                 return onEdtValue(() -> host.fileEditors.edit(file, line, windowId));
             }
+            @Override public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, dev.jasper.sdk.ui.LinkPlacement placement,
+                                              Optional<String> target, Optional<UUID> windowId) {
+                return onEdtValue(() -> host.webBrowsers.open(address, origin, placement, target, windowId));
+            }
             @Override public void commandClient(Path client) { onEdt(() -> host.commandClient = Optional.of(client)); }
             @Override public void close() { stopAll(); flush(); }
         };
@@ -741,19 +780,44 @@ class AppContractTest extends PluginContractTest {
         }
     }
 
-    private static void render(Contributions contributions, List<dev.jasper.app.contributions.MenuEntry> entries, String indent, List<String> lines) {
+    /** A section's entries as lines; web-address items only when {@code webAddress} says they show. */
+    private static void render(Contributions contributions, List<dev.jasper.app.contributions.MenuEntry> entries, String indent,
+                               List<String> lines, boolean webAddress) {
         for (var entry : entries) {
             switch (entry) {
                 case dev.jasper.app.contributions.MenuEntry.Item item -> {
                     if (contributions.action(item.actionId()).isPresent()) lines.add(indent + "item:" + item.actionId());
                 }
+                case dev.jasper.app.contributions.MenuEntry.WebAddressItem item -> {
+                    if (webAddress && contributions.action(item.actionId()).isPresent()) lines.add(indent + "web-address:" + item.actionId());
+                }
                 case dev.jasper.app.contributions.MenuEntry.Separator separator -> lines.add(indent + "---");
                 case dev.jasper.app.contributions.MenuEntry.Submenu submenu -> {
                     lines.add(indent + "submenu:" + submenu.title());
-                    render(contributions, submenu.entries(), indent + "  ", lines);
+                    render(contributions, submenu.entries(), indent + "  ", lines, webAddress);
                 }
             }
         }
+    }
+
+    /** The first entry of a section, submenus in place, that shows an item for the action; web-address items only when {@code webAddress}. */
+    private static Optional<dev.jasper.app.contributions.MenuEntry> shown(Contributions contributions, List<dev.jasper.app.contributions.MenuEntry> entries,
+                                                                          String actionId, boolean webAddress) {
+        if (contributions.action(actionId).isEmpty()) return Optional.empty();
+        for (var entry : entries) {
+            boolean shows = switch (entry) {
+                case dev.jasper.app.contributions.MenuEntry.Item item -> item.actionId().equals(actionId);
+                case dev.jasper.app.contributions.MenuEntry.WebAddressItem item -> webAddress && item.actionId().equals(actionId);
+                case dev.jasper.app.contributions.MenuEntry.Separator separator -> false;
+                case dev.jasper.app.contributions.MenuEntry.Submenu submenu -> false;
+            };
+            if (shows) return Optional.of(entry);
+            if (entry instanceof dev.jasper.app.contributions.MenuEntry.Submenu submenu) {
+                var nested = shown(contributions, submenu.entries(), actionId, webAddress);
+                if (nested.isPresent()) return nested;
+            }
+        }
+        return Optional.empty();
     }
 
     /** A raw TOML value as source text. */

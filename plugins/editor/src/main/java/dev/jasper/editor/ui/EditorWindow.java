@@ -191,7 +191,7 @@ public final class EditorWindow {
         serverIcon = "server";
         ask = question -> environment.askers().apply(owner()).apply(question);
         await = (message, saves) -> environment.waits().apply(owner()).apply(message, saves);
-        navigation = new MarkdownNavigation(this, context.platform()::browse);
+        navigation = new MarkdownNavigation(this, context.platform()::openInBrowser);
         findBar = new FindBar(() -> selected().flatMap(EditorTab::findTarget), this::refreshFind, id -> selected().ifPresent(tab -> { tab.view().focus(id); tab.view().selectAll(id); }), () -> selected().ifPresent(EditorTab::revealSource));
         status = new StatusLine(this::chooseLanguage, this::toggleWrap, this::toggleVim, this::openVimrc, this::reloadVimrc,
             () -> context.settings().show());

@@ -3,6 +3,7 @@ package dev.jasper.terminal.view;
 import dev.jasper.terminal.internal.text.MouseInput;
 
 import dev.jasper.terminal.internal.TerminalAccess;
+import dev.jasper.terminal.internal.text.LinkHit;
 import dev.jasper.terminal.internal.text.MouseGeometry;
 import dev.jasper.terminal.internal.text.MouseInput.Type;
 import java.awt.event.MouseEvent;
@@ -26,13 +27,13 @@ final class MouseController {
     private final IntSupplier cellWidth, cellHeight;
     private final BooleanSupplier copyOnSelect;
     private final Runnable requestFocus, copySelection, repaint;
-    private final Consumer<String> openLink;
+    private final Consumer<TerminalLink> openLink;
     /** The application's file link handler, or null while it has none. */
     private final Supplier<Consumer<FileLink>> openFile;
     private final Consumer<MouseEvent> contextMenu;
     MouseController(TerminalAccess terminal, SelectionController selection, Viewport viewport, boolean macOs, boolean windows,
                     IntSupplier cellWidth, IntSupplier cellHeight, BooleanSupplier copyOnSelect,
-                    Runnable requestFocus, Runnable copySelection, Consumer<String> openLink,
+                    Runnable requestFocus, Runnable copySelection, Consumer<TerminalLink> openLink,
                     Supplier<Consumer<FileLink>> openFile, Consumer<MouseEvent> contextMenu, Runnable repaint) {
         this.terminal = terminal; this.selection = selection; this.viewport = viewport; this.macOs = macOs; this.windows = windows;
         this.cellWidth = cellWidth; this.cellHeight = cellHeight; this.copyOnSelect = copyOnSelect;
@@ -85,13 +86,15 @@ final class MouseController {
             // Command-click is deliberately local on macOS, even if the program requests reports.
             if (button == MouseInput.Button.LEFT && ((macOs && linkModifier)
                 || action == MouseRouting.Action.OPEN_LINK)) {
-                Optional<String> link = terminal.linkAt(absoluteRow, column);
+                Optional<LinkHit> link = terminal.linkAt(absoluteRow, column);
                 Consumer<FileLink> files = openFile.get();
                 Optional<FileLink> file = link.isPresent() || files == null ? Optional.empty()
                     : terminal.fileLinkAt(absoluteRow, column, windows)
                         .map(target -> new FileLink(target.path(), target.line(), target.column()));
                 if (link.isPresent()) {
-                    openLink.accept(link.get());
+                    openLink.accept(new TerminalLink(link.get().uri(),
+                        MouseRouting.linkGesture(e.isShiftDown(), linkModifier, macOs, terminal.mouseReporting()),
+                        link.get().target()));
                     action = MouseRouting.Action.OPEN_LINK;
                 } else if (file.isPresent()) {
                     files.accept(file.get());

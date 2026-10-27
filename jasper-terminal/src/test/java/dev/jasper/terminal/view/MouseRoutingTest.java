@@ -1,6 +1,7 @@
 package dev.jasper.terminal.view;
 
 import dev.jasper.terminal.internal.text.MouseInput.Type;
+import dev.jasper.terminal.view.TerminalLink.Gesture;
 import org.junit.jupiter.api.Test;
 
 import static dev.jasper.terminal.view.MouseRouting.Action;
@@ -48,6 +49,32 @@ class MouseRoutingTest {
     void otherButtonsAndMovesDoNothingLocally() {
         assertThat(decide(Type.PRESSED, Button.RIGHT, 1, false, false, false, false)).isEqualTo(Action.NONE);
         assertThat(decide(Type.MOVED, Button.NONE, 0, false, false, false, false)).isEqualTo(Action.NONE);
+    }
+
+    /** The split gesture on every platform, whichever one runs the build: Shift with the link modifier. */
+    @Test
+    void shiftWithTheLinkModifierIsASplitOnMacOsWhetherOrNotTheProgramAsksForReports() {
+        assertThat(linkGesture(true, true, true, false)).isEqualTo(Gesture.SPLIT);
+        assertThat(linkGesture(true, true, true, true)).isEqualTo(Gesture.SPLIT);
+    }
+
+    @Test
+    void shiftWithTheLinkModifierIsASplitOnLinuxAndWindowsOnlyWithoutMouseReports() {
+        assertThat(linkGesture(true, true, false, false)).isEqualTo(Gesture.SPLIT);
+        assertThat(linkGesture(true, true, false, true)).as("Shift only keeps the click local there").isEqualTo(Gesture.OPEN);
+    }
+
+    @Test
+    void theLinkModifierWithoutShiftIsAnOpenEverywhere() {
+        for (boolean macOs : new boolean[] {true, false}) {
+            for (boolean reporting : new boolean[] {true, false}) {
+                assertThat(linkGesture(false, true, macOs, reporting)).isEqualTo(Gesture.OPEN);
+            }
+        }
+    }
+
+    private static Gesture linkGesture(boolean shift, boolean linkModifier, boolean macOs, boolean reporting) {
+        return MouseRouting.linkGesture(shift, linkModifier, macOs, reporting);
     }
 
     private static Action decide(Type type, Button button, int clicks, boolean shift, boolean linkModifier,

@@ -1,6 +1,7 @@
 package dev.jasper.terminal.internal.emulation;
 
 import dev.jasper.terminal.internal.text.FileTarget;
+import dev.jasper.terminal.internal.text.LinkHit;
 import dev.jasper.terminal.internal.text.MouseInput;
 import dev.jasper.terminal.session.TerminalSession;
 import dev.jasper.terminal.testsupport.Await;
@@ -91,7 +92,7 @@ class SessionInputTest {
         connector.feed("\033]8;;https://example.com\007link\033]8;;\007 plain");
         Await.until(() -> "link plain".equals(session.internalAccess().snapshot().lineText(0)), "linked text");
 
-        assertThat(session.internalAccess().linkAt(0, 1)).contains("https://example.com");
+        assertThat(session.internalAccess().linkAt(0, 1)).map(LinkHit::uri).contains("https://example.com");
         assertThat(session.internalAccess().linkAt(0, 6)).isEmpty();
     }
 
@@ -119,7 +120,7 @@ class SessionInputTest {
         connector.feed("\033]8;;mailto:someone@example.com\007mail\033]8;;\007");
         Await.until(() -> "mail".equals(session.internalAccess().snapshot().lineText(0)), "linked text");
 
-        assertThat(session.internalAccess().linkAt(0, 1)).contains("mailto:someone@example.com");
+        assertThat(session.internalAccess().linkAt(0, 1)).map(LinkHit::uri).contains("mailto:someone@example.com");
     }
 
     @Test
@@ -168,7 +169,7 @@ class SessionInputTest {
             return (snapshot.lineText(0) + snapshot.lineText(1)).equals("see https://jasper.dev/docs.");
         }, "complete wrapped url text");
 
-        assertThat(session.internalAccess().linkAt(0, 10)).contains("https://jasper.dev/docs");
+        assertThat(session.internalAccess().linkAt(0, 10)).map(LinkHit::uri).contains("https://jasper.dev/docs");
     }
 
     @Test
@@ -200,7 +201,7 @@ class SessionInputTest {
     void anOsc8LinkOnTheCellComesBeforeThePathInItsText() throws Exception {
         feedAll("\033]8;;https://example.com\007./a.txt\033]8;;\007 \033]8;;x-custom://thing\007./b.txt\033]8;;\007");
 
-        assertThat(session.internalAccess().linkAt(0, 2)).contains("https://example.com");
+        assertThat(session.internalAccess().linkAt(0, 2)).map(LinkHit::uri).contains("https://example.com");
         assertThat(session.internalAccess().fileLinkAt(0, 2, false)).isEmpty();
         assertThat(session.internalAccess().fileLinkAt(0, 10, false)).as("a refused link is not replaced by its text").isEmpty();
     }
@@ -276,7 +277,7 @@ class SessionInputTest {
     void aUrlIsNoPath() throws Exception {
         feedAll("https://x.dev/a.txt");
 
-        assertThat(session.internalAccess().linkAt(0, 15)).contains("https://x.dev/a.txt");
+        assertThat(session.internalAccess().linkAt(0, 15)).map(LinkHit::uri).contains("https://x.dev/a.txt");
         assertThat(session.internalAccess().fileLinkAt(0, 15, false)).isEmpty();
     }
 
@@ -292,8 +293,8 @@ class SessionInputTest {
     void twoOsc8LinksInTheSameColoursKeepTheirOwnTargets() throws Exception {
         feedAll("\033]8;;https://one.example\007one\033]8;;\007 \033]8;;https://two.example\007two\033]8;;\007");
 
-        assertThat(session.internalAccess().linkAt(0, 1)).contains("https://one.example");
-        assertThat(session.internalAccess().linkAt(0, 5)).contains("https://two.example");
+        assertThat(session.internalAccess().linkAt(0, 1)).map(LinkHit::uri).contains("https://one.example");
+        assertThat(session.internalAccess().linkAt(0, 5)).map(LinkHit::uri).contains("https://two.example");
     }
 
     /** Feeds {@code output} and waits for all of it, wrapped rows included: a title set after it arrives last. */

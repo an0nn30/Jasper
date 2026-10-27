@@ -42,4 +42,18 @@ final class MouseRouting {
             default -> Action.NONE;
         };
     }
+
+    /**
+     * The gesture of a click that landed on a web link. Shift with the link modifier is a split; a Ctrl-click on Linux
+     * or Windows is reported to a program that asks for mouse reports unless Shift is held, so there Shift cannot also
+     * mean a split and the click is an open. A Cmd-click is local on macOS whether or not the program asks.
+     *
+     * @param shift        Shift held
+     * @param linkModifier the link modifier held
+     * @param macOs        the platform is macOS
+     * @param reporting    the program enabled mouse reporting
+     */
+    static TerminalLink.Gesture linkGesture(boolean shift, boolean linkModifier, boolean macOs, boolean reporting) {
+        return shift && linkModifier && (macOs || !reporting) ? TerminalLink.Gesture.SPLIT : TerminalLink.Gesture.OPEN;
+    }
 }
