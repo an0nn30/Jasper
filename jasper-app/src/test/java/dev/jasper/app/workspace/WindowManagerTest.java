@@ -1031,7 +1031,7 @@ class WindowManagerTest {
             assertThat(layout.extendedState()).isZero();
             assertThat(layout.tabs()).hasSize(1).allSatisfy((id, saved) -> assertThat(saved).isInstanceOf(WorkspaceFile.TabRecord.Terminal.class));
             assertThat(layout.tools()).isEqualTo(window.content().toolWindows().snapshot());
-            assertThat(manager.leftOut(window)).as("the Errors tab").isEqualTo(1);
+            assertThat(manager.leftOutCount(window)).as("the Errors tab").isEqualTo(1);
         });
         launch();
     }

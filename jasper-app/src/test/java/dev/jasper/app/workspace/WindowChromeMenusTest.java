@@ -73,10 +73,10 @@ class WindowChromeMenusTest {
         edt(() -> {
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             owner.connectContributions(model(false));
-            assertThat(titles(owner)).containsExactly("File", "Edit", "View", "Tab", "Session", "Transfer", "Tools", "Own", "Help");
+            assertThat(titles(owner)).containsExactly("File", "Edit", "View", "Tab", "Window", "Session", "Transfer", "Tools", "Own", "Help");
             var first = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             first.connectContributions(model(true));
-            assertThat(titles(first)).as("registration order, as today").containsExactly("File", "Edit", "View", "Tab", "Session", "Transfer", "Tools", "Help", "Own");
+            assertThat(titles(first)).as("registration order, as today").containsExactly("File", "Edit", "View", "Tab", "Window", "Session", "Transfer", "Tools", "Help", "Own");
             assertThat(owner.chrome().menuBar().getClientProperty("FlatLaf.style")).as("the standard bar is not restyled").isNull();
         });
     }
@@ -106,7 +106,7 @@ class WindowChromeMenusTest {
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), classic());
             owner.connectContributions(model);
             var window = items(menu(owner, "Window"));
-            assertThat(window.getFirst()).isEqualTo("submenu:Split");
+            assertThat(window.subList(0, 3)).as("Layouts first (full windows plan 4)").containsExactly("submenu:Layouts", "---", "submenu:Split");
             assertThat(window).as("the Tab menu's Split list, pane, prompt and tab items with the plugin's Tab section, then the toggles")
                 .containsSubsequence("submenu:Split", "Move Pane to New Tab", "submenu:Move Pane to Tab", "Next Prompt", "---", "Next Tab",
                     "Previous Tab", "---",
@@ -114,7 +114,7 @@ class WindowChromeMenusTest {
             assertThat(window).as("Move Pane to Tab and Move Tab Into right after Move Pane to New Tab")
                 .containsSequence("Move Pane to New Tab", "submenu:Move Pane to Tab", "submenu:Move Tab Into");
             assertThat(window.getLast()).as("the tool-window toggles close the menu").isEqualTo("Toggle Hosts");
-            var split = (JMenu) menu(owner, "Window").getMenuComponent(0);
+            var split = (JMenu) menu(owner, "Window").getMenuComponent(2);
             assertThat(items(split)).containsExactly("Terminal Right", "Terminal Down", "Sketch Right", "Sketch Down");
             for (Component child : split.getMenuComponents())
                 assertThat(((JMenuItem) child).getIcon()).as("%s: the Split submenu shows no icons", ((JMenuItem) child).getText()).isNull();

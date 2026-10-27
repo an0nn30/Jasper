@@ -135,7 +135,8 @@ class ChromeRenderTest {
         var titles = WindowChromeMenusTest.titles(owner);
         if (look.projections().workspace().menus() == WorkspaceLook.Menus.CLASSIC)
             assertThat(titles).as(look.name()).contains("Window").doesNotContain("Tab");
-        else assertThat(titles).as(look.name()).contains("Tab").doesNotContain("Window");
+        // The standard bar has Window after Tab (full windows plan 4).
+        else assertThat(titles).as(look.name()).containsSequence("Tab", "Window");
         assertThat(titles.getLast()).as(look.name() + ": Help is last").isEqualTo("Help");
         // Plan 6b: the header, tabs, status cells and run item the look names.
         var workspace = look.projections().workspace();

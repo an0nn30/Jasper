@@ -11,7 +11,7 @@ import javax.swing.JMenuBar;
 
 /**
  * The classic menu bar (spec 10.2): File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help. Window holds
- * the Tab items and the tool-window toggles; Help comes last. The row is the mocks'
+ * Layouts (full windows plan 4), the Tab items and the tool-window toggles; Help comes last. The row is the mocks'
  * ({@link dev.jasper.app.platform.ClassicMenuRow}).
  */
 final class ClassicMenuBar implements MenuBarLayout {
@@ -35,9 +35,11 @@ final class ClassicMenuBar implements MenuBarLayout {
         return menus;
     }
 
-    /** Tab's items, then a rule and the tool-window toggles. */
+    /** Layouts and a rule, Tab's items, then a rule and the tool-window toggles. */
     private static JMenu window(Pass pass) {
         JMenu window = pass.menu().apply("Window");
+        window.add(pass.layouts().get());
+        window.addSeparator();
         move(pass.slots().get(MenuTarget.Slot.TAB), window);
         if (!pass.toolWindows().isEmpty()) {
             window.addSeparator();

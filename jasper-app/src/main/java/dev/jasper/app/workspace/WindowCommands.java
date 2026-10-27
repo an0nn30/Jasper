@@ -53,6 +53,8 @@ final class WindowCommands implements AutoCloseable {
                 case CLOSE_WINDOW -> List.of("window", "close");
                 case MOVE_TAB_TO_NEW_WINDOW -> List.of("detach", "separate window", "new window");
                 case MOVE_TAB_TO_WINDOW -> List.of("attach", "other window", "merge");
+                case APPLY_DEFAULT_LAYOUT, SAVE_LAYOUT_AS_NEW, SAVE_LAYOUT_AS_DEFAULT, RESET_DEFAULT_LAYOUT ->
+                    List.of("layout", "window", "workspace", "tool windows");
                 case NEW_TAB -> List.of("terminal");
                 case OPEN_SETTINGS -> List.of("preferences", "configuration");
                 case RELOAD_CONFIG -> List.of("configuration", "refresh");

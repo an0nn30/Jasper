@@ -42,6 +42,52 @@ class WindowMenuTest {
         throw new AssertionError("no " + text + " in " + texts(menu));
     }
 
+    /** A menu-bar menu's entries by their text, a submenu's followed by " \u25b8" and "-" for a rule. */
+    private static List<String> entries(javax.swing.JMenu menu) {
+        var texts = new ArrayList<String>();
+        for (var child : menu.getMenuComponents())
+            texts.add(child instanceof javax.swing.JMenu sub ? sub.getText() + " \u25b8" : child instanceof JMenuItem item ? item.getText() : "-");
+        return texts;
+    }
+
+    private static void open(javax.swing.JMenu menu) {
+        for (var listener : menu.getMenuListeners()) listener.menuSelected(new javax.swing.event.MenuEvent(menu));
+    }
+
+    /** Full windows plan 4: Window \u203a Layouts, in IntelliJ's order, after Tab in the standard bar. */
+    @Test void theLayoutsMenuIsInIntelliJsOrder(@org.junit.jupiter.api.io.TempDir java.nio.file.Path folder) throws Exception {
+        edt(() -> {
+            var store = new LayoutStore(folder.resolve("layouts.toml"), Runnable::run);
+            windows.manager.layouts(store);
+            var content = windows.first().content();
+            var record = windows.manager.layoutOf(windows.first()).orElseThrow();
+            store.saveAsNew("Alpha", record);
+            store.saveAsNew("Beta", record);
+            var bar = content.chrome().menuBar().menus().stream().map(javax.swing.JMenu::getText).toList();
+            assertThat(bar).as("Window after Tab").containsSubsequence("File", "Edit", "View", "Tab", "Window");
+            assertThat(bar.subList(0, 5)).containsExactly("File", "Edit", "View", "Tab", "Window");
+            var window = content.chrome().menuBar().menus().get(4);
+            open(window);
+            var layouts = (javax.swing.JMenu) window.getMenuComponent(0);
+            assertThat(layouts.getText()).isEqualTo("Layouts");
+            open(layouts);
+            assertThat(entries(layouts)).containsExactly("Default", "-", "Alpha \u25b8", "Beta \u25b8", "-",
+                "Save Current Layout as New\u2026", "Save Current Layout as Default", "Reset Default Layout");
+            var alpha = (javax.swing.JMenu) layouts.getMenuComponent(2);
+            assertThat(entries(alpha)).containsExactly("Apply", "Rename\u2026", "-", "Delete\u2026");
+            // Deleted elsewhere: the menu shows what the store holds as it opens.
+            store.delete("Alpha");
+            open(layouts);
+            assertThat(entries(layouts)).containsExactly("Default", "-", "Beta \u25b8", "-",
+                "Save Current Layout as New\u2026", "Save Current Layout as Default", "Reset Default Layout");
+            store.delete("Beta");
+            open(layouts);
+            assertThat(entries(layouts)).as("no named layouts, one rule").containsExactly("Default", "-",
+                "Save Current Layout as New\u2026", "Save Current Layout as Default", "Reset Default Layout");
+        });
+        windows.launch();
+    }
+
     /** Spec 6 and this plan's Rulings 6 and 7: a window has its entries, enabled as its actions are, while another is open. */
     @Test void theWindowMenuOffersItsEntriesWhileAnotherWindowIsOpen() throws Exception {
         edt(() -> {

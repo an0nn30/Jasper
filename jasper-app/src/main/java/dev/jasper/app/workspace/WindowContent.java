@@ -2517,6 +2517,44 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return value == JOptionPane.UNINITIALIZED_VALUE ? null : (String) value;
     }
 
+    /** Window \u203a Layouts' commands for this window (full windows plan 4). */
+    private final LayoutCommands layouts = new LayoutCommands(this);
+
+    LayoutCommands layouts() { return layouts; }
+
+    /** Window \u203a Layouts' name question ({@link LayoutCommands}); a test answers it instead of a dialog. */
+    LayoutCommands.NameQuestion askLayoutName = this::showLayoutNameDialog;
+
+    /** Window \u203a Layouts' Delete\u2026 and Reset Default Layout question; a test answers it instead of a dialog. */
+    LayoutCommands.Confirmation confirmLayout = this::showLayoutConfirmation;
+
+    /** Applies the named layout {@code name} to this window, after its tabs' guards ({@link LayoutCommands#apply}). */
+    void applyLayout(String name) { layouts.apply(name); }
+
+    /** Window \u203a Layouts \u203a a layout \u203a Rename\u2026. */
+    void renameLayout(String name) { layouts.rename(name); }
+
+    /** Window \u203a Layouts \u203a a layout \u203a Delete\u2026. */
+    void deleteLayout(String name) { layouts.delete(name); }
+
+    /** A layout name dialog, as Rename Tab's, with the window's appearance; null when cancelled. */
+    private String showLayoutNameDialog(String title, String message, String initial) {
+        var pane = new JOptionPane(message, JOptionPane.QUESTION_MESSAGE, JOptionPane.OK_CANCEL_OPTION);
+        pane.setWantsInput(true);
+        pane.setInitialSelectionValue(initial);
+        showOptionDialog(pane, title);
+        Object value = pane.getInputValue();
+        return value == JOptionPane.UNINITIALIZED_VALUE ? null : (String) value;
+    }
+
+    /** A question whose {@code button} goes ahead and whose Cancel does not, with the window's appearance. */
+    private boolean showLayoutConfirmation(String title, String message, String button) {
+        Object[] options = {button, Objects.requireNonNullElse(UIManager.getString("OptionPane.cancelButtonText", getLocale()), "Cancel")};
+        var pane = new JOptionPane(message, JOptionPane.QUESTION_MESSAGE, JOptionPane.DEFAULT_OPTION, null, options, options[0]);
+        showOptionDialog(pane, title);
+        return button.equals(pane.getValue());
+    }
+
     /**
      * Slate Cobalt's Dark ({@code dark}) or Light variant in every window sharing this window's themes, as
      * {@code ui.appearance} applies it; the terminal scheme stays. Tests and previews switch variants this way.

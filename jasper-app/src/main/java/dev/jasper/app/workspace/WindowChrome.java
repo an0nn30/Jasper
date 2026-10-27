@@ -99,8 +99,11 @@ final class WindowChrome {
         view.add(menu("Font Size", ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET));
         tabSplit = splitMenu();
         JMenu tab = tabMenu(tabSplit);
+        // Window holds Layouts (full windows plan 4), as IntelliJ's Window menu does.
+        JMenu window = menu("Window");
+        window.add(layoutsMenu());
         // The look's layout decides which built-in menus the bar shows from the start (spec 10.2).
-        for (JMenu fixed : owner.look().menus().fixed(new MenuBarLayout.BuiltIn(file, edit, view, tab))) menuBar.add(fixed);
+        for (JMenu fixed : owner.look().menus().fixed(new MenuBarLayout.BuiltIn(file, edit, view, tab, window))) menuBar.add(fixed);
         owner.look().menus().style(menuBar);
         standardMenus.put(MenuTarget.Slot.FILE, file); standardMenus.put(MenuTarget.Slot.EDIT, edit);
         standardMenus.put(MenuTarget.Slot.VIEW, view); standardMenus.put(MenuTarget.Slot.TAB, tab);
@@ -452,7 +455,8 @@ final class WindowChrome {
             // The bar orders menus as they are added; the layout gives the order (spec 10.2). A layout that keeps the
             // tool windows in View takes no items, so the default look builds none.
             List<JMenuItem> toolItems = layout.toolWindowsInView() ? List.of() : toolWindowItems();
-            for (JMenu menu : layout.contributed(new MenuBarLayout.Pass(standardMenus, topLevel, label -> menu(label), toolItems))) {
+            for (JMenu menu : layout.contributed(new MenuBarLayout.Pass(standardMenus, topLevel, label -> menu(label), toolItems,
+                this::layoutsMenu))) {
                 menuBar.add(menu); contributedMenus.add(menu);
             }
         }
@@ -595,13 +599,64 @@ final class WindowChrome {
         return moves;
     }
 
-    /** Fills each Move Pane to Tab and Move Tab Into submenu {@code menu} holds, as {@code menu} opens. */
+    /** Fills each Move Pane to Tab, Move Tab Into and Layouts submenu {@code menu} holds, as {@code menu} opens. */
     private void refreshPaneMoves(JMenu menu) {
         for (Component child : menu.getMenuComponents()) {
             if (!(child instanceof JMenu moves)) continue;
             if (PANE_MOVES.equals(moves.getName())) paneMoves(moves, MenuBarItems.Item::new);
             else if (TAB_MOVES.equals(moves.getName())) tabMoves(moves);
+            else if (LAYOUTS.equals(moves.getName())) fillLayouts(moves);
         }
+    }
+
+    /** The name of a Layouts submenu, which fills itself, and the menu holding it fills it, as it opens. */
+    static final String LAYOUTS = "layouts";
+
+    /** Window \u203a Layouts (full windows plan 4), filled with the saved layouts now and each time it opens. */
+    private JMenu layoutsMenu() {
+        JMenu layouts = menu("Layouts");
+        layouts.setName(LAYOUTS);
+        layouts.addMenuListener(new MenuListener() {
+            @Override public void menuSelected(MenuEvent event) { fillLayouts(layouts); }
+            @Override public void menuDeselected(MenuEvent event) {}
+            @Override public void menuCanceled(MenuEvent event) {}
+        });
+        fillLayouts(layouts);
+        return layouts;
+    }
+
+    /**
+     * Fills {@code layouts} in IntelliJ's order (full windows plan 4): Default; a rule; each named layout's submenu of
+     * Apply, Rename\u2026, a rule and Delete\u2026, then a rule; Save Current Layout as New\u2026, Save Current Layout
+     * as Default and Reset Default Layout. A layout's name is plain text.
+     */
+    private void fillLayouts(JMenu layouts) {
+        layouts.removeAll();
+        JMenuItem standard = new MenuBarItems.Item(owner.action(ActionId.APPLY_DEFAULT_LAYOUT));
+        standard.setText("Default");
+        layouts.add(standard);
+        layouts.addSeparator();
+        List<String> names = owner.layouts().names();
+        for (String name : names) {
+            JMenu named = observe(PlainText.menu(name));
+            named.add(new MenuBarItems.Item(layoutAction("Apply", () -> owner.layouts().apply(name))));
+            named.add(new MenuBarItems.Item(layoutAction("Rename\u2026", () -> owner.layouts().rename(name))));
+            named.addSeparator();
+            named.add(new MenuBarItems.Item(layoutAction("Delete\u2026", () -> owner.layouts().delete(name))));
+            layouts.add(named);
+        }
+        if (!names.isEmpty()) layouts.addSeparator();
+        for (ActionId id : List.of(ActionId.SAVE_LAYOUT_AS_NEW, ActionId.SAVE_LAYOUT_AS_DEFAULT, ActionId.RESET_DEFAULT_LAYOUT))
+            layouts.add(new MenuBarItems.Item(owner.action(id)));
+    }
+
+    /** A named layout's entry {@code label}, which runs {@code run} while the window takes input. */
+    private Action layoutAction(String label, Runnable run) {
+        return new AbstractAction(label) {
+            @Override public void actionPerformed(ActionEvent event) {
+                if (!owner.closed() && !dev.jasper.app.platform.WindowInput.blocked(owner)) run.run();
+            }
+        };
     }
 
     /** One item per tool window whose toggle action this window has, in registration order. */

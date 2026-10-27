@@ -59,7 +59,7 @@ class LayoutApplyTest {
             JasperWindow window = windowOfTwo();
             List<Tab> before = window.content().tabs();
             JasperWindow.Placement placement = window.placement();
-            assertThat(windows.manager.applyLayout(window, layout)).isTrue();
+            assertThat(windows.manager.applyLayout(window, layout)).isEqualTo(WindowManager.LayoutApplied.APPLIED);
             assertThat(window.closed()).as("the window stays").isFalse();
             assertThat(windows.manager.windows()).containsExactly(window);
             assertThat(window.content().tabs()).extracting(Tab::title).containsExactly("C", "D");
@@ -70,8 +70,8 @@ class LayoutApplyTest {
             assertThat(window.placement()).as("its bounds stay").isEqualTo(placement);
             // A layout is a template: applied again, here or elsewhere, it never clashes on ids.
             JasperWindow other = windows.manager.openWindow(null).orElseThrow();
-            assertThat(windows.manager.applyLayout(other, layout)).isTrue();
-            assertThat(windows.manager.applyLayout(window, layout)).isTrue();
+            assertThat(windows.manager.applyLayout(other, layout)).isEqualTo(WindowManager.LayoutApplied.APPLIED);
+            assertThat(windows.manager.applyLayout(window, layout)).isEqualTo(WindowManager.LayoutApplied.APPLIED);
             assertThat(other.content().tabs()).extracting(Tab::title).containsExactly("C", "D");
             assertThat(window.content().tabs()).extracting(Tab::title).containsExactly("C", "D");
         });
@@ -87,7 +87,7 @@ class LayoutApplyTest {
             windows.model.tabs().guard("dev.example.editor", (tabs, batch) -> CompletableFuture.completedFuture(false));
             List<Tab> before = window.content().tabs();
             ToolWindows tools = window.content().toolWindows().snapshot();
-            assertThat(windows.manager.applyLayout(window, layout)).isFalse();
+            assertThat(windows.manager.applyLayout(window, layout)).isEqualTo(WindowManager.LayoutApplied.REFUSED);
             assertThat(window.content().tabs()).isEqualTo(before);
             assertThat(before).noneMatch(Tab::closed);
             assertThat(window.content().toolWindows().snapshot()).isEqualTo(tools);
@@ -103,9 +103,25 @@ class LayoutApplyTest {
             Map.of("name", "todo"))), List.of(c, note), ToolWindows.BUILT_IN);
         edt(() -> {
             JasperWindow window = windowOfTwo();
-            assertThat(windows.manager.applyLayout(window, layout)).isTrue();
+            assertThat(windows.manager.applyLayout(window, layout)).isEqualTo(WindowManager.LayoutApplied.APPLIED);
             assertThat(window.content().tabs()).extracting(Tab::title).containsExactly("C", "todo.md");
             assertThat(window.content().tabs().getLast().kind()).isEqualTo(Tab.Kind.PLACEHOLDER);
+        });
+        windows.launch();
+    }
+
+    /** Ruling 3: a layout that fails after the guards agreed is reported as failed; the window keeps an empty workspace. */
+    @Test void aLayoutThatFailsHalfwayIsReportedAsFailed() throws Exception {
+        edt(() -> windows = new TestWindows());
+        TabId c = TabId.random();
+        var layout = layout(Map.of(c, shell("C")), List.of(c), new ToolWindows(false, true, Map.of()));
+        edt(() -> {
+            JasperWindow window = windowOfTwo();
+            // Closing the plugin's tab fails after its guard agreed.
+            window.content().tabs().getLast().onClosed(() -> { throw new IllegalStateException("closing failed"); });
+            assertThat(windows.manager.applyLayout(window, layout)).isEqualTo(WindowManager.LayoutApplied.FAILED);
+            assertThat(window.closed()).as("the window stays").isFalse();
+            assertThat(window.content().toolWindows().railVisible()).as("it takes the layout's tool windows").isFalse();
         });
         windows.launch();
     }

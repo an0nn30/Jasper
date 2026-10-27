@@ -20,6 +20,18 @@ import javax.swing.SwingUtilities;
  * costs only that write. EDT only.
  */
 public final class LayoutStore {
+    /** What a save or a rename did. */
+    public enum Saved {
+        /** It was saved. */
+        SAVED,
+        /** Nothing changed: another layout has the name. */
+        NAME_IN_USE,
+        /** Nothing changed: there is no layout of the name to rename. */
+        MISSING,
+        /** Nothing changed: {@code layouts.toml} would pass {@link LayoutsFile#MAX_BYTES}. */
+        TOO_LARGE
+    }
+
     /** The longest a layout name may be. */
     public static final int MAX_NAME = 64;
     private static final System.Logger LOG = System.getLogger(LayoutStore.class.getName());
@@ -69,9 +81,10 @@ public final class LayoutStore {
      * Saves {@code window} as the default layout.
      *
      * @param window the window's state; its bounds are not kept
+     * @return {@link Saved#SAVED}, or {@link Saved#TOO_LARGE} and nothing changes
      */
-    public void saveAsDefault(WindowRecord window) {
-        change(new Layouts(Optional.of(window), named()));
+    public Saved saveAsDefault(WindowRecord window) {
+        return change(new Layouts(Optional.of(window), named()));
     }
 
     /** Forgets the saved default layout. */
@@ -84,14 +97,13 @@ public final class LayoutStore {
      *
      * @param name a valid name ({@link #validName})
      * @param window the window's state; its bounds are not kept
-     * @return false, and nothing is saved, when the name is in use
+     * @return {@link Saved#SAVED}; else {@link Saved#NAME_IN_USE} or {@link Saved#TOO_LARGE}, and nothing is saved
      */
-    public boolean saveAsNew(String name, WindowRecord window) {
-        if (inUse(name)) return false;
+    public Saved saveAsNew(String name, WindowRecord window) {
+        if (inUse(name)) return Saved.NAME_IN_USE;
         var all = new ArrayList<>(named());
         all.add(new Named(name, window));
-        change(new Layouts(defaultLayout(), all));
-        return true;
+        return change(new Layouts(defaultLayout(), all));
     }
 
     /**
@@ -99,16 +111,17 @@ public final class LayoutStore {
      *
      * @param from its name
      * @param to the new, valid name
-     * @return false, and nothing changes, when there is no layout {@code from} or {@code to} is in use by another
+     * @return {@link Saved#SAVED}; else {@link Saved#MISSING} when there is no layout {@code from},
+     *     {@link Saved#NAME_IN_USE} when another has {@code to}, or {@link Saved#TOO_LARGE}, and nothing changes
      */
-    public boolean rename(String from, String to) {
+    public Saved rename(String from, String to) {
         List<Named> all = named();
         int index = indexOf(from);
-        if (index < 0 || (!from.equals(to) && inUse(to))) return false;
+        if (index < 0) return Saved.MISSING;
+        if (!from.equals(to) && inUse(to)) return Saved.NAME_IN_USE;
         var changed = new ArrayList<>(all);
         changed.set(index, new Named(to, all.get(index).layout()));
-        change(new Layouts(defaultLayout(), changed));
-        return true;
+        return change(new Layouts(defaultLayout(), changed));
     }
 
     /**
@@ -145,13 +158,16 @@ public final class LayoutStore {
         return -1;
     }
 
-    private void change(Layouts changed) {
+    /** Keeps {@code changed} and writes it, unless it is too large to write; deleting and resetting always fit. */
+    private Saved change(Layouts changed) {
+        if (!LayoutsFile.fits(changed)) return Saved.TOO_LARGE;
         layouts = changed;
         writes = writes.handle((done, failure) -> (Void) null).thenRunAsync(() -> write(changed), writer)
             .whenComplete((done, refused) -> {
                 if (refused != null) LOG.log(System.Logger.Level.WARNING, "Could not save the layouts to " + file, refused);
             });
         for (Runnable listener : List.copyOf(listeners)) listener.run();
+        return Saved.SAVED;
     }
 
     private void write(Layouts writing) {

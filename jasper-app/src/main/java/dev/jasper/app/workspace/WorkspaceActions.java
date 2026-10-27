@@ -62,6 +62,10 @@ final class WorkspaceActions {
             case CLOSE_WINDOW -> owner.requestCloseWindow();
             case MOVE_TAB_TO_NEW_WINDOW -> owner.moveTabToNewWindow(owner.selectedTab());
             case MOVE_TAB_TO_WINDOW -> owner.moveToOtherWindow();
+            case APPLY_DEFAULT_LAYOUT -> owner.layouts().applyDefault();
+            case SAVE_LAYOUT_AS_NEW -> owner.layouts().saveAsNew();
+            case SAVE_LAYOUT_AS_DEFAULT -> owner.layouts().saveAsDefault();
+            case RESET_DEFAULT_LAYOUT -> owner.layouts().resetDefault();
             case MOVE_PANE_TO_NEW_TAB -> owner.moveToNewTab(owner.selectedTab());
             case MOVE_PANE_TO_TAB_1, MOVE_PANE_TO_TAB_2, MOVE_PANE_TO_TAB_3, MOVE_PANE_TO_TAB_4, MOVE_PANE_TO_TAB_5,
                  MOVE_PANE_TO_TAB_6, MOVE_PANE_TO_TAB_7, MOVE_PANE_TO_TAB_8, MOVE_PANE_TO_TAB_9 ->
@@ -145,6 +149,10 @@ final class WorkspaceActions {
                     case MOVE_TAB_TO_NEW_WINDOW -> owner.mayMoveTabToNewWindow(owner.activeParentTab());
                     // A parent tab or a window moves whole or not at all (workspace plan 7b Rulings 7).
                     case MOVE_TAB_TO_WINDOW -> owner.mayMoveToOtherWindow();
+                    // Window \u203a Layouts (full windows plan 4): a window manager's window; saving needs the saved layouts.
+                    case APPLY_DEFAULT_LAYOUT -> owner.layouts().applicable();
+                    case SAVE_LAYOUT_AS_NEW, SAVE_LAYOUT_AS_DEFAULT -> owner.layouts().savable();
+                    case RESET_DEFAULT_LAYOUT -> owner.layouts().savable() && owner.layouts().defaultSaved();
                     // A tab's only pane, a pinned item and one being closed stay (workspace plan 8b Rulings 9).
                     case MOVE_PANE_TO_NEW_TAB -> owner.mayMoveToNewTab(owner.selectedTab());
                     // Its own tab's number, a number no tab has and a pane that may not move do nothing (pane

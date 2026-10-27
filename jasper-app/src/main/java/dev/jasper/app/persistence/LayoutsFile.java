@@ -143,12 +143,26 @@ public final class LayoutsFile {
      * @throws IOException when the file cannot be written, or the layouts would exceed {@link #MAX_BYTES}
      */
     public static void write(Path file, Layouts layouts) throws IOException {
+        String text = encode(layouts);
+        if (!fits(text)) throw new IOException("The layouts exceed " + MAX_BYTES + " bytes");
+        TomlStateFile.writeAtomically(file, ".layouts-", text);
+    }
+
+    /**
+     * Whether {@link #write} would write {@code layouts}: they fit in {@link #MAX_BYTES}.
+     *
+     * @param layouts the layouts
+     * @return false when they are too large to save
+     */
+    public static boolean fits(Layouts layouts) { return fits(encode(layouts)); }
+
+    private static boolean fits(String text) { return text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= MAX_BYTES; }
+
+    private static String encode(Layouts layouts) {
         var text = new StringBuilder("version = ").append(VERSION).append('\n');
         layouts.defaultLayout().ifPresent(layout -> text.append(WorkspaceFile.encodeWindow("\n[default]\n", "default", layout)));
         for (Named named : layouts.named())
             text.append(WorkspaceFile.encodeWindow("\n[[layouts]]\nname = " + UiState.quote(named.name()) + "\n", "layouts", named.layout()));
-        if (text.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_BYTES)
-            throw new IOException("The layouts exceed " + MAX_BYTES + " bytes");
-        TomlStateFile.writeAtomically(file, ".layouts-", text.toString());
+        return text.toString();
     }
 }

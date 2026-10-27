@@ -224,7 +224,20 @@ public final class WindowManager {
      *
      * @param value the store
      */
-    public void layouts(LayoutStore value) { layouts = Objects.requireNonNull(value, "value"); }
+    public void layouts(LayoutStore value) {
+        requireEdt();
+        layouts = Objects.requireNonNull(value, "value");
+        // The palette's Apply Layout entries follow the store (full windows plan 4).
+        LayoutPalette.follow(model, value, this);
+    }
+
+    /** The saved layouts; empty without them. */
+    Optional<LayoutStore> layoutStore() { return Optional.ofNullable(layouts); }
+
+    /** The window whose content {@code content} is; empty once it has gone. */
+    Optional<JasperWindow> windowOf(WindowContent content) {
+        return windows.stream().filter(window -> window.content() == content && !window.closed()).findFirst();
+    }
 
     /**
      * The default layout (full windows plan 4): the saved one, else the built-in layout, one terminal tab in
@@ -269,7 +282,7 @@ public final class WindowManager {
      * @param window one of these windows
      * @return how many of its tabs a layout of it leaves out ({@link #layoutOf}); 0 once its content has closed
      */
-    public int leftOut(JasperWindow window) {
+    public int leftOutCount(JasperWindow window) {
         requireEdt();
         if (window.content().closed()) return 0;
         return window.content().tabs().size() - windowRecord(window).tabs().size();
@@ -283,24 +296,37 @@ public final class WindowManager {
      *
      * @param window one of these windows
      * @param layout the layout; its bounds are ignored
-     * @return false when a guard refused, or the window is closed
+     * @return {@link LayoutApplied#REFUSED} when a guard refused or the window is closed; {@link LayoutApplied#FAILED}
+     *     when closing its tabs or restoring the layout's failed after the guards agreed
      */
-    public boolean applyLayout(JasperWindow window, WorkspaceFile.WindowRecord layout) {
+    public LayoutApplied applyLayout(JasperWindow window, WorkspaceFile.WindowRecord layout) {
         requireEdt();
         Objects.requireNonNull(layout, "layout");
-        if (window.closed() || !windows.contains(window) || window.content().closed()) return false;
+        if (window.closed() || !windows.contains(window) || window.content().closed()) return LayoutApplied.REFUSED;
         WindowContent content = window.content();
-        if (!content.mayClose()) return false;
+        if (!content.mayClose()) return LayoutApplied.REFUSED;
+        LayoutApplied applied = LayoutApplied.APPLIED;
         try {
             content.closeEveryTab();
             content.restore(fresh(layout));
         } catch (RuntimeException | Error failure) {
             // A restore closes what it made: the window keeps what its tabs' close left, its empty workspace.
             LOG.log(System.Logger.Level.WARNING, "Could not apply the layout's tabs", failure);
+            applied = LayoutApplied.FAILED;
         }
         toolWindows(content, layout.tools());
         changed();
-        return true;
+        return applied;
+    }
+
+    /** What {@link #applyLayout} did. */
+    public enum LayoutApplied {
+        /** The layout replaced the window's contents. */
+        APPLIED,
+        /** Nothing changed: a tab's guard refused, or the window has closed. */
+        REFUSED,
+        /** The window's tabs closed, or some did, but the layout's could not all be restored; it took the layout's tool windows. */
+        FAILED
     }
 
     /** Gives {@code content} the tool windows {@code tools}, whose changes are saved. */
@@ -904,8 +930,11 @@ public final class WindowManager {
     private Optional<JasperWindow> openEmpty(Rectangle bounds, Point cursor) {
         // A closing tab's listener asking for a window while every window closes gets none (spec 6.4).
         if (closingAll) return Optional.empty();
+        // While another window is open, the default's tool windows for a new window; else exactly (Ruling 3).
+        boolean another = windows.stream().anyMatch(window -> !window.closed());
+        ToolWindows tools = another ? newWindowTools() : savedDefault().map(WorkspaceFile.WindowRecord::tools).orElse(ToolWindows.BUILT_IN);
         return open(new Opening(true, null, "menu", Optional.ofNullable(bounds).map(Rectangle::new), Optional.ofNullable(cursor).map(Point::new),
-            newWindowTools()));
+            tools));
     }
 
     /** Composes, frames and shows one window; a failure on the way discards it and propagates. */

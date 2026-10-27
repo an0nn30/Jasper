@@ -58,17 +58,35 @@ class LayoutStoreTest {
         assertThat(LayoutStore.validName("x".repeat(64))).isPresent();
         edt(() -> {
             LayoutStore store = store();
-            assertThat(store.saveAsNew("Work", record(1))).isTrue();
-            assertThat(store.saveAsNew("Work", record(2))).isFalse();
-            assertThat(store.saveAsNew("Other", record(3))).isTrue();
-            assertThat(store.rename("Work", "Other")).isFalse();
-            assertThat(store.rename("Work", "Play")).isTrue();
-            assertThat(store.rename("Missing", "Z")).isFalse();
+            assertThat(store.saveAsNew("Work", record(1))).isEqualTo(LayoutStore.Saved.SAVED);
+            assertThat(store.saveAsNew("Work", record(2))).isEqualTo(LayoutStore.Saved.NAME_IN_USE);
+            assertThat(store.saveAsNew("Other", record(3))).isEqualTo(LayoutStore.Saved.SAVED);
+            assertThat(store.rename("Work", "Other")).isEqualTo(LayoutStore.Saved.NAME_IN_USE);
+            assertThat(store.rename("Work", "Play")).isEqualTo(LayoutStore.Saved.SAVED);
+            assertThat(store.rename("Missing", "Z")).isEqualTo(LayoutStore.Saved.MISSING);
             assertThat(store.named()).extracting(Named::name).containsExactly("Play", "Other");
             assertThat(store.named().getFirst().layout().bounds()).isEmpty();
             store.delete("Other");
             assertThat(store.named()).extracting(Named::name).containsExactly("Play");
         });
+    }
+
+    /** Ruling 1: a change that would take layouts.toml past its limit is refused, and nothing changes. */
+    @Test void aChangePastTheFilesLimitIsRefused() throws Exception {
+        var big = new WindowRecord(Optional.empty(), 0, record(1).layout(),
+            Map.of(record(1).tabs().keySet().iterator().next(), new TabRecord.Terminal("t".repeat(LayoutsFile.MAX_BYTES), "/tmp", "")),
+            ToolWindows.BUILT_IN);
+        var changes = new AtomicInteger();
+        edt(() -> {
+            LayoutStore store = store();
+            store.onChanged(changes::incrementAndGet);
+            assertThat(store.saveAsNew("Big", big)).isEqualTo(LayoutStore.Saved.TOO_LARGE);
+            assertThat(store.saveAsDefault(big)).isEqualTo(LayoutStore.Saved.TOO_LARGE);
+            assertThat(store.named()).isEmpty();
+            assertThat(store.defaultLayout()).isEmpty();
+            assertThat(store.saveAsDefault(record(2))).isEqualTo(LayoutStore.Saved.SAVED);
+        });
+        assertThat(changes).hasValue(1);
     }
 
     @Test void resetDefaultForgetsTheSavedDefault() throws Exception {

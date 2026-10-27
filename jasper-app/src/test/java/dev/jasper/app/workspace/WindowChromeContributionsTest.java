@@ -267,7 +267,7 @@ class WindowChromeContributionsTest {
                 owner.chrome().renderContributedMenus();
 
                 assertThat(owner.chrome().menuBar().menus().stream().map(JMenu::getText).toList())
-                    .containsExactly("File", "Edit", "View", "Tab", "Tools", "SSH", "Help");
+                    .containsExactly("File", "Edit", "View", "Tab", "Window", "Tools", "SSH", "Help");
                 assertThat(menu(owner, "SSH").getItem(0).isEnabled()).isFalse();
                 assertThat(items(menu(owner, "SSH"))).containsExactly("Connect", "Shortcuts");
                 assertThat(items(menu(owner, "Tools"))).containsExactly("Connect");

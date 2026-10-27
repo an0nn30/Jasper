@@ -88,6 +88,10 @@ These apply only while a terminal pane (or its find bar) has the focus.
 | New Window | `new_window` | Cmd+N | Ctrl+Shift+N |
 | Close Window | `close_window` | Cmd+Shift+W | none |
 | Move Tab to Window | `move_tab_to_window` | none | none |
+| Apply Default Layout (Window › Layouts › Default) | `apply_default_layout` | none | none |
+| Save Current Layout as New… | `save_layout_as_new` | none | none |
+| Save Current Layout as Default | `save_layout_as_default` | none | none |
+| Reset Default Layout | `reset_default_layout` | none | none |
 | Open File… | `open_file` | none | none |
 | Zen (Enter Zen Mode / Exit Zen Mode) | `toggle_zen_mode` | none | none |
 | Rail (Show Rail / Hide Rail) | `toggle_rail` | none | none |

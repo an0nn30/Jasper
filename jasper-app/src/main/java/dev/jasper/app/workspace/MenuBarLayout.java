@@ -24,8 +24,9 @@ sealed interface MenuBarLayout permits StandardMenuBar, ClassicMenuBar {
      * @param edit Edit
      * @param view View
      * @param tab Tab
+     * @param window Window, holding Layouts (full windows plan 4)
      */
-    record BuiltIn(JMenu file, JMenu edit, JMenu view, JMenu tab) { }
+    record BuiltIn(JMenu file, JMenu edit, JMenu view, JMenu tab, JMenu window) { }
 
     /**
      * A contributed top-level menu of this pass.
@@ -43,10 +44,15 @@ sealed interface MenuBarLayout permits StandardMenuBar, ClassicMenuBar {
      * @param menu makes an empty menu that refreshes the window's actions when opened
      * @param toolWindows one item per tool window's toggle action, in registration order; empty for a layout whose
      *        {@link MenuBarLayout#toolWindowsInView()} is true
+     * @param layouts makes a Layouts submenu (full windows plan 4) for a layout that builds its Window menu every pass
      */
-    record Pass(Map<MenuTarget.Slot, JMenu> slots, List<TopMenu> topLevel, Function<String, JMenu> menu, List<JMenuItem> toolWindows) {
+    record Pass(Map<MenuTarget.Slot, JMenu> slots, List<TopMenu> topLevel, Function<String, JMenu> menu, List<JMenuItem> toolWindows,
+                Supplier<JMenu> layouts) {
         /** Copies the lists. */
-        public Pass { topLevel = List.copyOf(topLevel); toolWindows = List.copyOf(toolWindows); Objects.requireNonNull(slots); Objects.requireNonNull(menu); }
+        public Pass {
+            topLevel = List.copyOf(topLevel); toolWindows = List.copyOf(toolWindows);
+            Objects.requireNonNull(slots); Objects.requireNonNull(menu); Objects.requireNonNull(layouts);
+        }
 
         /** {@code slot}'s menu while it has entries. */
         Optional<JMenu> filled(MenuTarget.Slot slot) {

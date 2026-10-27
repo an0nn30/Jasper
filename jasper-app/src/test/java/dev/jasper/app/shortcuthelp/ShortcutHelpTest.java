@@ -28,7 +28,8 @@ class ShortcutHelpTest {
                 "move_pane_to_tab_9", "move_tab_into_tab_1", "move_tab_into_tab_9"))
             assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Panes"));
         // Workspace plan 7b Rulings 13: the window commands, with New Window and Close Window.
-        for (String id : List.of("move_tab_to_window", "new_window"))
+        for (String id : List.of("move_tab_to_window", "new_window", "apply_default_layout", "save_layout_as_new",
+                "save_layout_as_default", "reset_default_layout"))
             assertThat(rows).filteredOn(row -> row.id().equals(id)).singleElement().satisfies(row -> assertThat(row.group()).isEqualTo("Application"));
     }
 

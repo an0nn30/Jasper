@@ -24,6 +24,10 @@ class KeymapDefaultsTest {
         new Row("close_window", KeyContext.GLOBAL, "cmd+shift+w", "none"),                    // workspace tabs spec 11
         new Row("move_tab_to_new_window", KeyContext.GLOBAL, "none", "none"),                 // tabs and panes spec 10
         new Row("move_tab_to_window", KeyContext.GLOBAL, "none", "none"),
+        new Row("apply_default_layout", KeyContext.GLOBAL, "none", "none"),               // full windows plan 4
+        new Row("save_layout_as_new", KeyContext.GLOBAL, "none", "none"),
+        new Row("save_layout_as_default", KeyContext.GLOBAL, "none", "none"),
+        new Row("reset_default_layout", KeyContext.GLOBAL, "none", "none"),
         new Row("quit", KeyContext.GLOBAL, "cmd+q", "ctrl+alt+shift+q"),                       // 3
         new Row("open_settings", KeyContext.GLOBAL, "cmd+,", "ctrl+shift+,"),                  // 4
         new Row("open_file", KeyContext.GLOBAL, "none", "none"),  // Enterprise spec 13: File › Open File…, unbound
