@@ -200,7 +200,8 @@ links use the installed hyperlink filter: `http`, `https`, `ftp` and `mailto`
 targets go to the link opener, a `file:` target that the OSC 7 host rule places on
 this machine is a file link, and other targets open nothing. That filter sees only the URI, so the shell filter puts
 `OSC 1341;jasper;link-target;<name>` before each OSC 8, naming its `target=` parameter (empty when it has none or the
-OSC 8 ends a link), and the engine gives that name to the link the OSC 8 opens. CSI `q` lacking a space intermediate
+OSC 8 ends a link), and an empty one after an OSC 8 that names one; the engine gives the name to the link the OSC 8
+opens. The filter ends an OSC where JediTerm does, at BEL, `ESC \` or the C1 ST U+009C. CSI `q` lacking a space intermediate
 is dropped so XTVERSION/DECLL cannot override the configured cursor. DECSCUSR 0
 is followed by a cursor-reset command that restores the configured cursor. An OSC 7 or 133 sequence longer than 4096
 held characters passes through unrewritten, and an OSC 8 that long has an empty `link-target`. Keep split-chunk parsing and payload

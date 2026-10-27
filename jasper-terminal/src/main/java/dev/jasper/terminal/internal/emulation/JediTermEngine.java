@@ -108,7 +108,9 @@ public final class JediTermEngine implements AutoCloseable {
         queries = new BufferQueries(buffer, terminal, display, rowState, cells);
         terminal.addCustomCommandListener(args -> {
             if (args.size() > 1 && "jasper".equals(args.get(0)) && ShellIntegrationFilter.LINK_TARGET.equals(args.get(1))) {
-                // A program can send this command itself, so its target is checked here too.
+                // A program can send this command itself, so its target is checked here too. The filter's own command
+                // replaces it before any OSC 8 the filter rewrites; only an OSC 8 JediTerm reads without the filter
+                // (a C1-introduced one, or one numbered 08) can take it, as that program's own choice of target.
                 pendingLinkTarget = args.size() == 3 && ShellIntegrationFilter.isLinkTarget(args.get(2)) ? args.get(2) : null;
             } else {
                 customCommands.accept(args);
@@ -116,7 +118,8 @@ public final class JediTermEngine implements AutoCloseable {
         });
         // Without a filter JediTerm drops OSC 8 links; one item spanning the whole URI makes it keep them. JediTerm
         // calls it on the reader thread for each OSC 8 that opens a link, right after the link-target command the
-        // shell filter put ahead of that OSC 8, so each link takes its own target and leaves none for the next.
+        // shell filter put ahead of that OSC 8, and the filter clears a named target again after it, so each link
+        // takes its own target and leaves none for the next.
         terminal.setUrlHyperlinkFilter(uri -> {
             String target = pendingLinkTarget;
             pendingLinkTarget = null;

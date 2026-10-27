@@ -6,7 +6,8 @@ package dev.jasper.terminal.internal.shell;
  * <pre>
  *   OSC 7 ; data ST          →  OSC 1341 ; jasper ; cwd ; data BEL
  *   OSC 133 ; data ST        →  OSC 1341 ; jasper ; mark ; data BEL
- *   OSC 8 ; params ; uri ST  →  OSC 1341 ; jasper ; link-target ; target BEL, then unchanged
+ *   OSC 8 ; params ; uri ST  →  OSC 1341 ; jasper ; link-target ; target BEL, then unchanged, then
+ *                               OSC 1341 ; jasper ; link-target ; BEL when target is not empty
  *   CSI 0 SP q, CSI SP q     →  unchanged, then OSC 1341 ; jasper ; cursor-reset BEL
  *   CSI ... q without SP     →  dropped
  * </pre>
@@ -20,9 +21,11 @@ package dev.jasper.terminal.internal.shell;
  * {@code key=value} parameters (separated by {@code :}) name, for the engine to give the link it opens. The target is
  * empty when the OSC 8 opens no link (an empty URI ends one), names none, or names one that {@link #isLinkTarget}
  * refuses; an OSC 8 longer than 4096 held characters, or abandoned before its terminator, passes through unchanged
- * after an empty one. Either way no link keeps the target of the one before it.
+ * after an empty one. An OSC 8 that names a target is followed by an empty one too, so a target the filter names is
+ * set only while JediTerm reads its OSC 8, and only the link that OSC 8 opens can take it.
  * <p>
- * Everything else passes through unchanged. Reader thread only.
+ * ST is {@code ESC \} or the C1 string terminator U+009C: JediTerm ends an OSC at either, and at BEL, so each sequence
+ * the filter holds ends where JediTerm ends it. Everything else passes through unchanged. Reader thread only.
  */
 public final class ShellIntegrationFilter {
     public static final String PREFIX = "\033]1341;jasper;";
@@ -31,6 +34,7 @@ public final class ShellIntegrationFilter {
 
     private static final char ESC = '\033';
     private static final char BEL = '\007';
+    private static final char C1_ST = (char) 0x9C;
     private static final int MAX_HELD = 4096;
     private static final int MAX_LINK_TARGET = 256;
     private static final String TARGET_PARAMETER = "target=";
@@ -96,7 +100,7 @@ public final class ShellIntegrationFilter {
                 }
             }
             case OSC_DATA -> {
-                if (c == BEL) {
+                if (c == BEL || c == C1_ST) {
                     complete(out, held.substring(dataStart, held.length() - 1));
                 } else if (c == ESC) {
                     state = State.OSC_DATA_ESCAPE;
@@ -141,7 +145,9 @@ public final class ShellIntegrationFilter {
 
     private void complete(StringBuilder out, String data) {
         if (isHyperlink()) {
-            out.append(PREFIX).append(LINK_TARGET).append(';').append(linkTarget(data)).append(BEL).append(held);
+            String target = linkTarget(data);
+            out.append(PREFIX).append(LINK_TARGET).append(';').append(target).append(BEL).append(held);
+            if (!target.isEmpty()) out.append(PREFIX).append(LINK_TARGET).append(';').append(BEL);
         } else {
             out.append(PREFIX).append(command).append(';').append(data).append(BEL);
         }
