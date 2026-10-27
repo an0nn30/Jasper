@@ -688,3 +688,73 @@ verifySupport.configure {
         logger.lifecycle('Verified the JCEF payload lists and their package check')
     }
 }
+
+// CI, release and SDK builds run on the JetBrains Runtime with JCEF, which verifyJcefToolchain requires. Every setup-java
+// step that installs the JetBrains distribution therefore asks for java-package: jdk+jcef. The workflow files are read as
+// text, one step at a time: a step is a list item with the lines indented deeper than its dash, and it is a setup-java
+// step when its own lines say uses: actions/setup-java@.
+verifySupport.configure {
+    doLast {
+        // The JetBrains setup-java steps of one workflow file as [line: the step's first line (1-based), jcef: whether the
+        // same step asks for jdk+jcef]. Quoting, a trailing comment and CRLF line ends make no difference.
+        def jetbrainsSteps = { String text ->
+            List<String> lines = text.readLines().collect { String line ->
+                line.trim().startsWith('#') ? '' : line.replaceFirst(/\s+#.*$/, '')
+            }
+            List<Map> steps = []
+            lines.eachWithIndex { String first, int index ->
+                def dash = first =~ /^(\s*)-\s+\S/
+                if (!dash.find()) return
+                int indent = dash.group(1).length()
+                List<String> step = [first]
+                for (int next = index + 1; next < lines.size(); next++) {
+                    String following = lines[next]
+                    if (!following.isBlank() && following.length() - following.stripLeading().length() <= indent) break
+                    step << following
+                }
+                if (!step.any { it =~ /\buses:\s*(['"]?)actions\/setup-java@/ }) return
+                if (!step.any { it =~ /\bdistribution:\s*(['"]?)jetbrains\1\s*(?:[,}]|\z)/ }) return
+                steps << [line: index + 1, jcef: step.any { it =~ /\bjava-package:\s*(['"]?)jdk\+jcef\1\s*(?:[,}]|\z)/ }]
+            }
+            return steps
+        }
+
+        // The reader on text of its own, so that a mistake in it cannot make the real check pass for nothing.
+        def workflow = { String... withLines ->
+            "jobs:\n  build:\n    steps:\n      - uses: actions/checkout@v7\n      - uses: actions/setup-java@v6\n        with:\n" +
+                withLines.collect { "          ${it}\n" }.join('') +
+                "      - uses: gradle/actions/setup-gradle@v6\n        with:\n          java-package: jdk+jcef\n"
+        }
+        assert jetbrainsSteps(workflow('distribution: jetbrains', "java-version: '25'", 'java-package: jdk+jcef')) == [[line: 5, jcef: true]]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', "java-package: 'jdk+jcef'"))*.jcef == [true]
+        assert jetbrainsSteps(workflow('distribution: "jetbrains"', 'java-package: "jdk+jcef"  # the JCEF build'))*.jcef == [true]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', 'java-package: jdk+jcef').replace('\n', '\r\n'))*.jcef == [true]
+        assert jetbrainsSteps(workflow('distribution: jetbrains'))*.jcef == [false]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', 'java-package: jdk'))*.jcef == [false]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', 'java-package: jre+jcef'))*.jcef == [false]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', 'java-package: jdk+jcefx'))*.jcef == [false]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', '# java-package: jdk+jcef'))*.jcef == [false]
+        // The following step's java-package is not this step's.
+        assert jetbrainsSteps(workflow('distribution: jetbrains', "java-version: '25'"))*.jcef == [false]
+        assert jetbrainsSteps(workflow('distribution: temurin')) == []
+        assert jetbrainsSteps(workflow('distribution: jetbrainsx')) == []
+        assert jetbrainsSteps('jobs:\n  build:\n    steps:\n      - name: JBR\n        uses: actions/setup-java@v6\n' +
+            '        with: { distribution: jetbrains, java-package: jdk+jcef }\n      - run: true\n') == [[line: 4, jcef: true]]
+        assert jetbrainsSteps('jobs:\n  build:\n    steps:\n    - uses: actions/setup-java@v6\n      with:\n        distribution: jetbrains\n') ==
+            [[line: 4, jcef: false]]
+        assert jetbrainsSteps('jobs:\n  build:\n    steps:\n      - run: echo uses actions/setup-java\n') == []
+        assert jetbrainsSteps('') == []
+
+        List<String> missing = []
+        int found = 0
+        rootProject.file('.github/workflows').listFiles().findAll { it.name ==~ /.+\.ya?ml/ }.sort { it.name }.each { File file ->
+            jetbrainsSteps(file.getText('UTF-8')).each { Map step ->
+                found++
+                if (!step.jcef) missing << ".github/workflows/${file.name}:${step.line}".toString()
+            }
+        }
+        assert found > 0 : 'no workflow under .github/workflows has a setup-java step with distribution: jetbrains'
+        assert missing.isEmpty() : "These setup-java steps install the JetBrains Runtime without java-package: jdk+jcef: ${missing.join(', ')}".toString()
+        logger.lifecycle("Verified java-package: jdk+jcef on all ${found} JetBrains setup-java steps of the workflows")
+    }
+}
