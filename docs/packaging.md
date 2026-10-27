@@ -16,7 +16,8 @@ checked by hand with the [native acceptance checklist](#native-acceptance-checkl
   properties. The plain JBR has the same vendor and version, so Gradle cannot tell the two apart: keep only one JBR 25
   installed, or point `org.gradle.java.installations.paths` at the JCEF build. A JRE is not enough: packaging runs the
   SDK's `jpackage`, and fails when the SDK has none, its architecture differs from the host's or it has no `jcef`
-  module; `check` fails for a runtime without JCEF too (`verifyJcefToolchain`).
+  module; `check` fails for a runtime without JCEF too (`verifyJcefToolchain`). On macOS packaging also needs the
+  bundle's `Contents/Frameworks` (Chromium) beside `Contents/Home`, which SDKMAN's install leaves out.
 - A **C/C++ compiler**, because `packageApp` builds Jasper's launcher ([packaging/launcher](../packaging/launcher/README.md)),
   `jasper-watch` and the `jasper` command ([packaging/cli](../packaging/cli/README.md)): the Xcode command line tools on
   macOS (`xcode-select --install`), `gcc` and `g++` on Linux, or Visual Studio or its Build Tools with the
@@ -183,7 +184,9 @@ without the cache and then without the user's options ([start-up recovery](diagn
   headless probe with the image's runtime, options and class path loads them from `native/` and extracts nothing.
 - **macOS**: the three bridges (architecture, signature, exported JNI symbols); `Info.plist` identifier
   `dev.jasper.app`, version, Local Network text and [document types](#macos-open-with); the icon file and catalog;
-  the launcher's app-specific UUID; `codesign --verify --deep --strict`; a trained cache accepted by
+  the launcher's app-specific UUID; Chromium's framework and `jcef Helper` apps in
+  `Contents/runtime/Contents/Frameworks/cef_server.app`, the renderer helper signed by JetBrains (team `2ZEFAR8TH3`);
+  `codesign --verify --deep --strict` of the runtime bundle and of the app; a trained cache accepted by
   `java -XX:AOTMode=on`; the SDK the launcher was linked against.
 - **Windows**: the PE machine type of `Jasper.exe`, `jasper-watch.exe`, `java.exe` and `jvm.dll`, and every frame of
   `Jasper.ico` embedded in the launcher.
@@ -192,7 +195,8 @@ without the cache and then without the user's options ([start-up recovery](diagn
 ## Signing
 
 - **macOS**: the app is signed ad hoc (`codesign --sign -`). The `jasper` command, `jasper-watch`, the bridges and the
-  bundled native libraries carry their own signatures, and the bundle is re-signed after every edit. There is no
+  bundled native libraries carry their own signatures, Chromium's framework and helpers keep JetBrains' Developer ID
+  signatures, and the bundle is re-signed after every edit, the runtime bundle (`Contents/runtime`) first. Jasper has no
   Developer ID signature and no notarization, so macOS may ask users to confirm opening an app from an unidentified
   developer.
 - **Windows**: `Jasper.exe`, the ZIP and the setup wizard are not Authenticode-signed; Windows may warn about an
@@ -208,7 +212,7 @@ the training launch); `verifyPackagingSupport`, part of `check`, tests it with f
 built image.
 
 - **Trimmed runtime.** jpackage gets an explicit list of root modules, `runtimeRootModules`, instead of every module:
-  41 modules in all, 42 on Windows, which adds `jdk.crypto.mscapi`. It is the runtime plugins may rely on
+  44 modules in all, 45 on Windows, which adds `jdk.crypto.mscapi`. It is the runtime plugins may rely on
   ([the Java runtime](plugin-authoring.md#the-java-runtime)). jlink runs with
   `--strip-debug --no-man-pages --no-header-files --generate-cds-archive`; `lib/modules` stays uncompressed, which loads
   classes faster, and `bin/java` stays because the JVM runs it to assemble the AOT cache.

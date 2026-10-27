@@ -58,26 +58,29 @@ ext.linuxPackageTasks = { String osRelease ->
 
 // The Java runtime packaged Jasper ships; docs/plugin-authoring.md ("The Java runtime") lists it for plugin authors.
 // jpackage's default for a class-path application is every module, and --bind-services then also bound javac,
-// jshell, jlink, jpackage and the JetBrains Runtime's JCEF and JOGL (192 MB). These roots keep all of Java SE for
-// plugins, the providers a desktop application needs (charsets, locale data, ZIP file system, PKCS#11, smart cards,
-// Kerberos, JAAS, DNS and RMI naming, socket options, the JDK HTTP server that File Server uses, sun.misc.Unsafe and
-// Swing interop) and the field diagnostics (JFR, JMX, attach). Windows adds its certificate stores. jdk.crypto.ec is
-// left out: it has been empty since JDK 22. jlink adds what the roots require.
+// jshell, jlink and jpackage. These roots keep all of Java SE for plugins, the providers a desktop application needs
+// (charsets, locale data, ZIP file system, PKCS#11, smart cards, Kerberos, JAAS, DNS and RMI naming, socket options,
+// the JDK HTTP server that File Server uses, sun.misc.Unsafe and Swing interop), the field diagnostics (JFR, JMX,
+// attach) and jcef, the JetBrains Runtime's Chromium (JCEF) for the browser plugin: a root, because nothing else
+// requires it. Windows adds its certificate stores. jdk.crypto.ec is left out: it has been empty since JDK 22. jlink
+// adds what the roots require.
 ext.runtimeRootModules = { String os ->
-    List<String> roots = ['java.se', 'java.smartcardio', 'jdk.accessibility', 'jdk.attach', 'jdk.charsets',
+    List<String> roots = ['java.se', 'java.smartcardio', 'jcef', 'jdk.accessibility', 'jdk.attach', 'jdk.charsets',
         'jdk.crypto.cryptoki', 'jdk.httpserver', 'jdk.jfr', 'jdk.localedata', 'jdk.management', 'jdk.management.agent',
         'jdk.management.jfr', 'jdk.naming.dns', 'jdk.naming.rmi', 'jdk.net', 'jdk.security.auth', 'jdk.security.jgss',
         'jdk.unsupported', 'jdk.unsupported.desktop', 'jdk.zipfs']
     os == 'windows' ? roots + ['jdk.crypto.mscapi'] : roots
 }
 
-// Every module of the packaged runtime, sorted: the roots and what they require (java.se's Java SE modules and
-// jdk.attach's jvmstat support). verifyPackage compares this with the MODULES line of the runtime's release file.
+// Every module of the packaged runtime, sorted: the roots and what they require (java.se's Java SE modules,
+// jdk.attach's jvmstat support and jcef's JOGL, jogl.all and gluegen.rt). verifyPackage compares this with the
+// MODULES line of the runtime's release file.
 ext.runtimeModules = { String os ->
-    (runtimeRootModules(os) + ['java.base', 'java.compiler', 'java.datatransfer', 'java.desktop', 'java.instrument',
-        'java.logging', 'java.management', 'java.management.rmi', 'java.naming', 'java.net.http', 'java.prefs',
-        'java.rmi', 'java.scripting', 'java.security.jgss', 'java.security.sasl', 'java.sql', 'java.sql.rowset',
-        'java.transaction.xa', 'java.xml', 'java.xml.crypto', 'jdk.internal.jvmstat']).toSorted()
+    (runtimeRootModules(os) + ['gluegen.rt', 'java.base', 'java.compiler', 'java.datatransfer', 'java.desktop',
+        'java.instrument', 'java.logging', 'java.management', 'java.management.rmi', 'java.naming', 'java.net.http',
+        'java.prefs', 'java.rmi', 'java.scripting', 'java.security.jgss', 'java.security.sasl', 'java.sql',
+        'java.sql.rowset', 'java.transaction.xa', 'java.xml', 'java.xml.crypto', 'jdk.internal.jvmstat',
+        'jogl.all']).toSorted()
 }
 
 // The build's runtime is the JetBrains Runtime with JCEF (Chromium) for the browser plugin. The plain build of the same
@@ -98,6 +101,23 @@ ext.requireJcefRuntime = { File sdkHome, String releaseText ->
     if (problem != null) {
         throw new GradleException("The selected JBR SDK at ${sdkHome} is not the JCEF build: ${problem}. Install jbrsdk_jcef-25.0.4.1 (docs/packaging.md).")
     }
+}
+
+// On macOS Chromium is not part of the module image: the SDK keeps its framework and helper apps in
+// Contents/Frameworks beside Contents/Home, and JCEF looks for them at java.home/../Frameworks. packageApp copies that
+// folder to Jasper.app/Contents/runtime/Contents/; verifyPackage requires these paths in the copy.
+ext.macJcefFrameworks = 'Frameworks'
+ext.macJcefPayload = ['Chromium Embedded Framework.framework', 'jcef Helper.app', 'jcef Helper (GPU).app',
+    'jcef Helper (Renderer).app', 'jcef Helper (Plugin).app'].collect { "cef_server.app/Contents/Frameworks/${it}".toString() }
+
+// The SDK's Chromium folder on macOS, or the failure nativeContext and packageApp both throw when it is missing. The
+// home's real path decides: SDKMAN's candidates/java/<version> can be a link to the bundle's Contents/Home.
+ext.requireMacJcefFrameworks = { File sdkHome ->
+    File frameworks = new File(sdkHome.canonicalFile.parentFile, macJcefFrameworks)
+    if (!frameworks.isDirectory()) {
+        throw new GradleException("The JBR SDK has no Chromium framework at ${frameworks}; install the full jbrsdk_jcef bundle (SDKMAN's macOS install keeps only Contents/Home)")
+    }
+    frameworks
 }
 
 // No --bind-services: the roots name every provider Jasper wants. --generate-cds-archive writes the runtime's default

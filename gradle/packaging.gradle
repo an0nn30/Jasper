@@ -100,6 +100,7 @@ def nativeContext = {
         throw new GradleException("The selected JBR SDK architecture (${toolchainArchitecture}) does not match the host (${host.architecture}); configure a matching JBR SDK 25")
     }
     requireJcefRuntime(sdkHome, sdkReleaseText)
+    if (host.os == 'macos') requireMacJcefFrameworks(sdkHome)
     File jpackage = new File(sdkHome, "bin/jpackage${host.os == 'windows' ? '.exe' : ''}")
     if (!jpackage.isFile()) {
         throw new GradleException("The selected JBR SDK has no jpackage at ${jpackage}; configure a matching JBR SDK 25, not a JRE")
@@ -170,7 +171,8 @@ def macLauncherTemplate = { ->
     Files.readAllBytes(new File(launcherResources.get().asFile, 'jdk/jpackage/internal/resources/jpackageapplauncher').toPath())
 }
 
-// Re-signs after the bundle is edited: the same ad-hoc identity jpackage used; the nested runtime keeps its own signature.
+// Re-signs a bundle after it is edited, with the same ad-hoc identity jpackage used: the app, or its nested runtime
+// bundle (Contents/runtime), which has a seal of its own. Without --deep, nested code keeps its own signature.
 def resignImage = { File image ->
     executeNative(['/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements,requirements,flags',
         image.absolutePath], 'codesign after bundle edits')
@@ -349,6 +351,13 @@ def packageApp = tasks.register('packageApp') {
                 executeNative(['/usr/bin/codesign', '--force', '--sign', '-', command.absolutePath], 'codesign the jasper command')
                 File watcher = installWatcher(image, 'macos')
                 executeNative(['/usr/bin/codesign', '--force', '--sign', '-', watcher.absolutePath], 'codesign jasper-watch')
+                // Chromium's framework and helpers, beside the runtime's Home where JCEF looks for them. ditto keeps the
+                // symbolic links, extended attributes and JetBrains' signatures. The copy breaks the runtime bundle's
+                // seal, which the outer signature does not cover: re-seal the runtime, then the app.
+                File runtime = new File(image, 'Contents/runtime')
+                executeNative(['/usr/bin/ditto', requireMacJcefFrameworks(context.sdkHome).absolutePath,
+                    new File(runtime, "Contents/${macJcefFrameworks}").absolutePath], 'ditto the Chromium framework')
+                resignImage(runtime)
                 resignImage(image)
             } else if (context.host.os == 'linux') {
                 removePluginClasspath(new File(imageDir, 'Jasper/lib/app/Jasper.cfg'))
@@ -697,6 +706,17 @@ def verifyPackage = tasks.register('verifyPackage') {
             if (!Arrays.equals(executable, macLauncherWithIdentity(executable, identifier, macLauncherTemplate()))) {
                 throw new GradleException('Package verification failed: launcher lacks its app-specific Mach-O UUID; macOS may apply another app\'s Local Network permission')
             }
+            // Chromium's framework and helpers, still signed by JetBrains (Developer ID team 2ZEFAR8TH3).
+            File jcefFrameworks = new File(image, "Contents/runtime/Contents/${macJcefFrameworks}")
+            List<String> missingJcef = macJcefPayload.findAll { !new File(jcefFrameworks, it).isDirectory() }
+            if (missingJcef) throw new GradleException("Package verification failed: ${jcefFrameworks} lacks ${missingJcef}")
+            File renderer = new File(jcefFrameworks, macJcefPayload.find { it.endsWith('/jcef Helper (Renderer).app') })
+            def rendererSignature = executeNative(['/usr/bin/codesign', '-dv', '--verbose=2', renderer.absolutePath], 'codesign -dv of the JCEF renderer helper')
+            if (!((rendererSignature.stdout + rendererSignature.stderr) =~ /(?m)^TeamIdentifier=2ZEFAR8TH3$/).find()) {
+                throw new GradleException("Package verification failed: ${renderer} is not signed by JetBrains\n${rendererSignature.stderr}")
+            }
+            // The app's seal covers the runtime's files but not the runtime bundle's own seal.
+            executeNative(['/usr/bin/codesign', '--verify', '--deep', '--strict', new File(image, 'Contents/runtime').absolutePath], 'codesign verification of the runtime bundle')
             executeNative(['/usr/bin/codesign', '--verify', '--deep', '--strict', image.absolutePath], 'codesign verification')
             if (verifyAotCache(runtimeHome, appDir)) {
                 logger.lifecycle("AOT cache accepted (-XX:AOTMode=on): ${new File(appDir, 'jasper.aot').length().intdiv(1024 * 1024)} MB")

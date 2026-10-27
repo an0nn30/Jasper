@@ -6,15 +6,41 @@ def verifySupport = tasks.register('verifyPackagingSupport') {
     doLast {
         List<String> roots = runtimeRootModules('macos')
         assert roots.containsAll(['java.se', 'jdk.httpserver', 'jdk.unsupported', 'jdk.jfr', 'jdk.attach', 'jdk.zipfs'])
-        assert roots.intersect(['jcef', 'jogl.all', 'gluegen.rt', 'jdk.compiler', 'jdk.jshell', 'jdk.jlink', 'jdk.jpackage',
-            'jdk.jdi', 'jdk.jdwp.agent', 'jdk.incubator.vector', 'jdk.dynalink']).isEmpty()
+        assert roots.contains('jcef')
+        assert roots.intersect(['jdk.compiler', 'jdk.jshell', 'jdk.jlink', 'jdk.jpackage', 'jdk.jdi', 'jdk.jdwp.agent',
+            'jdk.incubator.vector', 'jdk.dynalink']).isEmpty()
         assert runtimeRootModules('linux') == roots
         assert runtimeRootModules('windows') == roots + ['jdk.crypto.mscapi']
         List<String> modules = runtimeModules('macos')
-        assert modules == modules.toSorted() && modules == modules.toUnique() && modules.size() == 41
+        assert modules == modules.toSorted() && modules == modules.toUnique()
+        assert modules.size() == 44 && modules.containsAll(['jcef', 'jogl.all', 'gluegen.rt'])
         assert modules.containsAll(roots + ['java.base', 'java.desktop', 'java.sql', 'jdk.internal.jvmstat'])
         assert runtimeModules('linux') == modules
         assert runtimeModules('windows') == (modules + ['jdk.crypto.mscapi']).toSorted()
+        assert runtimeModules('windows').size() == 45
+        assert macJcefPayload.size() == 5 && macJcefPayload.every { it.startsWith('cef_server.app/Contents/Frameworks/') }
+        assert macJcefPayload.contains('cef_server.app/Contents/Frameworks/jcef Helper (Renderer).app')
+        // The Chromium framework sits beside the SDK home; without it packaging stops before jpackage runs.
+        File bundle = new File(temporaryDir, 'jcef-frameworks')
+        delete(bundle)
+        File sdk = new File(bundle, 'Contents/Home')
+        sdk.mkdirs()
+        File frameworks = new File(sdk.canonicalFile.parentFile, macJcefFrameworks)
+        try {
+            requireMacJcefFrameworks(sdk)
+            assert false : 'an SDK without Contents/Frameworks was accepted'
+        } catch (GradleException expected) {
+            assert expected.message == "The JBR SDK has no Chromium framework at ${frameworks}; install the full jbrsdk_jcef bundle (SDKMAN's macOS install keeps only Contents/Home)".toString()
+        }
+        frameworks.mkdirs()
+        assert requireMacJcefFrameworks(sdk) == frameworks
+        // A home reached through a link, as SDKMAN's candidates/java/<version> links to the bundle's Contents/Home.
+        if (!System.getProperty('os.name').startsWith('Windows')) {
+            File linked = new File(bundle, 'candidates/25.0.4.1-jcef')
+            linked.parentFile.mkdirs()
+            java.nio.file.Files.createSymbolicLink(linked.toPath(), sdk.toPath())
+            assert requireMacJcefFrameworks(linked) == frameworks
+        }
         assert jlinkOptions.tokenize(' ').containsAll(['--generate-cds-archive', '--strip-debug'])
         assert !jlinkOptions.contains('--bind-services') && !jlinkOptions.contains('--compress') &&
             !jlinkOptions.contains('--strip-native-commands')
@@ -24,7 +50,7 @@ def verifySupport = tasks.register('verifyPackagingSupport') {
         assert block.find() : 'docs/plugin-authoring.md has no runtime-modules block'
         assert (block.group(1) =~ /`([a-z][a-z0-9.]*)`/).collect { it[1] } == modules :
             'docs/plugin-authoring.md lists other runtime modules than gradle/packaging-support.gradle'
-        logger.lifecycle('Verified the runtime module list')
+        logger.lifecycle('Verified the runtime module list and the macOS Chromium framework')
     }
 }
 tasks.named('check') { dependsOn(verifySupport) }
