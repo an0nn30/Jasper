@@ -184,12 +184,12 @@ Each tab holds one or more panes, and each pane one terminal, Editor file or plu
 - Hold Cmd+Option (Ctrl+Alt on Linux and Windows; on Windows the left Alt key) and drag inside a pane to move it: onto
   another pane of the tab any window shows, which it splits on the side nearest the cursor; over the middle of a tab's
   entry, which shows that tab for the drop; onto the outer quarter of a tab's entry (under the Enterprise look also its
-  "+" or the room after the tabs), where it becomes a new tab; or anywhere over a window's empty workspace; released outside every Jasper window it becomes a new window at the
-  cursor holding one tab with that pane, its session still running, which opens the default layout's tool windows (out
-  of Zen, with Float and Window tool windows hidden); the pane's tab closes when it was its last pane. The only pane of a
-  window's only tab and a pinned pane never tear out: that window moves by its title bar. The
-  moved pane takes the focus where it lands. Because the keys start the drag, a
-  Cmd+Option-click (Ctrl+Alt-click) reaches neither a link nor the program in a terminal. Let go of the keys before
+  "+" or the room after the tabs), where it becomes a new tab; or anywhere over a window's empty workspace; released
+  outside every Jasper window it becomes a new window at the cursor holding one tab with that pane, its session still
+  running, which opens the default layout's tool windows (out of Zen, with Float and Window tool windows hidden); the
+  pane's tab closes when it was its last pane. A pinned pane never tears out, nor does the only pane of a window's only
+  tab: that window moves by its title bar. The moved pane takes the focus where it lands. Because the keys start the
+  drag, a Cmd+Option-click (Ctrl+Alt-click) reaches neither a link nor the program in a terminal. Let go of the keys before
   pressing Escape to cancel, as Cmd+Option+Esc is Force Quit on macOS and Ctrl+Alt+Esc kills a window on some Linux
   desktops (KDE, Xfce). A Linux desktop that moves windows with Ctrl+Alt-drag keeps that gesture for itself.
 - Drag the line between two panes to resize them: it trades space between the two panes beside it and leaves each at

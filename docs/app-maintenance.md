@@ -965,7 +965,8 @@ ends (the drop's window keeps what the drop shows), and makes a new tab at a str
 workspace; within its window `WindowContent.movePane` and `movePaneToNewTab` move it, into another
 `WindowManager.movePane` and `movePaneToNewTab`, through the tab registry. Outside every window it is a
 `Target.TearOut` (`WindowContent.mayMovePaneToNewWindow`: not the only pane of the only tab, not pinned) and
-`WindowManager.movePaneToNewWindow` opens an empty window at the cursor and moves the item into it. A text view's text drag sits out the gesture.
+`WindowManager.movePaneToNewWindow` opens an empty window at the cursor and moves the item into it. A text view's text
+drag sits out the gesture.
 `PaneDragTest` and `TabDragWindowsTest` drive it.
 
 ### Status bar breadcrumbs

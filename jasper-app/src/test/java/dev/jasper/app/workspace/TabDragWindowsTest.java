@@ -1155,6 +1155,35 @@ class TabDragWindowsTest {
         });
     }
 
+    /** Full windows plan 5: a pane drag running outside every window loses its target when its item becomes pinned. */
+    @Test void aPaneDragLosesItsTearOutWhenItsItemIsPinned() throws Exception {
+        edt(() -> {
+            main.content().split(Side.RIGHT);
+            relayout(frameOf(main));
+        });
+        launch();
+        edt(() -> {
+            WindowContent from = main.content();
+            Tab moving = from.workspace().tabs().get(1);
+            facts.clear();
+            Point outside = new Point(3000, 3000);
+            Component source = startPane(from, moving, outside);
+            assertThat(manager.tabDrag().target()).containsInstanceOf(TabDrag.Target.TearOut.class);
+            var pin = moving.pin();
+            try {
+                mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(3010, 3010), PANE);
+                assertThat(manager.tabDrag().target()).as("a modal owner holds it in its window").isEmpty();
+                mouse(source, MouseEvent.MOUSE_RELEASED, new Point(3010, 3010), PANE);
+                assertThat(manager.windows()).containsExactly(main, child);
+                assertThat(placed).isEmpty();
+                assertThat(from.workspace().tabs()).contains(moving);
+                assertThat(moves()).isEmpty();
+            } finally {
+                pin.close();
+            }
+        });
+    }
+
     /**
      * Tabs and panes spec 7 and workspace plan 8c Rulings 3 and 12: a pane dropped on the leading quarter of another
      * window's first entry becomes that window's first tab, shown, through the tab registry, one TAB_MOVED, under an id no

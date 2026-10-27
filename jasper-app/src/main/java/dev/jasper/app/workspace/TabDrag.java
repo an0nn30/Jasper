@@ -348,6 +348,7 @@ final class TabDrag {
         if (this.tab != null) cancel();
         Optional<ParentTabId> id = window.parentTabOf(item);
         if (id.isEmpty()) return;
+        WorkspaceView view = window.parentTabs().view(id.get()).orElseThrow();
         beginGesture(event);
         from = window;
         parentTab = id.get();
@@ -356,7 +357,6 @@ final class TabDrag {
         source = event.getComponent();
         pressedAt = screen(event);
         // A tear-out's window: the tab's workspace, with the pane's corner where the press holds it.
-        WorkspaceView view = window.parentTabs().view(id.get()).orElseThrow();
         Component held = item.group().map(view::groupView).map(Component.class::cast).orElse(view);
         grab = SwingUtilities.convertPoint(source, event.getPoint(), held);
         size = view.getSize();
