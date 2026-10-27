@@ -123,7 +123,8 @@ Expected: FAIL (a CHILD window has no header, status bar or stripes; Zen is disa
   mounted today (title bar or header, menu row or screen menu bar). `JasperApplication.composeContent` passes `uiState`
   to every window; `WindowContributions` docks and persists for every window, so the last window to change or close the
   dock is what `ui-state.toml` holds (the class comment's "the last window closed wins" now applies to every window).
-  The notification layer attaches to every window; `NotificationsFeature`'s routing (target, last active, first
+  Each window's Float and Window tool windows are its own: `DetachedFrame`'s Float dialog is owned by that window's
+  frame. The notification layer attaches to every window; `NotificationsFeature`'s routing (target, last active, first
   attached) is unchanged, so a card still shows in one window until plan 2.
 
 - [ ] **Step 4: Run the workspace and application tests**
@@ -206,7 +207,7 @@ Files; no other expectation changes).
         JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
         JasperWindow second = manager.openWindow(directory).orElseThrow();
         assertThat(manager.windows()).containsExactly(first, second);
-        assertThat(second.content().chrome().header().isDisplayable() || second.content().status() != null).isTrue();
+        assertThat(SwingUtilities.isDescendingFrom(second.content().status(), second.content())).as("full chrome").isTrue();
         assertThat(second.content().tabCount()).isEqualTo(1);
     });
     launch();
@@ -282,8 +283,11 @@ Expected: FAIL to compile (`ensureWindow`, `openWindow`, `moveTabToWindow`, `clo
   `fitted`, placeholders, the closing-all flag, `tabDrag`, `fronts`) and its failure handling; change only what the
   Interfaces block says. The restore (`openMain` → `restore`) opens every saved window in file order: a failure in the
   first opens it as a new window and keeps the file aside, as `openMain` does for the main window; a later failure costs
-  only that window, as `restoreChild` does; at the end the first restored comes to the front. The one-restore-at-a-time
-  rule is `openingMain` renamed `restoring`. `emptyWindow()` opens an empty window without `ensureWindow` first.
+  only that window, as `restoreChild` does, and a window whose restore brought nothing back, or emptied it before its
+  frame exists, is discarded unshown (the `prepare` predicate, replacing the removed `onEmpty`); at the end the first
+  restored comes to the front. `TabDrag`'s empty-workspace target needs no change: it follows `WorkspaceView`, which now
+  shows the empty workspace in every window (only its comments that say "the main window" change). The
+  one-restore-at-a-time rule is `openingMain` renamed `restoring`. `emptyWindow()` opens an empty window without `ensureWindow` first.
   `movedOut` closes any window left with no tab. `JasperWindow`'s activation and closing paths are unchanged.
 
 - [ ] **Step 4: Move every caller** named under Files to the new names: owner-less and handoff routes to
@@ -333,6 +337,11 @@ Expected: PASS.
     // exactly "alpha", "gamma"; choosing "gamma" moves beta's active tab into gamma. With one window the submenu is absent.
 }
 
+// WindowManagerTest
+@Test void aNewWindowCascadesFromTheActiveWindow() throws Exception {
+    // w0 placed at Bounds(100, 100, 1200, 800) via placed(...); openWindow(null)'s placement() is Bounds(130, 130, 1200, 800).
+}
+
 // ResidentTray test
 @Test void theMacMenuBarItemOffersNewWindow() {
     assertThat(ResidentTray.entries(true)).extracting(ResidentTray.Entry::label)
@@ -347,7 +356,9 @@ Expected: PASS.
 Run: `./gradlew :jasper-app:test --tests '*KeymapDefaultsTest' --tests '*WindowMenuTest' --tests '*ResidentTray*'`
 Expected: FAIL (`NEW_WINDOW` undefined).
 
-- [ ] **Step 3: Rename and add the actions** as listed under Files; the File menu, toolbar button (`app-window` icon,
+- [ ] **Step 3: Rename and add the actions** as listed under Files. `openWindow` (Task 2) places the new window 30 by
+  30 unscaled pixels below and right of `lastActive()`'s bounds, kept on that window's display by `WindowPlacement`,
+  before its frame shows (spec 5.2's cascade); with no window open it opens where the platform puts one; the File menu, toolbar button (`app-window` icon,
   tooltip "New window") and palette use `NEW_WINDOW`. `[keybindings]` keys `new_terminal_window` and
   `move_to_main_window` are not read any more (MVP).
 
