@@ -58,10 +58,10 @@ final class WorkspaceActions {
             case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
                  SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
                 owner.selectParentTabAt(id.ordinal() - ActionId.SELECT_TAB_1.ordinal());
-            case NEW_TERMINAL_WINDOW -> owner.requestNewTerminalWindow();
+            case NEW_WINDOW -> owner.requestNewWindow();
             case CLOSE_WINDOW -> owner.requestCloseWindow();
             case MOVE_TAB_TO_NEW_WINDOW -> owner.moveTabToNewWindow(owner.selectedTab());
-            case MOVE_TO_MAIN_WINDOW -> owner.moveToOtherWindow();
+            case MOVE_TAB_TO_WINDOW -> owner.moveToOtherWindow();
             case MOVE_PANE_TO_NEW_TAB -> owner.moveToNewTab(owner.selectedTab());
             case MOVE_PANE_TO_TAB_1, MOVE_PANE_TO_TAB_2, MOVE_PANE_TO_TAB_3, MOVE_PANE_TO_TAB_4, MOVE_PANE_TO_TAB_5,
                  MOVE_PANE_TO_TAB_6, MOVE_PANE_TO_TAB_7, MOVE_PANE_TO_TAB_8, MOVE_PANE_TO_TAB_9 ->
@@ -139,12 +139,12 @@ final class WorkspaceActions {
                     case MANAGE_CYGWIN_PACKAGES -> id.availableOn(System.getProperty("os.name", "")) && owner.onManageCygwinPackages != null;
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
-                    case COMMAND_PALETTE, NEW_TAB, NEW_TERMINAL_WINDOW, CLOSE_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT,
+                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, CLOSE_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT,
                          SPLIT_DOWN -> true;
                     // A window's only parent tab stays (workspace plan 8a Rulings 6).
                     case MOVE_TAB_TO_NEW_WINDOW -> owner.mayMoveTabToNewWindow(owner.activeParentTab());
                     // A parent tab or a window moves whole or not at all (workspace plan 7b Rulings 7).
-                    case MOVE_TO_MAIN_WINDOW -> owner.mayMoveToOtherWindow();
+                    case MOVE_TAB_TO_WINDOW -> owner.mayMoveToOtherWindow();
                     // A tab's only pane, a pinned item and one being closed stay (workspace plan 8b Rulings 9).
                     case MOVE_PANE_TO_NEW_TAB -> owner.mayMoveToNewTab(owner.selectedTab());
                     // Its own tab's number, a number no tab has and a pane that may not move do nothing (pane

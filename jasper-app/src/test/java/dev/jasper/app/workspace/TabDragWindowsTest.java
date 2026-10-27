@@ -418,7 +418,7 @@ class TabDragWindowsTest {
 
     /**
      * Workspace plan 7c Rulings 7: no standard look shows a strip over a window's only tab, so none can be dragged; the
-     * window manager still moves it, as Move to Main Window does, onto another window's strip, never out to a window of
+     * window manager still moves it, as Move Tab to Window does, onto another window's strip, never out to a window of
      * its own, and its window closes after the move.
      */
     @Test void aFullWindowsOnlyTabMovesOntoAnotherWindowsStripAndItsWindowClosesAfterTheMove() throws Exception {

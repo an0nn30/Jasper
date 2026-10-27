@@ -109,7 +109,7 @@ live in `config.toml` in Jasper's home folder (`~/.config/jasper` on macOS, `$XD
 | --- | --- | --- |
 | Command Palette | Cmd+Shift+P | Ctrl+Shift+P |
 | New Tab | Cmd+T | Ctrl+Shift+T |
-| New Terminal Window | Cmd+N | Ctrl+Shift+N |
+| New Window | Cmd+N | Ctrl+Shift+N |
 | Split Right | Cmd+D | Ctrl+Shift+D |
 | Split Down | Cmd+Shift+D | Ctrl+Alt+Shift+D |
 | Focus Pane Left / Right / Up / Down | Cmd+Option+Arrow | Ctrl+Alt+Shift+Arrow |

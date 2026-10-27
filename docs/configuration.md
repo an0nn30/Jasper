@@ -351,7 +351,7 @@ Jasper's home. [Notifications](notifications.md) describes what he shows.
 
 With `system.run_in_background` on (the default on macOS and Windows), Jasper keeps running when its last window
 closes, so the next window opens without a cold start; plugins keep running, but no shell does. On macOS, Quit (Cmd+Q)
-closes every window and leaves Jasper in the menu bar, whose item offers **New Terminal Window**, **Settings…** and
+closes every window and leaves Jasper in the menu bar, whose item offers **New Window**, **Settings…** and
 **Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and **Quit Jasper**. Linux has
 no such icon, so the default there is off. [The workspace](workspace.md) describes quitting and reopening.
 

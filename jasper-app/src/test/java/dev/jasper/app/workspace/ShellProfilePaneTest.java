@@ -105,7 +105,7 @@ class ShellProfilePaneTest {
         edt(() -> owner[0].newTab(owner[0].directory()));
         launchAll();
         edt(() -> {
-            owner[0].requestNewTerminalWindow();
+            owner[0].requestNewWindow();
             owner[0].openTab(HOME, null, Optional.empty());
         });
         launchAll();

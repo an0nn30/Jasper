@@ -115,7 +115,7 @@ keeps Jasper running with no windows open, so a new window opens at once. It tak
 | | macOS | Windows | Linux |
 | --- | --- | --- | --- |
 | Default | On | On | Off |
-| Closing the main window (and with it every window) | Jasper keeps running in its menu bar item: **New Terminal Window**, **Settings…**, **Quit Jasper Completely** | Jasper keeps running in its notification-area icon: **Open Jasper**, **Quit Jasper** | Jasper quits. With the setting on, it keeps running with no icon; launch Jasper again for a window |
+| Closing the main window (and with it every window) | Jasper keeps running in its menu bar item: **New Window**, **Settings…**, **Quit Jasper Completely** | Jasper keeps running in its notification-area icon: **Open Jasper**, **Quit Jasper** | Jasper quits. With the setting on, it keeps running with no icon; launch Jasper again for a window |
 | Quit | Cmd+Q closes every window and keeps Jasper in the menu bar; **Quit Jasper Completely** ends it | Quit (Ctrl+Alt+Shift+Q) ends Jasper | Quit (Ctrl+Alt+Shift+Q) ends Jasper |
 | At login | An installed Jasper starts in the background, with no Dock icon | An installed Jasper starts in the background | Not started |
 
@@ -128,7 +128,7 @@ only while one of Jasper's windows is open. Turning the setting off also removes
 
 ### Tabs and splits
 
-- **New Tab** (Cmd+T on macOS, Ctrl+Shift+T on Linux and Windows) opens a tab; **New Terminal Window** (Cmd+N,
+- **New Tab** (Cmd+T on macOS, Ctrl+Shift+T on Linux and Windows) opens a tab; **New Window** (Cmd+N,
   Ctrl+Shift+N) a child window, which has only a title bar and its tabs. New tabs, windows and splits start in the
   current pane's folder once its shell has reported it, as shell integration does.
 - **Split Right** (Cmd+D, Ctrl+Shift+D) and **Split Down** (Cmd+Shift+D, Ctrl+Alt+Shift+D) split the current pane;

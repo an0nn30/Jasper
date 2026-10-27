@@ -574,7 +574,7 @@ cannot mask a packaging problem.
   bar item present.
 - [ ] The menu bar glyph follows the menu bar in Light and Dark appearance (and with a tinted menu bar); **New
   Terminal Window**, **Settings…** and **Quit Jasper Completely** work with Jasper in the background and with windows
-  open, and **New Terminal Window** and **Settings…** come to the front.
+  open, and **New Window** and **Settings…** come to the front.
 - [ ] Press Cmd+Q with two windows open: both close, the Dock icon and the Cmd+Tab entry disappear, the menu bar item
   stays, and `pgrep -fl Jasper.app` still lists the process. Repeat with **Jasper › Quit Jasper**, **File › Quit** and
   the Dock icon's **Quit**.

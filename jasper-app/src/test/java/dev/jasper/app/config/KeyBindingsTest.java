@@ -18,9 +18,9 @@ class KeyBindingsTest {
     void actionCatalogCoversEveryPhaseOneActionAndUsesStableIds() {
         assertThat(EnumSet.allOf(ActionId.class)).containsExactly(
             ActionId.NEW_TAB, ActionId.CLOSE_PANE, ActionId.CLOSE_TAB,
-            ActionId.NEW_TERMINAL_WINDOW, ActionId.CLOSE_WINDOW,
+            ActionId.NEW_WINDOW, ActionId.CLOSE_WINDOW,
             ActionId.MOVE_TAB_TO_NEW_WINDOW,
-            ActionId.MOVE_TO_MAIN_WINDOW, ActionId.OPEN_FILE,
+            ActionId.MOVE_TAB_TO_WINDOW, ActionId.OPEN_FILE,
             ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_PANE, ActionId.MOVE_PANE_TO_NEW_TAB,
             ActionId.MOVE_PANE_TO_TAB_1, ActionId.MOVE_PANE_TO_TAB_2, ActionId.MOVE_PANE_TO_TAB_3, ActionId.MOVE_PANE_TO_TAB_4,
             ActionId.MOVE_PANE_TO_TAB_5, ActionId.MOVE_PANE_TO_TAB_6, ActionId.MOVE_PANE_TO_TAB_7, ActionId.MOVE_PANE_TO_TAB_8,
@@ -216,9 +216,9 @@ class KeyBindingsTest {
     }
     @Test
     void highFunctionKeyOverridesResolveActualAwtKeyEvents() {
-        KeyBindings bindings = KeyBindings.withOverrides(true, Map.of("new_tab", "F13", "new_terminal_window", "F24"));
+        KeyBindings bindings = KeyBindings.withOverrides(true, Map.of("new_tab", "F13", "new_window", "F24"));
         assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_F13, 0))).contains(ActionId.NEW_TAB);
-        assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_F24, 0))).contains(ActionId.NEW_TERMINAL_WINDOW);
+        assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_F24, 0))).contains(ActionId.NEW_WINDOW);
     }
 
     @Test void displayWritesTheMacGlyphsInOrderAndNamesElsewhere() {

@@ -85,9 +85,9 @@ These apply only while a terminal pane (or its find bar) has the focus.
 
 | Action | ID | macOS | Linux and Windows |
 |---|---|---|---|
-| New Terminal Window | `new_terminal_window` | Cmd+N | Ctrl+Shift+N |
+| New Window | `new_window` | Cmd+N | Ctrl+Shift+N |
 | Close Window | `close_window` | Cmd+Shift+W | none |
-| Move to Main Window | `move_to_main_window` | none | none |
+| Move Tab to Window | `move_tab_to_window` | none | none |
 | Open File… | `open_file` | none | none |
 | Zen (Enter Zen Mode / Exit Zen Mode) | `toggle_zen_mode` | none | none |
 | Rail (Show Rail / Hide Rail) | `toggle_rail` | none | none |

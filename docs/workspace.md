@@ -30,7 +30,7 @@ and keymap as the main window.
 
 ## Windows
 
-**New Terminal Window** (File menu, the toolbar's New Terminal Window button, Cmd+N on macOS, Ctrl+Shift+N on Linux and
+**New Window** (File menu, the toolbar's New Window button, Cmd+N on macOS, Ctrl+Shift+N on Linux and
 Windows) opens a child window with one terminal tab. Its shell starts in the focused pane's folder when Jasper knows
 it, otherwise in your home folder. **Close Window** (File menu, Cmd+Shift+W on macOS, no default shortcut on Linux and
 Windows) closes the window it runs in, as its title-bar close button does.
@@ -175,7 +175,7 @@ The toolbar sits at the trailing end of the header:
 
 | Button | Action |
 |---|---|
-| New Tab, New Terminal Window | **New Tab**, **New Terminal Window** |
+| New Tab, New Window | **New Tab**, **New Window** |
 | **Split** ▾ | A menu with **Split Right** and **Split Down** |
 | Maximize Pane | **Maximize Pane** |
 | Plugin buttons | What plugins add, after their own separator. The Editor adds **New Editor Window**, which opens an untitled file in a new child window; Remote adds a **Sessions** menu of your saved hosts, your WSL distributions on Windows, and **Manage Sessions…**. |
@@ -232,7 +232,7 @@ Menu items show their current shortcuts. Opening a menu refreshes which items ar
 
 | Menu | Items |
 |---|---|
-| File | New Tab, New Terminal Window, Open File…, Close Pane, Close Tab, Close Window, Settings, Reload Config, Quit; then, each after a separator, Jasper's **Manage Plugins…** and the plugins' items: Editor's **Open in Editor…**, **New Editor Tab**, **Split Right with Editor**, **Open in Editor Pane…** and **New Editor Window**, Credential Vault's **Open Vault...**, **Change Vault Master Password...** and **Vault Plugin Grants...**, Project Index's **Index Folder…** |
+| File | New Tab, New Window, Open File…, Close Pane, Close Tab, Close Window, Settings, Reload Config, Quit; then, each after a separator, Jasper's **Manage Plugins…** and the plugins' items: Editor's **Open in Editor…**, **New Editor Tab**, **Split Right with Editor**, **Open in Editor Pane…** and **New Editor Window**, Credential Vault's **Open Vault...**, **Change Vault Master Password...** and **Vault Plugin Grants...**, Project Index's **Index Folder…** |
 | Edit | Copy, Paste, Find, Find Next, Find Previous, Clear Scrollback |
 | View | Command Palette; View Modes › Zen; Maximize Pane; Show/Hide › Toolbar (Icons and Labels, Icons Only, Hidden), Status Bar, Rail; Font Size › Increase Font Size, Decrease Font Size, Reset Font Size; Tool Windows › one toggle per tool window |
 | Tab | Split › Terminal Right, Terminal Down, then each split item's Right and Down (Editor Right, Editor Down, Open File Right…, Open File Down…); Move Pane to New Tab, Move Pane to Tab ›, Move Tab Into ›, Focus Pane Left, Focus Pane Right, Focus Pane Up, Focus Pane Down, Previous Prompt, Next Prompt; Rename Tab; Next Tab, Previous Tab, Select Tab 1 to Select Tab 9 |
@@ -471,7 +471,7 @@ has prepared its first window.
   Jasper running. Plugins' items are asked first, as when you close them, but plugins are not: their
   work, such as a File Server share, carries on until **Quit Jasper Completely**. The Dock icon, and Jasper's place in
   Cmd+Tab, show only while a Jasper window is open; clicking the Dock icon, Spotlight or `open -a Jasper` opens a window
-  in the running Jasper. The menu bar item has **New Terminal Window**, **Settings…** and **Quit Jasper Completely**.
+  in the running Jasper. The menu bar item has **New Window**, **Settings…** and **Quit Jasper Completely**.
   Logging out, restarting or shutting down quits for real, and so does Cmd+Q before start-up has settled.
 - **Windows:** the notification-area icon (Windows may keep it among the hidden icons until you pin it) has **Open
   Jasper** and **Quit Jasper**. Double-clicking it opens or raises a window, or, while a notification's balloon waits

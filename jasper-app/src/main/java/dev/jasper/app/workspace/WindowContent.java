@@ -1003,8 +1003,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean settingsConnected() { return openSettingsAt != null; }
     void openWindowSettings() { if (openSettingsAt != null) openSettingsAt.accept("window"); }
     void reloadConfiguration() { reloadConfiguration.run(); }
-    /** New Terminal Window (full windows spec 5.2): a new window with a terminal tab where a tab from here starts. */
-    void requestNewTerminalWindow() { newWindow.accept(directory()); }
+    /** New Window (full windows spec 5.2): a new window with a terminal tab where a tab from here starts. */
+    void requestNewWindow() { newWindow.accept(directory()); }
     /** Close Window (workspace tabs spec 6.4 and 11): this window, as its title bar's close button closes it. */
     void requestCloseWindow() { onCloseWindow.run(); }
     /**
@@ -1015,15 +1015,29 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (manager != null && tab != null) parentTabOf(tab).ifPresent(parentTab -> manager.moveTabToNewWindow(this, parentTab));
     }
     /**
-     * The Move to Main Window action, until Move Tab to Window replaces it: the shown parent tab moves to the first other
-     * window in opening order ({@link #firstOtherWindow}).
+     * The Move Tab to Window action from the keyboard or the palette, which cannot choose: the shown parent tab moves to
+     * the other window that was active last.
      */
-    void moveToOtherWindow() { firstOtherWindow().ifPresent(to -> manager.moveTabToWindow(this, activeParentTab(), to)); }
+    void moveToOtherWindow() {
+        otherWindows(true).stream().findFirst().ifPresent(to -> manager.moveTabToWindow(this, activeParentTab(), to));
+    }
 
-    /** The first open window in opening order other than this one; empty outside a window manager or with no other. */
-    private Optional<WindowContent> firstOtherWindow() {
-        if (closed || manager == null) return Optional.empty();
-        return manager.windows().stream().map(JasperWindow::content).filter(other -> other != this && !other.closed()).findFirst();
+    /**
+     * Move Tab to Window (full windows spec 5.3): {@code parentTab} moves to just after {@code to}'s active parent tab,
+     * through the window manager.
+     */
+    private void moveTabToWindow(ParentTabId parentTab, WindowContent to) {
+        if (!closed && manager != null) manager.moveTabToWindow(this, parentTab, to);
+    }
+
+    /**
+     * The open windows other than this one, in opening order, or the one active last first; empty outside a window
+     * manager.
+     */
+    private java.util.List<WindowContent> otherWindows(boolean byActivation) {
+        if (closed || manager == null) return java.util.List.of();
+        return (byActivation ? manager.windowsByActivation() : manager.windows()).stream().map(JasperWindow::content)
+            .filter(other -> other != this && !other.closed()).toList();
     }
     /** File › Open File…: {@link #fileChooser} from the active pane's folder, then the route a Cmd-click takes, at no line. */
     void openFile() { fileChooser.apply(java.util.Optional.ofNullable(directory())).ifPresent(file -> onOpenFile.accept(file, 0)); }
@@ -1546,11 +1560,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      *
-     * Whether the Move to Main Window action may take the shown parent tab: one holding tabs that may all move, while
+     * Whether the Move Tab to Window action may take the shown parent tab: one holding tabs that may all move, while
      * another window is open (Rulings 7).
      */
-    boolean mayMoveToOtherWindow() {
-        return firstOtherWindow().isPresent() && parentTabs.view(activeParentTab()).filter(view -> !view.isEmpty())
+    boolean mayMoveToOtherWindow() { return mayMoveToOtherWindow(activeParentTab()); }
+
+    private boolean mayMoveToOtherWindow(ParentTabId parentTab) {
+        return !otherWindows(false).isEmpty() && parentTabs.view(parentTab).filter(view -> !view.isEmpty())
             .map(view -> movable(view.tabs())).orElse(false);
     }
 
@@ -1831,8 +1847,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * A tab's menu, from its strip entry (tabs and panes spec 6 and 10; workspace plan 8a Rulings 8), for the tab holding
      * {@code item}: Rename Tab while {@code item} is a terminal, Move Tab to New Window, Move Tab Into (pane flexibility
      * spec 5), a rule, Close Tab, then
-     * {@code item}'s own commands. Move to Main Window moves the whole window, so the window menu and the context menu
-     * offer it alone. Empty for an item this window does not hold.
+     * {@code item}'s own commands. Move Tab to Window follows Move Tab Into while another window is open. Empty for an item
+     * this window does not hold.
      *
      * @param item the item the entry shows, its tab's active pane's
      * @return the menu
@@ -1844,6 +1860,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 menu.add(tabMenuItem("Rename Tab", ActionId.RENAME_TAB, () -> { selectTab(item); invoke(ActionId.RENAME_TAB); }));
             menu.add(windowItem(ActionId.MOVE_TAB_TO_NEW_WINDOW, item));
             menu.add(tabMoves(parent));
+            if (!otherWindows(false).isEmpty()) menu.add(windowMoves(parent));
             menu.addSeparator();
             menu.add(tabMenuItem(ActionId.CLOSE_TAB.label(), ActionId.CLOSE_TAB, () -> closeParentTab(parent)));
             if (!item.commands().isEmpty()) menu.addSeparator();
@@ -1865,14 +1882,42 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * The window menu's entries (tabs and panes spec 6; workspace plan 8a Rulings 7): Move Tab to New Window, then the
-     * Move to Main Window action while another window is open.
+     * The window menu's entries (tabs and panes spec 6; full windows spec 5.3): Move Tab to New Window, then the Move Tab
+     * to Window submenu while another window is open.
      *
      * @return the entries in menu order
      */
     java.util.List<ActionId> windowMenuItems() {
-        return firstOtherWindow().isEmpty() ? java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW)
-            : java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TO_MAIN_WINDOW);
+        return otherWindows(false).isEmpty() ? java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW)
+            : java.util.List.of(ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TAB_TO_WINDOW);
+    }
+
+    /**
+     * The menu entry for one of {@link #windowMenuItems()}: the action's item, or for Move Tab to Window the submenu of
+     * the other windows ({@link #windowMoves}) for the shown parent tab.
+     */
+    JMenuItem windowMenuEntry(ActionId id) {
+        if (id == ActionId.MOVE_TAB_TO_WINDOW) return windowMoves(activeParentTab());
+        var item = new JMenuItem(action(id));
+        item.putClientProperty("html.disable", true);
+        return item;
+    }
+
+    /**
+     * Move Tab to Window's submenu for {@code parent} (full windows spec 5.3): an entry for each other window, in opening
+     * order, titled with its active tab's title as plain text, that moves {@code parent} there; disabled while the tab
+     * may not move.
+     */
+    private JMenu windowMoves(ParentTabId parent) {
+        var moves = new JMenu(ActionId.MOVE_TAB_TO_WINDOW.label());
+        for (WindowContent other : otherWindows(false)) {
+            Tab shown = other.selectedTab();
+            var entry = PlainText.item(shown == null ? other.frameTitle : other.tabTitle(shown));
+            entry.addActionListener(event -> moveTabToWindow(parent, other));
+            moves.add(entry);
+        }
+        moves.setEnabled(mayMoveToOtherWindow(parent));
+        return moves;
     }
 
     /**
@@ -1884,11 +1929,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     JPopupMenu windowMenu() {
         updateActions();
         var menu = new JPopupMenu();
-        for (ActionId id : windowMenuItems()) {
-            var item = new JMenuItem(action(id));
-            item.putClientProperty("html.disable", true);
-            menu.add(item);
-        }
+        for (ActionId id : windowMenuItems()) menu.add(windowMenuEntry(id));
         dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         return menu;
     }
@@ -1897,14 +1938,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private JMenuItem windowItem(ActionId id, Tab tab) {
         Runnable run = switch (id) {
             case MOVE_TAB_TO_NEW_WINDOW -> () -> moveTabToNewWindow(tab);
-            case MOVE_TO_MAIN_WINDOW -> this::moveToOtherWindow;
             default -> throw new IllegalArgumentException("Not a window menu entry: " + id);
         };
         var item = tabMenuItem(id.label(), id, run);
         // Enabled only while every tab the entry would move may move (workspace plan 7b Rulings 7).
         item.setEnabled(switch (id) {
             case MOVE_TAB_TO_NEW_WINDOW -> parentTabOf(tab).map(this::mayMoveTabToNewWindow).orElse(false);
-            case MOVE_TO_MAIN_WINDOW -> mayMoveToOtherWindow();
             default -> false;
         });
         return item;

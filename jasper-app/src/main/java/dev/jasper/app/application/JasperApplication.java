@@ -961,7 +961,7 @@ public final class JasperApplication {
     private void showIndicator(boolean show) {
         if (show && removeIndicator == null && !quitting && !stopped) {
             removeIndicator = residentIndicator.apply(new dev.jasper.app.platform.ResidentTray.Actions(
-                () -> open(List.of(), "menu"), this::newTerminalWindowFromMenuBar, this::settingsFromMenuBar, this::quit));
+                () -> open(List.of(), "menu"), this::newWindowFromMenuBar, this::settingsFromMenuBar, this::quit));
         } else if (!show && removeIndicator != null) {
             Runnable remove = removeIndicator;
             removeIndicator = null;
@@ -999,10 +999,10 @@ public final class JasperApplication {
     }
 
     /**
-     * The menu bar item's New Terminal Window: a new window with a terminal tab, after the saved windows are restored
+     * The menu bar item's New Window: a new window with a terminal tab, after the saved windows are restored
      * when none is open (workspace tabs spec 6.4 and 6.5), in front of other applications. EDT.
      */
-    private void newTerminalWindowFromMenuBar() {
+    private void newWindowFromMenuBar() {
         if (quitting || stopped) return;
         windows.openWindow(null);
         requestForeground();

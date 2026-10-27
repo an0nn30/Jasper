@@ -498,7 +498,7 @@ path, such as one on a network share, is not reported.
 New tabs, splits and new windows start in the focused pane's local directory; when it has none (before any report, or
 since a remote report), they start in the directory the pane was started in. A pane started without a directory, such as
 the first pane of the window Jasper opens at start-up, or a plugin's session, then passes nothing on, and the new shell
-starts in your home folder (a WSL profile's `~`, Cygwin Bash's Cygwin home). New Tab and New Terminal Window start the
+starts in your home folder (a WSL profile's `~`, Cygwin Bash's Cygwin home). New Tab and New Window start the
 configured profile; a split beside a running terminal starts that terminal's profile, and any other split the configured
 one. A terminal Jasper restores starts in its last local directory, or where a new shell starts when that directory is
 gone. On Windows, a directory on another computer's network share

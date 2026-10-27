@@ -112,7 +112,7 @@ class WindowChromeTest {
             }
             // Workspace plan 7b Rulings 16: the window's ⋮ follows Settings; the overflow button, last in the row's order,
             // lays out before the ⋮.
-            assertThat(shape).containsExactly("New tab", "New terminal window", "|", "Split", "Maximize pane", "(|)", "|", "Find", "Settings",
+            assertThat(shape).containsExactly("New tab", "New window", "|", "Split", "Maximize pane", "(|)", "|", "Find", "Settings",
                 "View Options", "More actions");
             var find = (JButton) java.util.Arrays.stream(toolbar.getComponents())
                 .filter(child -> child instanceof JButton button && "Find".equals(button.getClientProperty("label"))).findFirst().orElseThrow();

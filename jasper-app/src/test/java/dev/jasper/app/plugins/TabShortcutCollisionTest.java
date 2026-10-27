@@ -33,7 +33,7 @@ class TabShortcutCollisionTest {
         ActionId.PREVIOUS_TAB, ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4,
         ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6, ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9,
         ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
-        ActionId.MAXIMIZE_PANE, ActionId.MOVE_PANE_TO_NEW_TAB, ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TO_MAIN_WINDOW);
+        ActionId.MAXIMIZE_PANE, ActionId.MOVE_PANE_TO_NEW_TAB, ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TAB_TO_WINDOW);
 
     @TempDir Path root;
     private PluginRuntime runtime;

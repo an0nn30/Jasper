@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.lifecycle.Subscription;
@@ -52,13 +53,13 @@ class WindowMenuTest {
             main.newTab(HOME);
             main.updateActions();
             assertThat(main.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("from two tabs").isTrue();
-            assertThat(main.action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isFalse();
+            assertThat(main.action(ActionId.MOVE_TAB_TO_WINDOW).isEnabled()).isFalse();
             var full = windows.manager.openWindow(null).orElseThrow().content();
-            assertThat(full.windowMenuItems()).containsExactly(ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TO_MAIN_WINDOW);
-            assertThat(texts(full.windowMenu())).containsExactly("Move Tab to New Window", "Move to Main Window");
+            assertThat(full.windowMenuItems()).containsExactly(ActionId.MOVE_TAB_TO_NEW_WINDOW, ActionId.MOVE_TAB_TO_WINDOW);
+            assertThat(texts(full.windowMenu())).containsExactly("Move Tab to New Window", "Move Tab to Window");
             full.updateActions();
             assertThat(full.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("its only tab stays").isFalse();
-            assertThat(full.action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isTrue();
+            assertThat(full.action(ActionId.MOVE_TAB_TO_WINDOW).isEnabled()).isTrue();
             full.newTab(HOME);
             full.updateActions();
             assertThat(full.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).isTrue();
@@ -79,14 +80,14 @@ class WindowMenuTest {
             for (var window : List.of(main, full)) window.updateActions();
             assertThat(main.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).isFalse();
             assertThat(main.commands().find("move_tab_to_new_window").orElseThrow().action().isEnabled()).as("in the palette").isFalse();
-            assertThat(full.action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isFalse();
+            assertThat(full.action(ActionId.MOVE_TAB_TO_WINDOW).isEnabled()).isFalse();
             assertThat(main.windowMenu().getComponents()).as("the window menu").noneMatch(java.awt.Component::isEnabled);
             assertThat(item(main.tabMenu(inMain), "Move Tab to New Window").isEnabled()).isFalse();
             assertThat(item(full.tabMenu(inFull), "Move Tab to New Window").isEnabled()).isFalse();
             held.forEach(Subscription::close);
             for (var window : List.of(main, full)) window.updateActions();
             assertThat(main.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).isTrue();
-            assertThat(full.action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).isTrue();
+            assertThat(full.action(ActionId.MOVE_TAB_TO_WINDOW).isEnabled()).isTrue();
             assertThat(item(full.tabMenu(inFull), "Move Tab to New Window").isEnabled()).isTrue();
         });
         windows.launch();
@@ -134,7 +135,7 @@ class WindowMenuTest {
             JasperWindow full = windows.others().getLast();
             assertThat(full.content().activeParentTab()).isEqualTo(moving);
             assertThat(main.parentTabCount()).isEqualTo(1);
-            full.content().invoke(ActionId.MOVE_TO_MAIN_WINDOW);
+            full.content().invoke(ActionId.MOVE_TAB_TO_WINDOW);
             assertThat(full.closed()).isTrue();
             assertThat(main.parentTabCount()).isEqualTo(2);
             assertThat(main.activeParentTab()).isEqualTo(moving);
@@ -166,7 +167,32 @@ class WindowMenuTest {
             var main = windows.first().content();
             assertThat(texts(main.chrome().contextMenu())).endsWith("---", "Move Tab to New Window");
             var full = windows.manager.openWindow(null).orElseThrow().content();
-            assertThat(texts(full.chrome().contextMenu())).endsWith("---", "Move Tab to New Window", "Move to Main Window");
+            assertThat(texts(full.chrome().contextMenu())).endsWith("---", "Move Tab to New Window", "Move Tab to Window");
+        });
+        windows.launch();
+    }
+
+    /** Full windows spec 5.3: the submenu lists the other windows by their active tab's title; one choice moves the tab. */
+    @Test void moveTabToWindowListsTheOtherWindowsByTheirActiveTabsTitle() throws Exception {
+        edt(() -> {
+            var alpha = windows.first().content();
+            assertThat(texts(alpha.windowMenu())).as("one window: no submenu").containsExactly("Move Tab to New Window");
+            windows.model.tabs().open("dev.example.editor", "alpha", "alpha", null, new javax.swing.JPanel());
+            windows.model.tabs().open("dev.example.editor", "beta", "beta", null, new javax.swing.JPanel(), TabRegistry.Placement.NEW_WINDOW);
+            windows.model.tabs().open("dev.example.editor", "gamma", "gamma", null, new javax.swing.JPanel(), TabRegistry.Placement.NEW_WINDOW);
+            var betaWindow = windows.others().get(0);
+            var beta = betaWindow.content();
+            var gamma = windows.others().get(1).content();
+            var menu = beta.windowMenu();
+            var moves = (javax.swing.JMenu) menu.getComponent(1);
+            assertThat(moves.getText()).isEqualTo("Move Tab to Window");
+            var titles = new ArrayList<String>();
+            for (var child : moves.getMenuComponents()) titles.add(((JMenuItem) child).getText());
+            assertThat(titles).as("the other windows in opening order").containsExactly(alpha.tabTitle(alpha.selectedTab()), "gamma");
+            ParentTabId moving = beta.activeParentTab();
+            ((JMenuItem) moves.getMenuComponent(1)).doClick();
+            assertThat(gamma.parentTabs().view(moving)).as("beta's tab joined gamma").isPresent();
+            assertThat(betaWindow.closed()).as("beta emptied and closed").isTrue();
         });
         windows.launch();
     }
@@ -175,12 +201,12 @@ class WindowMenuTest {
     @Test void theCommandsAreInThePaletteUnderTheirIds() throws Exception {
         edt(() -> {
             var main = windows.first().content();
-            for (String id : List.of("move_tab_to_new_window", "move_to_main_window"))
+            for (String id : List.of("move_tab_to_new_window", "move_tab_to_window"))
                 assertThat(main.commands().find(id)).as(id).isPresent();
             for (String id : List.of("pop_out_tab", "pop_out_pane", "pop_out_parent_tab", "bring_back", "move_tab_to_main_window"))
                 assertThat(main.commands().find(id)).as(id).isEmpty();
             assertThat(main.action(ActionId.MOVE_TAB_TO_NEW_WINDOW).getValue(Action.NAME)).isEqualTo("Move Tab to New Window");
-            assertThat(main.action(ActionId.MOVE_TO_MAIN_WINDOW).getValue(Action.NAME)).isEqualTo("Move to Main Window");
+            assertThat(main.action(ActionId.MOVE_TAB_TO_WINDOW).getValue(Action.NAME)).isEqualTo("Move Tab to Window");
         });
         windows.launch();
     }

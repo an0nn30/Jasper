@@ -284,6 +284,20 @@ class WindowManagerTest {
         launch();
     }
 
+    /** Full windows spec 5.2: a new window opens 30 by 30 pixels below and right of the window used last. */
+    @Test void aNewWindowCascadesFromTheActiveWindow() throws Exception {
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            first.placed(new JasperWindow.Placement(Optional.of(new UiState.Bounds(100, 100, 1200, 800)), 0));
+            JasperWindow second = manager.openWindow(null).orElseThrow();
+            assertThat(second.placement().bounds()).contains(new UiState.Bounds(130, 130, 1200, 800));
+            JasperWindow third = manager.openWindow(null).orElseThrow();
+            assertThat(third.placement().bounds()).as("from the window opened last")
+                .contains(new UiState.Bounds(160, 160, 1200, 800));
+        });
+        launch();
+    }
+
     @Test void theWindowCommandsOpenCloseAndMoveWindows(@TempDir Path folder) throws Exception {
         Path directory = Files.createDirectories(folder.resolve("work"));
         JasperWindow[] first = new JasperWindow[1];
@@ -292,7 +306,7 @@ class WindowManagerTest {
             first[0].content().newTab(directory);
         });
         launch();
-        edt(() -> first[0].content().invoke(ActionId.NEW_TERMINAL_WINDOW));
+        edt(() -> first[0].content().invoke(ActionId.NEW_WINDOW));
         launch();
         assertThat(started).as("New Window: in the current terminal's directory").last().isEqualTo(directory);
         edt(() -> {
@@ -306,12 +320,12 @@ class WindowManagerTest {
             assertThat(moved.content().activeParentTab()).isEqualTo(moving);
             moved.content().updateActions();
             assertThat(moved.content().action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("its only tab stays").isFalse();
-            assertThat(moved.content().action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).as("another window is open").isTrue();
-            moved.content().invoke(ActionId.MOVE_TO_MAIN_WINDOW);
+            assertThat(moved.content().action(ActionId.MOVE_TAB_TO_WINDOW).isEnabled()).as("another window is open").isTrue();
+            moved.content().invoke(ActionId.MOVE_TAB_TO_WINDOW);
             assertThat(first[0].content().parentTabs().view(moving)).as("back in the first window").isPresent();
             assertThat(moved.closed()).isTrue();
             first[0].content().updateActions();
-            assertThat(first[0].content().action(ActionId.MOVE_TO_MAIN_WINDOW).isEnabled()).as("no other window").isFalse();
+            assertThat(first[0].content().action(ActionId.MOVE_TAB_TO_WINDOW).isEnabled()).as("no other window").isFalse();
             first[0].content().invoke(ActionId.CLOSE_WINDOW);
             assertThat(manager.isEmpty()).as("Close Window on the last window closes it").isTrue();
         });

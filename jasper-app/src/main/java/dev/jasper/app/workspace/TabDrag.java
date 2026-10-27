@@ -571,7 +571,7 @@ final class TabDrag {
         keys.addKeyEventDispatcher(escape);
         Toolkit.getDefaultToolkit().addAWTEventListener(lostRelease, AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
         closing = tab.onClosed(this::cancel);
-        // A command that moves the item while its tab is dragged (Move to Main Window from the keyboard) ends the drag.
+        // A command that moves the item while its tab is dragged (Move Tab to Window from the keyboard) ends the drag.
         changed = tab.onChanged(() -> { if (!inPlace()) cancel(); });
         // The entry giving way to another pane of its tab (a click there, a request opening there) ends the drag.
         shown = tab.onActive(active -> { if (!inPlace()) cancel(); });

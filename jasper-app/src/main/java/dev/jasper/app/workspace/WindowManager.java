@@ -11,6 +11,7 @@ import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.layout.TabRestore;
+import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.persistence.WorkspaceFile;
 import java.awt.AWTEvent;
 import java.awt.Point;
@@ -355,7 +356,8 @@ public final class WindowManager {
 
     /**
      * New Window (full windows spec 5.2): a new window with one terminal tab in {@code directory}, after the saved windows
-     * are restored when none is open, so that its first save does not replace them.
+     * are restored when none is open, so that its first save does not replace them. It opens {@link #CASCADE} pixels below
+     * and right of the most recently active window, on that window's display.
      *
      * @param directory where its terminal tab starts; null for where a new shell starts
      * @return the window; empty while Jasper quits or every window closes
@@ -364,7 +366,19 @@ public final class WindowManager {
     public Optional<JasperWindow> openWindow(Path directory) {
         requireEdt();
         if (closingAll || !restoredFirst("menu")) return Optional.empty();
-        return open(new Opening(false, directory, "menu", Optional.empty(), Optional.empty()));
+        Optional<UiState.Bounds> from = lastActive().flatMap(window -> window.placement().bounds());
+        return open(new Opening(false, directory, "menu", Optional.empty(), Optional.empty()), window -> {
+            from.ifPresent(bounds -> window.placed(new JasperWindow.Placement(Optional.of(cascaded(bounds)), 0)));
+            return true;
+        });
+    }
+
+    /** How far a new window sits below and right of the window it opens from (full windows spec 5.2), in unscaled pixels. */
+    static final int CASCADE = 30;
+
+    /** {@code bounds} moved {@link #CASCADE} down and right; its frame keeps it on its display ({@code WindowPlacement}). */
+    static UiState.Bounds cascaded(UiState.Bounds bounds) {
+        return new UiState.Bounds(bounds.x() + CASCADE, bounds.y() + CASCADE, bounds.width(), bounds.height());
     }
 
     /**

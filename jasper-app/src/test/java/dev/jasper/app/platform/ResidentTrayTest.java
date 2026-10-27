@@ -69,7 +69,7 @@ class ResidentTrayTest {
 
     @Test void theMenuBarItemOffersANewTerminalWindowSettingsAndTheRealQuit() {
         assertThat(ResidentTray.entries(true)).extracting(entry -> entry.label)
-            .containsExactly("New Terminal Window", "Settings…", null, "Quit Jasper Completely");
+            .containsExactly("New Window", "Settings…", null, "Quit Jasper Completely");
         assertThat(ResidentTray.entries(false)).extracting(entry -> entry.label)
             .as("the Windows tray menu is unchanged").containsExactly("Open Jasper", null, "Quit Jasper");
     }

@@ -90,7 +90,7 @@ class TabMenuTest {
             assertThat(saved[0]).isEqualTo(1);
             var full = content(idleLauncher(pending), HOME, false);
             assertThat(full.windowMenuItems()).as("a window with no other open").containsExactly(ActionId.MOVE_TAB_TO_NEW_WINDOW);
-            assertThat(titles(full.tabMenu(full.selectedTab()))).as("Move to Main Window moves the whole window: not here")
+            assertThat(titles(full.tabMenu(full.selectedTab()))).as("no other window is open: no Move Tab to Window")
                 .containsExactly("Rename Tab", "Move Tab to New Window", "Move Tab Into", "Close Tab");
         });
     }
@@ -254,7 +254,7 @@ class TabMenuTest {
     @Test void theFileViewAndTabMenusNameTabsAndPanes() throws Exception {
         var window = window(1);
         edt(() -> {
-            assertThat(items(window, "File")).containsSubsequence("New Tab", "New Terminal Window", "Open File…", "Close Pane",
+            assertThat(items(window, "File")).containsSubsequence("New Tab", "New Window", "Open File…", "Close Pane",
                 "Close Tab", "Close Window").doesNotContain("Close Parent Tab");
             assertThat(items(window, "View")).contains("Maximize Pane");
             assertThat(items(window, "Tab")).as("its plain items; Split is a submenu").containsExactly("Move Pane to New Tab", "Focus Pane Left",

@@ -33,9 +33,9 @@ class KeyBindingsContextTest {
             extension("dev.x.save", "cmd+n", KeyContext.content("dev.x"))));
         assertThat(resolved.problems()).isEmpty();
         KeyBindings bindings = resolved.bindings();
-        assertThat(bindings.idsFor(mac("cmd+n"))).containsExactly("new_terminal_window", "dev.x.hosts.new", "dev.x.save");
-        assertThat(bindings.idFor(mac("cmd+n"))).as("the Global or Terminal holder").hasValue("new_terminal_window");
-        assertThat(bindings.resolve(mac("cmd+n"), context -> context.level() == 0)).hasValue("new_terminal_window");
+        assertThat(bindings.idsFor(mac("cmd+n"))).containsExactly("new_window", "dev.x.hosts.new", "dev.x.save");
+        assertThat(bindings.idFor(mac("cmd+n"))).as("the Global or Terminal holder").hasValue("new_window");
+        assertThat(bindings.resolve(mac("cmd+n"), context -> context.level() == 0)).hasValue("new_window");
         assertThat(bindings.resolve(mac("cmd+n"), context -> context.level() == 0
             || context.equals(KeyContext.panel("dev.x.hosts")))).hasValue("dev.x.hosts.new");
         assertThat(bindings.resolve(mac("cmd+n"), context -> context.kind() != KeyContext.Kind.PANEL)).hasValue("dev.x.save");

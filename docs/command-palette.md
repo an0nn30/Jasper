@@ -175,7 +175,7 @@ own.
   word, titles that contain it, keyword matches, and fuzzy matches with fewer gaps first. Ties go to recently used
   commands, then to alphabetical order.
 - With the Commands chip and an empty query, it lists your last three distinct palette commands under **Recent**, or,
-  before there are any, the first three enabled of New Tab, Split Right, Settings and New Terminal Window under
+  before there are any, the first three enabled of New Tab, Split Right, Settings and New Window under
   **Suggested**.
 - Only commands run from the palette count as recent: running one from the toolbar, a menu or a shortcut changes
   nothing here.

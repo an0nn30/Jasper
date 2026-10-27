@@ -109,7 +109,7 @@ public final class Settings9bPreview {
                         d.select("keymap");SettingsSurfacePreview.save(d,holder[0],dir.resolve("keymap-collapsed.png"),980,681);
                         click(KitTestSupport.require(d.view(),"@tree/shortcuts/group/Application/title",JLabel.class));
                         SettingsSurfacePreview.save(d,holder[0],dir.resolve("keymap.png"),980,681);
-                        click(KitTestSupport.require(d.view(),"@tree/shortcuts/action/new_terminal_window/title",JLabel.class));
+                        click(KitTestSupport.require(d.view(),"@tree/shortcuts/action/new_window/title",JLabel.class));
                         SettingsSurfacePreview.save(d,holder[0],dir.resolve("keymap-recording.png"),980,681);
                         SettingsSurfacePreview.save(d,holder[0],dir.resolve("keymap-narrow.png"),640,681);
                         SettingsSurfacePreview.save(d,holder[0],dir.resolve("keymap-short.png"),980,400);

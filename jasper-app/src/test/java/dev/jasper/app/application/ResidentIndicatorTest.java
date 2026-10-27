@@ -234,7 +234,7 @@ class ResidentIndicatorTest {
         JasperApplication application = application(() -> { }, indicator, settled());
         resident(application);
         edt(application::quit);
-        edt(() -> indicator.actions().get().newTerminalWindow().run());
+        edt(() -> indicator.actions().get().newWindow().run());
         edt(() -> indicator.actions().get().settings().run());
         edt(() -> { });
         assertThat(indicator.removed()).hasValue(1);
