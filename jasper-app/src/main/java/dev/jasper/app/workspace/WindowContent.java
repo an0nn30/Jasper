@@ -2323,6 +2323,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
+     * Closes every tab of this window at once, its guards not asked again: they agreed already, and a layout takes the
+     * tabs' place (full windows plan 4). The window keeps its empty workspace; its registry facts are published as one
+     * change. A failure propagates once every tab has been closed.
+     */
+    void closeEveryTab() {
+        var held = registry.inWindow(id);
+        if (closed || held.isEmpty()) return;
+        Runnable close = () -> registry.removeAll(held);
+        if (terminals != null) terminals.atomically(close); else close.run();
+    }
+
+    /**
      * Closes {@code batch} on one decision: the plugin tabs' guards answer once and a refusal closes nothing; then every
      * tab of the batch closes, terminal tabs included, their registry facts published as one change when the guards
      * answered at once. A batch of terminal tabs alone needs no approval and closes at once, as one change.

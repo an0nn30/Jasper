@@ -48,6 +48,7 @@ import dev.jasper.app.workspace.WindowFrame;
 import dev.jasper.app.workspace.WindowManager;
 import dev.jasper.app.workspace.WindowShell;
 import dev.jasper.app.workspace.WorkspaceActivity;
+import dev.jasper.app.workspace.LayoutStore;
 import dev.jasper.app.workspace.WorkspaceStore;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.rendering.FontSet;
@@ -171,6 +172,8 @@ public final class JasperApplication {
     private UiState uiState = UiState.inMemory();
     /** Where the windows are saved and restored from; null before {@link #startPlugins(AppDirs)}, and then nothing is. */
     private WorkspaceStore workspaceStore;
+    /** The saved layouts ({@code layouts.toml}); null before {@link #startPlugins(AppDirs)}. */
+    private LayoutStore layoutStore;
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
     private PluginManager pluginManager;
@@ -184,6 +187,8 @@ public final class JasperApplication {
      * virtual thread of its own.
      */
     Executor workspaceWriter = task -> Thread.ofVirtual().name("jasper-workspace-save").start(task);
+    /** Test seam: where the layouts store's writes run, set before {@link #layouts(Path)}; each write after the one before. */
+    Executor layoutsWriter = task -> Thread.ofVirtual().name("jasper-layouts-save").start(task);
     /** Test seams. Production plans from this process's own command line and starts a real process. */
     Function<RestartMode, Optional<List<String>>> restartPlanner = mode -> RestartCommand.current(mode, List.of());
     Consumer<List<String>> spawner = command -> {
@@ -523,6 +528,18 @@ public final class JasperApplication {
 
     /** The store {@link #workspace(Path)} made; null before it. Tests. */
     WorkspaceStore workspaceStore() { return workspaceStore; }
+
+    /**
+     * The saved layouts in {@code file} (full windows plan 4): New Window and Empty State open their default, written by
+     * {@link #layoutsWriter}. Before the first window. EDT.
+     */
+    void layouts(Path file) {
+        layoutStore = new LayoutStore(file, layoutsWriter);
+        windows.layouts(layoutStore);
+    }
+
+    /** The store {@link #layouts(Path)} made; null before it. */
+    LayoutStore layoutStore() { return layoutStore; }
 
     /**
      * The saved window did not all come back (spec 15): {@code workspace.toml} could not be read, its reader dropped a tab
@@ -1289,6 +1306,7 @@ public final class JasperApplication {
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal, buddy::pluginWorking);
         uiState = UiState.load(dirs.uiState());
         workspace(dirs.workspaceState());
+        layouts(dirs.layouts());
         shells = new NativeShells(themes, uiState, this::nativeWindow, this::quit,
             dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths, presentation.projections().dialogs());

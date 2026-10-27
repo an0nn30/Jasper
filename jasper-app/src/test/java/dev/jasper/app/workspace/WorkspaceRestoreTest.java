@@ -313,6 +313,30 @@ class WorkspaceRestoreTest {
         assertThat(windows.started).as("the failed item's shell never started").containsExactly(work);
     }
 
+    /** Full windows plan 4: a window that cannot be restored opens the saved default layout, exactly. */
+    @Test void aWindowThatCannotBeRestoredOpensTheDefaultLayout() throws Exception {
+        TabId item = TabId.random();
+        WorkspaceFile.write(file(), savedInZen(item));
+        TabId one = TabId.random();
+        TabId two = TabId.random();
+        var tools = new ToolWindows(false, false, Map.of());
+        ParentTab first = tab(Layout.of(one));
+        var layout = new WorkspaceFile.WindowRecord(Optional.empty(), 0, new ParentTabs(List.of(first, tab(Layout.of(two))), first.id()),
+            Map.of(one, shell("one", folder, ""), two, shell("two", folder, "")), tools);
+        windows();
+        edt(() -> {
+            taken(item);
+            var store = new LayoutStore(folder.resolve("layouts.toml"), Runnable::run);
+            store.saveAsDefault(layout);
+            windows.manager.layouts(store);
+            JasperWindow main = windows.manager.ensureWindow("cold", null).orElseThrow();
+            assertThat(main.content().tabs()).extracting(Tab::title).containsExactly("one", "two");
+            assertThat(main.content().toolWindows().snapshot()).isEqualTo(tools);
+        });
+        assertThat(setAside).containsExactly(folder.resolve("workspace.toml.bad"));
+        windows.launch();
+    }
+
     /**
      * The restore of the window fails once its items are mounted, as a listener's bug would: its first title change
      * while it holds an item throws {@code failure}, once.

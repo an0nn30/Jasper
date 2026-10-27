@@ -260,6 +260,33 @@ class JasperApplicationWorkspaceTest {
         }
     }
 
+    /** Full windows plan 4: the plugins' start gives the windows {@code layouts.toml}, and New Window opens its default. */
+    @Test void newWindowOpensTheDefaultLayoutSavedInTheJasperHome() throws Exception {
+        var one = dev.jasper.app.layout.TabId.random();
+        var two = dev.jasper.app.layout.TabId.random();
+        var first = new dev.jasper.app.layout.ParentTab(dev.jasper.app.layout.ParentTabId.random(), dev.jasper.app.layout.Layout.of(one));
+        var second = new dev.jasper.app.layout.ParentTab(dev.jasper.app.layout.ParentTabId.random(), dev.jasper.app.layout.Layout.of(two));
+        var layout = new WorkspaceFile.WindowRecord(java.util.Optional.empty(), 0, new dev.jasper.app.layout.ParentTabs(List.of(first, second), first.id()),
+            java.util.Map.of(one, new WorkspaceFile.TabRecord.Terminal("one", home.toString(), ""),
+                two, new WorkspaceFile.TabRecord.Terminal("two", home.toString(), "")), ToolWindows.BUILT_IN);
+        var dirs = dirs();
+        CountDownLatch terminated = new CountDownLatch(1);
+        JasperApplication application = application(terminated::countDown);
+        try {
+            edt(() -> {
+                new dev.jasper.app.workspace.LayoutStore(dirs.layouts(), Runnable::run).saveAsDefault(layout);
+                application.startPlugins(dirs);
+                assertThat(application.layoutStore()).isNotNull();
+                application.openFirstWindow(List.of()).orElseThrow();
+                JasperWindow opened = application.windows().openWindow(null).orElseThrow();
+                assertThat(opened.content().terminalTabs()).hasSize(2);
+            });
+            launch();
+        } finally {
+            quitAndAwait(application, terminated);
+        }
+    }
+
     private static final String EDITOR_OFF = "version = 1\n[plugins.\"dev.jasper.editor\"]\nenabled = false\nconsented = []\n";
 
     /** A saved main window and the id of its Editor tab. */

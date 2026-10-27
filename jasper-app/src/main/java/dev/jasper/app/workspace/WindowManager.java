@@ -4,12 +4,16 @@ import dev.jasper.app.config.ReopenMode;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
+import dev.jasper.app.layout.Child;
+import dev.jasper.app.layout.Group;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.Layout;
+import dev.jasper.app.layout.Node;
 import dev.jasper.app.layout.ParentTab;
 import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
+import dev.jasper.app.layout.Split;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.layout.TabRestore;
 import dev.jasper.app.persistence.ToolWindowState;
@@ -58,9 +62,9 @@ public final class WindowManager {
      *     for where the platform puts a new window, or where a restored window's saved place puts it
      * @param cursor where the cursor released that tab on screen, present with the bounds: the window opens on the
      *     display there
-     * @param tools the window's own tool windows (full windows spec 6.1): the saved window's for a restore,
-     *     {@link ToolWindows#BUILT_IN} for a first window with nothing saved, else a copy of the most recently active
-     *     window's for a new window ({@code ToolWindowState.forNewWindow})
+     * @param tools the window's own tool windows (full windows spec 6.1; plan 4): the saved window's for a restore, the
+     *     default layout's for a first window that does not restore, else the default layout's for a new window
+     *     ({@code ToolWindowState.forNewWindow})
      */
     public record Opening(boolean empty, Path directory, String trigger, Optional<Rectangle> bounds, Optional<Point> cursor, ToolWindows tools) {
         /** Requires the trigger and the tool windows, and the bounds with the cursor or neither. */
@@ -165,6 +169,8 @@ public final class WindowManager {
     private boolean restoring;
     /** Where the windows are saved; none in a test that does not save. */
     private WorkspaceStore store;
+    /** The saved layouts (full windows plan 4); none in a test without them, and then the default is the built-in layout. */
+    private LayoutStore layouts;
     /** What a restore opens; the application gives the setting ({@link #reopen}). */
     private Supplier<ReopenMode> reopen = () -> ReopenMode.LAST_KNOWN_STATE;
     /** How each plugin stands, by id: without the application's answer, none is installed. */
@@ -211,6 +217,151 @@ public final class WindowManager {
      * @param value the store
      */
     public void workspace(WorkspaceStore value) { store = Objects.requireNonNull(value, "value"); }
+
+    /**
+     * The saved layouts (full windows plan 4): their default is what New Window and Empty State open. Without them the
+     * default is the built-in layout.
+     *
+     * @param value the store
+     */
+    public void layouts(LayoutStore value) { layouts = Objects.requireNonNull(value, "value"); }
+
+    /**
+     * The default layout (full windows plan 4): the saved one, else the built-in layout, one terminal tab in
+     * {@code directory} and {@link ToolWindows#BUILT_IN}.
+     *
+     * @param directory where the built-in layout's terminal starts; null for where a new shell starts
+     * @return the layout, without bounds
+     */
+    public WorkspaceFile.WindowRecord defaultLayout(Path directory) {
+        requireEdt();
+        return savedDefault().orElseGet(() -> builtInLayout(directory));
+    }
+
+    /** The saved default layout; empty without one, or without the store. */
+    private Optional<WorkspaceFile.WindowRecord> savedDefault() {
+        return layouts == null ? Optional.empty() : layouts.defaultLayout();
+    }
+
+    /** One terminal tab in {@code directory}, or where a new shell starts when it is null, and the built-in tool windows. */
+    static WorkspaceFile.WindowRecord builtInLayout(Path directory) {
+        TabId terminal = TabId.random();
+        var parentTab = new ParentTab(ParentTabId.random(), Layout.of(terminal));
+        return new WorkspaceFile.WindowRecord(Optional.empty(), 0, ParentTabs.of(parentTab),
+            Map.of(terminal, new WorkspaceFile.TabRecord.Terminal("", directory == null ? "" : directory.toString(), "")), ToolWindows.BUILT_IN);
+    }
+
+    /**
+     * {@code window} as a layout (full windows plan 4): what the last state would keep of it, its tabs and panes and its
+     * tool windows, without its bounds and with extended state 0. An untitled editor and Jasper's own tabs are left out.
+     *
+     * @param window one of these windows
+     * @return the layout; empty once its content has closed
+     */
+    public Optional<WorkspaceFile.WindowRecord> layoutOf(JasperWindow window) {
+        requireEdt();
+        if (window.content().closed()) return Optional.empty();
+        WorkspaceFile.WindowRecord record = windowRecord(window);
+        return Optional.of(new WorkspaceFile.WindowRecord(Optional.empty(), 0, record.layout(), record.tabs(), record.tools()));
+    }
+
+    /**
+     * @param window one of these windows
+     * @return how many of its tabs a layout of it leaves out ({@link #layoutOf}); 0 once its content has closed
+     */
+    public int leftOut(JasperWindow window) {
+        requireEdt();
+        if (window.content().closed()) return 0;
+        return window.content().tabs().size() - windowRecord(window).tabs().size();
+    }
+
+    /**
+     * Applies {@code layout} to {@code window} (full windows plan 4): every tab's guard answers first, and a refusal
+     * leaves the window as it is; then its tabs close and the layout's tabs, panes and tool windows take their place,
+     * under fresh ids, so a layout applied twice never clashes. Its bounds stay, and the window stays though its tabs
+     * close. A tab whose plugin is missing or cannot restore it comes back as a placeholder.
+     *
+     * @param window one of these windows
+     * @param layout the layout; its bounds are ignored
+     * @return false when a guard refused, or the window is closed
+     */
+    public boolean applyLayout(JasperWindow window, WorkspaceFile.WindowRecord layout) {
+        requireEdt();
+        Objects.requireNonNull(layout, "layout");
+        if (window.closed() || !windows.contains(window) || window.content().closed()) return false;
+        WindowContent content = window.content();
+        if (!content.mayClose()) return false;
+        try {
+            content.closeEveryTab();
+            content.restore(fresh(layout));
+        } catch (RuntimeException | Error failure) {
+            // A restore closes what it made: the window keeps what its tabs' close left, its empty workspace.
+            LOG.log(System.Logger.Level.WARNING, "Could not apply the layout's tabs", failure);
+        }
+        toolWindows(content, layout.tools());
+        changed();
+        return true;
+    }
+
+    /** Gives {@code content} the tool windows {@code tools}, whose changes are saved. */
+    private void toolWindows(WindowContent content, ToolWindows tools) {
+        content.replaceToolWindows(new ToolWindowState(tools, content.toolWindows().look()));
+        content.toolWindows().onChanged(this::changed);
+    }
+
+    /**
+     * {@code layout} under fresh tab, pane and parent tab ids, the same otherwise: a layout is a template, and the
+     * windows it opens in never share an id (parent tabs spec 4).
+     */
+    static WorkspaceFile.WindowRecord fresh(WorkspaceFile.WindowRecord layout) {
+        var tabs = new HashMap<TabId, TabId>();
+        var groups = new HashMap<GroupId, GroupId>();
+        var parents = new ArrayList<ParentTab>();
+        ParentTabId active = null;
+        for (ParentTab parent : layout.layout().parentTabs()) {
+            Layout old = parent.layout();
+            Layout renewed = new Layout(fresh(old.root(), tabs, groups), groups.computeIfAbsent(old.activeGroup(), id -> GroupId.random()),
+                old.maximized().map(id -> groups.computeIfAbsent(id, unused -> GroupId.random())));
+            var id = ParentTabId.random();
+            if (parent.id().equals(layout.layout().active())) active = id;
+            parents.add(new ParentTab(id, renewed));
+        }
+        var records = new HashMap<TabId, WorkspaceFile.TabRecord>();
+        layout.tabs().forEach((id, record) -> records.put(tabs.computeIfAbsent(id, unused -> TabId.random()), record));
+        return new WorkspaceFile.WindowRecord(layout.bounds(), layout.extendedState(), new ParentTabs(parents, active), records, layout.tools());
+    }
+
+    private static Node fresh(Node node, Map<TabId, TabId> tabs, Map<GroupId, GroupId> groups) {
+        return switch (node) {
+            case Group group -> new Group(groups.computeIfAbsent(group.id(), id -> GroupId.random()),
+                group.tabs().stream().map(id -> tabs.computeIfAbsent(id, unused -> TabId.random())).toList(),
+                group.selected().map(id -> tabs.computeIfAbsent(id, unused -> TabId.random())));
+            case Split split -> new Split(split.orientation(),
+                split.children().stream().map(child -> new Child(fresh(child.node(), tabs, groups), child.weight())).toList());
+        };
+    }
+
+    /**
+     * Fills {@code window}, opened empty, with the saved default layout's tabs under fresh ids, and {@code directory}
+     * after them in a new tab; without a saved default, or when its tabs cannot be restored, one terminal tab in
+     * {@code directory}. A failure there is logged: the window stays as it is.
+     */
+    private void fillWithDefault(JasperWindow window, Optional<WorkspaceFile.WindowRecord> saved, Path directory) {
+        WindowContent content = window.content();
+        try {
+            if (saved.isPresent()) {
+                try {
+                    content.restore(fresh(saved.get()));
+                    if (directory == null) return;
+                } catch (RuntimeException | Error failure) {
+                    LOG.log(System.Logger.Level.WARNING, "Could not restore the default layout's tabs; the window opens one terminal tab", failure);
+                }
+            }
+            content.newTab(directory);
+        } catch (RuntimeException | Error failure) {
+            LOG.log(System.Logger.Level.WARNING, "Could not give the window its default layout; it stays as it is", failure);
+        }
+    }
 
     /**
      * What a restore opens (the {@code system.reopen} setting): the saved window, or the built-in layout at its place.
@@ -305,8 +456,8 @@ public final class WindowManager {
 
     /**
      * The window as the store has it (workspace tabs spec 13; tabs and panes spec 12; full windows spec 6.1), where it
-     * was with its tabs, splits and panes, its items and its tool windows; with nothing to restore, or a window that
-     * cannot be restored, a new window with one terminal tab in {@code directory} and the built-in tool windows. A
+     * was with its tabs, splits and panes, its items and its tool windows; with nothing to restore, Empty State, or a
+     * window that cannot be restored, the default layout ({@link #defaultLayout}; full windows plan 4). A
      * restored window opens {@code directory} in a new tab after its own. A window that cannot be restored is not
      * lost: the store keeps the saved window as {@code workspace.toml.bad} and says so (spec 15). The store is read
      * here, after {@link #ensureWindow}'s checks, since reading it ends its hold.
@@ -314,14 +465,11 @@ public final class WindowManager {
     private Optional<JasperWindow> restore(String trigger, Path directory) {
         WorkspaceFile.Loaded loaded = store == null ? new WorkspaceFile.Loaded.Fresh(Optional.empty()) : store.load(reopen.get() != ReopenMode.EMPTY_STATE);
         if (!(loaded instanceof WorkspaceFile.Loaded.Restore restore))
-            return open(new Opening(false, directory, trigger, Optional.empty(), Optional.empty(), ToolWindows.BUILT_IN));
+            return openDefault(trigger, directory, JasperWindow.Placement.NONE);
         WorkspaceFile.Snapshot saved = restore.snapshot();
         if (reopen.get() == ReopenMode.EMPTY_STATE) {
-            // The built-in layout where the saved window was; the file stays until the next save replaces it.
-            return open(new Opening(false, directory, trigger, Optional.empty(), Optional.empty(), ToolWindows.BUILT_IN), window -> {
-                window.placed(new JasperWindow.Placement(saved.window().bounds(), saved.window().extendedState()));
-                return true;
-            });
+            // The default layout where the saved window was; the file stays until the next save replaces it.
+            return openDefault(trigger, directory, new JasperWindow.Placement(saved.window().bounds(), saved.window().extendedState()));
         }
         boolean[] restored = new boolean[1];
         Optional<JasperWindow> opened = open(new Opening(true, null, trigger, Optional.empty(), Optional.empty(), saved.window().tools()), window -> {
@@ -335,15 +483,15 @@ public final class WindowManager {
                     // closed what it made.
                     LOG.log(System.Logger.Level.WARNING, "Could not restore the saved window; it opens as a new one", failure);
                     keepAside(saved);
-                    // The built-in layout, tool windows included (Controller Ruling 2): the record's are not kept either.
+                    // The default layout, tool windows included (Controller Ruling 2; full windows plan 4): the record's are
+                    // not kept either.
+                    Optional<WorkspaceFile.WindowRecord> fallback = savedDefault();
                     try {
-                        WindowContent content = window.content();
-                        content.replaceToolWindows(new ToolWindowState(ToolWindows.BUILT_IN, content.toolWindows().look()));
-                        content.toolWindows().onChanged(this::changed);
-                        content.newTab(directory);
+                        toolWindows(window.content(), fallback.map(WorkspaceFile.WindowRecord::tools).orElse(ToolWindows.BUILT_IN));
                     } catch (RuntimeException | Error again) {
-                        LOG.log(System.Logger.Level.WARNING, "Could not give the failed window the built-in layout; it stays as it is", again);
+                        LOG.log(System.Logger.Level.WARNING, "Could not give the failed window the default tool windows", again);
                     }
+                    fillWithDefault(window, fallback, directory);
                 }
                 return true;
             });
@@ -358,12 +506,28 @@ public final class WindowManager {
     }
 
     /**
-     * New Window (full windows spec 5.2): a new window with one terminal tab in {@code directory}, after the saved window
-     * is restored when none is open. It opens {@link #CASCADE} pixels below and right of the most recently active window,
-     * or of the window it opened last when no other came to the front since, on that window's display, with a copy of the
-     * most recently active window's tool windows ({@link #newWindowTools()}).
+     * The first window, opened with the default layout exactly (full windows plan 4) at {@code placement}: the saved
+     * default's tabs, then {@code directory} in a new tab; without one, the built-in layout with its terminal in
+     * {@code directory}.
+     */
+    private Optional<JasperWindow> openDefault(String trigger, Path directory, JasperWindow.Placement placement) {
+        Optional<WorkspaceFile.WindowRecord> saved = savedDefault();
+        ToolWindows tools = saved.map(WorkspaceFile.WindowRecord::tools).orElse(ToolWindows.BUILT_IN);
+        return open(new Opening(saved.isPresent(), saved.isPresent() ? null : directory, trigger, Optional.empty(), Optional.empty(), tools), window -> {
+            window.placed(placement);
+            if (saved.isPresent()) fillWithDefault(window, saved, directory);
+            return true;
+        });
+    }
+
+    /**
+     * New Window (full windows spec 5.2; plan 4): a new window with the default layout's tabs ({@link #defaultLayout}),
+     * the built-in one with its terminal tab in {@code directory}, after the saved window is restored when none is open.
+     * It opens {@link #CASCADE} pixels below and right of the most recently active window, or of the window it opened last
+     * when no other came to the front since, on that window's display, with the default layout's tool windows for a new
+     * window ({@link #newWindowTools()}).
      *
-     * @param directory where its terminal tab starts; null for where a new shell starts
+     * @param directory where the built-in layout's terminal tab starts; null for where a new shell starts
      * @return the window; empty while Jasper quits or every window closes
      * @throws IllegalStateException when asked while the saved window is being restored and none is open yet
      */
@@ -373,8 +537,11 @@ public final class WindowManager {
         // The window this opened last, while no other came to the front since: a repeated New Window cascades on.
         Optional<JasperWindow> source = lastOpened != null && !lastOpened.closed() ? Optional.of(lastOpened) : lastActive();
         Optional<UiState.Bounds> from = source.flatMap(window -> window.placement().bounds());
-        Optional<JasperWindow> opened = open(new Opening(false, directory, "menu", Optional.empty(), Optional.empty(), newWindowTools()), window -> {
+        Optional<WorkspaceFile.WindowRecord> saved = savedDefault();
+        Optional<JasperWindow> opened = open(new Opening(saved.isPresent(), saved.isPresent() ? null : directory, "menu", Optional.empty(),
+            Optional.empty(), newWindowTools()), window -> {
             from.ifPresent(bounds -> window.placed(new JasperWindow.Placement(Optional.of(cascaded(bounds)), 0)));
+            if (saved.isPresent()) fillWithDefault(window, saved, null);
             return true;
         });
         opened.ifPresent(window -> lastOpened = window);
@@ -382,12 +549,13 @@ public final class WindowManager {
     }
 
     /**
-     * A window opened while another is open starts from a copy of the most recently active window's tool windows, out of
-     * Zen and with its tool windows saved in Float or Window mode hidden, as that window shows them already (full windows
-     * plan 1 Controller Ruling 10); with none open, the built-in ones.
+     * A window opened while another is open (New Window, a torn-out tab's, a plugin's {@code NEW_WINDOW}) starts from the
+     * default layout's tool windows, out of Zen and with its tool windows saved in Float or Window mode hidden, as another
+     * window may show them already (full windows plan 1 Controller Ruling 10; plan 4); the built-in ones without a saved
+     * default.
      */
     private ToolWindows newWindowTools() {
-        return lastActive().map(window -> window.content().toolWindows().forNewWindow().snapshot()).orElse(ToolWindows.BUILT_IN);
+        return savedDefault().map(layout -> new ToolWindowState(layout.tools(), "").forNewWindow().snapshot()).orElse(ToolWindows.BUILT_IN);
     }
 
     /** How far a new window sits below and right of the window it opens from (full windows spec 5.2), in unscaled pixels. */
