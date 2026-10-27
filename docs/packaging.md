@@ -241,7 +241,7 @@ behind, the task names the `hdiutil detach -force` command to run.
   prompt and discards its input;
 - the home's `workspace.toml` holds one window, 960 by 600 points at 100, 100, with one terminal tab
   (`startup-workspace.toml` in `jasper-app/src/main/resources/dev/jasper/app/benchmark/`), which the launch restores as
-  a normal start restores the saved windows, so the cache holds the restore path's classes too;
+  a normal start restores the saved window, so the cache holds the restore path's classes too;
 - `JAVA_TOOL_OPTIONS` asks for the cache (`-XX:AOTCacheOutput`), the start-up trace (`-Djasper.startupTrace`) and no
   Dock icon or menu bar (`-Dapple.awt.UIElement=true`);
 - `JASPER_HOME`, `JDK_JAVA_OPTIONS`, `_JAVA_OPTIONS`, `CLASSPATH`, `JASPER_VM_OPTIONS_SKIP`, `JASPER_AOT_CACHE_SKIP`,

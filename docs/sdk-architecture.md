@@ -262,7 +262,7 @@ where the look draws one (`TitleInset`).
 
 `Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)` mounts a plugin's view as an item in a Jasper
 window, translated to `contributions.TabRegistry` and `Tab`. Keys are scoped to the plugin; opening a key that is open
-selects its tab and returns its handle. A missing or closed owner window uses the most recently active window, restoring the saved windows first when none is open; a `TabPlacement` opens the item in a new tab of the window, a new pane beside the focused one or a new window. A foreign owner is refused. A split item (`Windows.splitItem`) joins every window's Split lists through the
+selects its tab and returns its handle. A missing or closed owner window uses the most recently active window, restoring the saved window first when none is open; a `TabPlacement` opens the item in a new tab of the window, a new pane beside the focused one or a new window. A foreign owner is refused. A split item (`Windows.splitItem`) joins every window's Split lists through the
 application's contributions model, its two actions registered as the plugin's own; `ContentTab.split`, `moveToNewTab`,
 `tabChoices` and `moveToTab` reach the item's window through the tab registry. `WindowContent` hosts terminal and
 plugin items alike in its `WorkspaceView`. Content views take the workspace theme.

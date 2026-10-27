@@ -29,8 +29,9 @@ the focus, and they act on that window.
 ## Windows
 
 **New Window** (File menu, the toolbar's New Window button, Cmd+N on macOS, Ctrl+Shift+N on Linux and
-Windows) opens a window with one terminal tab; with another window open it takes a copy of the active window's tool windows,
-out of Zen and with Float and Window tool windows hidden, and with none open it restores the saved window. Its shell starts in the focused pane's folder when Jasper knows
+Windows) opens a window with one terminal tab; with another window open it takes a copy of the active window's tool
+windows, out of Zen and with Float and Window tool windows hidden, and with none open it restores the saved
+window. Its shell starts in the focused pane's folder when Jasper knows
 it, otherwise in your home folder. **Close Window** (File menu, Cmd+Shift+W on macOS, no default shortcut on Linux and
 Windows) closes the window it runs in, as its title-bar close button does.
 
@@ -63,7 +64,8 @@ Jasper saves its windows to `workspace.toml` in Jasper home within a second of e
 closes, and on Quit and when it goes to the background, with the most recently active window's state (the closing
 window's, when you close one yourself). It restores one window at the next start and whenever a window opens with none
 open: the window saved last, with its size, position and maximised state (fitted onto a
-display when its place is no longer on one; never minimised), its tool windows, its tabs in order with the one it showed, and each tab's
+display when its place is no longer on one; never minimised), its tool windows, its tabs in order with the one it
+showed, and each tab's
 split panes with their sizes, the active pane, a maximised pane and the item each pane held. A terminal comes back with
 its name and profile and a new shell in its last local folder, or where a new shell starts when that folder is gone;
 only the shown tab's terminals start at once, the others when their tab first shows. Scrollback, running programs and
@@ -304,7 +306,8 @@ tooltip gives the count; see [the Notifications panel](notifications.md#the-noti
 for **View Mode**, **Move to** and **Hide**.
 
 A rail shows only while it holds a button. View › Show/Hide › Rail (palette: **Show Rail** / **Hide Rail**; no default
-shortcut, `toggle_rail`) hides or shows both rails in the window, and Jasper remembers the choice for the window in `workspace.toml`.
+shortcut, `toggle_rail`) hides or shows both rails in the window, and Jasper remembers the choice for the window in
+`workspace.toml`.
 `window.rail_width` (Settings › Window › Panel rail width) sets their width.
 
 Each tool window has a header: its title, the plugin's buttons, **Options** (⋮) with **View Mode**, **Move to** and
@@ -340,7 +343,8 @@ The tool window keeps its rail button or stripe button, in its slot, highlighted
 - Zen hides these windows with the docked tool windows and shows them again when it ends.
 
 Jasper saves each tool window's mode, whether it shows and its window's position and size in `workspace.toml`, for the
-window and the look in use ([the keys](configuration.md#workspacetoml)); a window that showed opens again with its window at the next
+window and the look in use ([the keys](configuration.md#workspacetoml)); a window that showed opens again with its
+window at the next
 start, and one saved on a display that is no longer connected opens on a connected one.
 
 ### Moving and resizing
@@ -378,7 +382,8 @@ window's tool windows, out of Zen and with its Float and Window tool windows hid
 The header, toolbar and tabs stay. A tool window you open while in Zen shows in its slot as usual, without the
 rails. Leaving Zen hides those and shows the remembered ones again. View › Show/Hide › Status Bar and Rail, and their
 shortcuts, are unavailable in Zen. Zen is each window's own: a window opens in the Zen saved in
-`workspace.toml`, or out of Zen while another window is open, and saves it each time you toggle it there. The saved layout keeps the tool
+`workspace.toml`, or out of Zen while another window is open, and saves it each time you toggle it there. The saved
+layout keeps the tool
 windows that showed before Zen, so one opened in Zen is not saved as showing.
 
 **Compact** (Settings › Appearance › View mode, `window.view_mode = "compact"`, after a restart) uses the system's

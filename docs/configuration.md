@@ -656,8 +656,8 @@ and, while its plugin runs, Retry. Scrollback, running programs, plugin views th
 untitled Editor tab, and Jasper's own tabs, such as the Errors tab, do not come back. When the windows would pass the
 size limit, Jasper leaves out plugins' views and then terminals, the largest first, and logs each one.
 
-When the saved window does not all come back (the file cannot be read, has another `version` or keeps no window, an
-entry in it is bad, or the window cannot be restored), Jasper keeps it as `workspace.toml.bad`, opens what it could
+When the saved window does not all come back (the file cannot be read, has an unknown `version` (not 1 or 2) or keeps no
+window, an entry in it is bad, or the window cannot be restored), Jasper keeps it as `workspace.toml.bad`, opens what it could
 (the built-in layout when the file itself is unusable) and posts "Jasper could not restore your window". Quit Jasper
 before changing the file: once Jasper has opened a window it restores from what it last saved, not from the file, and
 a later save may replace the change.

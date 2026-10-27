@@ -152,7 +152,7 @@ start-up flags (`AppArguments.residencyAllowed`: a home from `jasper.home` or `J
 does not change it. The home's owner serves the handoff endpoint (`<home>/daemon/socket`) and the `jasper` command
 socket (`<home>/daemon/commands`), resident or not; a resident owner keeps its plugins, configuration watcher and
 command recents after its last window closes. A handoff opens the request's files and folders, or brings Jasper forward,
-restoring the saved windows when none is open. `--config`, `--safe-mode` and `--plugin-dir` apply only to a Jasper that
+restoring the saved window when none is open. `--config`, `--safe-mode` and `--plugin-dir` apply only to a Jasper that
 starts: a later launch hands off, they are ignored, and the running Jasper says to quit it first; a Jasper started with
 one is never resident. [Command line](command-line.md) describes the client.
 
@@ -178,21 +178,23 @@ The `TabRegistry` (contributions) owns every item for its whole life: a move det
 moves a parent tab into a new window or into another window (Move Tab to Window): `WindowContent.receive`
 lands each item through the tab registry, then, once every item has arrived, `WorkspaceView.rearrange` gives the parent
 tab its planned layout. Every outside request and a plugin's item opened with no owner go to the most recently active window, and restore the
-saved windows first when none is open; Quit and going to the background close every window together, the most recently
+saved window first when none is open; Quit and going to the background close every window together, the most recently
 active last. `verifyApplicationArchitecture` pins where the windows are made: a `JasperWindow` only in
 `WindowManager.open`, the `WindowManager` only in `JasperApplication`'s constructor, and `WindowFrame`, a window's
 native frame, only in `JasperApplication.frameOnScreen` and `rehearsalWindow`.
 
-`WorkspaceStore` (workspace) keeps the windows in `workspace.toml` (`persistence.WorkspaceFile`: each window's
+`WorkspaceStore` (workspace) keeps one window in `workspace.toml` (`persistence.WorkspaceFile`: the window's
 bounds and maximised state, its tabs in strip order with the one it shows, each tab's panes and the item each holds,
-in the user's words: window, tab, pane, item). `WindowManager.snapshot()` builds what is saved, within a second of each
-change (a non-sliding timer on the EDT, the write on a virtual thread) and at once when a window closes, leaving items
-out until the file fits `WorkspaceFile.MAX_BYTES` (256 KiB); closing every window saves first and holds saving until
-the windows come back. `ensureWindow` restores the saved window when none is open (`system.reopen`: the saved window, or the built-in
-layout at its place), with its place, tabs, items and tool windows; a restored terminal's shell starts when its tab first shows, and until then its pane reports
+and its tool windows; in the user's words: window, tab, pane, item). `WindowManager.snapshot()` builds what is saved
+from the most recently active window, within a second of each change (a non-sliding timer on the EDT, the write on a
+virtual thread) and at once, from that window, when you close one, leaving items out until the file fits
+`WorkspaceFile.MAX_BYTES` (256 KiB); closing every window saves first and holds saving until the window comes back.
+`ensureWindow` restores the saved window when none is open (`system.reopen`: the saved window, or the built-in layout
+at its place), with its place, tabs, items and tool windows; a restored terminal's shell starts when its tab first
+shows, and until then its pane reports
 `NOT_STARTED`; a plugin's item comes back through its plugin's restorer or as a placeholder (`PlaceholderContent`; see
-[SDK architecture](sdk-architecture.md)). The reader drops a bad window, tab or item entry alone; whenever saved windows
-do not all come back, the file is kept as `workspace.toml.bad` and a notice says where.
+[SDK architecture](sdk-architecture.md)). The reader drops a bad window, tab or item entry alone; whenever the saved window
+does not all come back, the file is kept as `workspace.toml.bad` and a notice says where.
 
 ## Quit and shutdown
 
@@ -429,7 +431,7 @@ the frame; a press in the terminal column clears the tint. The two requests come
 and from a `Panels.toggle` or `PanelHost.show()` made while the panel's own declared toggle action runs (`HostedUi`);
 any other plugin toggle or show is plain. As IntelliJ's activate action, an activating toggle of a shown frame that is
 not the active one activates it, and only the active one hides. Each window's saved state keeps such a look's dock
-under `[window.tool_windows.look."<provider id>"]` of each window's saved state, and the application's Notifications panel becomes Event Log in the bottom strip
+under `[window.tool_windows.look."<provider id>"]` of the saved window, and the application's Notifications panel becomes Event Log in the bottom strip
 (`AppPanels`).
 
 ## Themes

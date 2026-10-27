@@ -235,7 +235,7 @@ empty `jasper.vmoptions` (through `JASPER_VM_OPTIONS`), so the user's configurat
 are untouched. Before each launch, priming launches included, the isolated home's `workspace.toml` is replaced with the
 one AOT training restores (one window with one terminal tab), so every run restores the same window, whatever the
 run before it saved as it quit. Warm mode always uses an isolated home, whose `config.toml` turns residency on.
-`--real-home` measures the user's own setup, its saved windows included, and warns when the configured terminal
+`--real-home` measures the user's own setup, its saved window included, and warns when the configured terminal
 program looks like tmux or screen, whose servers keep a session per launch.
 
 The benchmark refuses to start while any Jasper is running ("quit every Jasper (including a resident one) first",
@@ -251,6 +251,6 @@ milliseconds from the click, plus the count, median, minimum and maximum per mil
 same summary as a table.
 
 Cold launches include claiming the home (the instance lock, the handoff endpoint and the command socket, all before
-the first window) and restoring the saved windows, which the
+the first window) and restoring the saved window, which the
 [start-up baseline](benchmarks/2026-10-02-startup-baseline.md) predates, so its numbers are not strictly comparable
 with later cold runs. The AOT training launch is not resident.
