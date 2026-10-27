@@ -80,6 +80,26 @@ ext.runtimeModules = { String os ->
         'java.transaction.xa', 'java.xml', 'java.xml.crypto', 'jdk.internal.jvmstat']).toSorted()
 }
 
+// The build's runtime is the JetBrains Runtime with JCEF (Chromium) for the browser plugin. The plain build of the same
+// version has the same vendor and number, so its release file decides: the MODULES line must list jcef as a whole
+// token (jcef.something is another module) and the file must record the JCEF version. Null for a JCEF build, else the
+// first problem in words.
+ext.jcefRuntimeProblem = { String releaseText ->
+    String text = releaseText ?: ''
+    def modules = text =~ /(?m)^MODULES="([^"]*)"/
+    if (!modules.find() || !('jcef' in modules.group(1).tokenize())) return 'it has no jcef module'
+    if (!(text =~ /(?m)^JCEF_VERSION_DETAILED=[ \t]*"?[^"\s]/).find()) return 'its release file names no JCEF version'
+    null
+}
+
+// Refuses a runtime that is not the JCEF build, in the words nativeContext and verifyJcefToolchain both throw.
+ext.requireJcefRuntime = { File sdkHome, String releaseText ->
+    String problem = jcefRuntimeProblem(releaseText)
+    if (problem != null) {
+        throw new GradleException("The selected JBR SDK at ${sdkHome} is not the JCEF build: ${problem}. Install jbrsdk_jcef-25.0.4.1 (docs/packaging.md).")
+    }
+}
+
 // No --bind-services: the roots name every provider Jasper wants. --generate-cds-archive writes the runtime's default
 // CDS archive (lib/server/classes.jsa), the fallback whenever the AOT cache is unusable. No --compress: jlink's
 // default leaves lib/modules uncompressed, which loads classes faster. No --strip-native-commands: bin/java stays,

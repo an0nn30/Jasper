@@ -554,10 +554,14 @@ To add a bundled plugin:
 The [bundled Cygwin guide](../packaging/windows/cygwin/README.md) covers Windows Cygwin provisioning, the seed and its
 refresh, ownership and recovery, and native acceptance.
 
-`gradle/packaging-support.gradle` holds what packaging decides: the runtime's modules, the native libraries copied into
-the app and the AOT training launch. `verifyPackagingSupport` (in `check`) tests it with fixtures; `verifyPackage`
-checks a built image ([start-up performance](packaging.md#start-up-performance)).
+`gradle/packaging-support.gradle` holds what packaging decides: the build's runtime, the packaged runtime's modules, the
+native libraries copied into the app and the AOT training launch. `verifyPackagingSupport` (in `check`) tests it with
+fixtures; `verifyPackage` checks a built image ([start-up performance](packaging.md#start-up-performance)).
 
+- **The build's runtime is the JCEF build of the JetBrains Runtime.** `jcefRuntimeProblem` reads the toolchain's
+  `release` file (the `jcef` module and the JCEF version); `verifyJcefToolchain` (in `check`) and `nativeContext`
+  refuse any other build through `requireJcefRuntime`, whose message names the version to install. Moving to a newer
+  JBR means changing that version there and in the fixture that pins the message.
 - **A plugin or library needs another JDK module.** Add it to `runtimeRootModules` (and to the required list in
   `runtimeModules` when it pulls in a module not yet listed), add it to the `runtime-modules` block of
   [The Java runtime](plugin-authoring.md#the-java-runtime), and rebuild: `verifyPackagingSupport` fails until the

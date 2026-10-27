@@ -99,12 +99,28 @@ def nativeContext = {
     if (toolchainArchitecture != host.architecture) {
         throw new GradleException("The selected JBR SDK architecture (${toolchainArchitecture}) does not match the host (${host.architecture}); configure a matching JBR SDK 25")
     }
+    requireJcefRuntime(sdkHome, sdkReleaseText)
     File jpackage = new File(sdkHome, "bin/jpackage${host.os == 'windows' ? '.exe' : ''}")
     if (!jpackage.isFile()) {
         throw new GradleException("The selected JBR SDK has no jpackage at ${jpackage}; configure a matching JBR SDK 25, not a JRE")
     }
     [version: packageVersion, host: host, launcher: selectedLauncher, sdkHome: sdkHome, jpackage: jpackage]
 }
+
+// check refuses a runtime without JCEF too, not only the packaging tasks through nativeContext. The task declares no
+// outputs, so it always runs, which is cheap.
+tasks.register('verifyJcefToolchain') {
+    group = 'verification'
+    description = 'Fails unless the build\'s JetBrains Runtime 25 is the JCEF build.'
+    def sdkHome = launcher.map { it.metadata.installationPath.asFile }
+    doLast {
+        File home = sdkHome.get()
+        File release = new File(home, 'release')
+        requireJcefRuntime(home, release.isFile() ? release.getText('UTF-8') : '')
+        logger.lifecycle("Verified the JCEF runtime at ${home}")
+    }
+}
+tasks.named('check') { dependsOn('verifyJcefToolchain') }
 
 def executeNative = { List<String> command, String purpose ->
     def result = providers.exec {

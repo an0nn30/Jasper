@@ -10,10 +10,13 @@ checked by hand with the [native acceptance checklist](#native-acceptance-checkl
 
 ## Requirements
 
-- A **JetBrains Runtime SDK 25** (JBR SDK) of the build machine's architecture. The Gradle toolchain requires vendor
-  JetBrains and usually finds it; otherwise set `JAVA_HOME` and put its `bin` directory on `PATH` (especially on
-  Windows), or set `org.gradle.java.installations.paths` in your Gradle properties. A JRE is not enough: packaging runs
-  the SDK's `jpackage`, and fails when the SDK has none or its architecture differs from the host's.
+- The **JCEF build of the JetBrains Runtime SDK 25** (JBR SDK, `jbrsdk_jcef-25.0.4.1`, b635.75) of the build machine's
+  architecture. The Gradle toolchain requires vendor JetBrains and usually finds it; otherwise set `JAVA_HOME` and put
+  its `bin` directory on `PATH` (especially on Windows), or set `org.gradle.java.installations.paths` in your Gradle
+  properties. The plain JBR has the same vendor and version, so Gradle cannot tell the two apart: keep only one JBR 25
+  installed, or point `org.gradle.java.installations.paths` at the JCEF build. A JRE is not enough: packaging runs the
+  SDK's `jpackage`, and fails when the SDK has none, its architecture differs from the host's or it has no `jcef`
+  module; `check` fails for a runtime without JCEF too (`verifyJcefToolchain`).
 - A **C/C++ compiler**, because `packageApp` builds Jasper's launcher ([packaging/launcher](../packaging/launcher/README.md)),
   `jasper-watch` and the `jasper` command ([packaging/cli](../packaging/cli/README.md)): the Xcode command line tools on
   macOS (`xcode-select --install`), `gcc` and `g++` on Linux, or Visual Studio or its Build Tools with the

@@ -557,3 +557,35 @@ verifySupport.configure {
         logger.lifecycle('Verified training in a throwaway copy')
     }
 }
+
+// The build's runtime is the JetBrains Runtime with JCEF: the release file of one without it is refused, and so is
+// one that has the module but no JCEF version.
+verifySupport.configure {
+    doLast {
+        String jcef = '''JAVA_VERSION="25.0.4.1"
+IMPLEMENTOR_VERSION="JBRSDK-25.0.4.1+1-635.75-jcef"
+MODULES="java.base java.desktop gluegen.rt jogl.all jcef jdk.jpackage"
+JCEF_VERSION_DETAILED=150.0.14-g7c1aa68-chromium-150.0.7871.129-api-1.21-263-b16
+'''
+        String plain = '''JAVA_VERSION="25.0.4.1"
+IMPLEMENTOR_VERSION="JBRSDK-25.0.4.1+1-583.48-nomod"
+MODULES="java.base java.desktop jdk.jpackage"
+'''
+        assert jcefRuntimeProblem(jcef) == null
+        assert jcefRuntimeProblem(plain) == 'it has no jcef module'
+        assert jcefRuntimeProblem(jcef.replace(' jcef', '')) == 'it has no jcef module'
+        assert jcefRuntimeProblem(jcef.readLines().findAll { !it.startsWith('JCEF_VERSION_DETAILED') }.join('\n')) ==
+            'its release file names no JCEF version'
+        assert jcefRuntimeProblem('') == 'it has no jcef module'
+        assert jcefRuntimeProblem(jcef.replace(' jcef ', ' jcef.something ')) == 'it has no jcef module'
+        requireJcefRuntime(new File('/jbr'), jcef)
+        try {
+            requireJcefRuntime(new File('/jbr'), plain)
+            assert false : 'a runtime without JCEF must be refused'
+        } catch (GradleException expected) {
+            assert expected.message == 'The selected JBR SDK at /jbr is not the JCEF build: it has no jcef module. ' +
+                'Install jbrsdk_jcef-25.0.4.1 (docs/packaging.md).'
+        }
+        logger.lifecycle('Verified the JCEF runtime check')
+    }
+}
