@@ -313,4 +313,44 @@ class WorkspaceSavingTest {
         });
         windows.launch();
     }
+
+    /** A layout of one terminal tab titled {@code title}, the rail hidden. */
+    private static WorkspaceFile.WindowRecord oneTabLayout(String title) {
+        var item = dev.jasper.app.layout.TabId.random();
+        return new WorkspaceFile.WindowRecord(Optional.empty(), 0,
+            dev.jasper.app.layout.ParentTabs.of(new dev.jasper.app.layout.ParentTab(ParentTabId.random(), Layout.of(item))),
+            java.util.Map.of(item, new WorkspaceFile.TabRecord.Terminal(title, DesktopTestSupport.HOME.toString(), "")),
+            new dev.jasper.app.persistence.ToolWindows(false, true, java.util.Map.of()));
+    }
+
+    /**
+     * Full windows plan 4, final review: applying a layout saves the last state when it applied and when it failed
+     * partway, and asks for no save when a guard refused.
+     */
+    @Test void applyingALayoutSavesTheLastStateUnlessAGuardRefused() throws Exception {
+        windows();
+        edt(() -> {
+            JasperWindow main = windows.manager.ensureWindow("cold", folder).orElseThrow();
+            second();
+            assertThat(windows.manager.applyLayout(main, oneTabLayout("C"))).isEqualTo(WindowManager.LayoutApplied.APPLIED);
+            second();
+            assertThat(saved().window().tabs().values()).extracting(WorkspaceFile.TabRecord::title).containsExactly("C");
+            assertThat(saved().window().tools().railVisible()).isFalse();
+
+            Tab plugin = windows.model.tabs().open("dev.example.editor", "b", "B", main.id(), new javax.swing.JPanel());
+            while (!due.isEmpty()) due.remove().run();
+            windows.model.tabs().guard("dev.example.editor", (tabs, batch) -> java.util.concurrent.CompletableFuture.completedFuture(false));
+            assertThat(windows.manager.applyLayout(main, oneTabLayout("D"))).isEqualTo(WindowManager.LayoutApplied.REFUSED);
+            assertThat(due).as("a refusal asks for no save").isEmpty();
+
+            windows.model.tabs().guard("dev.example.editor", (tabs, batch) -> java.util.concurrent.CompletableFuture.completedFuture(true));
+            main.content().setRailVisible(true);
+            while (!due.isEmpty()) due.remove().run();
+            plugin.onClosed(() -> { throw new IllegalStateException("closing failed"); });
+            assertThat(windows.manager.applyLayout(main, oneTabLayout("E"))).isEqualTo(WindowManager.LayoutApplied.FAILED);
+            second();
+            assertThat(saved().window().tools().railVisible()).as("the layout's tool windows, saved").isFalse();
+        });
+        windows.launch();
+    }
 }

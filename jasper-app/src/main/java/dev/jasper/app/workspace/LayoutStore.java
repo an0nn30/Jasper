@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
 import javax.swing.SwingUtilities;
 
 /**
@@ -32,12 +33,11 @@ public final class LayoutStore {
         TOO_LARGE
     }
 
-    /** The longest a layout name may be. */
-    public static final int MAX_NAME = 64;
     private static final System.Logger LOG = System.getLogger(LayoutStore.class.getName());
 
     private final Path file;
     private final Executor writer;
+    private final Function<Path, Layouts> reader;
     private final List<Runnable> listeners = new ArrayList<>();
     private Layouts layouts;
     private volatile CompletableFuture<Void> writes = CompletableFuture.completedFuture(null);
@@ -48,27 +48,43 @@ public final class LayoutStore {
      * @param file {@code layouts.toml}
      * @param writer where writes run, off the EDT
      */
-    public LayoutStore(Path file, Executor writer) {
+    public LayoutStore(Path file, Executor writer) { this(file, writer, LayoutsFile::read); }
+
+    /**
+     * The store of {@code file}, read by {@code reader}: tests count the reads.
+     *
+     * @param file {@code layouts.toml}
+     * @param writer where writes run, off the EDT
+     * @param reader what reads {@code file}, once, as {@link LayoutsFile#read} does
+     */
+    public LayoutStore(Path file, Executor writer, Function<Path, Layouts> reader) {
         this.file = Objects.requireNonNull(file, "file");
         this.writer = Objects.requireNonNull(writer, "writer");
+        this.reader = Objects.requireNonNull(reader, "reader");
     }
 
     /**
-     * The name {@code typed} makes: trimmed, 1 to {@value #MAX_NAME} characters.
+     * The name {@code typed} makes: trimmed, 1 to {@value LayoutsFile#MAX_NAME} characters.
      *
      * @param typed what the user typed
      * @return the name, or empty when it is blank or too long
      */
     public static Optional<String> validName(String typed) {
         String name = typed.strip();
-        return name.isEmpty() || name.length() > MAX_NAME ? Optional.empty() : Optional.of(name);
+        return name.isEmpty() || name.length() > LayoutsFile.MAX_NAME ? Optional.empty() : Optional.of(name);
     }
 
     /** @return the saved layouts */
     public Layouts layouts() {
         requireEdt();
-        if (layouts == null) layouts = LayoutsFile.read(file);
+        if (layouts == null) layouts = reader.apply(file);
         return layouts;
+    }
+
+    /** @return whether {@code layouts.toml} has been read: what this store holds is known without reading it */
+    public boolean read() {
+        requireEdt();
+        return layouts != null;
     }
 
     /** @return the layout a new window opens with, if one is saved */

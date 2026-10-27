@@ -7,6 +7,13 @@
 > Rulings: 1, a save that would pass the 256 KiB limit is refused with "This layout is too large to save."; 2, a fresh
 > start opens the default layout; 3, a failure partway through applying shows "Jasper could not apply the layout
 > “<name>”.", `openEmpty` is exact when no window is open, and `leftOutCount` counts what a layout leaves out.
+> Final review fix wave, Ruling 4: Quit waits for `LayoutStore.written()`; `LayoutPalette.follow` reads nothing and
+> `WindowManager.listLayouts()` lists the palette entries once start-up settles (`OUTPUT_PAINTED`, `WARMED_UP` or the
+> settle fallback after `FIRST_PAINT`), and Reset Default Layout stays enabled while `layouts.toml` is unread
+> (`LayoutStore.read()`), so a restored first window does not read it; applying while another window is open hides the
+> layout's Float/Window tool windows (`ToolWindowState.detachedHidden`) and keeps Zen; Save Current Layout as Default
+> posts "<n> tab(s) can't be kept in a layout and are left out." afterwards (`onInfo`), and a default with no tabs opens
+> one terminal tab; `LayoutsFile.MAX_NAME`; docs and the plan 3 STATUS entry corrected.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

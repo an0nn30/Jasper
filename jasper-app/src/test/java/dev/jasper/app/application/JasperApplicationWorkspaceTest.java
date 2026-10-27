@@ -547,4 +547,95 @@ class JasperApplicationWorkspaceTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(writtenAtExit[0]).as("the save was on disk when the process ended").isTrue();
     }
+
+    /** Full windows plan 4, final review: a layout saved just before Quit is on disk when the process ends. */
+    @Test void quitEndsTheProcessOnlyOnceALayoutsWriteIsWritten() throws Exception {
+        CountDownLatch release = new CountDownLatch(1), terminated = new CountDownLatch(1);
+        Path layouts = home.resolve("layouts.toml");
+        boolean[] writtenAtExit = new boolean[1];
+        JasperApplication[] held = new JasperApplication[1];
+        edt(() -> {
+            held[0] = new JasperApplication(null, DesktopTestSupport.idleLauncher(pending), new CommandHistory(), null, () -> {
+                writtenAtExit[0] = Files.exists(layouts);
+                terminated.countDown();
+            });
+            held[0].frames = window -> new WindowShell(() -> { }, () -> { }, () -> { }, () -> { }, () -> null,
+                component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            held[0].layoutsWriter = task -> Thread.ofVirtual().start(() -> {
+                try { release.await(); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                task.run();
+            });
+            held[0].workspace(file());
+            held[0].layouts(layouts);
+        });
+        JasperApplication application = held[0];
+        try {
+            edt(() -> {
+                JasperWindow window = application.openFirstWindow(List.of()).orElseThrow();
+                assertThat(application.layoutStore().saveAsDefault(application.windows().layoutOf(window).orElseThrow()))
+                    .isEqualTo(dev.jasper.app.workspace.LayoutStore.Saved.SAVED);
+                application.quitNow();
+            });
+            launch();
+            assertThat(terminated.await(500, TimeUnit.MILLISECONDS)).as("held while the layouts write is").isFalse();
+        } finally {
+            release.countDown();
+        }
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(writtenAtExit[0]).as("layouts.toml was on disk when the process ended").isTrue();
+    }
+
+    /**
+     * Full windows plan 4, final review: {@code layouts.toml} is not read on the way to a restored first window; the
+     * palette lists its named layouts once start-up has settled.
+     */
+    @Test void layoutsAreReadForThePaletteOnlyOnceStartUpHasSettled() throws Exception {
+        Path layouts = home.resolve("layouts.toml");
+        edt(() -> {
+            var saving = new dev.jasper.app.workspace.LayoutStore(layouts, Runnable::run);
+            var one = dev.jasper.app.layout.TabId.random();
+            saving.saveAsNew("Work", new WorkspaceFile.WindowRecord(java.util.Optional.empty(), 0,
+                dev.jasper.app.layout.ParentTabs.of(new dev.jasper.app.layout.ParentTab(dev.jasper.app.layout.ParentTabId.random(),
+                    dev.jasper.app.layout.Layout.of(one))),
+                java.util.Map.of(one, new WorkspaceFile.TabRecord.Terminal("", home.toString(), "")), ToolWindows.BUILT_IN));
+        });
+        // A saved window to restore: its first window opens no default layout.
+        CountDownLatch terminated = new CountDownLatch(1);
+        JasperApplication first = application(terminated::countDown);
+        edt(() -> first.openFirstWindow(List.of()).orElseThrow());
+        launch();
+        quit(first);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+
+        StartupTrace trace = StartupTrace.detached();
+        int[] reads = new int[1];
+        JasperApplication[] held = new JasperApplication[1];
+        CountDownLatch ended = new CountDownLatch(1);
+        edt(() -> {
+            held[0] = new JasperApplication(null, DesktopTestSupport.idleLauncher(pending), new CommandHistory(), null, ended::countDown);
+            held[0].frames = window -> new WindowShell(() -> { }, () -> { }, () -> { }, () -> { }, () -> null,
+                component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
+            held[0].trace(trace);
+            held[0].layoutsReader = file -> { reads[0]++; return dev.jasper.app.persistence.LayoutsFile.read(file); };
+            held[0].workspace(file());
+            held[0].layouts(layouts);
+        });
+        JasperApplication application = held[0];
+        try {
+            edt(() -> application.openFirstWindow(List.of()).orElseThrow());
+            launch();
+            edt(() -> { });
+            assertThat(reads[0]).as("not read before start-up settles").isZero();
+            assertThat(application.contributions().actions()).extracting(dev.jasper.app.contributions.ActionEntry::title)
+                .doesNotContain("Apply Layout: Work");
+            trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
+            edt(() -> { });
+            edt(() -> { });
+            assertThat(reads[0]).as("read once").isEqualTo(1);
+            assertThat(application.contributions().actions()).extracting(dev.jasper.app.contributions.ActionEntry::title)
+                .contains("Apply Layout: Work");
+        } finally {
+            quit(application);
+        }
+    }
 }

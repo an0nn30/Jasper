@@ -57,6 +57,8 @@ class WindowManagerTest {
     private Tab early;
     /** What the closed hook runs once it has recorded the window. */
     private Consumer<JasperWindow> whenClosed = window -> { };
+    /** Runs as each stand-in frame shows its window. */
+    private Consumer<JasperWindow> whenShown = window -> { };
     /** Each window's name, {@code "w0"}, {@code "w1"}, …: its index in {@code windows()} when it was first named. */
     private final Map<JasperWindow, String> names = new IdentityHashMap<>();
     private WindowManager manager;
@@ -132,7 +134,7 @@ class WindowManagerTest {
     private WindowShell frame(JasperWindow window) {
         if (failFrames) throw new IllegalStateException("no frame");
         String name = name(window);
-        return new WindowShell(() -> events.add("show " + name), () -> events.add("front " + name), () -> events.add("dispose " + name),
+        return new WindowShell(() -> { events.add("show " + name); whenShown.accept(window); }, () -> events.add("front " + name), () -> events.add("dispose " + name),
             () -> events.add("discard " + name), () -> null, component -> SwingUtilities.isDescendingFrom(component, window.content()),
             (bounds, cursor) -> events.add("place " + name + " " + bounds.x + "," + bounds.y + " " + bounds.width + "x"
                 + bounds.height + " under " + cursor.x + "," + cursor.y));
@@ -1132,6 +1134,73 @@ class WindowManagerTest {
             assertThat(opened.content().tabs()).extracting(Tab::title).containsExactly("one", "two");
             assertThat(opened.placement()).isEqualTo(new JasperWindow.Placement(Optional.of(bounds), 6));
             assertThat(opened.content().toolWindows().snapshot()).as("exactly").isEqualTo(layout.tools());
+        });
+        launch();
+    }
+
+    /**
+     * Full windows plan 4 Ruling 4: applying a layout while another window is open hides its Float and Window tool
+     * windows, keeping their mode and bounds, and keeps its Zen; with no other window open it applies them exactly.
+     */
+    @Test void applyingALayoutBesideAnotherWindowHidesItsDetachedToolWindows() throws Exception {
+        var floating = new UiState.Panel(Slot.RIGHT_TOP, 0, true, dev.jasper.app.dock.ToolWindowMode.FLOAT,
+            Optional.of(new UiState.Bounds(10, 10, 300, 200)));
+        var tools = new ToolWindows(false, true, Map.of("", new ToolWindows.Look(Map.of("dev.x.floating", floating),
+            new UiState.Dock(300, 280, 180, 0.25, 0.5, 0.75))));
+        var layout = defaultOf(tools, terminal("one", HOME));
+        edt(() -> {
+            JasperWindow first = manager.ensureWindow("cold", null).orElseThrow();
+            assertThat(manager.applyLayout(first, layout)).isEqualTo(WindowManager.LayoutApplied.APPLIED);
+            assertThat(first.content().toolWindows().panel("dev.x.floating").orElseThrow().visible()).as("alone: exactly").isTrue();
+            JasperWindow second = manager.openWindow(null).orElseThrow();
+            assertThat(manager.applyLayout(second, layout)).isEqualTo(WindowManager.LayoutApplied.APPLIED);
+            var panel = second.content().toolWindows().panel("dev.x.floating").orElseThrow();
+            assertThat(panel.visible()).as("another window shows it").isFalse();
+            assertThat(panel.mode()).isEqualTo(dev.jasper.app.dock.ToolWindowMode.FLOAT);
+            assertThat(panel.window()).contains(new UiState.Bounds(10, 10, 300, 200));
+            assertThat(second.content().toolWindows().zenMode()).as("Zen kept").isTrue();
+            assertThat(first.content().toolWindows().panel("dev.x.floating").orElseThrow().visible()).isTrue();
+        });
+        launch();
+    }
+
+    /** Full windows plan 4, final review: a default layout holding no tab opens one terminal tab, in the requested directory. */
+    @Test void aDefaultLayoutWithNoTabsOpensOneTerminalTab(@TempDir Path folder) throws Exception {
+        Path requested = Files.createDirectories(folder.resolve("requested"));
+        var empty = new WorkspaceFile.WindowRecord(Optional.empty(), 0, ParentTabs.of(new dev.jasper.app.layout.ParentTab(
+            ParentTabId.random(), dev.jasper.app.layout.Layout.empty())), Map.of(), new ToolWindows(false, true, Map.of()));
+        edt(() -> {
+            manager.layouts(layouts(folder, empty));
+            JasperWindow first = manager.ensureWindow("cold", requested).orElseThrow();
+            assertThat(first.content().terminalTabs()).as("a first start").singleElement()
+                .satisfies(tab -> assertThat(tab.pane().directory()).isEqualTo(requested));
+            assertThat(first.content().toolWindows().railVisible()).as("the default's tool windows").isFalse();
+            first.events().activated().accept(true);
+            JasperWindow opened = manager.openWindow(requested).orElseThrow();
+            assertThat(opened.content().terminalTabs()).as("New Window").singleElement()
+                .satisfies(tab -> assertThat(tab.pane().directory()).isEqualTo(requested));
+            assertThat(manager.openWindow(null).orElseThrow().content().terminalTabs()).hasSize(1);
+        });
+        launch();
+    }
+
+    /**
+     * Ruling 3, final review: a plugin's tab placed in a new window while no window is open, the restored window having
+     * closed again in its own opening, opens with the default layout's tool windows exactly.
+     */
+    @Test void aPluginsNewWindowWithNoWindowOpenTakesTheDefaultsToolWindowsExactly(@TempDir Path folder) throws Exception {
+        var floating = new UiState.Panel(Slot.RIGHT_TOP, 0, true, dev.jasper.app.dock.ToolWindowMode.FLOAT,
+            Optional.of(new UiState.Bounds(10, 10, 300, 200)));
+        var tools = new ToolWindows(false, true, Map.of("", new ToolWindows.Look(Map.of("dev.x.floating", floating),
+            new UiState.Dock(300, 280, 180, 0.25, 0.5, 0.75))));
+        edt(() -> {
+            manager.layouts(layouts(folder, defaultOf(tools, terminal("one", HOME))));
+            // The restored window closes as it shows, once.
+            whenShown = window -> { whenShown = shown -> { }; window.requestClose(); };
+            Tab away = model.tabs().open("dev.example.editor", "away", "away.txt", null, new JPanel(), TabRegistry.Placement.NEW_WINDOW);
+            JasperWindow opened = manager.window(away.window()).orElseThrow();
+            assertThat(manager.windows()).containsExactly(opened);
+            assertThat(opened.content().toolWindows().snapshot()).as("exactly").isEqualTo(tools);
         });
         launch();
     }

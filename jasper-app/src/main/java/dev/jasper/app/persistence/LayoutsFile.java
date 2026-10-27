@@ -55,6 +55,8 @@ public final class LayoutsFile {
     static final long VERSION = 1;
     /** The largest file read, in bytes. */
     public static final int MAX_BYTES = 256 * 1024;
+    /** The longest a layout name may be. */
+    public static final int MAX_NAME = 64;
     private static final System.Logger LOG = System.getLogger(LayoutsFile.class.getName());
 
     private LayoutsFile() { }
@@ -100,7 +102,7 @@ public final class LayoutsFile {
         if (toml.get(List.of("layouts")) instanceof TomlArray entries) {
             for (int i = 0; i < entries.size(); i++) {
                 if (!(entries.get(i) instanceof TomlTable entry) || !(entry.get(List.of("name")) instanceof String name)
-                        || name.isBlank() || name.length() > 64 || !name.equals(name.strip())) {
+                        || name.isBlank() || name.length() > MAX_NAME || !name.equals(name.strip())) {
                     LOG.log(System.Logger.Level.WARNING, "Dropping layout entry " + (i + 1) + " from the layouts: it has no valid name");
                     continue;
                 }

@@ -40,6 +40,8 @@ class LayoutCommandsTest {
     private final List<String> confirmed = new ArrayList<>();
     /** What a window said went wrong, as "title|details". */
     private final List<String> errors = new ArrayList<>();
+    /** What a window told, as "title|details". */
+    private final List<String> infos = new ArrayList<>();
 
     @AfterEach void cleanup() throws Exception {
         if (windows != null) edt(() -> windows.manager.closeAll());
@@ -60,6 +62,7 @@ class LayoutCommandsTest {
         content.askLayoutName = (title, message, initial) -> { asked.add(message + "|" + initial); return answers.poll(); };
         content.confirmLayout = (title, message, button) -> { confirmed.add(message + "|" + button); return confirm; };
         content.onError = (title, details) -> errors.add(title + "|" + details);
+        content.onInfo = (title, details) -> infos.add(title + "|" + details);
     }
 
     private static void run(WindowContent content, ActionId id) {
@@ -243,6 +246,20 @@ class LayoutCommandsTest {
                 .onClosed(() -> { throw new IllegalStateException("closing failed"); });
             window.content().applyLayout("Broken");
             assertThat(errors).containsExactly("Layout not applied|Jasper could not apply the layout \u201cBroken\u201d.");
+        });
+        windows.launch();
+    }
+
+    /** Final review: Save Current Layout as Default says how many tabs it left out, after saving the rest. */
+    @Test void saveAsDefaultSaysHowManyTabsAreLeftOut(@TempDir Path folder) throws Exception {
+        edt(() -> {
+            JasperWindow window = window(folder, new ArrayDeque<>(), true);
+            run(window.content(), ActionId.SAVE_LAYOUT_AS_DEFAULT);
+            assertThat(infos).as("nothing left out").isEmpty();
+            windows.model.tabs().open(TabRegistry.APP_OWNER, "errors", "Errors", window.id(), new JPanel());
+            run(window.content(), ActionId.SAVE_LAYOUT_AS_DEFAULT);
+            assertThat(infos).containsExactly("Default layout saved|1 tab(s) can't be kept in a layout and are left out.");
+            assertThat(store.defaultLayout().orElseThrow().tabs()).hasSize(1);
         });
         windows.launch();
     }

@@ -189,6 +189,8 @@ public final class JasperApplication {
     Executor workspaceWriter = task -> Thread.ofVirtual().name("jasper-workspace-save").start(task);
     /** Test seam: where the layouts store's writes run, set before {@link #layouts(Path)}; each write after the one before. */
     Executor layoutsWriter = task -> Thread.ofVirtual().name("jasper-layouts-save").start(task);
+    /** Test seam: what reads {@code layouts.toml}, set before {@link #layouts(Path)}. */
+    java.util.function.Function<Path, dev.jasper.app.persistence.LayoutsFile.Layouts> layoutsReader = dev.jasper.app.persistence.LayoutsFile::read;
     /** Test seams. Production plans from this process's own command line and starts a real process. */
     Function<RestartMode, Optional<List<String>>> restartPlanner = mode -> RestartCommand.current(mode, List.of());
     Consumer<List<String>> spawner = command -> {
@@ -531,11 +533,17 @@ public final class JasperApplication {
 
     /**
      * The saved layouts in {@code file} (full windows plan 4): New Window and Empty State open their default, written by
-     * {@link #layoutsWriter}. Before the first window. EDT.
+     * {@link #layoutsWriter}. Before the first window. The palette lists the named layouts once start-up has settled, as
+     * residency does (the first output painted, a finished warm-up, or {@link #settleFallback} after the first paint), so
+     * the file is read on the way to the first window only when that window opens the default layout. EDT.
      */
     void layouts(Path file) {
-        layoutStore = new LayoutStore(file, layoutsWriter);
+        layoutStore = new LayoutStore(file, layoutsWriter, layoutsReader);
         windows.layouts(layoutStore);
+        Runnable list = () -> { if (!stopped) windows.listLayouts(); };
+        trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, SwingUtilities::invokeLater, list);
+        trace.when(StartupTrace.Milestone.WARMED_UP, SwingUtilities::invokeLater, list);
+        trace.when(StartupTrace.Milestone.FIRST_PAINT, SwingUtilities::invokeLater, () -> afterDelay(settleFallback, list));
     }
 
     /** The store {@link #layouts(Path)} made; null before it. */
@@ -2404,8 +2412,9 @@ public final class JasperApplication {
         pending.addAll(cleanups);
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
         pending.add(history.closedFuture());
-        // The last save (closing every window saved them) reaches the disk before the process ends.
+        // The last save (closing every window saved them) and the last layouts change reach the disk before the process ends.
         if (workspaceStore != null) pending.add(workspaceStore.written());
+        if (layoutStore != null) pending.add(layoutStore.written());
         shutdown.await(pending);
     }
 

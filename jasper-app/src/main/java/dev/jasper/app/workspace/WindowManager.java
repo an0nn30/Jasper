@@ -171,6 +171,8 @@ public final class WindowManager {
     private WorkspaceStore store;
     /** The saved layouts (full windows plan 4); none in a test without them, and then the default is the built-in layout. */
     private LayoutStore layouts;
+    /** The palette's Apply Layout entries, which follow {@link #layouts}; none without them. */
+    private LayoutPalette palette;
     /** What a restore opens; the application gives the setting ({@link #reopen}). */
     private Supplier<ReopenMode> reopen = () -> ReopenMode.LAST_KNOWN_STATE;
     /** How each plugin stands, by id: without the application's answer, none is installed. */
@@ -227,8 +229,18 @@ public final class WindowManager {
     public void layouts(LayoutStore value) {
         requireEdt();
         layouts = Objects.requireNonNull(value, "value");
-        // The palette's Apply Layout entries follow the store (full windows plan 4).
-        LayoutPalette.follow(model, value, this);
+        // The palette's Apply Layout entries follow the store (full windows plan 4), listed first by listLayouts().
+        palette = LayoutPalette.follow(model, value, this);
+    }
+
+    /**
+     * Lists the named layouts in the palette, reading {@code layouts.toml} if nothing has yet (full windows plan 4): the
+     * application calls it once start-up has settled, so the file is not read on the way to the first window. Again, or
+     * without {@link #layouts}, it does nothing.
+     */
+    public void listLayouts() {
+        requireEdt();
+        if (palette != null) palette.list();
     }
 
     /** The saved layouts; empty without them. */
@@ -292,7 +304,9 @@ public final class WindowManager {
      * Applies {@code layout} to {@code window} (full windows plan 4): every tab's guard answers first, and a refusal
      * leaves the window as it is; then its tabs close and the layout's tabs, panes and tool windows take their place,
      * under fresh ids, so a layout applied twice never clashes. Its bounds stay, and the window stays though its tabs
-     * close. A tab whose plugin is missing or cannot restore it comes back as a placeholder.
+     * close. A tab whose plugin is missing or cannot restore it comes back as a placeholder. While another window is open,
+     * the layout's tool windows in Float or Window mode are hidden, keeping their mode and bounds, as another window may
+     * show them already.
      *
      * @param window one of these windows
      * @param layout the layout; its bounds are ignored
@@ -314,7 +328,10 @@ public final class WindowManager {
             LOG.log(System.Logger.Level.WARNING, "Could not apply the layout's tabs", failure);
             applied = LayoutApplied.FAILED;
         }
-        toolWindows(content, layout.tools());
+        // While another window is open, its Float and Window tool windows are hidden, as a new window's are; Zen stays,
+        // as applying is deliberate (Ruling 4).
+        boolean another = windows.stream().anyMatch(other -> other != window && !other.closed());
+        toolWindows(content, another ? new ToolWindowState(layout.tools(), "").detachedHidden().snapshot() : layout.tools());
         changed();
         return applied;
     }
@@ -369,21 +386,23 @@ public final class WindowManager {
 
     /**
      * Fills {@code window}, opened empty, with the saved default layout's tabs under fresh ids, and {@code directory}
-     * after them in a new tab; without a saved default, or when its tabs cannot be restored, one terminal tab in
-     * {@code directory}. A failure there is logged: the window stays as it is.
+     * after them in a new tab; without a saved default, when its tabs cannot be restored, or when it holds none, one
+     * terminal tab in {@code directory}, or in {@code fallback} when that is null. A failure there is logged: the window
+     * stays as it is.
      */
-    private void fillWithDefault(JasperWindow window, Optional<WorkspaceFile.WindowRecord> saved, Path directory) {
+    private void fillWithDefault(JasperWindow window, Optional<WorkspaceFile.WindowRecord> saved, Path directory, Path fallback) {
         WindowContent content = window.content();
         try {
             if (saved.isPresent()) {
                 try {
                     content.restore(fresh(saved.get()));
-                    if (directory == null) return;
+                    // A default saved from a window of tabs a layout leaves out holds none: it opens one terminal tab.
+                    if (directory == null && content.tabCount() > 0) return;
                 } catch (RuntimeException | Error failure) {
                     LOG.log(System.Logger.Level.WARNING, "Could not restore the default layout's tabs; the window opens one terminal tab", failure);
                 }
             }
-            content.newTab(directory);
+            content.newTab(directory != null ? directory : fallback);
         } catch (RuntimeException | Error failure) {
             LOG.log(System.Logger.Level.WARNING, "Could not give the window its default layout; it stays as it is", failure);
         }
@@ -517,7 +536,7 @@ public final class WindowManager {
                     } catch (RuntimeException | Error again) {
                         LOG.log(System.Logger.Level.WARNING, "Could not give the failed window the default tool windows", again);
                     }
-                    fillWithDefault(window, fallback, directory);
+                    fillWithDefault(window, fallback, directory, null);
                 }
                 return true;
             });
@@ -541,7 +560,7 @@ public final class WindowManager {
         ToolWindows tools = saved.map(WorkspaceFile.WindowRecord::tools).orElse(ToolWindows.BUILT_IN);
         return open(new Opening(saved.isPresent(), saved.isPresent() ? null : directory, trigger, Optional.empty(), Optional.empty(), tools), window -> {
             window.placed(placement);
-            if (saved.isPresent()) fillWithDefault(window, saved, directory);
+            if (saved.isPresent()) fillWithDefault(window, saved, directory, null);
             return true;
         });
     }
@@ -567,7 +586,7 @@ public final class WindowManager {
         Optional<JasperWindow> opened = open(new Opening(saved.isPresent(), saved.isPresent() ? null : directory, "menu", Optional.empty(),
             Optional.empty(), newWindowTools()), window -> {
             from.ifPresent(bounds -> window.placed(new JasperWindow.Placement(Optional.of(cascaded(bounds)), 0)));
-            if (saved.isPresent()) fillWithDefault(window, saved, null);
+            if (saved.isPresent()) fillWithDefault(window, saved, null, directory);
             return true;
         });
         opened.ifPresent(window -> lastOpened = window);

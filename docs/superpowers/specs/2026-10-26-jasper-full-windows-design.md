@@ -391,7 +391,7 @@ tabs spec's section 6.3 and its out-of-scope "more than one main window" are sup
 
 Five plans, each leaving Jasper runnable, written with `superpowers:writing-plans`:
 
-1. **Full windows:** one window class with all chrome, per-window Zen, rail, status bar and detached tool windows,
+1. **Full windows:** one window class with all chrome, per-window Zen, rail and detached tool windows,
    panels and status items in every window, routing to the most recently active window, `new_window`, Move Tab to
    Window, the SDK 0.23.0 changes. Until plan 3, relaunch keeps restoring every saved window and the dock is shared
    through `ui-state.toml` as now.

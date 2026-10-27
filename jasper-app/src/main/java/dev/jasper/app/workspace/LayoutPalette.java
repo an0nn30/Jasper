@@ -21,6 +21,8 @@ final class LayoutPalette {
     private final LayoutStore store;
     private final WindowManager manager;
     private final List<ActionEntry> entries = new ArrayList<>();
+    /** Whether the entries have been listed: from the first change or {@link #list()}, whichever comes first. */
+    private boolean listed;
 
     private LayoutPalette(Contributions model, LayoutStore store, WindowManager manager) {
         this.model = model;
@@ -28,11 +30,21 @@ final class LayoutPalette {
         this.manager = manager;
     }
 
-    /** Lists {@code store}'s named layouts in {@code model}'s actions from now on. */
-    static void follow(Contributions model, LayoutStore store, WindowManager manager) {
+    /**
+     * Lists {@code store}'s named layouts in {@code model}'s actions after each change, and once {@link #list()} is
+     * called: following reads nothing, so {@code layouts.toml} is not read on the way to the first window.
+     *
+     * @return the palette, to {@link #list()} once start-up has settled
+     */
+    static LayoutPalette follow(Contributions model, LayoutStore store, WindowManager manager) {
         var palette = new LayoutPalette(model, store, manager);
         store.onChanged(palette::sync);
-        palette.sync();
+        return palette;
+    }
+
+    /** Lists the named layouts, unless a change listed them already; reads {@code layouts.toml} when nothing has yet. */
+    void list() {
+        if (!listed) sync();
     }
 
     /** The entry's id for the layout {@code name}. */
@@ -46,6 +58,7 @@ final class LayoutPalette {
     }
 
     private void sync() {
+        listed = true;
         entries.forEach(ActionEntry::close);
         entries.clear();
         for (LayoutsFile.Named named : store.named()) {

@@ -121,8 +121,19 @@ public final class ToolWindowState {
      * @return the copy
      */
     public ToolWindowState forNewWindow() {
-        var copy = new ToolWindowState(snapshot(), look);
+        var copy = detachedHidden();
         copy.zenMode = false;
+        return copy;
+    }
+
+    /**
+     * As {@link #forNewWindow()}, keeping Zen: a layout applied while another window is open (full windows plan 4 Ruling
+     * 4), which is deliberate. Its listener is not copied. This state is untouched.
+     *
+     * @return the copy
+     */
+    public ToolWindowState detachedHidden() {
+        var copy = new ToolWindowState(snapshot(), look);
         for (Layout layout : copy.layouts.values())
             layout.panels.replaceAll((id, panel) -> panel.visible() && panel.mode().detached()
                 ? new UiState.Panel(panel.slot(), panel.order(), false, panel.mode(), panel.window()) : panel);

@@ -656,8 +656,9 @@ the tab is shown. It opens the tab the way the plugin's action does, with the sa
 `Optional.empty()`; Jasper places it where it was saved, in whichever window, tab and pane held it. When the tab cannot
 come back now (its file is gone), return why instead, `Optional.of("its file is gone")`: its placeholder says so with
 Retry, and nothing reports a failure. Open only that tab: the window being restored takes no other while the restorer
-runs, so another tab opens where an owner-less one would. Ask the user nothing here (no dialog, sign-in or prompt); a
-tab that needs one opens waiting, as a session that offers Reconnect does.
+runs, so another tab opens where an owner-less one would. A layout is a template, so a restorer may be asked for state
+that another window already shows: open a new tab for it rather than selecting the open one. Ask the user nothing here
+(no dialog, sign-in or prompt); a tab that needs one opens waiting, as a session that offers Reconnect does.
 
 A saved tab comes back as a placeholder that says why, with **Close** and, while the plugin runs, **Retry**, when its
 plugin is not installed, is turned off, waits for review or failed to start, has no restorer for its kind, or when the

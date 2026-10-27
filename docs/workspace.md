@@ -62,26 +62,27 @@ does; an untitled Editor tab and Jasper's own tabs, such as the Errors tab, are 
 The **default layout** is what New Window, Empty State, a start with nothing saved and a failed restore open. Until you
 save one it is the built-in layout: one terminal tab (for New Window, in the active terminal's folder) and the built-in
 tool windows. A saved default's terminals start in the folders they were saved in, or where a new shell starts when that
-folder was on another host or is gone, so New Window then ignores the active terminal's folder. A window opened while
-another is open (New Window, a tab or pane torn out, a plugin's new window) opens the default's tool windows out of Zen,
-with Float and Window tool windows hidden; a torn-out tab's or pane's window and a plugin's new window take only those, New
-Window the default's tabs too.
+folder was on another host or is gone, so New Window then ignores the active terminal's folder; a saved default holding no
+tab opens one terminal tab. A window opened while another is open (New Window, a tab or pane torn out, a plugin's new
+window) opens the default's tool windows out of Zen, with Float and Window tool windows hidden; a torn-out tab's or pane's
+window and a plugin's new window take only those, New Window the default's tabs too.
 
-The **Window** menu (after Tab; under the Enterprise look and in the classic Window menu, **Layouts** joins what the menu
-holds) has **Layouts ›**:
+The **Window** menu (after Tab; under the Enterprise look it also holds the Tab menu's items) has **Layouts ›**:
 
 - **Default** applies the default layout to this window.
 - Each named layout opens **Apply**, **Rename…** and **Delete…**; Delete asks first.
 - **Save Current Layout as New…** asks "Layout name:" in the New Layout dialog, starting at "Custom", for 1 to 64
   characters; a name in use is refused, and the dialog says how many tabs are left out.
-- **Save Current Layout as Default**, and **Reset Default Layout**, which asks first and returns to the built-in layout.
+- **Save Current Layout as Default**, which then says how many tabs were left out, and **Reset Default Layout**, which
+  asks first and returns to the built-in layout.
 
 Applying a layout closes the window's tabs after asking each one's close guards, such as an Editor document with
-unsaved work (Cancel changes nothing), then opens the layout's tabs and tool windows; the window's size and position stay.
-A tab whose plugin is missing becomes a placeholder. When applying fails partway, Jasper says "Jasper could not apply the
-layout “name”.". The commands `apply_default_layout`, `save_layout_as_new`, `save_layout_as_default` and
-`reset_default_layout` have no default shortcut ([Keyboard shortcuts](keyboard-shortcuts.md)), and the command palette
-lists **Apply Layout: name**. A layout too large for the 256 KiB file is not saved: "This layout is too large to save."
+unsaved work (Cancel changes nothing), then opens the layout's tabs and tool windows (while another window is open, with its
+Float and Window tool windows hidden); the window's size and position stay. A tab whose plugin is missing becomes a
+placeholder. When applying fails partway, Jasper says "Jasper could not apply the layout “name”.". The commands
+`apply_default_layout`, `save_layout_as_new`, `save_layout_as_default` and `reset_default_layout` have no default
+shortcut ([Keyboard shortcuts](keyboard-shortcuts.md)), and the command palette lists **Apply Layout: name**. A layout too
+large for the 256 KiB file is not saved: "This layout is too large to save."
 
 ### Size and position
 
@@ -272,7 +273,7 @@ Menu items show their current shortcuts. Opening a menu refreshes which items ar
 | Edit | Copy, Paste, Find, Find Next, Find Previous, Clear Scrollback |
 | View | Command Palette; View Modes › Zen; Maximize Pane; Show/Hide › Toolbar (Icons and Labels, Icons Only, Hidden), Status Bar, Rail; Font Size › Increase Font Size, Decrease Font Size, Reset Font Size; Tool Windows › one toggle per tool window |
 | Tab | Split › Terminal Right, Terminal Down, then each split item's Right and Down (Editor Right, Editor Down, Open File Right…, Open File Down…); Move Pane to New Tab, Move Pane to Tab ›, Move Tab Into ›, Focus Pane Left, Focus Pane Right, Focus Pane Up, Focus Pane Down, Previous Prompt, Next Prompt; Rename Tab; Next Tab, Previous Tab, Select Tab 1 to Select Tab 9 |
-| Window | Layouts › ([below](#layouts)) |
+| Window | [Layouts ›](#layouts) |
 | Session | Plugins' session items. Remote: Connect to SSH Host..., Toggle SSH hosts, Split with Same Host, New Host..., Import from ~/.ssh/config..., Toggle Tunnels, Start or Stop a Tunnel..., New Tunnel..., Forward a Port..., Stop All Tunnels |
 | Transfer | Plugins' transfer items. Remote: Open SFTP here, Transfers; File Server: Share Folder…, New File Server… |
 | Tools | Plugins' tool items |
