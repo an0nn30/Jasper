@@ -39,6 +39,25 @@ class SplashSelectionTest {
             .isEqualTo("desktop-colors");
     }
 
+    @Test void aColdSystemSelectionInitializesTheToolkitBeforeObservingAppearance() {
+        var operations = new java.util.ArrayList<String>();
+        String selected = SplashSelection.theme(choices(AppearanceMode.SYSTEM), dev.jasper.app.plugins.PluginSelection.none(),
+            () -> operations.add("toolkit"), () -> {
+                assertThat(operations).as("AppKit must exist before the native observation").containsExactly("toolkit");
+                operations.add("appearance");
+                return Observation.light();
+            });
+        assertThat(selected).isEqualTo("catppuccin-latte");
+        assertThat(operations).containsExactly("toolkit", "appearance");
+    }
+
+    @Test void explicitAppearanceNeedsNoToolkitOrSystemObserverForSelection() {
+        String selected = SplashSelection.theme(choices(AppearanceMode.DARK), dev.jasper.app.plugins.PluginSelection.none(),
+            () -> { throw new AssertionError("Explicit appearance initialized the toolkit during selection"); },
+            () -> { throw new AssertionError("Explicit appearance opened a system observer"); });
+        assertThat(selected).isEqualTo("catppuccin-mocha");
+    }
+
     @Test void dormantPluginPicksFollowTheApplicationsFallback() {
         var plugins = new dev.jasper.app.appearance.PluginThemes(java.util.List.of(), java.util.Map.of("sleeping", "Sleeping"),
             java.util.Set.of("sleeping"), java.util.List.of());

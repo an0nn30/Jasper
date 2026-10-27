@@ -133,6 +133,12 @@ public final class ApplicationBootstrap {
      * splash whose files cannot be drawn is skipped and logged; start-up goes on.
      */
     static StartupSteps openSplash(Startup startup, boolean headless) {
+        return openSplash(startup, headless, config -> SplashSelection.theme(config, startup.selection()));
+    }
+
+    /** The artwork selector is lazy: launch exclusions and explicit branding precede any appearance observation. */
+    static StartupSteps openSplash(Startup startup, boolean headless,
+                                  Function<dev.jasper.app.config.ConfigSnapshot, String> selectTheme) {
         Presentation presentation = startup.selection().presentation();
         Branding branding = presentation.branding();
         String product = branding.present() ? branding.product() : "Jasper";
@@ -142,8 +148,8 @@ public final class ApplicationBootstrap {
         SplashPainter painter;
         try { painter = branding.present()
             ? SplashPainter.of(splashContent(presentation, BuildInfo.current()), screenScale())
-            : SplashPainter.themed(SplashSelection.theme(startup.service() == null ? dev.jasper.app.config.ConfigSnapshot.defaults()
-                : startup.service().initialState().snapshot(), startup.selection()),
+            : SplashPainter.themed(selectTheme.apply(startup.service() == null ? dev.jasper.app.config.ConfigSnapshot.defaults()
+                : startup.service().initialState().snapshot()),
                 BuildInfo.current().buildLine(), screenScale()); }
         catch (RuntimeException undrawable) {
             LOG.log(System.Logger.Level.WARNING, "The " + product + " splash cannot be drawn; starting without it", undrawable);
