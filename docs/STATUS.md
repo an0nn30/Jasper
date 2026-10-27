@@ -10,10 +10,12 @@ probe's code source, so `check` fails on a JBR with the bug. `CodeSourceScanTest
 callers stay, its Javadoc without the bug. `trainAotCache` still trains in a deleted copy, now documented for what it
 does. Headless `check` on macOS aarch64 (b635.75 jcef, after `cleanTest`) passed in 23m 59s: 13,451 JUnit tests (plan 2's
 13,452 less `CodeSourceScanTest`), zero failures and errors, 30 skips; `packageApp` and `verifyPackage` without AOT pass
-and the image's `jbr-api-1.9.0.jar` is byte-identical to Maven's. Open: not merged or pushed; main's `e0f4de63e` gave
-the image test another killing cache and removed the sealed probe, so its merge with this branch must keep the sealed
-probe and the trained cache's case; one `trainAotCache` run (opens a window, the user's OK) would show the trained
-`Jasper.app` starting with its cache and a sealed `jbr-api`; Windows and Linux runs of the image test wait for CI.
+and the image's `jbr-api-1.9.0.jar` is byte-identical to Maven's. The user-approved `trainAotCache` run passed (73 MB
+cache): with the training copy deleted, `verifyAotCache` and `verifyPackage` accepted the cache, and the image's
+`java -XX:AOTMode=on -version` loaded all 13 classes it loads from `jbr-api`'s sealed package `com.jetbrains` (and
+3,015 of Jasper's) from the cache. Open: not merged or pushed; main's `e0f4de63e` gave the image test another killing
+cache and removed the sealed probe, so its merge with this branch must keep the sealed probe and the trained cache's
+case; a normal start of a trained `Jasper.app` (GUI) is the user's; Windows and Linux runs of the image test wait for CI.
 
 **JCEF runtime (browser plan 2) — 2026-10-27** (`claude/browser-jcef-runtime-0c197e`;
 [plan](superpowers/plans/2026-10-27-browser-2-jcef-runtime.md); executed with per-task subagents and reviews). Jasper
