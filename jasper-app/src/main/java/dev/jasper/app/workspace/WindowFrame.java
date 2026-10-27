@@ -91,8 +91,7 @@ public final class WindowFrame {
                 JComponent sized = content.currentPane() != null ? content.currentPane() : content.workspace();
                 sized.setPreferredSize(InitialWindowSize.terminalArea(initial));
             }
-            bar = content.isMain() ? WindowContent.mount(frame.getRootPane(), content, look, frame::setTitle)
-                : WindowContent.mountChild(frame.getRootPane(), content, look, screenMenuBar(), frame::setTitle);
+            bar = WindowContent.mount(frame.getRootPane(), content, look, frame::setTitle);
             frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
             content.installRootBindings(frame.getRootPane());
             // Native initial focus must not fall through to the first restored tool-panel control.

@@ -157,9 +157,8 @@ final class WorkspaceActions {
                     case MOVE_TAB_INTO_TAB_1, MOVE_TAB_INTO_TAB_2, MOVE_TAB_INTO_TAB_3, MOVE_TAB_INTO_TAB_4, MOVE_TAB_INTO_TAB_5,
                          MOVE_TAB_INTO_TAB_6, MOVE_TAB_INTO_TAB_7, MOVE_TAB_INTO_TAB_8, MOVE_TAB_INTO_TAB_9 ->
                         offers(tabTargets, id.ordinal() - ActionId.MOVE_TAB_INTO_TAB_1.ordinal());
-                    case TOGGLE_ZEN_MODE -> owner.isMain();
-                    // A child window has no status bar or rail of its own (workspace tabs spec 6.3).
-                    case TOGGLE_RAIL, TOGGLE_STATUS_BAR -> owner.isMain() && !owner.zenMode();
+                    case TOGGLE_ZEN_MODE -> true;
+                    case TOGGLE_RAIL, TOGGLE_STATUS_BAR -> !owner.zenMode();
                     case PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
                     case CLEAR_TERMINAL -> ready && !pane.session().usingAlternateBuffer();

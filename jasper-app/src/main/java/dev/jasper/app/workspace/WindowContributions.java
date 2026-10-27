@@ -71,9 +71,7 @@ final class WindowContributions implements AutoCloseable {
     /** In Zen, the panels that showed before it, which show again when it ends and stay saved as showing; else null. */
     private Set<String> beforeZen;
     private Subscription panelRequests;
-    /** Whether this window docks panels and shows status entries: the main window does, a child window does not. */
-    private final boolean docks;
-    /** The detached tool windows' own windows: the main window's; null in a child window. */
+    /** The detached tool windows' own windows. */
     private final DetachedToolWindows detached;
     /** Opens the detached windows that waited for the main window to show (restored at start-up). */
     private final HierarchyListener showing = this::showingChanged;
@@ -85,40 +83,33 @@ final class WindowContributions implements AutoCloseable {
         this.dock = owner.dock();
         // A window restored in Zen remembers its saved panels for leaving it instead of showing them.
         if (owner.zenMode()) beforeZen = new LinkedHashSet<>();
-        // A child window takes the actions, the menus and the palette scopes; panels and status entries are the main
-        // window's (workspace tabs spec 6.3).
-        docks = owner.isMain();
-        detached = docks ? new DetachedToolWindows(owner, this::title, this::hidePanel, owner::bindDetachedRoot) : null;
+        detached = new DetachedToolWindows(owner, this::title, this::hidePanel, owner::bindDetachedRoot);
         syncActions();
         owner.chrome().connect(this);
-        if (docks) {
-            renderStatus();
-            restoreSizes();
-            for (DockStripe stripe : owner.stripes().all()) {
-                stripe.onToggle = this::toggleAndActivate;
-                stripe.onMove = this::movePanel;
-                stripe.onMode = this::setMode;
-                stripe.onHide = this::hidePanel;
-            }
-            owner.area().onMove = this::movePanel;
-            owner.area().onMode = this::setMode;
-            owner.area().onHide = this::hidePanel;
-            owner.area().onRemounted = detached::sync;
-            owner.addHierarchyListener(showing);
-            owner.dockDrag().onDrop = this::dropped;
-            owner.dockDrag().onDetach = this::detachDropped;
-            owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
-            owner.dockDrag().labels = this::stripeLabel;
-            owner.dockDrag().titles = id -> panels.containsKey(id) ? panels.get(id).entry.title() : "";
-            dock.addListener(docked);
-            panelRequests = model.onPanelRequest(this::requested);
+        renderStatus();
+        restoreSizes();
+        for (DockStripe stripe : owner.stripes().all()) {
+            stripe.onToggle = this::toggleAndActivate;
+            stripe.onMove = this::movePanel;
+            stripe.onMode = this::setMode;
+            stripe.onHide = this::hidePanel;
         }
+        owner.area().onMove = this::movePanel;
+        owner.area().onMode = this::setMode;
+        owner.area().onHide = this::hidePanel;
+        owner.area().onRemounted = detached::sync;
+        owner.addHierarchyListener(showing);
+        owner.dockDrag().onDrop = this::dropped;
+        owner.dockDrag().onDetach = this::detachDropped;
+        owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
+        owner.dockDrag().labels = this::stripeLabel;
+        owner.dockDrag().titles = id -> panels.containsKey(id) ? panels.get(id).entry.title() : "";
+        dock.addListener(docked);
+        panelRequests = model.onPanelRequest(this::requested);
         paletteRequests = model.onPaletteRequest(this::requestedPalette);
         syncScopes();
-        if (docks) {
-            syncPanels();
-            renderStripes();
-        }
+        syncPanels();
+        renderStripes();
         listening = model.onChanged(this::changed);
         namePieces = model.tabNamePieces().onChanged(this::namePiecesChanged);
     }
@@ -131,7 +122,7 @@ final class WindowContributions implements AutoCloseable {
 
     Contributions model() { return model; }
 
-    /** The detached tool windows' own windows: the main window's; null in a child window. */
+    /** The detached tool windows' own windows. */
     DetachedToolWindows detached() { return detached; }
 
     /** A panel's title, which its own window shows. */
@@ -593,8 +584,6 @@ final class WindowContributions implements AutoCloseable {
     }
 
     private void changed(Contributions.Kind kind) {
-        if (!docks && (kind == Contributions.Kind.PANELS || kind == Contributions.Kind.RAIL || kind == Contributions.Kind.BADGES
-            || kind == Contributions.Kind.STATUS)) return;
         switch (kind) {
             case ACTIONS -> {
                 boolean structural = syncActions();
@@ -602,7 +591,6 @@ final class WindowContributions implements AutoCloseable {
                 // Titles label toolbar buttons, and a vanished or disabled action changes every placement of it.
                 owner.chrome().renderContributedToolbar();
                 owner.chrome().renderContributedMenus();
-                if (!docks) return;
                 renderStatus();
                 // Which actions the stripe shows changes only when one is added or removed, which rebuilds it. A title or
                 // enabled change renames and repaints the buttons it has, so that it does not end a drag.
@@ -663,7 +651,7 @@ final class WindowContributions implements AutoCloseable {
      */
     void close(boolean remember) {
         if (listening == null) return;
-        if (remember && docks) persist();
+        if (remember) persist();
         listening.close();
         listening = null;
         if (namePieces != null) { namePieces.close(); namePieces = null; }
@@ -675,12 +663,10 @@ final class WindowContributions implements AutoCloseable {
         owner.dockDrag().labels = id -> "";
         owner.dockDrag().titles = id -> "";
         dock.removeListener(docked);
-        if (detached != null) {
-            // The windows close before their panels hear that they close.
-            detached.close();
-            owner.removeHierarchyListener(showing);
-            owner.area().onRemounted = () -> { };
-        }
+        // The windows close before their panels hear that they close.
+        detached.close();
+        owner.removeHierarchyListener(showing);
+        owner.area().onRemounted = () -> { };
         commands.values().forEach(Subscription::close);
         commands.clear();
         scopes.values().forEach(Subscription::close);

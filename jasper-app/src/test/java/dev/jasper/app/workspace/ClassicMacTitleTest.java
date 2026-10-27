@@ -141,45 +141,6 @@ class ClassicMacTitleTest {
         });
     }
 
-    /**
-     * Workspace tabs spec 6.3 under the classic title: a child window takes the band over its workspace, in the colour the
-     * main window's toolbar has, and its menus are the root's for the screen menu bar, which never folds them.
-     */
-    @Test void aChildWindowTakesTheBandWithItsMenusInTheScreenMenuBar() throws Exception {
-        edt(() -> {
-            var themes = EnterpriseLook.controller(false);
-            try {
-                var child = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look().chrome(), true,
-                    WindowRole.CHILD);
-                child.connectContributions(EnterpriseMenuRowMockTest.workstation());
-                var root = new JRootPane();
-                assertThat(WindowContent.mountChild(root, child, look(), true, title -> { })).as("no unified bar").isNull();
-                var menus = child.chrome().menuBar();
-                assertThat(root.getJMenuBar()).as("the screen menu bar's menus").isSameAs(menus).isSameAs(child.menuBar());
-                root.setSize(400, 500);
-                for (int i = 0; i < 2; i++) LayoutTestSupport.layoutTree(root);
-                assertThat(menus.fold()).isEqualTo(CollapsingMenuBar.Fold.NONE);
-                root.getJMenuBar().setVisible(false);
-                root.setSize(800, 500);
-                for (int i = 0; i < 2; i++) LayoutTestSupport.layoutTree(root);
-                var band = child.titleBand();
-                assertThat(band).isNotNull();
-                assertThat(SwingUtilities.convertRectangle(band.getParent(), band.getBounds(), root)).isEqualTo(new Rectangle(0, 0, 800, MacTitleBand.HEIGHT));
-                assertThat(SwingUtilities.convertPoint(child, 0, 0, root).y).as("the workspace meets the band").isEqualTo(MacTitleBand.HEIGHT);
-                assertThat(band.fill()).isEqualTo(ThemeZone.color(null, SemanticColor.SURFACE_APP));
-                assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameVibrantLight");
-                assertThat(TitleInset.of(root)).isEqualTo(MacTitleBand.HEIGHT);
-                var compact = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look().chrome(), true,
-                    WindowRole.CHILD);
-                compact.initializeViewMode(ViewMode.COMPACT);
-                var compactRoot = new JRootPane();
-                WindowContent.mountChild(compactRoot, compact, look(), true, title -> { });
-                assertThat(compact.titleBand()).as("Compact: the system title bar, as the main window's").isNull();
-                assertThat(TitleInset.of(compactRoot)).isZero();
-            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
-        });
-    }
-
     /** Rulings 18: Compact keeps the system title bar, without the band. */
     @Test void compactKeepsTheSystemTitleBarWithoutTheBand() throws Exception {
         edt(() -> {

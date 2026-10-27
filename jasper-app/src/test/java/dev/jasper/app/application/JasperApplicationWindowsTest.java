@@ -73,7 +73,7 @@ class JasperApplicationWindowsTest {
      * Floating tool windows plan 1 Task 8: the main window's detached tool windows get native windows only where windows
      * can be made; headless they get none and wait, and a child window has no detached tool windows.
      */
-    @Test void onlyTheMainWindowsDetachedToolWindowsGetNativeWindowsAndNoneHeadless() throws Exception {
+    @Test void everyWindowsDetachedToolWindowsGetNativeWindowsAndNoneHeadless() throws Exception {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
@@ -85,10 +85,10 @@ class JasperApplicationWindowsTest {
                 application.nativeToolWindows = true;
                 application.open(List.of(), JasperApplication.HANDOFF);
                 assertThat(DesktopTestSupport.detachedShells(application.windows().main().orElseThrow().content()))
-                    .as("where windows can be made, the main window's detached tool windows get them").isTrue();
+                    .as("where windows can be made, a window's detached tool windows get them").isTrue();
                 application.windows().openTerminalWindow(null);
                 JasperWindow child = application.windows().windows().stream().filter(window -> !window.isMain()).findFirst().orElseThrow();
-                assertThat(DesktopTestSupport.detachedShells(child.content())).as("a child window docks nothing").isFalse();
+                assertThat(DesktopTestSupport.detachedShells(child.content())).as("a second window's detached tool windows get them too").isTrue();
             });
         } finally {
             edt(application::quitNow);

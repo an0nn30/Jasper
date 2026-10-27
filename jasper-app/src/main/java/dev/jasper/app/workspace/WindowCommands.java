@@ -147,15 +147,13 @@ final class WindowCommands implements AutoCloseable {
         var rail = owner.action(ActionId.TOGGLE_RAIL);
         rail.putValue(Command.TITLE, !zen && owner.railVisible() ? "Hide Rail" : "Show Rail");
         rail.putValue(Action.SELECTED_KEY, !zen && owner.railVisible());
-        // A child window has no toolbar of its own (workspace tabs spec 6.3); its status bar and rail actions are disabled too.
-        boolean main = owner.isMain();
         boolean buddy = owner.buddyEnabled.getAsBoolean();
         view("view.buddy").putValue(Command.TITLE, buddy ? "Hide Jasper" : "Show Jasper");
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);
         for (var mode : ToolbarMode.values()) {
             var action = view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT));
             action.putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
-            action.setEnabled(main);
+            action.setEnabled(true);
         }
         syncSchemes();
         for (var scheme : schemes) {

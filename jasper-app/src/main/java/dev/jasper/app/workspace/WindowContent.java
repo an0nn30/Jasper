@@ -233,8 +233,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private String frameTitle = "Jasper";
     /** The Windows classic title bar's title under a classic title (Enterprise plan 14), or null until decorated. */
     private ClassicWindowTitle classicWindowTitle;
-    /** A Windows child window's title pane colours, which follow the theme and the window's activity; null elsewhere. */
-    private Runnable childTitleColors;
     Consumer<JComponent> showConfigDiagnostics = control -> {
         if (!followsThemeAppearance) JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
         else showOptionDialog(new JOptionPane(control, JOptionPane.PLAIN_MESSAGE), "Configuration");
@@ -404,10 +402,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         area.releaseDragSource = dockDrag::uninstall;
         // A dock change moves the window's minimum size; read the hook when it fires, as the frame sets it later.
         area.onMinimumSizeChanged = () -> onMinimumSizeChanged.run();
-        // A child window shows its workspace alone, in the centre surface that paints the main window's glass, with no dock,
-        // stripes or chrome around it; its chrome serves its menus and actions and is never shown (spec 6.3).
-        if (role == WindowRole.MAIN) { add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH); }
-        else add(area, BorderLayout.CENTER);
+        add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         themeRegistration = themes.subscribe(this::applyTheme);
         host = registry.addHost(workspaceHost());
         focusManager.addPropertyChangeListener("permanentFocusOwner", focusOwners);
@@ -460,101 +455,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (bar == null && look.followThemeAppearance()) content.chrome().chromeRow();
         if (bar != null) bar.setMenuBar(content.menuBar()); else root.setJMenuBar(content.menuBar());
         return bar;
-    }
-
-    /**
-     * Mounts a child window's {@code content} in its frame's {@code root} (workspace tabs spec 6.3): the look's title bar
-     * (the unified macOS bar with a centred title, the system's, or, under a classic title, IntelliJ Classic's band on
-     * macOS and a 28 px FlatLaf title pane in the toolbar's colour on Windows) showing the active tab's title, and no
-     * header, toolbar or status bar. On macOS the screen menu bar shows the same menus as the main window's, built from
-     * the same menu model, while the look keeps menus there ({@code screenMenuBar}); a child window never shows a menu
-     * row, and its title row ends with its ⋮ ({@code mountWindowMenu}): on Windows and Linux the title pane holds the
-     * title and the ⋮. Returns the unified bar, or null.
-     */
-    static MacTitleBar mountChild(JRootPane root, WindowContent content, WindowLook look, boolean screenMenuBar,
-                                  Consumer<String> nativeTitle) {
-        // Compact keeps the system's title bar, as the main window's does (spec 10.1).
-        boolean compact = content.viewMode == ViewMode.COMPACT;
-        MacTitleBar bar = null;
-        if (compact) root.setContentPane(content);
-        else bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), look.unifiedTitle());
-        // Under a classic title macOS always shows the menus in the screen menu bar, Compact included (Enterprise plan 14).
-        if (look.classicTitle() && content.macOs) content.chrome.menuBar().screenMenuBar(true);
-        boolean classic = look.classicTitle() && !compact;
-        if (bar != null) {
-            MacTitleBar unified = bar;
-            unified.setStyle(MacTitleBar.Style.WINDOW);
-            // The native controls sit on the title bar, which a theme may make dark on a light theme or light on a dark one.
-            content.onThemeChanged = theme -> unified.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(theme.chrome()).dark());
-        } else if (classic && content.macOs) {
-            // IntelliJ Classic's band, as the main window's (plan 14 Rulings 7 and 8); a child window has no toolbar, so
-            // the band takes the colour the main window's toolbar row has under a classic title.
-            content.titleBand = MacTitleBand.install(root, () -> ThemeZone.color(null, SemanticColor.SURFACE_APP));
-            content.onThemeChanged = theme -> content.titleBand.setDark(theme.chrome().dark());
-        } else if (content.macOs && (compact || look.followThemeAppearance())) {
-            content.onThemeChanged = theme -> dev.jasper.app.platform.MacAppearance.follow(root, theme.chrome().dark());
-        } else if (!content.macOs) {
-            // FlatLaf's title pane holds the title and the window's ⋮ (mountWindowMenu), in the chrome's colours, as
-            // the main window's holds its title; under a classic title it is 28 px, as the main window's (plan 14
-            // Rulings 13), and in-window dialogs and overlays start below it (Rulings 19).
-            if (classic) {
-                root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, ClassicWindowTitle.BAR_HEIGHT);
-                dev.jasper.app.platform.TitleInset.publish(root, () -> root.getContentPane() == null ? 0 : root.getContentPane().getY());
-            }
-            // FlatLaf paints the title in this one colour, active or not, so a classic title dims it here while the window is
-            // inactive, as the main window's does (Rulings 14).
-            Runnable colors = () -> {
-                root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, ThemeZone.color(null, SemanticColor.SURFACE_APP));
-                root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, classic
-                    ? dev.jasper.ui.theme.SurfaceContrast.painted(dev.jasper.ui.swing.FlatLafInstaller.installedTheme(),
-                        content.active ? WindowPairs.TITLE : WindowPairs.INACTIVE_TITLE)
-                    : ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
-            };
-            content.childTitleColors = colors;
-            content.onThemeChanged = theme -> colors.run();
-        }
-        content.onThemeChanged.accept(content.theme());
-        content.followsThemeAppearance = bar == null && look.followThemeAppearance() && content.macOs;
-        if (screenMenuBar) root.setJMenuBar(content.menuBar());
-        content.mountWindowMenu(root, bar, look.classicTitle());
-        MacTitleBar titled = bar;
-        content.onTitle = title -> {
-            nativeTitle.accept(title);
-            if (titled != null) titled.setTitle(title);
-        };
-        if (content.bodyLease != null) content.bodyLease.close();
-        content.bodyLease = dev.jasper.app.platform.WindowBody.install(root, content,
-            () -> new java.awt.Rectangle(0, 0, content.getWidth(), content.getHeight()));
-        content.update();
-        return bar;
-    }
-
-    /**
-     * Puts a child window's ⋮, its compact toolbar (parent tabs spec 6; workspace plan 7b Rulings 17), at the trailing end
-     * of its title row: the unified macOS bar's, or IntelliJ Classic's band on macOS. On Windows and Linux it ends a menu
-     * bar of its own after a glue, which FlatLaf's title pane embeds with the title in the glue, and which is a row under
-     * the system's title bar otherwise. On macOS under the system's title bar it ends a row at the top of the window, 8 px
-     * from its edge as in the other title rows. Under a {@code classic} title it is the classic ⋮ the main window's classic
-     * row ends with ({@link WindowChrome#classicWindowMenu(WindowContent)}).
-     */
-    private void mountWindowMenu(JRootPane root, MacTitleBar bar, boolean classic) {
-        JComponent button = classic ? WindowChrome.classicWindowMenu(this) : new WindowMenuButton(this);
-        if (bar != null) bar.setTrailing(button);
-        else if (titleBand != null) titleBand.setTrailing(button);
-        else if (!macOs) {
-            var row = new JMenuBar();
-            row.setName("windowBar");
-            row.add(Box.createHorizontalGlue());
-            row.add(button);
-            root.setJMenuBar(row);
-        } else {
-            var row = new JPanel(new BorderLayout());
-            row.setName("windowBar");
-            row.setOpaque(false);
-            row.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, com.formdev.flatlaf.util.UIScale.scale(8)));
-            row.add(button, BorderLayout.EAST);
-            add(row, BorderLayout.NORTH);
-        }
     }
 
     /**
@@ -1283,8 +1183,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed || terminals != null) return;
         bringToFront = toFront;
         terminals = new WindowTerminals(this, Objects.requireNonNull(registry), Objects.requireNonNull(toFront));
-        // A child window has no toolbar, so it builds no toolbar views (workspace tabs spec 6.3).
-        if (role == WindowRole.MAIN) chrome.windowOpened();
+        chrome.windowOpened();
     }
 
     /** This window's terminal tabs: every parent tab's, in bar order. */
@@ -1319,7 +1218,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         uiState = Objects.requireNonNull(state);
         railVisible = state.railVisible();
         // Restore before contributions can build or show saved panels.
-        if (role == WindowRole.MAIN) setZenMode(state.zenMode());
+        setZenMode(state.zenMode());
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         if (hostsContent) {
             // The window joins the application's registry, taking the tabs it already holds along (workspace plan 3a Rulings 3).
@@ -2079,8 +1978,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * predict this rule for the layout after the drop.
      */
     void syncRailVisibility() {
-        // A child window has no stripes: its workspace fills the centre surface edge to edge (workspace tabs spec 6.3).
-        boolean rails = isMain() && railsEnabled();
+        boolean rails = railsEnabled();
         boolean left = rails && !leftStripe.empty(), right = rails && !rightStripe.empty();
         boolean bottom = stripes.bottom().map(strip -> rails && !strip.empty()).orElse(false);
         area.setStripesVisible(left, right);
@@ -2757,7 +2655,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (!value) { dockDrag.cancel(); tabDrag.cancelFrom(this); }
         if (classicWindowTitle != null) classicWindowTitle.setActive(value);
         active = value;
-        if (childTitleColors != null) childTitleColors.run();
         update();
     }
     void setToolbarMode(ToolbarMode mode) {
@@ -2807,7 +2704,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         refreshTabs();
         if (titleBand != null) { titleBand.close(); titleBand = null; }
         onThemeChanged = theme -> {};
-        childTitleColors = null;
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; fileChooser = folder -> java.util.Optional.empty();

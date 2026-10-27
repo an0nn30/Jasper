@@ -686,7 +686,7 @@ class DetachedToolWindowsTest {
         });
     }
 
-    @Test void shellsGivenBeforeContributionsConnectAreUsedAndAChildWindowHasNone() throws Exception {
+    @Test void shellsGivenBeforeContributionsConnectAreUsedAndEveryWindowHasItsOwn() throws Exception {
         edt(() -> {
             var shells = new Shells();
             WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
@@ -698,7 +698,7 @@ class DetachedToolWindowsTest {
                 DesktopTestSupport.HOME, false, () -> { });
             child.connectContributions(new Contributions(), UiState.inMemory());
             child.detachedShells(shells);
-            assertThat(child.detachedWindows()).isNull();
+            assertThat(child.detachedWindows()).as("every window's tool windows are its own").isNotNull().isNotSameAs(owner.detachedWindows());
         });
     }
 

@@ -48,7 +48,7 @@ import javax.swing.WindowConstants;
  * The native window of one of the main window's detached tool windows (floating tool windows spec, The detached window),
  * the shell {@code DetachedToolWindows} drives: Float's modeless dialog owned by the main window's frame, or Window's
  * ownerless frame, titled with the tool window's title and holding its frame. Its chrome follows the rules of auxiliary
- * windows ({@code NativeShells}) and child windows ({@link WindowContent#mountChild}): on macOS the unified title bar, a
+ * windows ({@code NativeShells}) and the windows ({@link WindowContent#mount}): on macOS the unified title bar, a
  * dialog's row for Float and a window's for Window; without it, under a classic title IntelliJ Classic's band, and
  * otherwise the system's title bar, in the theme's appearance when the look follows it; on Windows and Linux FlatLaf's
  * title pane in the chrome's colours. It has the application icon, follows theme changes, binds Jasper's shortcuts on
@@ -150,7 +150,7 @@ public final class DetachedFrame {
     }
 
     /**
-     * Puts the title bar in place, as {@link WindowContent#mountChild} chooses it, and returns how it follows the theme:
+     * Puts the title bar in place, as {@link WindowContent#mount} chooses it, and returns how it follows the theme:
      * the unified macOS bar, IntelliJ Classic's band under a classic title on macOS, the system's bar there otherwise, and
      * FlatLaf's title pane on Windows and Linux, 28 px under a classic title.
      */

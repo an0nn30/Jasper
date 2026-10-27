@@ -585,11 +585,9 @@ public final class JasperApplication {
             // The first configuration a window takes keeps the start-up view mode, before any native chrome is installed.
             if (configuration != null) content.applyConfiguration(windowConfiguration(), macOs);
             if (configuration != null) configuration.register(content);
-            boolean main = opening.role() == WindowRole.MAIN;
-            // A child window has no dock or Zen of its own: its layout state is never saved (workspace tabs spec 6.3).
-            content.connectContributions(contributions, main ? uiState : UiState.inMemory());
-            // The main window's Float and Window tool windows open native windows of their own (floating tool windows spec).
-            if (main && nativeToolWindows) content.detachedShells(DetachedFrame.shells(themes, windowLook()));
+            content.connectContributions(contributions, uiState);
+            // Each window's Float and Window tool windows open native windows of their own (floating tool windows spec).
+            if (nativeToolWindows) content.detachedShells(DetachedFrame.shells(themes, windowLook()));
             if (WINDOWS) content.onManageCygwinPackages = cygwin::manage;
             UUID windowId = content.id();
             content.onError = (title, details) -> notificationViews.error(title, details, windowId);
@@ -598,7 +596,7 @@ public final class JasperApplication {
             content.onOpenFile = (file, line) -> openFileAt(file, line, windowId);
             // File › Open File… (spec 13): the plugins' file chooser over this window; nothing before plugins start.
             content.fileChooser = folder -> auxiliary == null ? Optional.empty() : auxiliary.openFile(windowId, folder);
-            if (main) notificationViews.attach(content);
+            notificationViews.attach(content);
             content.connectTerminals(terminals, () -> windows.window(windowId).ifPresent(JasperWindow::toFront));
             if (WORKSPACE_GLASS) content.setGlassListener(this::glassChanged);
             content.onToggleBuddy = this::toggleBuddy;

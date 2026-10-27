@@ -28,31 +28,66 @@ import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-/** Workspace tabs spec 6.2, 6.3 and 10: the main window's chrome and its empty workspace; a child window's workspace alone. */
-class WindowRolesTest {
+/** Full windows spec 5.1: every window has the header, status bar, dock, stripes and toolbar views; the empty workspace (spec 10). */
+class FullWindowChromeTest {
     private final ArrayDeque<Runnable> pending = new ArrayDeque<>();
 
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
     private void launch() { while (!pending.isEmpty()) pending.remove().run(); }
 
-    @Test void aChildWindowShowsItsWorkspaceAndNoChrome() throws Exception {
+    @Test void everyWindowHasTheHeaderStatusBarDockAndStripes() throws Exception {
         edt(() -> {
-            var child = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { });
-            assertThat(child.role()).isEqualTo(WindowRole.CHILD);
-            assertThat(child.isMain()).isFalse();
-            assertThat(child.getComponentCount()).as("its workspace and nothing else").isEqualTo(1);
-            assertThat(SwingUtilities.isDescendingFrom(child.workspace(), child)).isTrue();
-            assertThat(SwingUtilities.isDescendingFrom(child.chrome().header(), child)).as("no header or toolbar").isFalse();
-            assertThat(SwingUtilities.isDescendingFrom(child.status(), child)).as("no status bar").isFalse();
-            assertThat(child.area().getParent()).as("the centre surface alone: no dock or stripes around it").isSameAs(child);
-            assertThat(SwingUtilities.isDescendingFrom(child.workspace(), child.area())).as("as the main window's").isTrue();
-            assertThat(SwingUtilities.isDescendingFrom(child.leftStripe(), child)).as("no stripes").isFalse();
-            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, false, () -> { });
-            assertThat(main.role()).isEqualTo(WindowRole.MAIN);
-            assertThat(SwingUtilities.isDescendingFrom(main.chrome().header(), main)).isTrue();
-            assertThat(SwingUtilities.isDescendingFrom(main.status(), main)).isTrue();
-            assertThat(SwingUtilities.isDescendingFrom(main.workspace(), main.area())).as("the dock's centre").isTrue();
+            for (WindowRole role : WindowRole.values()) {
+                var window = content(idleLauncher(pending), role, HOME, false, () -> { });
+                assertThat(SwingUtilities.isDescendingFrom(window.chrome().header(), window)).as(role + " header").isTrue();
+                assertThat(SwingUtilities.isDescendingFrom(window.status(), window)).as(role + " status bar").isTrue();
+                assertThat(SwingUtilities.isDescendingFrom(window.workspace(), window.area())).as(role + " dock centre").isTrue();
+                assertThat(SwingUtilities.isDescendingFrom(window.leftStripe(), window)).as(role + " stripes").isTrue();
+            }
+        });
+        launch();
+    }
+
+    @Test void aSecondWindowDocksPanelsAndBuildsToolbarViews() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            int[] asked = {0};
+            model.addToolbar(new ToolbarEntry.View(window -> { asked[0]++; return Optional.empty(); }));
+            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
+            for (WindowRole role : WindowRole.values()) {
+                int before = asked[0];
+                var window = content(idleLauncher(pending), role, HOME, false, () -> { });
+                window.connectContributions(model);
+                window.connectTerminals(new TerminalRegistry(), () -> { });
+                assertThat(asked[0]).as(role + " builds its toolbar view once").isEqualTo(before + 1);
+                assertThat(window.dock().slot("test.panel")).as(role + " docks panels").contains(Slot.LEFT_TOP);
+            }
+        });
+        launch();
+    }
+
+    @Test void zenRailAndStatusBarToggleOnlyTheirOwnWindow() throws Exception {
+        edt(() -> {
+            var first = content(idleLauncher(pending), WindowRole.MAIN, HOME, false, () -> { });
+            var second = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { });
+            for (var window : java.util.List.of(first, second)) {
+                window.updateActions();
+                assertThat(window.action(ActionId.TOGGLE_ZEN_MODE).isEnabled()).as("Zen").isTrue();
+                assertThat(window.action(ActionId.TOGGLE_STATUS_BAR).isEnabled()).as("Status Bar").isTrue();
+                assertThat(window.action(ActionId.TOGGLE_RAIL).isEnabled()).as("Rail").isTrue();
+                assertThat(window.windowCommands().view("view.toolbar.icons").isEnabled()).as("Toolbar").isTrue();
+            }
+            second.invoke(ActionId.TOGGLE_ZEN_MODE);
+            assertThat(second.zenMode()).isTrue();
+            assertThat(first.zenMode()).isFalse();
+            second.updateActions();
+            assertThat(second.action(ActionId.TOGGLE_STATUS_BAR).isEnabled()).as("off in Zen").isFalse();
+            first.invoke(ActionId.TOGGLE_STATUS_BAR);
+            assertThat(first.status().isVisible()).isFalse();
+            assertThat(second.status().isVisible()).as("hidden by its own Zen").isFalse();
+            second.invoke(ActionId.TOGGLE_ZEN_MODE);
+            assertThat(second.status().isVisible()).as("the first window's toggle did not reach it").isTrue();
         });
         launch();
     }
@@ -111,43 +146,6 @@ class WindowRolesTest {
             child[0].commandPalette().toggle();
             assertThat(child[0].commandPalette().isOpen()).as("the palette opens over the child window").isTrue();
             child[0].commandPalette().dismiss();
-        });
-        launch();
-    }
-
-    @Test void aChildWindowLeavesTheMainWindowsChromeAlone() throws Exception {
-        edt(() -> {
-            var child = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { });
-            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, false, () -> { });
-            for (var window : java.util.List.of(child, main)) {
-                window.updateActions();
-                boolean expected = window.isMain();
-                assertThat(window.action(ActionId.TOGGLE_ZEN_MODE).isEnabled()).as("Zen").isEqualTo(expected);
-                assertThat(window.action(ActionId.TOGGLE_STATUS_BAR).isEnabled()).as("Status Bar").isEqualTo(expected);
-                assertThat(window.action(ActionId.TOGGLE_RAIL).isEnabled()).as("Rail").isEqualTo(expected);
-                assertThat(window.windowCommands().view("view.toolbar.icons").isEnabled()).as("Toolbar").isEqualTo(expected);
-                assertThat(window.action(ActionId.NEW_TAB).isEnabled()).as("its own tabs").isTrue();
-            }
-        });
-        launch();
-    }
-
-    @Test void aChildWindowBuildsNoToolbarViewsAndDocksNoPanels() throws Exception {
-        edt(() -> {
-            var model = new Contributions();
-            int[] asked = {0};
-            model.addToolbar(new ToolbarEntry.View(window -> { asked[0]++; return Optional.empty(); }));
-            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
-            var child = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { });
-            child.connectContributions(model);
-            child.connectTerminals(new TerminalRegistry(), () -> { });
-            assertThat(asked[0]).as("no toolbar, no toolbar views").isZero();
-            assertThat(child.dock().slot("test.panel")).as("panels are the main window's").isEmpty();
-            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, false, () -> { });
-            main.connectContributions(model);
-            main.connectTerminals(new TerminalRegistry(), () -> { });
-            assertThat(asked[0]).isEqualTo(1);
-            assertThat(main.dock().slot("test.panel")).contains(Slot.LEFT_TOP);
         });
         launch();
     }
