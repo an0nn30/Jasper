@@ -1254,6 +1254,29 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
+     * Replaces this window's tool windows with {@code fresh} (full windows spec 6.2): its contributions let go of the old
+     * state without saving it, every tool window undocks, and they connect again under {@code fresh}, its Zen and stripes
+     * included. A restore that failed opens the built-in layout so. The tabs and the registry are untouched. EDT.
+     *
+     * @param fresh the tool windows from now on, {@link #toolWindows()}
+     */
+    void replaceToolWindows(ToolWindowState fresh) {
+        Objects.requireNonNull(fresh, "fresh");
+        if (closed || contributed == null) return;
+        Contributions model = contributed.model();
+        contributed.discard();
+        contributed = null;
+        toolWindows = fresh;
+        railVisible = fresh.railVisible();
+        setZenMode(fresh.zenMode());
+        contributed = new WindowContributions(this, model, fresh);
+        rebind();
+        if (detachedShells != null) detachedShells(detachedShells);
+        syncRailVisibility();
+        updateActions();
+    }
+
+    /**
      * The registry-facing side of this window's workspace (workspace tabs spec 9.1): its panes are every tab's, so an item
      * placed beside a pane lands in that pane's tab (workspace plan 7a Rulings 8), and one placed without a pane opens as
      * a new tab (plan 8a Rulings 3).

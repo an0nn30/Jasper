@@ -11,6 +11,7 @@ import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.layout.TabRestore;
+import dev.jasper.app.persistence.ToolWindowState;
 import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.persistence.WorkspaceFile;
@@ -293,8 +294,8 @@ public final class WindowManager {
     /**
      * The window as the store has it (workspace tabs spec 13; tabs and panes spec 12; full windows spec 6.1), where it
      * was with its tabs, splits and panes, its items and its tool windows; with nothing to restore, or a window that
-     * cannot be restored, a new window with one terminal tab in {@code directory}. A restored window opens
-     * {@code directory} in a new tab after its own. A window that cannot be restored is not lost: the store keeps the
+     * cannot be restored, a new window with one terminal tab in {@code directory} and the built-in tool windows. A
+     * restored window opens {@code directory} in a new tab after its own. A window that cannot be restored is not lost: the store keeps the
      * saved window as {@code workspace.toml.bad} and says so (spec 15). The store is read here, after
      * {@link #ensureWindow}'s checks, since reading it ends its hold.
      */
@@ -315,7 +316,11 @@ public final class WindowManager {
                     // closed what it made.
                     LOG.log(System.Logger.Level.WARNING, "Could not restore the saved window; it opens as a new one", failure);
                     keepAside(saved);
-                    window.content().newTab(directory);
+                    // The built-in layout, tool windows included (Controller Ruling 2): the record's are not kept either.
+                    WindowContent content = window.content();
+                    content.replaceToolWindows(new ToolWindowState(ToolWindows.BUILT_IN, content.toolWindows().look()));
+                    content.toolWindows().onChanged(this::changed);
+                    content.newTab(directory);
                 }
                 return true;
             });

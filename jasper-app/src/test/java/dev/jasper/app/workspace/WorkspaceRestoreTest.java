@@ -276,10 +276,25 @@ class WorkspaceRestoreTest {
         return ((WorkspaceFile.Loaded.Restore) WorkspaceFile.read(folder.resolve("workspace.toml.bad"))).snapshot();
     }
 
-    @Test void aMainWindowThatCannotBeRestoredOpensANewOneAndTheSavedWindowsAreKept() throws Exception {
+    /** A window holding one terminal {@code item}, saved in Zen with its stripes hidden and a tool window showing. */
+    private WorkspaceFile.Snapshot savedInZen(TabId item) {
+        WorkspaceFile.WindowRecord plain = mainWindow(item, shell("", folder, ""));
+        var tools = new ToolWindows(false, true, Map.of("", new ToolWindows.Look(
+            Map.of("dev.x.hosts", new UiState.Panel(dev.jasper.app.dock.Slot.LEFT_TOP, 0, true)), new UiState.Dock(300, 280, 180, 0.25, 0.5, 0.75))));
+        return new WorkspaceFile.Snapshot(new WorkspaceFile.WindowRecord(plain.bounds(), plain.extendedState(), plain.layout(), plain.tabs(), tools));
+    }
+
+    /** Controller Ruling 2: a window whose restore failed opens the built-in layout, its tool windows included. */
+    private static void builtInToolWindows(JasperWindow window) {
+        assertThat(window.content().toolWindows().snapshot()).as("the built-in tool windows").isEqualTo(ToolWindows.BUILT_IN);
+        assertThat(window.content().zenMode()).as("out of Zen").isFalse();
+        assertThat(window.content().railVisible()).as("the stripes show").isTrue();
+    }
+
+    @Test void aWindowThatCannotBeRestoredOpensANewOneAndTheSavedWindowIsKept() throws Exception {
         Path work = Files.createDirectories(folder.resolve("work"));
         TabId item = TabId.random();
-        var saved = new WorkspaceFile.Snapshot(mainWindow(item, shell("", folder, "")));
+        var saved = savedInZen(item);
         WorkspaceFile.write(file(), saved);
         windows();
         edt(() -> {
@@ -287,8 +302,10 @@ class WorkspaceRestoreTest {
             JasperWindow main = windows.manager.ensureWindow("cold", work).orElseThrow();
             assertThat(main.content().tabs()).hasSize(1);
             assertThat(main.content().tabs().getFirst().id()).isNotEqualTo(item);
-            assertThat(windows.events).as("it opens as a new main window, never closed: the last window's closed hook can end Jasper")
+            assertThat(windows.events).as("it opens as a new window, never closed: the last window's closed hook can end Jasper")
                 .containsExactly("show w0", "opened w0");
+            builtInToolWindows(main);
+            assertThat(windows.manager.snapshot().orElseThrow().window().tools()).as("and saves them").isEqualTo(ToolWindows.BUILT_IN);
         });
         assertThat(setAside).as("told, for the notice").containsExactly(folder.resolve("workspace.toml.bad"));
         assertThat(keptAside()).as("not lost to the next save").isEqualTo(saved);
@@ -317,13 +334,13 @@ class WorkspaceRestoreTest {
     }
 
     /**
-     * Workspace plan 6a Task 8's review and Rulings 20: an Error from the main window's restore opens it as a new main
-     * window, never discarded, and the saved window is kept aside, so the next start does not meet it again.
+     * Workspace plan 6a Task 8's review and Rulings 20: an Error from the window's restore opens it as a new window with
+     * the built-in tool windows, never discarded, and the saved window is kept aside, so the next start does not meet it again.
      */
-    @Test void anErrorFromTheMainWindowsRestoreOpensItAsANewOneAndKeepsTheSavedWindows() throws Exception {
+    @Test void anErrorFromTheWindowsRestoreOpensItAsANewOneAndKeepsTheSavedWindow() throws Exception {
         Path work = Files.createDirectories(folder.resolve("work"));
         TabId item = TabId.random();
-        var saved = new WorkspaceFile.Snapshot(mainWindow(item, shell("", folder, "")));
+        var saved = savedInZen(item);
         WorkspaceFile.write(file(), saved);
         windows();
         edt(() -> {
@@ -331,9 +348,10 @@ class WorkspaceRestoreTest {
             JasperWindow main = windows.manager.ensureWindow("cold", work).orElseThrow();
             assertThat(main.content().tabs()).hasSize(1);
             assertThat(main.content().tabs().getFirst().id()).isNotEqualTo(item);
-            assertThat(main.content().isPreferredSizeSet()).as("sized as a new main window is").isFalse();
+            assertThat(main.content().isPreferredSizeSet()).as("sized as a new window is").isFalse();
             assertThat(windows.events).as("never discarded: the last window's closed hook can end Jasper")
                 .containsExactly("show w0", "opened w0");
+            builtInToolWindows(main);
         });
         assertThat(setAside).containsExactly(folder.resolve("workspace.toml.bad"));
         assertThat(keptAside()).isEqualTo(saved);

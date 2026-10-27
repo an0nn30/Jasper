@@ -650,6 +650,21 @@ final class WindowContributions implements AutoCloseable {
     @Override public void close() { close(true); }
 
     /**
+     * Lets go of this window as {@link #close(boolean)} does without saving, and undocks every tool window it docked,
+     * so that contributions connected again with another state dock them afresh (a restore that failed: full windows
+     * spec 6.2's built-in layout).
+     */
+    void discard() {
+        List<String> docked = List.copyOf(panels.keySet());
+        close(false);
+        for (String id : docked) {
+            dock.remove(id);
+            owner.area().removeContent(id);
+        }
+        owner.area().sync();
+    }
+
+    /**
      * As {@link #close()}. With {@code remember} false the window's layout is not saved first: the window is discarded
      * (it failed to compose, or it is the warm-up rehearsal's), so it must not ask for a save.
      */
