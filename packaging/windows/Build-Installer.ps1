@@ -6,10 +6,10 @@ param(
     [ValidateSet('x64', 'aarch64')][string]$Architecture
 )
 
-# Build the Windows setup wizard (or portable ZIP) with a JBR SDK 25 of the target architecture
-# and WiX 3. Gradle runs on that SDK, so the package matches it: by default this machine's own
-# architecture. An x64 package on Windows on Arm runs entirely under emulation, JIT-compiled code
-# included, so build one there only for x64 machines (-Architecture x64).
+# Build the Windows setup wizard (or portable ZIP) with a JBR SDK 25 with JCEF of the target
+# architecture and WiX 3. Gradle runs on that SDK, so the package matches it: by default this
+# machine's own architecture. An x64 package on Windows on Arm runs entirely under emulation,
+# JIT-compiled code included, so build one there only for x64 machines (-Architecture x64).
 # Settings apply to this build only, not the calling shell.
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
@@ -26,11 +26,14 @@ if (-not $Architecture) {
 }
 $architectureNames = if ($Architecture -eq 'aarch64') { @('aarch64', 'arm64') } else { @('x86_64', 'amd64', 'x64') }
 
+# A JBR SDK 25 of the target architecture with jpackage and JCEF: the MODULES line of its release
+# file names jcef as a whole module (jcef.something is another).
 function Test-JbrSdk([string]$SdkHome) {
     (Get-SdkArchitecture $SdkHome) -in $architectureNames -and
         (Test-Path -LiteralPath (Join-Path $SdkHome 'bin\jpackage.exe')) -and
         (Select-String -LiteralPath (Join-Path $SdkHome 'release') -Pattern '^JAVA_VERSION="25' -Quiet) -and
-        (Select-String -LiteralPath (Join-Path $SdkHome 'release') -Pattern '^IMPLEMENTOR="JetBrains' -Quiet)
+        (Select-String -LiteralPath (Join-Path $SdkHome 'release') -Pattern '^IMPLEMENTOR="JetBrains' -Quiet) -and
+        (Select-String -LiteralPath (Join-Path $SdkHome 'release') -Pattern '^MODULES="(.* )?jcef( .*)?"' -Quiet)
 }
 
 if (-not $JavaHome) {
@@ -40,10 +43,10 @@ if (-not $JavaHome) {
             Sort-Object Name -Descending | ForEach-Object FullName)
     $JavaHome = $candidates | Where-Object { $_ -and (Test-JbrSdk $_) } | Select-Object -First 1
     if (-not $JavaHome) {
-        throw "No $Architecture JBR SDK 25 found in JAVA_HOME, ~\.jdks or ~\.gradle\jdks; pass -JavaHome"
+        throw "No $Architecture JBR SDK 25 with JCEF found in JAVA_HOME, ~\.jdks or ~\.gradle\jdks; pass -JavaHome"
     }
 } elseif (-not (Test-JbrSdk $JavaHome)) {
-    throw "$JavaHome is not a $Architecture JBR SDK 25 with jpackage (OS_ARCH: $(Get-SdkArchitecture $JavaHome))"
+    throw "$JavaHome is not a $Architecture JBR SDK 25 with JCEF and jpackage (OS_ARCH: $(Get-SdkArchitecture $JavaHome))"
 }
 
 if ($Package -eq 'Installer') {

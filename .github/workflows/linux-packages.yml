@@ -64,8 +64,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      # The libraries from libnss3 on are Chromium's (libcef.so): the dependency scan resolves each library of
-      # the image with ldd on this host, and a library that does not resolve fails the build.
+      # The dependency scan resolves each library of the image with ldd on this host, and a library that does not
+      # resolve fails the build: libxtst6 and libasound2 for the Java runtime, and libasound2, libglib2.0-0 (through
+      # libglib2.0-dev) and the libraries from libnss3 on for Chromium (libcef.so).
       - name: Install packaging tools
         run: |
           sudo apt-get update

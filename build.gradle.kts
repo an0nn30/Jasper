@@ -137,6 +137,10 @@ val verifyTerminalArchitecture = tasks.register("verifyTerminalArchitecture") {
 
 gradle.projectsEvaluated {
     appProject.tasks.named("check") { dependsOn(verifyTerminalArchitecture) }
+    // Every module's tests wait for check's runtime check (gradle/packaging.gradle), so another runtime fails check
+    // in seconds, not after the tests. Ordering only: a test task run on its own does not run the check.
+    val verifyJcefToolchain = appProject.tasks.named("verifyJcefToolchain")
+    subprojects { tasks.withType<Test>().configureEach { mustRunAfter(verifyJcefToolchain) } }
 }
 
 apply(from = "gradle/application-architecture.gradle.kts")

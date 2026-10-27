@@ -585,12 +585,13 @@ verifySupport.configure {
 }
 
 // The build's runtime is the JetBrains Runtime with JCEF: the release file of one without it is refused, and so is
-// one that has the module but no JCEF version.
+// one that has the module but no JCEF version, and one that names another build than jcefRuntimeBuild.
 verifySupport.configure {
     doLast {
         String jcef = '''JAVA_VERSION="25.0.4.1"
 IMPLEMENTOR_VERSION="JBRSDK-25.0.4.1+1-635.75-jcef"
 MODULES="java.base java.desktop gluegen.rt jogl.all jcef jdk.jpackage"
+JCEF_VERSION="150.0.14.1233+g9df0879"
 JCEF_VERSION_DETAILED=150.0.14-g7c1aa68-chromium-150.0.7871.129-api-1.21-263-b16
 '''
         String plain = '''JAVA_VERSION="25.0.4.1"
@@ -604,15 +605,50 @@ MODULES="java.base java.desktop jdk.jpackage"
             'its release file names no JCEF version'
         assert jcefRuntimeProblem('') == 'it has no jcef module'
         assert jcefRuntimeProblem(jcef.replace(' jcef ', ' jcef.something ')) == 'it has no jcef module'
+        // Another build is refused too, however close: the first pinned value that differs is named.
+        assert jcefRuntimeProblem(jcef.replace('chromium-150.0.7871.129', 'chromium-150.0.7871.130')) ==
+            'its JCEF_VERSION_DETAILED is 150.0.14-g7c1aa68-chromium-150.0.7871.130-api-1.21-263-b16'
+        assert jcefRuntimeProblem(jcef.replace('263-b16', '263-b160')) ==
+            'its JCEF_VERSION_DETAILED is 150.0.14-g7c1aa68-chromium-150.0.7871.129-api-1.21-263-b160'
+        assert jcefRuntimeProblem(jcef.replace('1233+g9df0879', '1240+g0123abc')) == 'its JCEF_VERSION is 150.0.14.1240+g0123abc'
+        assert jcefRuntimeProblem(jcef.replace('635.75', '640.1')) == 'its IMPLEMENTOR_VERSION is JBRSDK-25.0.4.1+1-640.1-jcef'
+        assert jcefRuntimeProblem(jcef.replace('635.75', '640.1').replace('chromium-150.0.7871.129', 'chromium-151.0.7900.1')) ==
+            'its IMPLEMENTOR_VERSION is JBRSDK-25.0.4.1+1-640.1-jcef'
+        assert jcefRuntimeProblem(jcef.readLines().findAll { !it.startsWith('JCEF_VERSION=') }.join('\n')) ==
+            'its release file has no JCEF_VERSION'
+        // Quoting and CRLF line ends make no difference.
+        assert jcefRuntimeProblem(jcef.replace('DETAILED=150', 'DETAILED="150').replace('b16\n', 'b16"\n')) == null
+        assert jcefRuntimeProblem(jcef.replace('\n', '\r\n')) == null
         File sdk = new File('/jbr') // the message prints the File, which is \jbr on Windows
         requireJcefRuntime(sdk, jcef)
         try {
             requireJcefRuntime(sdk, plain)
             assert false : 'a runtime without JCEF must be refused'
         } catch (GradleException expected) {
-            assert expected.message == "The selected JBR SDK at ${sdk} is not the JCEF build: it has no jcef module. " +
-                'Install jbrsdk_jcef-25.0.4.1 (docs/packaging.md).'
+            assert expected.message == "The selected JBR SDK at ${sdk} is not the JCEF build JBRSDK-25.0.4.1+1-635.75-jcef: " +
+                'it has no jcef module. Install that build, or make Gradle use it (docs/packaging.md#requirements).'
         }
+        try {
+            requireJcefRuntime(sdk, jcef.replace('635.75', '640.1'))
+            assert false : 'another JCEF build must be refused'
+        } catch (GradleException expected) {
+            assert expected.message == "The selected JBR SDK at ${sdk} is not the JCEF build JBRSDK-25.0.4.1+1-635.75-jcef: " +
+                'its IMPLEMENTOR_VERSION is JBRSDK-25.0.4.1+1-640.1-jcef. Install that build, or make Gradle use it ' +
+                '(docs/packaging.md#requirements).'
+        }
+        // The Licenses window names the Chromium, Chromium Embedded Framework and JCEF of the pinned build.
+        String notices = rootProject.file('jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml').getText('UTF-8')
+        Map<String, String> noticed = notices.split(/(?m)^\[\[component\]\]/).collectEntries { String component ->
+            def name = component =~ /(?m)^name = "([^"]*)"/
+            def version = component =~ /(?m)^version = "([^"]*)"/
+            name.find() && version.find() ? [(name.group(1)): version.group(1)] : [:]
+        }
+        def detailed = jcefRuntimeBuild.JCEF_VERSION_DETAILED =~ /^([0-9.]+)-g[0-9a-f]+-chromium-([0-9.]+)-/
+        assert detailed.find() : "JCEF_VERSION_DETAILED names no CEF and Chromium version: ${jcefRuntimeBuild.JCEF_VERSION_DETAILED}"
+        Map<String, String> pinned = ['Chromium': detailed.group(2), 'Chromium Embedded Framework': detailed.group(1),
+            'JCEF': jcefRuntimeBuild.JCEF_VERSION]
+        assert noticed.subMap(pinned.keySet()) == pinned :
+            "notices.toml names ${noticed.subMap(pinned.keySet())}, jcefRuntimeBuild in gradle/packaging-support.gradle ${pinned}"
         logger.lifecycle('Verified the JCEF runtime check')
     }
 }
@@ -689,10 +725,12 @@ verifySupport.configure {
     }
 }
 
-// CI, release and SDK builds run on the JetBrains Runtime with JCEF, which verifyJcefToolchain requires. Every setup-java
-// step that installs the JetBrains distribution therefore asks for java-package: jdk+jcef. The workflow files are read as
-// text, one step at a time: a step is a list item with the lines indented deeper than its dash, and it is a setup-java
-// step when its own lines say uses: actions/setup-java@.
+// The workflows build on the JetBrains Runtime with JCEF: CI's check job refuses any other runtime (verifyJcefToolchain),
+// the packaging tasks of the release and Linux package workflows refuse it too (nativeContext), and the SDK release and
+// desktop-gtk-modern jobs, which run neither check, take the same runtime. Every setup-java step that installs the
+// JetBrains distribution therefore asks for java-package: jdk+jcef. The workflow files are read as text, one step at a
+// time: a step is a list item with the lines indented deeper than its dash, and it is a setup-java step when its own
+// lines say uses: actions/setup-java@.
 verifySupport.configure {
     doLast {
         // The JetBrains setup-java steps of one workflow file as [line: the step's first line (1-based), jcef: whether the

@@ -85,23 +85,38 @@ ext.runtimeModules = { String os ->
         'jogl.all']).toSorted()
 }
 
+// The one build of the JetBrains Runtime that Jasper is made with, JBR 25.0.4.1 b635.75 with JCEF, as the release file
+// of its SDK names it on all six platforms: the JBR build, and the JCEF and Chromium it carries. packaging/jcef's file
+// lists and checksums, macJcefPayload and notices.toml's Chromium, Chromium Embedded Framework and JCEF entries describe
+// this build, so a newer JBR starts here (docs/app-maintenance.md, "Moving to a newer JBR").
+ext.jcefRuntimeBuild = [
+    IMPLEMENTOR_VERSION: 'JBRSDK-25.0.4.1+1-635.75-jcef',
+    JCEF_VERSION: '150.0.14.1233+g9df0879',
+    JCEF_VERSION_DETAILED: '150.0.14-g7c1aa68-chromium-150.0.7871.129-api-1.21-263-b16',
+].asImmutable()
+
 // The build's runtime is the JetBrains Runtime with JCEF (Chromium) for the browser plugin. The plain build of the same
 // version has the same vendor and number, so its release file decides: the MODULES line must list jcef as a whole
-// token (jcef.something is another module) and the file must record the JCEF version. Null for a JCEF build, else the
-// first problem in words.
+// token (jcef.something is another module), the file must record the JCEF version, and it must have jcefRuntimeBuild's
+// values, quoted or not. Null for that build, else the first problem in words.
 ext.jcefRuntimeProblem = { String releaseText ->
     String text = releaseText ?: ''
     def modules = text =~ /(?m)^MODULES="([^"]*)"/
     if (!modules.find() || !('jcef' in modules.group(1).tokenize())) return 'it has no jcef module'
     if (!(text =~ /(?m)^JCEF_VERSION_DETAILED=[ \t]*"?[^"\s]/).find()) return 'its release file names no JCEF version'
-    null
+    jcefRuntimeBuild.findResult { String key, String expected ->
+        def line = text =~ /(?m)^${key}=[ \t]*"?([^"\r\n]*)/
+        if (!line.find()) return "its release file has no ${key}".toString()
+        String found = line.group(1).trim()
+        found == expected ? null : "its ${key} is ${found}".toString()
+    }
 }
 
-// Refuses a runtime that is not the JCEF build, in the words nativeContext and verifyJcefToolchain both throw.
+// Refuses a runtime that is not jcefRuntimeBuild, in the words nativeContext and verifyJcefToolchain both throw.
 ext.requireJcefRuntime = { File sdkHome, String releaseText ->
     String problem = jcefRuntimeProblem(releaseText)
     if (problem != null) {
-        throw new GradleException("The selected JBR SDK at ${sdkHome} is not the JCEF build: ${problem}. Install jbrsdk_jcef-25.0.4.1 (docs/packaging.md).")
+        throw new GradleException("The selected JBR SDK at ${sdkHome} is not the JCEF build ${jcefRuntimeBuild.IMPLEMENTOR_VERSION}: ${problem}. Install that build, or make Gradle use it (docs/packaging.md#requirements).")
     }
 }
 

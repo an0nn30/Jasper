@@ -20,12 +20,12 @@ cd Jasper
 ./gradlew :jasper-app:installDist
 ```
 
-Install the **JetBrains Runtime (JBR) 25** SDK with JCEF (`jbrsdk_jcef-25.0.4.1`), including its development tools. The
-Gradle toolchain requires the JetBrains vendor and finds the installed runtime itself; `check` fails when it is not the
-JCEF build. The developer Mac's path is in [AGENTS.md](../AGENTS.md). Use the wrapper, never a system Gradle. `check`
-also compiles native code (Jasper's launcher, its recovery watcher, the native `jasper` command and, on macOS, the
-Objective-C bridges), so it needs the host's C/C++ compiler, and it runs the theme converter's tests with Python 3.11 to
-3.13 (`-Pjasper.python=<interpreter>` picks one).
+Install the **JetBrains Runtime (JBR) 25** SDK with JCEF (`jbrsdk_jcef-25.0.4.1`, b635.75), including its development
+tools. The Gradle toolchain requires the JetBrains vendor and finds the installed runtime itself; `check` fails when it
+is not that build. The developer Mac's path is in [AGENTS.md](../AGENTS.md). Use the wrapper, never a system Gradle.
+`check` also compiles native code (Jasper's launcher, its recovery watcher, the native `jasper` command and, on macOS,
+the Objective-C bridges), so it needs the host's C/C++ compiler, and it runs the theme converter's tests with Python
+3.11 to 3.13 (`-Pjasper.python=<interpreter>` picks one).
 
 `check` is headless. Besides the tests it runs the bytecode architecture checks (`verifyTerminalArchitecture`,
 `verifyApplicationArchitecture`, `verifySdkArchitecture`, `verifyPluginArchitecture`, `verifyUiArchitecture`),

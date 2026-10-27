@@ -17,9 +17,10 @@ checked by hand with the [native acceptance checklist](#native-acceptance-checkl
   Gradle properties. The plain JBR has the same vendor and version, so Gradle cannot tell the two apart, and it always
   offers the JVM it runs on as a candidate: keep only the JCEF build of JBR 25 installed and run Gradle on it. A JRE is
   not enough: packaging runs the SDK's `jpackage`, and fails when the SDK has none, its architecture differs from the
-  host's or it has no `jcef` module; `check` fails for a runtime without JCEF too (`verifyJcefToolchain`). On macOS
-  packaging also needs the bundle's `Contents/Frameworks` (Chromium) beside `Contents/Home`: SDKMAN's own macOS download
-  of JBR keeps only `Contents/Home`, while a local SDKMAN version registered from a full bundle's `Contents/Home` works.
+  host's or it is not that build (`jcefRuntimeBuild` in `gradle/packaging-support.gradle` holds its `release` values);
+  `check` fails for any other runtime too (`verifyJcefToolchain`). On macOS packaging also needs the bundle's
+  `Contents/Frameworks` (Chromium) beside `Contents/Home`: SDKMAN's own macOS download of JBR keeps only
+  `Contents/Home`, while a local SDKMAN version registered from a full bundle's `Contents/Home` works.
 - A **C/C++ compiler**, because `packageApp` builds Jasper's launcher ([packaging/launcher](../packaging/launcher/README.md)),
   `jasper-watch` and the `jasper` command ([packaging/cli](../packaging/cli/README.md)): the Xcode command line tools on
   macOS (`xcode-select --install`), `gcc` and `g++` on Linux, or Visual Studio or its Build Tools with the
@@ -124,8 +125,8 @@ or `rpm-work/` under `jasper-app/build/packaging/`) for diagnosis and publishes 
 | Cygwin seed and its helper | none | `app\cygwin-seed\`, `app\cygwin-tool.jar` and `provision-cygwin.cmd` | none |
 | Icon | `Contents/Resources/Jasper.icns` and `Assets.car` | inside `Jasper.exe` | `lib/Jasper.png` |
 
-On macOS aarch64 `Jasper.app` measures 644 MB: `Contents/runtime` is 547 MB, of which `Contents/Home` is 228 MB and
-Chromium's `Contents/Frameworks` 319 MB.
+On macOS aarch64 an untrained `Jasper.app` (`packageApp`, no `jasper.aot`) takes 644 MB on disk: `Contents/runtime` is
+547 MB, of which `Contents/Home` is 228 MB and Chromium's `Contents/Frameworks` 319 MB.
 
 The `jasper` command has a `bin` folder of its own because the macOS and Windows file systems ignore case, so it
 cannot sit beside the `Jasper` launcher. `README.txt` is the package guide (`packaging/README.txt`);
@@ -335,22 +336,22 @@ the whole folder and run `Jasper.exe`; the launcher, `jasper-watch.exe`, `bin`, 
 `packageInstaller` builds the setup wizard from the same verified image with jpackage and WiX: a per-user installation
 (no administrator rights), an installation folder chooser (`--win-dir-chooser`, default folder
 `%LOCALAPPDATA%\Jasper`), shortcut choices for the Start menu (group `Jasper`) and the desktop, and an entry in Windows
-Installed apps for uninstalling. Build with a JBR SDK 25 of the target architecture and WiX on `PATH`; users need
-neither. This path is verified with the portable
+Installed apps for uninstalling. Build with the JCEF build of JBR SDK 25 of the target architecture and WiX on
+`PATH`; users need neither. This path is verified with the portable
 [WiX 3.14.1 binaries](https://github.com/wixtoolset/wix3/releases/tag/wix3141rtm): extract `wix314-binaries.zip` and
 add the folder holding `candle.exe` and `light.exe` to the build shell's `PATH`.
 
 ```powershell
-$env:JAVA_HOME = 'C:\path\to\jbrsdk-25-windows-aarch64'   # or -x64
+$env:JAVA_HOME = 'C:\path\to\jbrsdk_jcef-25.0.4.1-windows-aarch64-b635.75'   # or windows-x64
 $env:PATH = "C:\path\to\wix;$env:JAVA_HOME\bin;$env:PATH"
 .\gradlew.bat "-Dorg.gradle.java.installations.paths=$env:JAVA_HOME" `
     '-Dorg.gradle.java.installations.auto-detect=false' :jasper-app:packageInstaller
 ```
 
-`packaging\windows\Build-Installer.ps1` does the same without changing the calling shell. It finds a JBR SDK 25 of
-the target architecture (the build machine's unless `-Architecture` names another) in `JAVA_HOME`, `~\.jdks\jbrsdk*`
-or `~\.gradle\jdks\jbrsdk*`, and WiX 3 on `PATH`, in `%LOCALAPPDATA%\tauri\WixTools314` or in
-`%ProgramFiles(x86)%\WiX Toolset v3*\bin`.
+`packaging\windows\Build-Installer.ps1` does the same without changing the calling shell. It finds a JBR SDK 25 with
+JCEF (the `MODULES` line of its `release` file names `jcef`) of the target architecture (the build machine's unless
+`-Architecture` names another) in `JAVA_HOME`, `~\.jdks\jbrsdk*` or `~\.gradle\jdks\jbrsdk*`, and WiX 3 on `PATH`, in
+`%LOCALAPPDATA%\tauri\WixTools314` or in `%ProgramFiles(x86)%\WiX Toolset v3*\bin`.
 
 | Option | Effect |
 |---|---|
@@ -389,10 +390,10 @@ The task never installs or opens Jasper.
 
 ### User installation without a compiler
 
-`installWindowsUser` installs Jasper for the current user from the source tree with only a JBR SDK 25: no C/C++
-compiler, WiX, installer or administrator rights; its first build downloads the [Cygwin seed](#bundled-cygwin) unless
-`-Pjasper.cygwinSnapshot` names a retained one. In IntelliJ it is **jasper-app › distribution › installWindowsUser**
-in the Gradle tool window; from a shell:
+`installWindowsUser` installs Jasper for the current user from the source tree with only the JCEF build of JBR SDK 25:
+no C/C++ compiler, WiX, installer or administrator rights; its first build downloads the [Cygwin seed](#bundled-cygwin)
+unless `-Pjasper.cygwinSnapshot` names a retained one. In IntelliJ it is
+**jasper-app › distribution › installWindowsUser** in the Gradle tool window; from a shell:
 
 ```powershell
 .\gradlew.bat :jasper-app:installWindowsUser

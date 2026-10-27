@@ -85,14 +85,15 @@ jobs:
       - name: Select Xcode 26 SDK
         if: runner.os == 'macOS'
         run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
-      # The libraries from libnss3 on are Chromium's (libcef.so): the dependency scan resolves each library of
-      # the image with ldd on this host, and a library that does not resolve fails the build.
+      # The dependency scan resolves each library of the image with ldd on this host, and a library that does not
+      # resolve fails the build: libxtst6 and libasound2 for the Java runtime, and libasound2, libglib2.0-0 and the
+      # libraries from libnss3 on for Chromium (libcef.so).
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils g++ \
-            libnss3 libnspr4 libgbm1 libcups2 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libdbus-1-3 \
+          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils g++ libxtst6 libasound2 \
+            libglib2.0-0 libnss3 libnspr4 libgbm1 libcups2 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libdbus-1-3 \
             libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxkbcommon0 libcairo2 libpango-1.0-0 \
             libx11-6 libxext6 libxcb1 libexpat1 libudev1
       - name: Install WiX 3.14.1

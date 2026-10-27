@@ -653,7 +653,8 @@ def launcherProbeJar = tasks.register('launcherProbeJar', Jar) {
     destinationDirectory.set(launcherBuild.map { it.dir('probe-input') })
 }
 
-// The sealed package of the image test's cache that kills the JVM.
+// A sealed package for the image test's cache-training probe: the copy that starts with the trained cache must still
+// load both its classes, which JDK-8376576 broke for a cache trained in another directory.
 def launcherSealedProbeJar = tasks.register('launcherSealedProbeJar', Jar) {
     description = "Packs the launcher image test's sealed package."
     from(compileLauncherProbes)

@@ -108,11 +108,11 @@ def nativeContext = {
     [version: packageVersion, host: host, launcher: selectedLauncher, sdkHome: sdkHome, jpackage: jpackage]
 }
 
-// check refuses a runtime without JCEF too, not only the packaging tasks through nativeContext. The task declares no
-// outputs, so it always runs, which is cheap.
+// check refuses a runtime other than jcefRuntimeBuild too, not only the packaging tasks through nativeContext. The task
+// declares no outputs, so it always runs, which is cheap; test tasks wait for it when it runs (build.gradle.kts).
 tasks.register('verifyJcefToolchain') {
     group = 'verification'
-    description = 'Fails unless the build\'s JetBrains Runtime 25 is the JCEF build.'
+    description = 'Fails unless the build\'s JetBrains Runtime 25 is the JCEF build in jcefRuntimeBuild.'
     def sdkHome = launcher.map { it.metadata.installationPath.asFile }
     doLast {
         File home = sdkHome.get()
