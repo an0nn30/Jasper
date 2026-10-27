@@ -43,6 +43,7 @@ This design follows the [tabs and panes spec](2026-10-20-jasper-tabs-and-panes-d
   [full windows design](https://github.com/an0nn30/Jasper/blob/claude/full-windows/docs/superpowers/specs/2026-10-26-jasper-full-windows-design.md)
   (2026-10-26, on `claude/full-windows`), in which every window has the menus and a status bar. Plan 4 starts once it
   is on main *(call)*.
+- **One addition beyond iTerm2 stays** *(user)*: Chrome's way past a certificate error (section 14).
 - **iTerm2-only integrations are left out** (section 20). Examples are AI chat, Instant Replay, triggers, the Python API,
   Smart Selection, copy mode and named marks.
 - **iTerm2 is macOS-only, and Jasper runs everywhere** *(user)*. On Windows and Linux, each iTerm2 behaviour gets that
@@ -357,7 +358,20 @@ skip it (below).
 ### Where links come from
 
 - **Clicks in the terminal.** A Cmd-click (Ctrl-click; on Windows and Linux, Ctrl+Shift-click while a program asks for
-  mouse reports) on a written URL or an OSC 8 link follows the decision. Local web files are question 2 in section 26.
+  mouse reports) on a written URL or an OSC 8 link follows the decision.
+- **Local web files** *(user, 2026-10-27: "Mirror iTerm2")*. A Cmd-click (Ctrl-click) on an existing local file with
+  one of these extensions can open it in Jasper's browser: HTML, XML, SVG, CSS, JavaScript, PDF, PNG, JPEG, GIF, WebP
+  or HEIC.
+  - **With the Browser plugin on,** Jasper asks with a modal:
+    - heading "Open in Jasper?";
+    - text "Jasper can display files like this in its built-in web browser! Would you like to open this link in
+      Jasper?";
+    - buttons **Use Default Editor** (iTerm2's Use Default App, here the file rule in `docs/terminal.md`),
+      **Open in Jasper** (a new browser tab with its `file:` URL) and **Cancel**;
+    - a "Remember my choice" checkbox, unticked.
+  - **The remembered answer** is kept apart from the link setting, as the Settings › Browser choice "Open Local Web
+    Files": Always Ask (default), Built-in Browser, Default Editor.
+  - **Other files,** and every file while the plugin is off, open as they do today.
 - **Split clicks.** A Cmd+Shift-click (Ctrl+Shift-click) opens the link in Jasper's browser in a split, to the right
   when the pane is wider than tall and otherwise below. There is no prompt: iTerm2 calls this "implied consent".
   - **The direction** is the host's to choose, since it knows the pane's size in pixels. It passes `SPLIT_RIGHT` or
@@ -646,8 +660,17 @@ The Credential Vault plays iTerm2's password manager. Without the Vault plugin, 
   - **Titles:** "No Internet Connection", "Server Not Found", "The Connection Timed Out", "Can’t Connect to Server",
     "Network Connection Lost", "Too Many Redirects", "Page Unavailable", "File Not Found" and "Page Can’t Be Loaded".
   - **Certificate errors** show "Secure Connection Failed" with "Jasper can’t verify the identity of the website…", the
-    reason and the certificate chain. **There is no way past it**, as in iTerm2. This reverses the 2026-10-21 decision
-    (section 22).
+    reason and the certificate chain. Examples are a self-signed certificate, an unknown authority, an expiry or the
+    wrong host. This much is iTerm2's.
+  - **Continuing past it** follows Chrome's behaviour, beyond iTerm2 *(user, 2026-10-27: "keep 3", standing by the
+    2026-10-21 "Chrome behaviour for certs")*.
+    - A **Details** link on the error page reveals **Continue to this site (unsafe)**.
+    - It allows that host with that certificate until Jasper quits, through `onCertificateError`'s callback.
+    - While the page shows such a host, the address field shows "Not secure" in place of the favicon.
+    - A /dev/null item's allowance ends with its store.
+  - **Trust.** Certificates are checked against the system's trust store, so corporate authorities installed on the
+    machine work. Chromium on Linux reads NSS's store rather than `/etc/ssl`, so plan 4 confirms what Linux users must
+    do.
 - **Settings** is not a page: the menu button's Settings opens Settings › Browser *(call)*.
 - **`file:` URLs** use Chromium's own folder listing and file display *(call: iTerm2 draws its own because WebKit has
   none)*.
@@ -699,6 +722,7 @@ Settings › Browser, stored in the plugin's own settings file:
 | General | Page zoom | 100% (5%–500%) |
 | General | Downloads folder | the system's Downloads folder |
 | Link Opening | Open Links From Terminal: Always Ask, Built-in Browser, Default Browser | Always Ask |
+| Link Opening | Open Local Web Files: Always Ask, Built-in Browser, Default Editor | Always Ask |
 | Search Engine | Default Search Engine: Google, DuckDuckGo, Bing, Kagi, Custom | Google |
 | Search Engine | Custom Search URL, Custom Search Suggestions URL (each must contain `%s`) | empty |
 | Privacy & Data | Use /dev/null mode | off |
@@ -797,10 +821,12 @@ This section is unchanged from the 2026-10-21 design.
 
 ## 22. Changes from the 2026-10-21 design
 
-**Removed, because iTerm2 has none of them.** The user's earlier requests among these are marked:
+**Kept beyond iTerm2** *(user, 2026-10-27)*: Chrome's "Continue to this site (unsafe)" for certificate errors (section
+14).
+
+**Removed, because iTerm2 has none of them.** The user confirmed the marked ones on 2026-10-27 ("drop 1, 2 and 4"):
 - the window toolbar's New Browser Tab button *(the user's 2026-10-21 ask)*;
 - the Open in Default Browser button and the "way out" for failed sign-ins *(the user's ask)*;
-- Chrome's "Continue to this site (unsafe)" for certificate errors *(the user's ask)*;
 - `BROWSER` in local shells, with the rule and setting for program-opened URLs and `jasper open-url` *(the user's
   original intent 3, offering Jasper's browser for `gh` and `aws` sign-ins)*;
 - the Editor-style document bar, replaced by iTerm2's toolbar;
@@ -925,13 +951,9 @@ The plans, in order:
 
 ## 26. Open questions for the user
 
-1. **Earlier requests iTerm2 lacks** (section 22): keep any of these four?
-   - the toolbar's New Browser Tab button;
-   - Open in Default Browser on every page;
-   - Chrome's "Continue to this site (unsafe)";
-   - `BROWSER` in local shells, so `gh` and `aws` sign-ins can be offered Jasper's browser.
-2. **Local web files.** iTerm2 offers its browser when the user Cmd-clicks a local `.html`, `.xml`, `.svg`, `.css`, `.js`,
-   PDF or image file. The prompt reads "iTerm2 can display files like this in its built-in web browser! Would you like
-   to open this link in iTerm2?", offers Use Default App, Open in iTerm2 and Cancel, and remembers the answer
-   separately. Jasper opens such a file in the Default editor today. Mirror iTerm2, with **Use Default Editor** in
-   place of Use Default App, or keep the Editor and list this as left out?
+Both questions are answered.
+
+1. **The 2026-10-21 requests iTerm2 lacks.** The user, 2026-10-27: "drop 1, 2 and 4, keep 3".
+   - Dropped: the toolbar's New Browser Tab button, Open in Default Browser on every page, and `BROWSER` in local shells.
+   - Kept: Chrome's "Continue to this site (unsafe)" (section 14).
+2. **Local web files.** The user, 2026-10-27: "Mirror iTerm2" (section 9).
