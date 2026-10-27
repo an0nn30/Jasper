@@ -37,7 +37,8 @@
 >   JetBrains' helpers are hardened, keep library validation and have `allow-jit`.
 > - **Follow-up.** With JDK-8376576 fixed, production's unsealing of `jbr-api`, training in a copy that is deleted, and
 >   the JDK-8376576 wording in `gradle/packaging-support.gradle`, `docs/packaging.md`, `docs/app-maintenance.md`,
->   `CodeLocation.java`, `CodeSourceScanTest.java` and `jbr-api.NOTICE.txt` describe b583.48's behaviour.
+>   `CodeLocation.java`, `CodeSourceScanTest.java` and `jbr-api.NOTICE.txt` describe b583.48's behaviour. Done on
+>   `claude/great-wilson-b8a1e4` (`0f71eda86`..`d3f03b080`, see `docs/STATUS.md`).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

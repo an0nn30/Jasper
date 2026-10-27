@@ -228,13 +228,6 @@ def stage = tasks.register('stagePackage', Sync) {
     from(tasks.named('stagePlugins')) { into('plugins') }
     into(inputDirectory)
     duplicatesStrategy = DuplicatesStrategy.FAIL
-    // Spec 2026-10-14 section 3.1: the AOT cache's classes cannot satisfy package sealing (sealingSections). Nothing in
-    // Jasper relies on sealing; today this rewrites jbr-api only.
-    doLast {
-        inputDirectory.get().asFile.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }.each { File jar ->
-            if (unsealJar(jar)) logger.lifecycle("Unsealed ${jar.name}: classes from the AOT cache cannot satisfy package sealing")
-        }
-    }
 }
 
 apply from: rootProject.file('gradle/mac-native.gradle')
@@ -548,12 +541,6 @@ def verifyPackage = tasks.register('verifyPackage') {
             if (!packaged.isFile() || !Arrays.equals(Files.readAllBytes(staged.toPath()), Files.readAllBytes(packaged.toPath()))) {
                 throw new GradleException("Package verification failed: staged file differs or is missing: ${staged.name}")
             }
-        }
-        // stagePackage unseals the class path (spec 2026-10-14 section 3.1); a sealed jar here would stop the JVM once
-        // the AOT cache's training paths are gone.
-        appDir.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }.each { File jar ->
-            List<String> sealing = sealingSections(jar)
-            if (sealing) throw new GradleException("Package verification failed: ${jar.name} still seals packages (${sealing.join(', ')})")
         }
         File stagedPlugins = new File(inputDirectory.get().asFile, 'plugins')
         stagedPlugins.eachFileRecurse(groovy.io.FileType.FILES) { staged ->

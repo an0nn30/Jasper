@@ -195,7 +195,6 @@ license = "Apache-2.0"
 homepage = "https://github.com/JetBrains/JetBrainsRuntimeApi"
 modules = ["org.jetbrains.runtime:jbr-api:1.9.0"]
 text = "apache-2.0.txt"
-notice = "jbr-api.NOTICE.txt"
 
 [[component]]
 name = "JNA"

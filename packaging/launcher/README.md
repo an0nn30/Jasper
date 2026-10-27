@@ -160,9 +160,11 @@ All in `check`, on every OS:
   corrupted file, the skip variable, an ignored line without a dash, the fallback start with the arguments intact for
   options that end with `exit` and with `_exit`, a launch without the watcher, a relative launcher path, a directory in
   the file's place, a home with a space and a non-ASCII home, an image that cannot start (the watcher's report), a
-  diagnostic launch, the start-up cache's record and skip variable, and a cache that kills the JVM: `test/sealedprobe`
-  trained into a cache and run from a copy with `-XX:AOTMode=on` once a jar on the cache's class path has another
-  modification time. On Windows it also checks the windowed launcher.
+  diagnostic launch, the start-up cache's record and skip variable, a cache trained with `test/sealedprobe` that a copy
+  uses with `-XX:AOTMode=on` once the training image is gone, loading both classes of the sealed package and naming the
+  copy's jar as the code source (a JBR that fails this has JDK-8376576, which JBR 25.0.4.1 b635.75 fixes), and a cache
+  that kills the JVM: the same copy once a jar on the cache's class path has another modification time. On Windows it
+  also checks the windowed launcher.
 
 `verifyPackage` runs `testLauncherCore`, `testLauncherWatch` and `testWatcher` before it checks a package image; the
 Release workflow skips them because CI runs them.

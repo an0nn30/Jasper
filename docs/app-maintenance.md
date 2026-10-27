@@ -589,14 +589,12 @@ fixtures; `verifyPackage` checks a built image ([start-up performance](packaging
   export. A new bridge needs all three.
 - **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
   trained image, rebuild it. `trainAotCache` trains in a `ditto` copy of the image that it deletes before
-  `verifyAotCache`, because JBR 25 gives cached classes the code source of the path they were trained at
-  (JDK-8376576): the build machine then runs the trained image as every user's Mac does. For the same reason
-  `stagePackage` removes package sealing from class-path jars (`verifyPackage` rejects a sealed one) and Jasper finds
-  its own files with `CodeLocation`, never a code source. The training home's `workspace.toml` is
-  `startup-workspace.toml` beside `StartupRuns` (`aotTrainingWorkspace`), which the start-up benchmark also restores
-  before each run; after a change to `workspace.toml`'s format, write it again with `WorkspaceFile.write`, as
-  `StartupBenchTest` fails until it matches. Training opens a window: agents ask the user before `packageDist`,
-  `trainAotCache` or `-Pjasper.aot=true`.
+  `verifyAotCache`, so the build machine runs the trained image as every user's Mac does, without the paths the cache
+  was trained at. There a JBR with JDK-8376576 stops at a sealed package such as `jbr-api`'s; `verifyLauncherImage`
+  checks the JBR for it. The training home's `workspace.toml` is `startup-workspace.toml` beside `StartupRuns`
+  (`aotTrainingWorkspace`), which the start-up benchmark also restores before each run; after a change to
+  `workspace.toml`'s format, write it again with `WorkspaceFile.write`, as `StartupBenchTest` fails until it matches.
+  Training opens a window: agents ask the user before `packageDist`, `trainAotCache` or `-Pjasper.aot=true`.
 - **Jasper's launcher.** `packageApp` builds the image with Jasper's own build of jpackage's launcher
   (`gradle/launcher.gradle`, [packaging/launcher](../packaging/launcher/README.md)), which merges the user's
   `jasper.vmoptions` over these options. A JBR update means re-vendoring its launcher sources and re-applying the
@@ -636,8 +634,7 @@ the project publishes one) beside it; `verifyThirdPartyNotices` (in `check`) nam
 that no longer ships. A font file a bundled plugin ships is listed in its component's `files` as
 `<plugin id>/<path in its jar>`, and the check names any that is not. Read the new version's licence before updating
 the entry, and look inside the jar for bundled native binaries (DLLs, executables, shared libraries): their own
-licences need components too. When `stagePackage` logs that it unsealed a jar, record the change in that component's
-notice, as `jbr-api.NOTICE.txt` does. The Licenses window reads the same file. A component's `license` is an SPDX id
+licences need components too. The Licenses window reads the same file. A component's `license` is an SPDX id
 that `about.ThirdPartyNotices` maps to the name the window shows; a new licence needs its entry there.
 
 ## Themes
