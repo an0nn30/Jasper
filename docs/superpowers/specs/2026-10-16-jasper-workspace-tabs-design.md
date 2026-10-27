@@ -16,6 +16,7 @@ then, against the code as it stands, and every line reference in section 2 is re
 Amended 2026-10-19 (approved): parent tabs, panes, pane windows and the window menu, in
 [`2026-10-19-jasper-parent-tabs-design.md`](2026-10-19-jasper-parent-tabs-design.md), which wins where the two disagree.
 Amended 2026-10-20 by the [tabs and panes spec](2026-10-20-jasper-tabs-and-panes-design.md), which wins where they disagree.
+Amended 2026-10-26 by the [full windows spec](2026-10-26-jasper-full-windows-design.md) (every window a full window, layouts), which wins where they disagree.
 
 ## 1. Intent and decisions
 

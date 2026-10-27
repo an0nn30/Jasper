@@ -9,6 +9,8 @@ This design amends the [parent tabs spec](2026-10-19-jasper-parent-tabs-design.m
 the parent tabs spec's three levels (window, parent tabs, panes, items) with two levels: window, tabs, panes.
 Amended 2026-10-21 by the [pane flexibility spec](2026-10-21-jasper-pane-flexibility-design.md) (open a file beside,
 move panes and tabs into tabs, two views of a file), which wins where they disagree.
+Amended 2026-10-26 by the [full windows spec](2026-10-26-jasper-full-windows-design.md) (every window a full window, panes
+tear out into windows, layouts), which wins where they disagree.
 
 Plan 6a is stopped after its Task 5. Plans 6a and 6b will be re-planned on top of this design.
 
