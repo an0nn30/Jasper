@@ -26,8 +26,13 @@ section 9 (all of it) and section 23 item 3. Plan 3 is
 
 - **Branch:** `claude/browser-link-routing`, after its rebase onto `claude/browser-plugin-design` (on origin/main
   a67b37b14), in `.claude/worktrees/browser-link-routing`.
-- **SDK version:** this plan's types join plan 3's in the SDK's next minor, `0.23.0`. If the rebase report names a
-  different version, use that one. Every new public SDK member carries `@since 0.23.0`.
+- **SDK version:** `0.23.0`. The rebase (2026-10-27, branch tip e64286da5) already set `JasperSdk.VERSION`, every
+  `sdk = ">=0.23.0, <0.24"` range, and plan 3's `@since` tags. It also set Editor to 0.17.0 and Remote to 0.18.0, so
+  this plan bumps no versions. Every public SDK member it adds carries `@since 0.23.0`.
+- **The branch's baseline:** `./gradlew check` passed on 2026-10-27 on JBR 25.0.4.1 b635.75 with JCEF: 13,474 tests,
+  0 failures, 0 errors, 30 skipped.
+- **Full windows:** plan 3's `JasperApplicationPluginsTest` cases use `MainWindow` and `openFirstWindow`. If full
+  windows reaches main first, follow its replacements.
 - **The architecture rules:**
   - SDK types appear in the app only inside `dev.jasper.app.plugins`.
   - No public jasper-terminal method takes or returns a JediTerm type.
