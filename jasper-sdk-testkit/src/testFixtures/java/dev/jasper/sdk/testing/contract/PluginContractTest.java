@@ -846,10 +846,13 @@ public abstract class PluginContractTest {
         assertThat(heard).containsExactly("test.alpha.plain|" + pane + "|none", "test.alpha.down|" + pane + "|https://example.com/x",
             "test.alpha.split|" + pane + "|none");
 
+        // The model lines: the now empty submenu stays listed, though a right-click shows no submenu without items.
         h.ui(() -> nested.get().close());
-        assertThat(h.contextMenu(pane)).containsExactly("item:test.alpha.plain", "web-address:test.alpha.split", "submenu:Open URL");
+        assertThat(h.contextMenu(pane)).as("the model, without the closed item").containsExactly("item:test.alpha.plain",
+            "web-address:test.alpha.split", "submenu:Open URL");
         h.selectInPane(pane, "plain text");
-        assertThat(h.contextMenu(pane)).as("a plain item shows whatever is selected").containsExactly("item:test.alpha.plain", "submenu:Open URL");
+        assertThat(h.contextMenu(pane)).as("the model, a plain item listed whatever is selected")
+            .containsExactly("item:test.alpha.plain", "submenu:Open URL");
     }
 
     /** Browser plan 3b Task 6: web-address items belong to the terminal's right-click menu and name the plugin's own actions. */

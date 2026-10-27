@@ -68,16 +68,16 @@ public interface ContractHarness extends AutoCloseable {
     List<String> menu(String target);
 
     /**
-     * The plugin sections of a pane's right-click menu as a right-click in it shows them now: the lines {@link #menu} gives
-     * for {@code context}, each {@code web-address:id} line only while the pane's selection is one web address; empty for a
-     * pane that is not open.
+     * The terminal context menu's model lines for a pane: the lines {@link #menu} gives for {@code context}, empty
+     * submenus and separators included, with each {@code web-address:id} line present only while the pane's selection is
+     * one web address; empty for a pane that is not open.
      */
     List<String> contextMenu(java.util.UUID paneId);
 
     /**
-     * Chooses the action's first item in a pane's right-click menu ({@link #contextMenu}) as the user would, and waits: the
+     * Runs the action of the first item {@link #contextMenu} lists for it, as choosing that item does, and waits: the
      * action runs in the pane's window for that pane, and hears the selected address only from a {@code web-address} item.
-     * True when an enabled action ran; false when the menu shows no item for it.
+     * True when an enabled action ran; false when {@link #contextMenu} lists no item for it.
      */
     boolean chooseFromContextMenu(java.util.UUID paneId, String actionId);
 

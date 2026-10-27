@@ -793,11 +793,12 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * The plugin sections of a pane's right-click menu, as a right-click in the pane shows them now.
+     * The terminal context menu's model lines for a pane, as {@link #menu(String) menu("context")} lists them, empty
+     * submenus and separators included.
      *
      * @param paneId a pane
-     * @return the lines {@link #menu(String) menu("context")} gives, each {@code web-address:id} line only while the
-     *     pane's selection ({@link #setSelection}) is one web address; empty for a pane that is not open
+     * @return those lines, with each {@code web-address:id} line present only while the pane's selection
+     *     ({@link #setSelection}) is one web address; empty for a pane that is not open
      * @since 0.23.0
      */
     public List<String> contextMenu(UUID paneId) {
@@ -805,13 +806,13 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Chooses an action's first item in a pane's right-click menu ({@link #contextMenu}) as the user would: the action runs
-     * in the pane's window for that pane, and only a {@code web-address} item gives it the selected address as
+     * Runs the action of the first item {@link #contextMenu} lists for it, as choosing that item does: the action runs in
+     * the pane's window for that pane, and only a {@code web-address} item gives it the selected address as
      * {@code ActionContext.webAddress()}.
      *
      * @param paneId a pane
      * @param actionId the action
-     * @return whether an enabled action ran; false when the menu shows no item for it
+     * @return whether an enabled action ran; false when {@link #contextMenu} lists no item for it
      * @since 0.23.0
      */
     public boolean chooseFromContextMenu(UUID paneId, String actionId) {

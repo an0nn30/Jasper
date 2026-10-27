@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import org.junit.jupiter.api.AfterEach;
@@ -71,8 +72,8 @@ class TerminalContextMenuTest {
 
     /**
      * Browser plan 3b Task 6: the menu reads the right-clicked pane's selection as it is built, so a web-address item shows
-     * only while the selection is one web address, and choosing it carries the address; a plain item of the same section
-     * carries none.
+     * only while the selection is one web address, in a submenu too, and choosing it carries the address; a plain item of
+     * the same section carries none.
      */
     @Test void aWebAddressItemShowsOnlyWhileThePanesSelectionIsOneWebAddress() throws Exception {
         var output = new PipedInputStream(remote, 1 << 16);
@@ -88,8 +89,9 @@ class TerminalContextMenuTest {
             owner[0].connectContributions(model);
             model.addAction("dev.x.split", "Open URL in Split Right", null, List.of(), Optional.empty(), seen::add);
             model.addAction("dev.x.plain", "Plain Tool", null, List.of(), Optional.empty(), seen::add);
-            model.addMenuSection(MenuTarget.terminalContext())
-                .set(List.of(new MenuEntry.Item("dev.x.plain"), new MenuEntry.WebAddressItem("dev.x.split")));
+            model.addAction("dev.x.down", "Open URL in Split Down", null, List.of(), Optional.empty(), seen::add);
+            model.addMenuSection(MenuTarget.terminalContext()).set(List.of(new MenuEntry.Item("dev.x.plain"),
+                new MenuEntry.WebAddressItem("dev.x.split"), new MenuEntry.Submenu("More", List.of(new MenuEntry.WebAddressItem("dev.x.down")))));
         });
         pending.remove().run();
         until(() -> owner[0].currentPane().view() != null);
@@ -100,12 +102,13 @@ class TerminalContextMenuTest {
         doubleClick(owner[0].currentPane(), 6, 0);
         edt(() -> {
             JPopupMenu menu = owner[0].chrome().contextMenu();
-            assertThat(labels(menu)).endsWith("---", "Plain Tool", "Open URL in Split Right");
+            assertThat(labels(menu)).endsWith("---", "Plain Tool", "Open URL in Split Right", "More");
             item(menu, "Open URL in Split Right").doClick(0);
             item(owner[0].chrome().contextMenu(), "Plain Tool").doClick(0);
+            ((JMenuItem) ((JMenu) item(owner[0].chrome().contextMenu(), "More")).getMenuComponent(0)).doClick(0);
         });
-        assertThat(seen).extracting(Contributions.Invocation::webAddress)
-            .containsExactly(Optional.of(URI.create("https://example.com/x")), Optional.empty());
+        assertThat(seen).extracting(Contributions.Invocation::webAddress).containsExactly(
+            Optional.of(URI.create("https://example.com/x")), Optional.empty(), Optional.of(URI.create("https://example.com/x")));
         assertThat(seen).extracting(Contributions.Invocation::paneId).containsOnly(Optional.of(owner[0].currentPane().id()));
 
         doubleClick(owner[0].currentPane(), 1, 0);

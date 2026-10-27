@@ -11738,19 +11738,20 @@ last tab closes or moves to another window; the main window stays open.</p></div
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.contextMenu(UUID)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.contextMenu(UUID)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt; <b>contextMenu</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> paneId)</code></pre>
 <p class="badges"><span class="since">since 0.23.0</span></p>
-<div class="doc"><p>The plugin sections of a pane's right-click menu, as a right-click in the pane shows them now.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>paneId</code> a pane</dd><dt>Returns</dt><dd>the lines <a href="#dev.jasper.sdk.testing.FakePluginHost.menu(String)">menu("context")</a> gives, each <code>web-address:id</code> line only while the
-    pane's selection (<a href="#dev.jasper.sdk.testing.FakePluginHost.setSelection(UUID,String)"><code>setSelection</code></a>) is one web address; empty for a pane that is not open</dd></dl>
+<div class="doc"><p>The terminal context menu's model lines for a pane, as <a href="#dev.jasper.sdk.testing.FakePluginHost.menu(String)">menu("context")</a> lists them, empty
+submenus and separators included.</p></div>
+<dl class="tags"><dt>Parameters</dt><dd><code>paneId</code> a pane</dd><dt>Returns</dt><dd>those lines, with each <code>web-address:id</code> line present only while the pane's selection
+    (<a href="#dev.jasper.sdk.testing.FakePluginHost.setSelection(UUID,String)"><code>setSelection</code></a>) is one web address; empty for a pane that is not open</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.chooseFromContextMenu(UUID,String)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.chooseFromContextMenu(UUID,String)" aria-label="Link to this member">#</a><code><span class="kw">boolean</span> <b>chooseFromContextMenu</b>(
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/UUID.html" title="java.util.UUID">UUID</a> paneId,
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> actionId)</code></pre>
 <p class="badges"><span class="since">since 0.23.0</span></p>
-<div class="doc"><p>Chooses an action's first item in a pane's right-click menu (<a href="#dev.jasper.sdk.testing.FakePluginHost.contextMenu(UUID)"><code>contextMenu</code></a>) as the user would: the action runs
-in the pane's window for that pane, and only a <code>web-address</code> item gives it the selected address as
+<div class="doc"><p>Runs the action of the first item <a href="#dev.jasper.sdk.testing.FakePluginHost.contextMenu(UUID)"><code>contextMenu</code></a> lists for it, as choosing that item does: the action runs in
+the pane's window for that pane, and only a <code>web-address</code> item gives it the selected address as
 <code>ActionContext.webAddress()</code>.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>paneId</code> a pane</dd><dd><code>actionId</code> the action</dd><dt>Returns</dt><dd>whether an enabled action ran; false when the menu shows no item for it</dd></dl>
+<dl class="tags"><dt>Parameters</dt><dd><code>paneId</code> a pane</dd><dd><code>actionId</code> the action</dd><dt>Returns</dt><dd>whether an enabled action ran; false when <a href="#dev.jasper.sdk.testing.FakePluginHost.contextMenu(UUID)"><code>contextMenu</code></a> lists no item for it</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.status()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.status()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt; <b>status</b>()</code></pre>
