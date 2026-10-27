@@ -850,6 +850,34 @@ class WindowManagerTest {
         }
     }
 
+    /**
+     * Controller Ruling 4: a new window while none is open restores the saved windows first, so its first save cannot
+     * replace them; New Window and a plugin's tab placed in a new window alike.
+     */
+    @Test void aNewWindowWhileNoneIsOpenRestoresTheSavedWindowsFirst(@TempDir Path folder) throws Exception {
+        Path file = folder.resolve("workspace.toml");
+        dev.jasper.app.layout.TabId one = dev.jasper.app.layout.TabId.random(), two = dev.jasper.app.layout.TabId.random();
+        WorkspaceFile.write(file, new WorkspaceFile.Snapshot(List.of(savedWindow(one), savedWindow(two))));
+        edt(() -> {
+            manager.workspace(new WorkspaceStore(file, manager::snapshot, (delay, task) -> () -> { }, Runnable::run, aside -> { }));
+            JasperWindow opened = manager.openWindow(null).orElseThrow();
+            assertThat(manager.windows()).as("the two restored, then the new one").hasSize(3).last().isSameAs(opened);
+            assertThat(manager.windows().get(0).content().tabs()).extracting(Tab::id).containsExactly(one);
+            assertThat(manager.windows().get(1).content().tabs()).extracting(Tab::id).containsExactly(two);
+            assertThat(opened.content().tabCount()).isEqualTo(1);
+            manager.closeAll();
+        });
+        launch();
+        edt(() -> {
+            assertThat(manager.isEmpty()).isTrue();
+            Tab away = model.tabs().open("dev.example.editor", "away", "away.txt", null, new JPanel(), TabRegistry.Placement.NEW_WINDOW);
+            assertThat(manager.windows()).as("the three saved as every window closed, then the tab's own").hasSize(4);
+            assertThat(manager.windows().get(0).content().tabs()).extracting(Tab::id).containsExactly(one);
+            assertThat(away.window()).isEqualTo(manager.windows().getLast().id());
+        });
+        launch();
+    }
+
     /** A window saved without a place, holding one terminal tab {@code item}. */
     private static WorkspaceFile.WindowRecord savedWindow(dev.jasper.app.layout.TabId item) {
         var parentTab = new dev.jasper.app.layout.ParentTab(ParentTabId.random(), dev.jasper.app.layout.Layout.of(item));

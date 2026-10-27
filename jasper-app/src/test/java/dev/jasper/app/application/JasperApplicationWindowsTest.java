@@ -57,7 +57,7 @@ class JasperApplicationWindowsTest {
                 application.windows().closeAll();
                 assertThat(application.windows().isEmpty()).isTrue();
                 application.windows().openWindow(null);
-                assertThat(application.windows().windows()).as("New Window opens one window").hasSize(1);
+                assertThat(application.windows().windows()).as("New Window with none open restores first, then opens beside it").hasSize(2);
                 application.windows().closeAll();
                 var tab = application.contributions().tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
                 assertThat(tab.window()).as("a plugin's tab with no window open goes to a restored window")
@@ -212,7 +212,7 @@ class JasperApplicationWindowsTest {
         CountDownLatch terminated = new CountDownLatch(1);
         JasperApplication application = application(terminated::countDown);
         edt(() -> {
-            var first = application.windows().openWindow(null).orElseThrow();
+            var first = application.windows().ensureWindow("cold", null).orElseThrow();
             var second = application.windows().openWindow(null).orElseThrow();
             frames.clear();
             first.requestClose();

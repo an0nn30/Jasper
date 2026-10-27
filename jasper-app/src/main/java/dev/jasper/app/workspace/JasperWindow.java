@@ -15,7 +15,7 @@ import java.util.function.Consumer;
  * makes one, in one place, which {@code verifyApplicationArchitecture} checks; it tracks and closes every one, and the
  * window's native frame drives it through {@link #events()}. EDT only.
  */
-public class JasperWindow {
+public final class JasperWindow {
     /**
      * What a window's native frame tells it.
      *

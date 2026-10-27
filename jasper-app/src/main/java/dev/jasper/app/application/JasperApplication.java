@@ -1004,7 +1004,7 @@ public final class JasperApplication {
      */
     private void newTerminalWindowFromMenuBar() {
         if (quitting || stopped) return;
-        if (windows.ensureWindow("menu", null).isPresent()) windows.openWindow(null);
+        windows.openWindow(null);
         requestForeground();
     }
 

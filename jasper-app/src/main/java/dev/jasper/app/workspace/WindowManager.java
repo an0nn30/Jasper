@@ -354,15 +354,27 @@ public final class WindowManager {
     }
 
     /**
-     * New Window (full windows spec 5.2): a new window with one terminal tab in {@code directory}.
+     * New Window (full windows spec 5.2): a new window with one terminal tab in {@code directory}, after the saved windows
+     * are restored when none is open, so that its first save does not replace them.
      *
      * @param directory where its terminal tab starts; null for where a new shell starts
      * @return the window; empty while Jasper quits or every window closes
+     * @throws IllegalStateException when asked while the saved windows are being restored and none is open yet
      */
     public Optional<JasperWindow> openWindow(Path directory) {
         requireEdt();
-        if (closingAll) return Optional.empty();
+        if (closingAll || !restoredFirst("menu")) return Optional.empty();
         return open(new Opening(false, directory, "menu", Optional.empty(), Optional.empty()));
+    }
+
+    /**
+     * Restores the saved windows when none is open, before a new window opens beside them (Controller Ruling 4): a new
+     * window alone would otherwise save over them.
+     *
+     * @return whether a window is open or was restored; false while Jasper quits or every window closes
+     */
+    private boolean restoredFirst(String trigger) {
+        return !isEmpty() || ensureWindow(trigger, null).isPresent();
     }
 
     /**
@@ -985,10 +997,12 @@ public final class WindowManager {
 
     /**
      * An empty window for a plugin's tab placed in a new window (workspace tabs spec 14's
-     * {@code TabPlacement.NEW_WINDOW}); null while the saved windows are being restored.
+     * {@code TabPlacement.NEW_WINDOW}), after the saved windows are restored when none is open; null while they are being
+     * restored.
      */
     private UUID emptyWindow() {
         if (restoring) return null;
+        if (!restoredFirst("plugin")) throw new IllegalStateException(CLOSING);
         return openEmpty(null, null).map(JasperWindow::id).orElseThrow(() -> new IllegalStateException(CLOSING));
     }
 
