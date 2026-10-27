@@ -6,6 +6,7 @@ import dev.jasper.fileserver.definition.Login;
 import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.engine.ServerEvent;
+import dev.jasper.fileserver.runtime.ServerRegistry;
 import dev.jasper.fileserver.runtime.ServerState.Phase;
 import dev.jasper.fileserver.ui.FileServerScope;
 import dev.jasper.fileserver.ui.FileServersPanel;
@@ -554,8 +555,73 @@ class FileServerPluginTest {
                 assertThat(host.openRequests()).as("serve " + serve).isEmpty();
                 UiTestAccess.edt(() -> assertThat(host.panelView(FileServerPlugin.PANEL)).as("serve " + served + ": the panel shows").isPresent());
             }
-            assertThat(plugin.panel().selected()).as("the panel selects the newest server")
+            UiTestAccess.edt(() -> assertThat(plugin.panelHost(child).map(built -> built.window().id())).as("the instance is the asking window's")
+                .contains(child));
+            assertThat(plugin.panel(child).selected()).as("the panel selects the newest server")
                 .contains(plugin.registry().servers().get(1).definition().id());
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Full windows spec 9: a temporary server started from window b shows b's own File Servers panel; a builds none. */
+    @Test void showsInTheWindowItIsAskedFrom() throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(FileServerPlugin::portFree);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID a = host.addTerminalWindow(), b = host.addTerminalWindow(), tab = host.addTerminalTab(b, "zsh");
+            UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
+            UiTestAccess.edt(() -> assertThat(host.invoke(FileServerPlugin.SERVE_HTTP, b, local)).isTrue());
+            await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
+            UiTestAccess.edt(() -> {
+                assertThat(plugin.panelHost(b)).as("b's instance is built").hasValueSatisfying(built -> {
+                    assertThat(built.window().id()).as("in the asking window").isEqualTo(b);
+                    assertThat(built.visible()).isTrue();
+                });
+                assertThat(plugin.panel(b).selected()).contains(plugin.registry().servers().getFirst().definition().id());
+                assertThat(plugin.panelHost(a)).as("a builds none").isEmpty();
+                assertThat(plugin.panel(a)).isNull();
+            });
+            assertThat(host.openRequests()).isEmpty();
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Full windows spec 9: each window's File Servers panel is its own; closing a's leaves b's listing every server, and
+     * a serve from b selects the new server in b's panel only.
+     */
+    @Test void closingOneWindowsPanelKeepsTheOthers() throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(FileServerPlugin::portFree);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID a = host.addTerminalWindow(), b = host.addTerminalWindow(), tab = host.addTerminalTab(b, "zsh");
+            UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
+            UiTestAccess.edt(() -> { host.openPanel(FileServerPlugin.PANEL, a); host.openPanel(FileServerPlugin.PANEL, b); });
+            var inA = plugin.panel(a);
+            var inB = plugin.panel(b);
+            assertThat(inA).isNotNull().isNotSameAs(inB);
+            var docs = http("docs", home, Ports.free(), Login.ANONYMOUS, false);
+            plugin.store().put(docs);
+            settle(host);
+            UiTestAccess.edt(() -> { inA.select(docs.id()); inB.select(docs.id()); });
+            assertThat(inA.selected()).as("a's panel lists the saved server").contains(docs.id());
+            assertThat(inB.selected()).as("b's panel lists the saved server").contains(docs.id());
+            UiTestAccess.edt(() -> host.closePanel(FileServerPlugin.PANEL, a));
+            assertThat(plugin.panel(a)).isNull();
+            assertThat(plugin.panel(b)).isSameAs(inB);
+            UiTestAccess.edt(() -> assertThat(host.invoke(FileServerPlugin.SERVE_HTTP, b, local)).isTrue());
+            await(host, () -> plugin.registry().servers().size() == 2
+                && plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
+            UUID served = plugin.registry().servers().stream().filter(ServerRegistry.View::temporary).findFirst().orElseThrow().definition().id();
+            assertThat(inB.selected()).as("b's panel lists and selects the new server").contains(served);
             plugin.registry().stopAll();
             await(host, () -> plugin.registry().active() == 0, "everything stops");
             assertThat(host.failures()).isEmpty();

@@ -16,7 +16,7 @@ import java.util.concurrent.*;
 import java.util.function.*;
 
 /**
- * The explorer, in the main window's SFTP panel (workspace tabs spec 14), and captured picker flows; the coordinator owns
+ * The explorers, one in each window's SFTP panel (full windows spec 9), and captured picker flows; the coordinator owns
  * all queued jobs. The explorer is an owned kit view ({@code register}); its dialogs (host chooser, new folder, delete, existing items, Copy to host) are
  * kit forms from {@code context.kit()}, each closed with its dialog. Back, Forward and the parent folder are panel
  * shortcuts (Alt+Left, Alt+Right, Alt+Up by default) anywhere in the SFTP panel, listed in the Keymap.
@@ -39,11 +39,11 @@ public final class SftpUi implements AutoCloseable {
     private final Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip;
     private final Consumer<WindowHandle> releaseStrip;
     private final Consumer<String> clipboard;
-    /** The explorer while the SFTP panel is open: panels live in the main window. */
-    private View explorer;
+    /** One explorer in each window's dock that built the SFTP panel, by window id. */
+    private final Map<UUID,View> explorers=new LinkedHashMap<>();
     private final Set<PluginDialog> dialogs=new HashSet<>();
-    /** The host a Browse is resolving, until it connects or another Browse replaces it. */
-    private CompletableFuture<ConnectionIdentity> browsing;
+    /** The host each window's Browse is resolving, by window id, until it connects or another Browse there replaces it. */
+    private final Map<UUID,CompletableFuture<ConnectionIdentity>> browsing=new HashMap<>();
     private Consumer<UUID> followRequested=pane->{};
     private volatile boolean showHidden;
     private Consumer<Boolean> rememberHidden=shown->{};
@@ -80,7 +80,7 @@ public final class SftpUi implements AutoCloseable {
     }
     private void shortcut(String id,String title,String binding,Consumer<SftpPanel> command) {
         context.actions().register(ActionSpec.of(id,title).withKeywords(List.of("sftp","files","folder","history")).withDefaultBinding(binding)
-            .withContext(ShortcutContext.panel(PANEL)),invoked-> { var view=closed?null:explorer;if(view!=null) command.accept(view.panel()); });
+            .withContext(ShortcutContext.panel(PANEL)),invoked-> { var view=closed?null:explorers.get(invoked.window().id());if(view!=null) command.accept(view.panel()); });
     }
     /**
      * Whether the SFTP browsers show hidden items, and where a change is remembered; each browser takes the choice as it
@@ -88,8 +88,12 @@ public final class SftpUi implements AutoCloseable {
      */
     public void hiddenItems(boolean shown,Consumer<Boolean> remember) { showHidden=shown;rememberHidden=remember; }
     private void hiddenChanged(boolean shown) { showHidden=shown;rememberHidden.accept(shown); }
-    /** The explorer while the SFTP panel is open. */
-    SftpPanel panel() { return explorer==null?null:explorer.panel(); }
+    /** The first open explorer, or null when no SFTP panel is open. */
+    SftpPanel panel() { return explorers.values().stream().findFirst().map(View::panel).orElse(null); }
+    /** {@code window}'s explorer, or null when its SFTP panel is not open. */
+    SftpPanel panel(UUID window) { var view=explorers.get(window);return view==null?null:view.panel(); }
+    /** The host of {@code window}'s SFTP panel, while it is open. */
+    Optional<PanelHost> panelHost(UUID window) { return Optional.ofNullable(explorers.get(window)).map(View::host); }
     private UiView create(PanelHost host) {
         var panel=new SftpPanel(context.kit(),layout);var window=host.window();
         panel.onHeaderChanged(host::setHeader);
@@ -105,16 +109,17 @@ public final class SftpUi implements AutoCloseable {
         controller.onFollowRequested(pane->followRequested.accept(pane));
         controller.showHidden(showHidden);controller.onShowHiddenChanged(this::hiddenChanged);
         var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,open,transfers.get().reservations(),panel::operationStatus,controller::refresh);
-        var view=new View(host,panel,controller,operations);explorer=view;
+        var view=new View(host,panel,controller,operations);explorers.put(window.id(),view);
         controller.operations(new SftpController.Operations(()->upload(view,false),()->upload(view,true),()->download(view),()->newFolder(view),()->delete(view),()->copyPaths(view),()->copyHost(view),operations::cancel));
         if(editing!=null) panel.editing(new SftpPanel.Editing(entry->activate(view,entry),()->openSelected(view)));
         controller.visible(host.visible());
         host.onVisibility(visible->{controller.visible(visible);if(visible) activePane.apply(window).ifPresent(pane->controller.open(pane.pane(),pane.identity(),pane.directory(),false));});
-        host.onClosed(()-> { if(layout==dev.jasper.remote.workstation.Layout.ROWS) releaseStrip.accept(window);cancelBrowse();if(explorer==view) explorer=null;controller.close();operations.close();panel.close(); });return panel.view();
+        host.onClosed(()-> { if(layout==dev.jasper.remote.workstation.Layout.ROWS) releaseStrip.accept(window);if(explorers.remove(window.id(),view)) cancelBrowse(window.id());controller.close();operations.close();panel.close(); });return panel.view();
     }
-    /** The explorer, shown in {@code window}'s dock. */
+    /** {@code window}'s explorer, shown in its dock; null for a window that closed, which shows nothing. */
     private View showView(WindowHandle window) {
-        context.panels().show(PANEL,window);return explorer;
+        if(!window.isOpen()) return null;
+        context.panels().show(PANEL,window);return explorers.get(window.id());
     }
     public void show(WindowHandle window) {
         if(closed) return;var view=showView(window);if(view==null) return;
@@ -127,28 +132,29 @@ public final class SftpUi implements AutoCloseable {
     }
     public void toggle(WindowHandle window) { if(!closed) context.panels().toggle(PANEL,window); }
     /** Saved hosts changed: every disconnected sidebar's Choose Session menu follows. */
-    public void hostsChanged() { if(closed || explorer==null) return;explorer.panel().sessions(hosts.get()); }
+    public void hostsChanged() { if(closed) return;for(var view:List.copyOf(explorers.values())) view.panel().sessions(hosts.get()); }
     /** Shows the SFTP sidebar without choosing a host. */
     public void reveal(WindowHandle window) { if(!closed) showView(window); }
     public void browse(WindowHandle window,RemoteHost host) {
-        if(closed) return;var view=showView(window);if(view==null) return;var owner=view.host().window();view.panel().busy(true,"Connecting…");
-        cancelBrowse();var request=connections.resolveIdentity(host.id(),window);browsing=request;
-        // The follow-up is the explorer's, in the main window: a requester that closed meanwhile ended the attempt.
-        request.whenComplete((identity,error)->ui.execute(()-> { if(closed || !owner.isOpen() || browsing!=request) return;browsing=null;
-            if(error!=null) view.panel().error(window.isOpen()?message(error):"");else view.controller().open(host.id(),identity,"",true); }));
+        if(closed) return;var view=showView(window);if(view==null) return;UUID id=window.id();view.panel().busy(true,"Connecting…");
+        cancelBrowse(id);var request=connections.resolveIdentity(host.id(),window);browsing.put(id,request);
+        // The follow-up is the requesting window's explorer's: a window that closed meanwhile took its explorer and the attempt with it.
+        request.whenComplete((identity,error)->ui.execute(()-> { if(closed || !window.isOpen() || browsing.get(id)!=request || explorers.get(id)!=view) return;browsing.remove(id);
+            if(error!=null) view.panel().error(message(error));else view.controller().open(host.id(),identity,"",true); }));
     }
-    private void cancelBrowse() { var request=browsing;browsing=null;if(request!=null) request.cancel(true); }
-    public void pane(WindowHandle window,PaneTarget pane) { cancelBrowse();if(explorer!=null) explorer.controller().open(pane.pane(),pane.identity(),pane.directory(),false); }
-    public void directory(UUID pane,String path) { if(explorer!=null) explorer.controller().follow(pane,path); }
-    /** {@code pane}'s SSH session ended (closed, exited or lost): the explorer, showing it, disconnects and clears. */
-    public void ended(UUID pane) { if(explorer!=null) explorer.controller().ended(pane); }
+    private void cancelBrowse(UUID window) { var request=browsing.remove(window);if(request!=null) request.cancel(true); }
+    /** {@code window}'s explorer, if open, shows {@code pane}, which that window focused. */
+    public void pane(WindowHandle window,PaneTarget pane) { cancelBrowse(window.id());var view=explorers.get(window.id());if(view!=null) view.controller().open(pane.pane(),pane.identity(),pane.directory(),false); }
+    public void directory(UUID pane,String path) { for(var view:List.copyOf(explorers.values())) view.controller().follow(pane,path); }
+    /** {@code pane}'s SSH session ended (closed, exited or lost): each explorer showing it disconnects and clears. */
+    public void ended(UUID pane) { for(var view:List.copyOf(explorers.values())) view.controller().ended(pane); }
     /** Receives the pane whose shell folder a view wants now: shown, focused, or follow turned back on. */
     public void onFollowRequested(Consumer<UUID> listener) { followRequested=listener; }
     /** Sends files to the Editor. Call before any panel opens, and only when the Editor is installed. */
     public void editing(RemoteEditing editing) { this.editing=editing; }
-    /** True while the explorer, visible, follows {@code pane}. */
-    public boolean following(UUID pane) { return explorer!=null && explorer.controller().following(pane); }
-    public void notice(UUID pane,String text) { if(explorer!=null) explorer.controller().notice(pane,text); }
+    /** True while an explorer, visible, follows {@code pane}. */
+    public boolean following(UUID pane) { return explorers.values().stream().anyMatch(view->view.controller().following(pane)); }
+    public void notice(UUID pane,String text) { for(var view:List.copyOf(explorers.values())) view.controller().notice(pane,text); }
     private PluginDialog dialog(WindowHandle owner,String title) { var dialog=context.windows().dialog(new DialogSpec(title,owner,false));dialogs.add(dialog);dialog.onClosed(()->dialogs.remove(dialog));return dialog; }
     /** Mounts an owned kit view on {@code dialog}, closes it with the dialog and shows the dialog. */
     private static void show(PluginDialog dialog,UiView view,AutoCloseable owner) {
@@ -228,9 +234,9 @@ public final class SftpUi implements AutoCloseable {
         picker.hiddenItems(showHidden,this::hiddenChanged);
         pickerReference.set(picker);dialog.onClosed(()-> { picker.close();operations.close(); });dialog.setContent(picker.view());dialog.show();
     }
-    /** Whether {@code view} is still the open explorer, showing the same identity and directory {@code capture} was taken from: a late result from the per-identity {@link RemoteEditing} queue must not act on a view that moved on in the meantime. */
+    /** Whether {@code view} is still {@code owner}'s open explorer, showing the same identity and directory {@code capture} was taken from: a late result from the per-identity {@link RemoteEditing} queue must not act on a view that moved on in the meantime. */
     private boolean stillShowing(View view,WindowHandle owner,SftpController.Capture capture) {
-        return explorer==view && view.controller().capture().filter(now->now.identity().equals(capture.identity()) && now.directory().equals(capture.directory())).isPresent();
+        return explorers.get(owner.id())==view && view.controller().capture().filter(now->now.identity().equals(capture.identity()) && now.directory().equals(capture.directory())).isPresent();
     }
     private EditorOpening.Browser browser(View view,WindowHandle owner) {
         return new EditorOpening.Browser(ui,()->!closed && owner.isOpen(),capture->stillShowing(view,owner,capture),view.panel()::error,view.controller()::manual,()->{});
@@ -246,5 +252,8 @@ public final class SftpUi implements AutoCloseable {
         EditorOpening.openSelected(editing,browser(view,owner),captured.orElseThrow(),owner);
     }
     private static String message(Throwable failure) { while((failure instanceof CompletionException || failure instanceof ExecutionException) && failure.getCause()!=null) failure=failure.getCause();return failure.getMessage()==null?"SFTP operation failed":failure.getMessage(); }
-    @Override public void close() { if(closed) return;closed=true;cancelBrowse();for(var dialog:List.copyOf(dialogs)) dialog.close();var view=explorer;explorer=null;if(view!=null) { view.controller().close();view.operations().close();view.panel().close(); } }
+    @Override public void close() {
+        if(closed) return;closed=true;for(var window:List.copyOf(browsing.keySet())) cancelBrowse(window);for(var dialog:List.copyOf(dialogs)) dialog.close();
+        var views=List.copyOf(explorers.values());explorers.clear();for(var view:views) { view.controller().close();view.operations().close();view.panel().close(); }
+    }
 }

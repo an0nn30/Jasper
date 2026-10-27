@@ -108,7 +108,8 @@ class RemotePluginTest {
     @Test void everyPanelRequestFromASecondWindowRaisesNoOtherWindow(@TempDir Path dir) throws Exception {
         for (var layout : List.of(dev.jasper.remote.workstation.Layout.ROWS, dev.jasper.remote.workstation.Layout.CLASSIC)) try (var host = new FakePluginHost()) {
             if (layout == dev.jasper.remote.workstation.Layout.CLASSIC) host.setPresentation(FakePresentations.CLASSIC);
-            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin(dir.resolve("ssh-" + layout)));
+            var plugin = plugin(dir.resolve("ssh-" + layout));
+            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin);
             settle(host);
             host.addTerminalWindow();
             UUID child = host.addTerminalWindow();
@@ -118,8 +119,164 @@ class RemotePluginTest {
                     settle(host);
                     assertThat(host.openRequests()).as(layout + ": " + action + ", request " + request).isEmpty();
                 }
+            Kits.edt(() -> {
+                assertThat(SftpTestAccess.panelHost(plugin.sftp(), child).map(built -> built.window().id())).as(layout + ": SFTP's instance").contains(child);
+                assertThat(dev.jasper.remote.ui.tunnels.TunnelsTestAccess.panelHost(plugin.tunnels(), child).map(built -> built.window().id()))
+                    .as(layout + ": Tunnels' instance").contains(child);
+                if (layout == dev.jasper.remote.workstation.Layout.CLASSIC)
+                    assertThat(dev.jasper.remote.ui.transfers.TransfersTestAccess.panelHost(plugin.transfersPanels(), child).map(built -> built.window().id()))
+                        .as("Transfers' instance").contains(child);
+            });
             assertThat(host.failures()).isEmpty();
         }
+    }
+
+    /** Full windows spec 9: Show Tunnels from window b builds b's Tunnels panel; a has none. */
+    @Test void tunnelsShowInTheWindowTheyAreAskedFrom(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                RemotePlugin plugin = plugin(dir.resolve("ssh"));
+                host.start(INFO, Set.of(), Set.of(), plugin);
+                settle(host);
+                UUID a = host.addTerminalWindow(), b = host.addTerminalWindow();
+                assertThat(host.invoke(dev.jasper.remote.ui.tunnels.TunnelsUi.SHOW, b, null)).isTrue();
+                settle(host);
+                assertThat(dev.jasper.remote.ui.tunnels.TunnelsTestAccess.panelHost(plugin.tunnels(), b)).hasValueSatisfying(built -> {
+                    assertThat(built.window().id()).isEqualTo(b);
+                    assertThat(built.visible()).isTrue();
+                });
+                assertThat(dev.jasper.remote.ui.tunnels.TunnelsTestAccess.panelHost(plugin.tunnels(), a)).as("a builds none").isEmpty();
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
+    /** Full windows spec 9: closing a's Tunnels panel leaves b's, which still lists a new tunnel. */
+    @Test void closingOneWindowsTunnelsPanelKeepsTheOthers(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                RemotePlugin plugin = plugin(dir.resolve("ssh"));
+                host.start(INFO, Set.of(), Set.of(), plugin);
+                var prod = RemoteHost.create("prod", "prod.invalid", 22, "me", new Auth.Agent(), "", Optional.empty());
+                plugin.store().put(prod);
+                settle(host);
+                UUID a = host.addTerminalWindow(), b = host.addTerminalWindow();
+                host.openPanel(dev.jasper.remote.ui.tunnels.TunnelsUi.PANEL, a);
+                host.openPanel(dev.jasper.remote.ui.tunnels.TunnelsUi.PANEL, b);
+                var inA = dev.jasper.remote.ui.tunnels.TunnelsTestAccess.panel(plugin.tunnels(), a);
+                var inB = dev.jasper.remote.ui.tunnels.TunnelsTestAccess.panel(plugin.tunnels(), b);
+                assertThat(inA).isNotNull().isNotSameAs(inB);
+                var web = dev.jasper.remote.tunnels.Tunnel.create("web", prod.id(), dev.jasper.remote.tunnels.TunnelKind.LOCAL, "127.0.0.1", 8080, "localhost", 80);
+                plugin.tunnelStore().put(web);
+                settle(host);
+                String row = dev.jasper.remote.ui.tunnels.TunnelsTestAccess.rowId(web.id());
+                assertThat(dev.jasper.remote.ui.tunnels.TunnelsTestAccess.rowIds(inA)).as("a's panel lists it").contains(row);
+                assertThat(dev.jasper.remote.ui.tunnels.TunnelsTestAccess.rowIds(inB)).as("b's panel lists it").contains(row);
+                host.closePanel(dev.jasper.remote.ui.tunnels.TunnelsUi.PANEL, a);
+                assertThat(dev.jasper.remote.ui.tunnels.TunnelsTestAccess.panel(plugin.tunnels(), a)).isNull();
+                var db = dev.jasper.remote.tunnels.Tunnel.create("db", prod.id(), dev.jasper.remote.tunnels.TunnelKind.LOCAL, "127.0.0.1", 5432, "localhost", 5432);
+                plugin.tunnelStore().put(db);
+                settle(host);
+                assertThat(dev.jasper.remote.ui.tunnels.TunnelsTestAccess.rowIds(inB)).as("b's panel still refreshes")
+                    .contains(dev.jasper.remote.ui.tunnels.TunnelsTestAccess.rowId(db.id()));
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
+    /** Full windows spec 9, under CLASSIC: Transfers from window b builds b's Transfers panel; a has none. */
+    @Test void transfersShowInTheWindowTheyAreAskedFrom(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                host.setPresentation(FakePresentations.CLASSIC);
+                RemotePlugin plugin = plugin(dir.resolve("ssh"));
+                host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin);
+                settle(host);
+                UUID a = host.addTerminalWindow(), b = host.addTerminalWindow();
+                assertThat(host.invoke(dev.jasper.remote.ui.transfers.TransferUi.SHOW, b, null)).isTrue();
+                settle(host);
+                assertThat(dev.jasper.remote.ui.transfers.TransfersTestAccess.panelHost(plugin.transfersPanels(), b)).hasValueSatisfying(built -> {
+                    assertThat(built.window().id()).isEqualTo(b);
+                    assertThat(built.visible()).isTrue();
+                });
+                assertThat(dev.jasper.remote.ui.transfers.TransfersTestAccess.panelHost(plugin.transfersPanels(), a)).as("a builds none").isEmpty();
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
+    /** Full windows spec 9, under CLASSIC: closing a's Transfers panel leaves b's, which a second request shows again. */
+    @Test void closingOneWindowsTransfersPanelKeepsTheOthers(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                host.setPresentation(FakePresentations.CLASSIC);
+                RemotePlugin plugin = plugin(dir.resolve("ssh"));
+                host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), plugin);
+                settle(host);
+                UUID a = host.addTerminalWindow(), b = host.addTerminalWindow();
+                host.openPanel(dev.jasper.remote.ui.transfers.TransfersPanel.PANEL, a);
+                host.openPanel(dev.jasper.remote.ui.transfers.TransfersPanel.PANEL, b);
+                var inB = dev.jasper.remote.ui.transfers.TransfersTestAccess.panelHost(plugin.transfersPanels(), b).orElseThrow();
+                host.closePanel(dev.jasper.remote.ui.transfers.TransfersPanel.PANEL, a);
+                assertThat(dev.jasper.remote.ui.transfers.TransfersTestAccess.panelHost(plugin.transfersPanels(), a)).isEmpty();
+                assertThat(dev.jasper.remote.ui.transfers.TransfersTestAccess.panelHost(plugin.transfersPanels(), b)).containsSame(inB);
+                inB.hide();
+                assertThat(host.invoke(dev.jasper.remote.ui.transfers.TransferUi.SHOW, b, null)).isTrue();
+                assertThat(inB.visible()).as("b's own instance shows again").isTrue();
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
+    /** Full windows spec 9: Manage Sessions from window b shows b's own Sessions panel, also once a has built one. */
+    @Test void sessionsShowInTheWindowTheyAreAskedFrom(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                RemotePlugin plugin = plugin(dir.resolve("ssh"));
+                host.start(INFO, Set.of(), Set.of(), plugin);
+                settle(host);
+                UUID a = host.addTerminalWindow(), b = host.addTerminalWindow();
+                String manage = "dev.jasper.remote.sessions.manage";
+                assertThat(host.invoke(manage, a, null)).isTrue();
+                var inA = plugin.sessionsHost(a).orElseThrow();
+                inA.hide();
+                assertThat(host.invoke(manage, b, null)).isTrue();
+                assertThat(inA.visible()).as("a's panel stays hidden").isFalse();
+                assertThat(plugin.sessionsHost(b)).hasValueSatisfying(built -> {
+                    assertThat(built.window().id()).isEqualTo(b);
+                    assertThat(built.visible()).isTrue();
+                });
+                assertThat(host.openRequests()).isEmpty();
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
+    /** Full windows spec 9: each window's Sessions panel follows the saved hosts; closing a's leaves b's listing them. */
+    @Test void closingOneWindowsSessionsPanelKeepsTheOthers(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                RemotePlugin plugin = plugin(dir.resolve("ssh"));
+                host.start(INFO, Set.of(), Set.of(), plugin);
+                settle(host);
+                UUID a = host.addTerminalWindow(), b = host.addTerminalWindow();
+                host.openPanel(RemotePlugin.PANEL, a);
+                host.openPanel(RemotePlugin.PANEL, b);
+                var inA = plugin.hostsPanel(a);
+                var inB = plugin.hostsPanel(b);
+                assertThat(inA).isNotNull().isNotSameAs(inB);
+                plugin.store().put(RemoteHost.create("prod", "prod.invalid", 22, "me", new Auth.Agent(), "", Optional.empty()));
+                settle(host);
+                assertThat(rows(inA)).as("a's panel lists the host").hasSize(1);
+                assertThat(rows(inB)).as("b's panel lists the host").hasSize(1);
+                host.closePanel(RemotePlugin.PANEL, a);
+                assertThat(plugin.hostsPanel(a)).isNull();
+                plugin.store().put(RemoteHost.create("stage", "stage.invalid", 22, "me", new Auth.Agent(), "", Optional.empty()));
+                settle(host);
+                assertThat(rows(inB)).as("b's panel still refreshes").hasSize(2);
+                assertThat(host.failures()).isEmpty();
+            }
+        });
     }
 
     @Test void navigationActionsCarryTheirDefaultsAndAnOldShortcutsTableIsUnknown(@TempDir Path dir) {

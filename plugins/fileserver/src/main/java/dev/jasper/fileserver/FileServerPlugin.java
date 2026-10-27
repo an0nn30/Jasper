@@ -55,8 +55,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -124,9 +126,9 @@ public final class FileServerPlugin implements Plugin {
     private PluginAction stopAll;
     private Subscription quitGuard;
     private Runnable addressTimer;
-    /** The File Servers panel while it is open: panels live in the main window (workspace tabs spec 14). */
-    private FileServersPanel panel;
-    private PanelHost panelHost;
+    /** One File Servers panel in each window's dock that built it, by window id (full windows spec 9); the registry is shared. */
+    private record Instance(PanelHost host, FileServersPanel panel) {}
+    private final Map<UUID, Instance> panels = new LinkedHashMap<>();
     private List<String> reportedWarnings = List.of();
     private String reportedError;
     private boolean stopped;
@@ -217,7 +219,7 @@ public final class FileServerPlugin implements Plugin {
             refreshPanels();
         });
         addressTimer = environment.every().apply(Duration.ofSeconds(10), () -> {
-            if (!stopped && panelHost != null && panelHost.visible()) registry.refreshAddresses();
+            if (!stopped && panels.values().stream().anyMatch(instance -> instance.host().visible())) registry.refreshAddresses();
         });
         store.load().whenComplete((ignored, failure) -> { if (!stopped) registry.autostart(); });
         context.background().execute(() -> {
@@ -239,7 +241,12 @@ public final class FileServerPlugin implements Plugin {
     ServerRegistry registry() { return registry; }
     ServerEditor currentEditor() { return currentEditor; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
-    FileServersPanel panel() { return panel; }
+    /** The first open File Servers panel, or null when none is open. */
+    FileServersPanel panel() { return panels.values().stream().findFirst().map(Instance::panel).orElse(null); }
+    /** {@code window}'s File Servers panel, or null when it has none open. */
+    FileServersPanel panel(UUID window) { var instance = panels.get(window); return instance == null ? null : instance.panel(); }
+    /** The host of {@code window}'s File Servers panel, while it is open. */
+    Optional<PanelHost> panelHost(UUID window) { return Optional.ofNullable(panels.get(window)).map(Instance::host); }
     WindowHandle windowHandle(UUID id) { return context.terminals().window(id).orElseThrow(); }
 
     /** Engine events reach the transfer activities only while the plugin runs: a late one must not open an activity on a closed context. */
@@ -273,10 +280,10 @@ public final class FileServerPlugin implements Plugin {
         panel.setTlsFingerprint(tls.cachedFingerprint());
         panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
         panel.setServers(registry.servers(), store.error());
-        this.panel = panel;
-        panelHost = host;
+        var instance = new Instance(host, panel);
+        panels.put(window.id(), instance);
         host.onVisibility(visible -> { if (visible) registry.refreshAddresses(); });
-        host.onClosed(() -> { panel.close(); if (this.panel == panel) { this.panel = null; panelHost = null; } });
+        host.onClosed(() -> { panel.close(); panels.remove(window.id(), instance); });
         return panel.view();
     }
 
@@ -393,7 +400,9 @@ public final class FileServerPlugin implements Plugin {
 
     private void showPanel(WindowHandle window, UUID id) {
         context.panels().show(PANEL, window);
-        if (panel != null) panel.select(id);
+        // The asking window's panel selects the new server; another window's keeps its own selection.
+        var instance = panels.get(window.id());
+        if (instance != null) instance.panel().select(id);
     }
 
     private void confirmRestart(WindowHandle window, ServerRegistry.View view) {
@@ -502,7 +511,7 @@ public final class FileServerPlugin implements Plugin {
         activityRefreshPending = true;
         environment.ui().execute(() -> {
             activityRefreshPending = false;
-            if (!stopped && panel != null) panel.refreshActivity();
+            if (!stopped) for (var instance : List.copyOf(panels.values())) instance.panel().refreshActivity();
         });
     }
 
@@ -511,11 +520,13 @@ public final class FileServerPlugin implements Plugin {
             environment.ui().execute(this::refreshPanels);
             return;
         }
-        if (panel == null) return;
-        panel.setTlsFingerprint(tls.cachedFingerprint());
-        panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
-        panel.setServers(registry.servers(), store.error());
-        panel.refreshActivity();
+        for (var instance : List.copyOf(panels.values())) {
+            var panel = instance.panel();
+            panel.setTlsFingerprint(tls.cachedFingerprint());
+            panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
+            panel.setServers(registry.servers(), store.error());
+            panel.refreshActivity();
+        }
     }
 
     /** Shows the fingerprint the server presents: the shared SSH host key's for SFTP, else the shared certificate's. */

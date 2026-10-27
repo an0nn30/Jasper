@@ -26,6 +26,18 @@ public final class TunnelsTestAccess {
     /** The Tunnels panel, once it was opened in the main window. */
     public static TunnelsPanel panel(TunnelsUi tunnels) { return tunnels.panel(); }
 
+    /** {@code window}'s Tunnels panel while it is open, else null. */
+    public static TunnelsPanel panel(TunnelsUi tunnels, UUID window) { return tunnels.panel(window); }
+
+    /** The host of {@code window}'s Tunnels panel while it is open. */
+    public static java.util.Optional<dev.jasper.sdk.ui.PanelHost> panelHost(TunnelsUi tunnels, UUID window) { return tunnels.panelHost(window); }
+
+    /** The rows the panel lists, by row id. */
+    public static java.util.List<String> rowIds(TunnelsPanel panel) { return panel.rowIds(); }
+
+    /** The row id of a tunnel's row. */
+    public static String rowId(UUID tunnel) { return TunnelsPanel.rowId(tunnel); }
+
     /** The panel's double click on a tunnel's row: edit a saved tunnel, Save as Tunnel for a quick forward. */
     public static void activate(TunnelsPanel panel, UUID id) { select(panel, id); Kits.press(panel.view(), TunnelsPanel.ACTIVATE); }
 

@@ -111,7 +111,7 @@ public class RemotePlugin implements Plugin {
     private StatusItem status;
     private PluginAction splitAction;
     private SessionsToolbar sessionsToolbar;
-    /** Each window's chosen session, shared by its toolbar view and, in the main window, its Sessions tree under CLASSIC (spec 14.4). */
+    /** Each window's chosen session, shared by its toolbar view and its Sessions tree under CLASSIC (spec 14.4). */
     private final SessionSelection sessionSelection = new SessionSelection();
     private Timer poll;
     private String icon;
@@ -126,9 +126,9 @@ public class RemotePlugin implements Plugin {
     /** Restored SSH tabs' panes and their hosts, oldest first, until their session attaches (workspace plan 6b Rulings 41). */
     private final Map<UUID, UUID> restoredPanes = new java.util.LinkedHashMap<>();
     private final Set<CompletableFuture<HostKeyVerifier.Decision>> questions = new java.util.HashSet<>();
-    /** The Sessions panel while it is open: panels live in the main window (workspace tabs spec 14). */
-    private HostsPanel sessionsPanel;
-    private PanelHost sessionsHost;
+    /** One Sessions panel in each window's dock that built it, by window id (full windows spec 9); the store is shared. */
+    private record Sessions(PanelHost host, HostsPanel panel) {}
+    private final Map<UUID, Sessions> sessionsPanels = new java.util.LinkedHashMap<>();
     private final Map<UUID, UUID> panes = new HashMap<>();
     /** Tab names' {@code {host}}: set for each SSH tab when its session attaches; registered in {@link #start}. */
     private dev.jasper.sdk.terminal.TabNamePiece hostPiece;
@@ -272,12 +272,12 @@ public class RemotePlugin implements Plugin {
         // Enterprise's default slots (spec 14.4): Sessions on the right; the default look keeps the left.
         context.panels().register(new PanelSpec(PANEL, "Sessions", icon, layout == dev.jasper.remote.workstation.Layout.CLASSIC ? Anchor.RIGHT : Anchor.LEFT)
             .withToggleActionId(HOSTS), this::createPanel);
-        sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> {
-            if (sessionsHost == null) showPanel(window); else sessionsHost.show();
-        }, () -> distros, this::openDistro, layout, sessionSelection, this::activeHostId);
-        // The Sessions panel is the main window's: only that window's row moves it.
+        sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> context.panels().show(PANEL, window),
+            () -> distros, this::openDistro, layout, sessionSelection, this::activeHostId);
+        // Each window's Sessions panel follows that window's row only.
         sessionSelection.onChanged((windowId, row) -> {
-            if (sessionsPanel != null && windowId.equals(sessionsHost.window().id())) row.ifPresent(sessionsPanel::selectRow);
+            var sessions = sessionsPanels.get(windowId);
+            if (sessions != null) row.ifPresent(sessions.panel()::selectRow);
         });
 
         store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); tunnelsUi.hostsChanged(); sftpUi.hostsChanged(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
@@ -312,7 +312,7 @@ public class RemotePlugin implements Plugin {
             invoked -> context.palette().open(invoked.window(), RemoteScope.ID, Optional.empty(), Optional.empty()));
         context.actions().register(ActionSpec.of(HOSTS, "Toggle SSH hosts").withIcon(icon)
                 .withKeywords(List.of("ssh", "hosts", "panel", "show", "hide")).withDefaultBindings("cmd+alt+1", "alt+1"),
-            invoked -> showPanel(invoked.window()));
+            invoked -> context.panels().toggle(PANEL, invoked.window()));
         context.actions().register(ActionSpec.of(SFTP_TOGGLE, "Toggle SFTP")
                 .withIcon("folder").withKeywords(List.of("sftp", "files", "panel", "show", "hide"))
                 .withDefaultBindings("cmd+alt+2", "alt+2"),
@@ -883,14 +883,15 @@ public class RemotePlugin implements Plugin {
         // and follows each move.
         panel.wide(dev.jasper.remote.workstation.Layout.wide(host.placement()));
         host.onPlacement(placement -> panel.wide(dev.jasper.remote.workstation.Layout.wide(placement)));
-        sessionsPanel = panel; sessionsHost = host;
+        var sessions = new Sessions(host, panel);
+        sessionsPanels.put(window.id(), sessions);
         seedSessions(window.id(), panel);
         // Shown again, the first host is selected as when the old list was shown (under CLASSIC the window's row, which the
         // toolbar view shares); focus follows an explicit opening only (a restored panel's window is not showing yet, so
         // the kit's focus request does nothing).
         host.onVisibility(visible -> { if (visible) { panel.shown(); seedSessions(window.id(), panel); panel.focusWhenOpened(); } });
         // The host disposed the view; the panel goes inert so no later refresh touches it.
-        host.onClosed(() -> { panel.close(); if (sessionsPanel == panel) { sessionsPanel = null; sessionsHost = null; } });
+        host.onClosed(() -> { panel.close(); sessionsPanels.remove(window.id(), sessions); });
         return panel.view();
     }
 
@@ -910,19 +911,16 @@ public class RemotePlugin implements Plugin {
 
     private boolean nameTaken(String name) { return store.hosts().stream().anyMatch(host -> host.name().equalsIgnoreCase(name)); }
 
-    private void showPanel(WindowHandle window) {
-        context.panels().toggle(PANEL, window);
-    }
-
     private void refreshPanels() {
-        var panel = sessionsPanel;
-        if (panel == null) return;
-        panel.setCredentialLabels(this::credentialLabel);
-        panel.setDefaultGroup(panelState.defaultGroup());
-        panel.setHostDetails(this::hostDetails, this::sessionCount);
-        panel.setDistros(distros, this::distroSessions);
-        panel.setHosts(store.hosts(), store.error());
-        seedSessions(sessionsHost.window().id(), panel);
+        for (var entry : List.copyOf(sessionsPanels.entrySet())) {
+            var panel = entry.getValue().panel();
+            panel.setCredentialLabels(this::credentialLabel);
+            panel.setDefaultGroup(panelState.defaultGroup());
+            panel.setHostDetails(this::hostDetails, this::sessionCount);
+            panel.setDistros(distros, this::distroSessions);
+            panel.setHosts(store.hosts(), store.error());
+            seedSessions(entry.getKey(), panel);
+        }
     }
 
     /**
@@ -932,7 +930,7 @@ public class RemotePlugin implements Plugin {
     private void syncSessions() {
         if (stopped || layout != dev.jasper.remote.workstation.Layout.CLASSIC || sessionsToolbar == null) return;
         sessionsToolbar.renderViews();
-        if (sessionsPanel != null) seedSessions(sessionsHost.window().id(), sessionsPanel);
+        for (var entry : List.copyOf(sessionsPanels.entrySet())) seedSessions(entry.getKey(), entry.getValue().panel());
     }
 
     /**
@@ -973,7 +971,7 @@ public class RemotePlugin implements Plugin {
                 if (store.hosts().stream().anyMatch(host -> !host.group().isEmpty() && host.group().equalsIgnoreCase(value)))
                     throw new IllegalArgumentException("A group with that name already exists");
                 panelState.renameDefaultGroup(value);
-                if (sessionsPanel != null) sessionsPanel.setCollapsed(panelState.collapsed());
+                for (var sessions : List.copyOf(sessionsPanels.values())) sessions.panel().setCollapsed(panelState.collapsed());
                 refreshPanels(); dialog.close();
             } catch (IOException | IllegalArgumentException failure) { editor[0].showError(message(failure)); }
         }, dialog::close);
@@ -1016,8 +1014,13 @@ public class RemotePlugin implements Plugin {
     ConfirmPanel currentConfirm() { return currentConfirm; }
     /** The panes of restored SSH tabs that have not attached yet, oldest first, for tests. */
     List<UUID> restoredPaneIds() { return List.copyOf(restoredPanes.keySet()); }
-    /** The Sessions panel while it is open, for tests. */
-    HostsPanel hostsPanel() { return sessionsPanel; }
+    /** The first open Sessions panel, or null when none is open. */
+    HostsPanel hostsPanel() { return sessionsPanels.values().stream().findFirst().map(Sessions::panel).orElse(null); }
+    /** {@code window}'s Sessions panel, or null when it has none open. */
+    HostsPanel hostsPanel(UUID window) { var sessions = sessionsPanels.get(window); return sessions == null ? null : sessions.panel(); }
+    /** The host of {@code window}'s Sessions panel, while it is open. */
+    Optional<PanelHost> sessionsHost(UUID window) { return Optional.ofNullable(sessionsPanels.get(window)).map(Sessions::host); }
+    dev.jasper.remote.ui.transfers.TransfersPanels transfersPanels() { return transfersPanels; }
     dev.jasper.remote.ui.tunnels.TunnelsUi tunnels() { return tunnelsUi; }
     /** The SFTP explorers, for tests. */
     dev.jasper.remote.ui.sftp.SftpUi sftp() { return sftpUi; }

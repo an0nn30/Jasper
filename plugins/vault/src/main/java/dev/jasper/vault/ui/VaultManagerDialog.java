@@ -22,7 +22,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * The manager, one modeless dialog over the main window, and its modal editors, which hang from it. The plugin forwards
+ * The manager, one modeless dialog over the window that asked for it, and its modal editors, which hang from it. The plugin forwards
  * state/save/config changes here.
  */
 public final class VaultManagerDialog implements AutoCloseable {
@@ -39,7 +39,7 @@ public final class VaultManagerDialog implements AutoCloseable {
     private final Layout layout;
     private final CopyCards copies;
     private PluginDialog dialog;
-    /** The window that owns the open dialog, the main window; the passive Unlock asks over it. */
+    /** The window that owns the open dialog, the one that asked for it; the passive Unlock asks over it. */
     private WindowHandle owner;
     private UnlockPrompt unlockPrompt;
     ManagerPanel panel;

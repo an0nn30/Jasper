@@ -22,6 +22,12 @@ public final class SftpTestAccess {
     /** The explorer once the SFTP panel was opened in the main window. */
     public static SftpPanel panel(SftpUi sftp) throws Exception { return Kits.value(sftp::panel); }
 
+    /** {@code window}'s explorer while its SFTP panel is open, else null. */
+    public static SftpPanel panel(SftpUi sftp, java.util.UUID window) throws Exception { return Kits.value(() -> sftp.panel(window)); }
+
+    /** The host of {@code window}'s SFTP panel while it is open. UI thread only. */
+    public static java.util.Optional<dev.jasper.sdk.ui.PanelHost> panelHost(SftpUi sftp, java.util.UUID window) { return sftp.panelHost(window); }
+
     public static List<String> rows(SftpPanel panel) throws Exception { return Kits.value(panel::rowNames); }
     public static String directory(SftpPanel panel) throws Exception { return Kits.value(panel::directory); }
     public static List<FileEntry> selection(SftpPanel panel) throws Exception { return Kits.value(panel::selection); }

@@ -30,6 +30,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -69,9 +70,9 @@ public final class TunnelsUi implements AutoCloseable {
     private final String icon;
     private final NotificationGroup notifications;
     private String warningIcon;
-    /** The Tunnels panel while it is open: panels live in the main window (workspace tabs spec 14). */
-    private TunnelsPanel panel;
-    private PanelHost panelHost;
+    /** One Tunnels panel in each window's dock that built it, by window id (full windows spec 9); the manager is shared. */
+    private record Instance(PanelHost host, TunnelsPanel panel) {}
+    private final Map<UUID, Instance> panels = new LinkedHashMap<>();
     private final Set<PluginDialog> dialogs = new HashSet<>();
     private final TunnelsScope scope;
     private final StatusItem status;
@@ -140,7 +141,7 @@ public final class TunnelsUi implements AutoCloseable {
         status.setIcon(icon);
         status.setAction(TOGGLE);
         status.setVisible(false);
-        ticker = new Timer(1000, event -> { if (panel != null) panel.refresh(); });
+        ticker = new Timer(1000, event -> { for (var instance : List.copyOf(panels.values())) instance.panel().refresh(); });
         storeSubscription = store.onChanged(this::storeChanged);
         managerSubscription = manager.onChanged(this::refresh);
     }
@@ -167,8 +168,12 @@ public final class TunnelsUi implements AutoCloseable {
     public TunnelEditor currentEditor() { return currentEditor; }
     public ForwardPanel currentForward() { return currentForward; }
     public ConfirmPanel currentConfirm() { return currentConfirm; }
-    /** The Tunnels panel while it is open. */
-    TunnelsPanel panel() { return panel; }
+    /** The first open Tunnels panel, or null when none is open. */
+    TunnelsPanel panel() { return panels.values().stream().findFirst().map(Instance::panel).orElse(null); }
+    /** {@code window}'s Tunnels panel, or null when it has none open. */
+    TunnelsPanel panel(UUID window) { var instance = panels.get(window); return instance == null ? null : instance.panel(); }
+    /** The host of {@code window}'s Tunnels panel, while it is open. */
+    Optional<PanelHost> panelHost(UUID window) { return Optional.ofNullable(panels.get(window)).map(Instance::host); }
 
     /** Plugin stop: every tunnel stops and the dialogs close. */
     @Override public void close() {
@@ -192,12 +197,12 @@ public final class TunnelsUi implements AutoCloseable {
         // and follows each move.
         panel.wide(Layout.wide(host.placement()));
         host.onPlacement(placement -> panel.wide(Layout.wide(placement)));
-        this.panel = panel;
-        panelHost = host;
+        var instance = new Instance(host, panel);
+        panels.put(window.id(), instance);
         // The host disposed the view; the panel goes inert, so no later state change or tick touches it.
         host.onClosed(() -> {
             panel.close();
-            if (this.panel == panel) { this.panel = null; panelHost = null; }
+            panels.remove(window.id(), instance);
         });
         fill(panel);
         return panel.view();
@@ -221,7 +226,7 @@ public final class TunnelsUi implements AutoCloseable {
 
     private void refresh() {
         if (closed) return;
-        if (panel != null) fill(panel);
+        for (var instance : List.copyOf(panels.values())) fill(instance.panel());
         scope.changed();
         int active = manager.active(), failing = manager.failed();
         status.setText(TunnelRows.status(active, failing));

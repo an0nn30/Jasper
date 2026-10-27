@@ -12345,32 +12345,33 @@ only.</p></div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.editor.api.Editor.open(Path)">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.Editor.open(Path)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>open</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html" title="java.nio.file.Path">Path</a> file)</code></pre>
-<div class="doc"><p>Opens a local file in a new tab of the main window, or selects the tab already showing it (of several, the one
-focused last), and brings that tab's window to the front.</p></div>
+<div class="doc"><p>Opens a local file in a new tab of the most recently active window (opening one when none is open), or selects the
+tab already showing it (of several, the one focused last), and brings that tab's window to the front.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>file</code> a local file</dd></dl>
 </div>
 <div class="member" id="dev.jasper.editor.api.Editor.open(EditorDocument)">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.Editor.open(EditorDocument)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>open</b>(<a class="tl" href="#dev.jasper.editor.api.EditorDocument">EditorDocument</a> document)</code></pre>
-<div class="doc"><p>Opens a document another plugin provides in a new tab of the main window, or selects the tab whose document has the
-same key (of several, the one focused last), and brings that tab's window to the front.</p></div>
+<div class="doc"><p>Opens a document another plugin provides in a new tab of the most recently active window (opening one when none is
+open), or selects the tab whose document has the same key (of several, the one focused last), and brings that tab's
+window to the front.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>document</code> the document</dd></dl>
 </div>
 <div class="member" id="dev.jasper.editor.api.Editor.open(Path,WindowOwner)">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.Editor.open(Path,WindowOwner)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <span class="kw">void</span> <b>open</b>(
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html" title="java.nio.file.Path">Path</a> file,
         <a class="tl" href="#dev.jasper.sdk.WindowOwner">WindowOwner</a> owner)</code></pre>
-<div class="doc"><p>Opens a local file in a new tab of the window the request came from, or of the main window when <code>owner</code> is
- null; a file already open is selected in its tab, wherever that is (of several, the one focused last). The
- interface default ignores <code>owner</code>.</p></div>
+<div class="doc"><p>Opens a local file in a new tab of the window the request came from, or of the most recently active window
+ (opening one when none is open) when <code>owner</code> is null; a file already open is selected in its tab, wherever
+ that is (of several, the one focused last). The interface default ignores <code>owner</code>.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>file</code> local file</dd><dd><code>owner</code> the Jasper window or content tab the request came from, or null</dd></dl>
 </div>
 <div class="member" id="dev.jasper.editor.api.Editor.open(EditorDocument,WindowOwner)">
 <pre class="sig"><a class="self" href="#dev.jasper.editor.api.Editor.open(EditorDocument,WindowOwner)" aria-label="Link to this member">#</a><code><span class="kw">default</span> <span class="kw">void</span> <b>open</b>(
         <a class="tl" href="#dev.jasper.editor.api.EditorDocument">EditorDocument</a> document,
         <a class="tl" href="#dev.jasper.sdk.WindowOwner">WindowOwner</a> owner)</code></pre>
-<div class="doc"><p>Opens a document in a new tab of the window the request came from, or of the main window when <code>owner</code> is
- null; a document whose key is already open is selected in its tab, wherever that is (of several, the one focused
- last). The interface default ignores <code>owner</code>.</p></div>
+<div class="doc"><p>Opens a document in a new tab of the window the request came from, or of the most recently active window
+ (opening one when none is open) when <code>owner</code> is null; a document whose key is already open is selected in
+ its tab, wherever that is (of several, the one focused last). The interface default ignores <code>owner</code>.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>document</code> document to open</dd><dd><code>owner</code> the Jasper window or content tab the request came from, or null</dd></dl>
 </div>
 <div class="member" id="dev.jasper.editor.api.Editor.reopener(String,Function)">
