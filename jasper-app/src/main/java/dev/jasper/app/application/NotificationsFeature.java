@@ -23,8 +23,9 @@ import java.util.UUID;
 
 /**
  * The application's notification surfaces: Jasper's own groups, the built-in Notifications panel with its unread
- * badge and actions, and one card layer per attached window (the application attaches every window's), routing each
- * requested card to its target window or the window used last. EDT only; the application closes it at shutdown.
+ * badge and actions, and one card layer per attached window (the application attaches every window's). Every
+ * requested card shows in every layer; a card leaves all of them together, whether it is read, dismissed, expired,
+ * removed or timed out in one. EDT only; the application closes it at shutdown.
  */
 final class NotificationsFeature implements AutoCloseable {
     static final String PANEL_ID = "jasper.notifications";
@@ -41,7 +42,7 @@ final class NotificationsFeature implements AutoCloseable {
     private final Map<UUID, Attached> windows = new LinkedHashMap<>();
     private final Subscription listening;
     private final java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit;
-    private UUID lastActive;
+    private final LayerFactory layers;
     private boolean closed;
 
     /** {@code kit} supplies the chrome kit context the cards and the Notifications panel are built with: the default look's panel. */
@@ -52,9 +53,21 @@ final class NotificationsFeature implements AutoCloseable {
     /** As the three-argument form, with the panel's title and default slot under the look: Event Log at Bottom Left under labelled stripes. */
     NotificationsFeature(NotificationCenter center, Contributions contributions, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit,
                          dev.jasper.app.presentation.AppPanels panels) {
+        this(center, contributions, kit, panels, null);
+    }
+
+    /** Builds a window's card layer from its content and the callback a countdown that hides a card reports to; tests inject controlled schedules. */
+    interface LayerFactory {
+        CardLayer create(WindowContent content, java.util.function.Consumer<UUID> timedOut);
+    }
+
+    NotificationsFeature(NotificationCenter center, Contributions contributions, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit,
+                         dev.jasper.app.presentation.AppPanels panels, LayerFactory layers) {
         this.center = center;
         this.contributions = contributions;
         this.kit = java.util.Objects.requireNonNull(kit, "kit");
+        this.layers = layers != null ? layers : (content, timedOut) -> new CardLayer(this.kit.get(), this.center, content.isActiveAndOpen(),
+            () -> this.contributions.requestPanel(new Contributions.PanelRequest(content.id(), PANEL_ID, Contributions.PanelRequest.Op.SHOW)), timedOut);
         center.register(GENERAL);
         center.register(CONFIG);
         var icon = AppIcons.semantic("bell");
@@ -64,7 +77,7 @@ final class NotificationsFeature implements AutoCloseable {
                 Contributions.PanelRequest.Op.ACTIVATING_TOGGLE)));
         contributions.addAction(DISMISS_CARDS, "Notifications: Dismiss Cards", null,
             List.of("notifications", "close", "clear", "balloons", "cards"), Optional.empty(), invocation -> {
-                // Cards show in one window, the one the card targets else the most recently active, so Dismiss Cards closes them there.
+                // Every window shows every card and reading one clears it everywhere, so dismissing the invoking window's layer closes them all.
                 Attached attached = windows.get(invocation.windowId());
                 if (attached != null) attached.layer().dismissAll();
                 else windows.values().forEach(each -> each.layer().dismissAll());
@@ -79,11 +92,16 @@ final class NotificationsFeature implements AutoCloseable {
     void attach(WindowContent content) {
         if (closed || windows.containsKey(content.id())) return;
         UUID id = content.id();
-        var layer = new CardLayer(kit.get(), center, content.isActiveAndOpen(), () -> contributions.requestPanel(
-            new Contributions.PanelRequest(id, PANEL_ID, Contributions.PanelRequest.Op.SHOW)));
+        var layer = layers.create(content, shown -> windows.values().forEach(each -> {
+            if (each.content() != content) each.layer().withdraw(shown);
+        }));
         content.mountCornerLayer(layer);
+        // A window opened while cards show takes them, in their top-to-bottom order, then those waiting.
+        var replay = new java.util.LinkedHashSet<UUID>();
+        for (Attached each : windows.values()) replay.addAll(each.layer().showing());
+        for (Attached each : windows.values()) replay.addAll(each.layer().waiting());
         windows.put(id, new Attached(content, layer));
-        if (lastActive == null) lastActive = id;
+        for (UUID shown : replay) center.find(shown).ifPresent(layer::show);
     }
 
     /** The window closed: its cards go; their entries stay in history. */
@@ -91,25 +109,22 @@ final class NotificationsFeature implements AutoCloseable {
         Attached attached = windows.remove(content.id());
         if (attached == null) return;
         attached.layer().close();
-        if (content.id().equals(lastActive)) lastActive = windows.isEmpty() ? null : windows.keySet().iterator().next();
     }
 
     /**
-     * A Jasper window was activated: the most recently active window is the default target, and cards that
-     * waited for focus show now.
+     * A Jasper window was activated: cards that waited for focus show now.
      */
     void activated(WindowContent content) {
         if (closed || !windows.containsKey(content.id())) return;
-        lastActive = content.id();
         center.focusReturned();
     }
 
-    /** An application error: a title and details, which may be missing; its card shows in the window used last. */
+    /** An application error: a title and details, which may be missing; its card shows in every window. */
     void error(String title, String details) { post(Severity.ERROR, title, details, null); }
 
     void info(String title, String details) { post(Severity.INFO, title, details, null); }
 
-    /** A window's own error: its card shows in that window, or in the window used last once it is gone. */
+    /** A window's own error: its card shows in every window. */
     void error(String title, String details, UUID window) { post(Severity.ERROR, title, details, window); }
 
     void info(String title, String details, UUID window) { post(Severity.INFO, title, details, window); }
@@ -149,13 +164,7 @@ final class NotificationsFeature implements AutoCloseable {
     }
 
     private void route(Notification notification) {
-        Attached target = notification.request().target().map(windows::get).orElse(null);
-        if (target == null && lastActive != null) target = windows.get(lastActive);
-        if (target == null && !windows.isEmpty()) target = windows.values().iterator().next();
-        if (target == null) return;
-        // A repeat may come from another window than its first post: one card, in the window it last came from.
-        for (Attached other : windows.values()) if (other != target) other.layer().withdraw(notification.id());
-        target.layer().show(notification);
+        for (Attached each : windows.values()) each.layer().show(notification);
     }
 
     private void updateBadge() {

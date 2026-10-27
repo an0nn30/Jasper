@@ -37,6 +37,7 @@ class CardLayerTest {
         Clock.fixed(Instant.parse("2026-10-02T14:05:00Z"), ZoneOffset.UTC), () -> Delivery.Presence.FOCUSED);
     private final List<Scheduled> scheduled = new ArrayList<>();
     private final List<String> opened = new ArrayList<>();
+    private final List<java.util.UUID> timedOut = new ArrayList<>();
     private long now;
 
     private CardLayer layer(boolean focused) { return layer(KitTestSupport.context(), focused); }
@@ -46,7 +47,7 @@ class CardLayerTest {
     private CardLayer layer(KitContext kit, boolean focused) {
         center.register(CARDS);
         center.register(STICKY);
-        return new CardLayer(kit, center, focused, () -> opened.add("history"), (delay, task) -> {
+        return new CardLayer(kit, center, focused, () -> opened.add("history"), timedOut::add, (delay, task) -> {
             boolean[] cancelled = {false};
             scheduled.add(new Scheduled(delay, task, cancelled));
             return () -> cancelled[0] = true;
@@ -127,6 +128,19 @@ class CardLayerTest {
         live().getFirst().task().run();
         assertThat(layer.showing()).isEmpty();
         assertThat(center.find(a.id()).orElseThrow().read()).isFalse();
+    }
+
+    @Test void aCountdownThatHidesACardReportsIt() {
+        var layer = layer(true);
+        var a = post(CARDS, "a");
+        var b = post(CARDS, "b");
+        layer.show(a);
+        layer.show(b);
+        live().getFirst().task().run();
+        assertThat(timedOut).containsExactly(a.id());
+        center.markRead(b.id());
+        layer.withdraw(a.id());
+        assertThat(timedOut).as("a read or a withdraw reports nothing").containsExactly(a.id());
     }
 
     @Test void theCountdownPausesWhileUnfocusedOrHovered() {

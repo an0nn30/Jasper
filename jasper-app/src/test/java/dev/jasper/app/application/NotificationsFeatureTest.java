@@ -67,65 +67,100 @@ class NotificationsFeatureTest {
         assertThat(panel().badge()).isEmpty();
     }
 
-    @Test void cardsGoToTheirTargetOrTheWindowUsedLast() {
-        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
-        var first = window();
-        var second = window();
-        feature.attach(first);
-        feature.attach(second);
-        feature.activated(second);
-        feature.info("Last used", "");
-        assertThat(feature.layer(second.id()).showing()).hasSize(1);
-        assertThat(feature.layer(first.id()).showing()).isEmpty();
-        center.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.INFO, "Targeted").withTarget(first.id()));
-        assertThat(feature.layer(first.id()).showing()).hasSize(1);
+    private NotificationsFeature feature() {
+        return new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
     }
 
-    @Test void aWindowsOwnMessagesShowInThatWindowEvenWhenAnotherWasUsedLast() {
-        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
+    @Test void everyCardShowsInEveryWindow() {
+        var feature = feature();
         var first = window();
         var second = window();
         feature.attach(first);
         feature.attach(second);
         feature.activated(second);
+        feature.info("Untargeted", "");
         feature.error("From first", "", first.id());
-        assertThat(feature.layer(first.id()).showing()).hasSize(1);
-        assertThat(feature.layer(second.id()).showing()).isEmpty();
-        feature.info("Also from first", "", first.id());
         assertThat(feature.layer(first.id()).showing()).hasSize(2);
+        assertThat(feature.layer(second.id()).showing()).isEqualTo(feature.layer(first.id()).showing());
+    }
+
+    @Test void readingACardInOneWindowRemovesItFromAll() {
+        var feature = feature();
+        var first = window();
+        var second = window();
+        feature.attach(first);
+        feature.attach(second);
+        feature.info("One", "");
+        feature.info("Two", "");
+        var ids = feature.layer(first.id()).showing();
+        center.markRead(ids.get(0));
+        center.expire(ids.get(1));
+        assertThat(feature.layer(first.id()).showing()).isEmpty();
         assertThat(feature.layer(second.id()).showing()).isEmpty();
     }
 
-    @Test void aRepeatFromAnotherWindowMovesItsCardThere() {
-        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
+    @Test void aRepeatKeepsOneCardInEveryWindow() {
+        var feature = feature();
         var first = window();
         var second = window();
         feature.attach(first);
         feature.attach(second);
         feature.error("Could not save", "same details", first.id());
-        assertThat(feature.layer(first.id()).showing()).hasSize(1);
         feature.error("Could not save", "same details", second.id());
         assertThat(center.history()).hasSize(1);
-        assertThat(feature.layer(second.id()).showing()).hasSize(1);
-        assertThat(feature.layer(first.id()).showing()).as("one card, in the window it last happened in").isEmpty();
+        var id = center.history().getFirst().id();
+        assertThat(feature.layer(first.id()).showing()).containsExactly(id);
+        assertThat(feature.layer(second.id()).showing()).containsExactly(id);
     }
 
-    @Test void aClosedWindowsCardsGoAndLaterOnesFindAnotherWindow() {
-        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
+    @Test void aWindowAttachedWhileCardsShowTakesThem() {
+        var feature = feature();
+        var first = window();
+        feature.attach(first);
+        feature.info("One", "");
+        feature.info("Two", "");
+        var third = window();
+        feature.attach(third);
+        assertThat(feature.layer(first.id()).showing()).hasSize(2);
+        assertThat(feature.layer(third.id()).showing()).isEqualTo(feature.layer(first.id()).showing());
+    }
+
+    @Test void closingTheWindowACardCameFromKeepsItElsewhere() {
+        var feature = feature();
         var first = window();
         var second = window();
         feature.attach(first);
         feature.attach(second);
-        feature.activated(first);
-        feature.error("Before", "");
+        feature.error("Before", "", first.id());
         CardLayer closing = feature.layer(first.id());
-        assertThat(closing.showing()).hasSize(1);
         feature.detach(first);
         assertThat(feature.layer(first.id())).isNull();
         assertThat(closing.showing()).isEmpty();
-        feature.error("After", "");
         assertThat(feature.layer(second.id()).showing()).hasSize(1);
-        assertThat(center.history()).hasSize(2);
+        assertThat(center.history()).hasSize(1);
+    }
+
+    @Test void aCardThatTimesOutInOneWindowLeavesEveryWindow() {
+        var tasks = new ArrayList<Runnable>();
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context,
+            new dev.jasper.app.presentation.AppPanels("Notifications", Slot.RIGHT_TOP),
+            (content, timedOut) -> dev.jasper.app.notificationui.CardLayerTestAccess.layer(dev.jasper.app.testsupport.KitTestSupport.context(), center, true,
+                () -> { }, timedOut, (delay, task) -> {
+                    tasks.add(task);
+                    return () -> { };
+                }, () -> 0L));
+        var first = window();
+        var second = window();
+        feature.attach(first);
+        feature.attach(second);
+        feature.info("Slow", "");
+        assertThat(feature.layer(first.id()).showing()).hasSize(1);
+        assertThat(feature.layer(second.id()).showing()).hasSize(1);
+        assertThat(tasks).hasSize(2);
+        tasks.getFirst().run();
+        assertThat(feature.layer(first.id()).showing()).isEmpty();
+        assertThat(feature.layer(second.id()).showing()).isEmpty();
+        assertThat(center.history()).singleElement().satisfies(entry -> assertThat(entry.read()).isFalse());
     }
 
     @Test void notificationsFromBeforeTheFirstWindowShowWhenItIsFocused() {
@@ -185,7 +220,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void dismissCardsFromAWindowWithoutCardsClosesTheMainWindowsCards() {
-        // Cards show in the main window only; Dismiss Cards run from a child window (whose palette lists it) closes them.
+        // Dismiss Cards run from a window without a layer closes every window's cards.
         var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         var main = window();
         feature.attach(main);

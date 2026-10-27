@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import javax.swing.JComponent;
 
@@ -46,6 +47,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
     private final NotificationCenter center;
     private final BiFunction<Duration, Runnable, Runnable> schedule;
     private final LongSupplier nanoTime;
+    private final Consumer<UUID> timedOut;
     /** Top to bottom: oldest to newest. */
     private final List<Slot> slots = new ArrayList<>();
     /** Waiting for room, oldest first. */
@@ -79,12 +81,13 @@ public final class CardLayer extends JComponent implements AutoCloseable {
      * @param center the notification store
      * @param focused whether the window is active
      * @param openHistory shows the Notifications panel, for the "+N more" chip
+     * @param timedOut receives a card's id after its countdown hides the card here, so the other windows can drop it
      */
-    public CardLayer(KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory) {
-        this(kit, center, focused, openHistory, CardLayer::swingTimer, System::nanoTime);
+    public CardLayer(KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory, Consumer<UUID> timedOut) {
+        this(kit, center, focused, openHistory, timedOut, CardLayer::swingTimer, System::nanoTime);
     }
 
-    CardLayer(KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory,
+    CardLayer(KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory, Consumer<UUID> timedOut,
               BiFunction<Duration, Runnable, Runnable> schedule, LongSupplier nanoTime) {
         this.kit = Objects.requireNonNull(kit, "kit");
         this.center = Objects.requireNonNull(center, "center");
@@ -92,6 +95,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
         this.focused = focused;
         Objects.requireNonNull(openHistory, "openHistory");
+        this.timedOut = Objects.requireNonNull(timedOut, "timedOut");
         setLayout(null);
         setOpaque(false);
         setFocusable(false);
@@ -142,10 +146,13 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         for (UUID id : ids) center.markRead(id);
     }
 
+    /** The entries waiting for room behind the chip, oldest first. */
+    public List<UUID> waiting() { return List.copyOf(waiting); }
+
     /** The entries with a card showing, top to bottom. */
     public List<UUID> showing() { return slots.stream().map(Slot::id).toList(); }
 
-    /** Takes the entry's card out of this window, showing or waiting, because it now shows in another one. */
+    /** Takes the entry's card out of this window, showing or waiting, because it left another window's stack. */
     public void withdraw(UUID id) {
         if (closed) return;
         boolean waited = waiting.remove(id);
@@ -252,6 +259,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         slot.card.close();
         promote();
         refresh();
+        timedOut.accept(slot.id());
     }
 
     private void changed(NotificationCenter.Change change) {
