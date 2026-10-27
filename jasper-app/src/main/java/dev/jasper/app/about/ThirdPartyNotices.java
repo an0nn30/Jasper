@@ -30,7 +30,8 @@ public final class ThirdPartyNotices {
         "EPL-1.0", "Eclipse Public License 1.0",
         "OFL-1.1", "SIL Open Font License 1.1",
         "GPL-2.0-only WITH Classpath-exception-2.0", "GNU GPL v2 with the Classpath Exception",
-        "LicenseRef-Nerd-Fonts", "Nerd Fonts licenses");
+        "LicenseRef-Nerd-Fonts", "Nerd Fonts licenses",
+        "LicenseRef-JogAmp", "JogAmp licenses (BSD 2-Clause and others)");
 
     private ThirdPartyNotices() {}
 

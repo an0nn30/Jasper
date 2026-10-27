@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -72,6 +73,42 @@ class ThirdPartyNoticesTest {
                 .contains("f7377708b654b73b206da40bb382ecb4d44e8f12", "8062c061ff33e22041d9f1844db5b8b8a6b5e4d7")
                 .contains("This software includes code from IntelliJ IDEA\nCopyright (C) JetBrains s.r.o.\nhttps://www.jetbrains.com/idea/");
         });
+    }
+
+    /** Plan 2 (the JCEF runtime): every package ships Chromium, CEF, JetBrains' JCEF binding and the JogAmp modules JCEF requires. */
+    @Test void chromiumAndItsJavaBindingAreListed() {
+        var byName = ThirdPartyNotices.thirdParty().stream()
+            .collect(Collectors.toMap(ThirdPartyNotices.Component::name, component -> component));
+        assertThat(byName).containsKeys("Chromium", "Chromium Embedded Framework", "JCEF", "JOGL", "GlueGen");
+
+        var chromium = byName.get("Chromium");
+        assertThat(chromium.version()).isEqualTo("150.0.7871.129");
+        assertThat(chromium.license()).isEqualTo("BSD-3-Clause");
+        assertThat(ThirdPartyNotices.read(chromium.text())).contains("Copyright 2015 The Chromium Authors",
+            "Neither the name of Google LLC");
+        assertThat(ThirdPartyNotices.read(chromium.notice().orElseThrow()))
+            .contains("https://chromium.googlesource.com/chromium/src/+/refs/tags/150.0.7871.129/");
+
+        var cef = byName.get("Chromium Embedded Framework");
+        assertThat(cef.version()).isEqualTo("150.0.14");
+        assertThat(cef.license()).isEqualTo("BSD-3-Clause");
+        assertThat(ThirdPartyNotices.read(cef.text())).contains("Copyright (c) 2008-2020 Marshall A. Greenblatt");
+
+        var jcef = byName.get("JCEF");
+        assertThat(jcef.version()).isEqualTo("150.0.14.1233+g9df0879");
+        assertThat(jcef.license()).isEqualTo("BSD-3-Clause");
+        assertThat(jcef.homepage()).isEqualTo("https://github.com/JetBrains/jcef");
+        assertThat(ThirdPartyNotices.read(jcef.text())).contains("Copyright (c) 2008-2013 Marshall A. Greenblatt");
+
+        for (var name : List.of("JOGL", "GlueGen")) {
+            var jogamp = byName.get(name);
+            assertThat(jogamp.version()).as(name).isEqualTo("2.4.0-rc-20200930");
+            assertThat(jogamp.license()).as(name).isEqualTo("LicenseRef-JogAmp");
+            assertThat(jogamp.licenseName()).as(name).isEqualTo("JogAmp licenses (BSD 2-Clause and others)");
+            assertThat(jogamp.modules()).as(name).isEmpty();
+            assertThat(ThirdPartyNotices.read(jogamp.text())).as(name).contains("Simplified BSD 2-clause license",
+                "Copyright 2010");
+        }
     }
 
     @Test void jaspersTextIsTheRootLicense() throws Exception {

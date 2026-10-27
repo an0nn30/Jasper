@@ -63,6 +63,21 @@ modules = ["org.checkerframework:checker-qual:3.21.2"]
 text = "checker-qual.LICENSE.txt"
 
 [[component]]
+name = "Chromium"
+version = "150.0.7871.129"
+license = "BSD-3-Clause"
+homepage = "https://www.chromium.org/"
+text = "chromium.LICENSE.txt"
+notice = "chromium.NOTICE.txt"
+
+[[component]]
+name = "Chromium Embedded Framework"
+version = "150.0.14"
+license = "BSD-3-Clause"
+homepage = "https://github.com/chromiumembedded/cef"
+text = "cef.LICENSE.txt"
+
+[[component]]
 name = "CommonMark Java"
 version = "0.30.0"
 license = "BSD-2-Clause"
@@ -86,6 +101,13 @@ license = "Apache-2.0"
 homepage = "https://www.formdev.com/flatlaf/"
 modules = ["com.formdev:flatlaf:3.7", "com.formdev:flatlaf-extras:3.7"]
 text = "apache-2.0.txt"
+
+[[component]]
+name = "GlueGen"
+version = "2.4.0-rc-20200930"
+license = "LicenseRef-JogAmp"
+homepage = "https://jogamp.org/gluegen/www/"
+text = "gluegen.LICENSE.txt"
 
 [[component]]
 name = "IBM Plex"
@@ -112,6 +134,13 @@ license = "Apache-2.0"
 homepage = "https://github.com/JetBrains/intellij-community"
 text = "apache-2.0.txt"
 notice = "intellij-themes.NOTICE.txt"
+
+[[component]]
+name = "JCEF"
+version = "150.0.14.1233+g9df0879"
+license = "BSD-3-Clause"
+homepage = "https://github.com/JetBrains/jcef"
+text = "jcef.LICENSE.txt"
 
 [[component]]
 name = "JCL over SLF4J"
@@ -161,6 +190,13 @@ homepage = "https://github.com/java-native-access/jna"
 modules = ["net.java.dev.jna:jna:5.14.0", "net.java.dev.jna:jna-platform:5.14.0"]
 text = "apache-2.0.txt"
 notice = "jna.NOTICE.txt"
+
+[[component]]
+name = "JOGL"
+version = "2.4.0-rc-20200930"
+license = "LicenseRef-JogAmp"
+homepage = "https://jogamp.org/jogl/www/"
+text = "jogl.LICENSE.txt"
 
 [[component]]
 name = "jsvg"

@@ -1,0 +1,6 @@
+Chromium includes third-party software under licences other than its own, and the licences of that software are listed in
+Chromium's third-party credits (chrome://credits in a Chromium browser). Chromium generates the credits at build time from the
+README.chromium metadata and licence files of the libraries in its source tree, with tools/licenses/licenses.py.
+
+The Chromium source tree of the version Jasper ships, 150.0.7871.129, with those files and that script, is at
+https://chromium.googlesource.com/chromium/src/+/refs/tags/150.0.7871.129/
