@@ -47,9 +47,15 @@ sections 4 and 19. The facts below were gathered on 2026-10-27 from the reposito
 
 ## Prerequisites (the user, before Task 1)
 
-1. **The JCEF SDK on the dev Mac.** The user manages Java with SDKMAN. The steps given on 2026-10-27:
+1. **The JCEF SDK on the dev Mac.** Done by the user on 2026-10-27, and checked:
+   - `java -version` reports `JBR-25.0.4.1+1-635.75-jcef`;
+   - `java_home -V` lists one Java 25, the bundle below, with `Contents/Frameworks/cef_server.app`;
+   - `codesign --verify --deep --strict` passes;
+   - SDKMAN's default is the local version `25.0.4.1-jcef`.
+
+   The user manages Java with SDKMAN. The steps given on 2026-10-27:
    - copy the spike's full bundle to `~/Library/Java/JavaVirtualMachines/jbrsdk_jcef-25.0.4.1-osx-aarch64-b635.75`;
-   - register it as an SDKMAN local version, `sdk install java 25.0.4.1-jcef-b635 <bundle>/Contents/Home`, and make
+   - register it as an SDKMAN local version, `sdk install java 25.0.4.1-jcef <bundle>/Contents/Home`, and make
      it the default;
    - `sdk uninstall java 25.0.4+1.58348-jbr`, and move the plain `jbrsdk-25.0.4.1-osx-aarch64-b583.48` out of
      `~/Library/Java/JavaVirtualMachines`.
