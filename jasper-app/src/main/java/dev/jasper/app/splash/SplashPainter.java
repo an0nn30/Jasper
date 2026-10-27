@@ -69,6 +69,7 @@ public final class SplashPainter {
     }
 
     private final MeadowSplash meadow;
+    private final ThemeSplash themed;
     private final String product, version, copyright;
     private final Image icon;
     private final EncodedArtwork art;
@@ -78,12 +79,14 @@ public final class SplashPainter {
     private SplashPainter(String product, String version, String copyright, Image icon, EncodedArtwork art, Font name,
                           Font versionFont, Font stepFont, Font copyrightFont) {
         this.meadow = null;
+        this.themed = null;
         this.product = product; this.version = version; this.copyright = copyright; this.icon = icon; this.art = art;
         this.name = name; this.versionFont = versionFont; this.stepFont = stepFont; this.copyrightFont = copyrightFont;
     }
 
     private SplashPainter(MeadowSplash meadow) {
         this.meadow = meadow;
+        this.themed = null;
         product = version = copyright = null;
         icon = null; art = null;
         name = versionFont = stepFont = copyrightFont = null;
@@ -99,8 +102,33 @@ public final class SplashPainter {
         return new SplashPainter(new MeadowSplash(version, scale));
     }
 
+    private SplashPainter(ThemeSplash themed) {
+        this.themed = themed; meadow = null;
+        product = version = copyright = null;
+        icon = null; art = null;
+        name = versionFont = stepFont = copyrightFont = null;
+    }
+
+    /**
+     * Decodes the bundled still illustration for an interface theme. Custom and Desktop themes use Meadow art;
+     * unreadable art falls back to the original animated Meadow.
+     * @param themeId the validated interface theme id
+     * @param version the build version to display
+     * @param scale initial device scale for the original Meadow fallback, clamped to 1 through 4
+     * @return the decoded painter
+     */
+    public static SplashPainter themed(String themeId, String version, int scale) {
+        Objects.requireNonNull(themeId, "themeId"); Objects.requireNonNull(version, "version");
+        try { return new SplashPainter(new ThemeSplash(themeId, version)); }
+        catch (RuntimeException undrawable) {
+            LOG.log(System.Logger.Level.WARNING, "The theme splash cannot be drawn; using Meadow", undrawable);
+            return meadow(version, scale);
+        }
+    }
+
     boolean animated() { return meadow != null; }
-    java.awt.Color background() { return meadow == null ? SplashColors.TOP : SplashColors.MEADOW_PAPER; }
+    boolean illustrated() { return themed != null; }
+    java.awt.Color background() { return themed != null ? themed.background() : meadow == null ? SplashColors.TOP : SplashColors.MEADOW_PAPER; }
     void animationFrame(int tick) { if (meadow != null) meadow.frame(tick); }
 
     /**
@@ -137,6 +165,7 @@ public final class SplashPainter {
         Objects.requireNonNull(step, "step");
         Graphics2D g = (Graphics2D) target.create();
         try {
+            if (themed != null) { themed.paint(g, step, fraction); return; }
             if (meadow != null) { meadow.paint(g, step, fraction); return; }
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);

@@ -1,5 +1,6 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.appearance.AppearancePolicy;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commandline.CommandDispatcher;
 import dev.jasper.app.commandline.CommandInstall;

@@ -330,6 +330,23 @@ class ApplicationBootstrapTest {
             assertThat(ApplicationBootstrap.splashWanted(AppArguments.parse(new String[] {flag}, directory), false, true)).as(flag).isFalse();
     }
 
+    @Test void excludedStartsNeverSelectArtOrObserveSystemAppearance() {
+        var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));
+        var unexpected = (java.util.function.Function<dev.jasper.app.config.ConfigSnapshot, String>) config -> {
+            throw new AssertionError("An excluded launch tried to select art or initialize its appearance snapshot");
+        };
+        for (String flag : java.util.List.of("--background", "--no-window", "--safe-mode")) {
+            var startup = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[]{flag}, directory), dirs,
+                null, dev.jasper.app.plugins.PluginSelection.none(), null);
+            assertThat(ApplicationBootstrap.openSplash(startup, false, unexpected)).as(flag)
+                .isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+        }
+        var plain = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs,
+            null, dev.jasper.app.plugins.PluginSelection.none(), null);
+        assertThat(ApplicationBootstrap.openSplash(plain, true, unexpected)).as("headless")
+            .isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+    }
+
     /** Review Focus 5: the look's icons reach every branded launch, the splash only one that opens a window. */
     @Test void aBrandedLookGivesTheApplicationItsIconsEvenWithoutASplash() throws Exception {
         var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));

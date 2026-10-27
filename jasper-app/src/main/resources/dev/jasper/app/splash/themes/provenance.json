@@ -1,0 +1,56 @@
+{
+  "generator": "Built-in image_gen tool",
+  "date": "2026-10-26",
+  "purpose": "Approved theme splash landscapes and recolored/coated Buddy; native image output, no offline resampling. Runtime paints lettering and progress separately.",
+  "assets": [
+    {
+      "id": "jasper-meadow",
+      "generated_file": "exec-72b0450c-318e-4b9b-b46c-70ef3b325a3c.png",
+      "width": 1604,
+      "height": 981,
+      "sha256": "3221c53451b9642fa368f1d8f7ffe8dfdc72a969d73d7e5fb59bb83b326be2e1"
+    },
+    {
+      "id": "slate-cobalt",
+      "generated_file": "exec-0f544370-d27b-4abf-bb77-2e2aed5b649d.png",
+      "width": 1604,
+      "height": 980,
+      "sha256": "001824aba76fe202c82c8dfef2a9edee8cb05858aa487ede2820ede5138511cc"
+    },
+    {
+      "id": "ubuntu-yaru",
+      "generated_file": "exec-1f8b7165-cfb0-4736-b7d7-ee24484927ae.png",
+      "width": 1604,
+      "height": 980,
+      "sha256": "2cd86d298ce05bc795b6f9eac1ac1fa01cddc04ecafa201bb1a3dcaee7ccf8a5"
+    },
+    {
+      "id": "catppuccin-latte",
+      "generated_file": "exec-ae4869f0-45be-45ae-baf8-6c51f896d38f.png",
+      "width": 1604,
+      "height": 980,
+      "sha256": "9a6952dd2f45c9e7aeb3a58fbc6286d4efe6d3347097582a3e025f000f2f6310"
+    },
+    {
+      "id": "catppuccin-frappe",
+      "generated_file": "exec-e78ba0ec-4f33-4a2c-bf03-2e761ff48ab2.png",
+      "width": 1604,
+      "height": 981,
+      "sha256": "a64399284c6aae7b59c82d94c53e06f670cdb6d818266ace86e1fbf11f962b35"
+    },
+    {
+      "id": "catppuccin-macchiato",
+      "generated_file": "exec-62bed122-1f8b-4b60-ab06-6b941643ce0b.png",
+      "width": 1604,
+      "height": 981,
+      "sha256": "3fc720bbb4400275822a2444581017a74b389e835464a1149791ac37b327e837"
+    },
+    {
+      "id": "catppuccin-mocha",
+      "generated_file": "exec-e81d4863-a127-4966-8951-5ea92b6deca8.png",
+      "width": 1604,
+      "height": 980,
+      "sha256": "0636b5c12072d8302d81e7cfa112d50e973e6f2c061249a0d963d8379316bfc3"
+    }
+  ]
+}
