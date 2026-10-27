@@ -2348,25 +2348,33 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * Opens a web address as Jasper's own routes do (a link clicked in a terminal, the {@code jasper} command): with the
-     * browser a plugin provides through {@code Platform.browser}, given that plugin's handle for {@code windowId} while
-     * the window is open.
+     * browser a plugin provides through {@code Platform.browser}, as a {@link dev.jasper.sdk.ui.WebLink} that carries
+     * that plugin's handle for {@code windowId} while the window is open.
      *
-     * @param address an absolute http or https address
+     * @param address an absolute http or https address with a host, or an absolute file address
      * @param origin who asked for it
+     * @param placement where the link asks to open
+     * @param target the OSC 8 {@code target=} name the link carries, or empty
      * @param windowId the Jasper window the address came from, or empty
      * @return what the browser answered; false when no plugin provides one, or it threw, which {@link #failures()} records
+     * @throws IllegalArgumentException when the arguments do not make a {@link dev.jasper.sdk.ui.WebLink}
      * @since 0.23.0
      */
-    public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, Optional<UUID> windowId) {
+    public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, dev.jasper.sdk.ui.LinkPlacement placement,
+                            Optional<String> target, Optional<UUID> windowId) {
         Objects.requireNonNull(address, "address");
         Objects.requireNonNull(origin, "origin");
+        Objects.requireNonNull(placement, "placement");
+        Objects.requireNonNull(target, "target");
         Objects.requireNonNull(windowId, "windowId");
+        // The same checks whether or not a plugin provides a browser.
+        new dev.jasper.sdk.ui.WebLink(address, origin, placement, target, Optional.empty());
         ProvidedBrowser provided = providedBrowser;
         if (provided == null) return false;
         Optional<dev.jasper.sdk.WindowOwner> window = windowId.flatMap(id -> provided.context().terminals.window(id))
             .map(handle -> (dev.jasper.sdk.WindowOwner) handle);
         try {
-            return provided.browser().open(address, origin, window);
+            return provided.browser().open(new dev.jasper.sdk.ui.WebLink(address, origin, placement, target, window));
         } catch (RuntimeException failure) {
             failures.add(provided.context().plugin().id() + " web browser: " + failure);
             return false;

@@ -1,5 +1,7 @@
 package dev.jasper.sdk.ui;
 
+import java.net.URI;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -170,18 +172,58 @@ class UiValuesTest {
         assertThatNullPointerException().isThrownBy(() -> older.editor(null));
     }
 
-    /** Browser plan 3: the browser hook is a default an older host ignores, and an address comes from a click or a program. */
+    /** Browser plan 3: the browser hook is a default an older host ignores, and an address comes from a click or from outside Jasper. */
     @Test void theBrowserHookIsADefaultThatAnOlderHostIgnores() throws Exception {
         assertThat(Platform.class.getMethod("browser", WebBrowser.class).isDefault()).isTrue();
         Platform older = (Platform) java.lang.reflect.Proxy.newProxyInstance(Platform.class.getClassLoader(), new Class<?>[]{Platform.class},
             (proxy, method, args) -> method.isDefault() ? java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args) : null);
         var asked = new java.util.concurrent.atomic.AtomicInteger();
-        older.browser((address, origin, window) -> {
+        older.browser(link -> {
             asked.incrementAndGet();
             return true;
         }).close();
         assertThat(asked).as("an older host never asks").hasValue(0);
         assertThatNullPointerException().isThrownBy(() -> older.browser(null));
-        assertThat(LinkOrigin.values()).containsExactly(LinkOrigin.CLICK, LinkOrigin.PROGRAM);
+        assertThat(LinkOrigin.values()).containsExactly(LinkOrigin.CLICK, LinkOrigin.EXTERNAL);
+        assertThat(LinkPlacement.values()).containsExactly(LinkPlacement.TAB, LinkPlacement.SPLIT_RIGHT, LinkPlacement.SPLIT_DOWN);
+    }
+
+    /** Browser plan 3b: a web link is an http or https address with a host, as the user clicked or an outside program gave it. */
+    @Test void aWebLinkTakesHttpAndHttpsAddressesWithAHost() {
+        var link = new WebLink(URI.create("https://example.com/a"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), Optional.empty());
+        assertThat(link.address()).hasToString("https://example.com/a");
+        assertThat(new WebLink(URI.create("HTTP://example.com/"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), Optional.empty()).address())
+            .as("the scheme is case-insensitive").hasToString("HTTP://example.com/");
+        assertThatIllegalArgumentException().isThrownBy(() -> new WebLink(URI.create("mailto:a@b.c"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), Optional.empty()));
+        assertThatIllegalArgumentException().isThrownBy(() -> new WebLink(URI.create("https:///x"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), Optional.empty()));
+        assertThatIllegalArgumentException().as("a relative address").isThrownBy(() -> new WebLink(URI.create("/x"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), Optional.empty()));
+        assertThatIllegalArgumentException().as("an authority that is no host").isThrownBy(() -> new WebLink(URI.create("http://my_host/"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> new WebLink(null, LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> new WebLink(URI.create("https://e.com"), null, LinkPlacement.TAB, Optional.empty(), Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> new WebLink(URI.create("https://e.com"), LinkOrigin.CLICK, null, Optional.empty(), Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> new WebLink(URI.create("https://e.com"), LinkOrigin.CLICK, LinkPlacement.TAB, null, Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> new WebLink(URI.create("https://e.com"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), null));
+    }
+
+    @Test void aWebLinkTakesALocalFileOnlyAsAClickInATab() {
+        URI file = Path.of("/tmp/site/index.html").toUri();
+        assertThatCode(() -> new WebLink(file, LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), Optional.empty())).doesNotThrowAnyException();
+        assertThatIllegalArgumentException().isThrownBy(() -> new WebLink(file, LinkOrigin.EXTERNAL, LinkPlacement.TAB, Optional.empty(), Optional.empty()));
+        assertThatIllegalArgumentException().isThrownBy(() -> new WebLink(file, LinkOrigin.CLICK, LinkPlacement.SPLIT_RIGHT, Optional.empty(), Optional.empty()));
+        assertThatIllegalArgumentException().as("a relative file address").isThrownBy(() -> new WebLink(URI.create("file:site/index.html"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), Optional.empty()));
+    }
+
+    @Test void aTargetIsOneToTwoHundredFiftySixCharactersWithoutControls() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new WebLink(URI.create("https://e.com"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.of(""), Optional.empty()));
+        assertThatIllegalArgumentException().isThrownBy(() -> new WebLink(URI.create("https://e.com"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.of("a\nb"), Optional.empty()));
+        assertThatIllegalArgumentException().isThrownBy(() -> new WebLink(URI.create("https://e.com"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.of("x".repeat(257)), Optional.empty()));
+        assertThat(new WebLink(URI.create("https://e.com"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.of("x".repeat(256)), Optional.empty()).target()).hasValueSatisfying(target -> assertThat(target).hasSize(256));
+        assertThat(new WebLink(URI.create("https://e.com"), LinkOrigin.CLICK, LinkPlacement.SPLIT_DOWN, Optional.of("docs"), Optional.empty()).target().orElseThrow()).isEqualTo("docs");
+    }
+
+    @Test void anExternalLinkHasNoTargetAndOpensInATab() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new WebLink(URI.create("https://e.com"), LinkOrigin.EXTERNAL, LinkPlacement.SPLIT_DOWN, Optional.empty(), Optional.empty()));
+        assertThatIllegalArgumentException().isThrownBy(() -> new WebLink(URI.create("https://e.com"), LinkOrigin.EXTERNAL, LinkPlacement.TAB, Optional.of("t"), Optional.empty()));
+        assertThat(new WebLink(URI.create("https://e.com"), LinkOrigin.EXTERNAL, LinkPlacement.TAB, Optional.empty(), Optional.empty()).origin()).isEqualTo(LinkOrigin.EXTERNAL);
     }
 }

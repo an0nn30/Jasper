@@ -8,13 +8,13 @@ package dev.jasper.sdk.ui;
 public enum LinkOrigin {
     /**
      * The user asked for it: a link Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, one of Jasper's
-     * own web links such as Settings' Help, a plugin's
-     * {@link Platform#openInBrowser(java.net.URI) Platform.openInBrowser}, or {@code jasper <address>}.
+     * own web links such as Settings' Help, or a plugin's
+     * {@link Platform#openInBrowser(java.net.URI) Platform.openInBrowser}.
      */
     CLICK,
     /**
-     * A program asked for it, through {@code jasper open-url <address>}, such as the sign-in page a command line tool
-     * opens, which usually works only in the system browser.
+     * An address from outside Jasper: the {@code jasper <address>} command, or the system. It reaches the browser
+     * without the routing prompt a click can show.
      */
-    PROGRAM
+    EXTERNAL
 }

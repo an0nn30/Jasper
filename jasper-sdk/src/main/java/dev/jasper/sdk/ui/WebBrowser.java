@@ -1,9 +1,5 @@
 package dev.jasper.sdk.ui;
 
-import dev.jasper.sdk.WindowOwner;
-import java.net.URI;
-import java.util.Optional;
-
 /**
  * Opens the web addresses Jasper opens, once a plugin registers it with {@link Platform#browser}.
  *
@@ -12,12 +8,11 @@ import java.util.Optional;
 @FunctionalInterface
 public interface WebBrowser {
     /**
-     * Opens a web address. UI thread; it must not block.
+     * Opens a link. UI thread; it must not block.
      *
-     * @param address an absolute {@code http} or {@code https} address, as the link or the caller gave it
-     * @param origin who asked for it: the user, or a program
-     * @param window the Jasper window the address came from, as this plugin's handle; empty when it came from elsewhere
-     * @return true when it opened the address; false hands it to the system browser
+     * @param link the address and who asked for it, where it asks to open, its OSC 8 target and the window it came from
+     * @return true when it opened the link; false hands it back to Jasper: the system browser opens an
+     *     {@code http} or {@code https} address, the Default editor a {@code file:} one
      */
-    boolean open(URI address, LinkOrigin origin, Optional<WindowOwner> window);
+    boolean open(WebLink link);
 }

@@ -227,7 +227,8 @@ final class HostedContext implements PluginContext {
                         throw new IllegalArgumentException("Only an http or https address with a host opens in a browser: " + uri);
                     host.environment.ui().accept(() -> {
                         Optional<java.util.UUID> window = host.environment.terminals().activeWindow().map(dev.jasper.app.terminals.WindowEntry::id);
-                        if (host.webBrowsers.open(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, window)) return;
+                        if (host.webBrowsers.open(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.TAB,
+                            Optional.empty(), window)) return;
                         try { systemBrowser(address); }
                         catch (RejectedExecutionException stopped) {
                             log().log(System.Logger.Level.WARNING, "Could not open a web address: the plugin stopped first");

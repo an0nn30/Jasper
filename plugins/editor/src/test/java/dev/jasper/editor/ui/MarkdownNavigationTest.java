@@ -98,7 +98,7 @@ class MarkdownNavigationTest {
         edt(() -> {tab.surface().setFont(new java.awt.Font("Dialog",0,13));tab.markdownMode(MarkdownMode.PREVIEW,false);});drain();
         edt(() -> {
             host.start(new PluginInfo("dev.example.browser","Browser","1.0.0",Set.of("browser.provide")),Set.of(),Set.of(),
-                c -> c.platform().browser((address,origin,owner) -> {seen.add(address+"|"+origin+"|"+owner.isPresent());return true;}));
+                c -> c.platform().browser(link -> {seen.add(link.address()+"|"+link.origin()+"|"+link.window().isPresent());return true;}));
             var pane=tab.surface().preview();
             dev.jasper.editor.testsupport.PreviewFixture.layout(tab.surface().previewScroll,300,100);
             pane.editor().setCaretPosition(0);pane.nextLink(true);pane.activateSelectedLink();

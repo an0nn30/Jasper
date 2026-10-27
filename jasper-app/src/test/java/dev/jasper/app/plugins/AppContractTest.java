@@ -656,8 +656,9 @@ class AppContractTest extends PluginContractTest {
             @Override public boolean edit(Path file, java.util.OptionalInt line, Optional<UUID> windowId) {
                 return onEdtValue(() -> host.fileEditors.edit(file, line, windowId));
             }
-            @Override public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, Optional<UUID> windowId) {
-                return onEdtValue(() -> host.webBrowsers.open(address, origin, windowId));
+            @Override public boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, dev.jasper.sdk.ui.LinkPlacement placement,
+                                              Optional<String> target, Optional<UUID> windowId) {
+                return onEdtValue(() -> host.webBrowsers.open(address, origin, placement, target, windowId));
             }
             @Override public void commandClient(Path client) { onEdt(() -> host.commandClient = Optional.of(client)); }
             @Override public void close() { stopAll(); flush(); }

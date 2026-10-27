@@ -706,8 +706,8 @@ public final class PluginRuntime {
     }
 
     /**
-     * As {@link #openLink}, for an address a program asked for ({@code jasper open-url}): the browser hears it as a
-     * program's. UI thread.
+     * As {@link #openLink}, for an address a program asked for ({@code jasper open-url}): the browser hears it as an
+     * external address's. UI thread.
      *
      * @param address an absolute http or https address
      * @param window the Jasper window of the pane the program ran in, or empty
@@ -715,7 +715,7 @@ public final class PluginRuntime {
      * @throws IllegalStateException off the UI thread
      */
     public void openProgramLink(java.net.URI address, Optional<UUID> window, Consumer<java.net.URI> desktop) {
-        openAddress(address, dev.jasper.sdk.ui.LinkOrigin.PROGRAM, window, desktop);
+        openAddress(address, dev.jasper.sdk.ui.LinkOrigin.EXTERNAL, window, desktop);
     }
 
     private void openAddress(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, Optional<UUID> window,
@@ -725,7 +725,8 @@ public final class PluginRuntime {
         Objects.requireNonNull(window, "window");
         Objects.requireNonNull(desktop, "desktop");
         PluginHost current = host;
-        if (current == null || !current.webBrowsers.open(address, origin, window)) desktop.accept(address);
+        if (current == null || !current.webBrowsers.open(address, origin, dev.jasper.sdk.ui.LinkPlacement.TAB, Optional.empty(), window))
+            desktop.accept(address);
     }
 
     private Optional<Path> commandClient = Optional.empty();

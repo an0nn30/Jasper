@@ -348,9 +348,11 @@ public interface ContractHarness extends AutoCloseable {
         boolean edit(java.nio.file.Path file, java.util.OptionalInt line, java.util.Optional<java.util.UUID> windowId);
         /**
          * Opens a web address as Jasper's own routes do (a link clicked in a terminal, the {@code jasper} command), with the
-         * browser a plugin provides; false when none does, or it declined or threw. Asked on the UI thread.
+         * browser a plugin provides, as a {@code WebLink} of these parts; false when none does, or it declined or threw.
+         * Asked on the UI thread.
          */
-        boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, java.util.Optional<java.util.UUID> windowId);
+        boolean openLink(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, dev.jasper.sdk.ui.LinkPlacement placement,
+                         java.util.Optional<String> target, java.util.Optional<java.util.UUID> windowId);
         /** Sets the {@code jasper} command {@code CommandLine.client()} names, as the application names its installed or built one. */
         void commandClient(java.nio.file.Path client);
 }

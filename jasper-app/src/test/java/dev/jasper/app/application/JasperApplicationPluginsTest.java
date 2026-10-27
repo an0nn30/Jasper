@@ -572,14 +572,14 @@ class JasperApplicationPluginsTest {
         import java.nio.file.StandardOpenOption;
         public final class Main implements Plugin {
             @Override public void start(PluginContext context) {
-                context.platform().browser((address, origin, window) -> {
+                context.platform().browser(link -> {
                     try {
                         Files.writeString(context.dataDirectory().resolve("opened"),
-                            address + "|" + origin + "|"
-                                + window.map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-") + "\\n",
+                            link.address() + "|" + link.origin() + "|"
+                                + link.window().map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-") + "\\n",
                             StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                     } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
-                    return !address.getPath().equals("/declined");
+                    return !link.address().getPath().equals("/declined");
                 });
             }
         }
@@ -620,6 +620,34 @@ class JasperApplicationPluginsTest {
             .containsExactly("https://example.com/a|CLICK|-", "HTTPS://Example.com/declined|CLICK|-");
         assertThat(system).as("the declined address, mailto and ftp; nothing for a link that is no URI")
             .containsExactly("HTTPS://Example.com/declined", "mailto:someone@example.com", "ftp://files.example.com/x");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
+    /**
+     * Browser plan 3b (R4): an address with an authority that is no host, such as {@code http://my_host/}, is no
+     * {@code WebLink}; it never reaches the provided browser and never throws, and the system browser opens it as before.
+     */
+    @Test void anAddressNoWebLinkTakesGoesToTheSystemBrowserWithoutAskingTheProvidedBrowser() throws Exception {
+        var system = new CopyOnWriteArrayList<String>();
+        java.util.UUID window = java.util.UUID.randomUUID();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("web-plugin");
+        PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> system.add(address.toString());
+            application[0].startPlugins(null, dev, false, dirs);
+            application[0].openLink("http://my_host/", window);
+            application[0].openLink("https://example.com/a", window);
+        });
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
+            .as("only the address with a host reached the browser").containsExactly("https://example.com/a|CLICK|-");
+        assertThat(system).containsExactly("http://my_host/");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         ApplicationPluginCleanup.await(application[0]);
@@ -701,7 +729,7 @@ class JasperApplicationPluginsTest {
             home, Optional.empty(), text -> { }, text -> { }));
         assertThat(program.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened"))).containsExactly(
-            "https://example.com/c|CLICK|" + calling[0], "https://example.com/d|CLICK|" + calling[0], "https://example.com/sign-in|PROGRAM|-");
+            "https://example.com/c|CLICK|" + calling[0], "https://example.com/d|CLICK|" + calling[0], "https://example.com/sign-in|EXTERNAL|-");
         assertThat(system).as("the browser took each one").isEmpty();
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();

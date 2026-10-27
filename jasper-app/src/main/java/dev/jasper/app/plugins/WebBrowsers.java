@@ -2,7 +2,9 @@ package dev.jasper.app.plugins;
 
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.ui.LinkOrigin;
+import dev.jasper.sdk.ui.LinkPlacement;
 import dev.jasper.sdk.ui.WebBrowser;
+import dev.jasper.sdk.ui.WebLink;
 import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
@@ -60,21 +62,35 @@ final class WebBrowsers {
     }
 
     /**
-     * Asks the provided browser to open {@code address}. UI thread.
+     * Asks the provided browser to open a link. UI thread.
      *
+     * @param address the link's address, as {@link WebLink#address()}
+     * @param origin who asked for it
+     * @param placement where the link asks to open
+     * @param target the OSC 8 {@code target=} name, or empty
      * @param windowId the Jasper window the address came from; the browser gets its plugin's handle while it is open
-     * @return true when it opened the address; false when no plugin provides a browser, or it declined or threw
+     * @return true when it opened the link; false when no plugin provides a browser, the parts make no {@link WebLink}
+     *     (an {@code http} address with an authority that is no host, such as {@code http://my_host/}, which the system
+     *     browser then opens), or it declined or threw
      */
-    boolean open(URI address, LinkOrigin origin, Optional<UUID> windowId) {
+    boolean open(URI address, LinkOrigin origin, LinkPlacement placement, Optional<String> target, Optional<UUID> windowId) {
         Objects.requireNonNull(address, "address");
         Objects.requireNonNull(origin, "origin");
+        Objects.requireNonNull(placement, "placement");
+        Objects.requireNonNull(target, "target");
         Objects.requireNonNull(windowId, "windowId");
         Holder current = holder;
         if (current == null) return false;
         Optional<WindowOwner> window = windowId.flatMap(current.windows());
+        WebLink link;
+        try {
+            link = new WebLink(address, origin, placement, target, window);
+        } catch (IllegalArgumentException notAWebLink) {
+            return false;
+        }
         var opened = new AtomicBoolean();
         Throwable failure = containment.attempt(current.pluginId(), "web browser", () -> {
-            opened.set(current.browser().open(address, origin, window));
+            opened.set(current.browser().open(link));
             return null;
         });
         return failure == null && opened.get();

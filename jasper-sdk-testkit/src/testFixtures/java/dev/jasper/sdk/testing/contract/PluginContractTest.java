@@ -3996,14 +3996,19 @@ public abstract class PluginContractTest {
 
     /** A browser that records {@code <address>|<origin>|<window id or ->} and answers {@code answer}. */
     private static dev.jasper.sdk.ui.WebBrowser recordingBrowser(List<String> calls, boolean answer) {
-        return (address, origin, window) -> {
-            calls.add(address + "|" + origin + "|"
-                + window.map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-"));
+        return link -> {
+            calls.add(link.address() + "|" + link.origin() + "|"
+                + link.window().map(owner -> ((dev.jasper.sdk.terminal.WindowHandle) owner).id().toString()).orElse("-"));
             return answer;
         };
     }
 
     private static final java.net.URI PAGE = java.net.URI.create("https://example.com/page");
+
+    /** Opens a link as a plain click or an outside address does: in a tab, with no OSC 8 target. */
+    private boolean openLinkInATab(java.net.URI address, dev.jasper.sdk.ui.LinkOrigin origin, Optional<UUID> windowId) {
+        return h.openLink(address, origin, dev.jasper.sdk.ui.LinkPlacement.TAB, Optional.empty(), windowId);
+    }
 
     /** Browser plan 3: the web browser role needs its capability, and one plugin provides it at a time. */
     @Test void providingTheBrowserNeedsTheCapabilityAndOnePluginProvidesItAtATime() {
@@ -4014,7 +4019,7 @@ public abstract class PluginContractTest {
         h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
         h.start(info("test.b", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), b::set);
         List<String> calls = new CopyOnWriteArrayList<>();
-        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).as("no plugin provides one").isFalse();
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).as("no plugin provides one").isFalse();
         h.ui(() -> {
             assertThatThrownBy(() -> bare.get().platform().browser(recordingBrowser(calls, true)))
                 .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> assertThat(failure.capability()).isEqualTo("browser.provide"));
@@ -4025,9 +4030,9 @@ public abstract class PluginContractTest {
                 .withMessage("The browser is already provided by test.a");
             assertThatThrownBy(() -> a.get().platform().browser(null)).isInstanceOf(NullPointerException.class);
         });
-        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
-        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.PROGRAM, Optional.empty())).isTrue();
-        assertThat(calls).containsExactly(PAGE + "|CLICK|-", PAGE + "|PROGRAM|-");
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.EXTERNAL, Optional.empty())).isTrue();
+        assertThat(calls).containsExactly(PAGE + "|CLICK|-", PAGE + "|EXTERNAL|-");
     }
 
     /** Browser plan 3: a bundled plugin's browser replaces another plugin's, and the role ends with its plugin. */
@@ -4045,14 +4050,14 @@ public abstract class PluginContractTest {
             assertThatIllegalStateException().isThrownBy(() -> a.get().platform().browser(recordingBrowser(byA, true)))
                 .withMessage("The browser is already provided by test.z");
         });
-        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
         h.ui(() -> replaced.get().close());
-        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.PROGRAM, Optional.empty()))
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.EXTERNAL, Optional.empty()))
             .as("closing the replaced registration leaves the bundled one").isTrue();
         assertThat(byA).isEmpty();
-        assertThat(byZ).containsExactly(PAGE + "|CLICK|-", PAGE + "|PROGRAM|-");
+        assertThat(byZ).containsExactly(PAGE + "|CLICK|-", PAGE + "|EXTERNAL|-");
         h.stopAll();
-        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).as("the registration ends with its plugin").isFalse();
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).as("the registration ends with its plugin").isFalse();
     }
 
     /** Browser plan 3, Review Focus 2: a browser that throws or declines gives false; one gets its plugin's window handle. */
@@ -4062,19 +4067,59 @@ public abstract class PluginContractTest {
         h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
         List<String> calls = new CopyOnWriteArrayList<>();
         dev.jasper.sdk.ui.WebBrowser recording = recordingBrowser(calls, true);
-        h.ui(() -> a.get().platform().browser((address, origin, owner) -> {
-            if (address.getPath().equals("/broken")) throw new IllegalStateException("the browser broke");
-            if (address.getPath().equals("/declined")) return false;
-            return recording.open(address, origin, owner);
+        h.ui(() -> a.get().platform().browser(link -> {
+            if (link.address().getPath().equals("/broken")) throw new IllegalStateException("the browser broke");
+            if (link.address().getPath().equals("/declined")) return false;
+            return recording.open(link);
         }));
-        assertThat(h.openLink(java.net.URI.create("https://example.com/broken"), dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty()))
+        assertThat(openLinkInATab(java.net.URI.create("https://example.com/broken"), dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty()))
             .as("a browser that throws").isFalse();
-        assertThat(h.openLink(java.net.URI.create("https://example.com/declined"), dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.of(window)))
+        assertThat(openLinkInATab(java.net.URI.create("https://example.com/declined"), dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.of(window)))
             .as("a browser that declines").isFalse();
-        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.of(window))).isTrue();
-        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.PROGRAM, Optional.of(UUID.randomUUID())))
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.of(window))).isTrue();
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.EXTERNAL, Optional.of(UUID.randomUUID())))
             .as("a window that is not open is no window").isTrue();
-        assertThat(calls).containsExactly(PAGE + "|CLICK|" + window, PAGE + "|PROGRAM|-");
+        assertThat(calls).containsExactly(PAGE + "|CLICK|" + window, PAGE + "|EXTERNAL|-");
+    }
+
+    /**
+     * Browser plan 3b: the browser hears the link's placement and OSC 8 target as one equal {@code WebLink}, with its own
+     * plugin's handle for the window.
+     */
+    @Test void aBrowserHearsThePlacementAndTarget() {
+        UUID window = h.addTerminalWindow();
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        List<dev.jasper.sdk.ui.WebLink> heard = new CopyOnWriteArrayList<>();
+        h.ui(() -> a.get().platform().browser(link -> heard.add(link)));
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.SPLIT_DOWN, Optional.of("docs"), Optional.of(window))).isTrue();
+        assertThat(h.openLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.SPLIT_RIGHT, Optional.empty(), Optional.empty())).isTrue();
+        AtomicReference<dev.jasper.sdk.WindowOwner> own = new AtomicReference<>();
+        h.ui(() -> own.set(a.get().terminals().window(window).orElseThrow()));
+        assertThat(heard).containsExactly(
+            new dev.jasper.sdk.ui.WebLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.SPLIT_DOWN, Optional.of("docs"), Optional.of(own.get())),
+            new dev.jasper.sdk.ui.WebLink(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.SPLIT_RIGHT, Optional.empty(), Optional.empty()));
+    }
+
+    /** Browser plan 3b: a local file the user clicked reaches the browser as a {@code file:} link; a browser that declines it says so. */
+    @Test void aBrowserHearsALocalFileClick() {
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        List<dev.jasper.sdk.ui.WebLink> heard = new CopyOnWriteArrayList<>();
+        var answer = new java.util.concurrent.atomic.AtomicBoolean(true);
+        h.ui(() -> a.get().platform().browser(link -> {
+            heard.add(link);
+            return answer.get();
+        }));
+        java.net.URI file = HERE.resolve("site").resolve("index.html").toUri();
+        assertThat(openLinkInATab(file, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        answer.set(false);
+        assertThat(openLinkInATab(file, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).as("a browser that declines").isFalse();
+        assertThat(heard).extracting(dev.jasper.sdk.ui.WebLink::address).containsExactly(file, file);
+        assertThat(heard).allSatisfy(link -> {
+            assertThat(link.origin()).isEqualTo(dev.jasper.sdk.ui.LinkOrigin.CLICK);
+            assertThat(link.placement()).isEqualTo(dev.jasper.sdk.ui.LinkPlacement.TAB);
+        });
     }
 
     /**
@@ -4090,8 +4135,8 @@ public abstract class PluginContractTest {
         h.start(info("test.user"), Set.of(), Set.of(), user::set);
         List<String> calls = new CopyOnWriteArrayList<>();
         dev.jasper.sdk.ui.WebBrowser recording = recordingBrowser(calls, true);
-        h.ui(() -> a.get().platform().browser((address, origin, owner) ->
-            recording.open(address, origin, owner) && !address.getPath().equals("/declined")));
+        h.ui(() -> a.get().platform().browser(link ->
+            recording.open(link) && !link.address().getPath().equals("/declined")));
         java.net.URI declined = java.net.URI.create("https://example.com/declined");
         java.net.URI direct = java.net.URI.create("http://localhost:5432/");
         h.ui(() -> {
