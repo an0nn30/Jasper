@@ -135,10 +135,7 @@ description, which Task Manager shows as the process name, is "Jasper DevOps wor
 Prompt icon on every platform ([app icon assets](../packaging/icons/README.md)).
 
 The app folder holds `jasper-app.jar`, `jasper-ui.jar`, `jasper-terminal.jar`, `jasper-buddy.jar`, `jasper-sdk.jar`
-and their libraries, and on Windows `cygwin-tool.jar`, which jpackage puts on the class path too. `stagePackage`
-removes package sealing from any sealed jar (today `jbr-api`) and adds `Jasper-Modified: package sealing removed` to its
-manifest: classes loaded from the AOT cache cannot satisfy package sealing once the paths the cache was trained at are
-gone (JDK-8376576), which would stop the JVM.
+and their libraries, and on Windows `cygwin-tool.jar`, which jpackage puts on the class path too.
 
 ### Bundled plugins
 
@@ -217,8 +214,8 @@ Releases list every file's SHA-256 checksum in `SHA256SUMS`.
 
 ## Start-up performance
 
-`gradle/packaging-support.gradle` holds what packaging decides (the runtime's modules, the native libraries, unsealing,
-the training launch); `verifyPackagingSupport`, part of `check`, tests it with fixtures, and `verifyPackage` checks a
+`gradle/packaging-support.gradle` holds what packaging decides (the runtime's modules, the native libraries, the
+training launch); `verifyPackagingSupport`, part of `check`, tests it with fixtures, and `verifyPackage` checks a
 built image.
 
 - **Trimmed runtime.** jpackage gets an explicit list of root modules, `runtimeRootModules`, instead of every module:
