@@ -4,7 +4,7 @@
 **JCEF runtime (browser plan 2) — 2026-10-27** (`claude/browser-jcef-runtime-0c197e`;
 [plan](superpowers/plans/2026-10-27-browser-2-jcef-runtime.md); executed with per-task subagents and reviews). Jasper
 builds, tests and packages on JBR 25.0.4.1 b635.75 with JCEF, so every package carries Chromium; nothing starts it.
-`verifyJcefToolchain` (in `check`) and `packageApp` refuse a runtime without the `jcef` module; the packaged runtime has
+`verifyJcefToolchain` (in `check`) and `packageApp` refuse any other runtime; the packaged runtime has
 44 modules (45 on Windows). On macOS the SDK's `Contents/Frameworks` is copied into `Jasper.app/Contents/runtime`, the
 runtime bundle and then the app are re-sealed ad hoc (JetBrains' helper signatures stay), and `verifyPackage` checks the
 payload and `codesign --verify --deep --strict` of both; `Jasper.app` is 644 MB (`Contents/runtime` 547 MB: Home 228,
@@ -14,14 +14,17 @@ libraries, and the Licenses window lists Chromium, CEF, JCEF, JOGL, GlueGen, Apa
 sources vendored at b583.48 are identical to b635.75's (the same git tree in every vendored folder), so they stay, and
 `packaging/jcef/checksums.txt` records the six archives' SHA-512. Task 1b (added during the run): b635.75 fixes
 JDK-8376576, so `verifyLauncherImage`'s killing cache is now `-XX:AOTMode=on` with a class-path jar whose modification
-time changed. Final headless `check` on macOS aarch64 passed in 13m 34s: 13,452 JUnit tests, zero failures and errors,
-30 skips. Not run: Windows and Linux packaging (no host may run the downloaded JDKs, and the Actions budget blocks CI,
-so those `verifyPackage` lines and the Linux `apt-get` additions first run in CI) and Task 7 (AOT training with
-`-Pjasper.aot=true`, start-up and memory benchmarks), which needs the user's OK per batch. Open: not merged or pushed;
-GUI check of the Licenses window's longest caption ("JogAmp licenses (BSD 2-Clause and others)", 41 characters) on a
-narrow window; plan 4's first Chromium start shows whether the framework is found; Linux `lib/chrome-sandbox` keeps
-jlink's mode; the JDK-8376576 workarounds (unsealing `jbr-api`, training in a deleted copy, their wording) are a
-proposed follow-up.
+time changed. Final headless `check` on macOS aarch64, after the final review's fixes (`jcefRuntimeBuild` pins the exact
+build, with a fixture tying the Licenses window's Chromium, CEF and JCEF versions to it; tests run after
+`verifyJcefToolchain`), passed in 24m 34s (every test task rerun after `cleanTest`): 13,452 JUnit tests, zero failures
+and errors, 30 skips. Not run: Windows and Linux packaging (no host may run the downloaded JDKs, and the Actions budget
+blocks CI, so those `verifyPackage` lines and the Linux `apt-get` additions first run in CI; Task 3's substitute read
+libcef's direct `DT_NEEDED`, the rpm path's view, while the deb path's `ldd` also lists transitive libraries, so CI's
+install job first sees the `.deb`'s dependencies) and Task 7 (AOT training with `-Pjasper.aot=true`, start-up and memory
+benchmarks), which needs the user's OK per batch. Open: not merged or pushed; GUI check of the Licenses window's longest
+caption ("JogAmp licenses (BSD 2-Clause and others)", 41 characters) on a narrow window; plan 4's first Chromium start
+shows whether the framework is found; Linux `lib/chrome-sandbox` keeps jlink's mode; the JDK-8376576 workarounds
+(unsealing `jbr-api`, training in a deleted copy, their wording) are a proposed follow-up.
 
 **Theme-selected splash artwork — 2026-10-26** (`codex/theme-splashes`; [plan](superpowers/plans/2026-10-26-theme-splashes.md)).
 Ordinary launches choose one of seven approved landscapes and recolored/coated Buddy illustrations from the saved

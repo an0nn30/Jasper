@@ -4,9 +4,11 @@
 > `823125fdc`; not merged, not pushed), with the deviations below. Task 7 is not run: AOT training with
 > `-Pjasper.aot=true` and the start-up and memory benchmarks need the user's OK per batch. Commits: Task 1 `a289d48df`
 > and fix `1a7feae1e`, Task 1b `e84e4929a`, Task 2 `42d443334`, Task 3 `4eccde0b3` and fix `1bc83a953`, Task 4
-> `adbec9b35`, Task 5 `03251f099` and fix `5645a0fd3`, Task 6 "Docs: the JCEF runtime, its launcher sources and
-> checksums". The full `./gradlew check` on the dev Mac (macOS aarch64) after Task 6 passed: 13,452 JUnit tests, no
-> failures or errors, 30 skips.
+> `adbec9b35`, Task 5 `03251f099` and fix `5645a0fd3`, Task 6 `180b17cd5`, and the final review's fixes `ea9892e27`
+> (`jcefRuntimeBuild` pins the exact build and a fixture ties `notices.toml`'s Chromium, CEF and JCEF versions to it;
+> tests run after `verifyJcefToolchain`; `release.yml`'s libraries; `Build-Installer.ps1` requires JCEF). The full
+> `./gradlew check` on the dev Mac (macOS aarch64) after those fixes passed: 13,452 JUnit tests, no failures or errors,
+> 30 skips.
 >
 > - **Deviations.** The branch is `claude/browser-jcef-runtime-0c197e`, not `claude/browser-jcef-runtime`. Task 1:
 >   `verifyJcefToolchain` lives in `gradle/packaging.gradle` (the root applies no `java` or `base` plugin) and is part
@@ -27,7 +29,9 @@
 > - **Not run.** Windows and Linux packaging (no such host may run the downloaded JDKs, and the GitHub Actions budget
 >   blocks CI), so those `verifyPackage` lines and the Chromium libraries on the Linux `apt-get` lines are first
 >   exercised by CI; Task 3 Step 5 (`linuxLibraryRequirements` on a packaged Linux image) is replaced by reading
->   libcef's `DT_NEEDED` sonames from the Linux jmods. `lib/chrome-sandbox` keeps jlink's mode on Linux; plan 4 decides
+>   libcef's `DT_NEEDED` sonames from the Linux jmods, which is the rpm path's view (`readelf`, direct dependencies);
+>   the deb path runs `ldd`, which also lists transitive libraries, so the `.deb` declares more dependencies than were
+>   assessed, first exercised by CI's install job. `lib/chrome-sandbox` keeps jlink's mode on Linux; plan 4 decides
 >   the sandbox.
 > - **For plan 4.** The launcher, `java`, `libjvm` and `libjcef` are ad hoc with no hardened runtime and no entitlements;
 >   JetBrains' helpers are hardened, keep library validation and have `allow-jit`.
