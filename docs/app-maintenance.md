@@ -558,10 +558,13 @@ refresh, ownership and recovery, and native acceptance.
 native libraries copied into the app and the AOT training launch. `verifyPackagingSupport` (in `check`) tests it with
 fixtures; `verifyPackage` checks a built image ([start-up performance](packaging.md#start-up-performance)).
 
-- **The build's runtime is the JCEF build of the JetBrains Runtime.** `jcefRuntimeProblem` reads the toolchain's
-  `release` file (the `jcef` module and the JCEF version); `verifyJcefToolchain` (in `check`) and `nativeContext`
-  refuse any other build through `requireJcefRuntime`, whose message names the version to install. Moving to a newer
-  JBR means changing that version there and in the fixture that pins the message.
+- **Moving to a newer JBR.** `verifyJcefToolchain` (in `check`) and `nativeContext` read the toolchain's `release` file
+  and refuse any build but the JCEF build through `requireJcefRuntime`, which has `jcefRuntimeProblem` check the text
+  (the `jcef` module and the JCEF version) and names the version to install. Change that version there and in the
+  fixture that pins the message. Then regenerate `packaging/jcef/<platform>.txt` from each archive's `jcef.jmod`,
+  confirmed against the archive's own layout, update the payload counts pinned in
+  `gradle/packaging-support-test.gradle`, record the archives' SHA-512 in `packaging/jcef/checksums.txt`, and check that
+  `macJcefPayload` still names the helpers in the macOS bundle's `Contents/Frameworks`.
 - **A plugin or library needs another JDK module.** Add it to `runtimeRootModules` (and to the required list in
   `runtimeModules` when it pulls in a module not yet listed), add it to the `runtime-modules` block of
   [The Java runtime](plugin-authoring.md#the-java-runtime), and rebuild: `verifyPackagingSupport` fails until the

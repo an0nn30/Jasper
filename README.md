@@ -151,9 +151,9 @@ The [documentation index](docs/README.md) lists every guide. The main ones:
 
 - The **JetBrains Runtime SDK 25** (JBR SDK) with JCEF (`jbrsdk_jcef-25.0.4.1`) for the host's architecture, including
   `jpackage`; a JRE, the plain JBR or another vendor's JDK is not enough. Gradle's toolchain requires vendor JetBrains
-  and usually finds the SDK itself, but cannot tell the plain and JCEF builds apart: keep only one JBR 25 installed. If
-  it does not find the SDK, set `JAVA_HOME` to it and put its `bin` directory on `PATH`, or set
-  `org.gradle.java.installations.paths` in your Gradle properties.
+  and usually finds the SDK itself, but cannot tell the plain and JCEF builds apart: keep only the JCEF build of JBR 25
+  installed and run Gradle on it. If Gradle does not find the SDK, set `JAVA_HOME` to it and put its `bin` directory on
+  `PATH`, or set `org.gradle.java.installations.paths` in your Gradle properties.
 - **Python 3.11–3.13** on the `PATH` as `python3` or `python` for the theme converter's tests (or name an
   interpreter with `-Pjasper.python=<path>`). The `python3` in Xcode's command line tools (3.9) is too old. Under
   Python 3.14 `checkThemeTool`'s `test_deeply_nested_input_is_a_message` fails; use 3.11 to 3.13.

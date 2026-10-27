@@ -10,14 +10,16 @@ checked by hand with the [native acceptance checklist](#native-acceptance-checkl
 
 ## Requirements
 
-- The **JCEF build of the JetBrains Runtime SDK 25** (JBR SDK, `jbrsdk_jcef-25.0.4.1`, b635.75) of the build machine's
-  architecture. The Gradle toolchain requires vendor JetBrains and usually finds it; otherwise set `JAVA_HOME` and put
-  its `bin` directory on `PATH` (especially on Windows), or set `org.gradle.java.installations.paths` in your Gradle
-  properties. The plain JBR has the same vendor and version, so Gradle cannot tell the two apart: keep only one JBR 25
-  installed, or point `org.gradle.java.installations.paths` at the JCEF build. A JRE is not enough: packaging runs the
-  SDK's `jpackage`, and fails when the SDK has none, its architecture differs from the host's or it has no `jcef`
-  module; `check` fails for a runtime without JCEF too (`verifyJcefToolchain`). On macOS packaging also needs the
-  bundle's `Contents/Frameworks` (Chromium) beside `Contents/Home`, which SDKMAN's install leaves out.
+- The **JCEF build of the JetBrains Runtime SDK 25** (JBR SDK, `jbrsdk_jcef-25.0.4.1`, b635.75; the SHA-512 of its
+  archives for all six platforms are in [`packaging/jcef/checksums.txt`](../packaging/jcef/checksums.txt)) of the build
+  machine's architecture. The Gradle toolchain requires vendor JetBrains and usually finds it; otherwise set `JAVA_HOME`
+  and put its `bin` directory on `PATH` (especially on Windows), or set `org.gradle.java.installations.paths` in your
+  Gradle properties. The plain JBR has the same vendor and version, so Gradle cannot tell the two apart, and it always
+  offers the JVM it runs on as a candidate: keep only the JCEF build of JBR 25 installed and run Gradle on it. A JRE is
+  not enough: packaging runs the SDK's `jpackage`, and fails when the SDK has none, its architecture differs from the
+  host's or it has no `jcef` module; `check` fails for a runtime without JCEF too (`verifyJcefToolchain`). On macOS
+  packaging also needs the bundle's `Contents/Frameworks` (Chromium) beside `Contents/Home`: SDKMAN's own macOS download
+  of JBR keeps only `Contents/Home`, while a local SDKMAN version registered from a full bundle's `Contents/Home` works.
 - A **C/C++ compiler**, because `packageApp` builds Jasper's launcher ([packaging/launcher](../packaging/launcher/README.md)),
   `jasper-watch` and the `jasper` command ([packaging/cli](../packaging/cli/README.md)): the Xcode command line tools on
   macOS (`xcode-select --install`), `gcc` and `g++` on Linux, or Visual Studio or its Build Tools with the
@@ -117,9 +119,13 @@ or `rpm-work/` under `jasper-app/build/packaging/`) for diagnosis and publishes 
 | Bundled plugins | `Contents/app/plugins/<id>/` | `app\plugins\<id>\` | `lib/app/plugins/<id>/` |
 | Native libraries | `Contents/app/native/`, and the bridges `Contents/app/libjasper-macos.dylib`, `libjasper-glass.dylib`, `libjasper-appearance.dylib` | `app\native\` | none; the libraries extract themselves at run time |
 | Java runtime | `Contents/runtime/Contents/Home` | `runtime` | `lib/runtime` |
+| Chromium (JCEF) | `Contents/runtime/Contents/Frameworks` | in `runtime`: the files of `packaging/jcef/windows-<x64\|aarch64>.txt` | in `lib/runtime`: the files of `packaging/jcef/linux-<x64\|aarch64>.txt` |
 | AOT start-up cache | `Contents/app/jasper.aot` | none | none |
 | Cygwin seed and its helper | none | `app\cygwin-seed\`, `app\cygwin-tool.jar` and `provision-cygwin.cmd` | none |
 | Icon | `Contents/Resources/Jasper.icns` and `Assets.car` | inside `Jasper.exe` | `lib/Jasper.png` |
+
+On macOS aarch64 `Jasper.app` measures 644 MB: `Contents/runtime` is 547 MB, of which `Contents/Home` is 228 MB and
+Chromium's `Contents/Frameworks` 319 MB.
 
 The `jasper` command has a `bin` folder of its own because the macOS and Windows file systems ignore case, so it
 cannot sit beside the `Jasper` launcher. `README.txt` is the package guide (`packaging/README.txt`);
@@ -179,7 +185,8 @@ without the cache and then without the user's options ([start-up recovery](diagn
   main class, the class path (every runtime jar, no `plugins/` entry) and the exact JVM options above.
 - **Runtime**: Java 25 from JetBrains (`jbr-`) of the host architecture; exactly the modules of `runtimeModules`; a
   default CDS archive that `java -Xshare:on` uses; `jdeps` finds no module that the application or a bundled plugin
-  needs and the runtime lacks. It logs the runtime's module count and size.
+  needs and the runtime lacks. It logs the runtime's module count and size; on macOS the size is that of
+  `Contents/Home` alone, without Chromium's framework.
 - **Native libraries** (macOS, Windows): each is byte-identical to its jar entry and (macOS) validly signed, and a
   headless probe with the image's runtime, options and class path loads them from `native/` and extracts nothing.
 - **macOS**: the three bridges (architecture, signature, exported JNI symbols); `Info.plist` identifier
@@ -188,9 +195,11 @@ without the cache and then without the user's options ([start-up recovery](diagn
   `Contents/runtime/Contents/Frameworks/cef_server.app`, the renderer helper signed by JetBrains (team `2ZEFAR8TH3`);
   `codesign --verify --deep --strict` of the runtime bundle and of the app; a trained cache accepted by
   `java -XX:AOTMode=on`; the SDK the launcher was linked against.
-- **Windows**: the PE machine type of `Jasper.exe`, `jasper-watch.exe`, `java.exe` and `jvm.dll`, and every frame of
-  `Jasper.ico` embedded in the launcher.
-- **Linux**: the ELF machine type of the launcher, `jasper-watch` and `java`, and `lib/Jasper.png`.
+- **Windows**: the PE machine type of `Jasper.exe`, `jasper-watch.exe`, `java.exe` and `jvm.dll`, every frame of
+  `Jasper.ico` embedded in the launcher, and every Chromium file that `packaging/jcef/windows-<arch>.txt` lists.
+- **Linux**: the ELF machine type of the launcher, `jasper-watch` and `java`, `lib/Jasper.png`, and every Chromium file
+  that `packaging/jcef/linux-<arch>.txt` lists, of which the runtime's `lib/jcef_helper` and `lib/cef_server` must be
+  executable.
 
 ## Signing
 
@@ -502,7 +511,7 @@ To release, tag a clean commit `vX.Y.Z` (major 1–255, minor 0–255, patch 0�
 with it.
 
 **Release** ([`release.yml`](../.github/workflows/release.yml)) runs only by hand, one run per tag at a time. It checks
-the tag and resolves its commit, then builds that commit on five runners, each with JBR 25:
+the tag and resolves its commit, then builds that commit on five runners, each with the JCEF build of JBR 25:
 
 | Platform | Runner | Builds |
 |---|---|---|
@@ -541,7 +550,7 @@ program and the menu entry are gone. When distro `jasper-libs` is already instal
 both installation and removal; the Fedora equipped-runtime check installs it first. It never opens a window.
 
 **ci** ([`ci.yml`](../.github/workflows/ci.yml)) runs `./gradlew check --parallel --continue` on `macos-latest`,
-`ubuntu-24.04` and `windows-latest` with JBR 25 and Python 3.12, for pushes to `main` and pull requests, unless every
+`ubuntu-24.04` and `windows-latest` with the JCEF build of JBR 25 and Python 3.12, for pushes to `main` and pull requests, unless every
 changed file is Markdown or lies under `docs/` outside `docs/examples/`. Independent projects build in parallel with
 two Gradle workers on macOS and Linux and one on Windows, whose subprocess and clean-up tests miss their deadlines
 beside concurrent test JVMs; each project's tests still run one at a time, and a job times out after 30 minutes. On

@@ -14,8 +14,10 @@ because it builds without a compiler. The user-facing rules are in
 ## Upstream sources
 
 `upstream/` holds the launcher sources of JetBrains Runtime tag `jbr-release-25.0.4.1b583.48` (commit
-`868e6eaecc700d03b903fcb3b723d30c17d64de4`) at their upstream paths, and that repository's `LICENSE`. The vendored files
-are GPL version 2 with the Classpath Exception, as the file headers say; Jasper's changes to them are the lines marked
+`868e6eaecc700d03b903fcb3b723d30c17d64de4`) at their upstream paths, and that repository's `LICENSE`. The JCEF build that
+Jasper builds with, JBR 25.0.4.1 b635.75 (tag `jbr-release-25.0.4.1b635.75`, commit
+`8a91bff64015b62d9a088d7e55ecb34da472ce05`), has identical sources in every vendored folder. The vendored files are GPL
+version 2 with the Classpath Exception, as the file headers say; Jasper's changes to them are the lines marked
 `JASPER-HOOK`, published here.
 
 `upstream/SHA256SUMS` records every vendored file as upstream ships it (LF line endings, no `JASPER-HOOK` lines).
