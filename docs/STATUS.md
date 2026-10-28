@@ -4,6 +4,8 @@
 
 **Linux residency Plan 2 AWT probe preparation — 2026-10-27.** Task 2 adds the exact test-only public AWT probe, with no `check` dependency. Headless compilation passed locally and on Fedora ARM64/JBR b635.75; five theme inventory tests passed after adding its native-platform row (minor plan deviation). The packaged-JBR invocation and acceptance matrix are in the [verification](superpowers/plans/2026-10-27-linux-residency-2-verification.md). Only Plasma Wayland is installed on the retained host; LXDE X11 and a second MATE/XFCE legacy host, graphical authorization and actual recovery evidence remain pending. Task 6 remains gated. Task 1 wording now distinguishes passed ARM64 from pending x86_64/baseline CI and records existing cold-build compiler warnings. No GUI or panel/session change was performed.
 
+**Linux residency Plan 2 Task 3 — 2026-10-27.** Added the shared tray menu rows/action dispatch, ARGB byte conversion and modern-first capability/retry policy. Three focused tests pass, as do `ThemeMigrationCoverageTest` and `verifyApplicationArchitecture`. Deviation: added all four new Java sources to the theme migration inventory because its source discovery includes AWT imports in headless utility/tests. Task 2's native legacy recovery remains pending; this task did not change tray routing or perform native/GUI work.
+
 **Linux residency Plan 1 — 2026-10-27** (`codex/linux-residency`; [approved design](superpowers/specs/2026-10-27-linux-residency-design.md),
 [plan](superpowers/plans/2026-10-27-linux-residency-1-autostart.md); production revision `1080c1ec1f77c38df0639ed5357d14b47b1406fc`).
 Tasks 1–4 are implemented and their per-task reviews approved; whole-branch review of `d7c96dd08..3d415e6a1`

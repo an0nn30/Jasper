@@ -10,7 +10,7 @@
 
 **Spec:** [Approved Linux residency design](../specs/2026-10-27-linux-residency-design.md).
 
-**Status (2026-10-27):** Task 1 passed the user-directed Fedora 44 aarch64 gate: 49 focused tests and both packaged-runtime address cases, notices/architecture and headless packaging. [Verification](2026-10-27-linux-residency-2-verification.md) records exact versions and evidence. Rulings 9–10 follow the user's split: x86_64 and Ubuntu 22.04 remain CI-pending; after Task 1 review, Tasks 4–5 may proceed with the pinned 5.2.0 bindings below. Task 6 retains its separate AWT gate. Rulings 1–2 allow local preparation and replace the fixture sketch with short `/tmp` paths and bounded reader/process cleanup. Ruling 4 selects junixsocket after the released JDK transport's abstract-address rejection; Ruling 5 aligns application SLF4J API/nop to 2.0.17. Ruling 7 replaces the non-JAR aggregator with its exact common/native-common 2.10.1 jars. Ruling 8 excludes the confirmed compile-only annotation leak after packaging reproduced its module failure, superseding Ruling 6's temporary EPL investigation. Costs: native artifacts, explicit dependency tracking and a logging-version regression surface. The CI baseline and desktop matrix are not certified. Task 2 preparation is compiled locally and on Fedora ARM64; native legacy recovery remains pending. Minor deviations: add the native test probe to the theme source inventory and correct Task 1 evidence wording (ARM64 passed; existing cold Linux compiler warnings retained).
+**Status (2026-10-27):** Task 1 passed the user-directed Fedora 44 aarch64 gate: 49 focused tests and both packaged-runtime address cases, notices/architecture and headless packaging. [Verification](2026-10-27-linux-residency-2-verification.md) records exact versions and evidence. Rulings 9–10 follow the user's split: x86_64 and Ubuntu 22.04 remain CI-pending; after Task 1 review, Tasks 4–5 may proceed with the pinned 5.2.0 bindings below. Task 6 retains its separate AWT gate. Rulings 1–2 allow local preparation and replace the fixture sketch with short `/tmp` paths and bounded reader/process cleanup. Ruling 4 selects junixsocket after the released JDK transport's abstract-address rejection; Ruling 5 aligns application SLF4J API/nop to 2.0.17. Ruling 7 replaces the non-JAR aggregator with its exact common/native-common 2.10.1 jars. Ruling 8 excludes the confirmed compile-only annotation leak after packaging reproduced its module failure, superseding Ruling 6's temporary EPL investigation. Costs: native artifacts, explicit dependency tracking and a logging-version regression surface. The CI baseline and desktop matrix are not certified. Task 2 preparation is compiled locally and on Fedora ARM64; native legacy recovery remains pending. Task 3's shared menu, ARGB conversion and capability/retry policy pass focused tests and architecture/inventory checks. Deviation: add Task 3's four new Java sources to the theme source inventory because its source discovery scans AWT imports, including headless tests. Earlier deviations: add the native test probe to the theme source inventory and correct Task 1 evidence wording (ARM64 passed; existing cold Linux compiler warnings retained).
 
 ## Global Constraints
 
@@ -249,7 +249,7 @@ public final class LinuxTrayProbe {
 
 **Interfaces:** `LinuxTrayPolicy.target(boolean modern, boolean legacy)`, `retrySeconds(int failures)`; `LinuxTrayMenu.rows()`, `invoke(int id, ResidentTray.Actions actions)`, `argb(BufferedImage)`. Values are copied into adapter-owned wire values; no mutable image crosses a worker boundary.
 
-- [ ] **Step 1: Add complete test methods** with JUnit/AssertJ imports:
+- [x] **Step 1: Add complete test methods** with JUnit/AssertJ imports:
 
 ```java
 @Test void modernWinsAndNoHostIsAnOrdinaryState() {
@@ -279,8 +279,8 @@ public final class LinuxTrayProbe {
 }
 ```
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*LinuxTrayPolicyTest' --tests '*LinuxTrayMenuTest'`; expect missing classes.
-- [ ] **Step 3: Add these complete production classes.**
+- [x] **Step 2: Run** `./gradlew :jasper-app:test --tests '*LinuxTrayPolicyTest' --tests '*LinuxTrayMenuTest'`; expect missing classes.
+- [x] **Step 3: Add these complete production classes.**
 
 ```java
 package dev.jasper.app.platform;
@@ -330,8 +330,8 @@ final class LinuxTrayMenu {
 }
 ```
 
-- [ ] **Step 4: Run** the Step 2 command; expect zero failures.
-- [ ] **Step 5: Commit** `feat: define Linux tray actions and capability policy` with trailer.
+- [x] **Step 4: Run** the Step 2 command; expect zero failures.
+- [x] **Step 5: Commit** `feat: define Linux tray actions and capability policy` with trailer.
 
 ### Task 4: Export a real StatusNotifier item and DBusMenu
 
