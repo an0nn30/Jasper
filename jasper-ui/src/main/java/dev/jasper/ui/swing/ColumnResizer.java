@@ -12,9 +12,9 @@ import javax.swing.SwingUtilities;
 
 /**
  * Drags the boundaries between a header's column titles: within a few pixels of a boundary the pointer shows the
- * horizontal-resize cursor, a drag there moves width between the two neighbouring columns, a double-click fits the
- * column on its left, and the target reports the new widths once, when the drag ends. The zone is invisible apart from
- * the cursor; a click inside it never sorts ({@link #inBoundary}).
+ * horizontal-resize cursor, a drag there moves width between the two neighbouring columns, a double-click fits a
+ * column to its content, and the target reports the new widths once, when a drag ends (or is cut short) or a fit changes
+ * a width. The zone is invisible apart from the cursor; a click inside it never sorts ({@link #inBoundary}).
  */
 final class ColumnResizer extends MouseAdapter implements ContainerListener {
     /** A header whose boundaries can be dragged: a table's or a column tree's. */
@@ -25,8 +25,11 @@ final class ColumnResizer extends MouseAdapter implements ContainerListener {
         /** Moves boundary {@code boundary} by {@code dx} pixels, within both neighbours' minimums. */
         void drag(int boundary, int dx);
 
-        /** Fits the column left of boundary {@code boundary} to its widest visible cell and title. */
-        void fit(int boundary);
+        /**
+         * Fits the column boundary {@code boundary} sizes to its content: a table's column on its left, a column tree's
+         * trailing column on its right. Returns whether any width changed.
+         */
+        boolean fit(int boundary);
 
         /** Reports the columns' widths after a drag or a fit. */
         void finish();
@@ -107,13 +110,12 @@ final class ColumnResizer extends MouseAdapter implements ContainerListener {
 
     @Override public void mousePressed(MouseEvent event) {
         resized = false;
-        boundary = -1;
+        cancel();
         if (!SwingUtilities.isLeftMouseButton(event) || !live()) return;
         int x = x(event), hit = zone(x);
         if (hit < 0) return;
         if (event.getClickCount() == 2) {
-            target.fit(hit);
-            target.finish();
+            if (target.fit(hit)) target.finish();
             resized = true;
             return;
         }
@@ -126,11 +128,18 @@ final class ColumnResizer extends MouseAdapter implements ContainerListener {
     @Override public void mouseDragged(MouseEvent event) {
         if (boundary < 0) return;
         int[] edges = target.edges();
-        if (boundary >= edges.length) { boundary = -1; return; }
+        if (boundary >= edges.length) { cancel(); return; }
         int dx = pressEdge + x(event) - pressX - edges[boundary];
         if (dx == 0) return;
         target.drag(boundary, dx);
         moved = true;
+    }
+
+    /** Ends a drag without its release; widths it already moved are reported, as the header now shows them. */
+    private void cancel() {
+        if (boundary >= 0 && moved) target.finish();
+        boundary = -1;
+        moved = false;
     }
 
     @Override public void mouseReleased(MouseEvent event) {

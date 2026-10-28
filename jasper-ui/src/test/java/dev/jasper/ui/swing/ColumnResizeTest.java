@@ -47,13 +47,17 @@ class ColumnResizeTest {
     }
 
     /** The x of boundary {@code index} in the header: where the next title starts. */
-    static int edge(Tables.TableControl table, int index) {
-        return table.header.getComponent(index + 1).getX();
+    static int edge(Tables.TableControl table, int index) { return edge(table.header, index); }
+
+    static int edge(JComponent header, int index) {
+        return header.getComponent(index + 1).getX();
     }
 
+    static void send(Tables.TableControl table, Component on, int id, int x, int clicks) { send(table.header, on, id, x, clicks); }
+
     /** Sends {@code id} at header x {@code x} to {@code on}'s own listeners, as Swing would deliver it there. */
-    static void send(Tables.TableControl table, Component on, int id, int x, int clicks) {
-        int local = SwingUtilities.convertPoint(table.header, x, 2, on).x;
+    static void send(JComponent header, Component on, int id, int x, int clicks) {
+        int local = SwingUtilities.convertPoint(header, x, 2, on).x;
         var event = new MouseEvent(on, id, 0, 0, local, 2, clicks, false, MouseEvent.BUTTON1);
         for (var listener : on.getMouseListeners())
             switch (id) {
@@ -67,25 +71,39 @@ class ColumnResizeTest {
                 if (id == MouseEvent.MOUSE_DRAGGED) listener.mouseDragged(event); else listener.mouseMoved(event);
     }
 
+    static Component under(Tables.TableControl table, int x) { return under(table.header, x); }
+
     /** The title under header x {@code x}, or the header itself. */
-    static Component under(Tables.TableControl table, int x) {
-        var hit = table.header.getComponentAt(x, table.header.getHeight() / 2);
-        return hit == null ? table.header : hit;
+    static Component under(JComponent header, int x) {
+        var hit = header.getComponentAt(x, header.getHeight() / 2);
+        return hit == null ? header : hit;
     }
 
-    static void click(Tables.TableControl table, int x, int clicks) {
-        var on = under(table, x);
-        send(table, on, MouseEvent.MOUSE_PRESSED, x, clicks);
-        send(table, on, MouseEvent.MOUSE_RELEASED, x, clicks);
-        send(table, on, MouseEvent.MOUSE_CLICKED, x, clicks);
+    static void click(Tables.TableControl table, int x, int clicks) { click(table.header, x, clicks); }
+
+    static void click(JComponent header, int x, int clicks) {
+        var on = under(header, x);
+        send(header, on, MouseEvent.MOUSE_PRESSED, x, clicks);
+        send(header, on, MouseEvent.MOUSE_RELEASED, x, clicks);
+        send(header, on, MouseEvent.MOUSE_CLICKED, x, clicks);
     }
 
-    static void drag(Tables.TableControl table, int boundary, int... moves) {
-        int x = edge(table, boundary);
-        var on = under(table, x);
-        send(table, on, MouseEvent.MOUSE_PRESSED, x, 1);
-        for (int move : moves) send(table, on, MouseEvent.MOUSE_DRAGGED, x += move, 1);
-        send(table, on, MouseEvent.MOUSE_RELEASED, x, 1);
+    static void drag(Tables.TableControl table, int boundary, int... moves) { drag(table.header, boundary, moves); }
+
+    static void drag(JComponent header, int boundary, int... moves) {
+        int x = edge(header, boundary);
+        var on = under(header, x);
+        send(header, on, MouseEvent.MOUSE_PRESSED, x, 1);
+        for (int move : moves) send(header, on, MouseEvent.MOUSE_DRAGGED, x += move, 1);
+        send(header, on, MouseEvent.MOUSE_RELEASED, x, 1);
+    }
+
+    static int[] widths(JComponent header) {
+        return Arrays.stream(header.getComponents()).mapToInt(Component::getWidth).toArray();
+    }
+
+    static int[] starts(JComponent header) {
+        return Arrays.stream(header.getComponents()).mapToInt(Component::getX).toArray();
     }
 
     interface Body { void run(KitView view, Tables.TableControl table, List<UiEvent> events); }
@@ -200,6 +218,162 @@ class ColumnResizeTest {
         with(files(columns, rows), (view, table, events) -> {
             var number = table.mounted.get("a").title.getComponent(1);
             assertThat(number.getWidth()).isGreaterThanOrEqualTo(number.getPreferredSize().width);
+        });
+    }
+
+    @Test void aDragCancelledByAnotherPressStillReportsTheWidthsShown() {
+        with(files(columns("name", "kind", "size", 2), rows()), (view, table, events) -> {
+            int x = edge(table, 0);
+            var on = under(table, x);
+            send(table, on, MouseEvent.MOUSE_PRESSED, x, 1);
+            send(table, on, MouseEvent.MOUSE_DRAGGED, x + 30, 1);
+            var size = table.header.getComponent(2);
+            send(table, size, MouseEvent.MOUSE_PRESSED, size.getX() + size.getWidth() / 2, 1);
+            assertThat(events).hasSize(1).first().isInstanceOf(UiEvent.ColumnsResized.class);
+        });
+    }
+
+    @Test void aDragWhoseBoundaryDisappearsStillReportsTheWidthsShown() {
+        with(files(columns("name", "kind", "size", 2), rows()), (view, table, events) -> {
+            int x = edge(table, 1);
+            send(table, under(table, x), MouseEvent.MOUSE_PRESSED, x, 1);
+            send(table, under(table, x), MouseEvent.MOUSE_DRAGGED, x + 20, 1);
+            view.update(new ViewSpec(files(columns("name", "kind", "size", 2).subList(0, 2),
+                    List.of(new TableRow("a", Map.of("name", LONG, "kind", "Folder"), Optional.empty())))));
+            InteractiveRowsTest.layout(view);
+            send(table, table.header, MouseEvent.MOUSE_DRAGGED, x + 40, 1);
+            assertThat(events).hasSize(1);
+            assertThat(((UiEvent.ColumnsResized) events.getFirst()).widths().keySet()).containsExactlyInAnyOrder("name", "kind");
+        });
+    }
+
+    @Test void aDoubleClickThatChangesNoWidthSendsNothing() {
+        with(files(columns("name", "kind", "size", 1), rows()), (view, table, events) -> {
+            int x = edge(table, 0);
+            click(table, x, 1);
+            click(table, x, 2);
+            InteractiveRowsTest.layout(view);
+            assertThat(events).as("the first fit widens the column").hasSize(1);
+            x = edge(table, 0);
+            click(table, x, 1);
+            click(table, x, 2);
+            assertThat(events).as("fitting it again changes nothing").hasSize(1);
+        });
+    }
+
+    static List<Column> treeColumns() {
+        return List.of(new Column("name", "Name", TextRole.BODY, false),
+                new Column("host", "Host", TextRole.MONO_SMALL, false),
+                new Column("port", "Port", TextRole.MONO_SMALL, true));
+    }
+
+    static Tree hosts(List<Column> columns, Set<String> selected) {
+        var mac = new TreeItem("mac", "Mac", Optional.empty(), true, List.of(), OptionalInt.empty(), false, "",
+                Optional.empty(), List.of("192.168.1.119", "22"), Optional.empty());
+        var mine = new TreeItem("mine", "minecraft-local", Optional.empty(), true, List.of(), OptionalInt.empty(), false, "",
+                Optional.empty(), List.of("192.168.1.124", "2222"), Optional.empty());
+        var network = new TreeItem("net", "Local Network", Optional.empty(), false, List.of(mac, mine));
+        return new Tree("rows", ControlState.READY, List.of(network), Set.of("net"), selected, "", columns);
+    }
+
+    interface TreeBody { void run(KitView view, Trees.TreeControl tree, List<UiEvent> events); }
+
+    static void withTree(Tree tree, int width, TreeBody body) {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(tree), events::add)) {
+                view.setSize(width, 300); InteractiveRowsTest.layout(view);
+                body.run(view, (Trees.TreeControl) view.control("rows"), events);
+            } finally { release(context); }
+        });
+    }
+
+    @Test void treeDragShrinksTheTrailingColumnAndTheTitleColumnTakesTheRest() {
+        withTree(hosts(treeColumns(), Set.of()), 600, (view, tree, events) -> {
+            int[] before = widths(tree.header);
+            var address = (JComponent) tree.mounted.get("mac").trailing.getComponent(0);
+            int cell = address.getWidth();
+            drag(tree.header, 0, 10, 20);
+            InteractiveRowsTest.layout(view);
+            int[] after = widths(tree.header);
+            assertThat(after[1]).isEqualTo(before[1] - 30);
+            assertThat(after[2]).isEqualTo(before[2]);
+            assertThat(after[0]).as("the title column takes the rest").isEqualTo(before[0] + 30);
+            assertThat(((JComponent) tree.mounted.get("mac").trailing.getComponent(0)).getWidth()).as("the rows follow").isEqualTo(cell - 30);
+            assertThat(events).hasSize(1);
+            var resized = (UiEvent.ColumnsResized) events.getFirst();
+            assertThat(resized.id()).isEqualTo("rows");
+            assertThat(resized.widths().keySet()).containsExactlyInAnyOrder("name", "host", "port");
+            assertThat(resized.widths().get("host")).isEqualTo(com.formdev.flatlaf.util.UIScale.unscale(after[1]));
+        });
+    }
+
+    @Test void treeDoubleClickReturnsATrailingColumnToItsContentFit() {
+        withTree(hosts(treeColumns(), Set.of()), 600, (view, tree, events) -> {
+            int fit = widths(tree.header)[1];
+            drag(tree.header, 0, 40);
+            InteractiveRowsTest.layout(view);
+            assertThat(widths(tree.header)[1]).isEqualTo(fit - 40);
+            int x = edge(tree.header, 0);
+            click(tree.header, x, 1);
+            click(tree.header, x, 2);
+            InteractiveRowsTest.layout(view);
+            assertThat(widths(tree.header)[1]).isEqualTo(fit);
+            assertThat(events).hasSize(2).allMatch(UiEvent.ColumnsResized.class::isInstance);
+            x = edge(tree.header, 0);
+            click(tree.header, x, 1);
+            click(tree.header, x, 2);
+            assertThat(events).as("a fit that changes nothing sends nothing").hasSize(2);
+        });
+    }
+
+    @Test void treeWithoutWidthsLaysOutExactlyAsBefore() {
+        withTree(hosts(treeColumns(), Set.of()), 600, (view, tree, events) -> {
+            int[] starts = starts(tree.header), widths = widths(tree.header);
+            for (int i = 0; i < tree.trailingWidths.length; i++)
+                assertThat(widths[i + 1]).as("trailing column " + i + " at its content fit").isEqualTo(tree.trailingWidths[i]);
+            view.update(new ViewSpec(hosts(treeColumns(), Set.of("mac"))));
+            InteractiveRowsTest.layout(view);
+            assertThat(starts(tree.header)).isEqualTo(starts);
+            assertThat(widths(tree.header)).isEqualTo(widths);
+        });
+    }
+
+    @Test void tooWideTrailingWidthsKeepTheTitleColumnAtItsMinimum() {
+        var wide = treeColumns().stream().map(c -> c.id().equals("name") ? c : c.withWidth(OptionalInt.of(900))).toList();
+        withTree(hosts(wide, Set.of()), 400, (view, tree, events) -> {
+            var titles = tree.header.getComponents();
+            assertThat(titles[0].getWidth()).as("the title column at its title's width").isBetween(titles[0].getPreferredSize().width, titles[0].getPreferredSize().width + 2);
+            assertThat(titles[1].getWidth()).as("the widths still widen the columns").isGreaterThan(tree.trailingWidths[0]);
+            for (int i = 1; i < titles.length; i++)
+                assertThat(titles[i].getWidth()).as("column " + i + " at least its title").isGreaterThanOrEqualTo(titles[i].getPreferredSize().width);
+            var last = titles[titles.length - 1];
+            assertThat(last.getX() + last.getWidth()).as("no title beyond the header").isLessThanOrEqualTo(tree.header.getWidth());
+            assertThat(titles[0].getX()).isGreaterThanOrEqualTo(0);
+            assertThat(tree.canvas.getWidth()).as("no horizontal scroll").isLessThanOrEqualTo(tree.scroll.getViewport().getExtentSize().width);
+        });
+    }
+
+    @Test void lanedTreeHasNoResizeZone() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, KeycapLanesTest.tree(), events::add)) {
+                view.setTreeRowPresentation("shortcuts", Map.of("action/copy",
+                        new TreeRowPresentation("Global", false, Optional.of(KeycapLanesTest.keys()))));
+                view.setSize(777, 300);
+                for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
+                var tree = (Trees.TreeControl) view.control("shortcuts");
+                assertThat(tree.laned()).isTrue();
+                int x = edge(tree.header, 0);
+                var on = under(tree.header, x);
+                send(tree.header, on, MouseEvent.MOUSE_MOVED, x, 0);
+                assertThat(on.getCursor().getType()).isEqualTo(java.awt.Cursor.DEFAULT_CURSOR);
+                send(tree.header, on, MouseEvent.MOUSE_PRESSED, x, 1);
+                send(tree.header, on, MouseEvent.MOUSE_DRAGGED, x + 30, 1);
+                send(tree.header, on, MouseEvent.MOUSE_RELEASED, x + 30, 1);
+                assertThat(events).isEmpty();
+            } finally { release(context); }
         });
     }
 }

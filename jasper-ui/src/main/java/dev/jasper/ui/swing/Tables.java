@@ -399,13 +399,15 @@ final class Tables {
                 relayout();
             }
 
-            @Override public void fit(int boundary) {
-                if (boundary < 0 || boundary >= header.getComponentCount()) return;
+            @Override public boolean fit(int boundary) {
+                if (boundary < 0 || boundary >= header.getComponentCount()) return false;
                 int widest = header.getComponent(boundary).getPreferredSize().width;
                 for (var row : mounted.values())
                     if (row.title.getLayout() instanceof WeightLayout && boundary < row.title.getComponentCount())
                         widest = Math.max(widest, row.title.getComponent(boundary).getPreferredSize().width);
-                drag(boundary, widest - layout().allocation(headerWidth())[boundary]);
+                int[] before = layout().allocation(headerWidth());
+                drag(boundary, widest - before[boundary]);
+                return !java.util.Arrays.equals(before, layout().allocation(headerWidth()));
             }
 
             @Override public void finish() {

@@ -78,7 +78,8 @@ final class Trees {
 
     /**
      * A column tree's header: the item column's title from the rows' content inset, then each later title right-aligned
-     * over its trailing column, packed against the count column at the rows' trailing inset, as the rows pack them.
+     * over its trailing column ({@link TreeControl#columnWidths}), packed against the count column at the rows' trailing
+     * inset, as the rows pack them.
      */
     static final class ColumnHeaderLayout implements java.awt.LayoutManager {
         final TreeControl owner;
@@ -95,7 +96,6 @@ final class Trees {
         @Override public void layoutContainer(java.awt.Container parent) {
             var insets = parent.getInsets();
             var children = parent.getComponents();
-            int gap = ThemePainting.metric(owner.context(), dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP);
             int height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
             if (owner.laned()) {
                 // Plan 9b Rulings 7: the titles span the rows' lanes, measured from the header's end as the rows measure theirs;
@@ -109,13 +109,9 @@ final class Trees {
                 }
                 return;
             }
-            int end = parent.getWidth() - insets.right - (owner.countWidth > 0 ? owner.countWidth + gap : 0);
-            for (int i = children.length - 1; i >= 1; i--) {
-                int width = i - 1 < owner.trailingWidths.length ? owner.trailingWidths[i - 1] : children[i].getPreferredSize().width;
-                children[i].setBounds(end - width, insets.top, width, height);
-                end -= width + gap;
-            }
-            if (children.length > 0) children[0].setBounds(insets.left, insets.top, Math.max(0, end - insets.left), height);
+            int[] sizes = owner.columnWidths(), starts = owner.trailingStarts(parent.getWidth(), sizes);
+            for (int i = 1; i < children.length && i - 1 < sizes.length; i++) children[i].setBounds(starts[i - 1], insets.top, sizes[i - 1], height);
+            if (children.length > 0) children[0].setBounds(insets.left, insets.top, Math.max(0, owner.titleEnd(parent.getWidth(), sizes) - insets.left), height);
         }
     }
 
@@ -130,6 +126,10 @@ final class Trees {
         final javax.swing.JPanel header = new Tables.HeaderBand(this);
         /** A column tree's count column: as wide as its widest count, so every row's values line up; zero without counts. */
         int countWidth;
+        /** A column tree's minimum width for each column (the item column's too): its title's preferred width. */
+        int[] minimums = new int[0];
+        /** The widths the user dragged this view's columns to, unscaled, by column id; they outrank the columns' own. */
+        final Map<String, Integer> kept = new HashMap<>();
 
         TreeControl(KitView view, Nodes.Tree node) {
             super(view, node, new TreePane(view.context()));
@@ -137,6 +137,7 @@ final class Trees {
             var box=context().faces().tree.box(this);
             if(box!=null)scroll.setBorder(box);
             refresh();
+            ColumnResizer.install(this, header, new Resizing());
             InteractiveRows.bind(canvas, "RIGHT", () -> expandFocused(true));
             InteractiveRows.bind(canvas, "LEFT", () -> expandFocused(false));
         }
@@ -409,7 +410,130 @@ final class Trees {
                     String text = item.trailing().get(i);
                     trailingWidths[i] = Math.max(trailingWidths[i], Math.max(metrics[i].stringWidth(text), ThemePainting.measureText(fonts[i], text)));
                 }
+            var ids = value().columns().stream().map(Column::id).collect(java.util.stream.Collectors.toSet());
+            kept.keySet().retainAll(ids);
             columnHeader();
+        }
+
+        /**
+         * Each trailing column's width as the header and the rows lay it out: the width the user dragged it to, else its
+         * {@code Column.width} (scaled, at least its title), else its content fit ({@link #trailingWidths}). The item column
+         * takes the rest; when it would fall below its title the columns with a width shrink proportionally towards their
+         * titles (content-fit columns never do), so the header never scrolls.
+         */
+        int[] columnWidths() {
+            var sizes = trailingWidths.clone();
+            var columns = value().columns();
+            if (laned() || columns.size() != sizes.length + 1 || minimums.length != columns.size()) return sizes;
+            var set = new boolean[sizes.length];
+            int slack = 0;
+            for (int i = 0; i < sizes.length; i++) {
+                var column = columns.get(i + 1);
+                Integer kept = this.kept.get(column.id());
+                int width = kept != null ? kept : column.width().orElse(0);
+                if (width <= 0) continue;
+                set[i] = true;
+                sizes[i] = Math.max(minimums[i + 1], com.formdev.flatlaf.util.UIScale.scale(width));
+                slack += sizes[i] - minimums[i + 1];
+            }
+            int room = trailingRoom(), excess = java.util.Arrays.stream(sizes).sum() - room;
+            if (room >= 0 && excess > 0 && slack > 0) {
+                double share = Math.min(1, excess / (double) slack);
+                for (int i = 0; i < sizes.length; i++) if (set[i]) sizes[i] -= (int) Math.ceil((sizes[i] - minimums[i + 1]) * share);
+            }
+            return sizes;
+        }
+
+        /** The width the trailing columns may take with the item column at its title's width, or -1 before layout. */
+        private int trailingRoom() {
+            int width = scroll.getViewport().getExtentSize().width;
+            if (width <= 0) return -1;
+            var insets = header.getInsets();
+            int gap = ThemePainting.metric(context(), dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP);
+            return Math.max(0, width - insets.left - insets.right - (countWidth > 0 ? countWidth + gap : 0) - trailingWidths.length * gap - minimums[0]);
+        }
+
+        /** Where each trailing column {@code sizes} wide starts in a header {@code width} wide, packed against the count column. */
+        int[] trailingStarts(int width, int[] sizes) {
+            int gap = ThemePainting.metric(context(), dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP);
+            int end = width - header.getInsets().right - (countWidth > 0 ? countWidth + gap : 0);
+            var starts = new int[sizes.length];
+            for (int i = sizes.length - 1; i >= 0; i--) {
+                starts[i] = end - sizes[i];
+                end = starts[i] - gap;
+            }
+            return starts;
+        }
+
+        /** Where the item column ends in a header {@code width} wide, before trailing columns {@code sizes} wide. */
+        int titleEnd(int width, int[] sizes) {
+            int gap = ThemePainting.metric(context(), dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP);
+            return sizes.length == 0 ? width - header.getInsets().right - (countWidth > 0 ? countWidth + gap : 0) : trailingStarts(width, sizes)[0] - gap;
+        }
+
+        /**
+         * A column tree's side of a header drag. Boundary {@code b} is trailing column {@code b}'s start: a drag moves width
+         * between it and the column on its left (the item column for the first), and a double-click returns it to its
+         * content fit. A laned tree has no boundaries.
+         */
+        private final class Resizing implements ColumnResizer.Target {
+            private boolean resizable() { return !laned() && minimums.length == value().columns().size() && minimums.length == trailingWidths.length + 1 && minimums.length > 1; }
+
+            private int titleWidth(int[] sizes) { return titleEnd(header.getWidth(), sizes) - header.getInsets().left; }
+
+            @Override public int[] edges() {
+                return resizable() ? trailingStarts(header.getWidth(), columnWidths()) : new int[0];
+            }
+
+            @Override public void drag(int boundary, int dx) {
+                if (!resizable()) return;
+                int[] sizes = columnWidths();
+                if (boundary < 0 || boundary >= sizes.length) return;
+                int left = boundary == 0 ? titleWidth(sizes) : sizes[boundary - 1];
+                dx = Math.max(dx, Math.min(0, minimums[boundary] - left));
+                dx = Math.min(dx, Math.max(0, sizes[boundary] - minimums[boundary + 1]));
+                if (dx == 0) return;
+                sizes[boundary] -= dx;
+                if (boundary > 0) sizes[boundary - 1] += dx;
+                keep(sizes);
+                relayout();
+            }
+
+            @Override public boolean fit(int boundary) {
+                if (!resizable() || boundary < 0 || boundary >= trailingWidths.length) return false;
+                int[] before = columnWidths();
+                String id = value().columns().get(boundary + 1).id();
+                Integer old = kept.put(id, Math.max(1, com.formdev.flatlaf.util.UIScale.unscale(trailingWidths[boundary])));
+                if (java.util.Arrays.equals(before, columnWidths())) {
+                    if (old == null) kept.remove(id); else kept.put(id, old);
+                    return false;
+                }
+                relayout();
+                return true;
+            }
+
+            @Override public void finish() {
+                if (!resizable()) return;
+                keep(columnWidths());
+                var widths = new java.util.LinkedHashMap<String, Integer>();
+                for (var column : value().columns()) widths.put(column.id(), kept.get(column.id()));
+                emit(new UiEvent.ColumnsResized(node.id(), widths));
+            }
+
+            /** Keeps every column at the width it shows, unscaled: the trailing columns at {@code sizes}, the item column at the rest. */
+            private void keep(int[] sizes) {
+                var columns = value().columns();
+                kept.put(columns.getFirst().id(), Math.max(1, com.formdev.flatlaf.util.UIScale.unscale(titleWidth(sizes))));
+                for (int i = 0; i < sizes.length; i++)
+                    kept.put(columns.get(i + 1).id(), Math.max(1, com.formdev.flatlaf.util.UIScale.unscale(sizes[i])));
+            }
+
+            /** Lays the header and every mounted row out again at the new widths. */
+            private void relayout() {
+                header.revalidate();
+                header.repaint();
+                sync();
+            }
         }
 
         /** A plain tree row's side inset, as InteractiveRows.Row.doLayout gives it. */
@@ -433,6 +557,7 @@ final class Trees {
             var columns = value().columns();
             countWidth = 0;
             header.removeAll();
+            minimums = new int[columns.size()];
             if (columns.isEmpty()) {
                 if (scroll.getColumnHeader() != null && scroll.getColumnHeader().getView() == header) scroll.setColumnHeader(null);
                 return;
@@ -445,6 +570,7 @@ final class Trees {
                     label.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
                     trailingWidths[i - 1] = Math.max(trailingWidths[i - 1], label.getPreferredSize().width);
                 }
+                minimums[i] = label.getPreferredSize().width;
                 header.add(label);
             }
             var counts = canvas.getFontMetrics(ThemePainting.font(context(), dev.jasper.ui.metrics.Typography.Role.COUNT));
@@ -589,11 +715,12 @@ final class Trees {
                 var label=(javax.swing.JLabel)row.controls.get("@tree/"+node.id()+"/"+item.id()+"/keys").component;
                 label.getAccessibleContext().setAccessibleName(presented.keycaps().get().accessibleName());label.setText("");label.setIcon(new Keycaps(context(),presented.keycaps().get(),row.inked && context().faces().tree.boxesSelectedKeycaps()));label.setDisabledIcon(label.getIcon());
             }
+            int[] columnWidths = presented == null ? columnWidths() : trailingWidths;
             for (int i = 0; presented==null && i < trailingColumns(item); i++) {
                 var label = (javax.swing.JLabel) row.controls.get(trailing.get(i).id()).component;
                 label.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
                 label.setPreferredSize(null);
-                int width = i < trailingWidths.length ? trailingWidths[i] : label.getPreferredSize().width;
+                int width = i < columnWidths.length ? columnWidths[i] : label.getPreferredSize().width;
                 label.setPreferredSize(new java.awt.Dimension(width + label.getInsets().left + label.getInsets().right, label.getPreferredSize().height));
             }
             if (presented == null && row.controls.get("@tree/" + node.id() + "/" + item.id() + "/count") instanceof Labels.TextControl countText
