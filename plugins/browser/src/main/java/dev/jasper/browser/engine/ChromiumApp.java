@@ -3,7 +3,6 @@ package dev.jasper.browser.engine;
 import com.jetbrains.cef.JCefAppConfig;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import org.cef.CefApp;
 import org.cef.CefClient;
 import org.cef.CefSettings;
@@ -51,15 +50,15 @@ final class ChromiumApp {
     }
 
     /** Makes the one client, on the UI thread, and hands it over, unless the start ended meanwhile. */
-    void createClient(Chromium owner, CompletableFuture<CefClient> future) {
-        if (!owner.starting()) return;
+    void createClient(Chromium owner) {
+        if (!owner.mayCreateClient()) return;
         try {
             client = app.createClient();
-        } catch (RuntimeException failure) {
-            owner.failed(failure);
+        } catch (Throwable failure) { // As in the start: an Error too must fail the start, or nobody hears of it.
+            owner.clientFailed(failure);
             return;
         }
-        if (owner.running()) future.complete(client);
+        owner.clientCreated(client);
     }
 
     /**
