@@ -20,7 +20,8 @@ dependencies {
     // Keep this the version flatlaf-extras declares.
     compileOnly("com.github.weisj:jsvg:2.0.0")
     // Candidate transport: the released JDK transport rejects abstract Unix addresses.
-    // Linux address/packaged-runtime gates remain pending; see the Linux residency Plan 2 verification.
+    // Fedora ARM64 address/packaged-runtime gates passed; x86_64/Ubuntu baseline remain CI-pending.
+    // See the Linux residency Plan 2 verification.
     implementation("com.github.hypfvieh:dbus-java-core:5.2.0")
     runtimeOnly("com.github.hypfvieh:dbus-java-transport-junixsocket:5.2.0") {
         // Its Maven type=pom aggregator becomes a runtime file in Gradle (and breaks jdeps).

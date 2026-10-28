@@ -1,6 +1,6 @@
 # Linux residency Plan 2 verification — 2026-10-27
 
-**Task 1 Fedora aarch64 gate: PASS; per-task review pending.** Rulings 9–10 follow the user's
+**Task 1 Fedora aarch64 gate: PASS; per-task review approved.** Rulings 9–10 follow the user's
 architecture split: execute aarch64 on the authorized host and defer x86_64/Ubuntu 22.04 baseline
 to CI. Those CI rows are **PENDING**, not passed; Tasks 4–5 may proceed after Task 1 review under
 this explicit split. Task 6 still requires the separate AWT gate. The controller's earlier SSH
@@ -130,6 +130,8 @@ env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS \
 
 Passed in 2m 19s, 94 tasks executed. XML: **49 executed/passed, 0 failures/errors/skips**;
 transport XML specifically records `abstract=false` and `abstract=true`, both passing.
+The cold Linux compile log includes existing unrelated compiler warning noise (`100 warnings`);
+this was not pristine output and no warning-free claim is made.
 Notices verified 37 shipped modules; architecture passed. Native launcher: 152 checks, 0 failures.
 The verified Linux image contains 41 runtime modules, 198 MB runtime and 29 MB default CDS archive;
 no AOT cache was trained.
@@ -231,3 +233,70 @@ provider and ABI results. Full final integration check remains required after th
 9–10. User-directed split: Fedora aarch64 execution passes on the replacement host; x86_64 and Ubuntu 22.04 remain CI-pending. Tasks 4–5 may proceed after review; Task 6 retains its separate AWT gate.
 
 Task 1 meets the user-directed aarch64 execution gate, with remaining CI acceptance explicit. No product tray behavior was added.
+
+## Task 2 public AWT probe — preparation passed; native gate PENDING
+
+`LinuxTrayProbe` is the plan's exact disposable test-only class, including its retained icon reference,
+two-second polling and three-minute exit. It is opt-in, never a `check` dependency. No production
+fallback was added. Minor deviations: the theme source inventory includes its `native-platform` row;
+Task 1 build/evidence wording was corrected to distinguish ARM64 success from deferred CI and retain
+existing cold Linux compiler warning evidence.
+
+Headless local command `./gradlew :jasper-app:compileTestJava :jasper-app:test --tests '*ThemeMigrationCoverageTest'`
+passed in 4 seconds: **5 tests, 0 failures/errors/skips**. Log: `/tmp/jasper-task2-local.log`.
+Only the probe source was copied into the retained isolated Linux directory; with `DISPLAY`,
+`WAYLAND_DISPLAY` and `DBUS_SESSION_BUS_ADDRESS` removed, the configured JBR b635.75 ran
+`./gradlew :jasper-app:compileTestJava`, passing in 472 ms (12 tasks; one executed).
+Remote log: `/home/dustin/jasper-tray-gate.1yPuL3/task-2-compile.log`.
+Compilation proves public API availability, not tray recovery.
+
+Read-only preparation found `/usr/share/xsessions` empty and only `plasma.desktop` under
+`/usr/share/wayland-sessions`. `lxpanel`, `lxsession`, `mate-panel`, `xfce4-panel`, `startlxde`
+and `startxfce4` are unavailable; `xprop` and `xdpyinfo` are installed. No graphical/session
+secrets were read and no panel/session state was changed. Plasma alone cannot satisfy this gate.
+
+After explicit graphical authorization and provisioning of each required session, run from its
+own graphical-session terminal (inherits its display and authentication without copying secrets):
+
+```sh
+cd /home/dustin/jasper-tray-gate.1yPuL3
+jasper-app/build/packaging/image/Jasper/lib/runtime/bin/java \
+  -Djava.awt.headless=false \
+  -cp 'jasper-app/build/packaging/image/Jasper/lib/app/*:jasper-app/build/classes/java/main:jasper-app/build/classes/java/test' \
+  dev.jasper.app.platform.LinuxTrayProbe
+```
+
+The runtime version was checked read-only: JBR `25.0.4.1+1-b635.75-jcef`. The command above
+has **not** been launched. For each three-minute run, record distro/session/panel/JBR versions
+and actual observations for the following rows; use a fresh run where the sequence exceeds three minutes.
+
+| Required evidence | LXDE / X11 | MATE or XFCE legacy host |
+|---|---|---|
+| Start with no host; enable host and observe icon | PENDING | PENDING |
+| Restart panel; original icon returns without reinstall | PENDING | PENDING |
+| Remove/re-add tray applet; host-loss/support observations and recovery | PENDING | PENDING |
+| Menu click (`menu action EDT=true`) and activation | PENDING | PENDING |
+| Transparency and 1×/2× scale; no ghost/lost icon | PENDING | PENDING |
+
+Capture probe stdout alongside visible behavior: `no host`, `added slot=…`, `removed`,
+menu and activation lines. The probe intentionally retains `current` while support reports true;
+that characterizes JBR's automatic recovery. A ghost/lost icon fails even if Java still lists it.
+Assess whether public support/property signals suffice or remove/re-add would be necessary;
+no result is inferred from compilation or from an icon appearing once. Task 6 stays blocked until
+native evidence passes. Failed recovery requires a reviewed X11/JNA design amendment before fallback work.
+
+Read-only isolation feasibility: `Xvfb`/`xvfb-run` (installed Xvfb `21.1.25-2.fc44.aarch64`),
+`dbus-run-session`, `timeout` and `xrandr` are available. Cached Fedora package metadata confirms
+these missing install package names (no installation performed):
+
+- LXDE: `lxpanel` (`0.11.1^20260313git4dec3d0d-1.fc44`), `lxde-common`, `lxsession`, `openbox`.
+- Second legacy desktop: `xfce4-panel` (`4.20.7-2.fc44`), `xfce4-session`, `xfwm4`.
+- Observation/input: `xdotool`, `xwd`, `xwininfo`; optional visible nested display: `xorg-x11-server-Xephyr`.
+
+Proposed authorization scope is installation of those prerequisites and isolated X11 runs using
+Xvfb, a private `dbus-run-session`, temporary HOME/XDG configuration and only the test display's
+panels. Actual LXDE and XFCE panels can exercise late host creation, restarts, applet changes and
+menu/activation there, with stdout and captured pixels at 1×/2×. Xvfb screenshots can characterize
+raster alpha/scaling; physical display/HiDPI appearance still needs user inspection. Neither Xvfb
+nor a panel was launched during preparation. The package-provider file-list query lacked cached
+metadata; exact package-name queries above succeeded. Any GUI/session run still requires authorization.

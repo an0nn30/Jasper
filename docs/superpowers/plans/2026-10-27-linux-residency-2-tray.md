@@ -10,7 +10,7 @@
 
 **Spec:** [Approved Linux residency design](../specs/2026-10-27-linux-residency-design.md).
 
-**Status (2026-10-27):** Task 1 passed the user-directed Fedora 44 aarch64 gate: 49 focused tests and both packaged-runtime address cases, notices/architecture and headless packaging. [Verification](2026-10-27-linux-residency-2-verification.md) records exact versions and evidence. Rulings 9–10 follow the user's split: x86_64 and Ubuntu 22.04 remain CI-pending; after Task 1 review, Tasks 4–5 may proceed with the pinned 5.2.0 bindings below. Task 6 retains its separate AWT gate. Rulings 1–2 allow local preparation and replace the fixture sketch with short `/tmp` paths and bounded reader/process cleanup. Ruling 4 selects junixsocket after the released JDK transport's abstract-address rejection; Ruling 5 aligns application SLF4J API/nop to 2.0.17. Ruling 7 replaces the non-JAR aggregator with its exact common/native-common 2.10.1 jars. Ruling 8 excludes the confirmed compile-only annotation leak after packaging reproduced its module failure, superseding Ruling 6's temporary EPL investigation. Costs: native artifacts, explicit dependency tracking and a logging-version regression surface. The CI baseline and desktop matrix are not certified.
+**Status (2026-10-27):** Task 1 passed the user-directed Fedora 44 aarch64 gate: 49 focused tests and both packaged-runtime address cases, notices/architecture and headless packaging. [Verification](2026-10-27-linux-residency-2-verification.md) records exact versions and evidence. Rulings 9–10 follow the user's split: x86_64 and Ubuntu 22.04 remain CI-pending; after Task 1 review, Tasks 4–5 may proceed with the pinned 5.2.0 bindings below. Task 6 retains its separate AWT gate. Rulings 1–2 allow local preparation and replace the fixture sketch with short `/tmp` paths and bounded reader/process cleanup. Ruling 4 selects junixsocket after the released JDK transport's abstract-address rejection; Ruling 5 aligns application SLF4J API/nop to 2.0.17. Ruling 7 replaces the non-JAR aggregator with its exact common/native-common 2.10.1 jars. Ruling 8 excludes the confirmed compile-only annotation leak after packaging reproduced its module failure, superseding Ruling 6's temporary EPL investigation. Costs: native artifacts, explicit dependency tracking and a logging-version regression surface. The CI baseline and desktop matrix are not certified. Task 2 preparation is compiled locally and on Fedora ARM64; native legacy recovery remains pending. Minor deviations: add the native test probe to the theme source inventory and correct Task 1 evidence wording (ARM64 passed; existing cold Linux compiler warnings retained).
 
 ## Global Constraints
 
@@ -178,7 +178,7 @@ watcher tests. Wire declarations and exact exported signatures must still pass i
 
 **Interfaces:** Explicit opt-in test-class `main(String[] args)`; no Gradle `check` dependency. It runs for at most three minutes and never launches Jasper or a shell.
 
-- [ ] **Step 1: Add this complete disposable native probe.**
+- [x] **Step 1: Add this complete disposable native probe.**
 
 ```java
 package dev.jasper.app.platform;
@@ -238,7 +238,7 @@ public final class LinuxTrayProbe {
 }
 ```
 
-- [ ] **Step 2: Compile headlessly** with `./gradlew :jasper-app:compileTestJava`. Compilation passing proves only that the public API is usable.
+- [x] **Step 2: Compile headlessly** with `./gradlew :jasper-app:compileTestJava`. Compilation passing proves only that the public API is usable.
 - [ ] **Step 3: Hand the probe to the user for an authorized session run** with the bundled JBR, `-Djava.awt.headless=false`, application/test classpaths, and main `dev.jasper.app.platform.LinuxTrayProbe`. Run LXDE on X11 and a second legacy tray configuration (MATE/XFCE legacy host). Start with no host, enable it, restart the panel, remove/re-add the tray applet, click menu/activation, inspect alpha and 1×/2× scale. Record whether the original icon returns after panel restart and whether Java notices host loss. The probe's `current` reference is intentionally retained to characterize automatic JBR recovery. A visible ghost or lost icon is a failure even if `getTrayIcons()` still lists it.
 - [ ] **Step 4: Record PASS/failure evidence**, including whether public support/property signals suffice or a periodic remove/re-add is necessary. If the public API supports recovery, proceed with the adapter below. If it does not, stop Task 6 and amend the design for an X11/JNA fallback; do not import `sun.awt` or use an endless icon-reinstall timer as an unreviewed workaround. Independent protocol work may proceed after Task 1 while this gate awaits the user.
 - [ ] **Step 5: Commit** `test: characterize Linux legacy tray recovery` with trailer. Task completion requires recorded native evidence; committing the fixture alone leaves the gate pending.
