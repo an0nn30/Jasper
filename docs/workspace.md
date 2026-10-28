@@ -438,7 +438,7 @@ Import Theme…, and plugins' pickers. It opens over the window that asked and r
 - The top row has Back, Forward, Up and Refresh, the location as breadcrumbs (click to type a path, or Cmd+L; Ctrl+L), a
   search field that filters the folder, **New folder** (when saving), **Show hidden items** (on by default; Cmd+Shift+.;
   Ctrl+Shift+.) and the **Preview pane** switch (off by default).
-- The listing has Name, Modified and Size columns, folders first; click a column to sort by it, again to reverse.
+- The listing has Name, Modified and Size columns, folders first; click a column to sort by it, again to reverse; drag a column boundary to resize it. The sort and widths are remembered.
 - The preview shows the start of a text file (its first 8 KiB), `Binary file`, a folder's item count, or how many items
   are selected.
 - The primary button reads **Open**, **Save** or **Choose**. Saving over an existing file asks

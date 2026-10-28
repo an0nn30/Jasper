@@ -65,6 +65,13 @@ control shows.
 | `SecretChanged` | the node id only, never the value | secrets |
 | `Clicked` | the owner and the row | a plain left click on a row of a list, table or tree, after its `Selected` |
 | `Sorted` | the owner and the column | a click on a table's or tree's column header; the owner orders the rows |
+| `ColumnsResized` | the owner and the widths of its columns | a header boundary drag or double-click fit that has ended; the kit already shows the widths |
+
+Users drag a column boundary in any table or column tree to resize and double-click it to fit the column; the kit
+keeps the widths for the open view. A plugin remembers them across restarts with
+[`ColumnState`](sdk-reference.html#dev.jasper.sdk.ui.ColumnState) (a sort and widths; `apply` puts them on its
+columns, `encode` and `decode` store them) kept in a [`ColumnStateFile`](sdk-reference.html#dev.jasper.sdk.ui.ColumnStateFile),
+a properties file in the plugin's data folder.
 
 ## Compositions
 
@@ -441,8 +448,8 @@ from any control inside the stack that does not take Escape itself, as an inline
     scrolls; `addAction` is a footer button; `emptyText` is the muted line shown while there are no items.
 - [`Table`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.Table)`(columns, rows, selectedIds, activateAction,
   contextActions, selectionMode, scroll)`: [`Column`](sdk-reference.html#dev.jasper.sdk.ui.Column)`(id, title, role,
-  numeric, weight, sorted)`, the weight being the column's share of the width and `sorted` the sort indicator
-  (ascending when true); [`TableRow`](sdk-reference.html#dev.jasper.sdk.ui.TableRow)`(id, cells, icon, muted)`. A column
+  numeric, weight, sorted, width)`, the weight being the column's share of the width, `sorted` the sort indicator
+  (ascending when true) and `width` an optional fixed width in unscaled pixels that replaces the weight; [`TableRow`](sdk-reference.html#dev.jasper.sdk.ui.TableRow)`(id, cells, icon, muted)`. A column
   is a plain cell or a cell node (`cellNodes`), not both: `Text`, `StatusDot`, `Icon`, `Chip`, an INLINE stack of
   those, or a DROPDOWN `Choice` without a face, which reports `Selected` and draws without a border until hovered or
   focused. A `muted` row draws its text de-emphasised. `TableRow.heading(id, title, count, countNoun)` groups the rows

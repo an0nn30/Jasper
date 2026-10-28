@@ -71,6 +71,7 @@ hosts and distributions there are, with **New session** (+) and **Import session
 - Rows: the [WSL group](#wsl-distributions) first, then your groups in alphabetical order with the default group last
   (**Other** until you rename it), hosts alphabetical within each. While every host is ungrouped and the default group
   is still **Other**, the list has no group headers.
+- Hosts sort by name by default; the header's **Sort sessions** menu (default look) or a click on the Name, Host or Port header (Enterprise look) sorts them within each group by that column, and the sort and column widths are remembered.
 - A click on a group header collapses or expands it, as do Enter and a double click. Collapsed groups are remembered;
   a search shows their hosts.
 - A host row shows a dot (green while one of its SSH panes runs), its name and hostname, and a star: click the star to
@@ -368,8 +369,9 @@ crumb to open that folder, or click beside the crumbs to type a path (Enter goes
 retrace the folders you visited in this pane; Option+Left, Option+Right and Option+Up on macOS, Alt+Left, Alt+Right
 and Alt+Up on Linux and Windows (Back, Forward, Parent Folder) work anywhere in the panel.
 
-The list shows Name and Size, folders first, then by name ignoring case, with each entry's modified time in its tooltip.
+The list shows Name and Size, sorted by name ignoring case (folders mixed in with files) until you click a header, with each entry's modified time in its tooltip.
 In a window of its own or docked at the bottom it shows Name, Modified (date and time), Permissions (`rwxr-xr-x`) and Size.
+Click a header to sort the whole folder by that column, again to reverse; drag a column boundary to resize it and double-click it to fit. The sort is shared by every SFTP browser and both layouts, and the sort and widths are remembered.
 Select several rows for the file actions. A folder of more than 200 entries is shown 200 at a time ("1–200 of 950",
 **Previous page**, **Next page**). Names starting with a dot stay hidden until you press **Show hidden items**; the
 choice is remembered and applies to every browser opened afterwards. Enter or a double click opens a folder, opens a
@@ -667,7 +669,7 @@ when it starts, so it follows a change of look at the next start of Jasper.
   it the selected host's **Properties** (Host, User, Port, Credentials) with **Edit…** and **Connect** (**Open Shell**
   while it runs), or a distribution's Distribution, Version and Command with **Open**. In a window of its own or docked
   at the bottom, the Properties stand beside the tree instead of below it.
-- **Tunnels** starts on the right, under Sessions: a Type, Local, Remote and Via table. Enter or a double click starts
+- **Tunnels** starts on the right, under Sessions: a Type, Local, Remote and Via table whose headers sort and resize. Enter or a double click starts
   or stops a row, the right-click menu holds the rest, and the line below reads "pg-prod — active. Click to toggle." In a
   window of its own or docked at the bottom, the selected tunnel's **Properties** (Type, Local, Remote, Via, State and,
   while it is up, Connections, Traffic and Uptime) stand beside the table, with that line under them.

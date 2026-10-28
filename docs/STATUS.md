@@ -1,5 +1,7 @@
 # Jasper — Status and Handoff
 
+**Resizable and sortable table columns — 2026-10-28** (`claude/table-resize-sort`, from `0849270a3`, not merged or pushed; [spec](superpowers/specs/2026-10-28-table-column-resize-sort-design.md)). SDK 0.25.0: `Column.width`, `UiEvent.ColumnsResized`, `ColumnState` and `ColumnStateFile`. Dragging a header boundary in any table or column tree resizes it and a double-click fits it (the laned Keymap tree excepted). SFTP sorts the whole folder by any column (folders mixed in), shared by every browser and both layouts, widths per layout, kept in Remote's `data/columns.properties`; Sessions sorts by Name, Host or Port (Enterprise headers, the default look's **Sort sessions** menu); Tunnels (shares Remote's file), File Servers, Indexer settings and the Vault manager sort, resize and remember in their own `data/columns.properties`; the file chooser keeps its sort and widths in `ui-state.toml`. GUI checks for the user on macOS and Windows: drag a boundary, double-click to fit, header sort, the Sessions sort menu, and that a restart keeps widths and sort. No GUI launched.
+
 **Cold start and memory benchmark regressions — 2026-10-27** (`claude/startup-memory-regressions`, from `main` at
 `abe4531a2`; merged into local main by `eaab92624`, not pushed; [record](benchmarks/2026-10-27-startup-memory-regressions.md)). Browser plan 2's
 runtime comparison found both on its plain and JCEF images. **Cold start** (output painted at about 4.8 s against 2.06 s
