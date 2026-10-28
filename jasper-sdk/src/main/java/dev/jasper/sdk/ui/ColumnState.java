@@ -17,6 +17,8 @@ import java.util.stream.Stream;
  * @param sortColumn the id of the column the rows are sorted by; empty when the owner's own order applies
  * @param ascending true sorts the sort column ascending; meaningless when {@code sortColumn} is empty
  * @param widths column id to unscaled width in pixels, each positive; copied
+ * @throws IllegalArgumentException when a column id is blank or contains one of {@code ;,:=}, which the encoding uses,
+ *         or a width is not positive
  * @since 0.25.0
  */
 public record ColumnState(Optional<String> sortColumn, boolean ascending, Map<String, Integer> widths) {
@@ -25,9 +27,9 @@ public record ColumnState(Optional<String> sortColumn, boolean ascending, Map<St
 
     /** Validates the ids and widths and copies the widths. */
     public ColumnState {
-        Objects.requireNonNull(sortColumn); sortColumn.ifPresent(ModelChecks::id);
+        Objects.requireNonNull(sortColumn); sortColumn.ifPresent(ColumnState::id);
         widths = Map.copyOf(widths);
-        for (var e : widths.entrySet()) { ModelChecks.id(e.getKey()); if (e.getValue() <= 0) throw new IllegalArgumentException("Column width must be positive"); }
+        for (var e : widths.entrySet()) { id(e.getKey()); if (e.getValue() <= 0) throw new IllegalArgumentException("Column width must be positive"); }
     }
 
     /**
@@ -36,6 +38,7 @@ public record ColumnState(Optional<String> sortColumn, boolean ascending, Map<St
      * @param columnId the sort column's id
      * @param ascending true for ascending
      * @return the state
+     * @throws IllegalArgumentException when the id is blank or contains one of {@code ;,:=}
      */
     public static ColumnState sortedBy(String columnId, boolean ascending) { return new ColumnState(Optional.of(columnId), ascending, Map.of()); }
 
@@ -45,6 +48,7 @@ public record ColumnState(Optional<String> sortColumn, boolean ascending, Map<St
      *
      * @param columnId the clicked column's id
      * @return the new state
+     * @throws IllegalArgumentException when the id is blank or contains one of {@code ;,:=}
      */
     public ColumnState sorted(String columnId) {
         boolean same = sortColumn.filter(columnId::equals).isPresent();
@@ -56,8 +60,15 @@ public record ColumnState(Optional<String> sortColumn, boolean ascending, Map<St
      *
      * @param widths column id to unscaled width in pixels, each positive
      * @return the new state
+     * @throws IllegalArgumentException when an id is blank or contains one of {@code ;,:=}, or a width is not positive
      */
     public ColumnState resized(Map<String, Integer> widths) { return new ColumnState(sortColumn, ascending, widths); }
+
+    /** A column id the encoding can carry: not blank and free of its separators. */
+    private static void id(String id) {
+        ModelChecks.id(id);
+        if (id.chars().anyMatch(c -> ";,:=".indexOf(c) >= 0)) throw new IllegalArgumentException("Column id must not contain ; , : or =: " + id);
+    }
 
     /**
      * The columns marked with this state: the sort column carries the sort indicator, the others none, and every column

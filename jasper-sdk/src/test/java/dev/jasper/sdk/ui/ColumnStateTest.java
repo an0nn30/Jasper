@@ -5,9 +5,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ColumnStateTest {
     @Test void sortingTheSameColumnFlipsAndAnotherStartsAscending() {
@@ -35,5 +37,13 @@ class ColumnStateTest {
         assertThat(new ColumnStateFile(dir.resolve("data/columns.properties")).get("sftp")).isEqualTo(ColumnState.sortedBy("name", true));
         Files.writeString(dir.resolve("data/columns.properties"), "\\u00zz not properties");
         assertThat(file.get("sessions")).isEqualTo(ColumnState.NONE);
+    }
+    @Test void idsWithTheEncodingsSeparatorsAreRejected() {
+        for (String id : List.of("a;b", "a,b", "a:b", "a=b")) {
+            assertThatThrownBy(() -> ColumnState.sortedBy(id, true)).as(id).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> ColumnState.NONE.sorted(id)).as(id).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> ColumnState.NONE.resized(Map.of(id, 80))).as(id).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> new ColumnState(Optional.empty(), true, Map.of(id, 80))).as(id).isInstanceOf(IllegalArgumentException.class);
+        }
     }
 }
