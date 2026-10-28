@@ -4,13 +4,15 @@
 
 **Goal:** Add a recoverable Linux resident icon through Java D-Bus StatusNotifierItem/DBusMenu, falling back to X11 while retaining residency with no icon.
 
-**Architecture:** An application-owned `LinuxResidentTray` coordinates two concrete adapters behind `ResidentTray.install`. A small pure policy selects the preferred capability; a generation guards all asynchronous publications and actions. D-Bus owns its connection and exports; AWT owns the legacy icon on the EDT.
+**Architecture:** An application-owned `LinuxResidentTray` coordinates two concrete adapters behind `ResidentTray.install`. A small pure policy selects the preferred capability; a generation guards all asynchronous publications and actions. D-Bus owns its connection and exports; an owned XCB connection provides the legacy icon and an on-demand Swing popup owns its menu.
 
-**Tech Stack:** JBR 25, dbus-java core plus one Unix transport, public AWT, JUnit 5/AssertJ, isolated `dbus-daemon`, Gradle wrapper.
+**Tech Stack:** JBR 25, dbus-java core plus one Unix transport, existing JNA 5.14.0/XCB and public Swing, JUnit 5/AssertJ, isolated `dbus-daemon`, Gradle wrapper.
 
-**Spec:** [Approved Linux residency design](../specs/2026-10-27-linux-residency-design.md).
+**Spec:** [Approved Linux residency design](../specs/2026-10-27-linux-residency-design.md) and [approved XCB amendment](../specs/2026-10-28-linux-x11-tray-amendment-design.md).
 
-**Status (2026-10-27):** Tasks 1, 3, 4 and 5 have approved per-task reviews, including scoped fix reviews (`d77c7e7cb`, `2d291bb18`). Task 2 native characterization ran with authorization on 2026-10-28; the public-AWT gate failed. The [proposed XCB/JNA amendment](../specs/2026-10-28-linux-x11-tray-amendment-design.md) awaits builder review and user approval; Task 6 is stopped. Tasks 6–7 and the final whole-branch review remain pending. Task 1 passed the user-directed Fedora 44 aarch64 gate: 49 focused tests and both packaged-runtime address cases, notices/architecture and headless packaging. [Verification](2026-10-27-linux-residency-2-verification.md) records exact versions and evidence. Rulings 9–10 follow the user's split: x86_64 and Ubuntu 22.04 remain CI-pending; after Task 1 review, Tasks 4–5 may proceed with the pinned 5.2.0 bindings below. Task 6 retains its separate AWT gate. Rulings 1–2 allow local preparation and replace the fixture sketch with short `/tmp` paths and bounded reader/process cleanup. Ruling 4 selects junixsocket after the released JDK transport's abstract-address rejection; Ruling 5 aligns application SLF4J API/nop to 2.0.17. Ruling 7 replaces the non-JAR aggregator with its exact common/native-common 2.10.1 jars. Ruling 8 excludes the confirmed compile-only annotation leak after packaging reproduced its module failure, superseding Ruling 6's temporary EPL investigation. Costs: native artifacts, explicit dependency tracking and a logging-version regression surface. The CI baseline and desktop matrix are not certified. Task 2 native characterization is recorded: the safe public-AWT gate failed on LXDE/JBR b635.75; Task 6 awaits a reviewed legacy fallback amendment. Ruling 16 corrects the disposable probe's no-host lifetime with a bounded main-thread wait. Task 3's shared menu, ARGB conversion and capability/retry policy pass focused tests and architecture/inventory checks. Deviation: add Task 3's four new Java sources to the theme source inventory because its source discovery scans AWT imports, including headless tests. Task 4 implements the typed wire exports and bounded owner-scoped adapter; 19 Fedora private-bus tests pass, including independent exact `gdbus` introspection for both address forms. Controller Ruling 12 requires generic Tuple carriers and explicit Variant returns from `Properties.Get`; Ruling 13 narrowly repairs the pinned library's duplicated tuple-output introspection through public metadata APIs. Both accommodations are version-specific and must be revalidated on upgrade. Task 4 review fix 1 drains cleanup requests and releases worker ownership in one locked handoff, with a package-private no-op Runnable seam for deterministic tests; publication retains the discovery endpoint and verifies the daemon GetId before registration. Two required source-inventory rows were added. Earlier deviations: add the native test probe to the theme source inventory and correct Task 1 evidence wording (ARM64 passed; existing cold Linux compiler warnings retained). Task 5 passes 50 Fedora ARM64 private-bus/controller tests (no skips) and local controller/inventory/architecture checks. Ruling 14 adds separate connection-state observations and a Modern reconnect callback: the controller owns the sole backoff timer, the adapter owns bounded attempts, and connected-without-host stops reconnects. Ruling 15 adds bounded worker-only `withdrawAndAwait`; Task 6 must bind it before replacement publication. One test inventory row added. Injectable timers are logically invalidated; Task 6 still owns physical cancellation, daemon scheduling and EDT/probe composition, after approval and native proof of the replacement legacy design.
+**Revision status (2026-10-28):** User approved the XCB amendment and continuing the existing per-task implementer/reviewer workflow. Tasks 1–5 below are preserved records; Task 2 is FAILED and its AWT approach is superseded. Remaining map: **6** bounded XCB/auth/ABI gate → **7** native embedding/render/input and real-panel gate → **8** transient Swing popup and placement gate → **9** production composition/routing → **10** CI/packages/docs/final acceptance. This is one runnable tray deliverable. Tasks 6–10 replace former AWT Task 6 and final Task 7. Native gate failure requires a fix or amendment; it never grants permission to assume a pass. The remaining tasks below implement the approved amendment; no production fallback is wired by this planning revision.
+
+**Historical status through completed Tasks 1–5 (superseded remaining-task references):** Tasks 1, 3, 4 and 5 have approved per-task reviews, including scoped fix reviews (`d77c7e7cb`, `2d291bb18`). Task 2 native characterization ran with authorization on 2026-10-28; the public-AWT gate failed. The user subsequently approved the [XCB/JNA amendment](../specs/2026-10-28-linux-x11-tray-amendment-design.md); revised Tasks 6–10 and the final whole-branch review remain pending. Task 1 passed the user-directed Fedora 44 aarch64 gate: 49 focused tests and both packaged-runtime address cases, notices/architecture and headless packaging. [Verification](2026-10-27-linux-residency-2-verification.md) records exact versions and evidence. Rulings 9–10 follow the user's split: x86_64 and Ubuntu 22.04 remain CI-pending; after Task 1 review, Tasks 4–5 may proceed with the pinned 5.2.0 bindings below. Task 2 retains the failed AWT gate evidence. Rulings 1–2 allow local preparation and replace the fixture sketch with short `/tmp` paths and bounded reader/process cleanup. Ruling 4 selects junixsocket after the released JDK transport's abstract-address rejection; Ruling 5 aligns application SLF4J API/nop to 2.0.17. Ruling 7 replaces the non-JAR aggregator with its exact common/native-common 2.10.1 jars. Ruling 8 excludes the confirmed compile-only annotation leak after packaging reproduced its module failure, superseding Ruling 6's temporary EPL investigation. Costs: native artifacts, explicit dependency tracking and a logging-version regression surface. The CI baseline and desktop matrix are not certified. Task 2 native characterization is recorded: the safe public-AWT gate failed on LXDE/JBR b635.75; Remaining implementation follows the approved legacy fallback amendment. Ruling 16 corrects the disposable probe's no-host lifetime with a bounded main-thread wait. Task 3's shared menu, ARGB conversion and capability/retry policy pass focused tests and architecture/inventory checks. Deviation: add Task 3's four new Java sources to the theme source inventory because its source discovery scans AWT imports, including headless tests. Task 4 implements the typed wire exports and bounded owner-scoped adapter; 19 Fedora private-bus tests pass, including independent exact `gdbus` introspection for both address forms. Controller Ruling 12 requires generic Tuple carriers and explicit Variant returns from `Properties.Get`; Ruling 13 narrowly repairs the pinned library's duplicated tuple-output introspection through public metadata APIs. Both accommodations are version-specific and must be revalidated on upgrade. Task 4 review fix 1 drains cleanup requests and releases worker ownership in one locked handoff, with a package-private no-op Runnable seam for deterministic tests; publication retains the discovery endpoint and verifies the daemon GetId before registration. Two required source-inventory rows were added. Earlier deviations: add the native test probe to the theme source inventory and correct Task 1 evidence wording (ARM64 passed; existing cold Linux compiler warnings retained). Task 5 passes 50 Fedora ARM64 private-bus/controller tests (no skips) and local controller/inventory/architecture checks. Ruling 14 adds separate connection-state observations and a Modern reconnect callback: the controller owns the sole backoff timer, the adapter owns bounded attempts, and connected-without-host stops reconnects. Ruling 15 adds bounded worker-only `withdrawAndAwait`; Task 6 must bind it before replacement publication. One test inventory row added. Injectable timers are logically invalidated; Revised Task 9 owns physical cancellation, daemon scheduling and EDT/probe composition after native proof of the replacement legacy design.
 
 ## Global Constraints
 
@@ -31,8 +33,8 @@
 1. A watcher starts before its panel host, or its owner changes during registration — Tasks 4–5 owner/host and stale-generation tests.
 2. A queued click arrives after an icon was withdrawn or Quit began — Task 5 EDT-generation test.
 3. An abstract Unix session address or packaged transport is unsupported — Task 1 real-address and packaged runtime gate.
-4. A legacy panel restarts, or GNOME enables its extension while the fallback is shown — Tasks 2 and 5 recovery/single-publication gates.
-5. Cold background login races with a foreground launch or logout — Task 7 native session matrix plus existing bootstrap tests; a tray disappearance is never interpreted as logout.
+4. A legacy panel restarts, or GNOME enables its extension while the fallback is shown — Tasks 5/7/9 recovery and single-publication tests; Task 2 preserves the failed AWT evidence.
+5. Cold background login races with a foreground launch or logout — Task 10 native session matrix plus existing bootstrap tests; a tray disappearance is never interpreted as logout.
 
 ## File map
 
@@ -44,7 +46,9 @@ All new production Java below is under `jasper-app/src/main/java/dev/jasper/app/
 | `LinuxTrayMenu.java` | Stable IDs, labels and action dispatch shared by both adapters |
 | `LinuxTrayDbus.java` | Wire interfaces and value structs, with exact D-Bus signatures |
 | `LinuxStatusNotifier.java` | Session connection, watcher discovery, exports and modern registration |
-| `LinuxLegacyTray.java` | Public AWT installation/removal and capability observations |
+| `LinuxTrayXcb.java` | Lazy native ABI, bounded transport/auth, request/reply and image bindings |
+| `LinuxLegacyTray.java` | Owned XEmbed publication, host epochs, native worker, bounded cleanup |
+| `LinuxTrayPopup.java` | Transient EDT Swing menu and public-coordinate placement |
 | `LinuxResidentTray.java` | Scheduling, generation, backend switching, bounded close |
 | `ResidentTray.java` (existing) | Linux delegation; retain Windows balloon and macOS behavior |
 | `LinuxTestBus.java`, `LinuxTrayProbe.java` (tests only) | Private bus fixture and opt-in native capability probe |
@@ -573,15 +577,214 @@ state; actual state changes only after successful installation.
 - [x] **Step 4: Run** `./gradlew :jasper-app:test --tests '*LinuxResidentTrayTest' --tests '*LinuxStatusNotifierTest' --tests '*LinuxTrayPolicyTest'`. Expect zero failures. Use timeouts/latches, not sleeps, for controlled races.
 - [x] **Step 5: Commit** `feat: recover Linux tray hosts without duplicate icons` with trailer.
 
-### Task 6: AWT fallback and application wiring
+### Task 6: Owned XCB transport, authority and cancellation gate
 
-**Stopped — 2026-10-28:** Task 2 failed the public-AWT gate. The steps below remain the original plan record and must not be executed; the [proposed amendment](../specs/2026-10-28-linux-x11-tray-amendment-design.md) needs review and user approval before a replacement implementation plan.
+**Gate:** This task produces a bounded native connection and executable characterization, not a resident icon. Task 7 starts only after the Fedora aarch64 gate passes. x86_64 and Ubuntu 22.04 remain required CI release gates by user direction. A timeout that leaves native work alive fails the gate; fix it or amend the design before continuing.
 
-**Files:** Create `LinuxLegacyTray.java`; modify `ResidentTray.java` and `ResidentTrayTest.java`; add same-package `LinuxLegacyTrayTest.java`; extend `jasper-app/src/test/java/dev/jasper/app/application/ResidentIndicatorTest.java` only where lifecycle assertions are missing.
+**Files:** Create `LinuxTrayXcb.java`; tests `LinuxTrayXcbTest.java`, `LinuxX11TestServer.java`, `LinuxX11TrayProbe.java`; native test-only `jasper-app/src/test/native/linux-tray-abi.c`; modify `jasper-app/build.gradle.kts`, `docs/design/theme-engine/migration.csv` only for discovered source rows, and the existing verification report. Production/test Java paths are the platform directories in the file map.
 
-**Interfaces:** `LinuxLegacyTray.install(IntConsumer action)` returns a nullable removal callback on EDT; `supported()` runs on EDT; no desktop work in static initialization. Controller wraps callbacks with the current generation. `ResidentTray` gains a Linux installer function while retaining its existing macOS/Windows constructor/test seam.
+**Interfaces:** `LinuxTrayXcb` is a concrete, worker-confined `AutoCloseable`; native pointers never leave this class. Its nested immutable values are `Display(int number, int screen)`, `Setup(int root, int rootVisual, int rootDepth, int imageByteOrder, List<Visual> visuals, List<PixmapFormat> formats)`, `Visual(int id, int depth, int redMask, int greenMask, int blueMask)`, `PixmapFormat(int depth, int bitsPerPixel, int scanlinePad)`, `Reply(int sequence, byte[] bytes)`, and `Event(int type, int sequence, byte[] bytes)`. Produce `static Display parseDisplay(String)`, `static LinuxTrayXcb connect(Map<String,String> launch, long deadlineNanos, Cancellation cancellation)`, `Setup setup()`, `int newId()`, `int internAtom(String,long deadlineNanos)`, `int selectionOwner(int atom,long deadlineNanos)`, `void barrier(long deadlineNanos)`, `List<Event> poll(long deadlineNanos)`, thread-safe nonblocking `void wakeup()` and `void requestClose()`, and worker-only `void close()`. The binding creates/owns its nonblocking close-on-exec wake pipe before native setup; requestClose atomically forbids later requests, shuts down the protected active socket duplicate and writes one coalesced wake byte. Only the worker calls close/disconnect/free; wakeup/requestClose never free native state. All deadlines use `System.nanoTime()`. Task 7 extends this concrete binding with named core/RENDER operations; it does not introduce a backend interface. `LinuxX11TestServer` is a test-only Unix-socket X11 protocol fixture with `filesystem()` and `abstractSocket()` factories, `address()`, `awaitSetup()`, `pauseReads()`, `resumeReads()`, `drop()`, `bytesRead()` and idempotent `close()`; every fixture wait has a five-second bound.
 
-- [ ] **Step 1: Add the routing tests.** Replace the Linux-not-supported expectation with tests that Linux is eligible only when not headless and that its injected installer is invoked exactly once, its cleanup is forwarded once, and Windows/macOS continue through their existing icon path. Headless `forThisDesktop()` must neither connect nor initialize a native tray. Keep all balloon ownership/click regression tests.
+- [ ] **Step 1: Add failing parsing, ABI and lifecycle assertions.** `parseDisplay` accepts `:0`, `:7.2`, `unix:7`, `unix/:7.2`; rejects TCP/SSH forms (`localhost:10.0`, `host:0`, `tcp/host:0`), negative/nondecimal/overflow numbers and screens. Limit display number to 65535 and screen to 255; verify selected screen exists in setup. Preserve filesystem `/tmp/.X11-unix/XN` and abstract `\0/tmp/.X11-unix/XN` candidates, trying each within the same total deadline. Tests load the class without loading native libraries on macOS/headless paths. Use JNA 5.14.0 already present, not a new dependency.
+
+```java
+@Test void acceptsOnlyLocalDisplayGrammar() {
+    assertThat(LinuxTrayXcb.parseDisplay("unix/:7.2")).isEqualTo(new LinuxTrayXcb.Display(7, 2));
+    for (String value : List.of("localhost:10.0", "host:0", ":-1", ":65536", ":1.256", ":1.x"))
+        assertThatThrownBy(() -> LinuxTrayXcb.parseDisplay(value)).isInstanceOf(IllegalArgumentException.class);
+}
+```
+
+Add named test assertions: `authoritySnapshotRejectsFifoDirectorySymlinkRaceAndOversize` (cap 1 MiB, at most 4096 records, 65535 bytes per decoded field, no special-file read); `authorityMatchesLocalThenWild` (FamilyLocal 256 matches captured host bytes/display-number ASCII, FamilyWild 65535 fallback, name exactly `MIT-MAGIC-COOKIE-1`, data exactly 16 bytes; mismatches never reused); `missingCookieUsesEmptyAuthAndServerDecides` (no access-control mutation); `malformedAuthorityFreesEveryNativeRecord`; `deadlineShutdownCannotHitReusedFd`; `onlyWorkerDisconnectsAfterCallReturns`; `failedAttemptMustFinishBeforeRetry`; `nativeLoadFailureIsScoped` (ordinary unavailable, no static initializer failure). Never print record contents/cookies.
+
+`linux-tray-abi.c` includes `<xcb/xcb.h>`, `<xcb/xcbext.h>`, `<xcb/render.h>`, `<X11/Xauth.h>`, `<poll.h>`, `<sys/un.h>` and prints `sizeof`/`offsetof` as `name=value`; the Java probe compares exact values, not architecture names. On Linux x86_64/aarch64 require 8-byte pointers/longs; XIDs, atoms and cookies remain 32-bit. Assert `xcb_void_cookie_t=4`, generic event/error=36, client-message=32, `xcb_auth_info_t=32` with name/data pointers at 8/24, `Xauth=64` with address/number/name/data pointers at 8/24/40/56, `pollfd=8`, `sockaddr_un=110`. Compare every field offset used by the binding with the C output. Decode fixed X protocol buffers at their wire offsets; never map C `long` to XID.
+
+- [ ] **Step 2: Run red tests.** `./gradlew :jasper-app:test --tests '*LinuxTrayXcbTest'`; expect missing binding/fixture before implementation. Test regular-file auth parsing on all platforms through byte fixtures; native ABI/socket tests are Linux-only. Required-native mode in Step 5 fails rather than skips missing libraries, compiler, symbols or fixture prerequisites.
+
+- [ ] **Step 3: Implement connection/auth and exact JNA boundary.** Lazy-load `xcb`, `xcb-render`, `Xau` and libc only inside `connect`. Use nested `Library` declarations and JNA `Pointer`, `Memory`, `IntByReference`, `PointerByReference`, `NativeLong`; every cookie is the following by-value type (same representation for core and RENDER):
+
+```java
+@Structure.FieldOrder("sequence")
+public static class Cookie extends Structure implements Structure.ByValue { public int sequence; }
+@Structure.FieldOrder({"namelen", "name", "datalen", "data"})
+public static class Auth extends Structure {
+    public int namelen; public Pointer name; public int datalen; public Pointer data;
+}
+interface Xcb extends Library {
+    Pointer xcb_connect_to_fd(int fd, Auth auth);
+    Pointer xcb_get_setup(Pointer connection);
+    int xcb_connection_has_error(Pointer connection);
+    int xcb_get_file_descriptor(Pointer connection);
+    int xcb_generate_id(Pointer connection);
+    int xcb_flush(Pointer connection);
+    Pointer xcb_poll_for_event(Pointer connection);
+    int xcb_poll_for_reply(Pointer connection, int sequence, PointerByReference reply, PointerByReference error);
+    Cookie xcb_get_input_focus(Pointer connection);
+    Cookie xcb_intern_atom(Pointer connection, byte onlyIfExists, short length, byte[] name);
+    Cookie xcb_get_selection_owner(Pointer connection, int selection);
+    void xcb_disconnect(Pointer connection);
+}
+```
+
+Bind libc `socket`, `connect`, `getsockopt`, `poll`, `fcntl`, `dup`, `shutdown`, `close`, `pipe2`, `read`, `write`, `open`, `fstat(int fd, Pointer stat)`, `fmemopen`, `fclose`, `free`; Xau `XauReadAuth(Pointer)->Pointer`, `XauDisposeAuth(Pointer)`. Use Linux constants `AF_UNIX=1`, `SOCK_STREAM=1`, `SOCK_NONBLOCK=0x800`, `SOCK_CLOEXEC=0x80000`, `SHUT_RDWR=2`, `SOL_SOCKET=1`, `SO_ERROR=4`, `EINPROGRESS=115`, `EAGAIN=11`, `EINTR=4`, `POLLIN=1`, `POLLOUT=4`, `POLLERR=8`, `POLLHUP=16`, `O_NONBLOCK=0x800`, `O_CLOEXEC=0x80000`, `O_NOFOLLOW=0x20000`, `F_DUPFD_CLOEXEC=1030`. ABI helper also checks these constants and all stat fields used. Implement nested `NativeStat` using 256-byte Memory and fstat: x86_64 struct size144 with st_dev0/st_ino8/st_mode24/st_size48; aarch64 size128 with st_dev0/st_ino8/st_mode16/st_size48. Select only os.arch amd64/x86_64 or aarch64/arm64; reject others. Verify these offsets against installed headers in the ABI gate. Read mode as unsigned int, device/inode/size as 64-bit; S_IFMT=0170000/S_IFREG=0100000. No guessed cross-architecture stat layout.
+
+Capture the environment via `Map.copyOf(System.getenv())` at installer construction. Authority path is captured nonempty `XAUTHORITY`, otherwise captured `HOME + "/.Xauthority"`. Acquire a 1 MiB maximum regular-file snapshot with nonblocking, no-follow, close-on-exec open; verify device/inode/size before and after, reject changed snapshots and special files, and check the shared two-second deadline between reads (16 KiB chunks). Feed the bounded byte snapshot to `fmemopen(...,"rb")`, decode at most 4096 `XauReadAuth` records, deep-copy matching name/data into worker-owned `Memory`, dispose every Xauth and fclose in `finally`. No unbounded `XauGetBestAuthByAddr`, `Files.readAllBytes` or authority scan hidden in a Future. The native gate must exercise acquisition cancellation as well as decoding: an `open`/`read` that outlives the deadline fails Task 6 even if a Java caller returned. The file path rule deliberately rejects symlinks; record that supported local-file scope in verification and the final maintenance text.
+
+Open nonblocking Unix socket, handle EINPROGRESS with `poll` and `SO_ERROR`, within `deadlineNanos`; create a duplicate before passing ownership to `xcb_connect_to_fd`. libxcb owns the original thereafter. Poll and XCB setup may change FD blocking mode; duplicate shutdown remains the cancellation mechanism. Keep the auth `Memory` alive until connect returns. Parse setup using validated length fields with a 1 MiB bound; reject unknown image format/invalid screen without leaking the connection.
+
+Wrap **every native operation that can flush**, including setup, request generation, explicit `xcb_flush`, render/image requests and reply polling, in the same operation lifetime. A separately runnable single daemon deadline scheduler owns shutdown, never disconnect/free:
+
+```java
+// generation lock protects both fd identity and its lifetime against descriptor reuse.
+synchronized (deadlineLock) {
+    long ticket = ++operationEpoch;
+    operationDuplicate = libc.fcntl(socketFd, F_DUPFD_CLOEXEC, 0);
+    if (operationDuplicate < 0) throw new IllegalStateException("XCB cancellation FD unavailable");
+    deadlineFuture = deadlines.schedule(() -> {
+        synchronized (deadlineLock) {
+            if (operationEpoch == ticket && operationDuplicate >= 0)
+                libc.shutdown(operationDuplicate, SHUT_RDWR);
+        }
+    }, Math.max(0, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS);
+}
+// finally, only after the native call returned:
+synchronized (deadlineLock) {
+    ++operationEpoch;
+    deadlineFuture.cancel(false);
+    libc.close(operationDuplicate);
+    operationDuplicate = -1;
+}
+```
+
+The owning native worker alone uses connect/poll/request/close; other threads use only wakeup/requestClose. requestClose also works while connect is in progress through a captured cancellation holder allocated before connect; connect accepts that holder as trailing `Cancellation cancellation` argument. `LinuxTrayXcb.Cancellation` is a concrete nested value owning the generation lock, active duplicate, close flag and wake pipe, created by `new Cancellation()` on the native worker before its first call and published before starting connect. It exposes thread-safe `wakeup()`/`requestClose()` and worker-only `close()`. The adapter can requestClose before publication through its own close flag, which the worker checks before connect. LinuxTrayXcb delegates its two cross-thread methods to this holder. The deadline algorithm above operates on that holder. Use a connection-level protected duplicate while a native call is active; never duplicate a stale original after disconnect. On requestClose synchronously mark closed, invalidate operation epoch/admissions and shutdown the still-protected active duplicate, then wake the worker. A connection not yet published to the adapter is still canceled through the published Cancellation holder. Worker disconnects only after call return and closes all remaining FDs/auth memory in `finally`. Disarm-before-close is mandatory; tests force old deadline execution after FD reuse. `barrier` queues GetInputFocus and polls its reply; collect scoped error sequences up to that barrier. Do not call blocking `xcb_request_check`, `xcb_wait_for_event` or reply wait APIs. Cap outstanding reply cookies at 64, event batches at 64 events/256 KiB and total copied reply at 1 MiB; reject an excessive reply using its header before copying. Free each event/reply/error once. Drain batches then service cleanup before ordinary commands.
+
+- [ ] **Step 4: Implement the opt-in deterministic native gate.** Add Gradle `linuxX11TrayProbe` as `JavaExec` on test runtime classpath, depending on `testClasses`, main class `dev.jasper.app.platform.LinuxX11TrayProbe`, native access enabled; ordinary `check` never launches it. Probe options are `--gate transport|legacy|popup`, `--output <directory>`, `--require-native`, `--display <local-display>`, `--panel lxde|xfce` (latter options needed by Tasks 7–8). Transport mode creates only its own Unix fixture sockets; it never opens a GUI or uses the desktop bus. Create `linuxTrayNativeTest` Gradle `Test` on the existing test source set, include XCB/legacy tests with `jasper.tray.requireNative=true`; no skipped required-native row. Build the ABI helper only for Linux native mode with system `cc` and public headers; it only evaluates sizeof/offsetof/constants and requires no native library linking. Prefer `pkg-config --cflags xcb xcb-render xau`; if development headers are absent on the authorized Fedora host, use the rootless extraction below, never a sudo/system installation. No SDK or shipped native output.
+
+Run both socket forms against fixture modes: no setup response, setup accepted then no replies, stop reading until explicit flush blocks, stop reading during request generation until an **implicit** flush blocks, invalid cookie/BadWindow/BadMatch, EOF, close in every phase. Execute one deterministic stalled attempt per distinct phase with a two-second deadline and 500 ms cleanup allowance, then four fast fail/reconnect/close cycles and 32 fast FD-reuse iterations. Assert no overlapping attempts, every worker completes, zero live duplicate sockets/auth buffers afterward, thread and `/proc/self/fd` counts return to baseline. Do not repeat 100 two-second timeouts; the phase acknowledgement proves the relevant path. Use latch/state acknowledgements to prove each native phase was entered; a test that never backpressures a flush is failure. Run the 32 FD-reuse iterations under a delayed old cancellation callback and prove the replacement socket remains usable. Use a separate watchdog process with 10-second bound per case to record JVM survival; a timed-out child is failed evidence, not a pass. This process is a test fixture, never a production helper.
+
+- [ ] **Step 5: Run and record the gate before Task 7.** Locally run `./gradlew :jasper-app:test --tests '*LinuxTrayXcbTest' :jasper-app:compileTestJava` and architecture/source-inventory checks. On authorized Fedora host `dustin@10.211.55.13`, work only under `/home/dustin/jasper-tray-gate.1yPuL3` with pinned JBR b635.75:
+
+```bash
+./gradlew :jasper-app:linuxTrayNativeTest --tests '*LinuxTrayXcbTest'
+./gradlew :jasper-app:linuxX11TrayProbe --args='--gate transport --require-native --output build/tray-gate/transport'
+```
+
+If headers are absent, execute rootless extraction in the authorized remote workspace before the native gate (installed runtime versions select exact matching development RPMs):
+
+```bash
+mkdir -p build/tray-gate/headers/rpms build/tray-gate/headers/root
+xcbVersion=$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}' libxcb)
+xauVersion=$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}' libXau)
+dnf download --destdir build/tray-gate/headers/rpms "libxcb-devel-$xcbVersion" "libXau-devel-$xauVersion" xorg-x11-proto-devel
+```
+
+Use `rpm2cpio` piped to `cpio -idm --no-absolute-filenames` with the extraction root as working directory, one downloaded RPM at a time; validate `rpm -qp` identity against the requested installed version before extraction. Pass `-I<workspace>/build/tray-gate/headers/root/usr/include` to `cc` and run `cc -std=c11 ... linux-tray-abi.c -o .../linux-tray-abi` (no `-l` flags). Prefer repo-provided libxcb/Xau header RPMs matching installed versions; if the exact RPM or rootless download command is unavailable, record a concrete missing-header blocker, not a permission request for system installation. Header RPMs are test-only and are not bundled. CI installs dev prerequisites normally.
+
+Record C/Java ABI output, libxcb/libXau/JBR versions, every timeout/leak counter and exact command in verification. Gate passes only with zero required skips, zero stuck attempts, zero unexpected exceptions and all cancellation assertions satisfied. The isolated panel authorization extends to Tasks 7–8 probes; active Plasma, real Jasper GUI, AOT and benchmarks remain excluded. Commit `feat: add bounded owned XCB tray transport` with required trailer after per-task review/fixes. Gate failure stops dependent work and is recorded explicitly in STATUS.
+
+### Task 7: XEmbed legacy adapter, drawing and native host gate
+
+**Files:** Create `LinuxLegacyTray.java`, `LinuxLegacyTrayTest.java`; extend `LinuxTrayXcb.java`, `LinuxTrayXcbTest.java`, `LinuxX11TestServer.java`, `LinuxX11TrayProbe.java` and verification. Add inventory rows only if discovery requires them. All Java paths are the platform paths in the map.
+
+**Interfaces:** Produce `LinuxLegacyTray(Map<String,String> launch, Consumer<Boolean> available, Consumer<MenuRequest> menu, Runnable cancelPopup)`, `void start()`, `boolean install(IntConsumer action)`, `void removeAndAwait()`, `void discoveryEnabled(boolean)`, `void close()`. Constructor captures values without native loading. Nested `MenuRequest(long epoch, Rectangle rootBounds, boolean pointer, IntConsumer action, BooleanSupplier valid)` carries a defensive rectangle copy in X root device pixels; `valid` checks adapter admission as well as connection/host/icon epoch. Its action is already adapter-guarded and will also pass through the controller guard. Availability callbacks are delivered outside native locks. Only the native worker calls XCB/free; install/removal run on the controller worker with a **two-second total deadline including admission**. `false` guarantees no icon or pending install survives. Cleanup still owed throws `IllegalStateException`; it never returns false to permit another publication. `close` invalidates synchronously and returns without waiting.
+
+Extend concrete `LinuxTrayXcb` with `void select(int window,int mask,long deadline)`, `int property32(int window,int atom,int type,long deadline)` (0 for absent, reject unexpected count/format/type), `int[] property32s(int window,int atom,int type,int max,long deadline)`, `void property32(int window,int atom,int type,int[] data,long deadline)`, `void property8(int window,int atom,int type,byte[] data,long deadline)`, `int parent(int window,long deadline)`, `Rectangle geometryOnRoot(int window,long deadline)`, `int createIcon(int parent,Visual visual,int colormap,int size,long deadline)`, `void sendClientMessage(int destination,int window,int type,int eventMask,int... data)`, `void destroyIcon(long deadline)`, `void paint(BufferedImage image,int width,int height,Visual visual,boolean alpha,long deadline)`, `int[] keysyms(int firstKeycode,int count,long deadline)`. Methods that queue requests receive/retain the current operation deadline even when their signature omits it (`sendClientMessage` runs only inside an armed operation). `destroyIcon` destroys the complete owned resource set and completes a reply barrier. No Pointer/XID reaches app code.
+
+- [ ] **Step 1: Write failing epoch, docking, geometry and pixel tests.** Add named test methods with these exact assertions; fixture commands acknowledge each race before releasing it:
+
+| Test | Required assertions |
+|---|---|
+| `subscribesBeforeInitialOwnerSnapshot` | root event selection precedes owner request; manager arriving between both results in one current owner |
+| `requiresHandshakeReparentAndCurrentOwner` | request dock alone=false; embedded-notify alone=false; reparent alone=false; both plus current owner=true; icon is unmapped before acceptance |
+| `sameXidNewConnectionIsNewHost` | connection epoch changes even with identical owner XID; false then true callbacks; old actions count zero |
+| `coalescedFalseTrueRefreshesLegacyGeneration` | deliver false/true before controller drain; installed callback invalidates and old callback count zero; one redock |
+| `ownerLossDuringDockNeverLeavesPendingIcon` | false only after destroyed/barrier or terminated connection; refused cleanup throws and blocks replacement |
+| `hostLossBeforeQueuedActionDropsIt` | primary release then owner loss before EDT drain produces zero callbacks |
+| `boundedCommandSlotPrioritizesCleanup` | 10,000 probes/resizes leave one pending normal command, one cleanup flag and bounded image bytes; close wins |
+| `configuredPixelsDoNotUseJbrScale` | actual 24x40 slot remains 24x40 at JBR scale 1 and 2; artwork centered with aspect ratio |
+| `unsupportedSlotOrVisualFailsClosed` | 0, 513, unsupported masks/padding/depth or parent-depth mismatch produce unavailable with no mapped stray window |
+| `nativePixelsArePremultipliedAndMaskEncoded` | half-alpha red ARGB `0x80ff0000` gives premultiplied red 128, not 255; tests cover 16-bit RGB565, depth24/bpp32, alpha32, byte orders 0/1, 16/32 scanline padding |
+| `resizeExposeAndBackgroundOnlyRedrawWhenDirty` | burst of 10,000 events makes one paint of final dimensions; next idle drain makes zero paints |
+| `inputAndTraversalUseCurrentEpoch` | Button1 release inside=action1 once; Button3 release=one menu request; press/middle/wheel/outside=zero; Return/Space=1, Menu/Shift-F10=menu; Tab/Shift-Tab=focus-next/previous, no grab |
+
+```java
+@Test void premultipliesNativePixelsWithoutChangingDbusEncoding() {
+    BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+    image.setRGB(0, 0, 0x80ff0000);
+    assertThat(LinuxTrayXcb.pixels(image, 32, 32, 0, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000))
+        .containsExactly((byte) 0, (byte) 0, (byte) 128, (byte) 128);
+    assertThat(LinuxTrayMenu.argb(image)).containsExactly((byte)128, (byte)255, (byte)0, (byte)0);
+}
+```
+
+`pixels(BufferedImage,int bitsPerPixel,int scanlinePad,int byteOrder,int redMask,int greenMask,int blueMask,int alphaMask)` is a package-private pure converter in `LinuxTrayXcb`; it rejects noncontiguous/overlapping masks and unsupported bpp (support 16/24/32). Round premultiplication `(channel * alpha + 127) / 255`, scale channels to mask bit width with rounding, write bytes in server order, and zero row padding. Cap width/height at 512 and owned upload buffers at 4 MiB including source/destination/padding.
+
+- [ ] **Step 2: Run red tests.** `./gradlew :jasper-app:test --tests '*LinuxLegacyTrayTest' --tests '*LinuxTrayXcbTest'`; expect missing adapter/converter. Keep Task 5's existing false/true regression unchanged and add the adapter-to-controller case above.
+
+- [ ] **Step 3: Implement the native owner and XEmbed state machine.** One daemon `jasper-tray-xcb` worker plus Task 6's independent daemon deadline scheduler; one coalesced normal-command slot and priority cleanup bit. Task 6 owns the nonblocking `pipe2` wakeup; adapter submits call `xcb.wakeup()`/the shared Cancellation holder and never closes wake FDs itself. Install waits only off EDT and shares its caller's deadline across queueing/connect/snapshot/dock/barrier. The worker has states disconnected, discovering, docking, embedded, cleanup-owed, closed. `start` admits discovery; `discoveryEnabled(false)` cancels owner-check work after confirmed removal while preserving passive wake/event polling. Resume performs fresh snapshot before install. Reconnect never begins until prior worker cleanup finishes.
+
+Root mask is `StructureNotifyMask=1<<17`; owner mask is `(1<<17)|(1<<22)`; icon mask is KeyPress `1`, ButtonPress `4`, ButtonRelease `8`, Exposure `1<<15`, StructureNotify `1<<17`, FocusChange `1<<21`, PropertyChange `1<<22`. Subscribe before snapshot, then intern `_NET_SYSTEM_TRAY_S` + selected screen, `MANAGER`, `_NET_SYSTEM_TRAY_OPCODE`, `_NET_SYSTEM_TRAY_VISUAL`, `_NET_SYSTEM_TRAY_ORIENTATION`, `_XEMBED`, `_XEMBED_INFO`, `WM_NAME`, `WM_CLASS`, `_NET_WM_NAME`, `UTF8_STRING`, `_NET_WM_ICON`, `WM_NORMAL_HINTS`, `WM_SIZE_HINTS`, `VISUALID`, `CARDINAL`. Never select SubstructureRedirect or modify another window. Client messages are format32 and exactly five int words; event type is `rawType & 0x7f`. Validate target/type/format and all resource epochs, including synthetic events.
+
+Capture host identity `(connectionEpoch, screen, ownerXid, hostEpoch)`; increment hostEpoch on invalidation, visual changes and owner replacement. Atom data and host/root geometry are connection-scoped. On changed/invalid owner: invalidate action epoch **first**, invoke cancelPopup, admit `available(false)`, remove old icon, validate new owner/visual, then admit `available(true)`. Deliver false/true as separate callbacks even if immediately adjacent. Observe DestroyNotify=17, UnmapNotify=18, MapNotify=19, ReparentNotify=21, ConfigureNotify=22, PropertyNotify=28, SelectionClear=29, ClientMessage=33; verify owner by fresh selection snapshot, never merely by XID existence. While enabled, five-second owner snapshots cover owner selection loss without destruction; they never reinstall a healthy icon.
+
+Create icon unmapped with visual/depth/colormap, background chosen by rendering rules below, `WM_NAME`/UTF8 name `Jasper`, `WM_CLASS` bytes `jasper\0Jasper\0`, `_NET_WM_ICON` existing image ARGB CARDINALs, and minimum 1x1/preferred 24x24/maximum 512x512 size hints. `_XEMBED_INFO` is type `_XEMBED_INFO`, format32, `[0,1]` (version0/mapped intent). Send docking to the **captured owner**, window=owner, message `_NET_SYSTEM_TRAY_OPCODE`, data `[serverTimestamp,0,iconXid,0,0]`, NoEventMask. A timestamp of CurrentTime=0 is allowed before a real server event timestamp is available; later use the most recent server timestamp. Accept `_XEMBED` EMBEDDED_NOTIFY=0 only with data1=0, data3=nonzero embedder and negotiated version0, matching icon; QueryTree must confirm that parent equals announced embedder, and a final selection snapshot must still match owner. Map only after these validations. Do not treat a root reparent or an unrelated configure as embedding.
+
+Support XEmbed WINDOW_ACTIVATE=1/DEACTIVATE=2, REQUEST_FOCUS=3, FOCUS_IN=4/OUT=5, FOCUS_NEXT=6/PREV=7, MODALITY_ON=10/OFF=11. Request focus through current embedder on primary/key interaction, honor focus messages, return traversal to embedder; no XSetInputFocus/global grab. Track _XEMBED_INFO mapped flag and negotiated version; host unmapping pauses interaction, remapping repaints. Resolve the server's min/max keycode setup range (max256 codes; max32 keysyms/code) using GetKeyboardMapping; refresh on MappingNotify=34. Keysyms Return=0xff0d, Space=0x20, Menu=0xff67, F10=0xffc7 with ShiftMask=1, Tab=0xff09/ISO_Left_Tab=0xfe20. Deliver release-only primary action at valid local coordinates; duplicate/malformed event sequences do not double-invoke.
+
+- [ ] **Step 4: Implement native drawing and confirmed cleanup.** Extend lazy JNA declarations for core checked create/change/destroy window, colormap, pixmap/GC, ChangeProperty, GetProperty, QueryTree, GetGeometry, TranslateCoordinates, Map/Unmap, SendEvent, PutImage, GetKeyboardMapping, and RENDER QueryVersion/QueryPictFormats/CreatePicture/FreePicture/Composite. Bind each with exact C signature from installed public headers and Task 6 ABI helper; retain sequence numbers and use the reply barrier/error queue, not `xcb_request_check`. Fixture tests assert encoded opcode/length/values. Cap request payload to setup maximum request size; tile PutImage by scanline when necessary, including header/padding in the limit; do not require BIG-REQUESTS.
+
+Resolve advertised visual against setup and RENDER direct-format channel shifts/masks (not an assumed BGRA visual). Absent property uses root visual. Alpha visual requires a usable RENDER alpha destination and the host's verified compositing path; transparent Clear operator0 then Over operator3. For opaque destination matching embedder depth, set ParentRelative background (value1), ClearArea before repaint, composite premultiplied ARGB32 source Over. Reject ParentRelative across depth mismatch. Allocate source pixmap/GC/picture and destination picture/optional colormap once per geometry/visual epoch; free old set after replacement barrier. Native dimensions are already device pixels. Rasterize `ApplicationIcon.images("linux")` offscreen through `ResidentTray.image` into the slot with preserved aspect ratio and centered full artwork; no UI transform multiplication. Expose/configure/parent-background signals only set one dirty bit. Visual property change invalidates and redocks exactly once.
+
+`removeAndAwait`: invalidate native action epoch, cancel popup, request priority teardown; destroy icon and free pictures/pixmaps/GC/colormap; queue barrier and wait within the original two seconds. A destruction error is scoped and confirmed connection termination is acceptable; a timeout triggers protected-socket shutdown and waits for worker-owned disconnect confirmation within that same overall bound. If cleanup remains unconfirmed, throw and retain cleanup-owed; never signal successful removal. Close must remain nonblocking while worker cleanup drains. Native resource counters/test callbacks prove one free per allocation and no free while a native call is outstanding.
+
+- [ ] **Step 5: Execute the authorized isolated real-panel gate.** Extend `LinuxX11TrayProbe --gate legacy` to drive the adapter directly, capture uncaught exceptions as failed rows, and record host epochs/resources/slot dimensions/actions without cookies. Test harness controls only panels it starts inside the isolated display/bus; panel/app PID files must be scoped below output. With the user-authorized Fedora prerequisites, execute in `/home/dustin/jasper-tray-gate.1yPuL3`:
+
+```bash
+./gradlew :jasper-app:linuxTrayNativeTest --tests '*LinuxTrayXcbTest' --tests '*LinuxLegacyTrayTest'
+dbus-run-session -- xvfb-run -a -s '-screen 0 1280x800x24' ./gradlew :jasper-app:linuxX11TrayProbe --args='--gate legacy --panel lxde --require-native --output build/tray-gate/lxde'
+dbus-run-session -- xvfb-run -a -s '-screen 0 1280x800x24' ./gradlew :jasper-app:linuxX11TrayProbe --args='--gate legacy --panel xfce --require-native --output build/tray-gate/xfce'
+```
+
+Harness launches `lxpanel` or `xfce4-panel --disable-wm-check` using private XDG_CONFIG_HOME, after an initial no-host interval and an acknowledged unavailable snapshot. Use copied minimal panel profiles with only the tray plugin; record installed plugin identifiers/config, not active Plasma configuration. Run 20 slow/fast panel stop/start cycles, actual live tray applet removal/re-add via that isolated panel's configuration, selection replacement without process death using fixture owner, owner loss during docking and menu request. Distinguish whole-Xvfb teardown from loss of the adapter's independent socket. Assert one icon, no undocked visible window, old resources removed before replacement, no unexpected uncaught exceptions/incidents, no action from old host. Missing panel/program is failure in require-native mode.
+
+Capture light/dark/patterned panels at 16/24/32/48 slots, opaque/alpha visual paths with compositor off and, if available, on (private `xcompmgr`), matching 1x/2x and mixed host/JBR scales (`-Dsun.java2d.uiScale=2` for the probe process). Compare screenshots for complete artwork/corners/no trails, not only successful API returns. An alpha-advertising host without usable compositing must decline cleanly rather than paint black corners. xcompmgr is an optional test tool, not a new system-install prerequisite; if absent, record compositor-on/alpha-visible rows pending while observed opaque/noncomposited host paths can pass. Obtain extra compositor tooling only by rootless RPM extraction in the isolated directory if needed; never install system packages without authorization. A pending alpha path cannot be enabled as supported production behavior without its visual gate. Record input and XEmbed focus/traversal through `xdotool` only on this display. Virtual scale evidence leaves physical mixed-monitor rows pending for Task 10. Gate failure stops Task 9; fix/amend, never substitute a protocol fixture for real panels. Commit `feat: implement owned XEmbed legacy tray` with trailer after review.
+
+### Task 8: Transient Swing popup and placement gate
+
+**Files:** Create `LinuxTrayPopup.java`, `LinuxTrayPopupTest.java`; extend `LinuxX11TrayProbe.java`, verification and required inventory rows. No permanent frame or workspace window.
+
+**Interfaces:** `LinuxTrayPopup(Consumer<Runnable> edt)`, `void request(LinuxLegacyTray.MenuRequest request)`, `void cancel()`, `void close()`. All public-to-package methods admit nonblocking work; only EDT creates/disposes Swing. Keep one pending request using atomic latest request + one queued EDT drain; close/host invalidation clears it. Pure nested `Screen(Rectangle deviceBounds, Rectangle userBounds, Insets insets, AffineTransform transform)` plus `static Rectangle toUser(Rectangle root, Screen screen)`, `static Point clamp(Point anchor, Dimension menu, Screen screen)` for deterministic headless tests. Native root monitor rectangles must be paired with public GraphicsConfiguration identities by verified root/device rectangle; ambiguous pairing refuses keyboard popup and logs unavailable once rather than guessing a global scale.
+
+- [ ] **Step 1: Write red placement and lifetime tests.** `toUser` uses screen origin and inverse transform on the **relative device vector**, not inverse-transforming a global X root coordinate:
+
+```java
+// Native monitor2 starts at x=1920; AWT monitor2 user-space starts at x=1920, scale2.
+var screen = new LinuxTrayPopup.Screen(new Rectangle(1920,0,2560,1440),
+    new Rectangle(1920,0,1280,720), new Insets(0,0,40,0), AffineTransform.getScaleInstance(2,2));
+assertThat(LinuxTrayPopup.toUser(new Rectangle(2120,100,40,40), screen))
+    .isEqualTo(new Rectangle(2020,50,20,20));
+assertThat(LinuxTrayPopup.clamp(new Point(3190,710), new Dimension(240,200), screen))
+    .isEqualTo(new Point(2960,480));
+```
+
+Add cases negative monitor origins, fractional1.25/1.5 transforms (floor minimum/ceil maximum), menu larger than work area (pin to work-area origin), all four screen edges/insets, moved pointer, missing MouseInfo/headless, mismatched/ambiguous native-to-AWT monitor identity (no popup). Test `tenThousandRequestsQueueOneEdtTask`, `invalidEpochBeforeEdtCreatesNoWindow`, `hostLossCancelsAndDisposesOnce`, `closeDropsQueuedSelection`, `quitCanceledDoesNotCloseAdapter` and all menu row IDs/order against shared rows. Inject recording EDT and a package-private `Consumer<MenuRequest>` creation seam for headless admission tests; the production constructor supplies the real Swing creation method. Do not invoke real windows in `check`.
+
+- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*LinuxTrayPopupTest'`; expect missing implementation.
+- [ ] **Step 3: Implement short-lived menu ownership and mapping.** `request` samples latest guarded request; EDT checks `valid` before creating and before invoking each action. Reuse `LinuxTrayMenu.rows`, with labels/IDs unchanged; selection calls captured `IntConsumer` then disposes in `finally`. Create `new JDialog((Window)null)`, undecorated, focusable, `Window.Type.POPUP`, focusableWindowState true, default close DISPOSE_ON_CLOSE; place a `JPopupMenu` in its content pane with normal Swing menu selection/keyboard support. Pack before clamping, show once, request focus/menu selection; never construct a JFrame. Dispose on action, Escape, outside press, focus loss, invalidation or close. Remove AWTEventListener, WindowFocusListener, menu listeners and clear MenuSelectionManager path during the same idempotent dispose; no Timer/listener keeps a window alive. The native icon holds no pointer/keyboard grab.
+
+Pointer invocation samples `MouseInfo.getPointerInfo` on EDT; use its device GraphicsConfiguration bounds/insets and user-space point if still within the verified icon root rectangle transformed to that screen. Otherwise use icon bottom-center mapped through `toUser`; keyboard invocation always uses that path. Use only the approved public MouseInfo/GraphicsConfiguration path; no additional native library. Match the X root rectangle to public configurations only when origin/extent/default-transform pairing is unique and verified by the probe (single-monitor mapping is the initial provable case). For a multi-monitor layout that cannot establish an unambiguous correspondence from public data, decline the keyboard/moved-pointer anchored popup rather than guessing a root origin or global scale. Pointer placement still uses the current MouseInfo device/user coordinates; the gate must prove whether the pointer remained over the icon before using this route. Tests pin the mapping arithmetic above; native physical evidence pins identity. A pointer that moved and lacks a proven icon mapping cancels the popup, with the next user request still allowed. Physical mixed-DPI acceptance remains pending until observed. Sample pointer only at display time, never carry raw X button coordinates into Swing.
+
+- [ ] **Step 4: Run headless tests and isolated popup acceptance.** `./gradlew :jasper-app:test --tests '*LinuxTrayPopupTest' --tests '*LinuxLegacyTrayTest' --tests '*LinuxResidentTrayTest' :verifyApplicationArchitecture`. Extend Task 7 isolated commands with `--gate popup`, each panel, 1x and JBR2x. Harness opens no Jasper workspace; record `Window.getWindows` counts before/after and actual popup type/focus. Use `xdotool` to select all four rows, Escape/outside-click/focus-loss, Tab/Shift-Tab/menu keys, panel loss while open and close while an EDT show is queued. Assert exactly one callback per chosen row, zero after invalidation, no taskbar entry, window/listener counts return to baseline and no stuck JVM. A vetoed Quit records the callback but the adapter still discovers/reopens. Capture placement at each edge; virtual multi-screen origins supplement, never certify, physical mixed-DPI acceptance. If public Swing focus/dismissal cannot pass with no other window, fix/amend before production wiring. Commit `feat: add transient Linux tray popup` with trailer after review.
+
+### Task 9: Production scheduling, Linux routing and lifetime
+
+**Prerequisites:** Reviewed Tasks 6–8 Fedora native gates pass; x86_64/Ubuntu22.04 rows remain CI-pending as authorized. No AWT `SystemTray`/`TrayIcon` fallback is constructed.
+
+**Files:** Create `LinuxTrayRuntime.java` and `LinuxTrayRuntimeTest.java` (composition/lifetime only); modify `LinuxResidentTray.java`, `LinuxResidentTrayTest.java`, `ResidentTray.java`, `ResidentTrayTest.java`, `jasper-app/src/test/java/dev/jasper/app/application/ResidentIndicatorTest.java`; adjust existing bootstrap indicator comment/Javadoc only if inaccurate; required inventory rows and verification. This one extra runtime file keeps deterministic controller state separate from thread/adapter construction.
+
+**Interfaces:** `static Runnable LinuxTrayRuntime.install(ResidentTray.Actions actions)` creates the runtime and returns idempotent nonblocking cleanup even when no host exists. Preserve the reviewed `LinuxResidentTray` constructor exactly, delegating to an overload with trailing `Runnable cancelRetry, Consumer<Boolean> modernPublished` and no-op defaults. `cancelRetry` physically cancels the production future; `modernPublished` is a nonblocking state observation used only to suspend/resume legacy discovery. `ResidentTray` gains trailing `Function<Actions,Runnable> linuxInstaller` constructor overload; old two-argument constructor delegates with null. No application lifecycle decisions move to platform code.
+
+- [ ] **Step 1: Add failing routing, timer and cleanup tests.** Linux applies only nonheadless, independent of host presence; `forThisDesktop` headless/native-class-load path touches no libraries/connections. Inject installer and assert once-only install/cleanup and no Windows/macOS regressions. Linux `balloon` never adds a temporary AWT icon; existing `LinuxNotifications` remains owner. Runtime tests inject recording factories/executors through a package-private constructor with concrete function parameters, not interfaces; prove cold construction does no native work, install starts discovery only from the settled indicator hook, one daemon controller scheduler, physical timer queue empties on success/restored/close, five-second probe suspended only while modern publication is confirmed, resume snapshots before legacy install, close from EDT returns promptly while blocked native cleanup runs elsewhere.
 
 ```java
 @Test void linuxEligibilityDoesNotRequireAHost() {
@@ -590,119 +793,78 @@ state; actual state changes only after successful installation.
 }
 ```
 
-Use injected `Function<Actions,Runnable>` to assert no actual desktop API is touched. Add a no-icon installer lifecycle test that marks `StartupTrace.Milestone.WARMED_UP`, then Quits, and asserts its cleanup runs exactly once despite never showing an icon; use `ResidentIndicatorTest`'s existing `application`, `resident`, `settled` and EDT helpers.
+Add controller tests `successPhysicallyCancelsRetry`, `connectionRestoredPhysicallyCancelsReconnect`, `closePhysicallyCancelsRetry`, `modernPublicationSuspendsLegacyProbeAfterConfirmedAdd`, `failedWithdrawalCannotResumeLegacyPublication`. Existing controller tests keep old constructor/no-op hooks and exact ordering. Extend `ResidentIndicatorTest` using existing settled/EDT helpers: no-icon runtime still reaches `StartupTrace.Milestone.WARMED_UP`; Quit runs cleanup exactly once. Add integration trace for legacy → modern (confirmed legacy destroy precedes modern publish), modern failure → confirmed withdrawal → legacy, close during each queued callback, stale popup action, and both adapter cleanup failures (try/finally closes the other adapter).
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*ResidentTrayTest' --tests '*ResidentIndicatorTest' --tests '*LinuxLegacyTrayTest'`; expect Linux routing failure. **Task 2 native gate must already pass before committing the production fallback.**
-- [ ] **Step 3: Add the complete AWT installation method** in `LinuxLegacyTray` (imports JDK AWT, `AtomicBoolean`, `IntConsumer`):
+- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*ResidentTrayTest' --tests '*LinuxTrayRuntimeTest' --tests '*LinuxResidentTrayTest' --tests '*ResidentIndicatorTest'`; expect routing/hook failures before implementation.
+- [ ] **Step 3: Compose the exact reviewed adapters and physical cancellation.** Runtime captures launch environment, builds popup, legacy and modern with callbacks to a controller reference set before starting either adapter; callbacks queued earlier are retained/coalesced until reference initialization, not dropped. Use one `ScheduledThreadPoolExecutor(1, Thread.ofPlatform().daemon().name("jasper-tray-controller").factory())`, `setRemoveOnCancelPolicy(true)`. The controller still serializes reconciliation; adapter native work and D-Bus work stay on their own workers. EDT never waits for them.
 
 ```java
-static Runnable install(IntConsumer action) {
-    if (!javax.swing.SwingUtilities.isEventDispatchThread())
-        throw new IllegalStateException("Legacy tray installation requires EDT");
-    if (!supported()) return null;
-    try {
-        SystemTray tray = SystemTray.getSystemTray();
-        PopupMenu menu = new PopupMenu();
-        for (LinuxTrayMenu.Row row : LinuxTrayMenu.rows()) {
-            if (row.separator()) { menu.addSeparator(); continue; }
-            MenuItem item = new MenuItem(row.label());
-            item.addActionListener(event -> action.accept(row.id()));
-            menu.add(item);
-        }
-        TrayIcon icon = new TrayIcon(ResidentTray.image(ApplicationIcon.images("linux"), tray.getTrayIconSize()),
-            "Jasper is running in the background", menu);
-        icon.setImageAutoSize(true);
-        icon.addActionListener(event -> action.accept(1));
-        tray.add(icon);
-        AtomicBoolean removed = new AtomicBoolean();
-        return () -> { if (removed.compareAndSet(false, true)) tray.remove(icon); };
-    } catch (AWTException | RuntimeException failure) {
-        return null;
-    }
-}
-
-static boolean supported() {
-    return !GraphicsEnvironment.isHeadless() && SystemTray.isSupported();
-}
+var modernBinding = new LinuxResidentTray.Modern(
+    modern::publish, modern::withdrawAndAwait, modern::close, modern::start);
+var legacyBinding = new LinuxResidentTray.Legacy(
+    legacy::install, legacy::removeAndAwait, legacy::close);
 ```
 
-Surround `supported()` exceptions in the controller's capability probe; log installation errors through the
-controller's state-based diagnostics, not on every probe. Apply the Task 2-proven public support/property recovery
-behavior. Removal remains EDT-only; never call it from the D-Bus thread.
+Wire `LinuxStatusNotifier(capturedBusAddress, controller::hostChanged,
+connected -> { if (connected) controller.connectionRestored(); else controller.connectionLost(); })` with actual callback construction through the initialized reference. Native availability calls `controller.legacyChanged`. Popup receives adapter MenuRequest; its callback already calls the controller's captured generation dispatch. Dispatch through `SwingUtilities::invokeLater`.
 
-In `ResidentTray`, add a nullable final `Function<Actions,Runnable> linuxInstaller` and a constructor overload to
-inject it; have the existing `(boolean mac, BiFunction<Runnable,Optional<Actions>,Icon> add)` constructor delegate
-with null. `forThisDesktop()` first preserves the headless no-op path, then for Linux constructs the facade with
-`LinuxResidentTray::install`; add that production composition method now, creating the Task 5 controller and owning
-Task 4 discovery and the AWT adapter, then starting discovery/probing. At the top of `install(Actions)` after null validation, delegate to that function if
-present; wrap its returned cleanup in an idempotent callback. Other paths, including Windows balloon-only temporary
-icons, remain unchanged. Linux system notifications continue to use `LinuxNotifications`; `balloon` must not
-accidentally create a second legacy icon. Add an explicit Linux early return there if needed. Update only relevant
-Javadocs and bootstrap's indicator comment; do not move existing lifecycle decisions into the platform package.
+Store exactly one retry `ScheduledFuture<?>`; scheduling cancels the prior future before replacing it. New controller hook `cancelRetry()` clears logical ticket/purpose as today and invokes runtime cancellation **only when a ticket existed**. Production callback `getAndSet(null)` then `cancel(false)`; remove-on-cancel clears scheduler queue. Timer firing clears its own future before enqueuing controller work. No EDT blocking and no cancellation hook recursion. Add `modernPublished.accept(true)` only after successful current-generation publish; emit false only after confirmed modern withdrawal/connection termination, not merely an owner observation or timed-out cleanup. Hook false calls `legacy.discoveryEnabled(true)` and obtains fresh snapshot; true cancels runtime's sole five-second probe and `legacy.discoveryEnabled(false)`. The existing controller fallback/generation/cleanup rules remain intact. No new public controller state accessor.
 
-- [ ] **Step 4: Run** `./gradlew :jasper-app:test --tests '*ResidentTrayTest' --tests '*ResidentIndicatorTest' --tests '*Linux*Tray*Test' --tests '*JasperApplicationResidencyTest' --tests '*JasperApplicationBackgroundTest' --tests '*ApplicationBootstrapTest'` and `./gradlew verifyApplicationArchitecture`. Expect zero failures; Linux wire tests require Linux/private bus, and are not counted as verified when skipped on macOS.
-- [ ] **Step 5: Commit** `feat: integrate Linux resident trays with X11 fallback` with trailer.
+Runtime starts a single five-second fixed-delay legacy snapshot timer while enabled; expose `void LinuxLegacyTray.probe()` to coalesce a fresh owner snapshot on its native command slot. Native passive event polling remains active while disabled without periodic probing. Avoid two separate five-second timers: Task 7's test driver uses explicit `probe`, and production owns this sole timer. Native close invalidates popup before asynchronous resource drain. Runtime close atomically invalidates controller/adapters immediately, cancels retry/probe/deadlines, queues cleanup, and shuts down controller scheduler after its cleanup task; do not shut down an adapter deadline scheduler before its active operation has returned. Adapter workers stop themselves after releasing resources.
 
-### Task 7: Package, document and accept the desktop matrix
+`ResidentTray.forThisDesktop`: retain headless no-op first; on nonheadless Linux inject `LinuxTrayRuntime::install`, preserving Windows/macOS existing path. `install(Actions)` validates, delegates Linux branch before AWT icon logic, and returns an idempotent wrapper even when native unavailable. Linux facade marks notification routing so `balloon` returns without calling `add`; do not change Windows balloon ownership/click tests. Constructor/native loading remains cheap; existing application settled-startup hook triggers install.
 
-**Files:** Modify `.github/workflows/linux-packages.yml`, `docs/configuration.md`, `docs/workspace.md`, `docs/app-maintenance.md`, `docs/packaging.md`, `docs/STATUS.md`, this plan and its verification report. Update `jasper-app/build.gradle.kts` only if a dedicated packaged smoke classpath/task is needed.
+- [ ] **Step 4: Run focused integration regressions.** `./gradlew :jasper-app:test --tests '*Linux*Tray*Test' --tests '*LinuxStatusNotifierTest' --tests '*ResidentTrayTest' --tests '*ResidentIndicatorTest' --tests '*JasperApplicationResidencyTest' --tests '*JasperApplicationBackgroundTest' --tests '*ApplicationBootstrapTest' --tests '*ThemeMigrationCoverageTest' :verifyApplicationArchitecture`. Repeat Linux required-native/private-bus/controller tests on authorized Fedora, zero required skips. Run transport/legacy/popup probes once against composed runtime on isolated buses/displays; no real Jasper workspace, login registration or active Plasma. Record successful modern preference and one-publication ordering via fixture host. Commit `feat: integrate recoverable Linux resident trays` with trailer after review.
 
-**Interfaces:** Release gate is a recorded matrix with actual platform/runtime versions. No new supported API.
+### Task 10: Required Linux CI, packages, guides and final acceptance
 
-- [ ] **Step 1: Require private-bus tests in Linux CI.** Add `dbus-daemon` to the Linux package job's prerequisite packages. Run `./gradlew :jasper-app:test --tests '*LinuxTrayTransportTest' --tests '*LinuxTrayWireTest' --tests '*LinuxStatusNotifierTest'` on both architecture runners. Expand the workflow path filters to include `jasper-app/src/main/java/dev/jasper/app/platform/**` and the corresponding tests so tray changes trigger this gate. Tests must fail on missing private-bus prerequisites in this job; macOS/Windows may skip Linux-only cases. Never use the host desktop bus. Retain existing package install/coexistence tests.
-- [ ] **Step 2: Run final automated checks**: `./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage -Pjasper.aot=false`, then packaged-runtime transport/wire smoke on Linux x86_64/aarch64. Confirm every runtime artifact has a third-party notice, service providers are present, and the package still installs on its existing minimal baseline. Review XML counts and skipped tests; run `git diff --check`. No SDK changes expected; regenerate `sdkReference` only if its inputs changed.
-- [ ] **Step 3: Update the existing guides with exact behavior copy**, replacing stale Linux-no-icon claims:
+**Files:** Modify `.github/workflows/linux-packages.yml`, `docs/configuration.md`, `docs/workspace.md`, `docs/app-maintenance.md`, `docs/packaging.md`, `docs/STATUS.md`, this plan and verification. Modify `jasper-app/build.gradle.kts` only for packaged probe classpath support; SDK is unchanged.
+
+**Interfaces:** Recorded release matrix with exact runtime/library/host versions; CI uses existing native architecture runners (Ubuntu22.04 x64/aarch64). No new supported API. Incomplete user desktop/physical monitor rows stay pending; local virtual success is not a distro compatibility claim.
+
+- [ ] **Step 1: Require the Linux headless and native ABI/transport gates in CI.** Include both platform Java source/test paths, native fixture and runtime/library Gradle changes in workflow push/PR path filters. Install `dbus-daemon libxcb1 libxcb-render0 libxau6 libxcb1-dev libxcb-render0-dev libxau-dev pkg-config` alongside existing build prerequisites. Add required-native tests/probe **before** packaging on both Ubuntu22.04 runners:
+
+```bash
+./gradlew :jasper-app:test --tests '*LinuxTrayTransportTest' --tests '*LinuxTrayWireTest' --tests '*LinuxStatusNotifierTest'
+./gradlew :jasper-app:linuxTrayNativeTest --tests '*LinuxTrayXcbTest' --tests '*LinuxLegacyTrayTest'
+./gradlew :jasper-app:linuxX11TrayProbe --args='--gate transport --require-native --output build/tray-gate/transport'
+```
+
+No DISPLAY/desktop bus is required for those gates; protocol fixture supplies owned local sockets. CI missing prerequisites/skipped required rows fail. Preserve existing install/coexistence/package baseline jobs. No GTK/Qt SDK is introduced by tray work; existing unrelated desktop-color SDK jobs stay as they are. Upload ABI/gate logs on failure. x86_64 and Ubuntu22.04 results are CI-only until the workflow actually runs; never prefill them from Fedora ARM64.
+
+- [ ] **Step 2: Run final checks and actual packaged-runtime gates.** `./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage -Pjasper.aot=false` using configured JBR25 and supported Python3.11–3.13; run `git diff --check`, source hygiene scanner from AGENTS, inspect XML counts/skips. No SDK change means no external-plugin rerun/reference regeneration unless actual inputs changed. No AOT, GUI or benchmark task is implied by headless packaging.
+
+Provide `linuxX11TrayProbe -Pjasper.tray.packagedHome=<absolute app-image>` using a Gradle `JavaExec.javaLauncher`/`executable` override to the packaged `lib/runtime/bin/java` and classpath of exact packaged `lib/app/*.jar` plus **test output only** (not main runtimeClasspath dependency jars). Include no unshipped main jar/dependency, so missing package libraries fail. Run transport gate and existing packaged D-Bus address smoke on Fedora aarch64 and both Ubuntu22.04 CI architectures. Repeat isolated real-panel/popup gate with packaged JBR on authorized Fedora. Verify `readelf`/`ldd` for system XCB/Xau sonames, no new shipped native library, one D-Bus transport/NOP provider, no missing notices. All exact commands/artifact hashes/library versions go in verification. Any native cancellation failure or fatal adapter error is a release blocker.
+
+- [ ] **Step 3: Make minimal guide corrections to implemented behavior.** Replace stale Linux-no-tray claims with existing guide prose matching this copy; preserve headings/settings notification anchors:
 
 ```markdown
-On Linux, Jasper shows a tray icon when the desktop provides a compatible status notifier or X11 tray. Its menu
-provides **Open Jasper**, **New Window**, **Settings…** and **Quit Jasper**. Jasper keeps running without an icon when
-no tray is available; launch it normally to reopen it and use Quit in the app to exit. GNOME needs an enabled
-indicator extension to show the icon.
+On Linux, Jasper shows a tray icon when the desktop provides a compatible status notifier or local X11 tray.
+Its menu provides **Open Jasper**, **New Window**, **Settings…** and **Quit Jasper**. Jasper keeps running without
+an icon when no tray is available; launch it normally to reopen it and use Quit in the app to exit. GNOME needs
+an enabled indicator extension to show the icon.
 ```
 
-Add the platform owner/worker/cleanup description beside existing residency maintenance text. Preserve notifications
-and settings anchors. Link the GNOME extension in the existing packaging acceptance notes, not an automatic install
-command. Documentation promises protocol support and the tested matrix, not every combination of distro/DE version.
+Describe the owned XCB/local Unix display and regular nonsymlink bounded authority scope in existing maintenance text, and system `libxcb.so.1`, `libxcb-render.so.0`, `libXau.so.6` runtime resolution/worker cleanup beside current platform notes. Do not promise unsupported remote TCP/SSH tray fallback. Document confirmed protocol/tested matrix only; link GNOME extension from existing packaging acceptance notes, never install it automatically.
 
-- [ ] **Step 4: Hand native acceptance to the user.** Test the following release families; record exact installed point
-versions, session type, host/extension version, JBR build and architecture. Unavailable rows remain pending.
+- [ ] **Step 4: Record user desktop acceptance, preserving pending rows.** Use actual distro point version, architecture, session type, panel/extension version, JBR build and monitor transforms. User-authorized isolated LXDE/XFCE/Xvfb results can fill only their executed rows; do not launch real Jasper or enter the active Plasma session from this task.
 
-| Baseline | Desktop/session cases | Required observations |
+| Release family | Cases | Required evidence |
 |---|---|---|
-| Ubuntu 22.04, x86_64/aarch64 | Headless packaged runtime baseline | Both socket forms, native ABI/provider, installation |
-| Ubuntu 24.04 LTS | GNOME Wayland and available X11; extension on/off | Late host, no-host residency, focus/reopen, logout |
-| Debian 12/13 | LXDE X11, MATE X11, XFCE X11 | Legacy recovery and scaling; modern preference where present |
-| Fedora 44 | GNOME Wayland; Plasma Wayland and available X11 | Modern menu/pixmaps, extension changes, session logout |
-| openSUSE Leap 16 or current Tumbleweed | Plasma Wayland/X11 where supplied | RPM-family interoperability, panel restart |
-| Arch snapshot dated at execution | LXQt and XFCE; available Wayland/X11 | Modern hosts, panel replacement, same protocol code |
+| Ubuntu22.04 x86_64/aarch64 | CI headless packaged baseline | ABI/cancellation/private bus both socket forms, install dependencies |
+| Ubuntu24.04 LTS | GNOME Wayland/available X11, indicator on/off | late host/no-host residency/focus/reopen/logout |
+| Debian12/13 | LXDE/MATE/XFCE X11 | real panel loss/replacement, opaque/alpha composition, focus/menu |
+| Fedora44 | authorized isolated LXDE/XFCE aarch64; user GNOME/Plasma Wayland/available X11 | gate evidence separate from real session/modern-host acceptance |
+| openSUSE Leap16/current Tumbleweed | Plasma Wayland/X11 where supplied | RPM interoperability, owner/panel replacement |
+| Arch dated snapshot | LXQt/XFCE and available Wayland/X11 | modern hosts and legacy replacement |
+| Physical monitors | mixed1x/2x and fractional scale, negative origins | popup device identity/edges/insets, no workspace window/taskbar entry |
 
-Every GUI row runs fresh-login background start with no visible rehearsal/shell; normal launch reaches the same PID;
-last-window close keeps the PID; app/tray Quit honors close guards and exits without auto-restart; explicit off stays
-off across upgrade/login; panel restart and host enable/disable recover one icon; menu and direct activation work
-under compositor focus policy; logout terminates the old PID and new login gets a new owner. Test sleep/wake once
-per modern/legacy family. If session teardown leaves Jasper alive with a dead display, mark a release blocker and
-amend the design for session lifetime integration. A bus disconnect alone must continue to mean reconnect.
+For each actual desktop row test fresh-login background start without rehearsal/shell, normal launch same PID, last-window close remains resident, all four actions once, vetoed Quit remains live, accepted Quit ends native/menu workers/subscriptions without restart, opt-out persists across upgrade/login, panel/app applet restart and host enable/disable recover one icon, modern failed registration falls back, bus absent/lost recovers, no host remains resident, sleep/wake per modern/legacy family, logout ends old PID/new login gets new owner. A dead desktop leaving an orphan blocks session-lifetime acceptance and requires amendment; a bus disconnect alone remains reconnect. Physical mixed-monitor and compositor cases remain pending until observed, not replaced by virtual screenshots.
 
-- [ ] **Step 5: Record results and commit** `docs: document Linux tray compatibility and verification` with trailer.
-Request final whole-branch review, fix findings and rerun affected tests. Record unexecuted GUI/performance cases as
-pending, not passed. Warm/cold latency and idle resource measurements require separately authorized benchmarks and
-must be skipped while a game/VM is running per AGENTS.md. Do not merge or push without user authorization.
+- [ ] **Step 5: Final whole-branch review and commit.** Update STATUS/plan with actual completed gates, evidence, deviations and pending CI/user rows; request final independent whole-branch review under the existing workflow, fix findings and rerun affected checks. Commit `docs: record Linux tray compatibility and verification` with `Co-Authored-By: Codex <noreply@openai.com>`. Native source/fix commits in this task follow the same trailer rule. No merge/push without authorization. Benchmarks require separate authorization and AGENTS game/VM exclusion.
 
-## Conditional-plan binding and self-review
+## Revised-plan coverage and self-review
 
-This plan is deliberately gated where the approved spec required evidence before detailed implementation. Task 1
-must freeze the dependency and all exact library bindings; Task 2 must establish the actual AWT recovery path.
-The protocol table, controller transitions, behavior tests and application contracts above remain binding. Replace
-conditional library/fixture bindings with the gate-verified code in the task's plan update before starting dependent
-work; record any deviation in this banner and STATUS. A failed gate is not permission to omit the fallback or weaken
-wire/session tests.
+Approved amendment coverage: local Unix authority/owned XCB/ABI/bounded setup-output-cancellation → Task 6; host epochs/false-true admissions/XEmbed/confirmed cleanup/render/input/panel gate → Task 7; Swing lifetime/keyboard/coordinate identity → Task 8; reviewed controller contracts/physical timers/settled routing/no-icon residency/EDT guards → Task 9; packaged runtime/CI release split/guides/desktop and session acceptance → Task 10. Completed Tasks 1–5 retain their original evidence, with Task 2's public-AWT approach permanently superseded after FAILED characterization.
 
-Coverage: tray menu and icon data → Task 3; protocols, discovery, owner races and bounded calls → Task 4; recovery,
-single publication and threading → Task 5; fallback and facade → Tasks 2/6; packaging, GNOME/no-tray behavior, distro
-coverage and session lifecycle → Tasks 1/7. Existing application lifecycle and login registration come from Plan 1.
-No current product code or dependency has been changed merely by writing these plans.
-
-Research inputs: [publisher release](https://github.com/hypfvieh/dbus-java/releases/tag/dbus-java-5.2.0),
-[pinned builder API](https://github.com/hypfvieh/dbus-java/blob/dbus-java-parent-5.2.0/dbus-java-core/src/main/java/org/freedesktop/dbus/connections/impl/DBusConnectionBuilder.java),
-[pinned Properties API](https://github.com/hypfvieh/dbus-java/blob/dbus-java-parent-5.2.0/dbus-java-core/src/main/java/org/freedesktop/dbus/interfaces/Properties.java),
-and the approved spec's interoperability references. These are planning evidence, not executed acceptance.
+Every native proof records executed prerequisites and versions. Missing library/host, skipped required tests, child timeout, stranded native worker, ambiguous monitor identity or unconfirmed teardown is unavailable/failed/pending as appropriate, never a passing compatibility claim. Gate fixes stay inside the approved architecture; a failed cancellation or Swing mechanism that needs another architecture requires an amendment before wiring. Existing isolated probe authorization and execution workflow carry forward; this revision does not request another plan-approval round.

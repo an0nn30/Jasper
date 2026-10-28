@@ -1,11 +1,6 @@
 # Linux X11 tray fallback amendment
 
-**Status: PROPOSED, not approved — 2026-10-28.** This is the scoped amendment required by the
-[approved residency design](2026-10-27-linux-residency-design.md#legacy-x11-implementation) after
-[Plan 2 Task 2 failed its native gate](../plans/2026-10-27-linux-residency-2-verification.md#task-2-native-result--2026-10-28-public-awt-gate-failed).
-Task 6 remains stopped. Independent builder review found no important unanswered design questions on 2026-10-28.
-User approval precedes a revised implementation plan; this document authorizes neither implementation nor new GUI runs. The user selected the Java D-Bus plus X11/JNA contingency;
-the concrete XCB, rendering, transport and popup decisions below are engineering proposals for that approval.
+**Status: APPROVED by the user — 2026-10-28.** This scoped amendment replaces the public-AWT fallback after [Plan 2 Task 2 failed its native gate](../plans/2026-10-27-linux-residency-2-verification.md#task-2-native-result--2026-10-28-public-awt-gate-failed). The user approved the concrete XCB/JNA architecture and continuing the existing per-task workflow. [Revised Plan 2](../plans/2026-10-27-linux-residency-2-tray.md) specifies remaining Tasks 6–10. Implementation remains gated on native cancellation and characterization; approval is not evidence those gates passed. Authorized isolated Fedora probes and the CI-only x86_64/Ubuntu 22.04 split remain unchanged.
 
 ## Reason and boundary
 
@@ -27,7 +22,7 @@ helper service, root installation, extra process or alternate residency mechanis
 | --- | --- |
 | Public AWT plus recovery callbacks | Rejected by recorded native evidence. Catching Jasper's own add/remove calls cannot catch the earlier JBR event. |
 | Xlib through existing JNA | Familiar API, but protocol error handling is process-wide and default fatal I/O handling can terminate the process. Sharing or replacing JBR's handlers is unsuitable; an owned display alone does not isolate them. |
-| **Owned XCB connection through existing JNA** | Proposed. Scoped replies/errors and connection failure state fit the controller. Costs are explicit native bindings, image/XEmbed work, cancellable setup/output and native acceptance. |
+| **Owned XCB connection through existing JNA** | Approved. Scoped replies/errors and connection failure state fit the controller. Costs are explicit native bindings, image/XEmbed work, cancellable setup/output and native acceptance. |
 
 Xlib's newer per-display I/O-exit hook does not remove the protocol-handler integration problem; this design does
 not rely on it. See the [upstream Xlib manual distributed by Debian](https://manpages.debian.org/bookworm/libx11-doc/XSetIOErrorHandler.3.en.html).
@@ -63,22 +58,22 @@ connection and rapid false/true observations. No native action may bypass both a
 
 ## Connection, threading and cancellation
 
-Use the existing JNA 5.14.0 dependency. Proposed runtime libraries are system `libxcb.so.1`, `libxcb-render.so.0`,
+Use the existing JNA 5.14.0 dependency. Runtime libraries are system `libxcb.so.1`, `libxcb-render.so.0`,
 `libXau.so.6` and libc; no native library is bundled by this amendment. Missing libraries/symbols or unsupported
 formats mean unavailable fallback, logged once per state. Native loading happens only after non-headless Linux
 installation and settled startup. Classes remain safe to load in headless and other-platform tests.
 
-The proposed first transport scope is a local Unix X11 display, including local XWayland when actually verified.
+The approved first transport scope is a local Unix X11 display, including local XWayland when actually verified.
 Capture `DISPLAY`, screen and authority location from launch; support the normal filesystem and Linux abstract
-socket forms. Remote TCP/SSH-forwarded displays are outside this proposed fallback scope and leave modern/no-icon
-residency available. This restriction is an engineering choice requiring approval, not an already approved promise.
+socket forms. Remote TCP/SSH-forwarded displays are outside this fallback scope and leave modern/no-icon
+residency available. This approved scope leaves modern/no-icon residency available on other display transports.
 
 Use a nonblocking owned Unix socket and finite `poll` for connection establishment, then `xcb_connect_to_fd` with
 the launch session's authority. Use normal X authority matching/decoding APIs, with explicit lifetime for returned
 auth memory; never log cookies or modify authority/access controls. Bound the authority input and reject malformed
 or excessive records. Authority acquisition itself must pass the cancellation gate: a blocking
 `XauGetBestAuthByAddr` call hidden behind a timed Java Future is insufficient. A bounded, cancellable file snapshot
-decoded through `XauReadAuth` on an in-memory stream is the proposed way to retain native decoding without an
+decoded through `XauReadAuth` on an in-memory stream is the approved way to retain native decoding without an
 unbounded native file scan. Validate local-family/wildcard matching and missing-cookie behavior with fixture files.
 
 One daemon native worker owns every XCB call and resource free; one bounded/coalesced command slot gives cleanup
@@ -139,7 +134,7 @@ protocol only; legacy balloon messages remain outside its scope.
 
 Rasterize the existing Linux artwork offscreen. Treat native ConfigureNotify dimensions as device pixels; fit the
 complete icon with preserved aspect ratio into the actual slot and center it. Do not multiply by JBR's UI transform.
-Coalesce resize/expose events and redraw only when dirty. Bound accepted slot sizes and allocations (proposed maximum
+Coalesce resize/expose events and redraw only when dirty. Bound accepted slot sizes and allocations (maximum
 512 pixels per dimension); an unreasonable slot fails this publication rather than allocating without limit.
 
 Honor a valid advertised `_NET_SYSTEM_TRAY_VISUAL`, otherwise the screen default. Resolve its depth, byte order,
@@ -202,7 +197,7 @@ Required evidence:
 Headless tests cover packet/ABI fixtures, pixel conversion, owner and action epochs, coalescing, cancellation,
 partial installation, cleanup refusal and routing through the existing seams. Rerun the reviewed controller and
 D-Bus regressions, architecture/source inventory/notices, full `check` and headless package verification as required
-by the revised plan. Update only affected guide statements once implemented; this proposal changes no behavior guide.
+by the revised plan. Update only affected guide statements once implemented; this amendment changes no behavior guide until implementation.
 
 Read-only inventory on authorized Fedora 44 aarch64 on 2026-10-28 found libxcb 1.17.0-7.fc44, libXau 1.0.12-4.fc44,
 libXrender 0.9.12-4.fc44 and libX11 1.8.13-3.fc44. The three proposed XCB/Xau sonames exist; exported symbols include
@@ -210,6 +205,6 @@ connect-to-FD, poll event/reply, connection error, disconnect/flush, RENDER quer
 This proves installed availability only. No display, desktop bus, authority cookie, GUI or native implementation
 was accessed for this amendment. Runtime baseline/library packaging and every new native behavior remain unproven.
 
-Approval selects this scoped architecture and its gates. After user approval, write the revised
-Task 6 deliverable plan, preserve completed Tasks 1/3/4/5, and record the superseded AWT sections in Plan 2. No fallback
+Approval selected this scoped architecture and its gates. The revised Plan 2 preserves completed Tasks 1–5
+and records the failed public-AWT approach; remaining Tasks 6–10 implement this amendment. No fallback
 production code is committed until the new cancellation and legacy characterization gates pass.
