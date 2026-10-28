@@ -35,7 +35,10 @@ runtime bundle and then the app are re-sealed ad hoc (JetBrains' helper signatur
 payload and `codesign --verify --deep --strict` of both; `Jasper.app` is 644 MB (`Contents/runtime` 547 MB: Home 228,
 Frameworks 319). Windows and Linux list Chromium's files in `packaging/jcef/<os>-<arch>.txt`, and Linux packaging
 restores the helpers' execute bit. CI takes `jdk+jcef`, the Linux packaging jobs install Chromium's Ubuntu 22.04
-libraries, and the Licenses window lists Chromium, CEF, JCEF, JOGL, GlueGen, Apache Thrift and Boost. The launcher
+libraries, and the Licenses window lists Chromium, CEF, JCEF, JOGL, GlueGen, Apache Thrift and Boost, and Microsoft's
+Direct3D HLSL Compiler (`d3dcompiler_47.dll`, x64 and ARM64) and DirectX IL (`dxil.dll`, x64) under the Windows SDK
+licence terms (`LicenseRef-Windows-SDK`); `dxcompiler.dll` (x64) has no entry of its own because Chromium builds it
+from source (Dawn's DirectX Shader Compiler, LLVM licence) and its credits cover it. The launcher
 sources vendored at b583.48 are identical to b635.75's (the same git tree in every vendored folder), so they stay, and
 `packaging/jcef/checksums.txt` records the six archives' SHA-512. Task 1b (added during the run): b635.75 fixes
 JDK-8376576, so `verifyLauncherImage`'s killing cache is now `-XX:AOTMode=on` with a class-path jar whose modification
@@ -48,9 +51,13 @@ libcef's direct `DT_NEEDED`, the rpm path's view, while the deb path's `ldd` als
 install job first sees the `.deb`'s dependencies). Task 7 ran, and the user accepted
 [its record](benchmarks/2026-10-27-jcef-runtime.md) on 2026-10-27. The warm start and memory are within noise, the early
 cold milestones about 30 ms faster and the output-phase allocation 5 to 8 % higher; the cold window-to-output milestones
-are inconclusive (a load spike). Open: not merged or pushed; today's code starts cold in about 4.8 s on both images
-(2.06 s on 2026-10-02), and the memory benchmark's default matrix stops at search-resize-font with 1 pane and 100,000
-lines on both images; GUI check of the Licenses window's longest
+are inconclusive (a load spike). Merged into local `main` by `73286aaef` (not pushed), which keeps main's zeroed
+killing cache in `verifyLauncherImage` beside Task 1b's and the sealed probe's trained-cache case. Open: two questions
+for the user on the Windows SDK files (the ARM64 `d3dcompiler_47.dll` is not on Microsoft's REDIST list, and the SDK
+terms ask more than attribution: section 2.a.ii asks for end-user terms at least as protective, a copyright notice and
+indemnifying Microsoft, and the REDIST list allows Classic Windows apps only and files unmodified); today's code
+starts cold in about 4.8 s on both images (2.06 s on 2026-10-02), and the memory benchmark's default matrix stops at
+search-resize-font with 1 pane and 100,000 lines on both images; GUI check of the Licenses window's longest
 caption ("JogAmp licenses (BSD 2-Clause and others)", 41 characters) on a narrow window; plan 4's first Chromium start
 shows whether the framework is found; Linux `lib/chrome-sandbox` keeps jlink's mode. The JDK-8376576 workarounds
 (unsealing `jbr-api`, training in a deleted copy, their wording) are retired or re-justified in the entry above.
@@ -658,7 +665,8 @@ a window with a terminal tab and an Editor file in another tab, the Editor's rig
 terminal's tab by its title.
 
 **Browser plan 3: link routing — 2026-10-22** (`claude/browser-link-routing`, worktree
-`.claude/worktrees/browser-link-routing`, from `claude/browser-plugin-design`; not merged or pushed): Jasper routes web
+`.claude/worktrees/browser-link-routing`, from `claude/browser-plugin-design`; merged into `main` with plan 3b as
+`ec86c61c2` and pushed): Jasper routes web
 addresses through one plugin-provided web browser role, as it routes files through the editor role
 (`docs/superpowers/plans/2026-10-22-browser-3-link-routing.md`). The SDK, still 0.21.0, gains `WebBrowser`,
 `LinkOrigin` (`CLICK`, `PROGRAM`), `Platform.browser` (the thirteenth capability, `browser.provide`: one plugin at a
@@ -692,7 +700,8 @@ meanwhile, become 0.17.0 and 0.18.0. `docs/sdk-reference.html` is regenerated. `
 25.0.4.1 b635.75): **13,474 tests, 0 failures, 0 errors, 30 skipped**; the example external plugin builds against
 `build/sdk-release` (1 test, 0 failures). No GUI was launched.
 **Plan 3b, the routing amendment — 2026-10-27** (`claude/browser-routing-3b-b72db8`, worktree
-`.claude/worktrees/browser-routing-3b-b72db8`, from `claude/browser-link-routing` at `665d4bce5`; not merged or pushed):
+`.claude/worktrees/browser-routing-3b-b72db8`, from `claude/browser-link-routing` at `665d4bce5`; merged into `main` with
+plan 3 as `ec86c61c2` and pushed):
 plan 3's routing brought in line with the approved iTerm2-parity design
 (`docs/superpowers/plans/2026-10-27-browser-3b-routing-amendment.md`). The SDK, still 0.23.0, replaces
 `LinkOrigin.PROGRAM` with `EXTERNAL` (`CLICK` stays) and gains `LinkPlacement` (`TAB`, `SPLIT_RIGHT`, `SPLIT_DOWN`) and

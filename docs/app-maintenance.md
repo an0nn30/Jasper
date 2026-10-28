@@ -565,7 +565,8 @@ fixtures; `verifyPackage` checks a built image ([start-up performance](packaging
   those three values) and names the build to install. CI's `setup-java` installs the newest JBR 25 with JCEF, so CI
   fails from the day JetBrains publishes a newer build until this move is made. Update the fixtures in
   `gradle/packaging-support-test.gradle` that pin the release text and the message, and the Chromium, Chromium Embedded
-  Framework and JCEF versions in `notices.toml`, which a fixture compares with the constant. Then regenerate
+  Framework and JCEF versions in `notices.toml`, which a fixture compares with the constant, and re-check its Apache
+  Thrift, Boost, Direct3D HLSL Compiler and DirectX IL entries. Then regenerate
   `packaging/jcef/<platform>.txt` from each archive's `jcef.jmod`, confirmed against the archive's own layout, update
   the payload counts pinned in `gradle/packaging-support-test.gradle`, record the archives' SHA-512 in
   `packaging/jcef/checksums.txt`, and check that `macJcefPayload` still names the helpers in the macOS bundle's

@@ -1,7 +1,8 @@
 # Browser 2: the JCEF runtime — Implementation Plan
 
 > **Status (2026-10-27):** Tasks 1–6 done on `claude/browser-jcef-runtime-0c197e` (cut from the design branch at
-> `823125fdc`; not merged, not pushed), with the deviations below. Task 7 ran with the user's OK, and the user
+> `823125fdc`; merged into local `main` by `73286aaef`, which keeps main's zeroed killing cache in `verifyLauncherImage`
+> beside Task 1b's; not pushed), with the deviations below. Task 7 ran with the user's OK, and the user
 > accepted [its record](../../benchmarks/2026-10-27-jcef-runtime.md) on 2026-10-27. The warm start and memory are within
 > noise, the early cold milestones about 30 ms faster and the output-phase allocation 5 to 8 % higher; the cold
 > window-to-output milestones are inconclusive. Commits: Task 1 `a289d48df`
@@ -26,8 +27,10 @@
 >   were added, and `markJcefHelpersExecutable` decides from the files present. Task 4: Chromium's Ubuntu 22.04
 >   libraries are on the Linux packaging jobs' `apt-get` lines. Task 5: the entries sit in `notices.toml`'s
 >   alphabetical order, and Apache Thrift and Boost were added because JCEF ships them; Chromium's credits link is the
->   tag's source tree, since no static credits page exists. Task 6: the launcher sources vendored at b583.48 are
->   identical to b635.75's, so they stay.
+>   tag's source tree, since no static credits page exists. Microsoft's Direct3D HLSL Compiler (`d3dcompiler_47.dll`,
+>   x64 and ARM64) and DirectX IL (`dxil.dll`, x64) followed (`f08cd15c2`), under the Windows SDK licence terms
+>   (`LicenseRef-Windows-SDK`); Chromium's notice covers `dxcompiler.dll`. Task 6: the launcher sources vendored at
+>   b583.48 are identical to b635.75's, so they stay.
 > - **Not run.** Windows and Linux packaging (no such host may run the downloaded JDKs, and the GitHub Actions budget
 >   blocks CI), so those `verifyPackage` lines and the Chromium libraries on the Linux `apt-get` lines are first
 >   exercised by CI; Task 3 Step 5 (`linuxLibraryRequirements` on a packaged Linux image) is replaced by reading
@@ -35,6 +38,9 @@
 >   the deb path runs `ldd`, which also lists transitive libraries, so the `.deb` declares more dependencies than were
 >   assessed, first exercised by CI's install job. `lib/chrome-sandbox` keeps jlink's mode on Linux; plan 4 decides
 >   the sandbox.
+> - **Open for the user.** The ARM64 `d3dcompiler_47.dll` is not on Microsoft's REDIST list, and the SDK terms ask more
+>   than attribution: section 2.a.ii asks for end-user terms at least as protective, a copyright notice and
+>   indemnifying Microsoft, and the REDIST list allows Classic Windows apps only and files unmodified.
 > - **For plan 4.** The launcher, `java`, `libjvm` and `libjcef` are ad hoc with no hardened runtime and no entitlements;
 >   JetBrains' helpers are hardened, keep library validation and have `allow-jit`.
 > - **Follow-up.** With JDK-8376576 fixed, production's unsealing of `jbr-api`, training in a copy that is deleted, and
