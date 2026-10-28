@@ -181,6 +181,10 @@ transform and verified monitor origin. The revised plan must specify and test th
 identity is a native gate, not permission to guess a global scale. Popup focus/outside-click behavior and placement
 must pass with no other Jasper windows open. If this public Swing composition fails, revise it before shipping.
 
+Ruling 26 retains the selected X11 SCREEN width/height in immutable setup values and carries a defensive-copy
+root-screen rectangle with each menu request. Single-device mapping must match that native extent to the
+public configuration bounds and default transform; ambiguous multi-device layouts decline the popup.
+
 ## Decisive gates and delivery
 
 The revised plan must put an owned native characterization gate before production fallback wiring. Preserve the
