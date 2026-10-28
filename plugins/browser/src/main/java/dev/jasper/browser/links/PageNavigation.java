@@ -18,11 +18,11 @@ import org.cef.handler.CefRequestHandlerAdapter;
  * Where a page's links and popups go (spec section 8): the client's one request handler, for a link Chromium would open
  * elsewhere ({@code onOpenURLFromTab}: a modified or middle click), and a life span handler, for a popup
  * ({@code onBeforePopup}: a {@code target=_blank} link, or a {@code window.open} that reaches Chromium). Chromium gives
- * neither a disposition nor, for a popup, whether the user asked for it, so {@link LinkRoute} decides from the press and
- * key the page's {@link PageView} last forwarded. Chromium calls both on its own UI thread, and each answers at once that
- * Chromium makes nothing itself; what Jasper opens instead is posted to Swing's: the link loaded in its page, or an item
- * of its own that the page's item opens beside itself. The hover address, from {@code onStatusMessage}, is the
- * {@code page} package's display handler's.
+ * neither a disposition nor, for a popup, whether the user asked for it, so {@link LinkRoute} decides from the press the
+ * page's {@link PageView} last forwarded and the page's activation, which a popup consumes. Chromium calls both on its
+ * own UI thread, and each answers at once that Chromium makes nothing itself; what Jasper opens instead is posted to
+ * Swing's: the link loaded in its page, or an item of its own that the page's item opens beside itself. The hover
+ * address, from {@code onStatusMessage}, is the {@code page} package's display handler's.
  *
  * <p>JCEF keeps a client's first request handler, so this is the only one: what else a request handler is asked goes to
  * its defaults. Life span handlers are a list, which JetBrains' runtime adds its own to, so this adds one and removes
@@ -52,11 +52,9 @@ public final class PageNavigation {
     /** Links Chromium would open in a new tab or window, or download: Jasper places them itself. */
     private static final class Links extends CefRequestHandlerAdapter {
         @Override public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String url, boolean userGesture) {
-            if (browser instanceof PageBrowser page) {
-                PageView view = page.view();
-                LinkRoute.link(url, view.lastPress(), view.lastKeyMillis(), System.currentTimeMillis(), MAC_OS)
+            if (browser instanceof PageBrowser page)
+                LinkRoute.link(url, page.view().lastPress(), userGesture, System.currentTimeMillis(), MAC_OS)
                     .ifPresent(where -> EventQueue.invokeLater(() -> go(page, url, where)));
-            }
             return true;
         }
     }
@@ -66,7 +64,7 @@ public final class PageNavigation {
         @Override public boolean onBeforePopup(CefBrowser browser, CefFrame frame, String url, String name) {
             if (browser instanceof PageBrowser page) {
                 PageView view = page.view();
-                LinkRoute.popup(url, view.lastPress(), view.lastKeyMillis(), System.currentTimeMillis(), MAC_OS)
+                LinkRoute.popup(url, view.lastPress(), view.activation(), System.currentTimeMillis(), MAC_OS)
                     .ifPresent(where -> EventQueue.invokeLater(() -> go(page, url, where)));
             }
             return true;

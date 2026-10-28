@@ -98,24 +98,30 @@ class PageViewKeysTest {
     }
 
     /**
-     * A key press the page gets activates it, as a mouse press does: the view records when, for the page's popups. A key
-     * Jasper's shortcuts took, Escape, and typed and released events activate nothing, as Chromium counts them.
+     * A key press the page gets activates it, as a mouse press does, for its popups: a key Jasper's shortcuts took, a
+     * typed or released event, Escape and a modifier alone activate nothing, as in Chromium. A popup consuming the
+     * activation between keys shows which key brought it back.
      */
-    @Test void aKeyPressThePageGetsOtherThanEscapeIsRecordedAsItsLastActivatingKey() throws Exception {
+    @Test void aKeyPressThePageGetsActivatesItUnlessItIsEscapeOrAModifierAlone() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var view = view(event -> event.getID() == KeyEvent.KEY_PRESSED && event.getKeyCode() == KeyEvent.VK_L);
-            assertThat(view.lastKeyMillis()).as("no key yet").isEqualTo(Long.MIN_VALUE);
+            var activation = view.activation();
+            assertThat(activation.active(1_000)).as("no key yet").isFalse();
             view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 1_000, 0, KeyEvent.VK_A, 'a'));
-            assertThat(view.lastKeyMillis()).isEqualTo(1_000);
-            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_TYPED, 2_000, 0, KeyEvent.VK_UNDEFINED, 'a'));
-            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_RELEASED, 3_000, 0, KeyEvent.VK_A, 'a'));
-            assertThat(view.lastKeyMillis()).as("typed and released").isEqualTo(1_000);
-            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 4_000, MENU, KeyEvent.VK_L, 'l'));
-            assertThat(view.lastKeyMillis()).as("a key a shortcut took").isEqualTo(1_000);
-            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 5_000, 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
-            assertThat(view.lastKeyMillis()).as("Escape").isEqualTo(1_000);
-            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 6_000, InputEvent.SHIFT_DOWN_MASK, KeyEvent.VK_ENTER, '\n'));
-            assertThat(view.lastKeyMillis()).isEqualTo(6_000);
+            assertThat(activation.consume(1_000)).as("a letter").isTrue();
+            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_TYPED, 1_000, 0, KeyEvent.VK_UNDEFINED, 'a'));
+            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_RELEASED, 1_000, 0, KeyEvent.VK_A, 'a'));
+            assertThat(activation.active(1_000)).as("typed and released").isFalse();
+            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 1_000, MENU, KeyEvent.VK_L, 'l'));
+            assertThat(activation.active(1_000)).as("a key a shortcut took").isFalse();
+            for (int code : new int[] {KeyEvent.VK_ESCAPE, KeyEvent.VK_SHIFT, KeyEvent.VK_CONTROL, KeyEvent.VK_ALT, KeyEvent.VK_META,
+                    KeyEvent.VK_ALT_GRAPH, KeyEvent.VK_CAPS_LOCK, KeyEvent.VK_WINDOWS}) {
+                view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 1_000, 0, code, KeyEvent.CHAR_UNDEFINED));
+                assertThat(activation.active(1_000)).as(KeyEvent.getKeyText(code)).isFalse();
+            }
+            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 2_000, InputEvent.SHIFT_DOWN_MASK, KeyEvent.VK_ENTER, '\n'));
+            assertThat(activation.active(2_000)).as("Shift+Enter").isTrue();
+            assertThat(activation.active(7_001)).as("5,001 ms later").isFalse();
         });
     }
 

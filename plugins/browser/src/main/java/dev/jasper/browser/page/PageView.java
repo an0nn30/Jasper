@@ -47,12 +47,13 @@ import javax.swing.Timer;
  *
  * <p><b>Keys.</b> Jasper's shortcuts are key bindings on the window's root that take a key only where it applies. Each
  * key event has Swing's pass first, its key listeners and then its key bindings, and reaches the page only when that
- * pass left it unconsumed. A press a binding takes keeps its typed and released events from the page too. Each key
- * press the page gets is its {@link #lastKeyMillis()}.
+ * pass left it unconsumed. A press a binding takes keeps its typed and released events from the page too. Each press
+ * of a key the page gets activates it ({@link #activation()}), unless the key is Escape or a modifier alone, as in
+ * Chromium.
  *
  * <p><b>Mouse.</b> An event the window consumes before the view hears it, as the pane drag's press, does not reach the
- * page. Each press the page gets is its {@link #lastPress()}. The mouse's back and forward buttons, on Windows and Linux,
- * never reach the page: releasing one tells the view's {@link #onNavigationButton listener}.
+ * page. Each press the page gets is its {@link #lastPress()} and activates it. The mouse's back and forward buttons, on
+ * Windows and Linux, never reach the page: releasing one tells the view's {@link #onNavigationButton listener}.
  *
  * <p><b>Showing.</b> While the view does not show (its tab is hidden, or it is out of its window) its page is told it is
  * hidden and draws one frame a second; showing again restores 60. Network work goes on.
@@ -77,7 +78,7 @@ public final class PageView extends JComponent {
     // its methods' types, and the browser's type loads Chromium's.
     volatile PageBrowser browser;
     private volatile LastPress lastPress = LastPress.NONE;
-    private volatile long lastKeyMillis = Long.MIN_VALUE;
+    private final Activation activation = new Activation();
     private volatile String hoverUrl = "";
     private volatile double scale = 1;
     // The last frame, in device pixels, and the back buffer it is copied to; both written on Chromium's paint thread.
@@ -170,13 +171,13 @@ public final class PageView extends JComponent {
     }
 
     /**
-     * When the page last got a key press that activates it: any key but Escape, as Chromium counts them. A key Jasper's
-     * shortcuts took is not the page's.
+     * The page's user activation: each press the page gets and each press of a key it gets, but Escape and a modifier
+     * alone, activate it, and each popup that opens consumes it. A key Jasper's shortcuts took is not the page's.
      *
-     * @return when, in milliseconds since the epoch, or {@link Long#MIN_VALUE} before the first; any thread
+     * @return the activation; any thread
      */
-    public long lastKeyMillis() {
-        return lastKeyMillis;
+    public Activation activation() {
+        return activation;
     }
 
     /**
@@ -290,7 +291,10 @@ public final class PageView extends JComponent {
             return;
         }
         boolean press = event.getID() == MouseEvent.MOUSE_PRESSED;
-        if (press) lastPress = new LastPress(event.getButton(), event.getModifiersEx(), event.getWhen());
+        if (press) {
+            lastPress = new LastPress(event.getButton(), event.getModifiersEx(), event.getWhen());
+            activation.activate(event.getWhen());
+        }
         PageBrowser target = browser;
         if (target != null) target.sendMouseEvent(event);
         if (press) requestFocusInWindow();
@@ -337,8 +341,17 @@ public final class PageView extends JComponent {
             event.consume();
             return;
         }
-        if (event.getID() == KeyEvent.KEY_PRESSED && event.getKeyCode() != KeyEvent.VK_ESCAPE) lastKeyMillis = event.getWhen();
+        if (event.getID() == KeyEvent.KEY_PRESSED && activates(event.getKeyCode())) activation.activate(event.getWhen());
         hooks.keys().accept(event);
+    }
+
+    /** Whether pressing {@code keyCode} activates the page: every key but Escape and the modifiers, as in Chromium. */
+    private static boolean activates(int keyCode) {
+        return switch (keyCode) {
+            case KeyEvent.VK_ESCAPE, KeyEvent.VK_SHIFT, KeyEvent.VK_CONTROL, KeyEvent.VK_ALT, KeyEvent.VK_META,
+                 KeyEvent.VK_ALT_GRAPH, KeyEvent.VK_CAPS_LOCK, KeyEvent.VK_WINDOWS -> false;
+            default -> true;
+        };
     }
 
     /**

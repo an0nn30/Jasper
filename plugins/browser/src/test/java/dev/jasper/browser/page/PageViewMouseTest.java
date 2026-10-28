@@ -28,6 +28,7 @@ class PageViewMouseTest {
             }
             assertThat(told).containsExactly(NavigationButton.BACK, NavigationButton.FORWARD);
             assertThat(view.lastPress()).as("the page got no press").isEqualTo(LastPress.NONE);
+            assertThat(view.activation().active(System.currentTimeMillis())).as("nor an activation").isFalse();
         });
     }
 
@@ -37,6 +38,9 @@ class PageViewMouseTest {
             for (int button : new int[] { MouseEvent.BUTTON1, MouseEvent.BUTTON2, MouseEvent.BUTTON3 }) {
                 for (MouseEvent event : click(view, button)) view.processMouseEvent(event);
                 assertThat(view.lastPress().button()).isEqualTo(button);
+                long pressed = view.lastPress().whenMillis();
+                assertThat(view.activation().consume(pressed)).as("each press activates the page, for one popup").isTrue();
+                assertThat(view.activation().consume(pressed)).isFalse();
             }
             assertThat(told).isEmpty();
         });
