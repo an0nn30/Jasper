@@ -502,10 +502,10 @@ named (`Jasper notes.txt src`): each folder as a terminal tab in that window, an
 a file or folder you open with Jasper in Finder (Open With), or drop on its Dock icon, opens the same way. A running
 Jasper that does not answer within 10 seconds is reported with its process id, and the launch starts no second one.
 
-With **Run in background** on (Settings › System Settings, `system.run_in_background`; on by default on macOS and
-Windows, off on Linux; applies after a restart), Jasper keeps running when you close its last window,
-with its plugins but no shells, so the next window opens quickly. In an installed Jasper on macOS and Windows it
-also starts at login, with no window. The menu bar item or notification-area icon appears once start-up has settled:
+With **Run in background** on (Settings › System Settings, `system.run_in_background`; on by default on macOS,
+Windows and Linux; applies after a restart), Jasper keeps running when you close its last window,
+with its plugins but no shells, so the next window opens quickly. An installed Jasper also starts at login, with no
+window. On macOS and Windows, the menu bar item or notification-area icon appears once start-up has settled:
 when the first window has painted its shell's first output, 2 seconds after its first paint, or, at login, once Jasper
 has prepared its first window.
 

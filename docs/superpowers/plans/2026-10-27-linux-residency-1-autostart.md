@@ -10,7 +10,22 @@
 
 **Spec:** [Approved Linux residency design](../specs/2026-10-27-linux-residency-design.md).
 
-**Status (2026-10-27):** Written, not executed. Requires plan review before execution. No design deviations. Plan 2 adds trays; this deliverable deliberately ships working residency without a Linux icon.
+**Status (2026-10-27):** Tasks 1–4 implemented on `codex/linux-residency`; production revision
+`1080c1ec1f77c38df0639ed5357d14b47b1406fc` (Tasks 1–3 reviewed at `112558b40`, `7c36bf1b7`, `1080c1ec1`).
+Task 4 and whole-branch reviews remain pending. Headless `./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage
+-Pjasper.aot=false -Pjasper.python=/Users/dustin/.local/share/uv/python/cpython-3.13.15-macos-aarch64-none/bin/python3.13`
+passed in 28m 56s on macOS arm64/JBR 25: 13,628 XML tests, 0 failures/errors, 33 skipped (13,595 executed);
+72 theme-tool Python tests passed; CLI/launcher core checks 133/152, 0 failures; macOS bridge and package checks passed.
+No AOT cache was trained. `git diff --check` passed. Task 2 Step 4's portable tests passed; its Linux parser/validator
+checks and real-Linux focused tests remain pending, as do the user-run desktop cases in Task 4. No Linux-native or GUI
+acceptance is claimed. The Ubuntu 22.04 x86_64/aarch64 package baseline is unchanged. Plan 2 remains unexecuted.
+
+**Deviations:** Controller Ruling 1: Task 2's argv fixture awaits complete output rather than a nonempty file, avoiding
+a partial-write race; Task 2 also added failed-replacement cleanup coverage. Controller Ruling 3: Task 4 adds one
+`nonvisual-helper` row in `docs/design/theme-engine/migration.csv` for the new test's `ArrayList` discovery false positive,
+beyond the planned guide file list. The initial full check failed only on this missing row; the focused inventory
+rerun passed all 5 tests, then the full command above passed. No behavior change. Logs and exact per-module XML counts
+are in `.superpowers/sdd/2026-10-27-linux-residency-1-autostart/task-4-report.md`.
 
 ## Global Constraints
 
@@ -51,7 +66,7 @@ Read `docs/STATUS.md`, the spec, `docs/app-architecture.md`, `docs/app-maintenan
 
 **Interfaces:** Keeps `static boolean CoreSettings.runsInBackgroundByDefault(String osName)` and `ConfigSnapshot.backgroundEnabled()` unchanged in shape. No caller change.
 
-- [ ] **Step 1: Add failing/default and preservation tests.** In `CoreSettingsTest`:
+- [x] **Step 1: Add failing/default and preservation tests.** In `CoreSettingsTest`:
 
 ```java
 @Test void allSupportedDesktopPlatformsDefaultToResidency() {
@@ -104,8 +119,8 @@ In `JasperApplicationResidencyTest`, reuse `application`, `edt`, and its existin
 
 This last test pins existing behavior; do not manufacture a failure in already-correct lifecycle code. Existing `ResidentIndicatorTest` pins cleanup/late events.
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*CoreSettingsTest' --tests '*ConfigLoaderTest' --tests '*JasperApplicationResidencyTest'`. Expect the Linux default assertions to fail; preservation and lifecycle assertions can already pass.
-- [ ] **Step 3: Replace the default method and accurate copy.**
+- [x] **Step 2: Run** `./gradlew :jasper-app:test --tests '*CoreSettingsTest' --tests '*ConfigLoaderTest' --tests '*JasperApplicationResidencyTest'`. Expect the Linux default assertions to fail; preservation and lifecycle assertions can already pass.
+- [x] **Step 3: Replace the default method and accurate copy.**
 
 ```java
 static boolean runsInBackgroundByDefault(String osName) {
@@ -124,8 +139,8 @@ In `SYSTEM_RUN_IN_BACKGROUND.description`, replace only `On by default on macOS 
 
 Remove the stale Linux-off test comment; no config migration or parser rewrite. Keep `run_in_background` commented in the example.
 
-- [ ] **Step 4: Run** the Step 2 command plus `./gradlew :jasper-app:test --tests '*ConfigTemplateTest' --tests '*ApplicationBootstrapTest' --tests '*ResidentIndicatorTest' --tests '*JasperApplicationBackgroundTest' --tests '*RehearsalTest'`. Expect zero failures; preserve preexisting platform skips.
-- [ ] **Step 5: Commit** `feat: enable Linux background residency by default` with the required trailer.
+- [x] **Step 4: Run** the Step 2 command plus `./gradlew :jasper-app:test --tests '*ConfigTemplateTest' --tests '*ApplicationBootstrapTest' --tests '*ResidentIndicatorTest' --tests '*JasperApplicationBackgroundTest' --tests '*RehearsalTest'`. Expect zero failures; preserve preexisting platform skips.
+- [x] **Step 5: Commit** `feat: enable Linux background residency by default` with the required trailer.
 
 ### Task 2: XDG login entry with portable plan generation
 
@@ -133,7 +148,7 @@ Remove the stale Linux-off test comment; no config migration or parser rewrite. 
 
 **Interfaces:** Add `public static Plan plan(String osName, boolean enabled, String appPath, Path home, Map<String,String> env)`; retain the four-argument overload using `Map.of()` for deterministic existing callers. `Plan` and `apply(Plan)` remain unchanged in shape. New helpers below are private except testable `execToken`.
 
-- [ ] **Step 1: Add tests** (import `java.util.Map`, `java.util.List`, and AssertJ's exception assertion):
+- [x] **Step 1: Add tests** (import `java.util.Map`, `java.util.List`, and AssertJ's exception assertion):
 
 ```java
 @Test void linuxUsesXdgAutostartAndTheInstalledExecutable() {
@@ -188,8 +203,8 @@ Remove the stale Linux-off test comment; no config migration or parser rewrite. 
 
 Delete the old assertion that Linux returns `Plan.NONE` for an installed executable; keep the development-run assertions for all three platforms. Existing blocked-parent and repeated-apply tests remain.
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*LoginItemTest'`. Expect missing overload/helper failures first, then Linux output assertions.
-- [ ] **Step 3: Implement the overload, Linux branch and atomic write.** Move the existing `plan` body into the new five-argument overload; add `Objects.requireNonNull(env, "env")`. Retain macOS/Windows branches unchanged. Immediately before the final `return Plan.NONE`, add:
+- [x] **Step 2: Run** `./gradlew :jasper-app:test --tests '*LoginItemTest'`. Expect missing overload/helper failures first, then Linux output assertions.
+- [x] **Step 3: Implement the overload, Linux branch and atomic write.** Move the existing `plan` body into the new five-argument overload; add `Objects.requireNonNull(env, "env")`. Retain macOS/Windows branches unchanged. Immediately before the final `return Plan.NONE`, add:
 
 ```java
 if (os.equals("linux")) return linux(enabled, appPath, home, env);
@@ -294,7 +309,7 @@ The parser fixture is:
 }
 ```
 
-- [ ] **Step 5: Commit** `feat: register installed Linux Jasper through XDG autostart` with trailer.
+- [x] **Step 5: Commit** `feat: register installed Linux Jasper through XDG autostart` with trailer.
 
 ### Task 3: Latest saved login choice wins
 
@@ -302,7 +317,7 @@ The parser fixture is:
 
 **Interfaces:** `LoginItemUpdates(Consumer<Boolean> apply, Consumer<Runnable> launch)` implements `Consumer<Boolean>`; `accept(Boolean)` is nonblocking, thread-safe and coalesces pending values. `ApplicationBootstrap.loginItemReconciler(Consumer<Boolean>)` retains its signature and worker name. No permanent worker after the queue drains.
 
-- [ ] **Step 1: Add the complete deterministic test class.**
+- [x] **Step 1: Add the complete deterministic test class.**
 
 ```java
 package dev.jasper.app.bootstrap;
@@ -359,8 +374,8 @@ class LoginItemUpdatesTest {
 }
 ```
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*LoginItemUpdatesTest'`; expect missing class.
-- [ ] **Step 3: Add the complete worker class and wire bootstrap.**
+- [x] **Step 2: Run** `./gradlew :jasper-app:test --tests '*LoginItemUpdatesTest'`; expect missing class.
+- [x] **Step 3: Add the complete worker class and wire bootstrap.**
 
 ```java
 package dev.jasper.app.bootstrap;
@@ -426,8 +441,8 @@ return new LoginItemUpdates(reconcile, task ->
 
 In `reconcileLoginItem`, use the five-argument `LoginItem.plan(..., home, System.getenv())`. No other platform branch changes. Change its Javadoc to describe serialization and coalescing rather than a thread per change. `LoginItem.apply` logs filesystem failure itself, so automatic retry of identical failed writes is not newly promised; the next process start reconciles again. The queue still preserves newer choices following failure.
 
-- [ ] **Step 4: Run** `./gradlew :jasper-app:test --tests '*LoginItemUpdatesTest' --tests '*ApplicationBootstrapTest' --tests '*LoginItemTest'`. Expect zero failures and retain the existing real-worker/off-calling-thread test. Then run the application architecture task via `./gradlew verifyApplicationArchitecture` (root registration in `gradle/application-architecture.gradle.kts`).
-- [ ] **Step 5: Commit** `fix: serialize login startup reconciliation` with trailer.
+- [x] **Step 4: Run** `./gradlew :jasper-app:test --tests '*LoginItemUpdatesTest' --tests '*ApplicationBootstrapTest' --tests '*LoginItemTest'`. Expect zero failures and retain the existing real-worker/off-calling-thread test. Then run the application architecture task via `./gradlew verifyApplicationArchitecture` (root registration in `gradle/application-architecture.gradle.kts`).
+- [x] **Step 5: Commit** `fix: serialize login startup reconciliation` with trailer.
 
 ### Task 4: Document, verify and hand off desktop acceptance
 
@@ -435,8 +450,8 @@ In `reconcileLoginItem`, use the five-argument `LoginItem.plan(..., home, System
 
 **Interfaces:** Plan 2 consumes unchanged `ResidentTray.Actions`, bootstrap resident hook, and this plan's Linux default/autostart behavior.
 
-- [ ] **Step 1: Locate stale claims** with `rg -n 'off on Linux|false.*Linux|Linux.*no.*icon|macOS and Windows' docs/configuration.md docs/workspace.md docs/app-maintenance.md docs/packaging.md config.example.toml jasper-app/src/main/java/dev/jasper/app/config/CoreSettings.java`. Limit edits to residency claims.
-- [ ] **Step 2: Apply exact behavior copy.** The configuration default table becomes `` `true` on macOS, Windows and Linux ``. Replace the residency introduction with:
+- [x] **Step 1: Locate stale claims** with `rg -n 'off on Linux|false.*Linux|Linux.*no.*icon|macOS and Windows' docs/configuration.md docs/workspace.md docs/app-maintenance.md docs/packaging.md config.example.toml jasper-app/src/main/java/dev/jasper/app/config/CoreSettings.java`. Limit edits to residency claims.
+- [x] **Step 2: Apply exact behavior copy.** The configuration default table becomes `` `true` on macOS, Windows and Linux ``. Replace the residency introduction with:
 
 ```markdown
 With `system.run_in_background` on (the default on macOS, Windows and Linux), Jasper keeps running when its last
@@ -457,8 +472,8 @@ checkboxes beside the existing platform residency checks: fresh login, explicit 
 Quit exits/no restart, logout/login, no tray and executable removal. Do not claim Linux tray support until Plan 2.
 Update maintenance's `LoginItem`/residency description minimally and preserve configuration heading anchors.
 
-- [ ] **Step 3: Run** `./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage -Pjasper.aot=false` using Python 3.11–3.13 (`-Pjasper.python=<absolute interpreter>` if required). Expect `BUILD SUCCESSFUL`; summarize XML counts from `*/build/test-results/test/`, not console guesses. No AOT or GUI tasks. Run `git diff --check`.
-- [ ] **Step 4: Record evidence** in STATUS and the plan banner: exact revision, commands, results, deviations, and native checks pending. On Linux, repeat focused bootstrap/config/login tests under the real Linux default; package checks on macOS alone do not establish Linux acceptance. Existing Linux package baseline is Ubuntu 22.04, x86_64/aarch64; preserve it. User-run desktop cases: Ubuntu 24.04 GNOME, Debian 12/13 XFCE or LXDE, Fedora 44 GNOME/Plasma; record actual installed versions. No native runs have been authorized by this plan.
+- [x] **Step 3: Run** `./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage -Pjasper.aot=false` using Python 3.11–3.13 (`-Pjasper.python=<absolute interpreter>` if required). Expect `BUILD SUCCESSFUL`; summarize XML counts from `*/build/test-results/test/`, not console guesses. No AOT or GUI tasks. Run `git diff --check`.
+- [x] **Step 4: Record evidence** in STATUS and the plan banner: exact revision, commands, results, deviations, and native checks pending. On Linux, repeat focused bootstrap/config/login tests under the real Linux default; package checks on macOS alone do not establish Linux acceptance. Existing Linux package baseline is Ubuntu 22.04, x86_64/aarch64; preserve it. User-run desktop cases: Ubuntu 24.04 GNOME, Debian 12/13 XFCE or LXDE, Fedora 44 GNOME/Plasma; record actual installed versions. No native runs have been authorized by this plan.
 - [ ] **Step 5: Commit** `docs: describe Linux background residency and login startup` with trailer. Request final whole-branch review, resolve findings and rerun affected checks; leave native acceptance explicitly pending until user-run evidence exists. Do not merge/push as part of plan execution.
 
 ## Self-review and handoff

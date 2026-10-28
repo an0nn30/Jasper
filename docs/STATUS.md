@@ -1,11 +1,24 @@
 # Jasper — Status and Handoff
 
-**Linux residency plans — 2026-10-27** (`codex/linux-residency-design`; [approved design](superpowers/specs/2026-10-27-linux-residency-design.md)).
-[Plan 1](superpowers/plans/2026-10-27-linux-residency-1-autostart.md) covers default-on Linux residency, explicit-off
-preservation, XDG autostart and ordered login-setting writes. [Plan 2](superpowers/plans/2026-10-27-linux-residency-2-tray.md)
-covers Java D-Bus and X11 trays with dependency/AWT gates before dependent implementation. Both are written, not
-executed; no design deviations. Next: review plans, then execute Plan 1 with per-task implementer/reviewer work.
-No product changes, GUI, benchmark or AOT run; Linux transport/native acceptance remains pending.
+**Linux residency Plan 1 — 2026-10-27** (`codex/linux-residency`; [approved design](superpowers/specs/2026-10-27-linux-residency-design.md),
+[plan](superpowers/plans/2026-10-27-linux-residency-1-autostart.md); production revision `1080c1ec1f77c38df0639ed5357d14b47b1406fc`).
+Tasks 1–3 are implemented and reviewed (`112558b40`, `7c36bf1b7`, `1080c1ec1`); Task 4 updates the guides and records
+verification. Linux residency defaults on, preserves saved opt-outs, registers installed Jasper for the current user's
+XDG desktop login and serializes login-setting writes so the latest pending save wins. Task 4 and whole-branch reviews
+are next; no merge or push. [Plan 2](superpowers/plans/2026-10-27-linux-residency-2-tray.md) remains unexecuted.
+Verification on macOS arm64/JBR 25: `./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage -Pjasper.aot=false
+-Pjasper.python=/Users/dustin/.local/share/uv/python/cpython-3.13.15-macos-aarch64-none/bin/python3.13` passed in 28m 56s;
+13,628 XML tests, 0 failures/errors, 33 skipped (13,595 executed); 72 theme-tool Python tests passed; CLI/launcher core
+133/152 checks, 0 failures; macOS bridge checks and the image verification passed, without an AOT cache. `git diff --check` passed.
+Deviations: Controller Ruling 1 makes Task 2's argv fixture await complete output instead of the first nonempty bytes;
+Task 2 also added failed-replacement cleanup coverage. Controller Ruling 3 adds one nonvisual test row to the theme
+migration inventory after its broad `ArrayList` discovery failed the first full check; 5 focused inventory tests then
+passed, followed by the full rerun. No behavior change. Exact counts and logs: `.superpowers/sdd/2026-10-27-linux-residency-1-autostart/task-4-report.md`.
+Linux-native parser/`desktop-file-validate` and focused bootstrap/config/login tests remain pending on an authorized
+Linux host. User-run acceptance remains pending on Ubuntu 24.04 GNOME, Debian 12/13 XFCE or LXDE and Fedora 44
+GNOME/Plasma, recording actual installed versions: fresh login, explicit off, close/reopen same PID, Quit/no restart,
+logout/login, no tray host and executable removal. The Ubuntu 22.04 x86_64/aarch64 package baseline is unchanged.
+No GUI, benchmark, AOT training, actual login registration, VM/remote-host connection, merge or push was performed.
 
 **Full windows plan 5 — 2026-10-27** (`claude/full-windows`, plans 1-5, start `c2c04684d`, head = this commit, not merged or pushed; [plan](superpowers/plans/2026-10-27-full-windows-5-drags.md), [spec](superpowers/specs/2026-10-26-jasper-full-windows-design.md) section 5.4; executed with per-task subagents). A pane dragged (Cmd+Option on macOS, Ctrl+Alt elsewhere) and released outside every Jasper window becomes a new full window at the cursor, sized as a torn-out tab's window, holding one tab with that pane (its session keeps running); the new window takes the default layout's tool windows (Zen off, Float and Window tool windows hidden while another window is open); the pane's tab closes in the source window when it was its last pane; the only pane of a window's only tab, and a pinned pane, never tear out (that window moves by its title bar); every window's empty workspace takes a dropped tab or pane anywhere over it (`WindowManager.movePaneToNewWindow`, `WindowContent.mayMovePaneToNewWindow`). This closes the full-windows series (plans 1-5). Deviation from the plan, in its status banner: the new window keeps the cursor at the same spot within the moved pane, sized to the whole tab's workspace. GUI checks for the user: Cmd+Option-drag (Ctrl+Alt-drag) a pane out of a split onto the desktop on macOS, Windows and Linux; drag it back into another window's pane, strip and empty workspace; try the only pane of the only tab. Plans 1-4's GUI checks are in their own entries below. The memory benchmark of an extra window (spec risk 2) is pending the user's go-ahead. No GUI launched.
 

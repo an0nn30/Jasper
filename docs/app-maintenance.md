@@ -459,6 +459,11 @@ plugin quit guard that opens a window or an ownerless dialog brings Jasper back 
 the menu bar and focus to be answered). GUI behaviour is on the
 [packaging checklist](packaging.md#native-acceptance-checklist); `testMacDock` covers the native code headlessly.
 
+`system.run_in_background` defaults on for macOS, Windows and Linux; residency is decided at start-up and does not
+require an indicator. For an eligible installed launch, `platform.LoginItem` plans login registration (a LaunchAgent,
+Windows Run value or Linux XDG autostart entry). `bootstrap.LoginItemUpdates` serializes registration writes and
+coalesces pending saves to the latest accepted choice. Registration failures are logged; the next start reconciles again.
+
 ### Background warm-up
 
 The `--background` warm-up rehearses a window (`JasperApplication.warmUp`, `application.Rehearsal`) as well as building

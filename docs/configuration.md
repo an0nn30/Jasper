@@ -180,7 +180,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `notifications.long_command_seconds` | integer | `10` | 0–3600 seconds; `0` turns finished-command notifications off | Live | Notifications › Notify after |
 | `notifications.system` | boolean | `true` | Also shows notifications as the operating system's own while Jasper is away | Live | Notifications › Show system notifications |
 | `notifications.groups` | table | `{}` | Group id to `"card"`, `"sticky"`, `"history"` or `"off"` ([Notification groups](#notification-groups)) | Live | Notifications › Groups |
-| `system.run_in_background` | boolean | `true` on macOS and Windows, `false` on Linux | [Background residency](#background-residency) | Restart; the login item at once | System Settings › Run in background |
+| `system.run_in_background` | boolean | `true` on macOS, Windows and Linux | [Background residency](#background-residency) | Restart; the login item at once | System Settings › Run in background |
 | `system.reopen` | string | `"last_known_state"` | `"last_known_state"` or `"empty_state"`: what the window Jasper opens while none is open holds, the window you used last or the default layout where it was | Live | System Settings › Reopen with |
 | `palette.visible_rows` | integer | `5`, or the [look's](#look-dependent-defaults) | 1–20 rows | Live | Command Palette › Visible rows |
 | `terminal.scrollback` | integer | `10000` | 0–1000000 lines; `0` keeps no scrollback | New panes | Terminal › Scrollback lines |
@@ -351,11 +351,13 @@ Jasper's home. [Notifications](notifications.md) describes what he shows.
 
 ### Background residency
 
-With `system.run_in_background` on (the default on macOS and Windows), Jasper keeps running when its last window
-closes, so the next window opens without a cold start; plugins keep running, but no shell does. On macOS, Quit (Cmd+Q)
-closes every window and leaves Jasper in the menu bar, whose item offers **New Window**, **Settings…** and
-**Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and **Quit Jasper**. Linux has
-no such icon, so the default there is off. [The workspace](workspace.md) describes quitting and reopening;
+With `system.run_in_background` on (the default on macOS, Windows and Linux), Jasper keeps running when its last
+window closes, so the next window opens without a cold start; plugins keep running, but no shell does. On Linux,
+launch Jasper normally to reopen it, and use Quit in the app to exit the process.
+
+On macOS, Quit (Cmd+Q) closes every window and leaves Jasper in the menu bar, whose item offers **New Window**,
+**Settings…** and **Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and
+**Quit Jasper**. [The workspace](workspace.md) describes quitting and reopening;
 `system.reopen` chooses whether the reopened window holds the window you used last or the default layout.
 
 Residency also starts Jasper in the background at login:
@@ -363,6 +365,8 @@ Residency also starts Jasper in the background at login:
 - macOS: `~/Library/LaunchAgents/dev.jasper.background.plist`, from your next login.
 - Windows: the value `Jasper` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, which runs Jasper with
   `--background`.
+- Linux: `$XDG_CONFIG_HOME/autostart/dev.jasper.background.desktop` (normally
+  `~/.config/autostart/dev.jasper.background.desktop`), which runs installed Jasper with `--background`.
 
 Only an installed Jasper registers this; a development run never does. The login item follows the setting as soon as
 it is saved; residency itself is decided when Jasper starts, so turning it on or off applies from the next start. A

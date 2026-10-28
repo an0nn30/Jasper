@@ -476,6 +476,10 @@ selected JBR's own templates: the menu commands run inside a function, the insta
 menu failure only prints "jasper: the desktop menu entry was not registered" (or "…removed"). Every other line is
 jpackage's, and a JBR whose templates lack the expected placeholder fails the build.
 
+With the default `system.run_in_background`, the first eligible installed launch registers the current user's
+`$XDG_CONFIG_HOME/autostart/dev.jasper.background.desktop` (normally under `~/.config`) to run Jasper with
+`--background` at login. Package installation does not register every user's login startup.
+
 Settings installs the `jasper` command as `~/.local/bin/jasper`
 ([installing the jasper command](command-line.md#installing-the-jasper-command)). The packages do not install the
 hicolor icon tree that the portable distributions carry.
@@ -657,6 +661,18 @@ cannot mask a packaging problem.
 - [ ] Launch Jasper from the desktop menu: Jasper's icon shows in the menu, the dock or taskbar and the window
   switcher, and the running window groups with its launcher on GNOME and KDE, under X11 and Wayland.
 - [ ] The login shell starts, UTF-8 text renders, and Jasper home is `~/.config/jasper` (or `$XDG_CONFIG_HOME/jasper`).
+- [ ] On Ubuntu 24.04 GNOME, Debian 12/13 XFCE or LXDE, and Fedora 44 GNOME/Plasma, record the installed distribution
+  and desktop versions. With a fresh default configuration, launch the installed app once: the current user's XDG
+  autostart entry appears. Log out and in: Jasper runs with no window and no shell.
+- [ ] Set `system.run_in_background = false` and save: the autostart entry is removed immediately. Restart Jasper:
+  closing its last window exits, and the next login does not start it.
+- [ ] With residency on, close the last window, then launch Jasper normally: a window opens in the same process (check
+  its PID), with no Linux tray icon. Repeat on a desktop without a tray host.
+- [ ] Quit in the app exits through the usual guards and does not restart Jasper during the same login session.
+- [ ] Log out and in with Jasper resident, then with a window open: logout completes and the next login starts one
+  resident process. Launch Jasper by hand during login too: only one process remains and the foreground window opens.
+- [ ] Quit Jasper, remove its installed executable, then log out and in: no Jasper process starts; the stale autostart
+  entry causes no desktop prompt.
 - [ ] The clipboard (including the primary selection, where the desktop has one) and links work.
 - [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off; a Remote SSH connection works.
 - [ ] Install the `jasper` command from Settings: `~/.local/bin/jasper --help` lists the plugin commands.
