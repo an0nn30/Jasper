@@ -124,6 +124,8 @@ final class Tables {
         int[] minimums=new int[0];
         /** The widths the user dragged this view's columns to, unscaled, by column id; they outrank the columns' own. */
         final Map<String, Integer> kept = new HashMap<>();
+        /** The columns of the last refresh, whose own widths a kept width was measured against. */
+        private List<Column> keptColumns = List.of();
         private float measuredScale=-1;
         private void measureColumns(){
             var columns=value().columns();var fonts=columns.stream().map(c->ThemePainting.font(context(),Typography.Role.valueOf(c.role().name()))).toList();
@@ -471,8 +473,7 @@ final class Tables {
             nodeRows.clear();
             for (int i = 0; i < size(); i++) for (var cell : value().rows().get(i).cellNodes().values()) index(cell, i);
             if (focusControl != null && !nodeRows.containsKey(focusControl)) focusControl = null;
-            var ids = value().columns().stream().map(Column::id).collect(java.util.stream.Collectors.toSet());
-            kept.keySet().retainAll(ids);
+            keptColumns = ColumnResizer.reconcile(kept, keptColumns, value().columns());
             measureColumns();
             scroll.setMinimumSize(new Dimension(usableWidth(),0));
             // A manager list column's rows start at the face's column top below the header (today's: the rail's top inset,

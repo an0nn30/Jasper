@@ -68,7 +68,7 @@ control shows.
 | `ColumnsResized` | the owner and the widths of its columns | a header boundary drag or double-click fit that has ended; the kit already shows the widths |
 
 Users drag a column boundary in any table or column tree to resize and double-click it to fit the column; the kit keeps
-the widths for the open view. A plugin remembers them across restarts with
+the widths for the open view until the plugin changes its column ids or a column's `width`. A plugin remembers them across restarts with
 [`ColumnState`](sdk-reference.html#dev.jasper.sdk.ui.ColumnState) (a sort and widths; `apply` puts them on its columns,
 `encode` and `decode` store them) kept in a [`ColumnStateFile`](sdk-reference.html#dev.jasper.sdk.ui.ColumnStateFile), a
 properties file in the plugin's data folder, conventionally `data/columns.properties`. Widths are unscaled pixels.

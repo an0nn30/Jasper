@@ -211,6 +211,45 @@ class ColumnResizeTest {
         });
     }
 
+    static List<Column> sized(List<Column> columns, Map<String, Integer> widths) {
+        return columns.stream().map(c -> widths.containsKey(c.id()) ? c.withWidth(OptionalInt.of(widths.get(c.id()))) : c).toList();
+    }
+
+    static int scaled(int width) { return com.formdev.flatlaf.util.UIScale.scale(width); }
+
+    @Test void aChangedColumnSetDropsKeptWidthsAndTakesItsOwnWidths() {
+        with(files(columns("name", "kind", "size", 2), rows()), (view, table, events) -> {
+            drag(table, 0, 40);
+            InteractiveRowsTest.layout(view);
+            assertThat(table.kept).isNotEmpty();
+            var wide = new ArrayList<>(sized(columns("name", "kind", "size", 2), Map.of("name", 150, "kind", 100)));
+            wide.add(new Column("modified", "Modified", TextRole.BODY, false, 2, Optional.empty()));
+            var cells = new HashMap<>(rows().getFirst().cells());
+            cells.put("modified", "Today");
+            view.update(new ViewSpec(files(wide, List.of(new TableRow("a", cells, Optional.empty())))));
+            InteractiveRowsTest.layout(view);
+            assertThat(table.kept).as("no width carries over from the other column set").isEmpty();
+            int[] sizes = widths(table);
+            assertThat(sizes[0]).isEqualTo(scaled(150));
+            assertThat(sizes[1]).isEqualTo(scaled(100));
+        });
+    }
+
+    @Test void aColumnWidthTheHostChangesOutranksTheKeptOne() {
+        with(files(sized(columns("name", "kind", "size", 2), Map.of("name", 150)), rows()), (view, table, events) -> {
+            drag(table, 0, 40);
+            InteractiveRowsTest.layout(view);
+            int[] dragged = widths(table);
+            view.update(new ViewSpec(files(sized(columns("name", "kind", "size", 2), Map.of("name", 150)), rows())));
+            InteractiveRowsTest.layout(view);
+            assertThat(widths(table)).as("the same width keeps the drag").isEqualTo(dragged);
+            view.update(new ViewSpec(files(sized(columns("name", "kind", "size", 2), Map.of("name", 120)), rows())));
+            InteractiveRowsTest.layout(view);
+            assertThat(widths(table)[0]).isEqualTo(scaled(120));
+            assertThat(table.kept).doesNotContainKey("name").containsKey("kind");
+        });
+    }
+
     @Test void numericColumnKeepsItsContentMinimumUnderAWidth() {
         var columns = List.of(new Column("name", "Name", TextRole.BODY, false, 1, Optional.empty()),
                 new Column("size", "Size", TextRole.BODY, true, 1, Optional.empty(), OptionalInt.of(10)));
@@ -336,6 +375,37 @@ class ColumnResizeTest {
             InteractiveRowsTest.layout(view);
             assertThat(starts(tree.header)).isEqualTo(starts);
             assertThat(widths(tree.header)).isEqualTo(widths);
+        });
+    }
+
+    @Test void treeColumnSetChangeDropsKeptWidthsAndTakesItsOwnWidths() {
+        withTree(hosts(treeColumns(), Set.of()), 600, (view, tree, events) -> {
+            drag(tree.header, 0, 10, 20);
+            InteractiveRowsTest.layout(view);
+            assertThat(tree.kept).isNotEmpty();
+            var other = List.of(new Column("name", "Name", TextRole.BODY, false),
+                    new Column("address", "Address", TextRole.MONO_SMALL, false).withWidth(OptionalInt.of(150)),
+                    new Column("port", "Port", TextRole.MONO_SMALL, true));
+            view.update(new ViewSpec(hosts(other, Set.of())));
+            InteractiveRowsTest.layout(view);
+            assertThat(tree.kept).as("no width carries over from the other column set").isEmpty();
+            assertThat(widths(tree.header)[1]).isEqualTo(scaled(150));
+            assertThat(widths(tree.header)[2]).as("back at its content fit").isEqualTo(tree.trailingWidths[1]);
+        });
+    }
+
+    @Test void treeColumnWidthTheHostChangesOutranksTheKeptOne() {
+        withTree(hosts(sized(treeColumns(), Map.of("host", 150)), Set.of()), 600, (view, tree, events) -> {
+            drag(tree.header, 0, 30);
+            InteractiveRowsTest.layout(view);
+            int[] dragged = widths(tree.header);
+            view.update(new ViewSpec(hosts(sized(treeColumns(), Map.of("host", 150)), Set.of())));
+            InteractiveRowsTest.layout(view);
+            assertThat(widths(tree.header)).as("the same width keeps the drag").isEqualTo(dragged);
+            view.update(new ViewSpec(hosts(sized(treeColumns(), Map.of("host", 100)), Set.of())));
+            InteractiveRowsTest.layout(view);
+            assertThat(widths(tree.header)[1]).isEqualTo(scaled(100));
+            assertThat(tree.kept).doesNotContainKey("host").containsKey("port");
         });
     }
 

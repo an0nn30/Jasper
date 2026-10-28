@@ -130,6 +130,8 @@ final class Trees {
         int[] minimums = new int[0];
         /** The widths the user dragged this view's columns to, unscaled, by column id; they outrank the columns' own. */
         final Map<String, Integer> kept = new HashMap<>();
+        /** The columns of the last refresh, whose own widths a kept width was measured against. */
+        private List<Column> keptColumns = List.of();
 
         TreeControl(KitView view, Nodes.Tree node) {
             super(view, node, new TreePane(view.context()));
@@ -410,8 +412,7 @@ final class Trees {
                     String text = item.trailing().get(i);
                     trailingWidths[i] = Math.max(trailingWidths[i], Math.max(metrics[i].stringWidth(text), ThemePainting.measureText(fonts[i], text)));
                 }
-            var ids = value().columns().stream().map(Column::id).collect(java.util.stream.Collectors.toSet());
-            kept.keySet().retainAll(ids);
+            keptColumns = ColumnResizer.reconcile(kept, keptColumns, value().columns());
             columnHeader();
         }
 

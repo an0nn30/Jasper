@@ -1,11 +1,15 @@
 package dev.jasper.ui.swing;
 
+import dev.jasper.ui.model.Column;
+
 import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.event.ContainerEvent;
 import java.awt.event.ContainerListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.List;
+import java.util.Map;
 
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
@@ -51,6 +55,19 @@ final class ColumnResizer extends MouseAdapter implements ContainerListener {
         this.owner = owner;
         this.header = header;
         this.target = target;
+    }
+
+    /**
+     * Drops the kept widths a new spec outranks and returns {@code columns}, the next call's {@code previous}: every kept
+     * width when the column ids differ from {@code previous}'s, else the kept width of each column whose own width changed.
+     */
+    static List<Column> reconcile(Map<String, Integer> kept, List<Column> previous, List<Column> columns) {
+        if (!previous.stream().map(Column::id).toList().equals(columns.stream().map(Column::id).toList()))
+            kept.clear();
+        else
+            for (int i = 0; i < columns.size(); i++)
+                if (!previous.get(i).width().equals(columns.get(i).width())) kept.remove(columns.get(i).id());
+        return columns;
     }
 
     /** Lets {@code header}'s boundaries be dragged, over the header and every title it holds now or later. */
