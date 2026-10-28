@@ -357,3 +357,23 @@ The three new regression cases first failed on the prior implementation. Local f
 pass 22 XML tests (6 executed, 16 Linux skips); application architecture passes. Both final logs have
 zero compiler warnings. Evidence is in `task-4-evidence/fix-1/` beside the original task report; no
 full suite, graphical session, dependencies, installed app or packaging was changed.
+
+## Task 5 controller and lifecycle verification
+
+Fedora 44 aarch64, JBR 25.0.4.1-b635.75, isolated `/home/dustin/jasper-tray-gate.1yPuL3`:
+
+```sh
+env -u DISPLAY -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS \
+  JAVA_HOME=/home/dustin/.sdkman/candidates/java/current \
+  ./gradlew :jasper-app:test --tests '*LinuxResidentTrayTest' \
+  --tests '*LinuxStatusNotifierTest' --tests '*LinuxTrayPolicyTest' \
+  --tests '*LinuxTrayWireTest' verifyApplicationArchitecture --console=plain
+```
+
+**PASS:** 50 tests, zero failures/errors/skips: controller 27, adapter 2, policy 1, wire 20; architecture passes. Existing wire coverage runs again for both private-bus address forms. New cases prove bus connection loss/restoration even with identical no-host snapshots, confirmed withdrawal before replacement, two-second withdrawal timeout retaining owed cleanup and independent daemon name loss after confirmation. Controller tests use manual queues/latches without sleeps and cover owner replacement during registration, queued stale actions, late legacy support loss, duplicate healthy observations, 10,000-event coalescing, 1/2/4/8/16/30/30 backoff/reset, fallback restoration, every adapter failure/cleanup path and close during blocked work.
+
+Local macOS command adds `--tests '*ThemeMigrationCoverageTest'`: 52 XML tests, zero failures/errors, 18 Linux-only skips (34 executed); architecture passes. The new controller test needs one nonvisual source-inventory row. Final local/native compiler output has zero warnings. `git diff --check` and Java source hygiene pass.
+
+Ruling 14 expands the internal Modern record with `Runnable reconnect`, bound to `LinuxStatusNotifier.start`, and reports connection state independently of Host. The controller owns the sole capped reconnect timer; successful connection with no watcher resets backoff and cancels retries. Ruling 15 adds `withdrawAndAwait`, worker-only and bounded to two seconds, while preserving nonblocking `withdraw` for cancellation. Task 6 must bind confirmed withdrawal before fallback installation. Cleanup timeout refuses replacement and retains the cleanup request.
+
+Task 5 implements injected scheduling with logical timer invalidation. Task 6 still owns production physical timer cancellation/removal on success, restoration and close; daemon scheduling; five-second legacy probing suspended while modern publication is healthy; and bounded EDT marshaling/late-add cleanup. Task 2's native AWT gate is pending, as are x86_64/Ubuntu baseline CI, graphical acceptance and final integration checks. No GUI, actual desktop session bus, installed-app change, AOT, merge or push was used.

@@ -30,6 +30,9 @@ final class LinuxStatusNotifier implements AutoCloseable {
     private static final String WATCHER_PATH = "/StatusNotifierWatcher";
     private final List<String> addresses;
     private final Consumer<Host> changed;
+    private final Consumer<Boolean> connectionChanged;
+    private Boolean connected;
+    private Boolean pendingConnection;
     private final Runnable beforeHandoff;
     private final ThreadPoolExecutor worker = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
         new ArrayBlockingQueue<>(1), Thread.ofPlatform().daemon().name("jasper-tray-dbus").factory());
@@ -56,7 +59,16 @@ final class LinuxStatusNotifier implements AutoCloseable {
     LinuxStatusNotifier(String address, Consumer<Host> changed) { this(address, changed, () -> { }); }
 
     LinuxStatusNotifier(String address, Consumer<Host> changed, Runnable beforeHandoff) {
+        this(address, changed, state -> { }, beforeHandoff);
+    }
+
+    LinuxStatusNotifier(String address, Consumer<Host> changed, Consumer<Boolean> connectionChanged) {
+        this(address, changed, connectionChanged, () -> { });
+    }
+
+    LinuxStatusNotifier(String address, Consumer<Host> changed, Consumer<Boolean> connectionChanged, Runnable beforeHandoff) {
         this.beforeHandoff = beforeHandoff;
+        this.connectionChanged = connectionChanged;
         this.addresses = addresses(address, System.getenv("XDG_RUNTIME_DIR"));
         this.changed = changed;
         deadlines.setRemoveOnCancelPolicy(true);
@@ -148,6 +160,25 @@ final class LinuxStatusNotifier implements AutoCloseable {
         }
     }
 
+    /** Controller worker only: replacement is allowed only after the publication connection has closed. */
+    void withdrawAndAwait() {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        synchronized (deadlineLock) {
+            if (Thread.currentThread() == running)
+                throw new IllegalStateException("Withdrawal cannot wait on the D-Bus worker");
+            withdraw();
+            while (active.get() || withdrawRequested) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) throw new IllegalStateException("Linux tray withdrawal timed out");
+                try { TimeUnit.NANOSECONDS.timedWait(deadlineLock, remaining); }
+                catch (InterruptedException cancelled) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Linux tray withdrawal interrupted", cancelled);
+                }
+            }
+        }
+    }
+
     private Future<Boolean> submit(Callable<Boolean> operation) {
         synchronized (deadlineLock) {
             if (closed || !active.compareAndSet(false, true)) return null;
@@ -177,6 +208,7 @@ final class LinuxStatusNotifier implements AutoCloseable {
                     }
                     beforeHandoff.run();
                     Host notification;
+                    Boolean connectionNotification;
                     while (true) {
                         boolean closeAll;
                         synchronized (deadlineLock) {
@@ -190,7 +222,10 @@ final class LinuxStatusNotifier implements AutoCloseable {
                                 running = null;
                                 notification = pendingObservation;
                                 pendingObservation = null;
+                                connectionNotification = pendingConnection;
+                                pendingConnection = null;
                                 active.set(false);
+                                deadlineLock.notifyAll();
                                 if (closed) { worker.shutdown(); deadlines.shutdownNow(); }
                                 break;
                             }
@@ -199,6 +234,7 @@ final class LinuxStatusNotifier implements AutoCloseable {
                         closePublication();
                         if (closeAll) closeDiscovery();
                     }
+                    if (!closed && connectionNotification != null) connectionChanged.accept(connectionNotification);
                     if (!closed && notification != null) changed.accept(notification);
                     if (!closed && dirty.get()) requestSnapshot();
                 }
@@ -258,7 +294,7 @@ final class LinuxStatusNotifier implements AutoCloseable {
                     break;
                 }
             }
-            if (discovery == null) { report(NONE); return; }
+            if (discovery == null) { reportConnection(false); report(NONE); return; }
             // Subscribe before any owner/property query. Every signal schedules an authoritative snapshot.
             subscriptions.add(discovery.addSigHandler(DBus.NameOwnerChanged.class, event -> {
                 if ("org.freedesktop.DBus".equals(event.getSource()) && "/org/freedesktop/DBus".equals(event.getPath())
@@ -269,7 +305,9 @@ final class LinuxStatusNotifier implements AutoCloseable {
             subscriptions.add(discovery.addSigHandler(LinuxTrayDbus.FreedesktopWatcher.StatusNotifierHostRegistered.class, this::hostSignal));
             subscriptions.add(discovery.addSigHandler(LinuxTrayDbus.FreedesktopWatcher.StatusNotifierHostUnregistered.class, this::hostSignal));
         }
-        report(currentHost());
+        Host host = currentHost();
+        reportConnection(true);
+        report(host);
     }
 
     private void hostSignal(DBusSignal signal) {
@@ -313,7 +351,15 @@ final class LinuxStatusNotifier implements AutoCloseable {
         closeConnection(connection);
     }
 
+    private void reportConnection(boolean available) {
+        if (!closed && !Boolean.valueOf(available).equals(connected)) {
+            connected = available;
+            pendingConnection = available;
+        }
+    }
+
     private void closeDiscovery() {
+        reportConnection(false);
         // Closing the owned connection also removes bus subscriptions, without outbound RemoveMatch calls.
         subscriptions.clear();
         owners = Map.of();
@@ -342,7 +388,11 @@ final class LinuxStatusNotifier implements AutoCloseable {
                     Thread.currentThread().interrupt();
                     closePublication(); closeDiscovery();
                     Thread.interrupted();
-                    active.set(false);
+                    synchronized (deadlineLock) {
+                        withdrawRequested = false;
+                        active.set(false);
+                        deadlineLock.notifyAll();
+                    }
                     worker.shutdown(); deadlines.shutdownNow();
                 });
             } else {

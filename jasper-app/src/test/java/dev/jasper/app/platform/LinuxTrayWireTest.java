@@ -103,6 +103,43 @@ class LinuxTrayWireTest {
         }
     }
 
+    @ParameterizedTest(name = "confirmed withdrawal, timeout={0}") @ValueSource(booleans = {false, true})
+    void confirmedWithdrawalWaitsForNameLossAndTimeoutKeepsCleanupOwed(boolean timeout) throws Exception {
+        var armed = new java.util.concurrent.atomic.AtomicBoolean();
+        var boundary = new CountDownLatch(1); var release = new CountDownLatch(1);
+        Runnable handoff = () -> {
+            if (!armed.compareAndSet(true, false)) return;
+            boundary.countDown();
+            boolean interrupted = false;
+            try {
+                while (true) {
+                    try { if (!release.await(4, TimeUnit.SECONDS)) throw new AssertionError("Handoff not released"); break; }
+                    catch (InterruptedException cancelled) { interrupted = true; }
+                }
+            } finally { if (interrupted) Thread.currentThread().interrupt(); }
+        };
+        try (var f = new Fixture(false, true, fixture -> { }, handoff)) {
+            f.publish(); armed.set(true); f.adapter.start();
+            assertThat(boundary.await(2, TimeUnit.SECONDS)).isTrue();
+            var withdrawal = new java.util.concurrent.FutureTask<Void>(() -> { f.adapter.withdrawAndAwait(); return null; });
+            var worker = Thread.ofPlatform().daemon().start(withdrawal);
+            try {
+                if (timeout) {
+                    assertThatThrownBy(() -> withdrawal.get(3, TimeUnit.SECONDS))
+                        .isInstanceOf(java.util.concurrent.ExecutionException.class)
+                        .hasCauseInstanceOf(IllegalStateException.class);
+                } else assertThat(withdrawal.isDone()).isFalse();
+                release.countDown();
+                if (!timeout) assertThat(withdrawal.get(3, TimeUnit.SECONDS)).isNull();
+                // A timeout must retain the cleanup request; the next bounded confirmation observes it drained.
+                f.adapter.withdrawAndAwait();
+                var daemon = f.observer.getRemoteObject("org.freedesktop.DBus", "/org/freedesktop/DBus", org.freedesktop.dbus.interfaces.DBus.class);
+                assertThat(daemon.NameHasOwner(f.publication)).isFalse();
+            } finally { release.countDown(); worker.join(3000); }
+            assertThat(worker.isAlive()).isFalse();
+        }
+    }
+
     @Test void publicationStaysOnDiscoveryBusWhenEarlierAddressAppears() throws Exception {
         Path earlierDirectory = Files.createTempDirectory(Path.of("/tmp"), "jta-");
         Path selectedDirectory = Files.createTempDirectory(Path.of("/tmp"), "jtb-");
@@ -158,6 +195,30 @@ class LinuxTrayWireTest {
                 } finally { process.destroyForcibly(); }
             }
         }
+    }
+
+    @Test @SuppressWarnings("try")
+    void connectionStateRecoversWithoutHostEvenWhenHostSnapshotIsUnchanged() throws Exception {
+        Path directory = Files.createTempDirectory(Path.of("/tmp"), "jtc-");
+        var hosts = new LinkedBlockingQueue<LinuxStatusNotifier.Host>();
+        var states = new LinkedBlockingQueue<Boolean>();
+        try {
+            try (var first = LinuxTestBus.start(directory, false);
+                 var adapter = new LinuxStatusNotifier(first.address(), hosts::add, states::add)) {
+                adapter.start();
+                assertThat(states.poll(3, TimeUnit.SECONDS)).isTrue();
+                assertThat(hosts.poll(2, TimeUnit.SECONDS)).isNotNull().extracting(LinuxStatusNotifier.Host::registered).isEqualTo(false);
+                first.close();
+                assertThat(states.poll(3, TimeUnit.SECONDS)).isFalse();
+                try (var second = LinuxTestBus.start(directory, false)) {
+                    assertThat(second.address()).startsWith("unix:path=" + directory.resolve("bus"));
+                    adapter.start();
+                    assertThat(states.poll(3, TimeUnit.SECONDS)).isTrue();
+                    // Both daemon lifetimes have no watcher, so host deduplication cannot carry restoration.
+                    assertThat(hosts).isEmpty();
+                }
+            }
+        } finally { Files.deleteIfExists(directory.resolve("bus")); Files.delete(directory); }
     }
 
     @Test @SuppressWarnings("try") // Deliberately stop the first private bus before its scope ends.
