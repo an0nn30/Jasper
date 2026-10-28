@@ -36,7 +36,7 @@ final class LinuxTrayXcb implements AutoCloseable {
     record Display(int number, int screen) {}
     record Visual(int id, int depth, int redMask, int greenMask, int blueMask) {}
     record PixmapFormat(int depth, int bitsPerPixel, int scanlinePad) {}
-    record Setup(int root, int rootVisual, int rootDepth, int imageByteOrder,
+    record Setup(int root, int rootVisual, int rootDepth, int imageByteOrder, int width, int height,
                  List<Visual> visuals, List<PixmapFormat> formats) {
         Setup { visuals = List.copyOf(visuals); formats = List.copyOf(formats); }
     }
@@ -140,6 +140,8 @@ final class LinuxTrayXcb implements AutoCloseable {
         for (int i = 0; i < screens; i++) {
             require(b, 40); int p = b.position();
             int root = b.getInt(p), visual = b.getInt(p + 32), depth = Byte.toUnsignedInt(b.get(p + 38));
+            int width = Short.toUnsignedInt(b.getShort(p + 20)), height = Short.toUnsignedInt(b.getShort(p + 22));
+            if (width == 0 || height == 0) throw new IllegalArgumentException("Empty X11 screen");
             int depths = Byte.toUnsignedInt(b.get(p + 39)); b.position(p + 40);
             var visuals = new ArrayList<Visual>();
             for (int d = 0; d < depths; d++) {
@@ -151,7 +153,7 @@ final class LinuxTrayXcb implements AutoCloseable {
                     b.position(p + 24);
                 }
             }
-            if (i == screen) selected = new Setup(root, visual, depth, order, visuals, formats);
+            if (i == screen) selected = new Setup(root, visual, depth, order, width, height, visuals, formats);
         }
         if (b.hasRemaining()) throw new IllegalArgumentException("Trailing X11 setup data");
         return selected;
@@ -640,6 +642,28 @@ final class LinuxTrayXcb implements AutoCloseable {
     private void property(int window, int atom, int type, byte format, int count, byte[] data, long deadline) {
         if (data.length > maximumRequestBytes() - 24) throw new Unavailable("X11 property request too large");
         mutate(deadline, () -> bindings.xcb.xcb_change_property(connection, (byte)0, window, atom, type, format, count, data));
+    }
+    /** The caller leases its own packed popup peer until this barrier or connection termination. */
+    void popupHints(int window, long deadline) {
+        int state = internAtom("_NET_WM_STATE", deadline);
+        var values = new java.util.LinkedHashSet<Integer>();
+        for (int value : property32s(window, state, 4, 64, deadline)) values.add(value);
+        values.add(internAtom("_NET_WM_STATE_SKIP_TASKBAR", deadline));
+        values.add(internAtom("_NET_WM_STATE_SKIP_PAGER", deadline));
+        property32(window, state, 4, values.stream().mapToInt(Integer::intValue).toArray(), deadline);
+        barrier(deadline);
+    }
+    boolean activatePopup(int window, long userTime, long deadline) { return activatePopup(window, userTime, () -> true, deadline); }
+    boolean activatePopup(int window, long userTime, java.util.function.BooleanSupplier valid, long deadline) {
+        if (userTime <= 0 || userTime > 0xffffffffL || !valid.getAsBoolean()) return false;
+        int active = internAtom("_NET_ACTIVE_WINDOW", deadline);
+        int supported = internAtom("_NET_SUPPORTED", deadline);
+        if (java.util.Arrays.stream(property32s(setup.root, supported, 4, 4096, deadline)).noneMatch(value -> value == active)
+                || !valid.getAsBoolean()) return false;
+        operationDeadline(deadline);
+        sendClientMessage(setup.root, window, active, (1 << 19) | (1 << 20), 1, (int)userTime, 0, 0, 0);
+        barrier(deadline);
+        return true;
     }
     int parent(int window, long deadline) {
         return buffer(reply(request(deadline, () -> bindings.xcb.xcb_query_tree(connection, window)), deadline).bytes).getInt(12);

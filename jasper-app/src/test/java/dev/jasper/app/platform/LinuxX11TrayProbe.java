@@ -34,7 +34,10 @@ public final class LinuxX11TrayProbe {
         Path output = Path.of(options.getOrDefault("--output", "build/tray-gate/transport")).toAbsolutePath();
         Files.createDirectories(output);
         Files.writeString(output.resolve("probe.pid"), ProcessHandle.current().pid() + "\n");
-        if (options.getOrDefault("--gate", "transport").equals("legacy")) { legacy(options, output); return; }
+        if (Set.of("legacy", "popup").contains(options.getOrDefault("--gate", "transport"))) {
+            if (options.get("--gate").equals("popup")) System.setProperty("java.awt.headless", "false");
+            legacy(options, output); return;
+        }
         if (options.containsKey("--case")) {
             String name = options.get("--case");
             warm();
@@ -83,6 +86,194 @@ public final class LinuxX11TrayProbe {
         System.out.println("PASS transport requiredCases=" + cases.size() + " requiredSkips=0 watchdogFailures=0");
     }
 
+    private static java.awt.Window popupWindowOnEdt() {
+        return java.util.Arrays.stream(java.awt.Window.getWindows()).filter(java.awt.Window::isDisplayable).findFirst().orElseThrow();
+    }
+    private static java.awt.Window popupWindow() {
+        var result = new AtomicReference<java.awt.Window>();
+        try { javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var windows = java.util.Arrays.stream(java.awt.Window.getWindows()).filter(java.awt.Window::isDisplayable).toList();
+            assertThat(windows).hasSizeLessThanOrEqualTo(1);
+            if (!windows.isEmpty()) result.set(windows.getFirst());
+        }); } catch (Exception e) { throw new AssertionError(e); }
+        return result.get();
+    }
+    private static int[] popupRows(Map<String, String> env, Path output, LinuxLegacyTray tray, LinuxTrayPopup popup,
+            String icon, Process panel, List<Integer> actions, List<LinuxLegacyTray.MenuRequest> requests,
+            AtomicReference<java.awt.Rectangle> anchorOverride, String panelName) throws Exception {
+        if (Boolean.getBoolean("jasper.tray.focusTrace")) {
+        java.util.logging.Logger.getLogger("sun.awt.X11.focus").setLevel(java.util.logging.Level.FINEST);
+        java.util.logging.Logger.getLogger("java.awt.focus").setLevel(java.util.logging.Level.FINEST);
+        for (var handler : java.util.logging.Logger.getLogger("").getHandlers()) handler.setLevel(java.util.logging.Level.FINEST);
+        }
+        var toolkit = java.awt.Toolkit.getDefaultToolkit();
+        java.awt.event.AWTEventListener windowTrace = event -> {
+            if (event instanceof java.awt.event.WindowEvent we) System.out.println("WINDOWTRACE id=" + we.getID()
+                + " window=" + System.identityHashCode(we.getWindow()) + " displayable=" + we.getWindow().isDisplayable()
+                + " visible=" + we.getWindow().isVisible() + " focusable=" + we.getWindow().isFocusableWindow()
+                + " focused=" + System.identityHashCode(java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow())
+                + " active=" + System.identityHashCode(java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow()));
+        };
+        toolkit.addAWTEventListener(windowTrace, java.awt.AWTEvent.WINDOW_EVENT_MASK | java.awt.AWTEvent.WINDOW_FOCUS_EVENT_MASK);
+        try {
+        int rawBefore = java.awt.Window.getWindows().length;
+        // Prime the public menu UI's process-wide helpers before taking listener baselines.
+        javax.swing.SwingUtilities.invokeAndWait(() -> new javax.swing.JPopupMenu());
+        int listeners = toolkit.getAWTEventListeners().length;
+        assertThat(popupWindow()).isNull();
+        var trace = new ArrayList<String>();
+        for (int id : new int[] {1, 2, 3, 5}) {
+            command(env, "xdotool", "mousemove", "--window", icon, "10", "10", "click", "3");
+            LinuxX11TestServer.await(() -> popupWindow() != null, "popup for row " + id);
+            var window = popupWindow();
+            try { LinuxX11TestServer.await(window::isFocused, "popup focus"); }
+            catch (AssertionError failure) {
+                Files.writeString(output.resolve("focus-failure.txt"), "window=" + window + " focusOwner=" + window.getFocusOwner()
+                    + " currentFocused=" + java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow()
+                    + " path=" + java.util.Arrays.toString(javax.swing.MenuSelectionManager.defaultManager().getSelectedPath())
+                    + " expectedGestureTime=" + requests.getLast().userTime()
+                    + command(env, "xprop", "-id", command(env, "xdotool", "search", "--name", "^Jasper tray menu$").strip(),
+                        "_NET_WM_USER_TIME", "_NET_WM_USER_TIME_WINDOW", "_NET_WM_STATE", "WM_HINTS", "WM_PROTOCOLS")
+                    + command(env, "xprop", "-id", icon, "_NET_WM_USER_TIME")
+                    + command(env, "xprop", "-root", "_NET_SUPPORTED")
+                    + command(env, "xdotool", "getwindowfocus") + command(env, "xwininfo", "-root", "-tree"));
+                throw failure;
+            }
+            assertThat(window.getType()).isEqualTo(java.awt.Window.Type.UTILITY);
+            assertThat(((javax.swing.JDialog)window).isUndecorated()).isTrue();
+            String xid = command(env, "xdotool", "search", "--name", "^Jasper tray menu$").strip();
+            String type = command(env, "xprop", "-id", xid, "_NET_WM_WINDOW_TYPE");
+            String clients = command(env, "xprop", "-root", "_NET_CLIENT_LIST");
+            String nativeInfo = command(env, "xwininfo", "-id", xid, "-all");
+            String state = command(env, "xprop", "-id", xid, "_NET_WM_STATE");
+            String time = command(env, "xprop", "-id", xid, "_NET_WM_USER_TIME", "_NET_WM_USER_TIME_WINDOW");
+            String iconTime = command(env, "xprop", "-id", icon, "_NET_WM_USER_TIME");
+            String supported = command(env, "xprop", "-root", "_NET_SUPPORTED");
+            Files.writeString(output.resolve("root-supported.txt"), supported);
+            assertThat(command(env, "xprop", "-root", "_NET_ACTIVE_WINDOW").toLowerCase(java.util.Locale.ROOT))
+                .contains("window id # 0x" + Long.toHexString(Long.parseLong(xid)));
+            Files.writeString(output.resolve("popup-type-" + id + ".txt"), type + state + time + iconTime + "expectedGestureTime=" + requests.getLast().userTime() + "\n" + clients + nativeInfo);
+            assertThat(nativeInfo).contains("Override Redirect State: no");
+            assertThat(state).contains("_NET_WM_STATE_SKIP_TASKBAR", "_NET_WM_STATE_SKIP_PAGER");
+            var popupImage = capture(env, output, "popup-row-" + id);
+            if (id == 1) {
+                var baseline = javax.imageio.ImageIO.read(output.resolve("embedded.png").toFile()); int changed = 0;
+                for (int y = 0; y < 32; y++) for (int x = 100; x < 1200; x++)
+                    if (colourDistance(baseline.getRGB(x, y), popupImage.getRGB(x, y)) > 3) changed++;
+                System.out.println("TASKBAR_PIXEL_CHANGE=" + changed);
+                if (panelName.equals("lxde")) assertThat(changed).as("actual taskbar/pager pixels unchanged").isZero();
+                Files.writeString(output.resolve("taskbar-difference.txt"), "pixels=" + changed + " rectangle=100,0,1100,32\n");
+            }
+            int before = actions.size();
+            // First and last rows exercise keyboard selection; middle rows use actual pointer clicks.
+            if (id == 1 || id == 5) {
+                if (id == 5) command(env, "xdotool", "key", "Down", "Down", "Down");
+                command(env, "xdotool", "key", "Return");
+            } else {
+                var point = new AtomicReference<java.awt.Point>();
+                javax.swing.SwingUtilities.invokeAndWait(() -> {
+                    var menu = (javax.swing.JPopupMenu)((javax.swing.JDialog)window).getContentPane();
+                    var item = java.util.Arrays.stream(menu.getComponents()).filter(c -> Integer.toString(id).equals(c.getName())).findFirst().orElseThrow();
+                    var p = item.getLocationOnScreen(); p.translate(item.getWidth() / 2, item.getHeight() / 2); point.set(p);
+                });
+                // xdotool uses device pixels; derive the fixture click from the tested public transform.
+                var transform = window.getGraphicsConfiguration().getDefaultTransform();
+                var p = transform.transform(point.get(), null);
+                command(env, "xdotool", "mousemove", Integer.toString((int)p.getX()), Integer.toString((int)p.getY()), "click", "1");
+            }
+            LinuxX11TestServer.await(() -> actions.size() == before + 1 && popupWindow() == null, "selected row closes once " + id);
+            assertThat(actions.getLast()).isEqualTo(id);
+            assertThat(toolkit.getAWTEventListeners()).hasSize(listeners);
+            assertThat(javax.swing.MenuSelectionManager.defaultManager().getSelectedPath()).isEmpty();
+            trace.add("row=" + id + " callbackOnce=true type=UTILITY focused=true disposed=true listenersBaseline=" + listeners);
+        }
+        assertThat(actions).containsExactly(1, 2, 3, 5); // Quit was vetoed: adapter still opens another menu.
+        for (String dismiss : List.of("Escape", "outside", "focus")) {
+            command(env, "xdotool", "mousemove", "--window", icon, "10", "10", "click", "3");
+            LinuxX11TestServer.await(() -> popupWindow() != null, "dismiss popup");
+            LinuxX11TestServer.await(() -> popupWindow().isFocused(), "dismiss popup focus");
+            if (dismiss.equals("Escape")) {
+                command(env, "xdotool", "key", "Tab", "shift+Tab", "Down", "Up", "Escape");
+            } else if (dismiss.equals("outside")) command(env, "xdotool", "mousemove", "900", "600", "click", "1");
+            else command(env, "xdotool", "windowfocus", "--sync", "--", "0x" + command(env, "xwininfo", "-root").lines().filter(line -> line.contains("Window id:")).findFirst().orElseThrow().trim().split(" +")[3].substring(2));
+            LinuxX11TestServer.await(() -> popupWindow() == null, "dismiss " + dismiss);
+            assertThat(actions).hasSize(4); assertThat(toolkit.getAWTEventListeners()).hasSize(listeners);
+            trace.add("dismiss=" + dismiss + " noAction=true disposed=true listenersBaseline=true");
+        }
+        for (String key : List.of("Menu", "shift+F10")) {
+            command(env, "xdotool", "windowfocus", "--sync", icon);
+            command(env, "xdotool", "key", key);
+            LinuxX11TestServer.await(() -> popupWindow() != null && popupWindow().isFocused(), "native keyboard menu " + key);
+            capture(env, output, "keyboard-" + key.replace('+', '-'));
+            command(env, "xdotool", "key", "Escape"); LinuxX11TestServer.await(() -> popupWindow() == null, "keyboard menu dismissed");
+            assertThat(actions).hasSize(4); trace.add("keyboard=" + key + " focused=true noAction=true dismissed=true");
+        }
+        var pointerEntered = new CountDownLatch(1); var pointerRelease = new CountDownLatch(1);
+        javax.swing.SwingUtilities.invokeLater(() -> { pointerEntered.countDown(); try { pointerRelease.await(2, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+        assertThat(pointerEntered.await(2, TimeUnit.SECONDS)).isTrue();
+        command(env, "xdotool", "mousemove", "--window", icon, "10", "10", "click", "3");
+        command(env, "xdotool", "mousemove", "600", "400"); pointerRelease.countDown();
+        LinuxX11TestServer.await(() -> popupWindow() != null && popupWindow().isFocused() && popupWindow().getWidth() > 1, "moved-pointer popup");
+        var movedLocation = new AtomicReference<java.awt.Point>();
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var window = popupWindowOnEdt(); var config = window.getGraphicsConfiguration(); var nativeBounds = requests.getLast().rootScreenBounds();
+            var screen = LinuxTrayPopup.verifiedScreen(nativeBounds, config.getBounds(), toolkit.getScreenInsets(config), config.getDefaultTransform(), 1);
+            var expected = LinuxTrayPopup.clamp(LinuxTrayPopup.anchor(requests.getLast().rootBounds(), false, null, screen), window.getSize(), screen);
+            assertThat(window.getLocation()).isEqualTo(expected); movedLocation.set(expected);
+        });
+        capture(env, output, "moved-pointer"); command(env, "xdotool", "key", "Escape");
+        LinuxX11TestServer.await(() -> popupWindow() == null, "moved-pointer disposed");
+        trace.add("movedPointer=true iconFallback=" + movedLocation.get() + " callbacksUnchanged=true");
+        for (int cycle = 0; cycle < 20; cycle++) {
+            command(env, "xdotool", "mousemove", "--window", icon, "10", "10", "click", "3");
+            LinuxX11TestServer.await(() -> popupWindow() != null && popupWindow().isFocused(), "reopen focus");
+            command(env, "xdotool", "key", "Escape"); LinuxX11TestServer.await(() -> popupWindow() == null, "reopen retired");
+            assertThat(toolkit.getAWTEventListeners()).hasSize(listeners); assertThat(actions).hasSize(4);
+        }
+        trace.add("reopenCycles=20 callbacksUnchanged=true listenersBaseline=true onePeerAtATime=true");
+        // Keyboard/moved-pointer requests use immutable icon/root bounds, including every work-area edge.
+        var original = requests.getLast();
+        for (var edge : List.of(new java.awt.Point(0, 0), new java.awt.Point(1256, 0), new java.awt.Point(0, 776), new java.awt.Point(1256, 776))) {
+            command(env, "xdotool", "mousemove", "600", "400");
+            anchorOverride.set(new java.awt.Rectangle(edge.x, edge.y, 24, 24));
+            command(env, "xdotool", "mousemove", "--window", icon, "10", "10", "click", "3");
+            LinuxX11TestServer.await(() -> popupWindow() != null, "edge popup");
+            var window = popupWindow(); LinuxX11TestServer.await(window::isFocused, "edge focus");
+            javax.swing.SwingUtilities.invokeAndWait(() -> {});
+            LinuxX11TestServer.await(() -> window.getWidth() > 1 && window.getHeight() > 1, "edge peer configured");
+            var bounds = window.getBounds(); var config = window.getGraphicsConfiguration(); var work = config.getBounds();
+            var inset = toolkit.getScreenInsets(config); work.x += inset.left; work.y += inset.top;
+            work.width -= inset.left + inset.right; work.height -= inset.top + inset.bottom;
+            assertThat(work.contains(bounds)).isTrue();
+            capture(env, output, "edge-" + edge.x + "-" + edge.y);
+            trace.add("edge=" + edge + " popup=" + bounds + " work=" + work + " inside=true");
+            command(env, "xdotool", "key", "Escape"); LinuxX11TestServer.await(() -> popupWindow() == null, "edge disposed"); anchorOverride.set(null);
+        }
+        command(env, "xdotool", "mousemove", "--window", icon, "10", "10", "click", "3");
+        LinuxX11TestServer.await(() -> popupWindow() != null, "host loss popup");
+        var stale = requests.getLast(); stop(panel);
+        LinuxX11TestServer.await(() -> !stale.valid().getAsBoolean() && popupWindow() == null, "host loss cancels popup");
+        stale.action().accept(1); javax.swing.SwingUtilities.invokeAndWait(() -> {}); assertThat(actions).hasSize(4);
+        assertThat(toolkit.getAWTEventListeners()).hasSize(listeners);
+        // Deliberately hold EDT: close must invalidate a queued show before it can create a window.
+        var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        javax.swing.SwingUtilities.invokeLater(() -> { entered.countDown(); try { release.await(2, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+        assertThat(entered.await(2, TimeUnit.SECONDS)).isTrue();
+        var queuedNative = new java.util.concurrent.atomic.AtomicInteger();
+        popup.request(new LinuxLegacyTray.MenuRequest(1, new java.awt.Rectangle(0, 0, 24, 24), original.rootScreenBounds(), false,
+            ignored -> actions.add(99), () -> true, hint -> { queuedNative.incrementAndGet(); hint.complete().accept(false); }, requests.getLast().userTime()));
+        popup.close(); release.countDown(); javax.swing.SwingUtilities.invokeAndWait(() -> {});
+        assertThat(popupWindow()).isNull(); assertThat(actions).hasSize(4); assertThat(queuedNative).hasValue(0);
+        trace.add("hostLoss=true staleActionDropped=true closeQueuedShowDropped=true queuedNativeSubmissions=0 displayableBefore=0 displayableAfter=0 rawBefore=" + rawBefore
+            + " rawAfterBeforeGC=" + java.awt.Window.getWindows().length + " listenersBefore=" + listeners + " listenersAfter=" + toolkit.getAWTEventListeners().length);
+        Files.write(output.resolve("popup-rows.txt"), trace);
+        Files.writeString(output.resolve("summary.txt"), "PASS popup panel=" + panelName + " scale=" + System.getProperty("sun.java2d.uiScale", "1")
+            + " actions=" + actions + " fourEdges=true dismiss=Escape/outside/focus hostLoss=true queuedClose=true noWorkspace=true\n");
+        System.out.println(Files.readString(output.resolve("summary.txt")));
+        return new int[] {rawBefore, listeners - 1};
+        } finally { toolkit.removeAWTEventListener(windowTrace); }
+    }
+
     private static void legacy(Map<String, String> options, Path output) throws Exception {
         java.util.logging.Logger.getLogger("dev.jasper.app.platform.LinuxLegacyTray").setLevel(java.util.logging.Level.FINE);
         for (var handler : java.util.logging.Logger.getLogger("").getHandlers()) handler.setLevel(java.util.logging.Level.FINE);
@@ -119,8 +310,18 @@ public final class LinuxX11TrayProbe {
         var observations = new java.util.concurrent.CopyOnWriteArrayList<Boolean>();
         var actions = new java.util.concurrent.atomic.AtomicInteger();
         var menus = new java.util.concurrent.CopyOnWriteArrayList<LinuxLegacyTray.MenuRequest>();
+        boolean popupGate = options.get("--gate").equals("popup");
+        var popup = new LinuxTrayPopup(javax.swing.SwingUtilities::invokeLater);
+        var selectedRows = new java.util.concurrent.CopyOnWriteArrayList<Integer>();
+        var anchorOverride = new AtomicReference<java.awt.Rectangle>();
+        int[] popupBaseline = {-1, -1};
         var tray = new LinuxLegacyTray(environment, value -> { observations.add(value); System.out.println("availability=" + value); },
-            request -> { menus.add(request); System.out.println("menu=" + request.rootBounds()); }, () -> {});
+            request -> {
+                var anchor = anchorOverride.get();
+                if (anchor != null) request = new LinuxLegacyTray.MenuRequest(request.epoch(), anchor, request.rootScreenBounds(), false,
+                    request.action(), request.valid(), request.hints(), request.userTime());
+                menus.add(request); System.out.println("menu=" + request.rootBounds()); if (popupGate) popup.request(request);
+            }, popup::cancel);
         try {
             tray.start(); LinuxX11TestServer.await(() -> observations.contains(false), "initial unavailable snapshot");
             Thread.sleep(200); assertThat(observations).doesNotContain(true);
@@ -134,7 +335,7 @@ public final class LinuxX11TrayProbe {
             Path texturePath = output.resolve("panel-background.png"); javax.imageio.ImageIO.write(texture, "png", texturePath.toFile());
             if (panel.equals("lxde")) {
                 Path profile = home.resolve("config/lxpanel/jasper-gate/panels/panel"); Files.createDirectories(profile.getParent());
-                String config = "Global {\n edge=top\n align=left\n widthtype=percent\n width=100\n height=" + (slot + 8) + "\n iconsize=" + slot + "\n transparent=0\n background=1\n backgroundfile=" + texturePath + "\n}\nPlugin {\n type=tray\n}\n";
+                String config = "Global {\n edge=top\n align=left\n widthtype=percent\n width=100\n height=" + (slot + 8) + "\n iconsize=" + slot + "\n transparent=0\n background=1\n backgroundfile=" + texturePath + "\n}\nPlugin {\n type=tray\n}\nPlugin {\n type=taskbar\n expand=1\n}\nPlugin {\n type=pager\n}\n";
                 Files.writeString(profile, config); Files.writeString(output.resolve("panel-profile.txt"), config);
             } else {
                 String xfconfd = List.of("/usr/lib64/xfce4/xfconf/xfconfd", "/usr/lib/xfce4/xfconf/xfconfd", "/usr/libexec/xfconfd")
@@ -146,12 +347,13 @@ public final class LinuxX11TrayProbe {
                         {"/panels/panel-1/length", "uint", "100"}, {"/panels/panel-1/size", "uint", Integer.toString(slot + 8)},
                         {"/panels/panel-1/background-style", "uint", "2"}, {"/panels/panel-1/background-image", "string", texturePath.toString()},
                         {"/plugins/plugin-1/icon-size", "int", Integer.toString(slot)},
-                        {"/panels/panel-1/position-locked", "bool", "true"}, {"/plugins/plugin-1", "string", "systray"}})
+                        {"/panels/panel-1/position-locked", "bool", "true"}, {"/plugins/plugin-1", "string", "systray"}, {"/plugins/plugin-2", "string", "tasklist"}, {"/plugins/plugin-3", "string", "pager"}})
                     command(environment, "xfconf-query", "-c", "xfce4-panel", "-p", property[0], "-n", "-t", property[1], "-s", property[2]);
-                command(environment, "xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-1/plugin-ids", "-n", "-a", "-t", "int", "-s", "1");
+                command(environment, "xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-1/plugin-ids", "-n", "-a", "-t", "int", "-s", "1", "-t", "int", "-s", "2", "-t", "int", "-s", "3");
                 Files.writeString(output.resolve("panel-profile.txt"), command(environment, "xfconf-query", "-c", "xfce4-panel", "-lv"));
             }
-            owned.add(launch(environment, output, "wm", "openbox"));
+            owned.add(popupGate && panel.equals("xfce") ? launch(environment, output, "wm", "xfwm4", "--compositor=off")
+                : launch(environment, output, "wm", "openbox"));
             long wmDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
             while (!command(environment, "xprop", "-root", "_NET_SUPPORTING_WM_CHECK").contains("window id #")) {
                 if (System.nanoTime() >= wmDeadline) throw new AssertionError("Owned WM did not become ready");
@@ -185,7 +387,7 @@ public final class LinuxX11TrayProbe {
             LinuxX11TestServer.await(() -> observations.getLast(), "real panel owner available");
             Thread.sleep(200);
             var before = capture(environment, output, "before");
-            assertThat(tray.install(id -> { actions.incrementAndGet(); System.out.println("action=" + id); })).as("real XEmbed docking").isTrue();
+            assertThat(tray.install(id -> { selectedRows.add(id); actions.incrementAndGet(); System.out.println("action=" + id); })).as("real XEmbed docking").isTrue();
             Thread.sleep(400);
             Files.writeString(output.resolve("tree.txt"), command(environment, "xwininfo", "-root", "-tree"));
             var embedded = capture(environment, output, "embedded");
@@ -193,7 +395,7 @@ public final class LinuxX11TrayProbe {
             command(environment, "xwd", "-id", Integer.toUnsignedString((Integer)field(tray, "icon")), "-silent", "-out", output.resolve("native-icon.xwd").toString());
             Object nativeConnection = field(tray, "xcb"); Object drawing = field(nativeConnection, "drawing");
             Files.writeString(output.resolve("render-formats.txt"), "source=" + field(drawing, "sourceFormat") + "\ndestinations=" + field(drawing, "visualFormats") + "\n");
-            verifyArtwork(before, embedded, nativeBounds, output);
+            if (!popupGate) verifyArtwork(before, embedded, nativeBounds, output);
             javax.imageio.ImageIO.write(embedded.getSubimage(nativeBounds.x, nativeBounds.y, nativeBounds.width, nativeBounds.height),
                 "png", output.resolve("slot.png").toFile());
             String windows = command(environment, "xdotool", "search", "--name", "^Jasper$").strip();
@@ -205,6 +407,7 @@ public final class LinuxX11TrayProbe {
             Files.writeString(output.resolve("embedder-info.txt"), parentInfo);
             String ancestor = parentInfo.lines().filter(line -> line.contains("Parent window id:")).findFirst().orElseThrow().trim().split(" ")[3];
             Files.writeString(output.resolve("panel-info.txt"), command(environment, "xwininfo", "-id", ancestor, "-all"));
+            if (popupGate) { popupBaseline = popupRows(environment, output, tray, popup, windows, owned.getLast(), selectedRows, menus, anchorOverride, panel); return; }
             command(environment, "xdotool", "mousemove", "--window", windows, "12", "12", "click", "1");
             Files.writeString(output.resolve("pointer.txt"), command(environment, "xdotool", "getmouselocation", "--shell"));
             LinuxX11TestServer.await(() -> actions.get() == 1, "native primary release action");
@@ -321,6 +524,35 @@ public final class LinuxX11TrayProbe {
             } catch (Exception | AssertionError diagnostic) { Files.writeString(output.resolve("diagnostic-failure.txt"), diagnostic.toString()); }
             Throwable cleanupFailure = null;
             try {
+                popup.close(); javax.swing.SwingUtilities.invokeAndWait(() -> {});
+                if (popupGate) {
+                    if (popupBaseline[0] >= 0) {
+                        long gcEnd = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+                        do { System.gc(); javax.swing.SwingUtilities.invokeAndWait(() -> {}); Thread.sleep(50); }
+                        while (java.awt.Window.getWindows().length != popupBaseline[0] && System.nanoTime() < gcEnd);
+                        Files.writeString(output.resolve("focus-baseline.txt"), "rawWindows=" + java.awt.Window.getWindows().length
+                            + " focused=" + java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow()
+                            + " active=" + java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow()
+                            + " focusOwner=" + java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner() + "\n");
+                        assertThat(java.awt.Window.getWindows().length).as("bounded disposed AWT inventory residue").isLessThanOrEqualTo(popupBaseline[0] + 1);
+                        assertThat(java.awt.Window.getWindows()).allSatisfy(window -> assertThat(window.isDisplayable()).isFalse());
+                        assertThat(java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow()).isNull();
+                        assertThat(java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow()).isNull();
+                        assertThat(java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner()).isNull();
+                        assertThat(field(popup, "activeWindow")).isNull(); assertThat(field(popup, "dispose")).isNull();
+                        assertThat(field(popup, "lease")).isNull(); assertThat(field(popup, "cancelFocus")).isNull();
+                        assertThat(field(popup, "retiring")).isEqualTo(false);
+                        assertThat(java.awt.Toolkit.getDefaultToolkit().getAWTEventListeners()).as("process LAF baseline only").hasSize(popupBaseline[1]);
+                    }
+                    var windows = java.awt.Window.getWindows();
+                    Files.writeString(output.resolve("popup-cleanup.txt"), "rawWindows=" + windows.length
+                        + " displayableWindows=" + java.util.Arrays.stream(windows).filter(java.awt.Window::isDisplayable).count()
+                        + " toolkitListeners=" + java.awt.Toolkit.getDefaultToolkit().getAWTEventListeners().length
+                        + " listenerClasses=" + java.util.Arrays.toString(java.util.Arrays.stream(java.awt.Toolkit.getDefaultToolkit().getAWTEventListeners())
+                            .map(l -> l instanceof java.awt.event.AWTEventListenerProxy proxy ? proxy.getListener().getClass().getName() : l.getClass().getName()).toArray())
+                        + " menuPath=" + javax.swing.MenuSelectionManager.defaultManager().getSelectedPath().length
+                        + " focusedWindow=" + java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow() + "\n");
+                }
                 tray.close(); var worker = (Thread)field(tray, "worker");
                 if (worker != null) { worker.join(2500); if (worker.isAlive()) throw new AssertionError("Native worker did not close"); }
             } catch (Exception | AssertionError failure) { cleanupFailure = failure; }

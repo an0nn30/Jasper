@@ -18,7 +18,10 @@ import static org.assertj.core.api.Assertions.*;
 class LinuxLegacyTrayTest {
     @Test void menuRectangleCannotBeMutatedAcrossThreads() {
         var bounds = new Rectangle(10, 20, 24, 40);
-        var request = new LinuxLegacyTray.MenuRequest(1, bounds, true, ignored -> {}, () -> true);
+        var screen = new Rectangle(0, 0, 1280, 800);
+        var request = new LinuxLegacyTray.MenuRequest(1, bounds, screen, true, ignored -> {}, () -> true);
+        screen.width = 1; request.rootScreenBounds().height = 1;
+        assertThat(request.rootScreenBounds()).isEqualTo(new Rectangle(0, 0, 1280, 800));
         bounds.width = 500; request.rootBounds().height = 500;
         assertThat(request.rootBounds()).isEqualTo(new Rectangle(10, 20, 24, 40));
     }
@@ -164,7 +167,7 @@ class LinuxLegacyTrayTest {
             try (var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, menus::add, () -> {})) {
                 tray.start(); await(() -> available.contains(true), "owner"); assertThat(tray.install(actions::addAndGet)).isTrue();
                 host.input(5, 1, 2, 3, 0, 100); host.input(5, 1, 2, 3, 0, 100);
-                host.input(5, 3, 2, 3, 0, 101); host.input(4, 1, 2, 3, 0, 102);
+                host.input(4, 3, 2, 3, 0, 101); host.input(5, 3, 2, 3, 0, 101); host.input(4, 1, 2, 3, 0, 102);
                 host.input(5, 2, 2, 3, 0, 103); host.input(5, 4, 2, 3, 0, 104); host.input(5, 1, 24, 3, 0, 105);
                 host.input(2, 36, 0, 0, 0, 106); host.input(2, 65, 0, 0, 0, 107);
                 host.input(2, 135, 0, 0, 0, 108); host.input(2, 76, 0, 0, 1, 109);
@@ -186,7 +189,7 @@ class LinuxLegacyTrayTest {
             try (var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, menus::add,
                     () -> { if (watching.get()) canceled.countDown(); })) {
                 tray.start(); await(() -> available.contains(true), "owner"); assertThat(tray.install(actions::addAndGet)).isTrue();
-                host.input(5, 3, 2, 3, 0, 100); await(() -> menus.size() == 1, "menu before hide"); watching.set(true);
+                host.input(4, 3, 2, 3, 0, 100); host.input(5, 3, 2, 3, 0, 100); await(() -> menus.size() == 1, "menu before hide"); watching.set(true);
                 host.embedderMapped(false); assertThat(canceled.await(1, TimeUnit.SECONDS)).isTrue();
                 assertThat(menus.getFirst().valid().getAsBoolean()).isFalse();
                 host.input(5, 1, 2, 3, 0, 101); host.embedderMapped(true); host.input(5, 1, 2, 3, 0, 102);
@@ -204,7 +207,7 @@ class LinuxLegacyTrayTest {
             var held = new CountDownLatch(1); var release = new CountDownLatch(1);
             try (var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, menus::add, cancels::incrementAndGet)) {
                 tray.start(); await(() -> available.contains(true), "owner"); assertThat(tray.install(actions::addAndGet)).isTrue();
-                host.input(5, 3, 2, 3, 0, 100); await(() -> menus.size() == 1, "menu before property hide");
+                host.input(4, 3, 2, 3, 0, 100); host.input(5, 3, 2, 3, 0, 100); await(() -> menus.size() == 1, "menu before property hide");
                 var oldMenu = menus.getFirst(); int before = cancels.get();
                 SwingUtilities.invokeLater(() -> { held.countDown(); try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
                 assertThat(held.await(1, TimeUnit.SECONDS)).isTrue(); oldMenu.action().accept(1);
@@ -258,7 +261,7 @@ class LinuxLegacyTrayTest {
             var menus = new CopyOnWriteArrayList<LinuxLegacyTray.MenuRequest>(); var actions = new AtomicInteger();
             try (var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, menus::add, () -> {})) {
                 tray.start(); await(() -> available.contains(true), "owner"); assertThat(tray.install(actions::addAndGet)).isTrue();
-                host.input(5, 3, 1, 1, 0, 100); await(() -> menus.size() == 1, "old menu");
+                host.input(4, 3, 1, 1, 0, 100); host.input(5, 3, 1, 1, 0, 100); await(() -> menus.size() == 1, "old menu");
                 long epoch = (Long)LinuxTrayXcbTest.field(tray, "connectionEpoch");
                 server.drop(); await(() -> available.size() >= 4 && available.getLast(), "reconnected same XID");
                 assertThat(available).startsWith(false, true, false, true);
@@ -382,6 +385,43 @@ class LinuxLegacyTrayTest {
                 host.compositor(0); await(() -> !available.getLast(), "compositor lost"); tray.removeAndAwait();
                 assertThat(host.icon).isZero(); assertThat(tray.install(ignored -> {})).isFalse();
             }
+        }
+    }
+    @Test void menuTimestampIsMatchingButtonPressOrInitiatingKeyPress() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem()) {
+            var host = server.new TrayHost(); var available = new CopyOnWriteArrayList<Boolean>();
+            var menus = new CopyOnWriteArrayList<LinuxLegacyTray.MenuRequest>();
+            try (var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, menus::add, () -> {})) {
+                tray.start(); await(() -> available.contains(true), "owner"); assertThat(tray.install(ignored -> {})).isTrue();
+                host.input(5, 3, 1, 1, 0, 100); Thread.sleep(50); assertThat(menus).isEmpty();
+                host.input(4, 3, 1, 1, 0, 200); host.input(5, 3, 1, 1, 0, 400);
+                await(() -> menus.size() == 1, "matched pointer request"); assertThat(menus.getFirst().userTime()).isEqualTo(200L);
+                host.input(2, 135, 0, 0, 0, (int)0xf1234567L);
+                await(() -> menus.size() == 2, "keyboard request"); assertThat(menus.getLast().userTime()).isEqualTo(0xf1234567L);
+            }
+        }
+    }
+    @Test void popupHintFailureReleasesPeerOnlyAfterNativeConnectionTerminates() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem()) {
+            var host = server.new TrayHost(); var available = new CopyOnWriteArrayList<Boolean>();
+            var menus = new CopyOnWriteArrayList<LinuxLegacyTray.MenuRequest>();
+            var results = new CopyOnWriteArrayList<Boolean>(); var disconnected = new AtomicInteger();
+            var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, menus::add, () -> {});
+            try {
+                tray.start(); await(() -> available.contains(true), "owner"); assertThat(tray.install(ignored -> {})).isTrue();
+                host.input(4, 3, 1, 1, 0, 200); host.input(5, 3, 1, 1, 0, 200); await(() -> !menus.isEmpty(), "menu request");
+                server.pauseReads(); host.expose(); server.awaitPaused();
+                menus.getFirst().hints().accept(new LinuxLegacyTray.PopupHint(0x991, success -> {
+                    try { if (LinuxTrayXcbTest.field(tray, "xcb") == null) disconnected.incrementAndGet(); }
+                    catch (Exception failure) { throw new AssertionError(failure); }
+                    results.add(success);
+                }));
+                Thread.sleep(50); assertThat(results).isEmpty();
+                tray.close(); ((Thread)LinuxTrayXcbTest.field(tray, "worker")).join(2500);
+                assertThat(results).containsExactly(false); assertThat(disconnected).hasValue(1);
+            } finally { tray.close(); server.resumeReads(); }
         }
     }
     @Test void visibleSizeHintsDoNotUseXfceHiddenSentinel() throws Exception {

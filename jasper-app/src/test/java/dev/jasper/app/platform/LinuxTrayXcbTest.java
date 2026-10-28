@@ -89,6 +89,16 @@ class LinuxTrayXcbTest {
         assertThat(LinuxTrayXcb.authorityRecords(largeField)).isEqualTo(1);
     }
 
+    @Test void selectedScreenDimensionsComeFromIndependentProtocolOffsets() {
+        byte[] bytes = setupBytes();
+        var wire = ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder());
+        wire.putShort(56 + 20, (short)3840); wire.putShort(56 + 22, (short)2160);
+        var setup = LinuxTrayXcb.decodeSetup(bytes, 0);
+        assertThat(setup.width()).isEqualTo(3840); assertThat(setup.height()).isEqualTo(2160);
+        wire.putShort(56 + 20, (short)0);
+        assertThatThrownBy(() -> LinuxTrayXcb.decodeSetup(bytes, 0)).isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void setupRejectsInvalidScreenAndTruncation() {
         byte[] setup = setupBytes();
         var value = LinuxTrayXcb.decodeSetup(setup, 0);
@@ -101,6 +111,58 @@ class LinuxTrayXcbTest {
         assertThatThrownBy(() -> LinuxTrayXcb.decodeSetup(new byte[8], 0)).isInstanceOf(IllegalArgumentException.class);
         byte[] bad = setup.clone(); bad[30] = 2;
         assertThatThrownBy(() -> LinuxTrayXcb.decodeSetup(bad, 0)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void popupHintsPreserveExistingAtomsAndConfirmBeforeReturning() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem(); var cancel = new LinuxTrayXcb.Cancellation();
+             var xcb = LinuxTrayXcb.connect(Map.of("DISPLAY", server.address()), deadline(), cancel)) {
+            var host = server.new TrayHost();
+            server.responder = bytes -> {
+                if (bytes[0] == 20) {
+                    var r = ByteBuffer.allocate(40).order(ByteOrder.nativeOrder());
+                    r.put(0, (byte)1); r.put(1, (byte)32); r.putInt(4, 2); r.putInt(8, 4); r.putInt(16, 2);
+                    r.putInt(32, 777); r.putInt(36, host.atom("_NET_WM_STATE_SKIP_TASKBAR")); return r.array();
+                }
+                return host.respond(bytes);
+            };
+            xcb.popupHints(0x991, deadline());
+            var write = server.packets.stream().map(bytes -> ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder()))
+                .filter(b -> b.get(0) == 18 && b.getInt(8) == host.atom("_NET_WM_STATE")).findFirst().orElseThrow();
+            assertThat(write.getInt(4)).isEqualTo(0x991); assertThat(write.getInt(8)).isEqualTo(host.atom("_NET_WM_STATE"));
+            assertThat(write.getInt(12)).isEqualTo(4); assertThat(write.getInt(20)).isEqualTo(3);
+            assertThat(write.getInt(24)).isEqualTo(777);
+            assertThat(write.getInt(28)).isEqualTo(host.atom("_NET_WM_STATE_SKIP_TASKBAR"));
+            assertThat(write.getInt(32)).isEqualTo(host.atom("_NET_WM_STATE_SKIP_PAGER"));
+            assertThat(server.packets.getLast()[0]).isEqualTo((byte)43);
+        }
+    }
+
+    @Test void activationUsesApplicationSourceRealTimeAndRootMaskOnce() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem(); var cancel = new LinuxTrayXcb.Cancellation();
+             var xcb = LinuxTrayXcb.connect(Map.of("DISPLAY", server.address()), deadline(), cancel)) {
+            var host = server.new TrayHost(); server.responder = bytes -> {
+                if (bytes[0] == 20) {
+                    var r = ByteBuffer.allocate(36).order(ByteOrder.nativeOrder()); r.put(0, (byte)1); r.put(1, (byte)32);
+                    r.putInt(4, 1); r.putInt(8, 4); r.putInt(16, 1); r.putInt(32, host.atom("_NET_ACTIVE_WINDOW")); return r.array();
+                }
+                return host.respond(bytes);
+            };
+            assertThat(xcb.activatePopup(0x991, 0xf1234567L, deadline())).isTrue();
+            var sends = server.packets.stream().filter(bytes -> bytes[0] == 25).toList(); assertThat(sends).hasSize(1);
+            var b = ByteBuffer.wrap(sends.getFirst()).order(ByteOrder.nativeOrder());
+            assertThat(b.getInt(4)).isEqualTo(0x100); assertThat(b.get(1)).isZero();
+            assertThat(b.getInt(8)).isEqualTo((1 << 19) | (1 << 20));
+            assertThat(b.get(12)).isEqualTo((byte)33); assertThat(b.get(13)).isEqualTo((byte)32);
+            assertThat(b.getInt(16)).isEqualTo(0x991); assertThat(b.getInt(20)).isEqualTo(host.atom("_NET_ACTIVE_WINDOW"));
+            assertThat(b.getInt(24)).isEqualTo(1); assertThat(b.getInt(28)).isEqualTo((int)0xf1234567L);
+            assertThat(b.getInt(32)).isZero(); assertThat(b.getInt(36)).isZero(); assertThat(b.getInt(40)).isZero();
+            var checks = new AtomicInteger();
+            assertThat(xcb.activatePopup(0x991, 123, () -> checks.incrementAndGet() == 1, deadline())).isFalse();
+            assertThat(xcb.activatePopup(0x991, 0, deadline())).isFalse();
+            assertThat(server.packets.stream().filter(bytes -> bytes[0] == 25)).hasSize(1);
+        }
     }
 
     @Test void nativeWindowRequestsHaveExactWireEncodingAndBarrier() throws Exception {
@@ -579,6 +641,7 @@ class LinuxTrayXcbTest {
         b.put(32, (byte)32); b.put(33, (byte)32); b.put(34, (byte)8); b.put(35, (byte)255);
         b.put(40, (byte)24); b.put(41, (byte)32); b.put(42, (byte)32);
         b.put(48, (byte)32); b.put(49, (byte)32); b.put(50, (byte)32);
+        b.putShort(76, (short)1280); b.putShort(78, (short)800);
         b.putInt(56, 0x100); b.putInt(88, 0x21); b.put(94, (byte)24); b.put(95, (byte)1);
         b.put(96, (byte)24); b.putShort(98, (short)1);
         b.putInt(104, 0x21); b.put(108, (byte)4); b.put(109, (byte)8); b.putShort(110, (short)256);

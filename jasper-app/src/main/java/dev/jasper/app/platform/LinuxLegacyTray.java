@@ -21,10 +21,22 @@ final class LinuxLegacyTray implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(LinuxLegacyTray.class.getName());
     private static final long BOUND = TimeUnit.SECONDS.toNanos(2);
     private static final long CLEANUP_RESERVE = TimeUnit.MILLISECONDS.toNanos(250);
-    record MenuRequest(long epoch, Rectangle rootBounds, boolean pointer, IntConsumer action, BooleanSupplier valid) {
-        MenuRequest { rootBounds = new Rectangle(rootBounds); }
+    record MenuRequest(long epoch, Rectangle rootBounds, Rectangle rootScreenBounds, boolean pointer, IntConsumer action, BooleanSupplier valid, Consumer<PopupHint> hints, long userTime) {
+        MenuRequest(long epoch, Rectangle rootBounds, Rectangle rootScreenBounds, boolean pointer, IntConsumer action, BooleanSupplier valid) {
+            this(epoch, rootBounds, rootScreenBounds, pointer, action, valid, hint -> hint.complete.accept(false), 0);
+        }
+        MenuRequest(long epoch, Rectangle rootBounds, Rectangle rootScreenBounds, boolean pointer, IntConsumer action, BooleanSupplier valid, Consumer<PopupHint> hints) {
+            this(epoch, rootBounds, rootScreenBounds, pointer, action, valid, hints, 0);
+        }
+        MenuRequest { rootBounds = new Rectangle(rootBounds); rootScreenBounds = new Rectangle(rootScreenBounds); }
         @Override public Rectangle rootBounds() { return new Rectangle(rootBounds); }
+        @Override public Rectangle rootScreenBounds() { return new Rectangle(rootScreenBounds); }
     }
+    record PopupHint(long window, boolean activation, BooleanSupplier valid, Consumer<Boolean> complete) {
+        PopupHint(long window, Consumer<Boolean> complete) { this(window, false, () -> true, complete); }
+    }
+    private record HintWork(long token, PopupHint hint, long userTime, long deadline, long connection, long host, int icon) { }
+    private HintWork pendingHint, activeHint;
     private static final class Install {
         final long deadline;
         final IntConsumer action;
@@ -46,6 +58,7 @@ final class LinuxLegacyTray implements AutoCloseable {
     // Below: native-worker-only connection state. No XID escapes this package.
     private LinuxTrayXcb xcb;
     private final Map<String, Integer> atoms = new HashMap<>();
+    private int contextPressTime; // guarded by lock; retired with admission
     private int owner, compositor, icon, embedder, announcedEmbedder, serverTime, screen, lastInputTime, lastInputType, lastInputDetail;
     private long connectionEpoch, hostEpoch;
     private volatile long nextSnapshot;
@@ -78,7 +91,7 @@ final class LinuxLegacyTray implements AutoCloseable {
                 request = new Install(end - CLEANUP_RESERVE, action); pending = request; wake();
                 while (request.result == null && System.nanoTime() < request.deadline) await(request.deadline);
                 if (request.result != null) return request.result;
-                request.canceled = true; ++admission; installed = false; cleanup = true; ++cleanupRequested;
+                request.canceled = true; ++admission; contextPressTime = 0; installed = false; cleanup = true; ++cleanupRequested;
                 if (cancellation != null) cancellation.requestClose();
                 while (socketOwed() && System.nanoTime() < end) await(end);
                 if (socketOwed()) throw new IllegalStateException("Legacy icon cleanup remains unconfirmed");
@@ -94,7 +107,7 @@ final class LinuxLegacyTray implements AutoCloseable {
     private void removeAndAwait(long end) {
         long ticket;
         synchronized (lock) {
-            ++admission; installed = false;
+            ++admission; contextPressTime = 0; installed = false;
             if (pending != null) pending.canceled = true;
             if (active != null) active.canceled = true;
             cleanup = true; ticket = ++cleanupRequested; wake();
@@ -118,7 +131,7 @@ final class LinuxLegacyTray implements AutoCloseable {
     @Override public void close() {
         synchronized (lock) {
             if (closed) return;
-            closed = true; ++admission; installed = false; cleanup = true; ++cleanupRequested;
+            closed = true; ++admission; contextPressTime = 0; installed = false; cleanup = true; ++cleanupRequested;
             if (pending != null) pending.canceled = true;
             if (active != null) active.canceled = true;
             if (cancellation != null) cancellation.requestClose();
@@ -159,11 +172,19 @@ final class LinuxLegacyTray implements AutoCloseable {
             } catch (LinuxTrayXcb.Unavailable | LinkageError | IllegalArgumentException failure) {
                 LOG.log(System.Logger.Level.DEBUG, "Owned XEmbed connection unavailable", failure);
             } finally {
-                invalidate(); owner = 0; icon = 0; embedder = 0; announcedEmbedder = 0; atoms.clear();
-                advertise(false);
+                HintWork hintPending, hintActive;
                 synchronized (lock) {
+                    ++admission; contextPressTime = 0; installed = false;
+                    hintPending = pendingHint; hintActive = activeHint; pendingHint = null; activeHint = null;
                     connected = false; cancellation = null; cleanup = false; cleanupFinished = cleanupRequested;
                     finish(active, false); finish(pending, false); active = null; pending = null; lock.notifyAll();
+                }
+                try {
+                    invalidate(); owner = 0; icon = 0; embedder = 0; announcedEmbedder = 0; atoms.clear(); advertise(false);
+                } finally {
+                    // The connection has terminated and admission is retired even if another callback fails.
+                    if (hintPending != null) hintPending.hint.complete.accept(false);
+                    if (hintActive != null) hintActive.hint.complete.accept(false);
                 }
             }
             synchronized (lock) {
@@ -202,6 +223,20 @@ final class LinuxLegacyTray implements AutoCloseable {
                 synchronized (lock) { finish(request, result); active = null; }
                 continue;
             }
+            HintWork hint;
+            synchronized (lock) { hint = pendingHint; pendingHint = null; activeHint = hint; }
+            if (hint != null) {
+                boolean success = valid(hint.token) && connectionEpoch == hint.connection && hostEpoch == hint.host
+                    && icon == hint.icon && hint.hint.valid.getAsBoolean() && System.nanoTime() < hint.deadline;
+                if (success) {
+                    if (hint.hint.activation) success = xcb.activatePopup((int)hint.hint.window, hint.userTime,
+                        () -> valid(hint.token) && hint.hint.valid.getAsBoolean(), hint.deadline);
+                    else xcb.popupHints((int)hint.hint.window, hint.deadline);
+                }
+                synchronized (lock) { activeHint = null; }
+                hint.hint.complete.accept(success);
+                continue;
+            }
             boolean discover;
             synchronized (lock) { discover = enabled; }
             long deadline = System.nanoTime() + BOUND - CLEANUP_RESERVE;
@@ -221,7 +256,7 @@ final class LinuxLegacyTray implements AutoCloseable {
         available.accept(value);
     }
     private void invalidate() {
-        synchronized (lock) { ++admission; ++hostEpoch; installed = false; }
+        synchronized (lock) { ++admission; contextPressTime = 0; ++hostEpoch; installed = false; }
         resetXembed(); action = null; cancelPopup.run();
     }
     private void snapshot(long deadline) {
@@ -368,7 +403,7 @@ final class LinuxLegacyTray implements AutoCloseable {
                 boolean wasMapped = mapped;
                 mapped = (info[1] & 1) != 0; dirty = mapped;
                 if (wasMapped && !mapped) {
-                    synchronized (lock) { ++admission; }
+                    synchronized (lock) { ++admission; contextPressTime = 0; }
                     cancelPopup.run();
                 }
             }
@@ -376,7 +411,7 @@ final class LinuxLegacyTray implements AutoCloseable {
         }
         if (type == 29) { snapshot(deadline); return; }
         if (type == 12 && b.getInt(4) == icon) { dirty = true; return; }
-        if ((type == 2 || type == 5) && icon != 0 && b.getInt(12) == icon && mapped && hostMapped && !modality) input(b, type, deadline);
+        if ((type == 2 || type == 4 || type == 5) && icon != 0 && b.getInt(12) == icon && mapped && hostMapped && !modality) input(b, type, deadline);
     }
     private void keyboard(long deadline) {
         int first = xcb.firstKeycode(), last = xcb.lastKeycode();
@@ -387,11 +422,22 @@ final class LinuxLegacyTray implements AutoCloseable {
         int detail = Byte.toUnsignedInt(b.get(1)), time = b.getInt(4), modifiers = Short.toUnsignedInt(b.getShort(28));
         if (time == lastInputTime && type == lastInputType && detail == lastInputDetail) return;
         lastInputTime = time; lastInputType = type; lastInputDetail = detail; serverTime = time;
+        if (type == 4) {
+            if (detail == 3) {
+                int x = b.getShort(24), y = b.getShort(26);
+                synchronized (lock) { contextPressTime = installed && !closed && !cleanup && x >= 0 && y >= 0 && x < bounds.width && y < bounds.height ? time : 0; }
+            }
+            return;
+        }
         if (type == 5) {
+            int pressed = 0;
+            if (detail == 3) synchronized (lock) { pressed = contextPressTime; contextPressTime = 0; }
             int x = b.getShort(24), y = b.getShort(26);
             if (x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) return;
             if (detail == 1) { focus(3, deadline); dispatch(1); }
-            else if (detail == 3) menu(true, deadline);
+            else if (detail == 3) {
+                if (pressed != 0) menu(true, Integer.toUnsignedLong(pressed), deadline);
+            }
             return;
         }
         int first = xcb.firstKeycode(), count = xcb.lastKeycode() - first + 1;
@@ -400,8 +446,8 @@ final class LinuxLegacyTray implements AutoCloseable {
         int symbol = keysyms[offset + ((modifiers & 1) != 0 && perCode > 1 && keysyms[offset + 1] != 0 ? 1 : 0)];
         switch (symbol) {
             case 0xff0d, 0x20 -> { focus(3, deadline); dispatch(1); }
-            case 0xff67 -> menu(false, deadline);
-            case 0xffc7 -> { if ((modifiers & 1) != 0) menu(false, deadline); }
+            case 0xff67 -> menu(false, Integer.toUnsignedLong(time), deadline);
+            case 0xffc7 -> { if ((modifiers & 1) != 0) menu(false, Integer.toUnsignedLong(time), deadline); }
             case 0xff09, 0xfe20 -> focus(symbol == 0xfe20 || (modifiers & 1) != 0 ? 7 : 6, deadline);
             default -> { }
         }
@@ -414,7 +460,7 @@ final class LinuxLegacyTray implements AutoCloseable {
         xcb.barrier(deadline);
     }
     private void pauseInteraction() {
-        synchronized (lock) { hostMapped = false; ++admission; }
+        synchronized (lock) { hostMapped = false; ++admission; contextPressTime = 0; }
         cancelPopup.run();
     }
     private boolean valid(long token) { synchronized (lock) { return !closed && installed && !cleanup && mapped && hostMapped && admission == token; } }
@@ -423,13 +469,21 @@ final class LinuxLegacyTray implements AutoCloseable {
         synchronized (lock) { token = admission; callback = action; }
         SwingUtilities.invokeLater(() -> { if (valid(token) && callback != null) callback.accept(id); });
     }
-    private void menu(boolean pointer, long deadline) {
+    private void menu(boolean pointer, long userTime, long deadline) {
         bounds = xcb.geometryOnRoot(icon, deadline); validateSlot(bounds);
         long token; IntConsumer callback;
         synchronized (lock) { token = admission; callback = action; }
-        var request = new MenuRequest(token, bounds, pointer,
-            id -> SwingUtilities.invokeLater(() -> { if (valid(token) && callback != null) callback.accept(id); }), () -> valid(token));
+        var request = new MenuRequest(token, bounds, new Rectangle(0, 0, xcb.setup().width(), xcb.setup().height()), pointer,
+            id -> SwingUtilities.invokeLater(() -> { if (valid(token) && callback != null) callback.accept(id); }), () -> valid(token), hint -> hints(token, userTime, hint), userTime);
         SwingUtilities.invokeLater(() -> { if (valid(token)) menu.accept(request); });
+    }
+    private void hints(long token, long userTime, PopupHint hint) {
+        boolean accepted;
+        synchronized (lock) {
+            accepted = userTime > 0 && userTime <= 0xffffffffL && hint.window > 0 && hint.window <= 0xffffffffL && valid(token) && pendingHint == null && activeHint == null && hint.valid.getAsBoolean();
+            if (accepted) { pendingHint = new HintWork(token, hint, userTime, System.nanoTime() + BOUND - CLEANUP_RESERVE, connectionEpoch, hostEpoch, icon); wake(); }
+        }
+        if (!accepted) hint.complete.accept(false);
     }
     private void paint(long deadline) {
         bounds = xcb.geometryOnRoot(icon, deadline); validateSlot(bounds);

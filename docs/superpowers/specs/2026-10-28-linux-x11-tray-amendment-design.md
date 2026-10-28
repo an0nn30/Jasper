@@ -40,7 +40,7 @@ classes and the existing function-record test seams, not another backend interfa
 | `ResidentTray` | Retain Task 6's injected Linux installer and headless routing design. Return idempotent cleanup even with no icon. Linux balloons continue through `LinuxNotifications`. |
 | `LinuxResidentTray` | Retain `Modern(publish, withdraw, close, reconnect)`, `Legacy(install, remove, close)`, `hostChanged`, `legacyChanged(boolean)`, bus observations and action generations. Modern withdrawal stays `LinuxStatusNotifier.withdrawAndAwait`. |
 | `LinuxLegacyTray` | Own one XCB connection, one native icon, host identity, adapter epoch, bounded command slot and native event worker. Constructor captures launch environment and availability callback without native loading; `start()` admits discovery, `install(IntConsumer)` returns actual embedding success, `removeAndAwait()` confirms withdrawal, `close()` invalidates immediately and requests bounded cleanup. |
-| `LinuxTrayXcb` | Lazy JNA bindings and ABI layouts for libxcb, libxcb-render, required libc calls and authority handling. It owns no application actions and never borrows JBR's display, event queue or native windows. |
+| `LinuxTrayXcb` | Lazy JNA bindings and ABI layouts for libxcb, libxcb-render, required libc calls and authority handling. It owns no application actions and never borrows JBR's display/event queue; only the approved popup's leased peer receives bounded skip hints and one standard WM activation request. |
 | `LinuxTrayPopup` | EDT-owned, short-lived public Swing menu. Owns only its popup window/listeners and immutable shared rows; adapter/controller epochs guard display and action execution. |
 
 Bind `Legacy(adapter::install, adapter::removeAndAwait, adapter::close)`. `install` and confirmed removal are
@@ -167,8 +167,13 @@ Keyboard Enter/Space activates, Menu/Shift-F10 opens the menu, and Tab traversal
 through a bounded public X protocol keymap snapshot and refresh on mapping changes. Middle click and wheel have
 no action. No pointer or keyboard grab is held by the native icon. Unknown/old events cannot dispatch actions.
 
+The [approved popup correction](2026-10-28-linux-tray-popup-correction-proposal.md) supersedes the failed POPUP peer.
+EDT obtains only its packed peer ID through public JNA; bounded owned-XCB hint/barrier work adds skip-taskbar/pager
+before show. Keep the peer alive through every admitted native operation, including cancellation, preventing XID
+reuse; EDT never waits, and failure never shows.
+
 The popup is ordinary Swing created only on a user menu request: one short-lived undecorated focusable
-`JDialog` of `Window.Type.POPUP` containing a `JPopupMenu`, with standard menu selection and keyboard handling.
+managed ownerless `JDialog` of `Window.Type.UTILITY` containing a `JPopupMenu`, with standard menu selection and keyboard handling.
 Use `LinuxTrayMenu.rows()` and the existing ID dispatcher. Dispose it on selection, Escape, outside interaction,
 focus loss, host invalidation or close; remove global listeners immediately. Menu actions execute through the
 controller's EDT guard. A canceled Quit leaves discovery alive. No hidden permanent frame or popup keeps the
@@ -242,3 +247,8 @@ Task 6 separates the strict socket cancellation gate from held-authority admissi
 one authority-attempt slot and distinguish it from an actual icon/socket cleanup obligation; Task 10 records the
 residual limit in verification and maintenance. The native socket gate, Fedora execution and required x86_64/Ubuntu
 22.04 CI release gates are unchanged. Approval is not native cancellation evidence.
+
+Controller Rulings 28–30 are consolidated in the [approved popup correction](2026-10-28-linux-tray-popup-correction-proposal.md):
+actual press timestamps guard one advertised WM-mediated activation request after map. Failed own/redirected
+USER_TIME property paths were removed. The native boundary permits this request for the leased popup peer;
+it forbids direct XSetInputFocus, grabs, pager source, active-window property writes and private AWT state.
