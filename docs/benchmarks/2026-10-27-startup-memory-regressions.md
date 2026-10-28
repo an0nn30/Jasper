@@ -99,4 +99,23 @@ Evidence:
   [terminal readiness](2026-09-12-terminal-readiness.md)), before the resize began to settle.
 
 **Fix (`3f1bfc7be`).** `BenchmarkSearch` asks a search again when its session's width changed since it was asked; the
-run records how many as `searchesAskedAgain`. Not yet run in the native benchmark.
+run records how many as `searchesAskedAgain`.
+
+**The default matrix completes again.** Run at the user's request on an image `packageApp` built from `2c47ce3a0` (no AOT
+cache, which the memory benchmark does not use; JBR 25.0.4.1 b635.75), with no build running, a 1-minute load average
+of 3.3 to 8.5 and macOS's XProtect scanning throughout. All nine configurations completed, in 134 s. One JVM runs them
+in order, so later rows carry the earlier rows' heap and garbage:
+
+| Panes / lines | Stream MB/s | RSS at output peak / at cleanup, MiB | Search-resize-font phase | Searches asked again |
+|---|---|---|---|---|
+| 1 / 0 | 36.60 | 998 / 1,028 | 0.4 s | 0 |
+| 1 / 10,000 | 36.38 | 1,036 / 1,068 | 0.6 s | 0 |
+| 1 / 100,000 | 34.49 | 1,828 / 1,831 | 0.8 s | 4 |
+| 4 / 0 | 108.85 | 2,413 / 2,342 | 0.6 s | 0 |
+| 4 / 10,000 | 106.94 | 2,464 / 2,504 | 0.5 s | 0 |
+| 4 / 100,000 | 95.85 | 3,993 / 4,064 | 1.1 s | 13 |
+| 8 / 0 | 105.56 | 4,015 / 4,072 | 0.4 s | 0 |
+| 8 / 10,000 | 99.04 | 4,020 / 4,075 | 0.7 s | 0 |
+| 8 / 100,000 | 87.09 | 5,172 / 4,245 | 1.3 s | 16 |
+
+Searches were asked again only at 100,000 lines, where the diagnosis put the lost callbacks.
