@@ -1,0 +1,5 @@
+Jasper's Browser plugin's page renderer, dev.jasper.browser.page.PageRenderer, is adapted from java_tests/tests
+JBCefOsrHandler.java in JetBrains/jcef at commit 9df0879.
+Copyright 2000-2021 JetBrains s.r.o.
+Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+Source: https://github.com/JetBrains/jcef
