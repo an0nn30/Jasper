@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Plan 2 Task 8a acceptance (Task 6d): the staged Remote plugin's Sessions panel, a kit Panel, mounted in a real window.
  * The window borrows the panel's kit header, which carries the panel's own title and, through {@code PanelHost.setHeader},
- * the saved-session count and the New session and Import sessions actions before Options and Hide: one title row, no
+ * the saved-session count and the Sort sessions menu and the New session and Import sessions actions before Options and Hide: one title row, no
  * in-panel action row. The Add Host dialog keeps baseline f16ae32f keys through the real kit components: Enter saves
  * nothing (no default button), Escape cancels. Runs on the test thread and hops to the EDT for each step.
  */
@@ -47,7 +47,7 @@ class StagedRemoteSessionsTest {
             onEdt(() -> {
                 var header = remote.header();
                 assertThat(labels(header)).as("the title, then the count from PanelHost.setHeader").contains("Sessions").doesNotContain("0");
-                assertThat(names(header)).as("contributed actions before the window's own").containsExactly("New session", "Import sessions", "Options", "Hide");
+                assertThat(names(header)).as("contributed actions before the window's own").containsExactly("Sort sessions", "New session", "Import sessions", "Options", "Hide");
                 assertThat(labels(remote.window).stream().filter("Sessions"::equals).count()).as("one title row").isEqualTo(1);
                 assertThat(names(remote.window).stream().filter(name -> name.equals("New session") || name.equals("Import sessions")).toList())
                     .as("no duplicate in-panel action row").containsExactly("New session", "Import sessions");

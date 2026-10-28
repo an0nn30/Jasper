@@ -28,7 +28,7 @@ class SessionsCompositionTest {
             onEdt(()->{
                 var header=fixture.view().panelHeader("sessions");
                 assertThat(labels(header).stream().filter("6"::equals)).hasSize(1);
-                assertThat(names(header)).containsExactly("New session","Import sessions","Options","Hide");
+                assertThat(names(header)).containsExactly("Sort sessions","New session","Import sessions","Options","Hide");
                 assertThat(labels(fixture.view())).contains("Vault locked","amp","ubuntu@100.110.65.45:22");
                 assertThat(bounds(fixture.component("card.identity"),fixture.view()).x).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_PADDING));
                 var before=bounds(fixture.component("sessions.footer-surface"),fixture.view());

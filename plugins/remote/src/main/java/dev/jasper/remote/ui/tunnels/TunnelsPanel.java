@@ -399,10 +399,21 @@ public final class TunnelsPanel implements AutoCloseable {
     private List<Tunnel> ordered(List<Tunnel> tunnels) {
         if (layout != Layout.CLASSIC || tableState.sortColumn().isEmpty()) return tunnels;
         String column = tableState.sortColumn().get();
-        Comparator<Tunnel> primary = Comparator.comparing((Tunnel tunnel) -> sortText(tunnel, column).toLowerCase(Locale.ROOT)).thenComparing(tunnel -> sortText(tunnel, column));
+        Comparator<Tunnel> text = Comparator.comparing((Tunnel tunnel) -> sortText(tunnel, column).toLowerCase(Locale.ROOT)).thenComparing(tunnel -> sortText(tunnel, column));
+        // The ends read host:port: by host, then by the port as a number; a value with no port (SOCKS5) follows those that have one.
+        Comparator<Tunnel> ends = Comparator.comparing((Tunnel tunnel) -> portOf(sortText(tunnel, column)) < 0)
+            .thenComparing(tunnel -> hostOf(sortText(tunnel, column)).toLowerCase(Locale.ROOT)).thenComparingInt(tunnel -> portOf(sortText(tunnel, column))).thenComparing(text);
+        Comparator<Tunnel> primary = column.equals("local") || column.equals("remote") ? ends : text;
         Comparator<Tunnel> byName = Comparator.comparing((Tunnel tunnel) -> tunnel.name().toLowerCase(Locale.ROOT)).thenComparing(Tunnel::name).thenComparing(Tunnel::id);
         return tunnels.stream().sorted((tableState.ascending() ? primary : primary.reversed()).thenComparing(byName)).toList();
     }
+
+    private static int portOf(String end) {
+        int colon = end.lastIndexOf(':');
+        try { return colon < 0 ? -1 : Integer.parseInt(end.substring(colon + 1)); } catch (NumberFormatException none) { return -1; }
+    }
+
+    private static String hostOf(String end) { int colon = end.lastIndexOf(':'); return portOf(end) < 0 ? end : end.substring(0, colon); }
 
     private String sortText(Tunnel tunnel, String column) {
         Ends ends = ends(tunnel, states.apply(tunnel.id()));
