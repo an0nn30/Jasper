@@ -49,11 +49,15 @@ final class ChromiumApp {
         app.onInitialization(state -> then.run());
     }
 
-    /** Makes the one client, on the UI thread, and hands it over, unless the start ended meanwhile. */
+    /**
+     * Makes the one client, on the UI thread, has the owner's installers set it up, and hands it over, unless the start
+     * ended meanwhile.
+     */
     void createClient(Chromium owner) {
         if (!owner.mayCreateClient()) return;
         try {
             client = app.createClient();
+            owner.install(client);
         } catch (Throwable failure) { // As in the start: an Error too must fail the start, or nobody hears of it.
             owner.clientFailed(failure);
             return;

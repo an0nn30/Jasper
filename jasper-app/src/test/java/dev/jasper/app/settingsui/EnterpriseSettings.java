@@ -141,7 +141,9 @@ final class EnterpriseSettings implements AutoCloseable {
             PluginJars.descriptor("com.homedepot.sourcing.crypto", "1.2.0", "fix.crypto.Main").replace("name = \"com.homedepot.sourcing.crypto\"", "name = \"THD Sourcing Crypto\"")
                 + "description = \"Encrypt or decrypt strings with the THD Sourcing crypto library (com.homedepot.ta.aa.crypto).\"\nvendor = \"The Home Depot Sourcing\"\n",
             Map.of("fix.crypto.Main", PluginJars.emptyPlugin("fix.crypto", "Main")), List.of());
-        Files.writeString(home.resolve("plugins.toml"), "version = 1\n\n[plugins.\"com.homedepot.sourcing.crypto\"]\nenabled = true\nconsented = []\n");
+        // The mocks predate the Browser, so it is off here: its Settings page and actions would add rows they lack.
+        Files.writeString(home.resolve("plugins.toml"), "version = 1\n\n[plugins.\"com.homedepot.sourcing.crypto\"]\nenabled = true\nconsented = []\n"
+            + "\n[plugins.\"dev.jasper.browser\"]\nenabled = false\nconsented = []\n");
         Path file = home.resolve("config.toml");
         Files.writeString(file, CONFIG);
         // Read under the kit file's defaults, as the application reads it under the look; CONFIG sets every shown value.

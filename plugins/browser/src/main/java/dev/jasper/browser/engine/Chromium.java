@@ -4,8 +4,12 @@ import dev.jasper.browser.engine.ChromiumLife.Step;
 import java.awt.EventQueue;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
@@ -55,6 +59,12 @@ public final class Chromium implements AutoCloseable {
     private final AtomicBoolean warned = new AtomicBoolean();
     // Set by the worker before Chromium can initialize, so before any dispose or client is decided.
     private volatile ChromiumApp app;
+    // Guarded by installing: every installer given, those waiting for the client, and the client they ran on.
+    private final Object installing = new Object();
+    private final Set<Consumer<CefClient>> installers = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final List<Consumer<CefClient>> waiting = new ArrayList<>();
+    private boolean installed;
+    private CefClient installedOn;
 
     /**
      * A Chromium that starts nothing until {@link #client()} is first called.
@@ -95,6 +105,30 @@ public final class Chromium implements AutoCloseable {
     }
 
     /**
+     * Has {@code installer} set up the client before any page is made on it. JCEF keeps the first handler of each kind
+     * a client is given and ignores later ones, so each kind has one handler, installed once, that hands each page's
+     * callbacks to that page. An installer given before the client is made runs as it is made, on the UI thread, in
+     * the order given and before {@link #client()}'s future completes; one given later runs at once on the client. An
+     * installer that throws fails the start. The same installer given again runs once. Give installers when a page
+     * first asks for Chromium, not when the plugin starts: naming the client's type loads a Chromium class.
+     *
+     * @param installer what the client needs before any page, such as its display and load handlers
+     */
+    public void onClient(Consumer<CefClient> installer) {
+        Objects.requireNonNull(installer, "installer");
+        CefClient now;
+        synchronized (installing) {
+            if (!installers.add(installer)) return;
+            if (!installed) {
+                waiting.add(installer);
+                return;
+            }
+            now = installedOn;
+        }
+        installer.accept(now);
+    }
+
+    /**
      * Where Chromium's life stands.
      *
      * @return the state
@@ -113,6 +147,19 @@ public final class Chromium implements AutoCloseable {
 
     /** Whether the client may still be made. UI thread. */
     boolean mayCreateClient() { return life.mayCreateClient(); }
+
+    /** Runs the installers on the client just made, before it reaches any page; once. UI thread. */
+    void install(CefClient made) {
+        List<Consumer<CefClient>> each;
+        synchronized (installing) {
+            if (installed) return;
+            installed = true;
+            installedOn = made;
+            each = List.copyOf(waiting);
+            waiting.clear();
+        }
+        for (Consumer<CefClient> installer : each) installer.accept(made);
+    }
 
     /** The client is made. UI thread. */
     void clientCreated(CefClient made) { run(life.clientCreated(made)); }

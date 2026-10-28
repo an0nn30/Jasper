@@ -59,7 +59,7 @@ public final class PageView extends JComponent {
     private final Predicate<KeyEvent> taken;
     private final ImeAdapter ime = new ImeAdapter(this);
     private final Timer resize = new Timer(RESIZE_DELAY_MILLIS, event -> resized());
-    private volatile Page page = Page.NONE;
+    private volatile Hooks hooks = Hooks.NONE;
     private volatile PageBrowser browser;
     private volatile LastPress lastPress = LastPress.NONE;
     private volatile String hoverUrl = "";
@@ -72,11 +72,11 @@ public final class PageView extends JComponent {
     private int takenKey = KeyEvent.VK_UNDEFINED;
 
     /** Where the view's showing state and keys go: its browser's, or before it has one, nowhere. */
-    private record Page(Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys) {
-        static final Page NONE = new Page(shown -> { }, rate -> { }, key -> { });
+    private record Hooks(Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys) {
+        static final Hooks NONE = new Hooks(shown -> { }, rate -> { }, key -> { });
     }
 
-    /** A canvas without a page yet; {@link #setBrowser} gives it one. UI thread. */
+    /** A canvas without a page yet; {@link #setBrowser} gives it one. UI thread. Only {@link Page} makes one. */
     public PageView() {
         taken = KeyEvent::isConsumed;
         install();
@@ -92,7 +92,7 @@ public final class PageView extends JComponent {
      */
     PageView(Predicate<KeyEvent> taken, Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys) {
         this.taken = Objects.requireNonNull(taken, "taken");
-        page = new Page(Objects.requireNonNull(visibility, "visibility"), Objects.requireNonNull(frameRate, "frameRate"),
+        hooks = new Hooks(Objects.requireNonNull(visibility, "visibility"), Objects.requireNonNull(frameRate, "frameRate"),
             Objects.requireNonNull(keys, "keys"));
         install();
     }
@@ -133,7 +133,7 @@ public final class PageView extends JComponent {
      */
     public void setBrowser(PageBrowser browser) {
         this.browser = Objects.requireNonNull(browser, "browser");
-        page = new Page(browser::setWindowVisibility, browser::setWindowlessFrameRate, browser::sendKeyEvent);
+        hooks = new Hooks(browser::setWindowVisibility, browser::setWindowlessFrameRate, browser::sendKeyEvent);
         ime.setBrowser(browser);
         if (!GraphicsEnvironment.isHeadless()) new DropTarget(this, browser.drops()); // the view's drop target from now on
         rescale();
@@ -242,7 +242,7 @@ public final class PageView extends JComponent {
             }
             default -> false;
         };
-        if (pageGets) page.keys().accept(event);
+        if (pageGets) hooks.keys().accept(event);
         else event.consume();
     }
 
@@ -302,7 +302,7 @@ public final class PageView extends JComponent {
     }
 
     private void showing(boolean shown) {
-        Page target = page;
+        Hooks target = hooks;
         target.visibility().accept(shown);
         target.frameRate().accept(shown ? SHOWN_FRAME_RATE : HIDDEN_FRAME_RATE);
     }

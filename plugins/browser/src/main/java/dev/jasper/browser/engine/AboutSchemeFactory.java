@@ -33,7 +33,7 @@ final class AboutSchemeFactory implements CefSchemeHandlerFactory {
         return new Page(pages.answer(request.getURL()));
     }
 
-    /** One request: the status, then the body, at once. */
+    /** One request: the status, then the body, at once; an action's 204 has none. */
     private static final class Page extends CefResourceHandlerAdapter {
         private final int status;
         private final byte[] body;
@@ -51,7 +51,11 @@ final class AboutSchemeFactory implements CefSchemeHandlerFactory {
 
         @Override public void getResponseHeaders(CefResponse response, IntRef responseLength, StringRef redirectUrl) {
             response.setStatus(status);
-            response.setStatusText(status == 200 ? "OK" : "Not Found");
+            response.setStatusText(switch (status) {
+                case 200 -> "OK";
+                case 204 -> "No Content";
+                default -> "Not Found";
+            });
             response.setMimeType("text/html");
             // The charset, which JCEF's CefResponse has no setter for.
             response.setHeaderByName("Content-Type", "text/html; charset=utf-8", true);

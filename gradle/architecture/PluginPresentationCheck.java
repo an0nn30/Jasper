@@ -16,6 +16,8 @@ public final class PluginPresentationCheck {
 
     // The Browser's one canvas: it paints the page Chromium renders off screen, and builds no control but its own superclass.
     private static final String PAGE = "dev/jasper/browser/page/PageView";
+    // The Browser's page facade, the one class that makes the canvas; it builds nothing else.
+    private static final String PAGE_OWNER = "dev/jasper/browser/page/Page";
     private static final Set<String> CANVASES = Set.of("dev/jasper/editor/ui/DocumentArea", "dev/jasper/editor/vim/VimTextArea", PAGE);
     private static final String PREVIEW = "dev/jasper/editor/ui/PreviewPane";
     private static final String PREVIEW_KIT = "dev/jasper/editor/ui/PreviewKit";
@@ -91,6 +93,7 @@ public final class PluginPresentationCheck {
                 boolean visible = visible(owner, models, new HashSet<>());
                 if (member.equals("<init>") && visible) {
                     boolean allowed = exactSource && sourceOwner.equals("dev/jasper/editor/ui/EditorTab") && owner.equals("dev/jasper/editor/ui/DocumentArea")
+                        || exactSource && sourceOwner.equals(PAGE_OWNER) && owner.equals(PAGE)
                         || canvas && (sourceOwner.endsWith("/DocumentArea") ? DOCUMENT_CONSTRUCTORS.contains(owner)
                         : sourceOwner.equals(PAGE) ? owner.equals("javax/swing/JComponent")
                         : Set.of("org/fife/ui/rsyntaxtextarea/RSyntaxTextArea", TEXT_UI).contains(owner))
@@ -246,6 +249,7 @@ public final class PluginPresentationCheck {
         cases.put(TEXT_UI, "class EditorTextAreaUI { void apply(javax.swing.JButton b){b.setForeground(java.awt.Color.RED);} }");
         cases.put(PAGE, "class PageView extends javax.swing.JComponent { Object create(){return new javax.swing.JButton();} }");
         cases.put("dev/jasper/browser/page/PageRenderer", "class PageRenderer { void paint(java.awt.Graphics g){g.drawLine(0,0,1,1);} }");
+        cases.put(PAGE_OWNER, "class Page { Object create(){return new javax.swing.JButton();} }");
         var failures = new ArrayList<String>();
         for (var fixture : cases.entrySet()) {
             Path classes = compile(root.resolve(fixture.getKey().replace('/', '_')), fixture.getKey(), fixture.getValue());
@@ -281,6 +285,18 @@ public final class PluginPresentationCheck {
             var problems = check(compile(root.resolve("positive_" + fixture.getKey().replace('/', '_')), fixture.getKey(), fixture.getValue()));
             if (!problems.isEmpty()) failures.add("Rejected legitimate fixture " + fixture.getKey() + ": " + problems);
         }
+        // The page facade, and only it, makes the canvas: each fixture class in its own file, so each SourceFile matches.
+        String canvas = "class PageView extends javax.swing.JComponent { }", made = PAGE_OWNER + " constructs visible control " + PAGE;
+        var pageOwnerProblems = check(compile(root.resolve("page_owner"), Map.of(PAGE, canvas, PAGE_OWNER, "class Page { Object view = new PageView(); }")));
+        if (!pageOwnerProblems.isEmpty()) failures.add("Rejected the page facade making its canvas: " + pageOwnerProblems);
+        var sibling = check(compile(root.resolve("page_sibling"), Map.of(PAGE, canvas,
+            "dev/jasper/browser/page/PageEvents", "class PageEvents { Object view = new PageView(); }")));
+        if (sibling.stream().noneMatch(p -> p.contains("dev/jasper/browser/page/PageEvents constructs visible control " + PAGE)))
+            failures.add("Accepted the page canvas made outside the page facade: " + sibling);
+        var pageOwnerWrongSource = check(compile(root.resolve("page_owner_wrong_source"), Map.of(PAGE, canvas,
+            "dev/jasper/browser/page/Other", "class Page { Object view = new PageView(); }")));
+        if (pageOwnerWrongSource.stream().noneMatch(p -> p.contains(made)))
+            failures.add("Accepted the page canvas made by a page facade with a mismatched SourceFile: " + pageOwnerWrongSource);
         var pageEditorControl = compile(root.resolve("page_editor_control"), PAGE,
             "class PageView extends javax.swing.JComponent { Object create(){return new org.fife.ui.rsyntaxtextarea.RSyntaxTextArea();} }");
         if (check(pageEditorControl).stream().noneMatch(p -> p.contains("constructs visible control")))
@@ -291,6 +307,23 @@ public final class PluginPresentationCheck {
             failures.add("Accepted text view with mismatched SourceFile");
         if (!failures.isEmpty()) throw new AssertionError(String.join("\n", failures));
         System.out.println("Presentation checker fixtures: " + (cases.size()+PREVIEW_OWNERS.size()) + " negative, " + positive.size() + " positive passed");
+    }
+
+    /** Compiles each source, a binary name to its body in that name's package, in a file of its own, together. */
+    static Path compile(Path root, Map<String, String> sources) throws Exception {
+        Path classes = root.resolve("classes");
+        Files.createDirectories(classes);
+        var arguments = new ArrayList<>(List.of("-classpath", System.getProperty("java.class.path"), "-d", classes.toString()));
+        for (var source : sources.entrySet()) {
+            String name = source.getKey();
+            Path file = root.resolve(name + ".java");
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, "package " + name.substring(0, name.lastIndexOf('/')).replace('/', '.') + ";\n" + source.getValue());
+            arguments.add(file.toString());
+        }
+        int result = ToolProvider.getSystemJavaCompiler().run(null, null, null, arguments.toArray(String[]::new));
+        if (result != 0) throw new AssertionError("Fixtures did not compile: " + sources.keySet());
+        return classes;
     }
 
     static Path compile(Path root, String name, String body) throws Exception {

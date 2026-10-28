@@ -21,6 +21,27 @@ class AboutSchemeTest {
         assertThat(about.answer("jasper-about://empty/")).as("a page with nothing to show").isEqualTo(new AboutScheme.Answer(404, ""));
     }
 
+    @Test void anActionAnswers204WithAnEmptyBodyAndRunsOnTheUiThread() throws Exception {
+        var about = new AboutScheme();
+        var ran = new java.util.concurrent.CompletableFuture<Boolean>();
+        about.registerAction("settings", () -> ran.complete(java.awt.EventQueue.isDispatchThread()));
+        assertThat(about.answer("jasper-about://settings/")).isEqualTo(new AboutScheme.Answer(204, ""));
+        assertThat(ran.get(10, java.util.concurrent.TimeUnit.SECONDS)).as("on the UI thread").isTrue();
+        about.registerAction("fails", () -> { throw new IllegalStateException("closed"); });
+        assertThat(about.answer("jasper-about:fails")).extracting(AboutScheme.Answer::status).isEqualTo(204);
+        java.awt.EventQueue.invokeAndWait(() -> { }); // a failing action is logged, not thrown on the UI thread
+    }
+
+    @Test void pagesAndActionsShareTheirNames() {
+        var about = new AboutScheme();
+        about.register("welcome", () -> "");
+        about.registerAction("settings", () -> { });
+        assertThatThrownBy(() -> about.registerAction("welcome", () -> { })).isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("jasper-about:welcome");
+        assertThatThrownBy(() -> about.register("settings", () -> "")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> about.registerAction("Settings", () -> { })).isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void aPageNameIsLowercaseLettersDigitsAndHyphensAndIsTakenOnce() {
         var about = new AboutScheme();
         about.register("new-tab2", () -> "");

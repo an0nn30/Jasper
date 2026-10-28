@@ -129,6 +129,29 @@ class ChromiumStateTest {
         chromium.close();
     }
 
+    /**
+     * What a client needs before any page is made on it: each installer once, in the order given, when the client is
+     * made, and one given later at once. No client can be made here, so the made client is a stand-in null.
+     */
+    @Test void installersSetUpTheClientOnceInTheOrderGivenAndALateOneRunsAtOnce() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        var ran = new java.util.ArrayList<String>();
+        java.util.function.Consumer<org.cef.CefClient> display = client -> ran.add("display"), links = client -> ran.add("links");
+        chromium.onClient(display);
+        chromium.onClient(links);
+        chromium.onClient(display);
+        assertThat(ran).as("nothing runs before the client is made").isEmpty();
+        EventQueue.invokeAndWait(() -> chromium.install(null));
+        assertThat(ran).containsExactly("display", "links");
+        EventQueue.invokeAndWait(() -> chromium.install(null));
+        chromium.onClient(display);
+        assertThat(ran).as("once each, however often given or installed").containsExactly("display", "links");
+        chromium.onClient(client -> ran.add("late"));
+        assertThat(ran).containsExactly("display", "links", "late");
+        assertThat(starts).as("giving installers starts nothing").isEmpty();
+        chromium.close();
+    }
+
     private Chromium chromium(Executor worker, Duration limit) {
         return new Chromium(data, worker, new AboutScheme(), cause -> {
             tellings.incrementAndGet();

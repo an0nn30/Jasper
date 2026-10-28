@@ -49,18 +49,25 @@ class StartLoadsNoChromiumTest {
         return String.join("\n", lines.stream().filter(line -> !LOADED.matcher(line).find()).toList());
     }
 
-    /** The forked JVM's entry: starts the plugin on the fake host, stops it, and exits non-zero on any failure. */
+    /**
+     * The forked JVM's entry: starts the plugin on the fake host, on the UI thread as Jasper starts plugins, stops it,
+     * and exits non-zero on any failure.
+     */
     public static final class Main {
         private Main() { }
 
         public static void main(String[] args) throws Exception {
-            try (var host = new FakePluginHost(Path.of(args[0]))) {
-                host.start(new PluginInfo("dev.jasper.browser", "Browser", "0.1.0", Set.of("browser.provide")), Set.of(), Set.of(), new BrowserPlugin());
-                host.stopAll();
-                if (!host.failures().isEmpty()) {
-                    System.err.println(String.join("\n", host.failures()));
-                    System.exit(2);
+            var failures = new java.util.ArrayList<String>();
+            java.awt.EventQueue.invokeAndWait(() -> {
+                try (var host = new FakePluginHost(Path.of(args[0]))) {
+                    host.start(new PluginInfo("dev.jasper.browser", "Browser", "0.1.0", Set.of("browser.provide")), Set.of(), Set.of(), new BrowserPlugin());
+                    host.stopAll();
+                    failures.addAll(host.failures());
                 }
+            });
+            if (!failures.isEmpty()) {
+                System.err.println(String.join("\n", failures));
+                System.exit(2);
             }
             System.exit(0);
         }

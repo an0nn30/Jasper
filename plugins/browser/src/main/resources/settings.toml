@@ -1,1 +1,2 @@
-# Settings for the Browser plugin.
+# Settings for the Browser plugin. Change them in Settings > Tools > Browser or here; changes apply to pages opened afterwards.
+# start_page = "jasper-about:welcome"   # what a new browser tab, window or pane opens: a web address, or Jasper's welcome page

@@ -22,7 +22,8 @@ import org.cef.callback.CefDragData;
 
 /**
  * One page's Chromium browser, rendered off screen by its {@link PageRenderer} for its {@link PageView}. It draws 60
- * frames a second while its view shows. Closing it closes only the page.
+ * frames a second while its view shows. Closing it closes only the page. Its {@link Page} is where the client's handlers
+ * send its callbacks.
  */
 public final class PageBrowser extends CefBrowserOsrWithHandler {
     private static final System.Logger LOG = System.getLogger(PageBrowser.class.getName());
@@ -32,6 +33,8 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     private static final int COPY = 1, LINK = 2, MOVE = 16;
     private static final int SHIFT = 1 << 1, CONTROL = 1 << 2;
     private final PageView view;
+    // Set before the native browser is made, so before Chromium calls back for this browser.
+    private volatile Page owner;
 
     /**
      * A page that loads {@code url} once its native browser is made, which its view asks for once it is in a window.
@@ -54,15 +57,30 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         return settings;
     }
 
+    /** The page this browser shows, or null before it has one. Any thread. */
+    Page owner() {
+        return owner;
+    }
+
+    /** Makes {@code page} the one the client's handlers send this browser's callbacks to. Before the native browser exists. */
+    void owner(Page page) {
+        owner = page;
+    }
+
     /**
      * JCEF's native code stores the native browser here once it exists. Only from then on do calls such as
-     * {@code setWindowVisibility} and {@code setWindowlessFrameRate} take effect, because JCEF drops the ones made
-     * earlier. So the view tells the page again whether it shows, on the UI thread.
+     * {@code setWindowVisibility}, {@code setWindowlessFrameRate} and {@code loadURL} take effect, because JCEF drops
+     * the ones made earlier. So the view tells the page again whether it shows, and the page loads what it was asked
+     * to meanwhile, on the UI thread.
      */
     @Override public void setNativeRef(String identifier, long nativeRef) {
         super.setNativeRef(identifier, nativeRef);
         PageView target = view;
-        if (nativeRef != 0 && NATIVE_BROWSER.equals(identifier) && target != null) EventQueue.invokeLater(target::browserCreated);
+        if (nativeRef != 0 && NATIVE_BROWSER.equals(identifier) && target != null) EventQueue.invokeLater(() -> {
+            target.browserCreated();
+            Page page = owner;
+            if (page != null) page.created(this);
+        });
     }
 
     /**

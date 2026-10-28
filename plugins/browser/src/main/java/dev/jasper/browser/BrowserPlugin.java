@@ -2,17 +2,30 @@ package dev.jasper.browser;
 
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.browser.item.BrowserItems;
+import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
+import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.PluginMenu;
+import dev.jasper.sdk.ui.SplitItemSpec;
+import dev.jasper.sdk.ui.StandardMenu;
+import dev.jasper.sdk.ui.TabPlacement;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
- * The Browser: web pages as Jasper items. Its start makes Chromium's engine, which starts Chromium only when a page
- * first asks for it, so starting the plugin loads no Chromium class. Registers nothing yet.
+ * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
+ * item, the globe they show, Settings › Browser and the welcome page, and makes Chromium's engine, which starts Chromium
+ * only when a browser item first shows, so starting the plugin loads no Chromium class.
  */
 public class BrowserPlugin implements Plugin {
+    static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
+    /** The Browser split item: Split Right with Browser and Split Down with Browser. */
+    static final SplitItemSpec SPLIT = SplitItemSpec.of("dev.jasper.browser.browser", "Browser").withIcon(BrowserItems.GLOBE);
     private PluginContext context;
     private ExecutorService worker;
     private Chromium chromium;
@@ -26,7 +39,26 @@ public class BrowserPlugin implements Plugin {
         // Chromium starts on a platform thread of the plugin's own: its pre-initialisation needs the UI thread free, and
         // it must not hold one of the SDK's virtual threads. The executor makes no thread until a page asks for Chromium.
         worker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-browser-chromium").factory());
-        chromium = new Chromium(context.dataDirectory(), worker, new AboutScheme(), this::startFailed);
+        var about = new AboutScheme();
+        chromium = new Chromium(context.dataDirectory(), worker, about, this::startFailed);
+        BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
+        var items = new BrowserItems(context, chromium);
+        var welcome = new WelcomePage(context.appearance());
+        about.register(WelcomePage.NAME, welcome::html);
+        about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });
+        // Spec section 5: New Browser Tab and New Browser Window, in the File menu and the palette, with no default key.
+        context.actions().register(ActionSpec.of(NEW_TAB, "New Browser Tab").withIcon(BrowserItems.GLOBE)
+                .withKeywords(List.of("browser", "web", "page", "new", "tab")),
+            invoked -> items.open(settings.read().startAddress(), TabPlacement.NEW_TAB, Optional.empty(), Optional.of(invoked.window())));
+        context.actions().register(ActionSpec.of(NEW_WINDOW, "New Browser Window").withIcon(BrowserItems.GLOBE)
+                .withKeywords(List.of("browser", "web", "page", "new", "window")),
+            invoked -> items.open(settings.read().startAddress(), TabPlacement.NEW_WINDOW, Optional.empty(), Optional.of(invoked.window())));
+        // The host's Split submenus offer Browser Right and Browser Down.
+        context.windows().splitItem(SPLIT,
+            (shown, placement) -> items.open(settings.read().startAddress(), placement, Optional.empty(), Optional.of(shown)));
+        PluginMenu file = context.menus().standard(StandardMenu.FILE);
+        file.add(NEW_TAB);
+        file.add(NEW_WINDOW);
         running = true;
     }
 
