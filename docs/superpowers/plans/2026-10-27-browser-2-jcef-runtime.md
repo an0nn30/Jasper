@@ -1,8 +1,10 @@
 # Browser 2: the JCEF runtime — Implementation Plan
 
 > **Status (2026-10-27):** Tasks 1–6 done on `claude/browser-jcef-runtime-0c197e` (cut from the design branch at
-> `823125fdc`; not merged, not pushed), with the deviations below. Task 7 is not run: AOT training with
-> `-Pjasper.aot=true` and the start-up and memory benchmarks need the user's OK per batch. Commits: Task 1 `a289d48df`
+> `823125fdc`; not merged, not pushed), with the deviations below. Task 7 ran with the user's OK, and the user
+> accepted [its record](../../benchmarks/2026-10-27-jcef-runtime.md) on 2026-10-27. The warm start and memory are within
+> noise, the early cold milestones about 30 ms faster and the output-phase allocation 5 to 8 % higher; the cold
+> window-to-output milestones are inconclusive. Commits: Task 1 `a289d48df`
 > and fix `1a7feae1e`, Task 1b `e84e4929a`, Task 2 `42d443334`, Task 3 `4eccde0b3` and fix `1bc83a953`, Task 4
 > `adbec9b35`, Task 5 `03251f099` and fix `5645a0fd3`, Task 6 `180b17cd5`, and the final review's fixes `ea9892e27`
 > (`jcefRuntimeBuild` pins the exact build and a fixture ties `notices.toml`'s Chromium, CEF and JCEF versions to it;

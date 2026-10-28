@@ -36,8 +36,12 @@ build, with a fixture tying the Licenses window's Chromium, CEF and JCEF version
 and errors, 30 skips. Not run: Windows and Linux packaging (no host may run the downloaded JDKs, and the Actions budget
 blocks CI, so those `verifyPackage` lines and the Linux `apt-get` additions first run in CI; Task 3's substitute read
 libcef's direct `DT_NEEDED`, the rpm path's view, while the deb path's `ldd` also lists transitive libraries, so CI's
-install job first sees the `.deb`'s dependencies) and Task 7 (AOT training with `-Pjasper.aot=true`, start-up and memory
-benchmarks), which needs the user's OK per batch. Open: not merged or pushed; GUI check of the Licenses window's longest
+install job first sees the `.deb`'s dependencies). Task 7 ran, and the user accepted
+[its record](benchmarks/2026-10-27-jcef-runtime.md) on 2026-10-27. The warm start and memory are within noise, the early
+cold milestones about 30 ms faster and the output-phase allocation 5 to 8 % higher; the cold window-to-output milestones
+are inconclusive (a load spike). Open: not merged or pushed; today's code starts cold in about 4.8 s on both images
+(2.06 s on 2026-10-02), and the memory benchmark's default matrix stops at search-resize-font with 1 pane and 100,000
+lines on both images; GUI check of the Licenses window's longest
 caption ("JogAmp licenses (BSD 2-Clause and others)", 41 characters) on a narrow window; plan 4's first Chromium start
 shows whether the framework is found; Linux `lib/chrome-sandbox` keeps jlink's mode. The JDK-8376576 workarounds
 (unsealing `jbr-api`, training in a deleted copy, their wording) are retired or re-justified in the entry above.
