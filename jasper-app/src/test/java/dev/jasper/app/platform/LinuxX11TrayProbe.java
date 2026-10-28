@@ -34,8 +34,8 @@ public final class LinuxX11TrayProbe {
         Path output = Path.of(options.getOrDefault("--output", "build/tray-gate/transport")).toAbsolutePath();
         Files.createDirectories(output);
         Files.writeString(output.resolve("probe.pid"), ProcessHandle.current().pid() + "\n");
-        if (Set.of("legacy", "popup").contains(options.getOrDefault("--gate", "transport"))) {
-            if (options.get("--gate").equals("popup")) System.setProperty("java.awt.headless", "false");
+        if (Set.of("legacy", "popup", "runtime").contains(options.getOrDefault("--gate", "transport"))) {
+            if (!options.get("--gate").equals("legacy")) System.setProperty("java.awt.headless", "false");
             legacy(options, output); return;
         }
         if (options.containsKey("--case")) {
@@ -294,9 +294,9 @@ public final class LinuxX11TrayProbe {
         environment.remove("WAYLAND_DISPLAY"); environment.remove("WAYLAND_SOCKET"); environment.remove("SESSION_MANAGER");
         environment.put("GDK_BACKEND", "x11"); environment.put("QT_QPA_PLATFORM", "xcb");
         environment.put("XDG_SESSION_TYPE", "x11");
-        Path runtime = Files.createDirectory(home.resolve("runtime"));
-        Files.setPosixFilePermissions(runtime, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
-        environment.put("XDG_RUNTIME_DIR", runtime.toString());
+        Path runtimeDirectory = Files.createDirectory(home.resolve("runtime"));
+        Files.setPosixFilePermissions(runtimeDirectory, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+        environment.put("XDG_RUNTIME_DIR", runtimeDirectory.toString());
         environment.put("GIO_USE_VFS", "local"); environment.put("NO_AT_BRIDGE", "1");
         environment.put("HOME", home.toString()); environment.put("XDG_CONFIG_HOME", home.resolve("config").toString());
         environment.put("XDG_CACHE_HOME", home.resolve("cache").toString()); environment.put("XDG_DATA_HOME", home.resolve("data").toString());
@@ -305,25 +305,52 @@ public final class LinuxX11TrayProbe {
             + "\nXDG_SESSION_TYPE=" + environment.get("XDG_SESSION_TYPE")
             + "\nWAYLAND_DISPLAY_present=" + environment.containsKey("WAYLAND_DISPLAY")
             + "\nWAYLAND_SOCKET_present=" + environment.containsKey("WAYLAND_SOCKET")
-            + "\nHOME=" + home + "\nXDG_RUNTIME_DIR=" + runtime + "\n");
+            + "\nHOME=" + home + "\nXDG_RUNTIME_DIR=" + runtimeDirectory + "\n");
         var owned = new ArrayList<Process>();
         var observations = new java.util.concurrent.CopyOnWriteArrayList<Boolean>();
         var actions = new java.util.concurrent.atomic.AtomicInteger();
         var menus = new java.util.concurrent.CopyOnWriteArrayList<LinuxLegacyTray.MenuRequest>();
-        boolean popupGate = options.get("--gate").equals("popup");
+        boolean runtimeGate = options.get("--gate").equals("runtime");
+        boolean popupGate = options.get("--gate").equals("popup") || runtimeGate;
         var popup = new LinuxTrayPopup(javax.swing.SwingUtilities::invokeLater);
         var selectedRows = new java.util.concurrent.CopyOnWriteArrayList<Integer>();
         var anchorOverride = new AtomicReference<java.awt.Rectangle>();
         int[] popupBaseline = {-1, -1};
-        var tray = new LinuxLegacyTray(environment, value -> { observations.add(value); System.out.println("availability=" + value); },
+        var runtimeCallbacks = new AtomicReference<LinuxTrayRuntime.Observations>();
+        var runtimeEvents = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var tray = new LinuxLegacyTray(environment, value -> {
+            observations.add(value); System.out.println("availability=" + value);
+            var callbacks = runtimeCallbacks.get(); if (callbacks != null) callbacks.legacy().accept(value);
+        },
             request -> {
                 var anchor = anchorOverride.get();
                 if (anchor != null) request = new LinuxLegacyTray.MenuRequest(request.epoch(), anchor, request.rootScreenBounds(), false,
                     request.action(), request.valid(), request.hints(), request.userTime());
                 menus.add(request); System.out.println("menu=" + request.rootBounds()); if (popupGate) popup.request(request);
             }, popup::cancel);
-        try {
-            tray.start(); LinuxX11TestServer.await(() -> observations.contains(false), "initial unavailable snapshot");
+        Path modernDirectory = runtimeGate ? Files.createTempDirectory(Path.of("/tmp"), "jrm-") : null;
+        var modernBus = runtimeGate ? LinuxTestBus.start(modernDirectory, false) : null;
+        var scheduler = runtimeGate ? LinuxTrayRuntime.scheduler() : null;
+        var runtime = runtimeGate ? new LinuxTrayRuntime(new ResidentTray.Actions(
+            () -> { actions.incrementAndGet(); selectedRows.add(1); }, () -> selectedRows.add(2),
+            () -> selectedRows.add(3), () -> selectedRows.add(5)), scheduler, javax.swing.SwingUtilities::invokeLater,
+            callbacks -> {
+                runtimeCallbacks.set(callbacks);
+                var modern = new LinuxStatusNotifier(modernBus.address(), callbacks.host(), callbacks.connected());
+                return new LinuxResidentTray.Modern((host, action) -> {
+                    try { assertThat(field(tray, "icon")).as("confirmed old native destruction before modern publish").isEqualTo(0); }
+                    catch (Exception failure) { throw new AssertionError(failure); }
+                    boolean result = modern.publish(host, action);
+                    runtimeEvents.add("modern.publish=" + result); return result;
+                }, () -> { modern.withdrawAndAwait(); runtimeEvents.add("modern.withdraw.confirmed"); }, modern::close, modern::start);
+            }, callbacks -> new LinuxTrayRuntime.LegacyAdapter(new LinuxResidentTray.Legacy(action -> {
+                boolean result = tray.install(action); runtimeEvents.add("legacy.install=" + result); return result;
+            }, () -> { tray.removeAndAwait(); runtimeEvents.add("legacy.destroy.confirmed"); }, tray::close),
+                tray::start, tray::probe, tray::discoveryEnabled), popup::close) : null;
+        try (var probeTimer = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform().daemon().name("jasper-probe-snapshot").factory())) {
+            if (runtime != null) runtime.start();
+            else { tray.start(); probeTimer.scheduleWithFixedDelay(tray::probe, 5, 5, TimeUnit.SECONDS); }
+            LinuxX11TestServer.await(() -> observations.contains(false), "initial unavailable snapshot");
             Thread.sleep(200); assertThat(observations).doesNotContain(true);
             Files.writeString(output.resolve("host.txt"), command(environment, "uname", "-a")
                 + command(environment, "rpm", "-q", "lxpanel", "xfce4-panel", "xorg-x11-server-Xvfb")
@@ -387,6 +414,10 @@ public final class LinuxX11TrayProbe {
                 Thread.sleep(250); assertThat(observations).doesNotContain(true); assertThat(tray.install(id -> actions.incrementAndGet())).isFalse();
                 assertThat(command(environment, "xwininfo", "-root", "-tree")).doesNotContain("\"Jasper\"");
                 Files.writeString(output.resolve("summary.txt"), "PASS alpha-without-compositor declined cleanly; no icon or pending publication\n");
+                return;
+            }
+            if (runtimeGate) {
+                runtimeRows(environment, modernBus.address(), output, tray, popup, runtime, scheduler, runtimeEvents, selectedRows, menus, unexpected, panel);
                 return;
             }
             LinuxX11TestServer.await(() -> observations.getLast(), "real panel owner available");
@@ -527,8 +558,12 @@ public final class LinuxX11TrayProbe {
                     Files.writeString(output.resolve("final-owner.txt"), diagnostic + "\n");
                 }
             } catch (Exception | AssertionError diagnostic) { Files.writeString(output.resolve("diagnostic-failure.txt"), diagnostic.toString()); }
+            if (runtime != null) Files.write(output.resolve("runtime-trace.txt"), runtimeEvents);
             Throwable cleanupFailure = null;
             try {
+                if (runtime != null) {
+                    runtime.close(); assertThat(scheduler.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+                }
                 popup.close(); javax.swing.SwingUtilities.invokeAndWait(() -> {});
                 if (popupGate) {
                     if (popupBaseline[0] >= 0) {
@@ -565,10 +600,79 @@ public final class LinuxX11TrayProbe {
                 try { stop(owned.get(i)); }
                 catch (Exception | AssertionError failure) { if (cleanupFailure == null) cleanupFailure = failure; else cleanupFailure.addSuppressed(failure); }
             }
+            if (modernBus != null) {
+                modernBus.close(); Files.deleteIfExists(modernDirectory.resolve("bus")); Files.delete(modernDirectory);
+            }
             Thread.setDefaultUncaughtExceptionHandler(oldHandler);
             try (var paths = Files.walk(home)) { for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(path); }
             Files.writeString(output.resolve("cleanup.txt"), "ownedProcesses=" + owned.size() + " alive=" + owned.stream().filter(Process::isAlive).count() + " privateHomeRemoved=" + !Files.exists(home) + "\n");
             if (cleanupFailure != null) throw new AssertionError("Native gate cleanup failed", cleanupFailure);
+        }
+    }
+
+    /** Wiring-only native acceptance; real adapters, private bus and a real panel/WM. */
+    private static void runtimeRows(Map<String, String> env, String modernAddress, Path output, LinuxLegacyTray tray, LinuxTrayPopup popup,
+            LinuxTrayRuntime runtime, java.util.concurrent.ScheduledThreadPoolExecutor scheduler, List<String> events,
+            List<Integer> actions, List<LinuxLegacyTray.MenuRequest> menus, List<Throwable> unexpected, String panel) throws Exception {
+        LinuxX11TestServer.await(() -> events.contains("legacy.install=true"), "runtime automatically embedded legacy icon");
+        String icon = command(env, "xdotool", "search", "--name", "^Jasper$").strip();
+        assertThat(icon.lines().count()).isEqualTo(1);
+        command(env, "xdotool", "mousemove", "--window", icon, "12", "12", "click", "3");
+        LinuxX11TestServer.await(() -> popupWindow() != null, "composed runtime popup");
+        capture(env, output, "runtime-popup");
+        var stale = menus.getLast();
+        command(env, "xdotool", "key", "Escape");
+        LinuxX11TestServer.await(() -> popupWindow() == null, "popup dismissed");
+        try (var watcherConnection = org.freedesktop.dbus.connections.impl.DBusConnectionBuilder.forAddress(modernAddress).withShared(false).build();
+             var observer = org.freedesktop.dbus.connections.impl.DBusConnectionBuilder.forAddress(modernAddress).withShared(false).build()) {
+            var watcher = new LinuxTrayWireTest.Watcher(false);
+            var read = new CountDownLatch(1); watcher.onRead = read::countDown;
+            watcherConnection.exportObject("/StatusNotifierWatcher", watcher);
+            watcherConnection.requestBusName(LinuxTrayDbus.WATCHER);
+            assertThat(read.await(3, TimeUnit.SECONDS)).as("watcher alone is observed").isTrue();
+            assertThat(watcher.registrations).isEmpty();
+            assertThat(field(tray, "icon")).isNotEqualTo(0);
+            watcher.host = true;
+            watcherConnection.sendMessage(new LinuxTrayDbus.Watcher.StatusNotifierHostRegistered("/StatusNotifierWatcher"));
+            String publication = watcher.registrations.poll(3, TimeUnit.SECONDS);
+            assertThat(publication).startsWith(":");
+            LinuxX11TestServer.await(() -> events.contains("modern.publish=true"), "confirmed modern publication");
+            scheduler.submit(() -> {}).get(2, TimeUnit.SECONDS);
+            assertThat(scheduler.getQueue()).as("healthy modern publication suspends the only periodic probe").isEmpty();
+            assertThat(command(env, "xwininfo", "-root", "-tree")).doesNotContain("\"Jasper\"");
+            assertThat(events).containsSubsequence("legacy.install=true", "legacy.destroy.confirmed", "modern.publish=true");
+            int before = actions.size(); stale.action().accept(1); javax.swing.SwingUtilities.invokeAndWait(() -> {});
+            assertThat(actions).hasSize(before);
+            observer.getRemoteObject(publication, "/StatusNotifierItem", LinuxTrayDbus.Item.class).Activate(0, 0);
+            LinuxX11TestServer.await(() -> actions.size() == before + 1, "modern action through runtime EDT generation guard");
+            watcherConnection.releaseBusName(LinuxTrayDbus.WATCHER);
+            LinuxX11TestServer.await(() -> java.util.Collections.frequency(events, "legacy.install=true") == 2, "legacy fallback after confirmed modern withdrawal");
+            assertThat(events).containsSubsequence("modern.publish=true", "modern.withdraw.confirmed", "legacy.install=true");
+            var bus = observer.getRemoteObject("org.freedesktop.DBus", "/org/freedesktop/DBus", org.freedesktop.dbus.interfaces.DBus.class);
+            assertThat(bus.NameHasOwner(publication)).as("modern publication connection actually ended before fallback").isFalse();
+            try (var panelBus = org.freedesktop.dbus.connections.impl.DBusConnectionBuilder.forAddress(env.get("DBUS_SESSION_BUS_ADDRESS")).withShared(false).build()) {
+                var panelDaemon = panelBus.getRemoteObject("org.freedesktop.DBus", "/org/freedesktop/DBus", org.freedesktop.dbus.interfaces.DBus.class);
+                assertThat(bus.GetId()).as("modern fixture uses its exact separate private bus").isNotEqualTo(panelDaemon.GetId());
+                Files.writeString(output.resolve("runtime-buses.txt"), "modernAddress=" + modernAddress + "\nmodernId=" + bus.GetId()
+                    + "\npanelId=" + panelDaemon.GetId() + "\nseparatePrivateBuses=true\n");
+            }
+            icon = command(env, "xdotool", "search", "--name", "^Jasper$").strip();
+            assertThat(icon.lines().count()).isEqualTo(1);
+            command(env, "xdotool", "mousemove", "--window", icon, "12", "12", "click", "3");
+            LinuxX11TestServer.await(() -> popupWindow() != null, "fallback popup opens through composition");
+            var closedRequest = menus.getLast();
+            long start = System.nanoTime(); javax.swing.SwingUtilities.invokeAndWait(runtime::close);
+            assertThat(System.nanoTime() - start).isLessThan(TimeUnit.MILLISECONDS.toNanos(500));
+            assertThat(scheduler.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            LinuxX11TestServer.await(() -> popupWindow() == null, "runtime close disposes popup");
+            int count = actions.size(); closedRequest.action().accept(1); javax.swing.SwingUtilities.invokeAndWait(() -> {});
+            assertThat(actions).hasSize(count); assertThat(scheduler.getQueue()).isEmpty();
+            assertThat(unexpected).isEmpty();
+            Files.write(output.resolve("runtime-trace.txt"), events);
+            Files.writeString(output.resolve("summary.txt"), "PASS runtime panel=" + panel
+                + " watcherOnlyRetainsLegacy=true modernPreferred=true confirmedReplacementOrder=true soleProbeSuspended=true"
+                + " modernWithdrawalConfirmed=true legacyRecovered=true popup=true staleActionDropped=true closeOnEDT=true requiredSkips=0\n");
+            System.out.println(Files.readString(output.resolve("summary.txt")));
         }
     }
 

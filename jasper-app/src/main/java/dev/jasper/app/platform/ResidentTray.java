@@ -16,6 +16,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.SwingUtilities;
 
 /**
@@ -27,7 +29,8 @@ import javax.swing.SwingUtilities;
  * focused again. A click on a balloon or on the icon activates the most recent notification, if it is still unread,
  * since {@code TrayIcon} cannot tell balloons apart; once that one is read, a click on the resident icon is Open and a
  * click on the icon added for balloons does nothing, even if an older notification is unread. macOS banners come from
- * its own bridge, so the menu bar item carries no balloons; Linux gets no icon. EDT only; menu actions arrive on the
+ * its own bridge, so the menu bar item carries no balloons. Linux prefers a live StatusNotifier host and recovers
+ * through an owned XEmbed icon; LinuxNotifications owns its notifications. EDT only; menu actions arrive on the
  * EDT.
  */
 public final class ResidentTray {
@@ -86,6 +89,8 @@ public final class ResidentTray {
     record Icon(Consumer<String> tooltip, Consumer<SystemNotifier.Message> balloon, Runnable remove) {}
 
     private final boolean mac;
+    private final Function<Actions, Runnable> linuxInstaller;
+    private Runnable linuxCleanup;
     /**
      * Adds an icon whose action (a click on it or on its balloon) runs the given task, with the resident menu when there
      * are actions; null where the platform gets no icon or the tray refuses one.
@@ -99,23 +104,30 @@ public final class ResidentTray {
     private Consumer<String> clicked = id -> { };
 
     ResidentTray(boolean mac, BiFunction<Runnable, Optional<Actions>, Icon> add) {
+        this(mac, add, null);
+    }
+
+    ResidentTray(boolean mac, BiFunction<Runnable, Optional<Actions>, Icon> add,
+                 Function<Actions, Runnable> linuxInstaller) {
         this.mac = mac;
+        this.linuxInstaller = linuxInstaller;
         this.add = Objects.requireNonNull(add, "add");
     }
 
     /**
-     * This desktop's menu bar or notification area: the real one on a macOS or Windows desktop, otherwise one that never
+     * This desktop's menu bar or notification area: the real one on a macOS, Windows or Linux desktop, otherwise one that never
      * shows an icon. Cheap: nothing touches the tray until an icon is added.
      */
     public static ResidentTray forThisDesktop() {
         String os = System.getProperty("os.name");
         boolean mac = os != null && os.startsWith("Mac");
         if (!applies(os, GraphicsEnvironment.isHeadless())) return new ResidentTray(mac, (action, actions) -> null);
+        if ("Linux".equals(os)) return new ResidentTray(false, (action, actions) -> null, LinuxTrayRuntime::install);
         return new ResidentTray(mac, (action, actions) -> addToSystemTray(mac, action, actions));
     }
 
     static boolean applies(String osName, boolean headless) {
-        return !headless && osName != null && (osName.startsWith("Windows") || osName.startsWith("Mac"));
+        return !headless && osName != null && (osName.startsWith("Windows") || osName.startsWith("Mac") || osName.equals("Linux"));
     }
 
     static List<Entry> entries(boolean mac) {
@@ -133,6 +145,19 @@ public final class ResidentTray {
      */
     public Runnable install(Actions actions) {
         Objects.requireNonNull(actions, "actions");
+        if (linuxInstaller != null) {
+            if (linuxCleanup != null) return linuxCleanup;
+            Runnable cleanup;
+            try { cleanup = linuxInstaller.apply(actions); }
+            catch (RuntimeException | LinkageError unavailable) {
+                LOG.log(System.Logger.Level.DEBUG, "Linux tray unavailable", unavailable);
+                cleanup = () -> { };
+            }
+            var closed = new AtomicBoolean();
+            Runnable installed = cleanup;
+            linuxCleanup = () -> { if (closed.compareAndSet(false, true)) installed.run(); };
+            return linuxCleanup;
+        }
         // A background notification's icon gives way to the resident one, which carries its balloons from now on.
         if (icon != null) icon.remove().run();
         icon = add.apply(this::action, Optional.of(actions));
@@ -153,7 +178,7 @@ public final class ResidentTray {
 
     /** Shows a notification's balloon, adding Jasper's icon for it when none is there. Windows only. */
     void balloon(SystemNotifier.Message message) {
-        if (mac) return; // macOS banners come from its own bridge; the menu bar item stays as it is.
+        if (mac || linuxInstaller != null) return; // macOS banners come from its own bridge; the menu bar item stays as it is.
         if (icon == null) {
             icon = add.apply(this::action, Optional.empty());
             if (icon == null) return;

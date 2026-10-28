@@ -282,6 +282,37 @@ class LinuxResidentTrayTest {
         f.controller.close(); f.drain(); assertThat(f.events).hasSize(4);
     }
 
+    @Test void successPhysicallyCancelsRetry() {
+        var f = new Fixture(); f.modernSucceeds = false; f.controller.hostChanged(A); f.drain();
+        assertThat(f.cancellations).isZero();
+        f.modernSucceeds = true; f.controller.hostChanged(B); f.drain();
+        assertThat(f.cancellations).isEqualTo(1);
+    }
+    @Test void connectionRestoredPhysicallyCancelsReconnect() {
+        var f = new Fixture(); f.controller.connectionLost(); f.drain();
+        f.controller.connectionRestored(); f.drain();
+        assertThat(f.cancellations).isEqualTo(1);
+    }
+    @Test void closePhysicallyCancelsRetry() {
+        var f = new Fixture(); f.controller.connectionLost(); f.drain();
+        f.controller.close(); f.controller.close(); f.drain();
+        assertThat(f.cancellations).isEqualTo(1);
+    }
+    @Test void modernPublicationSuspendsLegacyProbeAfterConfirmedAdd() {
+        var f = new Fixture(); f.inModern = () -> assertThat(f.publications).isEmpty();
+        f.controller.hostChanged(A); f.drain();
+        assertThat(f.publications).containsExactly(true);
+        f.controller.hostChanged(null); f.drain();
+        assertThat(f.publications).containsExactly(true, false);
+    }
+    @Test void failedWithdrawalCannotResumeLegacyPublication() {
+        var f = new Fixture(); f.controller.hostChanged(A); f.drain();
+        f.failModernRemove = true; f.controller.hostChanged(null); f.drain();
+        assertThat(f.publications).containsExactly(true);
+        f.failModernRemove = false; f.fireTimer();
+        assertThat(f.publications).containsExactly(true, false);
+    }
+
     private static LinuxStatusNotifier.Host host(String owner) {
         return new LinuxStatusNotifier.Host("org.kde.StatusNotifierWatcher", owner, true);
     }
@@ -299,7 +330,8 @@ class LinuxResidentTrayTest {
         final AtomicInteger actions = new AtomicInteger();
         boolean modernSucceeds = true, legacySucceeds = true;
         boolean failModernRemove, failLegacyRemove, failModernClose, failLegacyClose, failReconnect;
-        int reconnects;
+        int reconnects, cancellations;
+        final List<Boolean> publications = new ArrayList<>();
         Runnable inModern = () -> { }, inLegacy = () -> { }, inWithdraw = () -> { };
         IntConsumer modernClick, legacyClick;
         final LinuxResidentTray controller = new LinuxResidentTray(
@@ -315,7 +347,8 @@ class LinuxResidentTrayTest {
             }, () -> { events.add("legacy.remove"); if (failLegacyRemove) throw new IllegalStateException("remove"); },
                 () -> { events.add("legacy.close"); if (failLegacyClose) throw new IllegalStateException("close legacy"); }),
             task -> { synchronized (work) { work.add(task); } },
-            (delay, task) -> { delays.add(delay); timers.add(task); }, edt::add);
+            (delay, task) -> { delays.add(delay); timers.add(task); }, edt::add,
+            () -> cancellations++, publications::add);
         void drain() {
             while (true) {
                 Runnable next; synchronized (work) { next = work.poll(); }

@@ -38,6 +38,56 @@ class LinuxLegacyTrayTest {
             }
         }
     }
+    @Test void explicitProbeRefreshesOwnerAndDisabledDiscoveryDoesNotProbe() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem()) {
+            var host = server.new TrayHost(); host.owner = 0;
+            var available = new CopyOnWriteArrayList<Boolean>();
+            try (var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, ignored -> {}, () -> {})) {
+                tray.start(); await(() -> host.observed.contains("snapshot"), "initial snapshot");
+                host.owner = 0x123; // Selection changes without a MANAGER event require the runtime's snapshot probe.
+                tray.probe(); await(() -> available.contains(true), "explicit fresh snapshot");
+                tray.discoveryEnabled(false);
+                int snapshots = java.util.Collections.frequency(host.observed, "snapshot");
+                for (int i = 0; i < 10000; i++) tray.probe();
+                Thread.sleep(150);
+                assertThat(java.util.Collections.frequency(host.observed, "snapshot")).isEqualTo(snapshots);
+                host.owner = 0;
+                tray.discoveryEnabled(true); tray.probe();
+                await(() -> !available.getLast(), "fresh snapshot on resume");
+            }
+        }
+    }
+
+    @Test void idlePollBudgetIsNotTheNativeOperationDeadline() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem()) {
+            var host = server.new TrayHost(); var available = new CopyOnWriteArrayList<Boolean>();
+            try (var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, ignored -> {}, () -> {})) {
+                tray.start(); await(() -> available.contains(true), "host"); assertThat(tray.install(ignored -> {})).isTrue();
+                Object cancel = LinuxTrayXcbTest.field(tray, "cancellation"); Object bindings = LinuxTrayXcbTest.field(cancel, "bindings");
+                var member = bindings.getClass().getDeclaredField("xcb"); member.setAccessible(true); Object original = member.get(bindings);
+                var delayed = new java.util.concurrent.atomic.AtomicBoolean(); var polls = new AtomicInteger();
+                var returned = new CountDownLatch(1); int baseline = available.size();
+                member.set(bindings, java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {member.getType()}, (proxy, method, args) -> {
+                    if (method.getName().equals("xcb_poll_for_event")) {
+                        polls.incrementAndGet();
+                        if (delayed.compareAndSet(false, true)) {
+                            try { Thread.sleep(150); return method.invoke(original, args); }
+                            finally { returned.countDown(); }
+                        }
+                    }
+                    return method.invoke(original, args);
+                }));
+                assertThat(returned.await(2, TimeUnit.SECONDS)).isTrue();
+                await(() -> polls.get() >= 2 || available.size() > baseline, "next event drain or erroneous host invalidation");
+                assertThat(available).hasSize(baseline);
+                assertThat(LinuxTrayXcbTest.field(tray, "installed")).isEqualTo(true);
+                assertThat(host.docks).isEqualTo(1);
+            }
+        }
+    }
+
     @Test void requiresHandshakeReparentAndCurrentOwner() throws Exception {
         nativeOnly();
         for (boolean handshake : List.of(false, true)) for (boolean reparent : List.of(false, true)) {

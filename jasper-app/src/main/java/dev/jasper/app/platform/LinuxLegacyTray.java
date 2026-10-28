@@ -61,7 +61,7 @@ final class LinuxLegacyTray implements AutoCloseable {
     private int contextPressTime; // guarded by lock; retired with admission
     private int owner, compositor, icon, embedder, announcedEmbedder, serverTime, screen, lastInputTime, lastInputType, lastInputDetail;
     private long connectionEpoch, hostEpoch;
-    private volatile long nextSnapshot;
+    private volatile boolean probeRequested;
     private LinuxTrayXcb.Visual visual;
     private boolean alpha, dirty, activated = true, modality, focused;
     private volatile boolean mapped, hostMapped;
@@ -123,9 +123,16 @@ final class LinuxLegacyTray implements AutoCloseable {
     void discoveryEnabled(boolean value) {
         synchronized (lock) {
             if (closed || enabled == value) return;
-            enabled = value; nextSnapshot = 0;
+            enabled = value; probeRequested = value;
             if (!value && !connected && cancellation != null) cancellation.requestClose();
             wake();
+        }
+    }
+    /** Coalesces a fresh owner snapshot on the native worker; production owns the periodic timer. */
+    void probe() {
+        synchronized (lock) {
+            if (closed || !enabled) return;
+            probeRequested = true; wake();
         }
     }
     @Override public void close() {
@@ -240,7 +247,7 @@ final class LinuxLegacyTray implements AutoCloseable {
             boolean discover;
             synchronized (lock) { discover = enabled; }
             long deadline = System.nanoTime() + BOUND - CLEANUP_RESERVE;
-            if (discover && System.nanoTime() >= nextSnapshot) snapshot(deadline);
+            if (discover && probeRequested) { probeRequested = false; snapshot(deadline); }
             drain(Math.min(deadline, System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100)), deadline);
             if (dirty && icon != 0 && mapped) paint(deadline);
         }
@@ -260,7 +267,7 @@ final class LinuxLegacyTray implements AutoCloseable {
         resetXembed(); action = null; cancelPopup.run();
     }
     private void snapshot(long deadline) {
-        nextSnapshot = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        probeRequested = false;
         int current = xcb.selectionOwner(atom("_NET_SYSTEM_TRAY_S" + screen), deadline);
         int advertisedVisual = current == 0 ? 0 : xcb.property32(current, atom("_NET_SYSTEM_TRAY_VISUAL"), atom("VISUALID"), deadline);
         int visualId = advertisedVisual == 0 ? xcb.setup().rootVisual() : advertisedVisual;
@@ -272,8 +279,8 @@ final class LinuxLegacyTray implements AutoCloseable {
         if (current == 0 || candidate == null || wantsAlpha && currentCompositor == 0 || !xcb.supports(candidate, wantsAlpha, deadline)) return;
         if (currentCompositor != 0) xcb.select(currentCompositor, 1 << 17, deadline);
         xcb.select(current, (1 << 17) | (1 << 22), deadline); xcb.barrier(deadline);
-        if (xcb.selectionOwner(atom("_NET_SYSTEM_TRAY_S" + screen), deadline) != current) { nextSnapshot = 0; return; }
-        if (wantsAlpha && xcb.selectionOwner(atom("_NET_WM_CM_S" + screen), deadline) != currentCompositor) { nextSnapshot = 0; return; }
+        if (xcb.selectionOwner(atom("_NET_SYSTEM_TRAY_S" + screen), deadline) != current) { probeRequested = true; return; }
+        if (wantsAlpha && xcb.selectionOwner(atom("_NET_WM_CM_S" + screen), deadline) != currentCompositor) { probeRequested = true; return; }
         owner = current; compositor = currentCompositor; alpha = wantsAlpha; visual = candidate; advertise(true);
     }
     private boolean dock(Install request) {
@@ -306,7 +313,7 @@ final class LinuxLegacyTray implements AutoCloseable {
             if (announcedEmbedder != 0 && xcb.parent(icon, deadline) == announcedEmbedder) {
                 if (xcb.selectionOwner(atom("_NET_SYSTEM_TRAY_S" + screen), deadline) != capturedOwner
                         || alpha && xcb.selectionOwner(atom("_NET_WM_CM_S" + screen), deadline) != capturedCompositor) {
-                    invalidate(); advertise(false); remove(deadline); nextSnapshot = 0; return false;
+                    invalidate(); advertise(false); remove(deadline); probeRequested = true; return false;
                 }
                 embedder = announcedEmbedder;
                 xcb.select(embedder, (1 << 17) | (1 << 22), deadline);
@@ -335,11 +342,11 @@ final class LinuxLegacyTray implements AutoCloseable {
         lastInputTime = 0; lastInputType = 0; lastInputDetail = 0;
     }
     private void drain(long pollDeadline, long operationDeadline) {
-        List<LinuxTrayXcb.Event> events = xcb.poll(pollDeadline);
+        List<LinuxTrayXcb.Event> events = xcb.poll(pollDeadline, operationDeadline);
         for (int batch = 0; batch < 256; batch++) {
             for (var event : events) event(event, operationDeadline);
             if (events.size() < 64 || cleanupRequested()) return;
-            events = xcb.poll(Math.min(operationDeadline, System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1)));
+            events = xcb.poll(Math.min(operationDeadline, System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1)), operationDeadline);
         }
     }
     private void event(LinuxTrayXcb.Event event, long deadline) {
@@ -382,7 +389,7 @@ final class LinuxLegacyTray implements AutoCloseable {
                 if (type == 18) { mapped = false; pauseInteraction(); }
                 if (type == 19) { mapped = true; hostMapped = true; dirty = true; }
                 if (type == 21 && embedder != 0 && b.getInt(12) != embedder) {
-                    invalidate(); advertise(false); remove(deadline); owner = 0; nextSnapshot = 0;
+                    invalidate(); advertise(false); remove(deadline); owner = 0; probeRequested = true;
                 }
                 if (type == 22) dirty = true;
             }

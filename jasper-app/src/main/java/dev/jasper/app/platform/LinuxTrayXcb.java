@@ -934,16 +934,18 @@ final class LinuxTrayXcb implements AutoCloseable {
             }
         } finally { outstanding.remove(sequence); }
     }
-    List<Event> poll(long deadline) {
+    List<Event> poll(long deadline) { return poll(deadline, deadline); }
+    /** Idle waiting may expire normally; each potentially flushing native drain keeps its own operation bound. */
+    List<Event> poll(long idleDeadline, long operationDeadline) {
         cancellation.checkOpen();
-        if (System.nanoTime() >= deadline) return List.of();
+        if (System.nanoTime() >= idleDeadline) return List.of();
         if (!pendingEvents.isEmpty()) {
             List<Event> events = List.copyOf(pendingEvents); pendingEvents.clear(); return events;
         }
-        List<Event> events = drainEvents(deadline);
+        List<Event> events = drainEvents(operationDeadline);
         if (!events.isEmpty()) return events;
-        if (!waitSocket(socketFd, 1, deadline, true)) return List.of();
-        return drainEvents(deadline);
+        if (!waitSocket(socketFd, 1, idleDeadline, true)) return List.of();
+        return drainEvents(operationDeadline);
     }
     private List<Event> drainEvents(long deadline) {
         var events = new ArrayList<Event>(); int bytes = 0;

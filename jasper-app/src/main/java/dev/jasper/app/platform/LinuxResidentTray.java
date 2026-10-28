@@ -25,6 +25,8 @@ final class LinuxResidentTray implements AutoCloseable {
     private final Consumer<Runnable> enqueue;
     private final BiConsumer<Duration, Runnable> retry;
     private final Consumer<Runnable> edt;
+    private final Runnable cancelPhysicalRetry;
+    private final Consumer<Boolean> modernPublished;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicLong generation = new AtomicLong();
     private final Object admission = new Object();
@@ -49,6 +51,14 @@ final class LinuxResidentTray implements AutoCloseable {
 
     LinuxResidentTray(ResidentTray.Actions actions, Modern modern, Legacy legacy, Consumer<Runnable> enqueue,
                       BiConsumer<Duration, Runnable> retry, Consumer<Runnable> edt) {
+        this(actions, modern, legacy, enqueue, retry, edt, () -> { }, published -> { });
+    }
+
+    LinuxResidentTray(ResidentTray.Actions actions, Modern modern, Legacy legacy, Consumer<Runnable> enqueue,
+                      BiConsumer<Duration, Runnable> retry, Consumer<Runnable> edt,
+                      Runnable cancelRetry, Consumer<Boolean> modernPublished) {
+        this.cancelPhysicalRetry = Objects.requireNonNull(cancelRetry);
+        this.modernPublished = Objects.requireNonNull(modernPublished);
         this.actions = Objects.requireNonNull(actions);
         this.modern = Objects.requireNonNull(modern);
         this.legacy = Objects.requireNonNull(legacy);
@@ -137,6 +147,7 @@ final class LinuxResidentTray implements AutoCloseable {
             if (added) {
                 publishedHost = candidate;
                 publishedGeneration = ticket;
+                modernPublished.accept(true);
                 restored();
                 synchronized (admission) { disconnected = false; failures = 0; cancelRetry(); }
                 return;
@@ -188,6 +199,7 @@ final class LinuxResidentTray implements AutoCloseable {
         catch (RuntimeException failure) { failed("modern withdrawal", failure); scheduleRetry(Retry.CLEANUP); return false; }
         modernNeedsWithdrawal = false;
         publishedHost = null;
+        modernPublished.accept(false);
         return true;
     }
 
@@ -237,7 +249,11 @@ final class LinuxResidentTray implements AutoCloseable {
         }
     }
 
-    private void cancelRetry() { retryTicket = null; retryPurpose = null; }
+    private void cancelRetry() {
+        boolean existed = retryTicket != null;
+        retryTicket = null; retryPurpose = null;
+        if (existed) cancelPhysicalRetry.run();
+    }
 
     private void failed(String state, RuntimeException failure) {
         if (!failedStates.add(state)) return;

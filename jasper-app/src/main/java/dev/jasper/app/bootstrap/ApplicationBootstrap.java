@@ -366,7 +366,7 @@ public final class ApplicationBootstrap {
             // A restart replays this launch's own arguments, without its paths (workspace-tabs spec 5.3).
             application.launchArguments(options.given());
             application.staleBuild(replacedOnDisk(source, HandoffSocket.lastModified(source)));
-            // The macOS menu bar item and the Windows notification-area icon, once start-up has settled. On Windows the
+            // The macOS menu bar item and Windows/Linux tray discovery, once start-up has settled. On Windows the
             // same icon carries the system notifications' balloons, and one is added for them when Jasper is not resident.
             ResidentTray tray = ResidentTray.forThisDesktop();
             boolean onWindows = WindowsProcess.supported(System.getProperty("os.name"));

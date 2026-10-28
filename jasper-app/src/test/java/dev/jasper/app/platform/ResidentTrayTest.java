@@ -58,13 +58,29 @@ class ResidentTrayTest {
     /** A click on the newest icon's balloon or on the icon itself, which Windows reports alike. */
     private void click() { clicksOnIcons.getLast().run(); }
 
-    @Test void macOsAndWindowsDesktopsGetAnIconAndLinuxDoesNot() {
+    @Test void desktopEligibilityIncludesLinuxWithoutConsultingAHost() {
         assertThat(ResidentTray.applies("Windows 11", false)).isTrue();
         assertThat(ResidentTray.applies("Windows 11", true)).as("headless").isFalse();
         assertThat(ResidentTray.applies("Mac OS X", false)).as("the menu bar item").isTrue();
         assertThat(ResidentTray.applies("Mac OS X", true)).as("headless").isFalse();
-        assertThat(ResidentTray.applies("Linux", false)).isFalse();
+        assertThat(ResidentTray.applies("Linux", false)).isTrue();
+        assertThat(ResidentTray.applies("Linux", true)).isFalse();
         assertThat(ResidentTray.applies(null, false)).isFalse();
+    }
+
+    @Test void linuxDelegatesOnceAndNeverAddsAnAwtBalloonIcon() throws Exception {
+        var installs = new AtomicInteger(); var closes = new AtomicInteger();
+        var tray = new ResidentTray(false, (click, menu) -> {
+            throw new AssertionError("Linux must never create an AWT tray peer");
+        }, given -> { installs.incrementAndGet(); return closes::incrementAndGet; });
+        SwingUtilities.invokeAndWait(() -> {
+            tray.balloon(message("before"));
+            var remove = tray.install(actions());
+            tray.balloon(message("resident"));
+            remove.run(); remove.run();
+            tray.balloon(message("after"));
+        });
+        assertThat(installs).hasValue(1); assertThat(closes).hasValue(1);
     }
 
     @Test void theMenuBarItemOffersANewTerminalWindowSettingsAndTheRealQuit() {
