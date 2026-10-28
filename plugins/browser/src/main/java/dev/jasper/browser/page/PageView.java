@@ -246,6 +246,14 @@ public final class PageView extends JComponent {
         else event.consume();
     }
 
+    /**
+     * The page's native browser now exists. JCEF dropped what the page was told before, so it is told again whether the
+     * view shows. UI thread.
+     */
+    void browserCreated() {
+        showing(isShowing());
+    }
+
     /** The view's input method side, which the renderer tells where the page's composition sits. */
     ImeAdapter ime() {
         return ime;

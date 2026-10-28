@@ -54,6 +54,27 @@ class PageViewHiddenTest {
         });
     }
 
+    /** JCEF drops what a page is told before its native browser exists, so the view tells it again once it does. */
+    @Test void onceItsNativeBrowserExistsThePageIsToldAgainWhetherTheViewShows() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var view = view();
+            var parent = new JPanel();
+            parent.addNotify();
+            try {
+                parent.add(view);
+                view.browserCreated();
+                assertThat(visibility).as("shown").containsExactly(true, true);
+                assertThat(frameRates).containsExactly(60, 60);
+                parent.setVisible(false);
+                view.browserCreated();
+                assertThat(visibility).as("then hidden").containsExactly(true, true, false, false);
+                assertThat(frameRates).containsExactly(60, 60, 1, 1);
+            } finally {
+                parent.removeNotify();
+            }
+        });
+    }
+
     private PageView view() {
         return new PageView(event -> false, visibility::add, frameRates::add, event -> { });
     }

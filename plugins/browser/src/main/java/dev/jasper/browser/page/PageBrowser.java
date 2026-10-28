@@ -1,5 +1,7 @@
 package dev.jasper.browser.page;
 
+import java.awt.EventQueue;
+import java.awt.Point;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
@@ -12,20 +14,24 @@ import java.awt.dnd.InvalidDnDOperationException;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import org.cef.CefBrowserSettings;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowserOsrWithHandler;
 import org.cef.browser.CefRequestContext;
 import org.cef.callback.CefDragData;
 
 /**
- * One page's Chromium browser, rendered off screen by its {@link PageRenderer} for its {@link PageView}. Closing it
- * closes only the page.
+ * One page's Chromium browser, rendered off screen by its {@link PageRenderer} for its {@link PageView}. It draws 60
+ * frames a second while its view shows. Closing it closes only the page.
  */
 public final class PageBrowser extends CefBrowserOsrWithHandler {
     private static final System.Logger LOG = System.getLogger(PageBrowser.class.getName());
+    // The name JCEF stores this browser's native counterpart under.
+    private static final String NATIVE_BROWSER = "CefBrowser";
     // Chromium's drag operations (cef_drag_operations_mask_t) and event flags (cef_event_flags_t).
     private static final int COPY = 1, LINK = 2, MOVE = 16;
     private static final int SHIFT = 1 << 1, CONTROL = 1 << 2;
+    private final PageView view;
 
     /**
      * A page that loads {@code url} once its native browser is made, which its view asks for once it is in a window.
@@ -37,7 +43,26 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
      * @param view the canvas it is drawn on, which takes its input
      */
     public PageBrowser(CefClient client, String url, CefRequestContext context, PageRenderer renderer, PageView view) {
-        super(client, url, context, renderer, view);
+        super(client, url, context, renderer, view, settings());
+        this.view = view;
+    }
+
+    /** Chromium's own default is 30 frames a second. */
+    private static CefBrowserSettings settings() {
+        var settings = new CefBrowserSettings();
+        settings.windowless_frame_rate = PageView.SHOWN_FRAME_RATE;
+        return settings;
+    }
+
+    /**
+     * JCEF's native code stores the native browser here once it exists. Only from then on do calls such as
+     * {@code setWindowVisibility} and {@code setWindowlessFrameRate} take effect, because JCEF drops the ones made
+     * earlier. So the view tells the page again whether it shows, on the UI thread.
+     */
+    @Override public void setNativeRef(String identifier, long nativeRef) {
+        super.setNativeRef(identifier, nativeRef);
+        PageView target = view;
+        if (nativeRef != 0 && NATIVE_BROWSER.equals(identifier) && target != null) EventQueue.invokeLater(target::browserCreated);
     }
 
     /**
@@ -56,14 +81,18 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     }
 
     // Adapted from JetBrains/jcef (java/org/cef/browser/CefDropTargetListener.java) at 9df0879, under JCEF's BSD-3-Clause licence.
-    /** JCEF's own drop listener, {@code org.cef.browser.CefDropTargetListener}, which a plugin cannot construct. UI thread. */
+    /**
+     * JCEF's own drop listener, {@code org.cef.browser.CefDropTargetListener}, which a plugin cannot construct. A drag
+     * from outside Jasper cannot be read before its drop is accepted, so until then the page sees only what kind of
+     * drag it is. The drop accepts, reads the data, and hands the page the drag again with it. UI thread.
+     */
     private final class Drops implements DropTargetListener {
         private int operations = COPY, modifiers, accepted = DnDConstants.ACTION_COPY;
         private boolean over;
 
         @Override public void dragEnter(DropTargetDragEvent event) {
-            actionChanged(event.getDropAction());
-            dragTargetDragEnter(dragData(event.getTransferable()), event.getLocation(), modifiers, operations);
+            actionChanged(event.getDropAction(), event.getSourceActions());
+            dragTargetDragEnter(offered(event), event.getLocation(), modifiers, operations);
             over = true;
         }
 
@@ -72,7 +101,7 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         }
 
         @Override public void dropActionChanged(DropTargetDragEvent event) {
-            actionChanged(event.getDropAction());
+            actionChanged(event.getDropAction(), event.getSourceActions());
         }
 
         @Override public void dragExit(DropTargetEvent event) {
@@ -86,37 +115,77 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
                 return;
             }
             over = false;
-            dragTargetDrop(event.getLocation(), modifiers);
-            event.acceptDrop(accepted);
+            actionChanged(event.getDropAction(), event.getSourceActions());
+            event.acceptDrop(accepted); // only now can a drag from outside the JVM be read
+            CefDragData data = dropped(event.getTransferable());
+            Point at = event.getLocation();
+            dragTargetDragLeave();
+            if (data == null) {
+                event.dropComplete(false);
+                return;
+            }
+            dragTargetDragEnter(data, at, modifiers, operations);
+            dragTargetDragOver(at, modifiers, operations);
+            dragTargetDrop(at, modifiers);
             event.dropComplete(true);
         }
 
-        /** The drag's action as Chromium's operation and the keys that ask for it, as JCEF maps them. */
-        private void actionChanged(int action) {
+        /**
+         * Chromium is offered every action the source allows. The chosen action sets the keys that ask for it and the
+         * action accepted, as JCEF maps them.
+         */
+        private void actionChanged(int action, int sourceActions) {
+            operations = operations(sourceActions);
             accepted = action;
             switch (action) {
-                case DnDConstants.ACTION_NONE -> { operations = COPY; modifiers = 0; accepted = DnDConstants.ACTION_COPY; }
-                case DnDConstants.ACTION_COPY -> { operations = COPY; modifiers = CONTROL; }
-                case DnDConstants.ACTION_MOVE -> { operations = MOVE; modifiers = SHIFT; }
-                case DnDConstants.ACTION_LINK -> { operations = LINK; modifiers = CONTROL | SHIFT; }
+                case DnDConstants.ACTION_NONE -> { modifiers = 0; accepted = DnDConstants.ACTION_COPY; }
+                case DnDConstants.ACTION_COPY -> modifiers = CONTROL;
+                case DnDConstants.ACTION_MOVE -> modifiers = SHIFT;
+                case DnDConstants.ACTION_LINK -> modifiers = CONTROL | SHIFT;
                 default -> { }
             }
         }
     }
 
-    /** The dragged files, or else the dragged text, for the page. */
-    private static CefDragData dragData(Transferable dragged) {
+    /** AWT's drag actions as Chromium's operations; a source that names none is offered a copy. */
+    private static int operations(int actions) {
+        int mask = 0;
+        if ((actions & DnDConstants.ACTION_COPY) != 0) mask |= COPY;
+        if ((actions & DnDConstants.ACTION_MOVE) != 0) mask |= MOVE;
+        if ((actions & DnDConstants.ACTION_LINK) != 0) mask |= LINK;
+        return mask == 0 ? COPY : mask;
+    }
+
+    /**
+     * What the drag holds, by kind only: a file entry with no path, or empty text. Pages see a drag's kinds, never its
+     * data, until the drop.
+     */
+    private static CefDragData offered(DropTargetDragEvent event) {
         CefDragData data = CefDragData.create();
-        try {
-            if (dragged.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-                for (Object file : (List<?>) dragged.getTransferData(DataFlavor.javaFileListFlavor))
-                    if (file instanceof File each) data.addFile(each.getPath(), each.getName());
-            } else if (dragged.isDataFlavorSupported(DataFlavor.stringFlavor)) {
-                data.setFragmentText((String) dragged.getTransferData(DataFlavor.stringFlavor));
-            }
-        } catch (UnsupportedFlavorException | IOException | InvalidDnDOperationException unreadable) {
-            LOG.log(System.Logger.Level.DEBUG, "A drag's data could not be read", unreadable);
-        }
+        if (event.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) data.addFile("", "");
+        else if (event.isDataFlavorSupported(DataFlavor.stringFlavor)) data.setFragmentText("");
         return data;
+    }
+
+    /** The dropped files, or else the dropped text; null when there is neither or it cannot be read. */
+    private static CefDragData dropped(Transferable dropped) {
+        try {
+            if (dropped.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                List<?> files = (List<?>) dropped.getTransferData(DataFlavor.javaFileListFlavor);
+                CefDragData data = CefDragData.create();
+                for (Object file : files)
+                    if (file instanceof File each) data.addFile(each.getPath(), each.getName());
+                return data;
+            }
+            if (dropped.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+                String text = (String) dropped.getTransferData(DataFlavor.stringFlavor);
+                CefDragData data = CefDragData.create();
+                data.setFragmentText(text);
+                return data;
+            }
+        } catch (UnsupportedFlavorException | IOException | InvalidDnDOperationException | ClassCastException unreadable) {
+            LOG.log(System.Logger.Level.WARNING, "A drop's data could not be read", unreadable);
+        }
+        return null;
     }
 }

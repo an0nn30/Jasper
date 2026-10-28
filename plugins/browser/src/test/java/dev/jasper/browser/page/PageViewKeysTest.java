@@ -1,18 +1,24 @@
 package dev.jasper.browser.page;
 
+import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
+import javax.swing.AbstractAction;
+import javax.swing.JComponent;
+import javax.swing.JPanel;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Jasper's shortcuts are key bindings, which see each key before the page does: a press a binding takes reaches the
- * page with none of the typed and released events that follow it, and every other key reaches the page whole. Headless,
- * no window holds the bindings, so the test says which events a binding took; the page is a record of what it is handed.
+ * page with none of the typed and released events that follow it, and every other key reaches the page whole. Headless
+ * there is no window, so some tests say which events a binding took, and the rest bind a key on a parent panel and let
+ * Swing's own pass decide. The page is a record of what it is handed.
  */
 class PageViewKeysTest {
     private static final int MENU = InputEvent.META_DOWN_MASK;
@@ -59,6 +65,46 @@ class PageViewKeysTest {
             other.forEach(view::processKeyEvent);
             view.processKeyEvent(taken.get(2));
             assertThat(page).as("B pressed while L is held, then L released").containsExactlyElementsOf(other);
+        });
+    }
+
+    /**
+     * Swing's own pass decides, as in Jasper's window: an ancestor's binding whose action accepts the key runs and
+     * consumes it, so the page gets neither the press nor its tail.
+     */
+    @Test void aKeyAnAncestorsBindingAcceptsRunsTheBindingAndNoneOfItReachesThePage() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var ran = new ArrayList<String>();
+            var view = view(KeyEvent::isConsumed);
+            bindOpenLocation(view, true, ran);
+            var keys = stroke(view, KeyEvent.VK_L, 'l', MENU);
+            keys.forEach(view::processKeyEvent);
+            assertThat(ran).as("the binding ran once, on the press").containsExactly("open location");
+            assertThat(page).isEmpty();
+        });
+    }
+
+    /** A binding whose action declines the key (a Web menu key outside a browser item) leaves it all to the page. */
+    @Test void aKeyAnAncestorsBindingDeclinesReachesThePageWithItsTail() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var ran = new ArrayList<String>();
+            var view = view(KeyEvent::isConsumed);
+            bindOpenLocation(view, false, ran);
+            var keys = stroke(view, KeyEvent.VK_L, 'l', MENU);
+            keys.forEach(view::processKeyEvent);
+            assertThat(ran).isEmpty();
+            assertThat(page).containsExactlyElementsOf(keys);
+        });
+    }
+
+    /** Puts {@code view} in a panel binding Cmd+L to an action that takes the key only when {@code accepts}. */
+    private static void bindOpenLocation(PageView view, boolean accepts, List<String> ran) {
+        var parent = new JPanel();
+        parent.add(view);
+        parent.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_L, MENU), "open-location");
+        parent.getActionMap().put("open-location", new AbstractAction() {
+            @Override public boolean accept(Object sender) { return accepts; }
+            @Override public void actionPerformed(ActionEvent event) { ran.add("open location"); }
         });
     }
 
