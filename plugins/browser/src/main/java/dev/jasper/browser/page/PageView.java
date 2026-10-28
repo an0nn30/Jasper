@@ -10,6 +10,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsEnvironment;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Transparency;
@@ -21,10 +22,13 @@ import java.awt.event.HierarchyEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
+import java.awt.font.TextHitInfo;
 import java.awt.geom.AffineTransform;
 import java.awt.im.InputMethodRequests;
 import java.awt.image.BufferedImage;
 import java.awt.image.VolatileImage;
+import java.text.AttributedCharacterIterator;
+import java.text.AttributedString;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -58,6 +62,8 @@ public final class PageView extends JComponent {
     private final Predicate<KeyEvent> taken;
     // Made with the page's browser: it names Chromium's types, which an item that has not shown yet does not load.
     private volatile ImeAdapter ime;
+    // The view's input method client from the start, so a view focused before its page attaches is an active client.
+    private final InputMethodRequests requests = new Requests();
     private final Timer resize = new Timer(RESIZE_DELAY_MILLIS, event -> resized());
     private volatile Hooks hooks = Hooks.NONE;
     // Set by the browser as it attaches; no method of the view names it, because the view's construction reflects on
@@ -174,9 +180,54 @@ public final class PageView extends JComponent {
         resize.restart(); // tells the page its size once the view has kept it for 100 ms
     }
 
-    /** The page's input method requests; none before the view has a page. */
+    /**
+     * The view's input method requests, the same from its construction: an input method decides when the view gains
+     * focus whether it takes composed text, so a view focused before its page attaches takes it too. Before the page
+     * attaches, they answer as for empty text with the caret at the view's origin.
+     */
     @Override public InputMethodRequests getInputMethodRequests() {
-        return ime;
+        return requests;
+    }
+
+    /** The page's input method side once it attaches; before, empty text with its caret at the view's origin. */
+    private final class Requests implements InputMethodRequests {
+        @Override public Rectangle getTextLocation(TextHitInfo offset) {
+            ImeAdapter page = ime;
+            if (page != null) return page.getTextLocation(offset);
+            Point at = isShowing() ? getLocationOnScreen() : new Point();
+            return new Rectangle(at.x, at.y, 0, 0);
+        }
+
+        @Override public TextHitInfo getLocationOffset(int x, int y) {
+            ImeAdapter page = ime;
+            return page == null ? null : page.getLocationOffset(x, y);
+        }
+
+        @Override public int getInsertPositionOffset() {
+            ImeAdapter page = ime;
+            return page == null ? 0 : page.getInsertPositionOffset();
+        }
+
+        @Override public AttributedCharacterIterator getCommittedText(int beginIndex, int endIndex,
+                                                                      AttributedCharacterIterator.Attribute[] attributes) {
+            ImeAdapter page = ime;
+            return page == null ? new AttributedString("").getIterator() : page.getCommittedText(beginIndex, endIndex, attributes);
+        }
+
+        @Override public int getCommittedTextLength() {
+            ImeAdapter page = ime;
+            return page == null ? 0 : page.getCommittedTextLength();
+        }
+
+        @Override public AttributedCharacterIterator cancelLatestCommittedText(AttributedCharacterIterator.Attribute[] attributes) {
+            ImeAdapter page = ime;
+            return page == null ? null : page.cancelLatestCommittedText(attributes);
+        }
+
+        @Override public AttributedCharacterIterator getSelectedText(AttributedCharacterIterator.Attribute[] attributes) {
+            ImeAdapter page = ime;
+            return page == null ? new AttributedString("").getIterator() : page.getSelectedText(attributes);
+        }
     }
 
     @Override protected void paintComponent(Graphics graphics) {
@@ -256,7 +307,7 @@ public final class PageView extends JComponent {
         showing(isShowing());
     }
 
-    /** The view's input method side, which the renderer tells where the page's composition sits; null before it has a page. */
+    /** The page's input method side, which the renderer tells where the page's composition sits; null before it has a page. */
     ImeAdapter ime() {
         return ime;
     }
