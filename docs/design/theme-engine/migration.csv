@@ -1691,3 +1691,4 @@ jasper-app/src/main/java/dev/jasper/app/platform/LinuxTrayPopup.java,app.platfor
 jasper-app/src/test/java/dev/jasper/app/platform/LinuxTrayPopupTest.java,app.platform,LinuxTrayPopupTest,nonvisual-helper,none,none,none-direct,Plan 2 Task 8 headless placement and admission regressions.
 jasper-app/src/main/java/dev/jasper/app/platform/LinuxTrayRuntime.java,app.platform,LinuxTrayRuntime,nonvisual-helper,,,none-direct,Plan 2 Task 9 adapter composition and daemon timer ownership.
 jasper-app/src/test/java/dev/jasper/app/platform/LinuxTrayRuntimeTest.java,app.platform,LinuxTrayRuntimeTest,nonvisual-helper,,,none-direct,Plan 2 Task 9 composition cancellation and cleanup regressions.
+plugins/browser/src/main/java/dev/jasper/browser/BrowserPlugin.java,dev.jasper.browser,BrowserPlugin,nonvisual-helper,none,none,plugins/browser/src/test/java/dev/jasper/browser/StartLoadsNoChromiumTest.java,New in Browser plan 4a Task 1; its start registers nothing yet

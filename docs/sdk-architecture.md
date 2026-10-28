@@ -34,8 +34,11 @@ own packages, the libraries it bundles and the exported packages listed for it i
 constructing ordinary Swing controls, painting, and setting colours, fonts, borders, sizes, layout, alignment or icons
 on visible components. The Editor's `DocumentArea`, `VimTextArea` and `EditorTheme` are the named exceptions for its
 document surface, with operation-specific exceptions for `EditorTextView`, `EditorTextAreaUI`, `PreviewPane`,
-`PreviewKit` and `PreviewImageView`, and its `SystemClipboard` for Vim registers. Each exception requires its exact
-class and matching source file. A plugin built elsewhere is not checked at build time;
+`PreviewKit` and `PreviewImageView`, and its `SystemClipboard` for Vim registers. The Browser's `PageView` is its
+one canvas, which paints the page and builds no control. Each exception requires its exact class and matching source
+file. The Browser (`plugins/browser`) shows Chromium pages through the runtime's `jcef` module, which runs in process;
+only it may name an `org.cef` or `com.jetbrains.cef` type, and only in its `engine`, `page`, `links` and `dialogs`
+packages (`ChromiumBoundaryTest`). A plugin built elsewhere is not checked at build time;
 at run time the SDK has no way to mount an ordinary control, and custom content admission (below) refuses one.
 
 ## Launch

@@ -158,9 +158,10 @@ puts them on the class path.
 
 `Jasper.cfg` carries exactly these options, and `verifyPackage` fails on any other:
 
-- the application's: `--enable-native-access=ALL-UNNAMED`, `-Dapple.awt.application.name=Jasper`, `-Xmx2048m`,
-  `-XX:+IgnoreUnrecognizedVMOptions`, and on macOS `--add-opens=java.desktop/java.awt=ALL-UNNAMED` and
-  `--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED` for workspace glass;
+- the application's: `--enable-native-access=ALL-UNNAMED`, `--enable-native-access=jcef`,
+  `-Dapple.awt.application.name=Jasper`, `-Xmx2048m`, `-XX:+IgnoreUnrecognizedVMOptions`, and on macOS
+  `--add-opens=java.desktop/java.awt=ALL-UNNAMED` and `--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED` for
+  workspace glass;
 - on macOS and Windows, the options that point the native libraries at the app's `native` folder:
   `-Dflatlaf.nativeLibraryPath=$APPDIR/native`, `-Djna.boot.library.path=$APPDIR/native`, `-Djna.nosys=true` and
   `-Dpty4j.preferred.native.folder=$APPDIR/native`;

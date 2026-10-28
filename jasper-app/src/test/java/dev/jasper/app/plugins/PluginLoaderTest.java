@@ -49,6 +49,16 @@ class PluginLoaderTest {
         }
     }
 
+    /** The Browser reaches Chromium through the runtime's {@code jcef} module; loading a type from it starts nothing. */
+    @Test void aBundledPluginSeesTheRuntimesJcefModule() throws Exception {
+        var loaded = PluginLoader.load(candidate("fix.browser", "", Map.of("fix.browser.Main", PluginJars.emptyPlugin("fix.browser", "Main")),
+            List.of(), PluginCandidate.Origin.BUNDLED), Map.of(), sdk);
+        try (var loader = loaded.loader()) {
+            for (String name : List.of("org.cef.CefApp", "org.cef.browser.CefBrowserOsrWithHandler", "com.jetbrains.cef.JCefAppConfig"))
+                assertThat(Class.forName(name, false, loader).getModule().getName()).as(name).isEqualTo("jcef");
+        }
+    }
+
     @Test void importsOnlyTheExportedPackagesOfDeclaredDependencies() throws Exception {
         var vaultCandidate = candidate("fix.vault", "exports = [\"fix.vault.api\"]\n", Map.of(
             "fix.vault.Main", PluginJars.emptyPlugin("fix.vault", "Main"),

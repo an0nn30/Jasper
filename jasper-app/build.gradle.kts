@@ -46,6 +46,8 @@ application {
     // The heap default and IntelliJ's tolerance of outdated flags; a user's jasper.vmoptions overrides them.
     applicationDefaultJvmArgs = listOf(
         "--enable-native-access=ALL-UNNAMED",
+        // The runtime's jcef module (Chromium, for the Browser plugin) loads its native library; named so JDK 24+ stays quiet.
+        "--enable-native-access=jcef",
         "-Dapple.awt.application.name=Jasper",
         "-Xmx2048m",
         "-XX:+IgnoreUnrecognizedVMOptions",
@@ -63,6 +65,7 @@ val stagePlugins = tasks.register<Sync>("stagePlugins") {
     from(project(":jasper-plugin-fileserver").tasks.named("stagePlugin")) { into("dev.jasper.fileserver") }
     from(project(":jasper-plugin-indexer").tasks.named("stagePlugin")) { into("dev.jasper.indexer") }
     from(project(":jasper-plugin-enterprise").tasks.named("stagePlugin")) { into("dev.jasper.enterprise") }
+    from(project(":jasper-plugin-browser").tasks.named("stagePlugin")) { into("dev.jasper.browser") }
     into(layout.buildDirectory.dir("plugins"))
 }
 // installDist and the distribution archives carry them beside the application jar, where the runtime looks.
