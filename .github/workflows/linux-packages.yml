@@ -16,6 +16,7 @@ on:
       - settings.gradle.kts
       - jasper-app/src/main/java/dev/jasper/app/platform/**
       - jasper-app/src/test/java/dev/jasper/app/platform/**
+      - jasper-app/src/test/native/linux-tray-abi.c
       - jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml
       - jasper-app/build.gradle.kts
       - packaging/**
@@ -31,6 +32,7 @@ on:
       - settings.gradle.kts
       - jasper-app/src/main/java/dev/jasper/app/platform/**
       - jasper-app/src/test/java/dev/jasper/app/platform/**
+      - jasper-app/src/test/native/linux-tray-abi.c
       - jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml
       - jasper-app/build.gradle.kts
       - packaging/**
@@ -99,12 +101,18 @@ jobs:
           ./gradlew :jasper-app:linuxX11TrayProbe --args='--gate transport --require-native --output build/tray-gate/transport'
           python3 - <<'PYTHON'
           import pathlib, xml.etree.ElementTree as ET
-          roots = [pathlib.Path('jasper-app/build/test-results') / name for name in ('test', 'linuxTrayNativeTest')]
-          for root in roots:
-              reports = list(root.glob('TEST-*.xml'))
-              assert reports, f'Missing required reports: {root}'
-              for report in reports:
+          required = {
+              'test': ('LinuxTrayTransportTest', 'LinuxTrayWireTest', 'LinuxStatusNotifierTest'),
+              'linuxTrayNativeTest': ('LinuxTrayXcbTest', 'LinuxLegacyTrayTest'),
+          }
+          for task, names in required.items():
+              root = pathlib.Path('jasper-app/build/test-results') / task
+              for name in names:
+                  qualified = f'dev.jasper.app.platform.{name}'
+                  report = root / f'TEST-{qualified}.xml'
+                  assert report.is_file(), f'Missing required report: {report}'
                   suite = ET.parse(report).getroot()
+                  assert suite.attrib['name'] == qualified, report
                   assert int(suite.attrib['tests']) > 0, report
                   assert all(int(suite.attrib.get(key, 0)) == 0 for key in ('failures', 'errors', 'skipped')), report
           PYTHON
