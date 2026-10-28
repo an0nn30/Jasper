@@ -15,10 +15,15 @@ class PluginLoaderTest {
     private final ClassLoader sdk = Plugin.class.getClassLoader();
 
     private PluginCandidate candidate(String id, String descriptorExtra, Map<String, String> sources, List<Path> classpath) throws Exception {
+        return candidate(id, descriptorExtra, sources, classpath, PluginCandidate.Origin.DEV);
+    }
+
+    private PluginCandidate candidate(String id, String descriptorExtra, Map<String, String> sources, List<Path> classpath,
+            PluginCandidate.Origin origin) throws Exception {
         String entry = sources.keySet().stream().filter(name -> name.endsWith(".Main")).findFirst().orElse("x.Main");
         PluginJars.build(root.resolve(id), id + ".jar", PluginJars.descriptor(id, "1.0.0", entry) + descriptorExtra, sources, classpath);
         List<String> problems = new ArrayList<>();
-        PluginCandidate found = PluginDiscovery.single(root.resolve(id), PluginCandidate.Origin.DEV, problems).orElseThrow();
+        PluginCandidate found = PluginDiscovery.single(root.resolve(id), origin, problems).orElseThrow();
         assertThat(problems).isEmpty();
         return found;
     }
@@ -70,6 +75,11 @@ class PluginLoaderTest {
             "dev.jasper.sdk.evil.Shadow", "package dev.jasper.sdk.evil;\npublic final class Shadow { }\n"), List.of());
         assertThatThrownBy(() -> PluginLoader.load(intruder, Map.of(), sdk))
             .isInstanceOf(PluginLoader.LoadFailure.class).hasMessageContaining("dev.jasper.sdk.evil");
+        var bundledIntruder = candidate("fix.bundled", "", Map.of(
+            "fix.bundled.Main", PluginJars.emptyPlugin("fix.bundled", "Main"),
+            "javax.evil.Shadow", "package javax.evil;\npublic final class Shadow { }\n"), List.of(), PluginCandidate.Origin.BUNDLED);
+        assertThatThrownBy(() -> PluginLoader.load(bundledIntruder, Map.of(), sdk))
+            .as("bundled plugins too").isInstanceOf(PluginLoader.LoadFailure.class).hasMessageContaining("javax.evil");
 
         var vaultCandidate = candidate("fix.vault", "exports = [\"fix.vault.api\"]\n", Map.of(
             "fix.vault.Main", PluginJars.emptyPlugin("fix.vault", "Main"),
