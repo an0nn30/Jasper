@@ -594,19 +594,14 @@ public final class ApplicationBootstrap {
     }
 
     /**
-     * Wraps a login-item reconcile action so a run of equal values collapses to one call, and so
-     * the call itself never runs on the EDT. {@code ConfigurationController.accept} publishes on
-     * every saved config, not only when {@code system.run_in_background} changed, and on a packaged
-     * Windows install the wrapped action can shell out to {@code reg add} with a ten-second
-     * timeout -- long enough to freeze the UI if it ran inline.
+     * Serializes login-item reconciliation off the calling thread, coalescing pending saved choices
+     * to the latest value. {@code ConfigurationController.accept} publishes on every saved config,
+     * not only when {@code system.run_in_background} changed, and on a packaged Windows install the
+     * wrapped action can shell out to {@code reg add} with a ten-second timeout.
      */
     static java.util.function.Consumer<Boolean> loginItemReconciler(java.util.function.Consumer<Boolean> reconcile) {
-        Boolean[] lastApplied = {null};
-        return enabled -> {
-            if (enabled.equals(lastApplied[0])) return;
-            lastApplied[0] = enabled;
-            Thread.ofPlatform().name("jasper-login-item").daemon().start(() -> reconcile.accept(enabled));
-        };
+        return new LoginItemUpdates(reconcile, task ->
+            Thread.ofPlatform().name("jasper-login-item").daemon().start(task));
     }
 
     /** Makes the user's login items match the setting. Never throws; autostart is not worth a failed launch. */
@@ -616,7 +611,7 @@ public final class ApplicationBootstrap {
                 "Background residency is on, but this Jasper is not an installed package, so it will not start at login");
         }
         try {
-            LoginItem.apply(LoginItem.plan(System.getProperty("os.name"), enabled, appPath, home));
+            LoginItem.apply(LoginItem.plan(System.getProperty("os.name"), enabled, appPath, home, System.getenv()));
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "Could not reconcile the login item", failure);
         }
