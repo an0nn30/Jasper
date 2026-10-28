@@ -13,3 +13,5 @@ EDT would create/pack the dialog and capture its XID plus popup/host/controller 
 Before routing, repeat the real popup gate with LXDE/XFCE tray and taskbar plugins, Openbox/xfwm4 as applicable, and JBR scales1/2: reopen focus, all four exactly-once actions, vetoed Quit reopen, keyboard traversal, Escape/outside/focus loss, host loss, queued-show close, edge placement, one displayable dialog, actual no-taskbar/no-pager screenshots and native state, baseline listeners/menu path, bounded cleanup/JVM exit. Physical mixed-monitor acceptance remains pending.
 
 Keeping pure Swing with the managed dialog would require accepting its visible taskbar entry; that user-visible concession is not recommended. A JBR fix for the POPUP timestamp path is another option, but none was demonstrated.
+
+Design completeness check: an independent builder review found no important unanswered planning questions. The native hint and repeat-focus gates remain unexecuted.
