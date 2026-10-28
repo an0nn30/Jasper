@@ -352,8 +352,12 @@ Jasper's home. [Notifications](notifications.md) describes what he shows.
 ### Background residency
 
 With `system.run_in_background` on (the default on macOS, Windows and Linux), Jasper keeps running when its last
-window closes, so the next window opens without a cold start; plugins keep running, but no shell does. On Linux,
-launch Jasper normally to reopen it, and use Quit in the app to exit the process.
+window closes, so the next window opens without a cold start; plugins keep running, but no shell does.
+
+On Linux, Jasper shows a tray icon when the desktop provides a compatible status notifier or local X11 tray.
+Its menu provides **Open Jasper**, **New Window**, **Settings…** and **Quit Jasper**. Jasper keeps running without
+an icon when no tray is available; launch it normally to reopen it and use Quit in the app to exit. GNOME needs
+an enabled indicator extension to show the icon.
 
 On macOS, Quit (Cmd+Q) closes every window and leaves Jasper in the menu bar, whose item offers **New Window**,
 **Settings…** and **Quit Jasper Completely**. On Windows, a notification-area icon offers **Open Jasper** and

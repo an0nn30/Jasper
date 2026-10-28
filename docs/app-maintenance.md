@@ -464,6 +464,12 @@ require an indicator. For an eligible installed launch, `platform.LoginItem` pla
 Windows Run value or Linux XDG autostart entry). `bootstrap.LoginItemUpdates` serializes registration writes and
 coalesces pending saves to the latest accepted choice. Registration failures are logged; the next start reconciles again.
 
+Linux's settled indicator hook starts `LinuxTrayRuntime`: a live StatusNotifier host takes precedence over an owned
+XCB tray connection. The X11 fallback accepts local Unix displays and bounded regular nonsymlink authority files;
+its native worker resolves system `libxcb.so.1`, `libxcb-render.so.0` and `libXau.so.6`. Cancellation wakes owned
+socket work and cleanup retires the connection, popup, subscriptions and scheduler. Authority filesystem reads are
+cooperative: one canceled daemon worker may remain until the filesystem returns; late results cannot publish.
+
 ### Background warm-up
 
 The `--background` warm-up rehearses a window (`JasperApplication.warmUp`, `application.Rehearsal`) as well as building

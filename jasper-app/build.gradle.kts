@@ -317,10 +317,37 @@ tasks.register<Test>("linuxTrayNativeTest") {
     systemProperty("jasper.tray.requireNative", "true")
     jvmArgs("--enable-native-access=ALL-UNNAMED", "-Djava.awt.headless=true")
 }
+// Ruling 33: these assertion/API jars are test harness only; never append testRuntimeClasspath to a package.
+val trayProbeHarness = configurations.create("trayProbeHarness") { isCanBeConsumed = false }
+dependencies {
+    add(trayProbeHarness.name, "org.assertj:assertj-core:3.27.7") { isTransitive = false }
+    add(trayProbeHarness.name, "org.junit.jupiter:junit-jupiter-api:6.1.3")
+}
 tasks.register<JavaExec>("linuxX11TrayProbe") {
     group = "verification"
     dependsOn(tasks.testClasses)
-    classpath = sourceSets["test"].runtimeClasspath
+    val packagedHome = providers.gradleProperty("jasper.tray.packagedHome")
+    if (packagedHome.isPresent) {
+        val home = file(packagedHome.get())
+        require(File(packagedHome.get()).isAbsolute) { "jasper.tray.packagedHome must be absolute" }
+        setExecutable(home.resolve("lib/runtime/bin/java").absolutePath)
+        classpath = files(fileTree(home.resolve("lib/app")) { include("*.jar") },
+            sourceSets["test"].output, trayProbeHarness)
+        doFirst {
+            val allowed = setOf("org.assertj:assertj-core:3.27.7", "org.junit.jupiter:junit-jupiter-api:6.1.3",
+                "org.junit.platform:junit-platform-commons:6.1.3", "org.opentest4j:opentest4j:1.3.0")
+            val production = configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts
+                .map { "${it.moduleVersion.id.group}:${it.name}" }.toSet()
+            val harness = trayProbeHarness.resolvedConfiguration.resolvedArtifacts
+            require(harness.all { it.moduleVersion.id.toString() in allowed &&
+                "${it.moduleVersion.id.group}:${it.name}" !in production }) { "Unapproved/production jar in tray probe harness" }
+            require(home.resolve("lib/runtime/bin/java").isFile &&
+                home.resolve("lib/app").listFiles()?.any { it.extension == "jar" } == true) { "Missing packaged runtime/jars" }
+            logger.lifecycle("Packaged tray java: $executable")
+            logger.lifecycle("Packaged tray classpath: ${classpath.asPath}")
+            logger.lifecycle("Tray test harness: ${harness.map { it.moduleVersion.id }.sortedBy { it.toString() }}")
+        }
+    } else classpath = sourceSets["test"].runtimeClasspath
     mainClass = "dev.jasper.app.platform.LinuxX11TrayProbe"
     jvmArgs("--enable-native-access=ALL-UNNAMED", "-Djava.awt.headless=true")
 }

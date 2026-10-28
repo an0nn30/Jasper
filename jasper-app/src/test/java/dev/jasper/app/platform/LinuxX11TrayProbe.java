@@ -34,6 +34,9 @@ public final class LinuxX11TrayProbe {
         Path output = Path.of(options.getOrDefault("--output", "build/tray-gate/transport")).toAbsolutePath();
         Files.createDirectories(output);
         Files.writeString(output.resolve("probe.pid"), ProcessHandle.current().pid() + "\n");
+        if (options.getOrDefault("--gate", "transport").equals("bus")) {
+            packagedBus(output); return;
+        }
         if (Set.of("legacy", "popup", "runtime").contains(options.getOrDefault("--gate", "transport"))) {
             if (!options.get("--gate").equals("legacy")) System.setProperty("java.awt.headless", "false");
             legacy(options, output); return;
@@ -84,6 +87,35 @@ public final class LinuxX11TrayProbe {
         Files.deleteIfExists(output.resolve("FAILED"));
         Files.write(output.resolve("summary.txt"), summary);
         System.out.println("PASS transport requiredCases=" + cases.size() + " requiredSkips=0 watchdogFailures=0");
+    }
+
+    private static void packagedBus(Path output) throws Exception {
+        var transports = java.util.ServiceLoader.load(org.freedesktop.dbus.spi.transport.ITransportProvider.class)
+            .stream().map(provider -> provider.type().getName()).toList();
+        var logging = java.util.ServiceLoader.load(org.slf4j.spi.SLF4JServiceProvider.class)
+            .stream().map(provider -> provider.type().getName()).toList();
+        assertThat(transports).containsExactly("org.freedesktop.dbus.transport.junixsocket.JUnixSocketTransportProvider");
+        assertThat(logging).containsExactly("org.slf4j.nop.NOPServiceProvider");
+        var results = new ArrayList<String>();
+        results.add("java.home=" + System.getProperty("java.home"));
+        results.add("classpath=" + System.getProperty("java.class.path"));
+        results.add("transport=" + transports + " logging=" + logging);
+        for (boolean abstractAddress : List.of(false, true)) {
+            Path directory = Files.createTempDirectory(Path.of("/tmp"), "jtp-");
+            try {
+                try (var bus = LinuxTestBus.start(directory, abstractAddress);
+                     var connection = org.freedesktop.dbus.connections.impl.DBusConnectionBuilder
+                         .forAddress(bus.address()).withShared(false).build()) {
+                    assertThat(connection.getUniqueName()).startsWith(":");
+                    assertThat(connection.isConnected()).isTrue();
+                    results.add("PASS private bus abstract=" + abstractAddress);
+                }
+            } finally {
+                Files.deleteIfExists(directory.resolve("bus")); Files.delete(directory);
+            }
+        }
+        Files.write(output.resolve("summary.txt"), results);
+        results.forEach(System.out::println);
     }
 
     private static java.awt.Window popupWindowOnEdt() {
@@ -617,6 +649,7 @@ public final class LinuxX11TrayProbe {
         LinuxX11TestServer.await(() -> events.contains("legacy.install=true"), "runtime automatically embedded legacy icon");
         String icon = command(env, "xdotool", "search", "--name", "^Jasper$").strip();
         assertThat(icon.lines().count()).isEqualTo(1);
+        awaitRuntimeIcon(env, icon);
         command(env, "xdotool", "mousemove", "--window", icon, "12", "12", "click", "3");
         LinuxX11TestServer.await(() -> popupWindow() != null, "composed runtime popup");
         capture(env, output, "runtime-popup");
@@ -658,8 +691,13 @@ public final class LinuxX11TrayProbe {
             }
             icon = command(env, "xdotool", "search", "--name", "^Jasper$").strip();
             assertThat(icon.lines().count()).isEqualTo(1);
+            awaitRuntimeIcon(env, icon);
+            Files.writeString(output.resolve("fallback-admission-before.txt"), runtimeAdmission(tray, popup, menus)
+                + command(env, "xwininfo", "-id", icon));
             command(env, "xdotool", "mousemove", "--window", icon, "12", "12", "click", "3");
-            LinuxX11TestServer.await(() -> popupWindow() != null, "fallback popup opens through composition");
+            try { LinuxX11TestServer.await(() -> popupWindow() != null, "fallback popup opens through composition"); }
+            finally { Files.writeString(output.resolve("fallback-admission-after.txt"), runtimeAdmission(tray, popup, menus)
+                + command(env, "xdotool", "getmouselocation", "--shell")); }
             var closedRequest = menus.getLast();
             long start = System.nanoTime(); javax.swing.SwingUtilities.invokeAndWait(runtime::close);
             assertThat(System.nanoTime() - start).isLessThan(TimeUnit.MILLISECONDS.toNanos(500));
@@ -674,6 +712,25 @@ public final class LinuxX11TrayProbe {
                 + " modernWithdrawalConfirmed=true legacyRecovered=true popup=true staleActionDropped=true closeOnEDT=true requiredSkips=0\n");
             System.out.println(Files.readString(output.resolve("summary.txt")));
         }
+    }
+
+    private static void awaitRuntimeIcon(Map<String, String> env, String icon) throws Exception {
+        // Install confirms XEmbed admission; the panel can still be mapping an ancestor of the native child.
+        // A physical xdotool click requires server-observed viewability, not just the adapter's mapped flags.
+        LinuxX11TestServer.await(() -> {
+            try { return command(env, "xwininfo", "-id", icon).contains("Map State: IsViewable"); }
+            catch (Exception failure) { throw new AssertionError("Cannot inspect runtime icon viewability", failure); }
+        }, "runtime icon becomes viewable before physical input");
+    }
+
+    private static String runtimeAdmission(LinuxLegacyTray tray, LinuxTrayPopup popup, List<LinuxLegacyTray.MenuRequest> menus) throws Exception {
+        var state = new StringBuilder();
+        for (String name : List.of("installed", "mapped", "hostMapped", "modality", "cleanup", "admission", "contextPressTime", "lastInputTime", "lastInputType"))
+            state.append(name).append('=').append(field(tray, name)).append('\n');
+        for (String name : List.of("retiring", "lease", "closed", "pending", "activeWindow"))
+            state.append("popup.").append(name).append('=').append(field(popup, name)).append('\n');
+        state.append("menus=").append(menus.size()).append('\n');
+        return state.toString();
     }
 
     /** Supplementary real-server owner; no protocol mock and no production native ownership. */

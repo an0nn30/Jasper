@@ -11,6 +11,12 @@ on:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
       - gradle/linux-desktop-colors.gradle
+      - gradle.properties
+      - build.gradle.kts
+      - settings.gradle.kts
+      - jasper-app/src/main/java/dev/jasper/app/platform/**
+      - jasper-app/src/test/java/dev/jasper/app/platform/**
+      - jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml
       - jasper-app/build.gradle.kts
       - packaging/**
       - .github/workflows/linux-packages.yml
@@ -20,6 +26,12 @@ on:
       - gradle/packaging.gradle
       - gradle/packaging-support.gradle
       - gradle/linux-desktop-colors.gradle
+      - gradle.properties
+      - build.gradle.kts
+      - settings.gradle.kts
+      - jasper-app/src/main/java/dev/jasper/app/platform/**
+      - jasper-app/src/test/java/dev/jasper/app/platform/**
+      - jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml
       - jasper-app/build.gradle.kts
       - packaging/**
       - .github/workflows/linux-packages.yml
@@ -67,7 +79,7 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils build-essential cmake pkg-config libglib2.0-dev libxtst6 libasound2
+          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils build-essential cmake pkg-config libglib2.0-dev libglib2.0-bin libxtst6 libasound2 dbus-daemon libxcb1 libxcb-render0 libxau6 libxcb1-dev libxcb-render0-dev libxau-dev
       - uses: actions/setup-java@v6
         with:
           distribution: jetbrains
@@ -80,8 +92,41 @@ jobs:
         run: |
           tar -xzf desktop-qt-sdk.tar.gz
           printf '\njasper.qt5Prefix=%s/.desktop-qt-sdk/prefixes/qt5\njasper.qt6Prefix=%s/.desktop-qt-sdk/prefixes/qt6\njasper.kf5Prefix=%s/.desktop-qt-sdk/prefixes/kf5\njasper.kde6QtPrefix=%s/.desktop-qt-sdk/prefixes/kde6-qt\njasper.kf6Prefix=%s/.desktop-qt-sdk/prefixes/kf6\n' "$PWD" "$PWD" "$PWD" "$PWD" "$PWD" >> gradle.properties
+      - name: Require Linux tray wire, ABI and cancellation gates
+        run: |
+          ./gradlew :jasper-app:test --tests '*LinuxTrayTransportTest' --tests '*LinuxTrayWireTest' --tests '*LinuxStatusNotifierTest'
+          ./gradlew :jasper-app:linuxTrayNativeTest --tests '*LinuxTrayXcbTest' --tests '*LinuxLegacyTrayTest'
+          ./gradlew :jasper-app:linuxX11TrayProbe --args='--gate transport --require-native --output build/tray-gate/transport'
+          python3 - <<'PYTHON'
+          import pathlib, xml.etree.ElementTree as ET
+          roots = [pathlib.Path('jasper-app/build/test-results') / name for name in ('test', 'linuxTrayNativeTest')]
+          for root in roots:
+              reports = list(root.glob('TEST-*.xml'))
+              assert reports, f'Missing required reports: {root}'
+              for report in reports:
+                  suite = ET.parse(report).getroot()
+                  assert int(suite.attrib['tests']) > 0, report
+                  assert all(int(suite.attrib.get(key, 0)) == 0 for key in ('failures', 'errors', 'skipped')), report
+          PYTHON
       - name: Package and build native fixtures at baseline
         run: ./gradlew :jasper-app:packageDist :jasper-app:compileDesktopQtNativeTests -Pjasper.python=/usr/bin/python3 --max-workers=2 --stacktrace
+      - name: Require exact packaged tray runtime
+        run: |
+          image="$PWD/jasper-app/build/packaging/image/Jasper"
+          ./gradlew :jasper-app:linuxX11TrayProbe -Pjasper.tray.packagedHome="$image" --args='--gate transport --require-native --output build/tray-gate/packaged-transport'
+          timeout 60 ./gradlew :jasper-app:linuxX11TrayProbe -Pjasper.tray.packagedHome="$image" --args='--gate bus --require-native --output build/tray-gate/packaged-bus'
+          cat /etc/os-release
+          uname -m
+          "$image/lib/runtime/bin/java" -version
+          dbus-daemon --version
+          dpkg-query -W libxcb1 libxcb-render0 libxau6 libc6
+          sha256sum "$image"/lib/app/*.jar "$image/lib/runtime/bin/java"
+          for library in libxcb.so.1 libxcb-render.so.0 libXau.so.6; do
+            resolved=$(ldconfig -p | awk -v library="$library" '$1 == library && !found { print $NF; found=1 }')
+            test -n "$resolved"
+            readelf -h -d -V "$resolved"
+            ldd "$resolved"
+          done
       - name: Archive exact release helpers and matching native fixtures
         run: tar -czf desktop-native-tests.tar.gz jasper-app/build/desktop-colors/cmake jasper-app/build/desktop-helpers
       - uses: actions/upload-artifact@v7
@@ -96,6 +141,15 @@ jobs:
             jasper-app/build/packaging/dist/*.deb
             jasper-app/build/packaging/dist/*.rpm
           if-no-files-found: error
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jasper-linux-${{ matrix.arch }}-tray-gate
+          path: |
+            jasper-app/build/tray-gate/
+            jasper-app/build/test-results/
+            jasper-app/build/linux-tray-wire/
+          if-no-files-found: ignore
       # A failed package task keeps its jpackage work directory for diagnosis.
       - if: failure()
         uses: actions/upload-artifact@v7

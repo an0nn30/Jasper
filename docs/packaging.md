@@ -442,6 +442,11 @@ and its refresh, the relay, the native probes and the acceptance harnesses.
 
 ## Linux packages
 
+The Linux tray resolves system `libxcb.so.1`, `libxcb-render.so.0` and `libXau.so.6`; its XCB code is carried by the
+existing JNA dependency. Ubuntu 22.04 x64/aarch64 CI requires wire, native ABI/cancellation and exact packaged-runtime
+tray gates before release. Executed desktop rows and pending physical/session acceptance are recorded in the
+[Linux tray verification](superpowers/plans/2026-10-27-linux-residency-2-verification.md).
+
 `packageDist` on recognized RPM-family hosts (Fedora, RHEL and SUSE families) runs `packageRpm`; other Linux hosts,
 including Debian/Ubuntu, run both `packageDeb` and `packageRpm`. Both tasks remain individually callable and build
 their format from the verified image.
@@ -667,7 +672,9 @@ cannot mask a packaging problem.
 - [ ] Set `system.run_in_background = false` and save: the autostart entry is removed immediately. Restart Jasper:
   closing its last window exits, and the next login does not start it.
 - [ ] With residency on, close the last window, then launch Jasper normally: a window opens in the same process (check
-  its PID), with no Linux tray icon. Repeat on a desktop without a tray host.
+  its PID). Check **Open Jasper**, **New Window**, **Settings…** and **Quit Jasper** once each. Repeat on a desktop
+  without a tray host; Jasper stays resident and a normal launch reopens it. On GNOME, test with the
+  [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/) enabled and disabled.
 - [ ] Quit in the app exits through the usual guards and does not restart Jasper during the same login session.
 - [ ] Log out and in with Jasper resident, then with a window open: logout completes and the next login starts one
   resident process. Launch Jasper by hand during login too: only one process remains and the foreground window opens.
