@@ -9,6 +9,8 @@ import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
+import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +18,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,6 +47,48 @@ final class LinuxTrayXcb implements AutoCloseable {
     record Event(int type, int sequence, byte[] bytes) {
         Event { bytes = bytes.clone(); }
         @Override public byte[] bytes() { return bytes.clone(); }
+    }
+
+    /** Premultiplied device pixels in the server's channel masks, byte order and row alignment. */
+    static byte[] pixels(BufferedImage image, int bitsPerPixel, int scanlinePad, int byteOrder,
+                         int redMask, int greenMask, int blueMask, int alphaMask) {
+        int width = image.getWidth(), height = image.getHeight();
+        if (width < 1 || height < 1 || width > 512 || height > 512
+                || (bitsPerPixel != 16 && bitsPerPixel != 24 && bitsPerPixel != 32)
+                || (scanlinePad != 16 && scanlinePad != 32) || (byteOrder != 0 && byteOrder != 1))
+            throw new IllegalArgumentException("Unsupported native pixel layout");
+        int occupied = 0;
+        for (int mask : new int[] {redMask, greenMask, blueMask, alphaMask}) {
+            if (mask == 0) continue;
+            long unsigned = Integer.toUnsignedLong(mask);
+            long normalized = unsigned >>> Integer.numberOfTrailingZeros(mask);
+            if ((normalized & (normalized + 1)) != 0 || (occupied & mask) != 0
+                    || (unsigned >>> bitsPerPixel) != 0)
+                throw new IllegalArgumentException("Unsupported native channel masks");
+            occupied |= mask;
+        }
+        if (redMask == 0 || greenMask == 0 || blueMask == 0)
+            throw new IllegalArgumentException("Missing native colour mask");
+        int stride = ((width * bitsPerPixel + scanlinePad - 1) / scanlinePad) * (scanlinePad / 8);
+        if ((long)width * height * 4 + (long)stride * height > 4 * 1024 * 1024)
+            throw new IllegalArgumentException("Native image budget exceeded");
+        byte[] result = new byte[stride * height];
+        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+            int argb = image.getRGB(x, y), alpha = argb >>> 24;
+            int pixel = channel(((argb >>> 16 & 255) * alpha + 127) / 255, redMask)
+                | channel(((argb >>> 8 & 255) * alpha + 127) / 255, greenMask)
+                | channel(((argb & 255) * alpha + 127) / 255, blueMask) | channel(alpha, alphaMask);
+            int bytes = bitsPerPixel / 8;
+            for (int i = 0; i < bytes; i++)
+                result[y * stride + x * bytes + i] = (byte)(pixel >>> (8 * (byteOrder == 0 ? i : bytes - 1 - i)));
+        }
+        return result;
+    }
+    private static int channel(int value, int mask) {
+        if (mask == 0) return 0;
+        int shift = Integer.numberOfTrailingZeros(mask);
+        long maximum = Integer.toUnsignedLong(mask) >>> shift;
+        return (int)(((value * maximum + 127) / 255) << shift);
     }
 
     static Display parseDisplay(String value) {
@@ -136,7 +181,37 @@ final class LinuxTrayXcb implements AutoCloseable {
         Cookie xcb_get_input_focus(Pointer connection);
         Cookie xcb_intern_atom(Pointer connection, byte onlyIfExists, short length, byte[] name);
         Cookie xcb_get_selection_owner(Pointer connection, int selection);
+        Cookie xcb_change_window_attributes(Pointer c, int window, int mask, int[] values);
+        Cookie xcb_change_property(Pointer c, byte mode, int window, int property, int type, byte format, int length, byte[] data);
+        Cookie xcb_get_property(Pointer c, byte delete, int window, int property, int type, int offset, int length);
+        Cookie xcb_query_tree(Pointer c, int window);
+        Cookie xcb_get_geometry(Pointer c, int drawable);
+        Cookie xcb_translate_coordinates(Pointer c, int source, int destination, short x, short y);
+        Cookie xcb_create_window(Pointer c, byte depth, int window, int parent, short x, short y,
+            short width, short height, short border, short windowClass, int visual, int mask, int[] values);
+        Cookie xcb_map_window(Pointer c, int window);
+        Cookie xcb_unmap_window(Pointer c, int window);
+        Cookie xcb_destroy_window(Pointer c, int window);
+        Cookie xcb_create_colormap(Pointer c, byte allocation, int colormap, int window, int visual);
+        Cookie xcb_free_colormap(Pointer c, int colormap);
+        Cookie xcb_send_event(Pointer c, byte propagate, int destination, int mask, byte[] event);
+        Cookie xcb_get_keyboard_mapping(Pointer c, byte first, byte count);
+        Cookie xcb_clear_area(Pointer c, byte exposures, int window, short x, short y, short width, short height);
+        Cookie xcb_create_pixmap(Pointer c, byte depth, int pixmap, int drawable, short width, short height);
+        Cookie xcb_free_pixmap(Pointer c, int pixmap);
+        Cookie xcb_create_gc(Pointer c, int gc, int drawable, int mask, int[] values);
+        Cookie xcb_free_gc(Pointer c, int gc);
+        Cookie xcb_put_image(Pointer c, byte format, int drawable, int gc, short width, short height,
+            short x, short y, byte leftPad, byte depth, int length, byte[] data);
         void xcb_disconnect(Pointer connection);
+    }
+    public interface Render extends Library {
+        Cookie xcb_render_query_version(Pointer c, int major, int minor);
+        Cookie xcb_render_query_pict_formats(Pointer c);
+        Cookie xcb_render_create_picture(Pointer c, int picture, int drawable, int format, int mask, int[] values);
+        Cookie xcb_render_free_picture(Pointer c, int picture);
+        Cookie xcb_render_composite(Pointer c, byte op, int source, int mask, int destination,
+            short sx, short sy, short mx, short my, short dx, short dy, short width, short height);
     }
     public interface Libc extends Library {
         int socket(int domain, int type, int protocol);
@@ -170,8 +245,7 @@ final class LinuxTrayXcb implements AutoCloseable {
         final Libc libc;
         final Xcb xcb;
         final Xau xau;
-        // Keep the render library loaded for this connection's lifetime; operations are added with the icon adapter.
-        final NativeLibrary render;
+        final Render render;
         Bindings() {
             if (!System.getProperty("os.name").equals("Linux")) throw new Unavailable("XCB requires Linux");
             NativeStat.modeOffset();
@@ -181,11 +255,10 @@ final class LinuxTrayXcb implements AutoCloseable {
                 libc = Native.load("c", Libc.class);
                 xcb = Native.load("xcb", Xcb.class);
                 xau = Native.load("Xau", Xau.class);
-                render = NativeLibrary.getInstance("xcb-render");
-                render.getFunction("xcb_render_query_pict_formats");
+                render = Native.load("xcb-render", Render.class);
                 // Resolve every boundary symbol before resources are acquired.
-                for (var type : List.of(Libc.class, Xcb.class, Xau.class)) {
-                    var library = NativeLibrary.getInstance(type == Libc.class ? "c" : type == Xcb.class ? "xcb" : "Xau");
+                for (var type : List.of(Libc.class, Xcb.class, Xau.class, Render.class)) {
+                    var library = NativeLibrary.getInstance(type == Libc.class ? "c" : type == Xcb.class ? "xcb" : type == Xau.class ? "Xau" : "xcb-render");
                     for (var method : type.getDeclaredMethods()) library.getFunction(method.getName());
                 }
             } catch (LinkageError | RuntimeException e) { throw new Unavailable("XCB native boundary unavailable", e); }
@@ -200,6 +273,8 @@ final class LinuxTrayXcb implements AutoCloseable {
         private final int[] wake = {-1, -1};
         private final Memory wakeByte = new Memory(1);
         private boolean closed, disposed, wakePending, admitted;
+        private boolean socketPhase;
+        boolean socketCleanupOwed() { synchronized (lock) { return admitted && socketPhase; } }
         private long epoch;
         private int duplicate = -1;
         private ScheduledFuture<?> timer;
@@ -230,7 +305,7 @@ final class LinuxTrayXcb implements AutoCloseable {
                 admitted = true;
             }
         }
-        private void release() { worker(); synchronized (lock) { admitted = false; } }
+        private void release() { worker(); synchronized (lock) { admitted = false; socketPhase = false; } }
         private void arm(int fd, long deadline) {
             check(deadline);
             synchronized (lock) {
@@ -437,6 +512,10 @@ final class LinuxTrayXcb implements AutoCloseable {
     private int socketFd = -1;
     private Setup setup;
     private boolean disposed;
+    private int icon, ownedColormap;
+    private final Drawing drawing = new Drawing();
+    private long operationDeadline;
+    private final Set<Integer> mutations = new HashSet<>();
     private byte[] setupBytes;
     private final Set<Integer> outstanding = new HashSet<>();
     private final ArrayDeque<Event> pendingEvents = new ArrayDeque<>();
@@ -449,6 +528,7 @@ final class LinuxTrayXcb implements AutoCloseable {
         try {
             try (Authority auth = authority(snapshot(launch, cancellation, deadline), display, cancellation, deadline)) {
                 cancellation.check(deadline);
+                synchronized (cancellation.lock) { cancellation.socketPhase = true; }
                 result.socketFd = result.openSocket(display, deadline);
                 result.operation(deadline, () -> {
                     // Ownership is transferred even when XCB returns its static error connection.
@@ -500,6 +580,7 @@ final class LinuxTrayXcb implements AutoCloseable {
         throw new Unavailable("Local X11 connection unavailable");
     }
     private <T> T operation(long deadline, Supplier<T> action) {
+        operationDeadline = deadline;
         cancellation.arm(socketFd, deadline);
         try { T result = action.get(); cancellation.check(deadline); return result; }
         finally { cancellation.disarm(); }
@@ -514,6 +595,251 @@ final class LinuxTrayXcb implements AutoCloseable {
         return operation(System.nanoTime() + TimeUnit.SECONDS.toNanos(2),
             () -> bindings.xcb.xcb_generate_id(connection));
     }
+    private int newId(long deadline) {
+        cancellation.check(deadline); checkConnection();
+        return operation(deadline, () -> bindings.xcb.xcb_generate_id(connection));
+    }
+    private void mutate(long deadline, Supplier<Cookie> action) {
+        cancellation.check(deadline); checkConnection();
+        if (mutations.size() >= 256) barrier(deadline);
+        int sequence = operation(deadline, () -> {
+            Cookie cookie = action.get();
+            try { return cookie.sequence; }
+            finally { ((Memory)cookie.getPointer()).close(); }
+        });
+        if (!mutations.add(sequence)) throw new Unavailable("X11 mutation sequence reused");
+        checkConnection();
+    }
+    void select(int window, int mask, long deadline) {
+        mutate(deadline, () -> bindings.xcb.xcb_change_window_attributes(connection, window, 1 << 11, new int[] {mask}));
+    }
+    int property32(int window, int atom, int type, long deadline) {
+        int[] value = property32s(window, atom, type, 1, deadline);
+        return value.length == 0 ? 0 : value[0];
+    }
+    int[] property32s(int window, int atom, int type, int max, long deadline) {
+        if (max < 1 || max > 262136) throw new IllegalArgumentException("Property budget");
+        var b = buffer(reply(request(deadline, () -> bindings.xcb.xcb_get_property(connection,
+            (byte)0, window, atom, type, 0, max)), deadline).bytes);
+        int actual = b.getInt(8), count = b.getInt(16);
+        if (actual == 0 && count == 0 && b.get(1) == 0 && b.getInt(12) == 0) return new int[0];
+        if (actual != type || b.get(1) != 32 || count < 0 || count > max || b.getInt(12) != 0
+                || b.capacity() != 32 + count * 4) throw new Unavailable("Unexpected X11 property");
+        int[] result = new int[count]; for (int i = 0; i < count; i++) result[i] = b.getInt(32 + i * 4);
+        return result;
+    }
+    void property32(int window, int atom, int type, int[] data, long deadline) {
+        if (data.length > 262136) throw new IllegalArgumentException("Property budget");
+        var bytes = ByteBuffer.allocate(data.length * 4).order(ByteOrder.nativeOrder());
+        for (int value : data) bytes.putInt(value);
+        property(window, atom, type, (byte)32, data.length, bytes.array(), deadline);
+    }
+    void property8(int window, int atom, int type, byte[] data, long deadline) {
+        property(window, atom, type, (byte)8, data.length, data, deadline);
+    }
+    private void property(int window, int atom, int type, byte format, int count, byte[] data, long deadline) {
+        if (data.length > maximumRequestBytes() - 24) throw new Unavailable("X11 property request too large");
+        mutate(deadline, () -> bindings.xcb.xcb_change_property(connection, (byte)0, window, atom, type, format, count, data));
+    }
+    int parent(int window, long deadline) {
+        return buffer(reply(request(deadline, () -> bindings.xcb.xcb_query_tree(connection, window)), deadline).bytes).getInt(12);
+    }
+    int depth(int window, long deadline) { return Byte.toUnsignedInt(geometry(window, deadline).get(1)); }
+    private ByteBuffer geometry(int window, long deadline) {
+        return buffer(reply(request(deadline, () -> bindings.xcb.xcb_get_geometry(connection, window)), deadline).bytes);
+    }
+    Rectangle geometryOnRoot(int window, long deadline) {
+        var geometry = geometry(window, deadline);
+        var translated = buffer(reply(request(deadline, () -> bindings.xcb.xcb_translate_coordinates(connection,
+            window, setup.root, (short)0, (short)0)), deadline).bytes);
+        if (translated.get(1) == 0) throw new Unavailable("X11 icon on another screen");
+        return new Rectangle(translated.getShort(12), translated.getShort(14),
+            Short.toUnsignedInt(geometry.getShort(16)), Short.toUnsignedInt(geometry.getShort(18)));
+    }
+    int createIcon(int parent, Visual visual, int colormap, int size, long deadline) {
+        if (icon != 0 || ownedColormap != 0) throw new IllegalStateException("X11 icon cleanup owed");
+        if (size < 1 || size > 512 || !setup.visuals.contains(visual)) throw new Unavailable("Unsupported icon geometry/visual");
+        if (colormap == 0 && visual.id != setup.rootVisual) {
+            ownedColormap = newId(deadline); colormap = ownedColormap;
+            int map = colormap;
+            mutate(deadline, () -> bindings.xcb.xcb_create_colormap(connection, (byte)0, map, parent, visual.id));
+        }
+        icon = newId(deadline);
+        int mask = (1 << 1) | (1 << 3) | (1 << 11), eventMask = 1 | 4 | 8 | (1 << 15) | (1 << 17) | (1 << 21) | (1 << 22);
+        int[] values = colormap == 0 ? new int[] {0, 0, eventMask} : new int[] {0, 0, eventMask, colormap};
+        if (colormap != 0) mask |= 1 << 13;
+        int attributes = mask;
+        mutate(deadline, () -> bindings.xcb.xcb_create_window(connection, (byte)visual.depth, icon, parent,
+            (short)0, (short)0, (short)size, (short)size, (short)0, (short)1, visual.id, attributes, values));
+        return icon;
+    }
+    void sendClientMessage(int destination, int window, int type, int eventMask, int... data) {
+        if (data.length != 5) throw new IllegalArgumentException("ClientMessage needs five words");
+        var event = ByteBuffer.allocate(32).order(ByteOrder.nativeOrder());
+        event.put(0, (byte)33); event.put(1, (byte)32); event.putInt(4, window); event.putInt(8, type);
+        for (int i = 0; i < 5; i++) event.putInt(12 + 4 * i, data[i]);
+        mutate(operationDeadline, () -> bindings.xcb.xcb_send_event(connection, (byte)0, destination, eventMask, event.array()));
+    }
+    void mapIcon(long deadline) {
+        if (icon == 0) throw new IllegalStateException("Missing icon");
+        mutate(deadline, () -> bindings.xcb.xcb_map_window(connection, icon));
+        barrier(deadline);
+    }
+    void destroyIcon(long deadline) {
+        drawing.free(deadline);
+        if (icon != 0) mutate(deadline, () -> bindings.xcb.xcb_destroy_window(connection, icon));
+        if (ownedColormap != 0) mutate(deadline, () -> bindings.xcb.xcb_free_colormap(connection, ownedColormap));
+        barrier(deadline); icon = 0; ownedColormap = 0;
+    }
+    boolean alpha(Visual visual, long deadline) {
+        drawing.formats(deadline);
+        var format = drawing.visualFormats.get(visual.id);
+        return format != null && format.alpha != 0;
+    }
+    boolean supports(Visual visual, long deadline) { return supports(visual, false, deadline); }
+    boolean supports(Visual visual, boolean alpha, long deadline) {
+        drawing.formats(deadline);
+        var destination = drawing.visualFormats.get(visual.id);
+        if (destination == null || destination.depth != visual.depth || (destination.alpha != 0) != alpha
+                || destination.red != visual.redMask || destination.green != visual.greenMask
+                || destination.blue != visual.blueMask || drawing.sourceFormat == null) return false;
+        var format = setup.formats.stream().filter(f -> f.depth == visual.depth).findFirst().orElse(null);
+        if (format == null) return false;
+        try {
+            pixels(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), format.bitsPerPixel,
+                format.scanlinePad, setup.imageByteOrder, destination.red, destination.green, destination.blue, destination.alpha);
+            var source = setup.formats.stream().filter(f -> f.depth == 32).findFirst().orElse(null);
+            if (source == null) return false;
+            pixels(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), source.bitsPerPixel, source.scanlinePad,
+                setup.imageByteOrder, drawing.sourceFormat.red, drawing.sourceFormat.green, drawing.sourceFormat.blue, drawing.sourceFormat.alpha);
+            return true;
+        } catch (IllegalArgumentException e) { return false; }
+    }
+    void paint(BufferedImage image, int width, int height, Visual visual, boolean alpha, long deadline) {
+        if (icon == 0 || width < 1 || height < 1 || width > 512 || height > 512
+                || image.getWidth() != width || image.getHeight() != height || !supports(visual, alpha, deadline))
+            throw new Unavailable("Unsupported icon rendering");
+        if (!alpha && depth(parent(icon, deadline), deadline) != visual.depth)
+            throw new Unavailable("ParentRelative depth mismatch");
+        drawing.paint(image, width, height, visual, alpha, deadline);
+    }
+    private record PictureFormat(int id, int depth, int red, int green, int blue, int alpha) {}
+    /** All native drawing resources share the enclosing connection's worker and deadline ownership. */
+    private final class Drawing {
+        final Map<Integer, PictureFormat> visualFormats = new HashMap<>();
+        PictureFormat sourceFormat;
+        int pixmap, gc, source, destination, width, height, visualId;
+        boolean loaded;
+        void formats(long deadline) {
+            if (loaded) return;
+            var version = buffer(reply(request(deadline,
+                () -> bindings.render.xcb_render_query_version(connection, 0, 11)), deadline).bytes);
+            if (version.getInt(8) == 0 && version.getInt(12) < 1) throw new Unavailable("RENDER version unavailable");
+            var b = buffer(reply(request(deadline, () -> bindings.render.xcb_render_query_pict_formats(connection)), deadline).bytes);
+            int formatCount = b.getInt(8), screens = b.getInt(12), depths = b.getInt(16), visuals = b.getInt(20);
+            if (formatCount < 1 || formatCount > 4096 || screens < 1 || screens > 256
+                    || depths < 0 || depths > 65536 || visuals < 0 || visuals > 65536)
+                throw new Unavailable("Invalid RENDER formats");
+            var formats = new HashMap<Integer, PictureFormat>(); b.position(32);
+            for (int i = 0; i < formatCount; i++) {
+                require(b, 28); int p = b.position();
+                if (b.get(p + 4) == 1) {
+                    var f = new PictureFormat(b.getInt(p), Byte.toUnsignedInt(b.get(p + 5)),
+                        mask(b, p + 8), mask(b, p + 12), mask(b, p + 16), mask(b, p + 20));
+                    formats.put(f.id, f);
+                    if (f.depth == 32 && f.alpha != 0 && Integer.bitCount(f.red) == 8
+                            && Integer.bitCount(f.green) == 8 && Integer.bitCount(f.blue) == 8
+                            && Integer.bitCount(f.alpha) == 8) sourceFormat = f;
+                }
+                b.position(p + 28);
+            }
+            int seenDepths = 0, seenVisuals = 0;
+            for (int screen = 0; screen < screens; screen++) {
+                require(b, 8); int count = b.getInt(); b.getInt();
+                if (count < 0 || count > depths - seenDepths) throw new Unavailable("Invalid RENDER depths");
+                seenDepths += count;
+                for (int d = 0; d < count; d++) {
+                    require(b, 8); int p = b.position(), n = Short.toUnsignedInt(b.getShort(p + 2)); b.position(p + 8);
+                    if (n > visuals - seenVisuals) throw new Unavailable("Invalid RENDER visuals");
+                    seenVisuals += n;
+                    for (int v = 0; v < n; v++) {
+                        require(b, 8); int visual = b.getInt(), format = b.getInt();
+                        var f = formats.get(format);
+                        if (f != null && setup.visuals.stream().anyMatch(value -> value.id == visual)) visualFormats.put(visual, f);
+                    }
+                }
+            }
+            if (seenDepths != depths || seenVisuals != visuals) throw new Unavailable("Incomplete RENDER formats");
+            int subpixel = b.getInt(24);
+            if (subpixel < 0 || b.remaining() != subpixel * 4L) throw new Unavailable("Invalid RENDER trailing data");
+            loaded = true;
+        }
+        private int mask(ByteBuffer b, int offset) {
+            int shift = Short.toUnsignedInt(b.getShort(offset)), mask = Short.toUnsignedInt(b.getShort(offset + 2));
+            if (shift > 31 || ((long)mask << shift) > 0xffffffffL) throw new Unavailable("Invalid RENDER channel");
+            return mask << shift;
+        }
+        void paint(BufferedImage image, int w, int h, Visual visual, boolean alpha, long deadline) {
+            var format = setup.formats.stream().filter(f -> f.depth == 32).findFirst()
+                .orElseThrow(() -> new Unavailable("ARGB32 upload unavailable"));
+            byte[] pixels = pixels(image, format.bitsPerPixel, format.scanlinePad, setup.imageByteOrder,
+                sourceFormat.red, sourceFormat.green, sourceFormat.blue, sourceFormat.alpha);
+            if (w != width || h != height || visual.id != visualId || source == 0) {
+                free(deadline); barrier(deadline);
+                width = w; height = h; visualId = visual.id;
+                pixmap = newId(deadline);
+                mutate(deadline, () -> bindings.xcb.xcb_create_pixmap(connection, (byte)32, pixmap, icon, (short)w, (short)h));
+                gc = newId(deadline);
+                mutate(deadline, () -> bindings.xcb.xcb_create_gc(connection, gc, pixmap, 0, new int[0]));
+                source = newId(deadline);
+                mutate(deadline, () -> bindings.render.xcb_render_create_picture(connection, source, pixmap, sourceFormat.id, 0, new int[0]));
+                destination = newId(deadline);
+                mutate(deadline, () -> bindings.render.xcb_render_create_picture(connection, destination, icon,
+                    visualFormats.get(visual.id).id, 0, new int[0]));
+                if (!alpha) mutate(deadline, () -> bindings.xcb.xcb_change_window_attributes(connection, icon, 1, new int[] {1}));
+                barrier(deadline);
+            }
+            int stride = pixels.length / h, rows = (maximumRequestBytes() - 24) / stride;
+            if (rows < 1) throw new Unavailable("X11 request cannot fit one scanline");
+            for (int y = 0; y < h; y += rows) {
+                int count = Math.min(rows, h - y), offset = y;
+                byte[] tile = Arrays.copyOfRange(pixels, y * stride, (y + count) * stride);
+                mutate(deadline, () -> bindings.xcb.xcb_put_image(connection, (byte)2, pixmap, gc,
+                    (short)w, (short)count, (short)0, (short)offset, (byte)0, (byte)32, tile.length, tile));
+            }
+            if (alpha) mutate(deadline, () -> bindings.render.xcb_render_composite(connection, (byte)0, source, 0, destination,
+                (short)0, (short)0, (short)0, (short)0, (short)0, (short)0, (short)w, (short)h));
+            else mutate(deadline, () -> bindings.xcb.xcb_clear_area(connection, (byte)0, icon, (short)0, (short)0, (short)w, (short)h));
+            mutate(deadline, () -> bindings.render.xcb_render_composite(connection, (byte)3, source, 0, destination,
+                (short)0, (short)0, (short)0, (short)0, (short)0, (short)0, (short)w, (short)h));
+            barrier(deadline);
+        }
+        void free(long deadline) {
+            if (source != 0) { int id = source; mutate(deadline, () -> bindings.render.xcb_render_free_picture(connection, id)); source = 0; }
+            if (destination != 0) { int id = destination; mutate(deadline, () -> bindings.render.xcb_render_free_picture(connection, id)); destination = 0; }
+            if (gc != 0) { int id = gc; mutate(deadline, () -> bindings.xcb.xcb_free_gc(connection, id)); gc = 0; }
+            if (pixmap != 0) { int id = pixmap; mutate(deadline, () -> bindings.xcb.xcb_free_pixmap(connection, id)); pixmap = 0; }
+        }
+    }
+
+    int[] keysyms(int firstKeycode, int count, long deadline) {
+        if (firstKeycode < 8 || firstKeycode > 255 || count < 1 || count > 255 || firstKeycode + count > 256)
+            throw new Unavailable("Invalid keyboard range");
+        var b = buffer(reply(request(deadline, () -> bindings.xcb.xcb_get_keyboard_mapping(connection,
+            (byte)firstKeycode, (byte)count)), deadline).bytes);
+        int perCode = Byte.toUnsignedInt(b.get(1));
+        if (perCode < 1 || perCode > 32 || b.capacity() != 32 + count * perCode * 4)
+            throw new Unavailable("Invalid keyboard mapping");
+        int[] result = new int[count * perCode];
+        for (int i = 0; i < result.length; i++) result[i] = b.getInt(32 + i * 4);
+        return result;
+    }
+    int firstKeycode() { return Byte.toUnsignedInt(setupBytes[34]); }
+    int lastKeycode() { return Byte.toUnsignedInt(setupBytes[35]); }
+    int maximumRequestBytes() { return Short.toUnsignedInt(buffer(setupBytes).getShort(26)) * 4; }
+    private static ByteBuffer buffer(byte[] bytes) { return ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder()); }
+
+    void operationDeadline(long deadline) { cancellation.check(deadline); operationDeadline = deadline; }
     private int requestAtom(String name, long deadline) {
         byte[] bytes = name.getBytes(StandardCharsets.UTF_8);
         if (bytes.length > 65535) throw new IllegalArgumentException("Atom name too long");
@@ -547,6 +873,7 @@ final class LinuxTrayXcb implements AutoCloseable {
             if (event.type == 0) throw new Unavailable("X11 request failed at sequence " + event.sequence);
             pendingEvents.add(event);
         }
+        mutations.clear();
     }
     private int integerReply(int sequence, long deadline) {
         return ByteBuffer.wrap(reply(sequence, deadline).bytes).order(ByteOrder.nativeOrder()).getInt(8);

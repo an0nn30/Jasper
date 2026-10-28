@@ -91,7 +91,7 @@ One daemon native worker owns every XCB call and resource free; one bounded/coal
 priority. It drains event/reply batches with count and byte limits, then yields to commands. Poll the connection FD
 plus a private wakeup FD for commands; use `xcb_poll_for_event` and `xcb_poll_for_reply`, not blocking event/reply
 waits. All returned native buffers are freed once. Use a reply barrier and scoped error sequence tracking to confirm
-void request batches without an unbounded `xcb_request_check`. Bound outstanding cookies and image buffers.
+unchecked void request batches without an unbounded `xcb_request_check` (Ruling 24: checked void errors require that blocking check; unchecked errors reach the scoped event queue). Bound outstanding cookies and image buffers.
 
 Setup, explicit flush **and requests that may flush internally** share an operation deadline. A separate daemon
 deadline scheduler cancels by `shutdown(SHUT_RDWR)` on an owned duplicate of that operation's socket. A generation

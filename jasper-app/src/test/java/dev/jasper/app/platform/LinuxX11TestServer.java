@@ -13,6 +13,9 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Function;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -48,9 +51,14 @@ final class LinuxX11TestServer implements AutoCloseable {
     private final AtomicLong bytes = new AtomicLong();
     private volatile boolean closed, paused, pauseObserved;
     private volatile Throwable failure;
+    final List<byte[]> packets = new CopyOnWriteArrayList<>();
+    volatile Function<byte[], byte[]> responder;
     volatile Mode mode = Mode.NORMAL;
     volatile int authNameLength, authDataLength;
     volatile byte[] authData;
+    volatile byte[] setupReply = LinuxTrayXcbTest.setupBytes();
+    volatile boolean connectionEnded;
+    volatile int connections;
     volatile int requests;
     volatile int eventsBeforeReply;
     volatile int eventBytes = 32;
@@ -100,6 +108,13 @@ final class LinuxX11TestServer implements AutoCloseable {
     long bytesRead() { return bytes.get(); }
 
     private void serve() {
+        while (!closed && failure == null) {
+            serveConnection();
+            int previous = client; client = -1;
+            if (previous >= 0) C.close(previous);
+        }
+    }
+    private void serveConnection() {
         try {
             while (!closed) {
                 client = C.accept4(listener, null, null, 0x800 | 0x80000);
@@ -107,6 +122,7 @@ final class LinuxX11TestServer implements AutoCloseable {
                 ready(listener, 1);
             }
             if (closed) return;
+            requests = 0; connectionEnded = false; connections++;
             byte[] prefix = read(12);
             ByteOrder order = prefix[0] == 'l' ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
             if (order != ByteOrder.nativeOrder()) throw new AssertionError("unexpected client byte order");
@@ -119,7 +135,7 @@ final class LinuxX11TestServer implements AutoCloseable {
             if (mode == Mode.BAD_AUTH) {
                 write(new byte[] {0, 0, 11, 0, 0, 0, 0, 0}); return;
             }
-            write(LinuxTrayXcbTest.setupBytes());
+            write(setupReply);
             while (!closed) {
                 while (paused && !closed) { pauseObserved = true; Thread.sleep(2); }
                 pauseObserved = false;
@@ -127,7 +143,20 @@ final class LinuxX11TestServer implements AutoCloseable {
                 byte[] header = read(4);
                 int length = Short.toUnsignedInt(ByteBuffer.wrap(header).order(order).getShort(2)) * 4;
                 if (length < 4 || length > 262140) throw new AssertionError("invalid request length");
-                read(length - 4); requests++;
+                byte[] packet = Arrays.copyOf(header, length);
+                System.arraycopy(read(length - 4), 0, packet, 4, length - 4);
+                requests++; packets.add(packet);
+                var handler = responder;
+                if (handler != null) {
+                    byte[] response = handler.apply(packet);
+                    if (response != null) {
+                        if (response.length != 0) {
+                            ByteBuffer.wrap(response).order(order).putShort(2, (short)requests);
+                            write(response);
+                        }
+                        continue;
+                    }
+                }
                 if (mode == Mode.NO_REPLY) continue;
                 int opcode = Byte.toUnsignedInt(header[0]);
                 if (opcode == 16 || opcode == 23 || opcode == 43) {
@@ -150,7 +179,7 @@ final class LinuxX11TestServer implements AutoCloseable {
             }
         } catch (Throwable e) {
             if (!closed && !(e instanceof End)) failure = e;
-        } finally { setup.countDown(); }
+        } finally { connectionEnded = true; setup.countDown(); }
     }
     private byte[] read(int size) throws Exception {
         byte[] result = new byte[size]; int offset = 0;
@@ -165,7 +194,7 @@ final class LinuxX11TestServer implements AutoCloseable {
         if (offset != size) throw new End();
         return result;
     }
-    private void write(byte[] bytes) throws Exception {
+    synchronized void write(byte[] bytes) throws Exception {
         try (Memory data = new Memory(bytes.length)) {
             data.write(0, bytes, 0, bytes.length); int offset = 0;
             while (offset < bytes.length && !closed) {
@@ -198,5 +227,104 @@ final class LinuxX11TestServer implements AutoCloseable {
         Files.deleteIfExists(path);
         check();
     }
+    /** A controllable tray manager on the fixture wire; each event command is sent before returning. */
+    final class TrayHost {
+        final java.util.Map<String, Integer> atoms = new java.util.concurrent.ConcurrentHashMap<>();
+        final java.util.List<String> observed = new CopyOnWriteArrayList<>();
+        volatile int owner = 0x123, compositor, visualId, icon, iconParent = 0x100, width = 24, height = 40, depth = 24, docks, paints, destroys;
+        volatile boolean handshake = true, reparent = true, mapped;
+        volatile Runnable beforeSnapshot = () -> {};
+        TrayHost() { responder = this::respond; }
+        int atom(String name) { return atoms.computeIfAbsent(name, ignored -> 100 + atoms.size()); }
+        byte[] respond(byte[] bytes) {
+            var b = ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder());
+            int opcode = Byte.toUnsignedInt(bytes[0]);
+            var r = ByteBuffer.allocate(32).order(ByteOrder.nativeOrder()); r.put(0, (byte)1);
+            switch (opcode) {
+                case 16 -> { r.putInt(8, atom(new String(bytes, 8, Short.toUnsignedInt(b.getShort(4)), StandardCharsets.UTF_8))); return r.array(); }
+                case 2 -> { if (b.getInt(4) == 0x100 && b.getInt(8) == (1 << 11)) observed.add("root-select"); return new byte[0]; }
+                case 23 -> {
+                    if (b.getInt(4) == atom("_NET_WM_CM_S0")) r.putInt(8, compositor);
+                    else { beforeSnapshot.run(); observed.add("snapshot"); r.putInt(8, owner); }
+                    return r.array();
+                }
+                case 20 -> {
+                    if (b.getInt(8) == atom("_NET_SYSTEM_TRAY_VISUAL") && visualId != 0) {
+                        r = ByteBuffer.allocate(36).order(ByteOrder.nativeOrder()); r.put(0, (byte)1); r.put(1, (byte)32);
+                        r.putInt(4, 1); r.putInt(8, atom("VISUALID")); r.putInt(16, 1); r.putInt(32, visualId); return r.array();
+                    }
+                    if (b.getInt(8) == atom("_XEMBED_INFO")) {
+                        r = ByteBuffer.allocate(40).order(ByteOrder.nativeOrder()); r.put(0, (byte)1); r.put(1, (byte)32);
+                        r.putInt(4, 2); r.putInt(8, atom("_XEMBED_INFO")); r.putInt(16, 2); r.putInt(36, 1);
+                    }
+                    return r.array();
+                }
+                case 1 -> { icon = b.getInt(4); iconParent = b.getInt(8); mapped = false; return new byte[0]; }
+                case 4 -> { if (b.getInt(4) == icon) { destroys++; icon = 0; mapped = false; } return new byte[0]; }
+                case 8 -> { if (b.getInt(4) == icon) mapped = true; return new byte[0]; }
+                case 15 -> { r.putInt(8, 0x100); r.putInt(12, iconParent); return r.array(); }
+                case 14 -> { r.put(1, (byte)depth); r.putInt(8, 0x100); r.putShort(16, (short)width); r.putShort(18, (short)height); return r.array(); }
+                case 40 -> { r.put(1, (byte)1); r.putShort(12, (short)100); r.putShort(14, (short)50); return r.array(); }
+                case 25 -> {
+                    if (b.getInt(20) == atom("_NET_SYSTEM_TRAY_OPCODE")) {
+                        docks++; observed.add("dock");
+                        try { if (reparent) reparent(); if (handshake) embedded(); }
+                        catch (Exception e) { throw new AssertionError(e); }
+                    } else if (b.getInt(20) == atom("_XEMBED")) observed.add("xembed-" + b.getInt(28));
+                    return new byte[0];
+                }
+                case 101 -> {
+                    int first = Byte.toUnsignedInt(bytes[4]), count = Byte.toUnsignedInt(bytes[5]);
+                    r = ByteBuffer.allocate(32 + count * 4).order(ByteOrder.nativeOrder());
+                    r.put(0, (byte)1); r.put(1, (byte)1); r.putInt(4, count);
+                    for (int i = 0; i < count; i++) r.putInt(32 + i * 4, switch (first + i) {
+                        case 36 -> 0xff0d; case 65 -> 0x20; case 135 -> 0xff67; case 76 -> 0xffc7; case 23 -> 0xff09; default -> 0;
+                    });
+                    return r.array();
+                }
+                default -> {
+                    if (opcode == 140 && bytes[1] == 8) paints++;
+                    return LinuxTrayXcbTest.renderReply(bytes);
+                }
+            }
+        }
+        void owner(int replacement) throws Exception {
+            owner = replacement;
+            var event = event(33); event.put(1, (byte)32); event.putInt(4, 0x100); event.putInt(8, atom("MANAGER"));
+            event.putInt(12, 100); event.putInt(16, atom("_NET_SYSTEM_TRAY_S0")); event.putInt(20, replacement); write(event.array());
+        }
+        void compositor(int replacement) throws Exception {
+            compositor = replacement;
+            var event = event(33); event.put(1, (byte)32); event.putInt(4, 0x100); event.putInt(8, atom("MANAGER"));
+            event.putInt(12, 100); event.putInt(16, atom("_NET_WM_CM_S0")); event.putInt(20, replacement); write(event.array());
+        }
+        void embedded() throws Exception {
+            var event = event(33); event.put(1, (byte)32); event.putInt(4, icon); event.putInt(8, atom("_XEMBED"));
+            event.putInt(24, 0x124); write(event.array());
+        }
+        void reparent() throws Exception {
+            iconParent = 0x124;
+            var event = event(21); event.putInt(4, icon); event.putInt(8, icon); event.putInt(12, iconParent); write(event.array());
+        }
+        void input(int type, int detail, int x, int y, int modifiers, int time) throws Exception {
+            var event = event(type); event.put(1, (byte)detail); event.putInt(4, time); event.putInt(8, 0x100); event.putInt(12, icon);
+            event.putShort(24, (short)x); event.putShort(26, (short)y); event.putShort(28, (short)modifiers); event.put(30, (byte)1);
+            write(event.array());
+        }
+        void burst(int count, int finalWidth, int finalHeight) throws Exception {
+            var bytes = ByteBuffer.allocate(count * 32).order(ByteOrder.nativeOrder());
+            for (int i = 0; i < count; i++) { bytes.put(i * 32, (byte)12); bytes.putShort(i * 32 + 2, (short)requests); bytes.putInt(i * 32 + 4, icon); }
+            width = finalWidth; height = finalHeight; write(bytes.array());
+        }
+        void embedderMapped(boolean mapped) throws Exception {
+            var event = event(mapped ? 19 : 18); event.putInt(4, 0x124); event.putInt(8, 0x124); write(event.array());
+        }
+        void expose() throws Exception { var event = event(12); event.putInt(4, icon); write(event.array()); }
+        private ByteBuffer event(int type) {
+            var event = ByteBuffer.allocate(32).order(ByteOrder.nativeOrder()); event.put(0, (byte)(type | 128));
+            event.putShort(2, (short)requests); return event;
+        }
+    }
+
     private static final class End extends Exception {}
 }

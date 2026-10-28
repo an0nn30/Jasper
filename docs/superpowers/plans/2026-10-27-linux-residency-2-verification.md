@@ -585,3 +585,40 @@ were closed; watchdog children exited normally. Active Plasma and actual authori
 No Jasper GUI, AOT, benchmark, push or merge ran. Native legacy hosts remain Task 7, production ownership/composition
 Tasks 7/9, and final full check/packages/packaged-runtime proofs Task 10. x86_64 and Ubuntu 22.04 remain required CI
 release gates. Independent per-task review is pending.
+
+## Task 7 owned XEmbed — 2026-10-28 Fedora native gate passed
+
+Implemented `LinuxLegacyTray` and extended the concrete `LinuxTrayXcb` worker boundary for XEmbed, RENDER and input. Constructor remains native-free; install/remove have two-second caller bounds, cleanup refusal blocks replacement, and close invalidates without waiting. Host/connection admission guards queued actions. No popup or production fallback routing is included; independent review precedes Tasks 8–9.
+
+**Controller Ruling 24:** use unchecked generated void mutations with retained full sequences and a bounded reply barrier/error drain. Installed public headers specify that checked void errors require `xcb_request_check`, conflicting with the approved nonblocking boundary. Async errors, including unrelated/stale errors, fail this owned connection; ordinary events remain queued. Cost: conservative connection invalidation/redock on unexpected errors. Wire regressions cover create/destroy error delivery, ordinary event retention, exact metadata/messages and scanline uploads under a 256-byte server request limit.
+
+**Controller Ruling 25:** advertise minimum2x2, preferred24x24 and maximum512x512; assigned slots1..512 remain valid. [Official XFCE source](https://github.com/xfce-mirror/xfce4-panel/blob/51a7d2a9526f8a9f4f9cadabd85eae3dd56bb1c3/plugins/systray/systray-box.c) treats both requested dimensions<=1 as invisible and moves the socket offscreen. Before: native icon at(-9999,-9999), plugin width1. After: visible allocated slot and native input pass. This corrects the plan's interoperability defect without forcing24px slots. Optional Ruling23 pure pixel-helper split was not used; native ownership stays inside `LinuxTrayXcb`.
+
+| Evidence | Result |
+| --- | --- |
+| Fedora44 aarch64, JBR25.0.4.1-b635.75, final native task | 46 tests:29 XCB +17 adapter;0 failures/errors/skips |
+| Controller/inventory regressions and architecture | 30 controller +5 inventory tests;0 failures/errors/skips; architecture passes |
+| Existing transport watchdog gate after binding changes | 20 required cases;0 skips/failures |
+| Expanded installed-header C/JNA ABI helper | 137 exact values, including35 new core/RENDER offsets; FD45→45, threads8→8,0 duplicates/auth records/stuck workers/unexpected exceptions |
+| Local macOS focused/inventory + architecture | 51 tests:14 executed,37 Linux-only skips;0 failures/errors |
+| LXDE opaque, compositor off | 24/24 cells:16/24/32/48 slots × light/dark/pattern × JBR scales1/2 |
+| XFCE advertised alpha visual912, private compositor on | 24/24 cells, same matrix; actual native dimensions match requested slots |
+| Additional compositor checks | LXDE opaque16/pattern/JBR2 with compositor on passes; XFCE alpha/compositor-off declines cleanly with no icon/pending publication |
+| Real host death/restart | 20 alternating slow/fast cycles per panel; old resources removed, one replacement icon, stale actionzero |
+| Actual live tray applet removal/re-add | Both panels pass through preferences UI with the **same panel PID alive**; separate from restart rows |
+| Actual Xvfb selection replacement/dock loss | Both panels stay alive; supplementary private owner replaces selection, receives actual dock, validates successful reparent/notify, then loses selection during a second pending dock; false only after cleanup; stale menu actionzero |
+| Final replay after unmap fix | Both panels repeat2 fast/slow cycles plus input, live applet and selection/dock/menu rows |
+
+The native tests reproduce and fix a close-lock bug (close previously waited1.69s during dock cleanup) and an embedder-unmap admission bug. Unmapping now cancels popup/queued admission and pauses input until remap. An acknowledged held-native-destroy regression proves removal throws after its bound, another install is refused and close stays nonblocking until the worker can finish. The approved authority-only exception remains unchanged. An unsupported-slot fixture now awaits server EOF acknowledgement after local disconnect; no cleanup guarantee was relaxed.
+
+Native outputs are retained in authorized stage `/home/dustin/jasper-tray-gate.1yPuL3`: `jasper-app/build/tray-gate/task7-matrix/lxde-*`, `task7-framebuffer-matrix/xfce-*`, `task7-lxde-cycles`, `task7-xfce-framebuffer-cycles`, `task7-lxde-final-replay`, `task7-xfce-final-replay`, `task7-alpha-off`, `task7-opaque-compositor-on`, `task7-transport-regression`, `task7-expanded-abi`. Command logs are under `build/tray-gate/task7-*.log`. Local implementation report and selected evidence are under `.superpowers/sdd/2026-10-27-linux-residency-2-tray/task-7-report.md` and `task-7-native-evidence/`.
+
+The source audit compared **3,956** tracked/new source and build inputs across app/controller/native fixtures and dependent modules/plugins; all local/remote SHA256 values match. Final manifest `task7-input-hashes-final.json` has SHA256 `a2e4c31c96be2f208dcc68402bdf3979f13d847868c315415fe3a22082ff4e1e`. An earlier remote controller copy lacked the reviewed Task5 generation fix; that composition failure is excluded, and the full input audit plus final composition tests replaced it. Production inputs are unchanged since final checks/replays; the final test-only ABI expansion was compiled and executed separately.
+
+Visual acceptance uses full raster composition/corner comparisons with tolerance3/channel and no removal trails, plus inspected screenshots. Raw root XGetImage is unsuitable for depth32 inferiors of a depth24 root: [Xlib documents undefined different-depth inferior pixels](https://xorg.freedesktop.org/releases/current/doc/libX11/libX11.html). The harness preserves root/native-icon captures and captures the owned Xvfb `-fbdir` framebuffer for composited output. It moves the cursor outside the comparison region and forces RGB PNG24 output: otherwise ImageMagick's grayscale optimization causes Java ImageIO to convert encoded238 to247, creating a false delta9. Those failed captures are retained and excluded; renderer upload was not changed to accommodate them.
+
+Optional compositor `xcompmgr1.1.10-4.fc44.aarch64` was obtained by authorized rootless Fedora RPM extraction, with signature/digests and resolved dependencies verified; no system install. RPM SHA256 `68abc55104501474b99978459fe2da761fc02c40d643999841b772894fc37963`, executable SHA256 `db657142b0835039126be5de311d362d19a6bcca6802747c921ca2a2feb10331`. It is a test tool, not a production dependency.
+
+**Excluded isolation failure:** the first XFCE attempt inherited Wayland settings and its log queried compositor capabilities before it failed to provide a tray owner. It is not evidence that the active compositor was untouched. Owned processes were terminated and private HOME removed. Subsequent runs explicitly set private DISPLAY/bus/HOME/XDG_CONFIG/DATA/CACHE/RUNTIME, remove WAYLAND_DISPLAY/WAYLAND_SOCKET/SESSION_MANAGER and force X11 backends/session type. Finally cleanup joins the native worker, stops only owned processes/descendants and removes private homes; each accepted row records `alive=0 privateHomeRemoved=true`. Xvfb/private-bus wrappers own server/socket cleanup. No active desktop configuration was edited.
+
+No actual Jasper GUI, AOT, benchmark, login install, merge or push was performed. Virtual mixed host/JBR scales leave physical mixed-monitor acceptance pending. x86_64, Ubuntu22.04 and packaged-runtime acceptance remain the approved later CI/Task10 gates.

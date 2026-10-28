@@ -4,6 +4,7 @@ import com.sun.jna.Memory;
 import com.sun.jna.NativeLong;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.PointerByReference;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.RandomAccessFile;
@@ -29,6 +30,40 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class LinuxTrayXcbTest {
+    @Test void premultipliesNativePixelsWithoutChangingDbusEncoding() {
+        var image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        image.setRGB(0, 0, 0x80ff0000);
+        assertThat(LinuxTrayXcb.pixels(image, 32, 32, 0, 0xff0000, 0xff00, 0xff, 0xff000000))
+            .containsExactly((byte)0, (byte)0, (byte)128, (byte)128);
+        assertThat(LinuxTrayMenu.argb(image)).containsExactly((byte)128, (byte)255, (byte)0, (byte)0);
+    }
+    @Test void nativePixelsArePremultipliedAndMaskEncoded() {
+        var image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        image.setRGB(0, 0, 0xff804020);
+        assertThat(LinuxTrayXcb.pixels(image, 16, 16, 0, 0xf800, 0x7e0, 0x1f, 0))
+            .containsExactly((byte)4, (byte)130);
+        assertThat(LinuxTrayXcb.pixels(image, 16, 32, 1, 0xf800, 0x7e0, 0x1f, 0))
+            .containsExactly((byte)130, (byte)4, (byte)0, (byte)0);
+        assertThat(LinuxTrayXcb.pixels(image, 24, 32, 0, 0xff0000, 0xff00, 0xff, 0))
+            .containsExactly((byte)32, (byte)64, (byte)128, (byte)0);
+        assertThat(LinuxTrayXcb.pixels(image, 32, 32, 1, 0xff0000, 0xff00, 0xff, 0))
+            .containsExactly((byte)0, (byte)128, (byte)64, (byte)32);
+        image.setRGB(0, 0, 0x80ff0000);
+        assertThat(LinuxTrayXcb.pixels(image, 32, 32, 1, 0xff, 0xff00, 0xff0000, 0xff000000))
+            .containsExactly((byte)128, (byte)0, (byte)0, (byte)128);
+    }
+    @Test void unsupportedPixelLayoutsAreRejectedBeforeAllocating() {
+        var image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        for (int[] layout : new int[][] {{8, 32, 0, 0xe0, 0x1c, 3, 0},
+                {16, 8, 0, 0xf800, 0x7e0, 31, 0}, {32, 32, 2, 0xff0000, 0xff00, 255, 0},
+                {32, 32, 0, 0xff0000, 0xff00, 511, 0}, {32, 32, 0, 0xff0000, 0xff00, 5, 0},
+                {16, 16, 0, 0xff0000, 0xff00, 255, 0}})
+            assertThatThrownBy(() -> LinuxTrayXcb.pixels(image, layout[0], layout[1], layout[2],
+                layout[3], layout[4], layout[5], layout[6])).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> LinuxTrayXcb.pixels(new BufferedImage(513, 1, BufferedImage.TYPE_INT_ARGB),
+            32, 32, 0, 0xff0000, 0xff00, 255, 0)).isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void acceptsOnlyLocalDisplayGrammar() {
         assertThat(LinuxTrayXcb.parseDisplay(":0")).isEqualTo(new LinuxTrayXcb.Display(0, 0));
         assertThat(LinuxTrayXcb.parseDisplay(":7.2")).isEqualTo(new LinuxTrayXcb.Display(7, 2));
@@ -61,11 +96,153 @@ class LinuxTrayXcbTest {
         assertThat(value.rootVisual()).isEqualTo(0x21);
         assertThat(value.rootDepth()).isEqualTo(24);
         assertThat(value.visuals()).containsExactly(new LinuxTrayXcb.Visual(0x21, 24, 0xff0000, 0xff00, 0xff));
-        assertThat(value.formats()).containsExactly(new LinuxTrayXcb.PixmapFormat(24, 32, 32));
+        assertThat(value.formats()).containsExactly(new LinuxTrayXcb.PixmapFormat(24, 32, 32), new LinuxTrayXcb.PixmapFormat(32, 32, 32));
         assertThatThrownBy(() -> LinuxTrayXcb.decodeSetup(setup, 1)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> LinuxTrayXcb.decodeSetup(new byte[8], 0)).isInstanceOf(IllegalArgumentException.class);
         byte[] bad = setup.clone(); bad[30] = 2;
         assertThatThrownBy(() -> LinuxTrayXcb.decodeSetup(bad, 0)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void nativeWindowRequestsHaveExactWireEncodingAndBarrier() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem(); var cancel = new LinuxTrayXcb.Cancellation();
+             var xcb = LinuxTrayXcb.connect(Map.of("DISPLAY", server.address()), deadline(), cancel)) {
+            xcb.select(0x100, 1 << 17, deadline());
+            xcb.property32(0x200001, 81, 82, new int[] {0, 1}, deadline());
+            xcb.property8(0x200001, 83, 84, new byte[] {65, 0}, deadline());
+            int icon = xcb.createIcon(0x100, xcb.setup().visuals().getFirst(), 0, 24, deadline());
+            xcb.sendClientMessage(0x123, 0x123, 85, 0, 0, 0, icon, 0, 0);
+            xcb.destroyIcon(deadline());
+            var packets = server.packets.stream().map(bytes -> ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder())).toList();
+            var select = packets.stream().filter(b -> b.get(0) == 2).findFirst().orElseThrow();
+            assertThat(select.getInt(4)).isEqualTo(0x100); assertThat(select.getInt(8)).isEqualTo(1 << 11);
+            assertThat(select.getInt(12)).isEqualTo(1 << 17);
+            var props = packets.stream().filter(b -> b.get(0) == 18).toList();
+            assertThat(props.get(0).get(16)).isEqualTo((byte)32);
+            assertThat(props.get(0).getInt(20)).isEqualTo(2);
+            assertThat(props.get(0).getInt(24)).isZero(); assertThat(props.get(0).getInt(28)).isEqualTo(1);
+            assertThat(props.get(1).get(16)).isEqualTo((byte)8); assertThat(props.get(1).getInt(20)).isEqualTo(2);
+            var send = packets.stream().filter(b -> b.get(0) == 25).findFirst().orElseThrow();
+            assertThat(send.capacity()).isEqualTo(44); assertThat(send.getInt(4)).isEqualTo(0x123);
+            assertThat(send.get(12)).isEqualTo((byte)33); assertThat(send.get(13)).isEqualTo((byte)32);
+            assertThat(send.getInt(16)).isEqualTo(0x123); assertThat(send.getInt(20)).isEqualTo(85);
+            assertThat(send.getInt(32)).isEqualTo(icon);
+            assertThat(packets.stream().filter(b -> b.get(0) == 8)).isEmpty();
+            assertThat(packets.stream().filter(b -> b.get(0) == 4).count()).isEqualTo(1);
+            assertThat(packets.getLast().get(0)).isEqualTo((byte)43);
+        }
+    }
+    @Test void malformedPropertyReplyIsNotAcceptedAsVisual() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem(); var cancel = new LinuxTrayXcb.Cancellation();
+             var xcb = LinuxTrayXcb.connect(Map.of("DISPLAY", server.address()), deadline(), cancel)) {
+            for (int[] values : new int[][] {{32, 82, 2}, {8, 82, 1}, {32, 83, 1}}) {
+                server.responder = packet -> {
+                    if (packet[0] != 20) return null;
+                    var reply = ByteBuffer.allocate(40).order(ByteOrder.nativeOrder());
+                    reply.put(0, (byte)1); reply.put(1, (byte)values[0]); reply.putInt(4, 2);
+                    reply.putInt(8, values[1]); reply.putInt(16, values[2]); return reply.array();
+                };
+                assertThatThrownBy(() -> xcb.property32(0x123, 81, 82, deadline()))
+                    .isInstanceOf(LinuxTrayXcb.Unavailable.class);
+            }
+        }
+    }
+
+    @Test void renderUsesParentRelativePremultipliedSourceAndFreesEveryResource() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem(); var cancel = new LinuxTrayXcb.Cancellation()) {
+            server.responder = LinuxTrayXcbTest::renderReply;
+            try (var xcb = LinuxTrayXcb.connect(Map.of("DISPLAY", server.address()), deadline(), cancel)) {
+                var visual = xcb.setup().visuals().getFirst();
+                xcb.createIcon(0x100, visual, 0, 24, deadline());
+                var image = new BufferedImage(24, 40, BufferedImage.TYPE_INT_ARGB);
+                image.setRGB(0, 0, 0x80ff0000);
+                xcb.paint(image, 24, 40, visual, false, deadline());
+                xcb.paint(image, 24, 40, visual, false, deadline());
+                xcb.destroyIcon(deadline());
+                var packets = server.packets.stream().map(bytes -> ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder())).toList();
+                assertThat(packets.stream().filter(b -> b.get(0) == 53).count()).isEqualTo(1);
+                assertThat(packets.stream().filter(b -> b.get(0) == 54).count()).isEqualTo(1);
+                assertThat(packets.stream().filter(b -> b.get(0) == 55).count()).isEqualTo(1);
+                assertThat(packets.stream().filter(b -> b.get(0) == 60).count()).isEqualTo(1);
+                assertThat(packets.stream().filter(b -> b.get(0) == (byte)140 && b.get(1) == 4).count()).isEqualTo(2);
+                assertThat(packets.stream().filter(b -> b.get(0) == (byte)140 && b.get(1) == 7).count()).isEqualTo(2);
+                var upload = packets.stream().filter(b -> b.get(0) == 72).findFirst().orElseThrow();
+                assertThat(upload.getShort(12)).isEqualTo((short)24); assertThat(upload.getShort(14)).isEqualTo((short)40);
+                assertThat(Arrays.copyOfRange(upload.array(), 24, 28)).containsExactly((byte)0, (byte)0, (byte)128, (byte)128);
+                assertThat(packets.stream().filter(b -> b.get(0) == 61).count()).isEqualTo(2);
+                assertThat(packets.stream().filter(b -> b.get(0) == (byte)140 && b.get(1) == 8)
+                    .allMatch(b -> b.get(4) == 3)).isTrue();
+            }
+        }
+    }
+    @Test void uncheckedMutationErrorsFailBarrierAndOrdinaryEventsSurvive() throws Exception {
+        nativeOnly();
+        for (int badOpcode : new int[] {1, 4}) {
+            try (var server = LinuxX11TestServer.filesystem(); var cancel = new LinuxTrayXcb.Cancellation();
+                 var xcb = LinuxTrayXcb.connect(Map.of("DISPLAY", server.address()), deadline(), cancel)) {
+                server.responder = packet -> {
+                    if (Byte.toUnsignedInt(packet[0]) != badOpcode) return null;
+                    byte[] error = new byte[32]; error[1] = 3; error[10] = (byte)badOpcode; return error;
+                };
+                if (badOpcode == 1) assertThatThrownBy(() -> { xcb.createIcon(0x100, xcb.setup().visuals().getFirst(), 0, 24, deadline()); xcb.barrier(deadline()); })
+                    .isInstanceOf(LinuxTrayXcb.Unavailable.class);
+                else {
+                    xcb.createIcon(0x100, xcb.setup().visuals().getFirst(), 0, 24, deadline());
+                    assertThatThrownBy(() -> xcb.destroyIcon(deadline())).isInstanceOf(LinuxTrayXcb.Unavailable.class);
+                }
+            }
+        }
+        try (var server = LinuxX11TestServer.filesystem(); var cancel = new LinuxTrayXcb.Cancellation();
+             var xcb = LinuxTrayXcb.connect(Map.of("DISPLAY", server.address()), deadline(), cancel)) {
+            server.eventsBeforeReply = 3; xcb.barrier(deadline());
+            assertThat(xcb.poll(deadline())).hasSize(3).allMatch(event -> event.type() == 12);
+        }
+    }
+    @Test void putImageTilesScanlinesWithinServerMaximumRequest() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem(); var cancel = new LinuxTrayXcb.Cancellation()) {
+            ByteBuffer.wrap(server.setupReply).order(ByteOrder.nativeOrder()).putShort(26, (short)64);
+            server.responder = LinuxTrayXcbTest::renderReply;
+            try (var xcb = LinuxTrayXcb.connect(Map.of("DISPLAY", server.address()), deadline(), cancel)) {
+                var visual = xcb.setup().visuals().getFirst(); xcb.createIcon(0x100, visual, 0, 24, deadline());
+                xcb.paint(new BufferedImage(24, 40, BufferedImage.TYPE_INT_ARGB), 24, 40, visual, false, deadline());
+                var uploads = server.packets.stream().filter(packet -> packet[0] == 72)
+                    .map(bytes -> ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder())).toList();
+                assertThat(uploads).hasSize(20);
+                for (int i = 0; i < uploads.size(); i++) {
+                    var upload = uploads.get(i); assertThat(upload.capacity()).isLessThanOrEqualTo(256);
+                    assertThat(upload.getShort(14)).isEqualTo((short)2); assertThat(upload.getShort(18)).isEqualTo((short)(i * 2));
+                }
+                xcb.destroyIcon(deadline());
+            }
+        }
+    }
+
+    static byte[] renderReply(byte[] packet) {
+        int opcode = Byte.toUnsignedInt(packet[0]);
+        var reply = ByteBuffer.allocate(32).order(ByteOrder.nativeOrder()); reply.put(0, (byte)1);
+        if (opcode == 98) { reply.put(8, (byte)1); reply.put(9, (byte)140); return reply.array(); }
+        if (opcode == 14) { reply.put(1, (byte)24); reply.putShort(16, (short)24); reply.putShort(18, (short)40); return reply.array(); }
+        if (opcode == 15) { reply.putInt(8, 0x100); reply.putInt(12, 0x100); return reply.array(); }
+        if (opcode != 140) return null;
+        if (packet[1] == 0) { reply.putInt(12, 11); return reply.array(); }
+        if (packet[1] != 1) return new byte[0];
+        var formats = ByteBuffer.allocate(128).order(ByteOrder.nativeOrder());
+        formats.put(0, (byte)1); formats.putInt(4, 24); formats.putInt(8, 2); formats.putInt(12, 1);
+        formats.putInt(16, 2); formats.putInt(20, 2);
+        for (int i = 0; i < 2; i++) {
+            int p = 32 + 28 * i; formats.putInt(p, 90 + i); formats.put(p + 4, (byte)1);
+            formats.put(p + 5, (byte)(i == 0 ? 24 : 32));
+            formats.putShort(p + 8, (short)16); formats.putShort(p + 10, (short)255);
+            formats.putShort(p + 12, (short)8); formats.putShort(p + 14, (short)255);
+            formats.putShort(p + 18, (short)255);
+            if (i == 1) { formats.putShort(p + 20, (short)24); formats.putShort(p + 22, (short)255); }
+        }
+        formats.putInt(88, 2); formats.put(96, (byte)24); formats.putShort(98, (short)1);
+        formats.putInt(104, 0x21); formats.putInt(108, 90);
+        formats.put(112, (byte)32); formats.putShort(114, (short)1); formats.putInt(120, 0x40); formats.putInt(124, 91); return formats.array();
     }
 
     @Test void connectsOnlyToOwnedFixture() throws Exception {
@@ -388,17 +565,24 @@ class LinuxTrayXcbTest {
         }
     }
 
+    static byte[] alphaSetup() {
+        byte[] bytes = Arrays.copyOf(setupBytes(), 160); var b = ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder());
+        b.putShort(6, (short)38); b.put(95, (byte)2); b.put(128, (byte)32); b.putShort(130, (short)1);
+        b.putInt(136, 0x40); b.put(140, (byte)4); b.put(141, (byte)8); b.putShort(142, (short)256);
+        b.putInt(144, 0xff0000); b.putInt(148, 0xff00); b.putInt(152, 0xff); return bytes;
+    }
     static byte[] setupBytes() {
-        ByteBuffer b = ByteBuffer.allocate(120).order(ByteOrder.nativeOrder());
-        b.put(0, (byte)1); b.putShort(2, (short)11); b.putShort(6, (short)28);
+        ByteBuffer b = ByteBuffer.allocate(128).order(ByteOrder.nativeOrder());
+        b.put(0, (byte)1); b.putShort(2, (short)11); b.putShort(6, (short)30);
         b.putInt(12, 0x200000); b.putInt(16, 0x1fffff); b.putShort(26, (short)65535);
-        b.put(28, (byte)1); b.put(29, (byte)1); b.put(30, (byte)(ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN ? 0 : 1));
+        b.put(28, (byte)1); b.put(29, (byte)2); b.put(30, (byte)(ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN ? 0 : 1));
         b.put(32, (byte)32); b.put(33, (byte)32); b.put(34, (byte)8); b.put(35, (byte)255);
         b.put(40, (byte)24); b.put(41, (byte)32); b.put(42, (byte)32);
-        b.putInt(48, 0x100); b.putInt(80, 0x21); b.put(86, (byte)24); b.put(87, (byte)1);
-        b.put(88, (byte)24); b.putShort(90, (short)1);
-        b.putInt(96, 0x21); b.put(100, (byte)4); b.put(101, (byte)8); b.putShort(102, (short)256);
-        b.putInt(104, 0xff0000); b.putInt(108, 0xff00); b.putInt(112, 0xff);
+        b.put(48, (byte)32); b.put(49, (byte)32); b.put(50, (byte)32);
+        b.putInt(56, 0x100); b.putInt(88, 0x21); b.put(94, (byte)24); b.put(95, (byte)1);
+        b.put(96, (byte)24); b.putShort(98, (short)1);
+        b.putInt(104, 0x21); b.put(108, (byte)4); b.put(109, (byte)8); b.putShort(110, (short)256);
+        b.putInt(112, 0xff0000); b.putInt(116, 0xff00); b.putInt(120, 0xff);
         return b.array();
     }
 }
