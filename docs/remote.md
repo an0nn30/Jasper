@@ -371,7 +371,8 @@ and Alt+Up on Linux and Windows (Back, Forward, Parent Folder) work anywhere in 
 
 The list shows Name and Size, sorted by name ignoring case (folders mixed in with files) until you click a header, with each entry's modified time in its tooltip.
 In a window of its own or docked at the bottom it shows Name, Modified (date and time), Permissions (`rwxr-xr-x`) and Size.
-Click a header to sort the whole folder by that column, again to reverse; drag a column boundary to resize it and double-click it to fit. The sort is shared by every SFTP browser and both layouts, and the sort and widths are remembered. A sort by Modified or
+Click a header to sort the whole folder by that column, again to reverse; drag a column boundary to resize it and double-click it to fit. The sort is shared by every SFTP browser and both layouts, and the sort and widths are remembered. A sort by Size keeps folders and entries without a size together, below the
+smallest file. A sort by Modified or
 Permissions chosen in the wide layout also orders the narrow table, which shows no arrow because it lacks that column.
 Select several rows for the file actions. A folder of more than 200 entries is shown 200 at a time ("1–200 of 950",
 **Previous page**, **Next page**). Names starting with a dot stay hidden until you press **Show hidden items**; the
