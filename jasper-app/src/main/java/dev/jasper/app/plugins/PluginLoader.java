@@ -36,6 +36,8 @@ final class PluginLoader {
             if (dependency == null) continue;
             for (String exported : dependency.candidate().descriptor().exports()) imports.put(exported, dependency.loader());
         }
+        // Jasper's build compiles the bundled plugins against this SDK; reading their ~28,000 class files took ~0.9 s a start.
+        boolean inspect = candidate.origin() != PluginCandidate.Origin.BUNDLED;
         for (var jar : candidate.jars()) {
             try (var file = new JarFile(jar.toFile(), true, JarFile.OPEN_READ, Runtime.version())) {
                 var entries = file.versionedStream().iterator();
@@ -48,7 +50,7 @@ final class PluginLoader {
                     String packageName = slash < 0 ? "" : name.substring(0, slash).replace('/', '.');
                     if (DescriptorParser.forbidden(packageName))
                         throw new LoadFailure(jar.getFileName() + " defines a class in the reserved package " + packageName, null);
-                    try(var input=file.getInputStream(entry)) {
+                    if (inspect) try(var input=file.getInputStream(entry)) {
                         byte[] bytes=input.readNBytes(16 * 1024 * 1024 + 1);
                         if(bytes.length>16 * 1024 * 1024)throw new LoadFailure(jar.getFileName()+" class exceeds admission limit: "+name,null);
                         KitCompatibility.check(bytes,jar.getFileName()+"!"+entry.getRealName());

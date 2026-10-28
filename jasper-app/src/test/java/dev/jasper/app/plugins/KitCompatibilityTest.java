@@ -17,6 +17,9 @@ import static org.assertj.core.api.Assertions.*;
 class KitCompatibilityTest {
     @TempDir Path root;
     private PluginCandidate candidate(String range, Map<String,byte[]> entries, boolean multi) throws Exception {
+        return candidate(range,entries,multi,PluginCandidate.Origin.DEV);
+    }
+    private PluginCandidate candidate(String range, Map<String,byte[]> entries, boolean multi, PluginCandidate.Origin origin) throws Exception {
         var manifest=new Manifest();manifest.getMainAttributes().putValue("Manifest-Version","1.0");
         if(multi)manifest.getMainAttributes().putValue("Multi-Release","true");
         var directory=Files.createDirectories(root.resolve(UUID.randomUUID().toString()));
@@ -24,7 +27,7 @@ class KitCompatibilityTest {
             out.putNextEntry(new JarEntry("plugin.toml"));out.write(PluginJars.descriptor("test.kit","1.0.0","test.kit.Main").replace(">=0.1",range).getBytes(java.nio.charset.StandardCharsets.UTF_8));out.closeEntry();
             for(var entry:entries.entrySet()){out.putNextEntry(new JarEntry(entry.getKey()));out.write(entry.getValue());out.closeEntry();}
         }
-        return PluginDiscovery.single(directory,PluginCandidate.Origin.DEV,new ArrayList<>()).orElseThrow();
+        return PluginDiscovery.single(directory,origin,new ArrayList<>()).orElseThrow();
     }
     private byte[] reference(String owner,String name,String descriptor) {
         return ClassFile.of().build(ClassDesc.of("test.kit.Probe"),builder -> {
@@ -131,6 +134,16 @@ class KitCompatibilityTest {
         var bytes=reference("dev.jasper.sdk.ui.WindowSurface","setContent","(Ljavax/swing/JComponent;)V");
         var candidate=candidate(">=0.1",Map.of("Probe.class",bytes),false);
         assertThatThrownBy(() -> PluginLoader.load(candidate,Map.of(),Plugin.class.getClassLoader())).hasMessageContaining("setContent");
+    }
+    /** A bundled plugin is compiled against this SDK in Jasper's build, so its class files are not read at start. */
+    @Test void onlyPluginsNotBundledWithJasperAreInspected() throws Exception {
+        var bytes=reference("dev.jasper.sdk.ui.WindowSurface","setContent","(Ljavax/swing/JComponent;)V");
+        for(var origin:List.of(PluginCandidate.Origin.USER,PluginCandidate.Origin.DEV)) {
+            var candidate=candidate(">=0.1",Map.of("test/kit/Probe.class",bytes),false,origin);
+            assertThatThrownBy(() -> PluginLoader.load(candidate,Map.of(),Plugin.class.getClassLoader())).as(origin.name()).hasMessageContaining("setContent");
+        }
+        var bundled=candidate(">=0.1",Map.of("test/kit/Probe.class",bytes),false,PluginCandidate.Origin.BUNDLED);
+        try(var loader=PluginLoader.load(bundled,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).isNotNull();}
     }
     @Test void sameNamesWithFinalDescriptorsAndOrdinaryAwtValuesAreAdmitted() throws Exception {
         var bytes=reference("dev.jasper.sdk.ui.WindowSurface","setContent","(Ldev/jasper/sdk/ui/UiView;)V");
