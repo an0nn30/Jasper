@@ -17,15 +17,18 @@ import java.util.stream.Stream;
  * @param sortColumn the id of the column the rows are sorted by; empty when the owner's own order applies
  * @param ascending true sorts the sort column ascending; meaningless when {@code sortColumn} is empty
  * @param widths column id to unscaled width in pixels, each positive; copied
- * @throws IllegalArgumentException when a column id is blank or contains one of {@code ;,:=}, which the encoding uses,
- *         or a width is not positive
  * @since 0.25.0
  */
 public record ColumnState(Optional<String> sortColumn, boolean ascending, Map<String, Integer> widths) {
     /** No sort and no widths. */
     public static final ColumnState NONE = new ColumnState(Optional.empty(), true, Map.of());
 
-    /** Validates the ids and widths and copies the widths. */
+    /**
+     * Validates the ids and widths and copies the widths.
+     *
+     * @throws IllegalArgumentException when a column id is blank or contains one of {@code ;,:=}, which the encoding
+     *         uses, or a width is not positive
+     */
     public ColumnState {
         Objects.requireNonNull(sortColumn); sortColumn.ifPresent(ColumnState::id);
         widths = Map.copyOf(widths);

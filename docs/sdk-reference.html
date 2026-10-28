@@ -6852,7 +6852,8 @@ keep it as one line of text, which <a href="#dev.jasper.sdk.ui.ColumnStateFile">
         <span class="kw">boolean</span> ascending,
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Map.html" title="java.util.Map">Map</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html" title="java.lang.Integer">Integer</a>&gt; widths)</code></pre>
 <div class="doc"><p>Validates the ids and widths and copies the widths.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>sortColumn</code></dd><dd><code>ascending</code></dd><dd><code>widths</code></dd></dl>
+<dl class="tags"><dt>Parameters</dt><dd><code>sortColumn</code></dd><dd><code>ascending</code></dd><dd><code>widths</code></dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when a column id is blank or contains one of <code>;,:=</code>, which the encoding
+        uses, or a width is not positive</dd></dl>
 </div>
 <h5>Methods</h5>
 <div class="member" id="dev.jasper.sdk.ui.ColumnState.sortedBy(String,boolean)">
