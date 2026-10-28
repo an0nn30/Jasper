@@ -335,7 +335,8 @@ public final class LinuxX11TrayProbe {
             Path texturePath = output.resolve("panel-background.png"); javax.imageio.ImageIO.write(texture, "png", texturePath.toFile());
             if (panel.equals("lxde")) {
                 Path profile = home.resolve("config/lxpanel/jasper-gate/panels/panel"); Files.createDirectories(profile.getParent());
-                String config = "Global {\n edge=top\n align=left\n widthtype=percent\n width=100\n height=" + (slot + 8) + "\n iconsize=" + slot + "\n transparent=0\n background=1\n backgroundfile=" + texturePath + "\n}\nPlugin {\n type=tray\n}\nPlugin {\n type=taskbar\n expand=1\n}\nPlugin {\n type=pager\n}\n";
+                String config = "Global {\n edge=top\n align=left\n widthtype=percent\n width=100\n height=" + (slot + 8) + "\n iconsize=" + slot + "\n transparent=0\n background=1\n backgroundfile=" + texturePath + "\n}\nPlugin {\n type=tray\n}\n";
+                if (popupGate) config += "Plugin {\n type=taskbar\n expand=1\n}\nPlugin {\n type=pager\n}\n";
                 Files.writeString(profile, config); Files.writeString(output.resolve("panel-profile.txt"), config);
             } else {
                 String xfconfd = List.of("/usr/lib64/xfce4/xfconf/xfconfd", "/usr/lib/xfce4/xfconf/xfconfd", "/usr/libexec/xfconfd")
@@ -347,9 +348,13 @@ public final class LinuxX11TrayProbe {
                         {"/panels/panel-1/length", "uint", "100"}, {"/panels/panel-1/size", "uint", Integer.toString(slot + 8)},
                         {"/panels/panel-1/background-style", "uint", "2"}, {"/panels/panel-1/background-image", "string", texturePath.toString()},
                         {"/plugins/plugin-1/icon-size", "int", Integer.toString(slot)},
-                        {"/panels/panel-1/position-locked", "bool", "true"}, {"/plugins/plugin-1", "string", "systray"}, {"/plugins/plugin-2", "string", "tasklist"}, {"/plugins/plugin-3", "string", "pager"}})
+                        {"/panels/panel-1/position-locked", "bool", "true"}, {"/plugins/plugin-1", "string", "systray"}})
                     command(environment, "xfconf-query", "-c", "xfce4-panel", "-p", property[0], "-n", "-t", property[1], "-s", property[2]);
-                command(environment, "xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-1/plugin-ids", "-n", "-a", "-t", "int", "-s", "1", "-t", "int", "-s", "2", "-t", "int", "-s", "3");
+                if (popupGate) {
+                    command(environment, "xfconf-query", "-c", "xfce4-panel", "-p", "/plugins/plugin-2", "-n", "-t", "string", "-s", "tasklist");
+                    command(environment, "xfconf-query", "-c", "xfce4-panel", "-p", "/plugins/plugin-3", "-n", "-t", "string", "-s", "pager");
+                    command(environment, "xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-1/plugin-ids", "-n", "-a", "-t", "int", "-s", "1", "-t", "int", "-s", "2", "-t", "int", "-s", "3");
+                } else command(environment, "xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-1/plugin-ids", "-n", "-a", "-t", "int", "-s", "1");
                 Files.writeString(output.resolve("panel-profile.txt"), command(environment, "xfconf-query", "-c", "xfce4-panel", "-lv"));
             }
             owned.add(popupGate && panel.equals("xfce") ? launch(environment, output, "wm", "xfwm4", "--compositor=off")
