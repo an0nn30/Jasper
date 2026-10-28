@@ -92,6 +92,32 @@ class LinuxResidentTrayTest {
         assertThat(f.events).containsExactly("modern.add :1.10");
     }
 
+    @Test void coalescedHostAppearanceAndLossRefreshesLegacyActions() {
+        var f = new Fixture(); f.controller.legacyChanged(true); f.drain();
+        IntConsumer oldClick = f.legacyClick;
+        f.controller.hostChanged(A); f.controller.hostChanged(null); f.drain();
+        assertThat(f.events).containsExactly("legacy.add", "legacy.remove", "legacy.add");
+        oldClick.accept(1); f.legacyClick.accept(1); f.drainEdt();
+        assertThat(f.actions.get()).isEqualTo(1);
+    }
+
+    @Test void coalescedLegacySupportLossAndRestorationRefreshesActions() {
+        var f = new Fixture(); f.controller.legacyChanged(true); f.drain();
+        IntConsumer oldClick = f.legacyClick;
+        f.controller.legacyChanged(false); f.controller.legacyChanged(true); f.drain();
+        assertThat(f.events).containsExactly("legacy.add", "legacy.remove", "legacy.add");
+        oldClick.accept(1); f.legacyClick.accept(1); f.drainEdt();
+        assertThat(f.actions.get()).isEqualTo(1);
+    }
+
+    @Test void duplicateHealthyLegacySnapshotsKeepPublicationAndActions() {
+        var f = new Fixture(); f.controller.legacyChanged(true); f.drain();
+        f.legacyClick.accept(1);
+        f.controller.legacyChanged(true); f.controller.hostChanged(null); f.drain(); f.drainEdt();
+        assertThat(f.events).containsExactly("legacy.add");
+        assertThat(f.actions.get()).isEqualTo(1);
+    }
+
     @Test void legacySupportLossInvalidatesQueuedActionBeforeRemoval() {
         var f = new Fixture(); f.controller.legacyChanged(true); f.drain();
         f.legacyClick.accept(1); f.controller.legacyChanged(false); f.drainEdt(); f.drain();

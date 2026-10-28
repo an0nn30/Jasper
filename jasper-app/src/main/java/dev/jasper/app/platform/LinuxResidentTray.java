@@ -39,6 +39,7 @@ final class LinuxResidentTray implements AutoCloseable {
     private boolean legacyInstalled;
     private boolean legacyNeedsRemoval;
     private long publishedGeneration;
+    private long legacyGeneration;
     private boolean disconnected;
     private Object retryTicket;
     private Retry retryPurpose;
@@ -119,7 +120,7 @@ final class LinuxResidentTray implements AutoCloseable {
         if (publishedHost != null && candidate != null && candidate.equals(publishedHost)
             && publishedGeneration == generation.get()) return;
         if (modernNeedsWithdrawal && !withdrawModern()) return;
-        if (legacyNeedsRemoval && !legacyInstalled && !removeLegacy()) return;
+        if (legacyNeedsRemoval && (!legacyInstalled || legacyGeneration != generation.get()) && !removeLegacy()) return;
         if (closed.get()) return;
         if (target == LinuxTrayPolicy.Target.MODERN && !waiting(Retry.REGISTRATION)) {
             if (!removeLegacy()) return;
@@ -161,6 +162,7 @@ final class LinuxResidentTray implements AutoCloseable {
             }
             legacyInstalled = added;
             legacyNeedsRemoval = added;
+            legacyGeneration = ticket;
             if (closed.get() || ticket != generation.get() || !legacySupported || !Objects.equals(desiredHost, candidate)) {
                 removeLegacy();
                 return;
