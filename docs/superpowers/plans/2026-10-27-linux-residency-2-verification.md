@@ -377,3 +377,13 @@ Local macOS command adds `--tests '*ThemeMigrationCoverageTest'`: 52 XML tests, 
 Ruling 14 expands the internal Modern record with `Runnable reconnect`, bound to `LinuxStatusNotifier.start`, and reports connection state independently of Host. The controller owns the sole capped reconnect timer; successful connection with no watcher resets backoff and cancels retries. Ruling 15 adds `withdrawAndAwait`, worker-only and bounded to two seconds, while preserving nonblocking `withdraw` for cancellation. Task 6 must bind confirmed withdrawal before fallback installation. Cleanup timeout refuses replacement and retains the cleanup request.
 
 Task 5 implements injected scheduling with logical timer invalidation. Task 6 still owns production physical timer cancellation/removal on success, restoration and close; daemon scheduling; five-second legacy probing suspended while modern publication is healthy; and bounded EDT marshaling/late-add cleanup. Task 2's native AWT gate is pending, as are x86_64/Ubuntu baseline CI, graphical acceptance and final integration checks. No GUI, actual desktop session bus, installed-app change, AOT, merge or push was used.
+
+### Task 5 review fix 1
+
+Commit `2d291bb18` records the installed legacy action generation and refreshes a stale publication after
+coalesced host/support reversals. Both deterministic transition regressions failed before the fix; the
+healthy-duplicate case already passed. The final portable controller/policy run passed 31 tests with no
+failures, errors or skips. Scoped re-review approved all findings with no new breakage. The native
+50-test run above predates this controller-only fix; the adapter is unchanged. Tasks 1, 3, 4 and 5 are
+reviewed. Task 2's compiled probe still awaits explicit installation/GUI authorization, so Task 6
+production composition, Task 7 final checks and whole-branch review remain pending.
