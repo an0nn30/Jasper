@@ -6,6 +6,7 @@ import dev.jasper.remote.workstation.Layout;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.ColumnState;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
@@ -57,7 +58,7 @@ public final class HostsPanel implements AutoCloseable {
     public static final String ROOT = "sessions", HEADER = "sessions.header", SEARCH = "sessions.search", ROWS = "sessions.rows",
         FOOTER = "sessions.footer", HINT = "sessions.hint", CARD = "card", CARD_TILE = "card.tile", CARD_NAME = "card.name",
         CARD_ADDRESS = "card.address", CARD_INFO = "card.info", CARD_JUMP = "card.jump", CARD_CREDENTIAL = "card.credential",
-        CARD_CONNECTED = "card.connected", CARD_LOCKED = "card.locked", EDIT = "card.edit", CONNECT = "card.connect", ACTIVATE = "activate";
+        CARD_CONNECTED = "card.connected", CARD_LOCKED = "card.locked", EDIT = "card.edit", CONNECT = "card.connect", ACTIVATE = "activate", SORT = "sort:";
     /** The wide layout's nodes: the split, its list and detail columns, and the detail's content, fields and actions. */
     public static final String COLUMNS = "sessions.columns", LIST_COLUMN = "sessions.list", DETAIL_COLUMN = "sessions.detail",
         DETAIL_CONTENT = "sessions.detail.content", DETAIL_EMPTY = "sessions.detail.empty", DETAIL_FIELDS = "sessions.detail.fields",
@@ -90,6 +91,9 @@ public final class HostsPanel implements AutoCloseable {
     private Consumer<ShellProfileInfo> splitDistro = profile -> { };
     private Consumer<PanelHeader> headerChanged;
     private int headerCount = -1;
+    /** The sort both looks share and the classic tree's widths; the owner hears each change. */
+    private ColumnState columns = ColumnState.sortedBy("name", true);
+    private Consumer<ColumnState> columnsChanged = state -> { };
     private boolean closed;
     /** Whether the panel is asked for its wide layout (a window of its own, or docked at the bottom). */
     private boolean wide;
@@ -216,6 +220,29 @@ public final class HostsPanel implements AutoCloseable {
         selectedRow = first.map(HostsPanel::rowId).orElse(null);
     }
 
+    /** Sorting hosts by these columns, in the Sessions header menu and the classic tree's headers. */
+    private static final List<String> SORTS = List.of("name", "host", "port");
+
+    /**
+     * The sort and the classic tree's column widths (key {@code sessions}), and who hears each change the user makes;
+     * a sort column other than name, host or port reads as name. Another panel's change arrives through here too.
+     */
+    public void setColumns(ColumnState state, Consumer<ColumnState> changed) {
+        Objects.requireNonNull(state); columnsChanged = Objects.requireNonNull(changed);
+        columns = state.sortColumn().filter(SORTS::contains).isPresent() ? state : new ColumnState(Optional.of("name"), true, state.widths());
+        if (closed) return;
+        rebuild();
+    }
+
+    private void sortBy(String columnId) {
+        if (!SORTS.contains(columnId)) return;
+        columns = columns.sorted(columnId);
+        columnsChanged.accept(columns);
+        rebuild();
+    }
+
+    private HostRows.Order order() { return new HostRows.Order(columns.sortColumn().orElse("name"), columns.ascending()); }
+
     private void handle(UiEvent event) {
         if (closed) return;
         switch (event) {
@@ -236,6 +263,11 @@ public final class HostsPanel implements AutoCloseable {
             case UiEvent.Expanded expanded when expanded.id().equals(ROWS) -> rowById(expanded.itemId()).ifPresent(row -> {
                 if (row instanceof HostRows.Group group && expanded.expanded() == collapsedGroup(group)) toggle(group);
             });
+            case UiEvent.Sorted sorted when sorted.id().equals(ROWS) -> sortBy(sorted.columnId());
+            case UiEvent.ColumnsResized resized when resized.id().equals(ROWS) -> {
+                columns = columns.resized(resized.widths());
+                columnsChanged.accept(columns);
+            }
             case UiEvent.Action action -> act(action.id());
             default -> { }
         }
@@ -255,6 +287,7 @@ public final class HostsPanel implements AutoCloseable {
     private Optional<ShellProfileInfo> distro(String rowId) { return rowById(rowId).filter(HostRows.Distro.class::isInstance).map(row -> ((HostRows.Distro) row).profile()); }
 
     private void act(String id) {
+        if (id.startsWith(SORT)) { sortBy(id.substring(SORT.length())); return; }
         if (id.equals(ACTIVATE)) { selectedRow().ifPresent(this::activate); return; }
         if (id.equals(CONNECT)) { connectSelected(); return; }
         if (id.equals(EDIT)) { selectedHost().ifPresent(host -> actions.edit().accept(Optional.of(host))); return; }
@@ -326,7 +359,7 @@ public final class HostsPanel implements AutoCloseable {
         error.ifPresent(message -> next.add(new HostRows.Error(message)));
         // The classic tree keeps every row and shows the collapsed groups through its expanded ids.
         boolean flat = layout == Layout.CLASSIC;
-        next.addAll(HostRows.rows(matching, "", flat || !needle.isEmpty() ? Set.of() : collapsed, defaultGroup, distroRows, !flat && needle.isEmpty() && wslCollapsed));
+        next.addAll(HostRows.rows(matching, "", flat || !needle.isEmpty() ? Set.of() : collapsed, defaultGroup, distroRows, !flat && needle.isEmpty() && wslCollapsed, order()));
         rows = List.copyOf(next);
         // A refresh keeps the selected row (a host, distribution or group by identity); otherwise the first host.
         if (selectedRow == null || rows.stream().noneMatch(row -> rowId(row).equals(selectedRow))) selectFirstHost();
@@ -360,7 +393,13 @@ public final class HostsPanel implements AutoCloseable {
     }
 
     private Nodes.Header rowsHeader() {
-        return new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.of(hosts.size() + distros.size()), Optional.empty(), Optional.empty(), List.of());
+        var items = new ArrayList<MenuItem>();
+        for (String id : SORTS) {
+            String icon = columns.sortColumn().filter(id::equals).isEmpty() ? "" : columns.ascending() ? "chevron.up" : "chevron.down";
+            items.add(new MenuItem("sort:" + id, Character.toUpperCase(id.charAt(0)) + id.substring(1), icon, SORT + id, true, false));
+        }
+        var sort = new Nodes.MenuButton("sort", ControlState.READY, "", "chevron.down", Nodes.ButtonKind.GHOST, "", items, "Sort sessions");
+        return new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.of(hosts.size() + distros.size()), Optional.empty(), Optional.of(sort), List.of());
     }
 
     private Nodes.Field rowsSearch() {
@@ -635,7 +674,7 @@ public final class HostsPanel implements AutoCloseable {
             else roots.add(treeItem(row));
         }
         if (group != null) roots.add(groupItem(group, children));
-        return new Nodes.Tree(ROWS, ControlState.READY, roots, expanded, selectedRow == null ? Set.of() : Set.of(selectedRow), ACTIVATE, TREE_COLUMNS);
+        return new Nodes.Tree(ROWS, ControlState.READY, roots, expanded, selectedRow == null ? Set.of() : Set.of(selectedRow), ACTIVATE, columns.apply(TREE_COLUMNS));
     }
 
     private Nodes.Panel classicNode() {

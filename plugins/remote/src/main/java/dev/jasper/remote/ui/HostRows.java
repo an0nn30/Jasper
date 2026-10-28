@@ -32,6 +32,23 @@ public final class HostRows {
 
     public record Error(String message) implements Row { }
 
+    /** How hosts sort within a group: by {@code name}, {@code host} or {@code port}, ascending or not; ties go by name. */
+    public record Order(String column, boolean ascending) {
+        public static final Order DEFAULT = new Order("name", true);
+
+        Comparator<RemoteHost> comparator() {
+            Comparator<RemoteHost> byName = Comparator.comparing((RemoteHost host) -> host.name().toLowerCase(Locale.ROOT)).thenComparing(RemoteHost::name);
+            Comparator<RemoteHost> primary = switch (column) {
+                case "host" -> Comparator.comparing((RemoteHost host) -> host.hostname().toLowerCase(Locale.ROOT));
+                case "port" -> Comparator.comparingInt(RemoteHost::port);
+                default -> byName;
+            };
+            boolean byNameOnly = !column.equals("host") && !column.equals("port");
+            Comparator<RemoteHost> directed = ascending ? primary : primary.reversed();
+            return byNameOnly ? directed : directed.thenComparing(byName);
+        }
+    }
+
     private HostRows() { }
 
     public static boolean matches(RemoteHost host, String query) {
@@ -58,6 +75,11 @@ public final class HostRows {
     }
 
     public static List<Row> rows(List<RemoteHost> hosts, String query, Set<String> collapsed, String defaultGroup) {
+        return rows(hosts, query, collapsed, defaultGroup, Order.DEFAULT);
+    }
+
+    /** As {@link #rows(List, String, Set, String)}, with the hosts of each group in {@code order}. */
+    public static List<Row> rows(List<RemoteHost> hosts, String query, Set<String> collapsed, String defaultGroup, Order order) {
         boolean searching = !query.strip().isEmpty();
         var groups = new TreeMap<String, List<RemoteHost>>(Comparator.comparing((String name) -> name.equals(defaultGroup) ? 1 : 0).thenComparing(name -> name.toLowerCase(Locale.ROOT)));
         for (RemoteHost host : hosts) {
@@ -71,7 +93,7 @@ public final class HostRows {
             // Keep a restored collapsed header reachable; a renamed default group retains its identity too.
             if (!flat || hidden) rows.add(new Group(entry.getKey(), entry.getValue().size(), hidden));
             if (hidden) continue;
-            entry.getValue().stream().sorted(Comparator.comparing((RemoteHost host) -> host.name().toLowerCase(Locale.ROOT)).thenComparing(RemoteHost::name))
+            entry.getValue().stream().sorted(order.comparator())
                 .forEach(host -> rows.add(new Host(host)));
         }
         return List.copyOf(rows);
@@ -84,6 +106,12 @@ public final class HostRows {
      */
     public static List<Row> rows(List<RemoteHost> hosts, String query, Set<String> collapsed, String defaultGroup, List<Distro> distros,
                                  boolean wslCollapsed) {
+        return rows(hosts, query, collapsed, defaultGroup, distros, wslCollapsed, Order.DEFAULT);
+    }
+
+    /** As the overload without an order, with the hosts of each group in {@code order}; the WSL group keeps its order. */
+    public static List<Row> rows(List<RemoteHost> hosts, String query, Set<String> collapsed, String defaultGroup, List<Distro> distros,
+                                 boolean wslCollapsed, Order order) {
         boolean searching = !query.strip().isEmpty();
         var rows = new ArrayList<Row>();
         List<Distro> shown = distros.stream()
@@ -93,7 +121,7 @@ public final class HostRows {
             rows.add(new Group(WSL, shown.size(), hidden, true));
             if (!hidden) rows.addAll(shown);
         }
-        rows.addAll(rows(hosts, query, collapsed, defaultGroup));
+        rows.addAll(rows(hosts, query, collapsed, defaultGroup, order));
         return List.copyOf(rows);
     }
 }

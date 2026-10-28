@@ -884,6 +884,7 @@ public class RemotePlugin implements Plugin {
         panel.setCollapsed(panelState.collapsed());
         panel.setWslCollapsed(panelState.wslCollapsed());
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed(), panel.wslCollapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
+        panel.setColumns(columnStates.get(SESSIONS_COLUMNS), state -> sessionColumns(state, panel));
         panel.setHosts(store.hosts(), store.error());
         // In a window of its own or docked at the bottom the list sits beside the detail; the panel is right from the start
         // and follows each move.
@@ -899,6 +900,18 @@ public class RemotePlugin implements Plugin {
         // The host disposed the view; the panel goes inert so no later refresh touches it.
         host.onClosed(() -> { panel.close(); sessionsPanels.remove(window.id(), sessions); });
         return panel.view();
+    }
+
+    private static final String SESSIONS_COLUMNS = "sessions";
+
+    /** The user sorted or resized the Sessions table in {@code source}: keep it and show it in every other window's panel. */
+    private void sessionColumns(dev.jasper.sdk.ui.ColumnState state, HostsPanel source) {
+        try { columnStates.put(SESSIONS_COLUMNS, state); }
+        catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "Sessions columns: {0}", failure.getMessage()); }
+        for (var entry : List.copyOf(sessionsPanels.entrySet())) {
+            var other = entry.getValue().panel();
+            if (other != source) other.setColumns(state, changed -> sessionColumns(changed, other));
+        }
     }
 
     private void reportMutation(String title, CompletableFuture<Void> mutation) {
