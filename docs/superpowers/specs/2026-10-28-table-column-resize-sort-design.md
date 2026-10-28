@@ -30,6 +30,10 @@ Finder / Explorer, is designed separately afterwards.
 - **Sessions:** hosts sort within their group; the groups keep their current order (default group last, others
   alphabetical, as `HostRows` does now).
 - Clicking the sorted column flips its direction; clicking another column sorts by it ascending.
+- **Sessions in the default look** has no columns (a plain list). It stays a list. Its header gains a sort menu button
+  offering Name, Host and Port; the current column shows its direction, and choosing it again flips the direction.
+  The default look and the Enterprise column tree share one Sessions sort (decided by the user, 2026-10-28).
+- **SFTP sorts the whole folder**, not only the 200-row page shown: the order goes into the directory cache's query.
 
 ## Platforms
 
