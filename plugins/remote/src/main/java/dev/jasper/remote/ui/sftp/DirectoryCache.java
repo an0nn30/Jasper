@@ -9,7 +9,7 @@ import java.util.*;
 /**
  * Disposable worker-owned directory spool, independent of the durable transfer database. Pages and counts can leave out
  * hidden items, the names starting with a dot. Pages are sorted over the whole folder by one column, folders mixed in
- * with everything else (by size, folders and unknown sizes come below every file); ties go by name.
+ * with everything else (by size, folders and unknown sizes count as smaller than any file); ties go by name.
  */
 public final class DirectoryCache implements AutoCloseable {
     /** The order pages take: a column, {@code name}, {@code size}, {@code modified} or {@code permissions} (any other sorts by name), and its direction. */
@@ -19,7 +19,7 @@ public final class DirectoryCache implements AutoCloseable {
         String sql() {
             String direction=ascending?" ASC":" DESC";
             return switch(column) {
-                // Folders and unknown sizes show no size, so they sort together below every file.
+                // Folders and unknown sizes show no size, so they count as smaller than any file.
                 case "size" -> "CASE WHEN kind='DIRECTORY' OR size<0 THEN -1 ELSE size END"+direction+",name COLLATE NOCASE,name";
                 case "modified","permissions" -> column+direction+",name COLLATE NOCASE,name";
                 default -> "name COLLATE NOCASE"+direction+",name"+direction;
