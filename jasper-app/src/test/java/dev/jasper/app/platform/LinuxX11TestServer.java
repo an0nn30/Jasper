@@ -231,8 +231,9 @@ final class LinuxX11TestServer implements AutoCloseable {
     final class TrayHost {
         final java.util.Map<String, Integer> atoms = new java.util.concurrent.ConcurrentHashMap<>();
         final java.util.List<String> observed = new CopyOnWriteArrayList<>();
+        volatile int announcedEmbedder = 0x124;
         volatile int owner = 0x123, compositor, visualId, icon, iconParent = 0x100, width = 24, height = 40, depth = 24, docks, paints, destroys;
-        volatile boolean handshake = true, reparent = true, mapped;
+        volatile boolean handshake = true, reparent = true, mapped, infoMapped = true;
         volatile Runnable beforeSnapshot = () -> {};
         TrayHost() { responder = this::respond; }
         int atom(String name) { return atoms.computeIfAbsent(name, ignored -> 100 + atoms.size()); }
@@ -255,7 +256,7 @@ final class LinuxX11TestServer implements AutoCloseable {
                     }
                     if (b.getInt(8) == atom("_XEMBED_INFO")) {
                         r = ByteBuffer.allocate(40).order(ByteOrder.nativeOrder()); r.put(0, (byte)1); r.put(1, (byte)32);
-                        r.putInt(4, 2); r.putInt(8, atom("_XEMBED_INFO")); r.putInt(16, 2); r.putInt(36, 1);
+                        r.putInt(4, 2); r.putInt(8, atom("_XEMBED_INFO")); r.putInt(16, 2); r.putInt(36, infoMapped ? 1 : 0);
                     }
                     return r.array();
                 }
@@ -298,9 +299,12 @@ final class LinuxX11TestServer implements AutoCloseable {
             var event = event(33); event.put(1, (byte)32); event.putInt(4, 0x100); event.putInt(8, atom("MANAGER"));
             event.putInt(12, 100); event.putInt(16, atom("_NET_WM_CM_S0")); event.putInt(20, replacement); write(event.array());
         }
+        void xembed(int opcode) throws Exception {
+            var event = event(33); event.put(1, (byte)32); event.putInt(4, icon); event.putInt(8, atom("_XEMBED")); event.putInt(16, opcode); write(event.array());
+        }
         void embedded() throws Exception {
             var event = event(33); event.put(1, (byte)32); event.putInt(4, icon); event.putInt(8, atom("_XEMBED"));
-            event.putInt(24, 0x124); write(event.array());
+            event.putInt(24, announcedEmbedder); write(event.array());
         }
         void reparent() throws Exception {
             iconParent = 0x124;
@@ -315,6 +319,9 @@ final class LinuxX11TestServer implements AutoCloseable {
             var bytes = ByteBuffer.allocate(count * 32).order(ByteOrder.nativeOrder());
             for (int i = 0; i < count; i++) { bytes.put(i * 32, (byte)12); bytes.putShort(i * 32 + 2, (short)requests); bytes.putInt(i * 32 + 4, icon); }
             width = finalWidth; height = finalHeight; write(bytes.array());
+        }
+        void mappedProperty(boolean value) throws Exception {
+            infoMapped = value; var event = event(28); event.putInt(4, icon); event.putInt(8, atom("_XEMBED_INFO")); write(event.array());
         }
         void embedderMapped(boolean mapped) throws Exception {
             var event = event(mapped ? 19 : 18); event.putInt(4, 0x124); event.putInt(8, 0x124); write(event.array());

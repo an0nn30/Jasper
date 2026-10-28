@@ -70,22 +70,29 @@ final class LinuxLegacyTray implements AutoCloseable {
         offEdt(); long end = System.nanoTime() + BOUND;
         Install request;
         synchronized (lock) {
-            if (closed || !Boolean.TRUE.equals(advertised)) return false;
-            if (cleanup) throw new IllegalStateException("Legacy icon cleanup is owed");
-            if (installed) return true;
-            if (pending != null || active != null) throw new IllegalStateException("Legacy install already pending");
-            request = new Install(end - CLEANUP_RESERVE, action); pending = request; wake();
-            while (request.result == null && System.nanoTime() < request.deadline) await(request.deadline);
-            if (request.result != null) return request.result;
-            request.canceled = true; ++admission; installed = false; cleanup = true; ++cleanupRequested;
-            if (cancellation != null) cancellation.requestClose();
-            while (socketOwed() && System.nanoTime() < end) await(end);
-            if (socketOwed()) throw new IllegalStateException("Legacy icon cleanup remains unconfirmed");
+            if (closed || !Boolean.TRUE.equals(advertised)) request = null;
+            else {
+                if (cleanup) throw new IllegalStateException("Legacy icon cleanup is owed");
+                if (installed) return true;
+                if (pending != null || active != null) throw new IllegalStateException("Legacy install already pending");
+                request = new Install(end - CLEANUP_RESERVE, action); pending = request; wake();
+                while (request.result == null && System.nanoTime() < request.deadline) await(request.deadline);
+                if (request.result != null) return request.result;
+                request.canceled = true; ++admission; installed = false; cleanup = true; ++cleanupRequested;
+                if (cancellation != null) cancellation.requestClose();
+                while (socketOwed() && System.nanoTime() < end) await(end);
+                if (socketOwed()) throw new IllegalStateException("Legacy icon cleanup remains unconfirmed");
+            }
         }
-        cancelPopup.run(); return false;
+        if (request == null) removeAndAwait(end);
+        else cancelPopup.run();
+        return false;
     }
     void removeAndAwait() {
-        offEdt(); long end = System.nanoTime() + BOUND, ticket;
+        offEdt(); removeAndAwait(System.nanoTime() + BOUND);
+    }
+    private void removeAndAwait(long end) {
+        long ticket;
         synchronized (lock) {
             ++admission; installed = false;
             if (pending != null) pending.canceled = true;
@@ -215,7 +222,7 @@ final class LinuxLegacyTray implements AutoCloseable {
     }
     private void invalidate() {
         synchronized (lock) { ++admission; ++hostEpoch; installed = false; }
-        mapped = false; dirty = false; action = null; lastInputTime = 0; cancelPopup.run();
+        resetXembed(); action = null; cancelPopup.run();
     }
     private void snapshot(long deadline) {
         nextSnapshot = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
@@ -284,8 +291,13 @@ final class LinuxLegacyTray implements AutoCloseable {
     }
     private void remove(long deadline) {
         if (icon != 0) xcb.destroyIcon(deadline);
-        icon = 0; embedder = 0; announcedEmbedder = 0; mapped = false; dirty = false;
+        icon = 0; resetXembed();
         synchronized (lock) { installed = false; }
+    }
+    private void resetXembed() {
+        embedder = 0; announcedEmbedder = 0; mapped = false; hostMapped = false; dirty = false;
+        activated = true; focused = false; modality = false;
+        lastInputTime = 0; lastInputType = 0; lastInputDetail = 0;
     }
     private void drain(long pollDeadline, long operationDeadline) {
         List<LinuxTrayXcb.Event> events = xcb.poll(pollDeadline);
@@ -307,7 +319,12 @@ final class LinuxLegacyTray implements AutoCloseable {
             if (target != icon || icon == 0 || message != atom("_XEMBED")) return;
             serverTime = b.getInt(12); int opcode = b.getInt(16);
             switch (opcode) {
-                case 0 -> { if (b.getInt(24) != 0 && b.getInt(28) == 0) announcedEmbedder = b.getInt(24); }
+                case 0 -> {
+                    if (b.getInt(24) != 0 && b.getInt(28) == 0) {
+                        if (b.getInt(24) == xcb.setup().root()) throw new LinuxTrayXcb.Unavailable("Root is not an XEmbed socket");
+                        announcedEmbedder = b.getInt(24);
+                    }
+                }
                 case 1 -> activated = true;
                 case 2 -> activated = false;
                 case 4 -> focused = true;
@@ -348,7 +365,12 @@ final class LinuxLegacyTray implements AutoCloseable {
             if (window == icon && b.getInt(8) == atom("_XEMBED_INFO")) {
                 int[] info = xcb.property32s(icon, atom("_XEMBED_INFO"), atom("_XEMBED_INFO"), 2, deadline);
                 if (info.length != 2 || info[0] != 0) throw new LinuxTrayXcb.Unavailable("Invalid XEmbed info");
+                boolean wasMapped = mapped;
                 mapped = (info[1] & 1) != 0; dirty = mapped;
+                if (wasMapped && !mapped) {
+                    synchronized (lock) { ++admission; }
+                    cancelPopup.run();
+                }
             }
             return;
         }

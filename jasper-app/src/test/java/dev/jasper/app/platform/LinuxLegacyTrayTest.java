@@ -52,6 +52,20 @@ class LinuxLegacyTrayTest {
             }
         }
     }
+    @Test void rootEmbedderNotifyCannotMapAnUndockedRootChild() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem()) {
+            var host = server.new TrayHost(); host.reparent = false; host.announcedEmbedder = 0x100;
+            var available = new CopyOnWriteArrayList<Boolean>();
+            try (var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, ignored -> {}, () -> {})) {
+                tray.start(); await(() -> available.contains(true), "owner");
+                assertThat(tray.install(ignored -> {})).isFalse();
+                assertThat(host.docks).isEqualTo(1); assertThat(host.mapped).isFalse();
+                assertThat(server.packets.stream().noneMatch(packet -> packet[0] == 8)).isTrue();
+                await(() -> host.icon == 0 || server.connectionEnded, "root-parent icon cleanup confirmed");
+            }
+        }
+    }
     @Test void ownerLossDuringDockNeverLeavesPendingIcon() throws Exception {
         nativeOnly();
         try (var server = LinuxX11TestServer.filesystem()) {
@@ -93,6 +107,36 @@ class LinuxLegacyTrayTest {
                 long before = System.nanoTime(); tray.close(); assertThat(System.nanoTime() - before).isLessThan(TimeUnit.MILLISECONDS.toNanos(100));
             } finally {
                 release.countDown(); tray.close(); if (remover != null) remover.join(2500);
+                var worker = (Thread)LinuxTrayXcbTest.field(tray, "worker"); worker.join(2500); assertThat(worker.isAlive()).isFalse();
+            }
+        }
+    }
+    @Test void unavailableInstallWaitsForHeldOldIconDestruction() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem()) {
+            var host = server.new TrayHost(); var available = new CopyOnWriteArrayList<Boolean>();
+            var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+            var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, ignored -> {}, () -> {});
+            try {
+                tray.start(); await(() -> available.contains(true), "owner"); assertThat(tray.install(ignored -> {})).isTrue();
+                Object cancellation = LinuxTrayXcbTest.field(tray, "cancellation"); Object bindings = LinuxTrayXcbTest.field(cancellation, "bindings");
+                var member = bindings.getClass().getDeclaredField("xcb"); member.setAccessible(true); Object original = member.get(bindings);
+                member.set(bindings, java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {member.getType()}, (proxy, method, args) -> {
+                    if (method.getName().equals("xcb_destroy_window")) {
+                        entered.countDown(); if (!release.await(5, TimeUnit.SECONDS)) throw new AssertionError("held native mutation not released");
+                    }
+                    try { return method.invoke(original, args); }
+                    catch (java.lang.reflect.InvocationTargetException error) { throw error.getCause(); }
+                }));
+                host.owner(0); assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+                assertThat(available.getLast()).isFalse(); assertThat(host.icon).isNotZero();
+                long started = System.nanoTime();
+                assertThatThrownBy(() -> tray.install(ignored -> {})).isInstanceOf(IllegalStateException.class);
+                assertThat(System.nanoTime() - started).isLessThan(TimeUnit.MILLISECONDS.toNanos(2250));
+                assertThat(host.docks).isEqualTo(1);
+                long before = System.nanoTime(); tray.close(); assertThat(System.nanoTime() - before).isLessThan(TimeUnit.MILLISECONDS.toNanos(100));
+            } finally {
+                release.countDown(); tray.close();
                 var worker = (Thread)LinuxTrayXcbTest.field(tray, "worker"); worker.join(2500); assertThat(worker.isAlive()).isFalse();
             }
         }
@@ -149,6 +193,49 @@ class LinuxLegacyTrayTest {
                 await(() -> actions.get() > 0, "fresh remapped input");
                 menus.getFirst().action().accept(1); SwingUtilities.invokeAndWait(() -> {});
                 assertThat(actions.get()).isEqualTo(1); tray.removeAndAwait();
+            }
+        }
+    }
+    @Test void mappedPropertyHideNeverRevivesOldMenuOrQueuedAction() throws Exception {
+        nativeOnly();
+        try (var server = LinuxX11TestServer.filesystem()) {
+            var host = server.new TrayHost(); var available = new CopyOnWriteArrayList<Boolean>();
+            var menus = new CopyOnWriteArrayList<LinuxLegacyTray.MenuRequest>(); var actions = new AtomicInteger(); var cancels = new AtomicInteger();
+            var held = new CountDownLatch(1); var release = new CountDownLatch(1);
+            try (var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, menus::add, cancels::incrementAndGet)) {
+                tray.start(); await(() -> available.contains(true), "owner"); assertThat(tray.install(actions::addAndGet)).isTrue();
+                host.input(5, 3, 2, 3, 0, 100); await(() -> menus.size() == 1, "menu before property hide");
+                var oldMenu = menus.getFirst(); int before = cancels.get();
+                SwingUtilities.invokeLater(() -> { held.countDown(); try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+                assertThat(held.await(1, TimeUnit.SECONDS)).isTrue(); oldMenu.action().accept(1);
+                host.mappedProperty(false); await(() -> !oldMenu.valid().getAsBoolean(), "hidden property applied");
+                int paints = host.paints; host.mappedProperty(true); await(() -> host.paints > paints, "remapped property painted");
+                assertThat(oldMenu.valid().getAsBoolean()).isFalse(); assertThat(cancels.get()).isGreaterThan(before);
+                release.countDown(); SwingUtilities.invokeAndWait(() -> {}); assertThat(actions.get()).isZero();
+                oldMenu.action().accept(1); SwingUtilities.invokeAndWait(() -> {}); assertThat(actions.get()).isZero();
+                host.input(5, 1, 2, 3, 0, 101); await(() -> actions.get() == 1, "fresh property-remapped input"); tray.removeAndAwait();
+            } finally { release.countDown(); }
+        }
+    }
+    @Test void modalityDoesNotSurviveRemovalReplacementOrReconnect() throws Exception {
+        nativeOnly();
+        for (int transition = 0; transition < 3; transition++) {
+            try (var server = LinuxX11TestServer.filesystem()) {
+                var host = server.new TrayHost(); var available = new CopyOnWriteArrayList<Boolean>(); var actions = new AtomicInteger();
+                try (var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, ignored -> {}, () -> {})) {
+                    tray.start(); await(() -> available.contains(true), "owner"); assertThat(tray.install(actions::addAndGet)).isTrue();
+                    int paints = host.paints; host.xembed(10); host.expose(); await(() -> host.paints > paints, "modality event processed before redraw");
+                    assertThat(LinuxTrayXcbTest.field(tray, "modality")).isEqualTo(true);
+                    int observations = available.size();
+                    if (transition == 0) tray.removeAndAwait();
+                    else {
+                        if (transition == 1) host.owner(0x125); else server.drop();
+                        await(() -> available.size() >= observations + 2 && available.getLast(), "new host publication available");
+                    }
+                    assertThat(tray.install(actions::addAndGet)).isTrue();
+                    host.input(5, 1, 2, 3, 0, 101); await(() -> actions.get() == 1, "replacement input without old-host modality off");
+                    assertThat(LinuxTrayXcbTest.field(tray, "modality")).isEqualTo(false); tray.removeAndAwait();
+                }
             }
         }
     }
