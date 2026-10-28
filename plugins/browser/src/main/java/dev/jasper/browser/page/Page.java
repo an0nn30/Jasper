@@ -2,11 +2,13 @@ package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
 import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.JComponent;
 import org.cef.CefClient;
@@ -24,6 +26,7 @@ public final class Page implements AutoCloseable {
     private final Runnable changed;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
+    private BiConsumer<String, TabPlacement> opener = (url, placement) -> { };
     // What the page loads once its browser can: first its start, then the last address asked for before that.
     private URI requested;
     // Where the page is, as Chromium last reported it, or what it was last asked to load since.
@@ -214,12 +217,46 @@ public final class Page implements AutoCloseable {
         return () -> loadStarts.remove(listener);
     }
 
+    /**
+     * Has {@code opener} open each link or popup of the page that goes to an item of its own, beside the page's item: the
+     * page's item sets it. It replaces the one before.
+     *
+     * @param opener told the address Chromium gave and where the new item goes, on the UI thread
+     */
+    public void onOpenItem(BiConsumer<String, TabPlacement> opener) {
+        this.opener = Objects.requireNonNull(opener, "opener");
+    }
+
+    /**
+     * A link or popup of the page goes to an item of its own: tells the page's opener. Nothing after {@link #close()}.
+     *
+     * @param url the address, as Chromium gave it
+     * @param placement where the new item goes: next to the page's tab, or split from its pane
+     */
+    public void openItem(String url, TabPlacement placement) {
+        Objects.requireNonNull(url, "url");
+        Objects.requireNonNull(placement, "placement");
+        if (!closed) opener.accept(url, placement);
+    }
+
+    /**
+     * Loads {@code url} in the page itself, as a plain click on a link to it would: for a modified click Chromium would
+     * have opened elsewhere. Nothing before the page has its browser or after {@link #close()}.
+     *
+     * @param url the address, as Chromium gave it
+     */
+    public void follow(String url) {
+        Objects.requireNonNull(url, "url");
+        if (ready && !closed) browser.loadURL(url);
+    }
+
     /** Closes the page's browser, which ends only this page, and stops telling anything of it. Once. */
     @Override public void close() {
         if (closed) return;
         closed = true;
         loadStarts.clear();
         navigationButtons.clear();
+        opener = (url, placement) -> { };
         view.setHoverUrl("");
         PageBrowser page = browser;
         if (page != null) page.close(true);

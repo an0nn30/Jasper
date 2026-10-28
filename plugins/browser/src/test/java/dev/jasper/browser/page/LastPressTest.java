@@ -20,6 +20,13 @@ class LastPressTest {
         assertThat(press.withinActivation(99_999)).as("before the press").isFalse();
     }
 
+    @Test void anyInputsTimeActivatesForTheSameFiveSeconds() {
+        assertThat(LastPress.withinActivation(100_000, 105_000)).isTrue();
+        assertThat(LastPress.withinActivation(100_000, 105_001)).isFalse();
+        assertThat(LastPress.withinActivation(100_000, 99_999)).isFalse();
+        assertThat(LastPress.withinActivation(Long.MIN_VALUE, Long.MAX_VALUE)).as("never").isFalse();
+    }
+
     @Test void noPressActivatesNothing() {
         for (long now : new long[] {0, 1, 5_000, System.currentTimeMillis(), Long.MAX_VALUE, Long.MIN_VALUE})
             assertThat(LastPress.NONE.withinActivation(now)).as("at %d", now).isFalse();

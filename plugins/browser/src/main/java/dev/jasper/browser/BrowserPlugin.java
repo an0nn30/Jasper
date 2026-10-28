@@ -4,6 +4,7 @@ import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.WebMenu;
+import dev.jasper.browser.links.PageNavigation;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -43,7 +44,13 @@ public class BrowserPlugin implements Plugin {
         var about = new AboutScheme();
         chromium = new Chromium(context.dataDirectory(), worker, about, this::startFailed);
         BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
-        var items = new BrowserItems(context, chromium);
+        // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
+        // it, as naming their types loads Chromium's classes.
+        Chromium engine = chromium;
+        var items = new BrowserItems(context, page -> {
+            PageNavigation.prepare(engine);
+            page.start(engine);
+        });
         var welcome = new WelcomePage(context.appearance());
         about.register(WelcomePage.NAME, welcome::html);
         about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });

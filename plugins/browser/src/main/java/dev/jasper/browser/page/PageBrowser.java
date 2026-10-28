@@ -79,9 +79,23 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         return JCefAppConfig.getDeviceScaleFactor(view);
     }
 
-    /** The page this browser shows, or null before it has one. Any thread. */
-    Page owner() {
+    /**
+     * The page this browser shows, where the client's handlers send its callbacks. Any thread.
+     *
+     * @return the page, or null before it has one
+     */
+    public Page owner() {
         return owner;
+    }
+
+    /**
+     * The canvas the page is drawn on, which records the press and the key that decide whether and where its links and
+     * popups open. Any thread.
+     *
+     * @return the canvas
+     */
+    public PageView view() {
+        return view;
     }
 
     /** Makes {@code page} the one the client's handlers send this browser's callbacks to. Before the native browser exists. */

@@ -156,6 +156,61 @@ class BrowserItemTest {
         } });
     }
 
+    /**
+     * A link or popup the page sends to an item of its own opens one beside this item (spec section 8): a new tab right
+     * after this item's tab, or a split from this item's pane, which is selected first when another item was focused.
+     * The new item loads the address Chromium gave, for no OSC 8 target.
+     */
+    @Test void aLinkThePageOpensElsewhereOpensAnItemNextToItsTabOrSplitFromItsPane() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            var opener = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var other = items.open(URI.create("https://example.org"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var before = host.windowTabs(window);
+            assertThat(before).hasSize(2);
+            opener.tab().select();
+
+            opener.page().openItem("https://example.com/next?q=a%20b", TabPlacement.NEXT_TAB);
+            var next = items.items().getLast();
+            assertThat(next.url()).isEqualTo(URI.create("https://example.com/next?q=a%20b"));
+            assertThat(next.target()).isEmpty();
+            assertThat(next.tab().window().id()).isEqualTo(window);
+            var afterNext = host.windowTabs(window);
+            assertThat(afterNext).as("right after the opener's tab").hasSize(3);
+            assertThat(afterNext.get(0)).isEqualTo(before.get(0));
+            assertThat(afterNext.get(1)).singleElement().isNotIn(before.get(0), before.get(1));
+            assertThat(afterNext.get(2)).isEqualTo(before.get(1));
+            assertThat(opener.tab().isActive()).as("the new tab shows").isFalse();
+
+            opener.page().openItem("https://example.com/split", TabPlacement.SPLIT_RIGHT);
+            var split = items.items().getLast();
+            assertThat(split.url()).isEqualTo(URI.create("https://example.com/split"));
+            var afterSplit = host.windowTabs(window);
+            assertThat(afterSplit).as("no new tab").hasSize(3);
+            assertThat(afterSplit.get(0)).as("a pane beside the opener's, though another item had the focus")
+                .hasSize(2).startsWith(before.get(0).getFirst());
+            assertThat(items.items()).containsExactly(opener, other, next, split);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    @Test void aLinkToAnAddressThatIsNoURIOrFromAClosedItemOpensNothing() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var opener = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            opener.page().openItem("no address", TabPlacement.NEXT_TAB);
+            assertThat(items.items()).containsExactly(opener);
+            var page = opener.page();
+            opener.close();
+            page.openItem("https://example.com/next", TabPlacement.NEXT_TAB);
+            assertThat(items.items()).isEmpty();
+            assertThat(host.contentTabs()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
     /** The items of a started stand-in plugin whose pages {@code start} makes. UI thread. */
     private static BrowserItems items(FakePluginHost host, Consumer<Page> start) {
         var context = new AtomicReference<PluginContext>();

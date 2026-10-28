@@ -47,7 +47,8 @@ import javax.swing.Timer;
  *
  * <p><b>Keys.</b> Jasper's shortcuts are key bindings on the window's root that take a key only where it applies. Each
  * key event has Swing's pass first, its key listeners and then its key bindings, and reaches the page only when that
- * pass left it unconsumed. A press a binding takes keeps its typed and released events from the page too.
+ * pass left it unconsumed. A press a binding takes keeps its typed and released events from the page too. Each key
+ * press the page gets is its {@link #lastKeyMillis()}.
  *
  * <p><b>Mouse.</b> An event the window consumes before the view hears it, as the pane drag's press, does not reach the
  * page. Each press the page gets is its {@link #lastPress()}. The mouse's back and forward buttons, on Windows and Linux,
@@ -76,6 +77,7 @@ public final class PageView extends JComponent {
     // its methods' types, and the browser's type loads Chromium's.
     volatile PageBrowser browser;
     private volatile LastPress lastPress = LastPress.NONE;
+    private volatile long lastKeyMillis = Long.MIN_VALUE;
     private volatile String hoverUrl = "";
     private volatile double scale = 1;
     // The last frame, in device pixels, and the back buffer it is copied to; both written on Chromium's paint thread.
@@ -165,6 +167,16 @@ public final class PageView extends JComponent {
      */
     public LastPress lastPress() {
         return lastPress;
+    }
+
+    /**
+     * When the page last got a key press that activates it: any key but Escape, as Chromium counts them. A key Jasper's
+     * shortcuts took is not the page's.
+     *
+     * @return when, in milliseconds since the epoch, or {@link Long#MIN_VALUE} before the first; any thread
+     */
+    public long lastKeyMillis() {
+        return lastKeyMillis;
     }
 
     /**
@@ -321,8 +333,12 @@ public final class PageView extends JComponent {
             }
             default -> false;
         };
-        if (pageGets) hooks.keys().accept(event);
-        else event.consume();
+        if (!pageGets) {
+            event.consume();
+            return;
+        }
+        if (event.getID() == KeyEvent.KEY_PRESSED && event.getKeyCode() != KeyEvent.VK_ESCAPE) lastKeyMillis = event.getWhen();
+        hooks.keys().accept(event);
     }
 
     /**

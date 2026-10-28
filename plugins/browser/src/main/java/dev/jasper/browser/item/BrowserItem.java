@@ -52,6 +52,7 @@ public final class BrowserItem implements AutoCloseable {
         this.url = url;
         page = new Page(url, this::changed);
         page.onNavigationButton(this::navigationButton);
+        page.onOpenItem(this::openItem);
         title = TabTitle.of("", host(url.toString()), "", false);
         view = items.context().kit().create(spec(), this::event);
         view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.PREVIEW, page.view(), page));
@@ -190,6 +191,11 @@ public final class BrowserItem implements AutoCloseable {
         return page.view();
     }
 
+    /** The item's page. */
+    Page page() {
+        return page;
+    }
+
     private void shown() {
         if (asked || closed) return;
         asked = true;
@@ -207,6 +213,23 @@ public final class BrowserItem implements AutoCloseable {
     private void navigationButton(NavigationButton button) {
         if (button == NavigationButton.BACK) goBack();
         else goForward();
+    }
+
+    /**
+     * A link or popup of the page opens an item of its own beside this one, for no OSC 8 target: in a new tab right
+     * after this item's tab, or split from this item's pane. A split opens beside the focused pane of the window's shown
+     * tab, so this item is selected first when it is not that. An address that is no URI opens nothing.
+     */
+    private void openItem(String address, TabPlacement placement) {
+        if (closed || tab == null) return;
+        Optional<URI> link = AddressInput.parse(address);
+        if (link.isEmpty()) return;
+        if (placement != TabPlacement.NEXT_TAB && !tab.isActive()) tab.select();
+        try {
+            items.open(link.get(), placement, Optional.empty(), Optional.of(tab));
+        } catch (IllegalStateException closing) { // the windows close, or Jasper quits
+            items.context().log().log(System.Logger.Level.WARNING, "A link could not open: " + closing.getMessage(), closing);
+        }
     }
 
     /** The page's address, title, loading state or where it can go changed. */

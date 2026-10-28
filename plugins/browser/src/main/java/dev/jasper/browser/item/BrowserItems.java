@@ -1,6 +1,5 @@
 package dev.jasper.browser.item;
 
-import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.page.Page;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -29,30 +28,16 @@ public final class BrowserItems {
     private final List<BrowserItem> open = new java.util.ArrayList<>();
 
     /**
-     * The items of a plugin run, whose pages Chromium makes.
+     * The items of a plugin run, whose pages {@code start} makes: the plugin's has Chromium make them, and a test's
+     * records them, as a page cannot be made without Chromium.
      *
      * @param context the plugin's context; while it starts, as the globe is registered now
-     * @param chromium the plugin's Chromium
-     */
-    public BrowserItems(PluginContext context, Chromium chromium) {
-        this(context, starter(chromium));
-    }
-
-    /**
-     * Items whose pages {@code start} makes, for tests: a page cannot be made without Chromium.
-     *
-     * @param context the plugin's context
      * @param start makes a page, the first time its item shows
      */
-    BrowserItems(PluginContext context, Consumer<Page> start) {
+    public BrowserItems(PluginContext context, Consumer<Page> start) {
         this.context = Objects.requireNonNull(context, "context");
         this.start = Objects.requireNonNull(start, "start");
         context.kit().registerIcon(GLOBE_ART);
-    }
-
-    private static Consumer<Page> starter(Chromium chromium) {
-        Objects.requireNonNull(chromium, "chromium");
-        return page -> page.start(chromium);
     }
 
     /**

@@ -97,6 +97,28 @@ class PageViewKeysTest {
         });
     }
 
+    /**
+     * A key press the page gets activates it, as a mouse press does: the view records when, for the page's popups. A key
+     * Jasper's shortcuts took, Escape, and typed and released events activate nothing, as Chromium counts them.
+     */
+    @Test void aKeyPressThePageGetsOtherThanEscapeIsRecordedAsItsLastActivatingKey() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var view = view(event -> event.getID() == KeyEvent.KEY_PRESSED && event.getKeyCode() == KeyEvent.VK_L);
+            assertThat(view.lastKeyMillis()).as("no key yet").isEqualTo(Long.MIN_VALUE);
+            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 1_000, 0, KeyEvent.VK_A, 'a'));
+            assertThat(view.lastKeyMillis()).isEqualTo(1_000);
+            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_TYPED, 2_000, 0, KeyEvent.VK_UNDEFINED, 'a'));
+            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_RELEASED, 3_000, 0, KeyEvent.VK_A, 'a'));
+            assertThat(view.lastKeyMillis()).as("typed and released").isEqualTo(1_000);
+            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 4_000, MENU, KeyEvent.VK_L, 'l'));
+            assertThat(view.lastKeyMillis()).as("a key a shortcut took").isEqualTo(1_000);
+            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 5_000, 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
+            assertThat(view.lastKeyMillis()).as("Escape").isEqualTo(1_000);
+            view.processKeyEvent(new KeyEvent(view, KeyEvent.KEY_PRESSED, 6_000, InputEvent.SHIFT_DOWN_MASK, KeyEvent.VK_ENTER, '\n'));
+            assertThat(view.lastKeyMillis()).isEqualTo(6_000);
+        });
+    }
+
     /** Puts {@code view} in a panel binding Cmd+L to an action that takes the key only when {@code accepts}. */
     private static void bindOpenLocation(PageView view, boolean accepts, List<String> ran) {
         var parent = new JPanel();
