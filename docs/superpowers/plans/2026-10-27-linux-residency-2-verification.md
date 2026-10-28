@@ -405,3 +405,126 @@ probe/display/panel/session was started and no credentials were read. The native
 **PENDING**, not failed recovery: no recovery observation was possible. Required next step is
 installation of the already-approved package list by the user or narrowly scoped installation
 access. Graphical authorization remains granted; it need not be requested again for this scope.
+
+## Task 2 native result — 2026-10-28: public AWT gate FAILED
+
+The user installed the approved packages after the earlier noninteractive sudo failure. Versions:
+`lxpanel 0.11.1^20260313git4dec3d0d-1.fc44`, `lxde-common 0.99.3-6.fc44`,
+`lxsession 0.5.6-4.fc44`, `openbox 3.6.1-30.fc44`, `xfce4-panel 4.20.7-2.fc44`,
+`xfce4-session 4.20.3-2.fc44`, `xfwm4 4.20.0-4.fc44`, `xdotool 3.20211022.1-10.fc44`,
+`xwd 1.0.9-5.fc44`, `xwininfo 1.1.6-4.fc44`; all aarch64 except noarch lxde-common.
+Host remains Fedora 44 aarch64, Xvfb `21.1.25-2.fc44`, packaged JBR
+`25.0.4.1+1-b635.75-jcef`. No installed Jasper was run or changed.
+
+Each run used only an owned Openbox/LXPanel or xfwm4/XFCE panel, a separate `dbus-run-session`,
+Xvfb `1024x768x24 -nolisten tcp`, and temporary HOME/XDG config/cache/data/runtime (runtime mode 0700).
+Full desktop sessions/autostarts were excluded; active Plasma's display, bus and panels were untouched.
+The harness records owned child PIDs, terminates/waits only those processes, exits its private display/bus
+and removes its temporary home. Displays :101–:121 were private test displays, not Plasma.
+Commands follow this pattern, with the preserved harness supplying the actual panel configuration,
+known PIDs, input, screenshots and cleanup:
+
+```sh
+env -u DBUS_SESSION_BUS_ADDRESS -u DISPLAY -u WAYLAND_DISPLAY -u SESSION_MANAGER \
+  HOME="$taskhome" XDG_CONFIG_HOME="$taskhome/config" XDG_CACHE_HOME="$taskhome/cache" \
+  XDG_DATA_HOME="$taskhome/data" XDG_RUNTIME_DIR="$taskhome/run" \
+  NO_AT_BRIDGE=1 GIO_USE_VFS=local \
+  dbus-run-session -- xvfb-run --server-num=101 \
+  -s '-screen 0 1024x768x24 -nolisten tcp' \
+  python3 task-2-native.py lxde 1 native-task2/lxde-1-corrected
+```
+
+**Fixture correction (Ruling 16).** The original exact probe exited 0 in **1.39 seconds** after
+one `no host` line: Swing Timer alone did not keep the no-window JVM alive. Its main now waits on
+a bounded 185-second latch; the original 180-second timer still removes the icon and exits 0,
+with exit 1 as a bounded fallback. Corrected no-host runs stayed alive past five seconds and discovered
+late hosts. Local headless compile/inventory passed (8 seconds; **5 tests, 0 failures/errors/skips**),
+and Linux compile passed (3 seconds). Existing `UnexpectedExceptionsTest` passed **3/3** locally.
+This is test-only lifecycle preparation, not proof of Jasper residency.
+
+| Observation | LXDE/Openbox | XFCE/xfwm4 |
+|---|---|---|
+| No host, then panel introduced | Icon appeared; support false → true | Icon appeared; support false → true |
+| Panel stopped for five seconds and restarted | Icon returned; actions/menu still worked; uncaught exception below | Icon returned; actions/menu still worked |
+| Rapid panel replacement | Retained original icon in diagnostic run, add count 1 → 1 | Usually public removal + re-add, add count 1 → 2 |
+| Actual live applet removal/re-add via panel preferences | Empty list/no icon, then full icon and actions/menu restored | Empty list/no icon, then full icon and actions/menu restored |
+| Menu/activation | `activate`, `menu action EDT=true` before/after recovery | Same |
+| Normal 1x and matched 2x rendering | Full orange circle, transparent corners | Full orange circle, transparent corners |
+
+Live UI evidence is in `native-task2/live-{lxde,xfce}-1`: observed preference controls removed
+System Tray / Status Tray Plugin and re-added the same actual applet. Both produced public membership
+0 / unavailable notifications and restored membership 1, activation and EDT menu callbacks. Earlier
+`*-supplement`/`final-*` XFCE stages named `applet-live-removed` only deleted xfconf properties;
+the running plugin stayed visible. Those stages are **excluded** as live-removal evidence. The
+initial interactive `ui-*` runs confirmed removal but reached their timer before re-add; the automated
+`live-*` runs completed both using controls derived from those captured private-panel screenshots.
+
+**Decisive failure:** LXDE panel destruction/restart with a published icon produces:
+
+```text
+Exception in thread "AWT-EventQueue-0" java.lang.UnsupportedOperationException: The system tray is not supported on the current platform.
+	at java.desktop/java.awt.SystemTray.getSystemTray(Unknown Source)
+	at java.desktop/sun.awt.X11.XTrayIconPeer$3$1.run(Unknown Source)
+	at java.desktop/java.awt.event.InvocationEvent.dispatch(Unknown Source)
+	at java.desktop/java.awt.EventQueue.dispatchEventImpl(Unknown Source)
+	at java.desktop/java.awt.EventQueue.dispatchEvent(Unknown Source)
+	at java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(Unknown Source)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(Unknown Source)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(Unknown Source)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(Unknown Source)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(Unknown Source)
+	at java.desktop/java.awt.EventDispatchThread.run(Unknown Source)
+```
+
+JVM liveness,
+subsequent icons and menus recover; the exception is still material. Jasper's
+`ApplicationBootstrap.UnexpectedExceptions` logs ERROR and forwards to `JasperApplication.unexpected`,
+then `IncidentNotices.jasperFailure`, which records and announces a Jasper incident. No Jasper GUI
+was needed to establish that routing; the focused existing three-test handler suite passed.
+
+A disposable public-only callback candidate used the cached `SystemTray` owner, removed the current
+icon immediately on the EDT when documented `systemTray` became null, and reconciled current identity
+against `getTrayIcons()` on documented `trayIcons` notifications. It did **not** prevent the LXDE
+exception. `notify-lxde-original-gdk1-dpi96-auto1/probe.log` records exception **before** the public
+unavailable callback at `2026-10-28T13:28:48.872743004Z`, then membership 0 at `.877812619Z`, available
+again at `.909885181Z`, and a later successful add/action. The same order recurred at panel stop.
+Live applet removal/re-add with these callbacks succeeded without that exception; panel destruction
+remains the failed case. No exception suppression, internal imports or reinstall loop was added.
+
+Pinned JBR `lib/src.zip` explains the observed race: `XTrayIconPeer` queues a reparent-to-root
+cleanup that calls `SystemTray.getSystemTray().remove(target)`; `XSystemTrayPeer.ownerDeath` separately
+queues the public `systemTray` notification and peer removal. A listener cannot cancel cleanup already
+queued ahead of it. Public membership notifications detect auto-removal (seen on XFCE), but the tested
+public listener did not make the LXDE panel-loss path incident-free. Extracted source and hashes are
+retained under `native-task2/source-{SystemTray,XSystemTrayPeer,XTrayIconPeer}.java` and `source-sha256.txt`.
+
+**Scale qualification:** public `getTrayIconSize()` reported 24x24 throughout; actual XEmbed slots
+were 24x24 LXDE / 22x22 XFCE at 1x, and 48x48 / 44x44 at matched 2x. Diagnostics recorded public default
+transforms 1 and 2 respectively. Matched 2x uses `GDK_SCALE=2`, Xft.dpi=96 and LXDE `iconsize=48`
+(panel height 64); normal orange bounds double from 18x17 pixels (242 orange pixels) to 36x34 (968).
+The screenshots show panel-colored transparent corners, no black opaque square or duplicate/ghost icon.
+
+Forcing only `-Dsun.java2d.uiScale=2` while the host remains 1x clips the icon in both panels, while the
+menu scales. Xft.dpi=192 alone with GTK2 LXDE retained public transform 1; combining GDK_SCALE=2 and
+Xft.dpi=192 auto-detected transform 4 (double scaling), not a normal 2x acceptance case. A disposable
+explicit-size/no-autoSize candidate fixed the small-host crop but was undersized on a scaled host;
+MultiResolutionImage retained the crop. One explicit-size XFCE rapid-restart variant also lost its
+icon (blank screenshot, no JavaEmbeddedFrame, retained reference/add count 1 → 1). These variants are
+rejected; none is production code or evidence for a universal fix. Virtual-display raster checks do
+not establish physical-monitor HiDPI appearance.
+
+Selected original screenshots are retained in [the evidence folder](2026-10-27-linux-residency-2-evidence/):
+`lxde-2x.png`, `xfce-2x.png`, `java2-panel1-clipped.png`, `variant-lost-icon.png`,
+`lxde-live-removed.png` and `lxde-live-restored.png`. Complete PNG/XWD/window trees, probe/panel logs,
+PID records and fixture scripts remain under `/home/dustin/jasper-tray-gate.1yPuL3/native-task2/`,
+`task-2-*.{py,sh}` and `runner/LinuxTray{Diagnostics,Notifications}.java`; local selected/full copies
+are under `/tmp/jasper-task2-native-evidence/`. The initial unmodified run and independent timing are
+`lxde-1/` and `original-nohost-timing.log`; normal accepted configurations are `final-*` plus
+`lxde-1-corrected` / `xfce-1-corrected`. `notify-*` contains the decisive failed callback mitigation.
+
+**Gate disposition:** FAIL for an incident-free public-AWT legacy fallback on this pinned JBR.
+Stop Task 6's AWT composition and review the plan-required X11/JNA legacy design amendment; do not
+silently drop legacy support or hide the native exception. Protocol Tasks 1/3/4/5 remain independent.
+No production fallback, Jasper GUI, benchmark, AOT, merge or push was performed.
+
+Cleanup audit: all **113 recorded owned PIDs** were gone, and no test display socket/lock for :101–:121 remained. Eight temporary homes contained only late Mesa shader caches after initial cleanup; those exact audited directories were removed. Final temporary-home list is empty. Raw audit: `native-task2/cleanup-audit.json`. Both automated live-app probe runs exited 0 at their normal three-minute deadline.

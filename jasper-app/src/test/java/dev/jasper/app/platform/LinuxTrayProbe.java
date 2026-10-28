@@ -7,6 +7,8 @@ import java.awt.PopupMenu;
 import java.awt.SystemTray;
 import java.awt.TrayIcon;
 import java.awt.image.BufferedImage;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
@@ -51,5 +53,8 @@ public final class LinuxTrayProbe {
             end.setRepeats(false);
             end.start();
         });
+        // A Swing timer alone cannot keep AWT alive while no tray host exists.
+        new CountDownLatch(1).await(185, TimeUnit.SECONDS);
+        System.exit(1); // Bounded fallback if the EDT cannot deliver the three-minute timer.
     }
 }
