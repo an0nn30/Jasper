@@ -137,6 +137,35 @@ class ThirdPartyNoticesTest {
             .contains("The copyright notices in the Software and this entire statement");
     }
 
+    /** The Windows JCEF runtime ships two Windows SDK files unmodified: d3dcompiler_47.dll (x64 and ARM64) and dxil.dll (x64). */
+    @Test void theWindowsSdkLibrariesInTheJcefRuntimeAreListed() {
+        var byName = ThirdPartyNotices.thirdParty().stream()
+            .collect(Collectors.toMap(ThirdPartyNotices.Component::name, component -> component));
+        assertThat(byName).containsKeys("Direct3D HLSL Compiler", "DirectX IL");
+
+        var compiler = byName.get("Direct3D HLSL Compiler");
+        assertThat(compiler.version()).isEqualTo("10.0.26100.7705");
+        assertThat(ThirdPartyNotices.read(compiler.notice().orElseThrow())).contains("bin/d3dcompiler_47.dll",
+            "Redist\\D3D\\x64\\d3dcompiler_47.dll", "Redist\\D3D\\arm64\\d3dcompiler_47.dll", "Microsoft.Windows.SDK.CPP 10.0.26100.7705",
+            "© Microsoft Corporation. All rights reserved.");
+
+        var dxil = byName.get("DirectX IL");
+        assertThat(dxil.version()).isEqualTo("101.7.2308.24");
+        assertThat(ThirdPartyNotices.read(dxil.notice().orElseThrow())).contains("bin/dxil.dll", "Redist\\D3D\\x64\\dxil.dll",
+            "Microsoft.Windows.SDK.CPP 10.0.26100.3323", "(c) Microsoft Corporation. All rights reserved.");
+
+        for (var component : List.of(compiler, dxil)) {
+            assertThat(component.license()).as(component.name()).isEqualTo("LicenseRef-Windows-SDK");
+            assertThat(component.licenseName()).as(component.name()).isEqualTo("Microsoft Windows SDK license terms");
+            assertThat(component.homepage()).as(component.name()).isEqualTo("https://learn.microsoft.com/windows/apps/windows-sdk/");
+            assertThat(component.modules()).as(component.name()).isEmpty();
+            assertThat(ThirdPartyNotices.read(component.text())).as(component.name())
+                .startsWith("MICROSOFT SOFTWARE LICENSE TERMS\nMICROSOFT WINDOWS SOFTWARE DEVELOPMENT KIT (SDK) FOR WINDOWS 10\n")
+                .contains("2. ADDITIONAL LICENSING REQUIREMENTS AND/OR USE RIGHTS.", "REDIST.TXT Files.",
+                    "EULAID:WIN10SDK.RTM.AUG_2018_en-US");
+        }
+    }
+
     @Test void jaspersTextIsTheRootLicense() throws Exception {
         String root = Files.readString(ROOT.resolve("LICENSE.md"));
         assertThat(ThirdPartyNotices.read(ThirdPartyNotices.jasper("").text())).isEqualTo(root);

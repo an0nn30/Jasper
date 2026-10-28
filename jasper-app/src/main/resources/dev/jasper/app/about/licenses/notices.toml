@@ -110,6 +110,22 @@ text = "/dev/jasper/app/fonts/cousine/OFL.txt"
 notice = "/dev/jasper/app/fonts/cousine/NOTICE.md"
 
 [[component]]
+name = "Direct3D HLSL Compiler"
+version = "10.0.26100.7705"
+license = "LicenseRef-Windows-SDK"
+homepage = "https://learn.microsoft.com/windows/apps/windows-sdk/"
+text = "windows-sdk.LICENSE.txt"
+notice = "d3dcompiler.NOTICE.txt"
+
+[[component]]
+name = "DirectX IL"
+version = "101.7.2308.24"
+license = "LicenseRef-Windows-SDK"
+homepage = "https://learn.microsoft.com/windows/apps/windows-sdk/"
+text = "windows-sdk.LICENSE.txt"
+notice = "dxil.NOTICE.txt"
+
+[[component]]
 name = "FlatLaf"
 version = "3.7"
 license = "Apache-2.0"

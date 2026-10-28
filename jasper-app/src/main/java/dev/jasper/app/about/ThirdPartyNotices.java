@@ -32,7 +32,8 @@ public final class ThirdPartyNotices {
         Map.entry("OFL-1.1", "SIL Open Font License 1.1"),
         Map.entry("GPL-2.0-only WITH Classpath-exception-2.0", "GNU GPL v2 with the Classpath Exception"),
         Map.entry("LicenseRef-Nerd-Fonts", "Nerd Fonts licenses"),
-        Map.entry("LicenseRef-JogAmp", "JogAmp licenses (BSD 2-Clause and others)"));
+        Map.entry("LicenseRef-JogAmp", "JogAmp licenses (BSD 2-Clause and others)"),
+        Map.entry("LicenseRef-Windows-SDK", "Microsoft Windows SDK license terms"));
 
     private ThirdPartyNotices() {}
 
