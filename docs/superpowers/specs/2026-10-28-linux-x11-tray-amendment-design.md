@@ -208,3 +208,54 @@ was accessed for this amendment. Runtime baseline/library packaging and every ne
 Approval selected this scoped architecture and its gates. The revised Plan 2 preserves completed Tasks 1–5
 and records the failed public-AWT approach; remaining Tasks 6–10 implement this amendment. No fallback
 production code is committed until the new cancellation and legacy characterization gates pass.
+
+
+## PROPOSED authority-I/O correction — 2026-10-28
+
+**Pending user approval; Task 6 is blocked.** This proposal preserves the approved text above until accepted.
+Linux [open(2)](https://man7.org/linux/man-pages/man2/open.2.html) specifies that `O_NONBLOCK` has no effect on
+regular-file I/O and `O_NOFOLLOW` rejects only the final symlink. Path resolution/open may also wait on
+network/FUSE/automount activity. [close(2)](https://man7.org/linux/man-pages/man2/close.2.html) explains that a
+blocked Linux syscall retains its open-file-description; concurrent close cannot guarantee cancellation.
+Deadline checks between reads therefore cannot prove the approved two-second authority-acquisition bound.
+Ordinary local-filesystem timings do not prove cancellation of those stalls.
+
+Proposed replacement authority contract:
+
+> Use a nonblocking owned Unix socket and finite `poll` for connection establishment, then `xcb_connect_to_fd`
+> with the launch session's authority. Authority acquisition takes a size-bounded regular-file snapshot and checks
+> cancellation and the shared two-second deadline before and after each filesystem syscall and between 16 KiB reads.
+> Decode the bounded snapshot through `XauReadAuth` on an in-memory stream, with explicit lifetime for native records
+> and matching cookie memory. Reject final-component symlinks, special files, malformed/excessive records and changed
+> snapshots; never log cookies or modify access controls. Normal local regular files are the supported operational
+> scope. Filesystem acquisition is cooperative: a stalled pathname lookup, open, stat or read may retain the sole
+> worker and its file descriptor until the kernel returns. At most one authority/connection attempt may remain
+> outstanding. Close invalidates admissions immediately and never waits on the filesystem; canceled acquisition
+> cannot subsequently connect or publish. Cleanup runs on the owning worker once the syscall returns. No replacement
+> authority/connection attempt is admitted before that worker finishes cleanup. Authority discovery creates no native
+> icon; a stalled authority attempt therefore does not block modern publication. The sole native worker is a daemon,
+> and application exit never waits for it. Socket setup and every XCB operation that can flush retain the
+> protected-duplicate shutdown deadline and native cancellation gate. Validate authority matching, malformed input
+> and missing-cookie behavior with fixture files.
+
+If approved, apply these corresponding changes together:
+
+- **Task 6 and this amendment's lifetime/gate clauses:** distinguish a bounded caller wait from filesystem syscall
+  completion. At authority timeout, invalidate the attempt before returning unavailable, preventing late connect or
+  publication. Preserve all authority input limits and ownership checks. Replace the strict authority-cancellation
+  row with a deterministic held-acquisition test of one attempt, immediate invalidation, modern availability,
+  discarded late results and worker cleanup after release. Keep the strict socket setup/request/flush deadline and
+  500 ms cleanup allowance, ABI checks, FD-reuse proofs and watchdog requirements unchanged.
+- **Tasks 7/9:** retain one authority-attempt slot until its worker returns; admit no second acquisition worker/retry.
+  Authority-only work creates no connection/icon and does not block modern publication. An actual socket/icon cleanup
+  obligation still refuses replacement until confirmed. Bound caller waits, preserve nonblocking EDT close and ensure
+  Quit does not await the daemon acquisition worker.
+- **Task 10, plan status, verification and maintenance:** record the changed guarantee and residual risk explicitly;
+  normal acquisition timings are not proof of syscall cancellation. Preserve the Fedora native gate and required
+  x86_64/Ubuntu 22.04 CI release gates. Update the Task 6 brief consistently.
+
+Residual risk requiring approval: a filesystem stall may retain one daemon worker and one authority FD, in addition
+to its owned wake pipe, and leave legacy fallback unavailable until the syscall returns. Modern publication and app
+exit remain available. In-process resource cleanup waits for that return. This limits accumulation but weakens the
+approved cleanup guarantee; no new gate has passed. Keeping the strict requirement instead requires a separately
+reviewed acquisition design before implementation; this proposal introduces no helper or abandoned-worker retry.
