@@ -10,9 +10,8 @@ import java.util.regex.Pattern;
 /**
  * Where a class was loaded from: its jar, or its classes directory during development.
  *
- * <p>Read from the class's own resource URL, never from its protection domain: a class the JDK 25 AOT cache loads
- * reports the location the cache was trained at, or none once that location is gone (JDK-8376576, fixed for JDK 28),
- * while the class path's resource lookup always names the file that is installed.
+ * <p>Read from the class's own resource URL, which the class path's resource lookup resolves to the file that is
+ * installed.
  */
 public final class CodeLocation {
     /** The prefix of a multi-release jar's versioned section, which a class served from it carries in its resource. */

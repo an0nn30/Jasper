@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -72,6 +73,97 @@ class ThirdPartyNoticesTest {
                 .contains("f7377708b654b73b206da40bb382ecb4d44e8f12", "8062c061ff33e22041d9f1844db5b8b8a6b5e4d7")
                 .contains("This software includes code from IntelliJ IDEA\nCopyright (C) JetBrains s.r.o.\nhttps://www.jetbrains.com/idea/");
         });
+    }
+
+    /** Plan 2 (the JCEF runtime): every package ships Chromium, CEF, JetBrains' JCEF binding and the JogAmp modules JCEF requires. */
+    @Test void chromiumAndItsJavaBindingAreListed() {
+        var byName = ThirdPartyNotices.thirdParty().stream()
+            .collect(Collectors.toMap(ThirdPartyNotices.Component::name, component -> component));
+        assertThat(byName).containsKeys("Chromium", "Chromium Embedded Framework", "JCEF", "JOGL", "GlueGen");
+
+        var chromium = byName.get("Chromium");
+        assertThat(chromium.version()).isEqualTo("150.0.7871.129");
+        assertThat(chromium.license()).isEqualTo("BSD-3-Clause");
+        assertThat(ThirdPartyNotices.read(chromium.text())).contains("Copyright 2015 The Chromium Authors",
+            "Neither the name of Google LLC");
+        assertThat(ThirdPartyNotices.read(chromium.notice().orElseThrow()))
+            .contains("https://chromium.googlesource.com/chromium/src/+/refs/tags/150.0.7871.129/");
+
+        var cef = byName.get("Chromium Embedded Framework");
+        assertThat(cef.version()).isEqualTo("150.0.14");
+        assertThat(cef.license()).isEqualTo("BSD-3-Clause");
+        assertThat(ThirdPartyNotices.read(cef.text())).contains("Copyright (c) 2008-2020 Marshall A. Greenblatt");
+
+        var jcef = byName.get("JCEF");
+        assertThat(jcef.version()).isEqualTo("150.0.14.1233+g9df0879");
+        assertThat(jcef.license()).isEqualTo("BSD-3-Clause");
+        assertThat(jcef.homepage()).isEqualTo("https://github.com/JetBrains/jcef");
+        assertThat(ThirdPartyNotices.read(jcef.text())).contains("Copyright (c) 2008-2013 Marshall A. Greenblatt");
+
+        for (var name : List.of("JOGL", "GlueGen")) {
+            var jogamp = byName.get(name);
+            assertThat(jogamp.version()).as(name).isEqualTo("2.4.0-rc-20200930");
+            assertThat(jogamp.license()).as(name).isEqualTo("LicenseRef-JogAmp");
+            assertThat(jogamp.licenseName()).as(name).isEqualTo("JogAmp licenses (BSD 2-Clause and others)");
+            assertThat(jogamp.modules()).as(name).isEmpty();
+            assertThat(ThirdPartyNotices.read(jogamp.text())).as(name).contains("Simplified BSD 2-clause license",
+                "Copyright 2010");
+        }
+    }
+
+    /** The JCEF runtime's cef_server links Apache Thrift and Boost, and its jcef module carries a renamed copy of Thrift's Java runtime. */
+    @Test void thriftAndBoostInTheJcefRuntimeAreListed() {
+        var byName = ThirdPartyNotices.thirdParty().stream()
+            .collect(Collectors.toMap(ThirdPartyNotices.Component::name, component -> component));
+        assertThat(byName).containsKeys("Apache Thrift", "Boost");
+
+        var thrift = byName.get("Apache Thrift");
+        assertThat(thrift.version()).isEqualTo("0.23.0");
+        assertThat(thrift.license()).isEqualTo("Apache-2.0");
+        assertThat(thrift.homepage()).isEqualTo("https://thrift.apache.org/");
+        assertThat(thrift.modules()).isEmpty();
+        assertThat(ThirdPartyNotices.read(thrift.text())).contains("Apache License").contains("Version 2.0, January 2004");
+        assertThat(ThirdPartyNotices.read(thrift.notice().orElseThrow())).contains("Copyright (C) 2006 - 2019, The Apache Software Foundation",
+            "This product includes software developed at\nThe Apache Software Foundation", "com.jetbrains.cef.remote.thrift",
+            "lib/cpp/src/thrift/windows/SocketPair.cpp", "Copyright 2007 by Nathan C. Myers");
+
+        var boost = byName.get("Boost");
+        assertThat(boost.version()).isEqualTo("1.91.0");
+        assertThat(boost.license()).isEqualTo("BSL-1.0");
+        assertThat(boost.licenseName()).isEqualTo("Boost Software License 1.0");
+        assertThat(boost.homepage()).isEqualTo("https://www.boost.org/");
+        assertThat(boost.modules()).isEmpty();
+        assertThat(ThirdPartyNotices.read(boost.text())).startsWith("Boost Software License - Version 1.0 - August 17th, 2003\n")
+            .contains("The copyright notices in the Software and this entire statement");
+    }
+
+    /** The Windows JCEF runtime ships two Windows SDK files unmodified: d3dcompiler_47.dll (x64 and ARM64) and dxil.dll (x64). */
+    @Test void theWindowsSdkLibrariesInTheJcefRuntimeAreListed() {
+        var byName = ThirdPartyNotices.thirdParty().stream()
+            .collect(Collectors.toMap(ThirdPartyNotices.Component::name, component -> component));
+        assertThat(byName).containsKeys("Direct3D HLSL Compiler", "DirectX IL");
+
+        var compiler = byName.get("Direct3D HLSL Compiler");
+        assertThat(compiler.version()).isEqualTo("10.0.26100.7705");
+        assertThat(ThirdPartyNotices.read(compiler.notice().orElseThrow())).contains("bin/d3dcompiler_47.dll",
+            "Redist\\D3D\\x64\\d3dcompiler_47.dll", "Redist\\D3D\\arm64\\d3dcompiler_47.dll", "Microsoft.Windows.SDK.CPP 10.0.26100.7705",
+            "© Microsoft Corporation. All rights reserved.");
+
+        var dxil = byName.get("DirectX IL");
+        assertThat(dxil.version()).isEqualTo("101.7.2308.24");
+        assertThat(ThirdPartyNotices.read(dxil.notice().orElseThrow())).contains("bin/dxil.dll", "Redist\\D3D\\x64\\dxil.dll",
+            "Microsoft.Windows.SDK.CPP 10.0.26100.3323", "(c) Microsoft Corporation. All rights reserved.");
+
+        for (var component : List.of(compiler, dxil)) {
+            assertThat(component.license()).as(component.name()).isEqualTo("LicenseRef-Windows-SDK");
+            assertThat(component.licenseName()).as(component.name()).isEqualTo("Microsoft Windows SDK license terms");
+            assertThat(component.homepage()).as(component.name()).isEqualTo("https://learn.microsoft.com/windows/apps/windows-sdk/");
+            assertThat(component.modules()).as(component.name()).isEmpty();
+            assertThat(ThirdPartyNotices.read(component.text())).as(component.name())
+                .startsWith("MICROSOFT SOFTWARE LICENSE TERMS\nMICROSOFT WINDOWS SOFTWARE DEVELOPMENT KIT (SDK) FOR WINDOWS 10\n")
+                .contains("2. ADDITIONAL LICENSING REQUIREMENTS AND/OR USE RIGHTS.", "REDIST.TXT Files.",
+                    "EULAID:WIN10SDK.RTM.AUG_2018_en-US");
+        }
     }
 
     @Test void jaspersTextIsTheRootLicense() throws Exception {

@@ -1,5 +1,47 @@
 # Browser 2: the JCEF runtime — Implementation Plan
 
+> **Status (2026-10-27):** Tasks 1–6 done on `claude/browser-jcef-runtime-0c197e` (cut from the design branch at
+> `823125fdc`; not merged, not pushed), with the deviations below. Task 7 ran with the user's OK, and the user
+> accepted [its record](../../benchmarks/2026-10-27-jcef-runtime.md) on 2026-10-27. The warm start and memory are within
+> noise, the early cold milestones about 30 ms faster and the output-phase allocation 5 to 8 % higher; the cold
+> window-to-output milestones are inconclusive. Commits: Task 1 `a289d48df`
+> and fix `1a7feae1e`, Task 1b `e84e4929a`, Task 2 `42d443334`, Task 3 `4eccde0b3` and fix `1bc83a953`, Task 4
+> `adbec9b35`, Task 5 `03251f099` and fix `5645a0fd3`, Task 6 `180b17cd5`, and the final review's fixes `ea9892e27`
+> (`jcefRuntimeBuild` pins the exact build and a fixture ties `notices.toml`'s Chromium, CEF and JCEF versions to it;
+> tests run after `verifyJcefToolchain`; `release.yml`'s libraries; `Build-Installer.ps1` requires JCEF). The full
+> `./gradlew check` on the dev Mac (macOS aarch64) after those fixes passed: 13,452 JUnit tests, no failures or errors,
+> 30 skips.
+>
+> - **Deviations.** The branch is `claude/browser-jcef-runtime-0c197e`, not `claude/browser-jcef-runtime`. Task 1:
+>   `verifyJcefToolchain` lives in `gradle/packaging.gradle` (the root applies no `java` or `base` plugin) and is part
+>   of `:jasper-app:check`. Task 1b is not in the plan text: b635.75 fixes JDK-8376576, so `verifyLauncherImage`'s
+>   "cache that kills the JVM" no longer died; its new killing cache is `-XX:AOTMode=on` with a class-path jar whose
+>   modification time changed after training (`-Xshare:on` cannot be combined with `-XX:AOTCache` on JDK 25), and the
+>   probe image gets the default CDS archive from `--generate-cds-archive`. Task 2: the documented runtime-modules block
+>   changed with the code (44 modules, 45 on Windows); the runtime bundle is re-sealed ad hoc before the app;
+>   `verifyPackage` also verifies `Contents/runtime` on its own, because the app's deep verify does not catch a broken
+>   runtime seal; the SDK home is resolved to its real path before `../Frameworks` (SDKMAN links); the spike's
+>   self-check against the packaged runtime shows the `jcef` module and the headless plumbing, not that Chromium's
+>   framework is found, which plan 4's first Chromium start shows. Task 3: `jcefLinuxHelpers` and `jcefPayloadProblem`
+>   were added, and `markJcefHelpersExecutable` decides from the files present. Task 4: Chromium's Ubuntu 22.04
+>   libraries are on the Linux packaging jobs' `apt-get` lines. Task 5: the entries sit in `notices.toml`'s
+>   alphabetical order, and Apache Thrift and Boost were added because JCEF ships them; Chromium's credits link is the
+>   tag's source tree, since no static credits page exists. Task 6: the launcher sources vendored at b583.48 are
+>   identical to b635.75's, so they stay.
+> - **Not run.** Windows and Linux packaging (no such host may run the downloaded JDKs, and the GitHub Actions budget
+>   blocks CI), so those `verifyPackage` lines and the Chromium libraries on the Linux `apt-get` lines are first
+>   exercised by CI; Task 3 Step 5 (`linuxLibraryRequirements` on a packaged Linux image) is replaced by reading
+>   libcef's `DT_NEEDED` sonames from the Linux jmods, which is the rpm path's view (`readelf`, direct dependencies);
+>   the deb path runs `ldd`, which also lists transitive libraries, so the `.deb` declares more dependencies than were
+>   assessed, first exercised by CI's install job. `lib/chrome-sandbox` keeps jlink's mode on Linux; plan 4 decides
+>   the sandbox.
+> - **For plan 4.** The launcher, `java`, `libjvm` and `libjcef` are ad hoc with no hardened runtime and no entitlements;
+>   JetBrains' helpers are hardened, keep library validation and have `allow-jit`.
+> - **Follow-up.** With JDK-8376576 fixed, production's unsealing of `jbr-api`, training in a copy that is deleted, and
+>   the JDK-8376576 wording in `gradle/packaging-support.gradle`, `docs/packaging.md`, `docs/app-maintenance.md`,
+>   `CodeLocation.java`, `CodeSourceScanTest.java` and `jbr-api.NOTICE.txt` describe b583.48's behaviour. Done on
+>   `claude/great-wilson-b8a1e4` (`0f71eda86`..`d3f03b080`, see `docs/STATUS.md`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

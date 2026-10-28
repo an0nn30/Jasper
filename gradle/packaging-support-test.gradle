@@ -6,15 +6,41 @@ def verifySupport = tasks.register('verifyPackagingSupport') {
     doLast {
         List<String> roots = runtimeRootModules('macos')
         assert roots.containsAll(['java.se', 'jdk.httpserver', 'jdk.unsupported', 'jdk.jfr', 'jdk.attach', 'jdk.zipfs'])
-        assert roots.intersect(['jcef', 'jogl.all', 'gluegen.rt', 'jdk.compiler', 'jdk.jshell', 'jdk.jlink', 'jdk.jpackage',
-            'jdk.jdi', 'jdk.jdwp.agent', 'jdk.incubator.vector', 'jdk.dynalink']).isEmpty()
+        assert roots.contains('jcef')
+        assert roots.intersect(['jdk.compiler', 'jdk.jshell', 'jdk.jlink', 'jdk.jpackage', 'jdk.jdi', 'jdk.jdwp.agent',
+            'jdk.incubator.vector', 'jdk.dynalink']).isEmpty()
         assert runtimeRootModules('linux') == roots
         assert runtimeRootModules('windows') == roots + ['jdk.crypto.mscapi']
         List<String> modules = runtimeModules('macos')
-        assert modules == modules.toSorted() && modules == modules.toUnique() && modules.size() == 41
+        assert modules == modules.toSorted() && modules == modules.toUnique()
+        assert modules.size() == 44 && modules.containsAll(['jcef', 'jogl.all', 'gluegen.rt'])
         assert modules.containsAll(roots + ['java.base', 'java.desktop', 'java.sql', 'jdk.internal.jvmstat'])
         assert runtimeModules('linux') == modules
         assert runtimeModules('windows') == (modules + ['jdk.crypto.mscapi']).toSorted()
+        assert runtimeModules('windows').size() == 45
+        assert macJcefPayload.size() == 5 && macJcefPayload.every { it.startsWith('cef_server.app/Contents/Frameworks/') }
+        assert macJcefPayload.contains('cef_server.app/Contents/Frameworks/jcef Helper (Renderer).app')
+        // The Chromium framework sits beside the SDK home; without it packaging stops before jpackage runs.
+        File bundle = new File(temporaryDir, 'jcef-frameworks')
+        delete(bundle)
+        File sdk = new File(bundle, 'Contents/Home')
+        sdk.mkdirs()
+        File frameworks = new File(sdk.canonicalFile.parentFile, macJcefFrameworks)
+        try {
+            requireMacJcefFrameworks(sdk)
+            assert false : 'an SDK without Contents/Frameworks was accepted'
+        } catch (GradleException expected) {
+            assert expected.message == "The JBR SDK has no Chromium framework at ${frameworks}; install the full jbrsdk_jcef bundle (SDKMAN's macOS install keeps only Contents/Home)".toString()
+        }
+        frameworks.mkdirs()
+        assert requireMacJcefFrameworks(sdk) == frameworks
+        // A home reached through a link, as SDKMAN's candidates/java/<version> links to the bundle's Contents/Home.
+        if (!System.getProperty('os.name').startsWith('Windows')) {
+            File linked = new File(bundle, 'candidates/25.0.4.1-jcef')
+            linked.parentFile.mkdirs()
+            java.nio.file.Files.createSymbolicLink(linked.toPath(), sdk.toPath())
+            assert requireMacJcefFrameworks(linked) == frameworks
+        }
         assert jlinkOptions.tokenize(' ').containsAll(['--generate-cds-archive', '--strip-debug'])
         assert !jlinkOptions.contains('--bind-services') && !jlinkOptions.contains('--compress') &&
             !jlinkOptions.contains('--strip-native-commands')
@@ -24,7 +50,7 @@ def verifySupport = tasks.register('verifyPackagingSupport') {
         assert block.find() : 'docs/plugin-authoring.md has no runtime-modules block'
         assert (block.group(1) =~ /`([a-z][a-z0-9.]*)`/).collect { it[1] } == modules :
             'docs/plugin-authoring.md lists other runtime modules than gradle/packaging-support.gradle'
-        logger.lifecycle('Verified the runtime module list')
+        logger.lifecycle('Verified the runtime module list and the macOS Chromium framework')
     }
 }
 tasks.named('check') { dependsOn(verifySupport) }
@@ -400,91 +426,6 @@ verifySupport.configure {
 
 verifySupport.configure {
     doLast {
-        // Spec 2026-10-14 section 3.1: classes the AOT cache loads get no code source once its training paths are gone,
-        // and a sealed package then refuses its second class, so staging unseals the class path.
-        File jars = new File(temporaryDir, 'sealing')
-        jars.deleteDir()
-        jars.mkdirs()
-        def manifest = new java.util.jar.Manifest()
-        manifest.mainAttributes.putValue('Manifest-Version', '1.0')
-        manifest.mainAttributes.putValue('Sealed', 'true')
-        manifest.mainAttributes.putValue('Multi-Release', 'true')
-        manifest.entries.put('p/', new java.util.jar.Attributes())
-        manifest.entries['p/'].putValue('Sealed', 'true')
-        manifest.entries['p/'].putValue('Implementation-Title', 'P')
-        manifest.entries.put('q/', new java.util.jar.Attributes())
-        manifest.entries['q/'].putValue('Sealed', 'false')
-        long stamp = 1_759_400_000_000L
-        File sealed = new File(jars, 'sealed.jar')
-        sealed.withOutputStream { raw ->
-            new java.util.jar.JarOutputStream(raw, manifest).withCloseable { out ->
-                [['p/', null], ['p/A.class', 'class A'], ['q/B.class', 'class B']].each { String name, String body ->
-                    def entry = new java.util.zip.ZipEntry(name)
-                    entry.time = stamp
-                    if (name == 'q/B.class') entry.comment = 'kept'
-                    out.putNextEntry(entry)
-                    if (body != null) out.write(body.getBytes('UTF-8'))
-                    out.closeEntry()
-                }
-            }
-        }
-        def entries = { File jar ->
-            new java.util.zip.ZipFile(jar).withCloseable { zip ->
-                zip.entries().toList().collect { entry ->
-                    [entry.name, entry.time, entry.comment, entry.directory ? null : zip.getInputStream(entry).bytes.encodeHex().toString()]
-                }
-            }
-        }
-        def before = entries(sealed)
-        assert sealingSections(sealed) == ['main', 'p/', 'q/']
-        assert unsealJar(sealed)
-        assert sealingSections(sealed).isEmpty()
-        def after = entries(sealed)
-        assert after.collect { it[0] } == before.collect { it[0] } : 'entries keep their names and order'
-        assert after.findAll { it[0] != 'META-INF/MANIFEST.MF' } == before.findAll { it[0] != 'META-INF/MANIFEST.MF' } :
-            'every other entry keeps its bytes, time and comment'
-        def rewritten = new java.util.jar.JarFile(sealed).withCloseable { it.manifest }
-        assert rewritten.mainAttributes.getValue('Sealed') == null
-        assert rewritten.mainAttributes.getValue('Multi-Release') == 'true'
-        assert rewritten.mainAttributes.getValue('Jasper-Modified') == 'package sealing removed'
-        assert rewritten.entries.keySet() == ['p/'] as Set : 'a section left empty is dropped'
-        assert rewritten.entries['p/'].getValue('Implementation-Title') == 'P'
-        byte[] once = sealed.bytes
-        assert !unsealJar(sealed) && Arrays.equals(sealed.bytes, once) : 'an unsealed jar is left alone'
-
-        File plain = new File(jars, 'plain.jar')
-        plain.withOutputStream { raw ->
-            new java.util.zip.ZipOutputStream(raw).withCloseable { out ->
-                out.putNextEntry(new java.util.zip.ZipEntry('a.txt'))
-                out.write('a'.getBytes('UTF-8'))
-                out.closeEntry()
-            }
-        }
-        assert sealingSections(plain).isEmpty() && !unsealJar(plain) : 'a jar without a manifest is not sealed'
-
-        File signed = new File(jars, 'signed.jar')
-        signed.withOutputStream { raw ->
-            new java.util.jar.JarOutputStream(raw, manifest).withCloseable { out ->
-                out.putNextEntry(new java.util.zip.ZipEntry('META-INF/SIGNER.SF'))
-                out.write('Signature-Version: 1.0\n'.getBytes('UTF-8'))
-                out.closeEntry()
-            }
-        }
-        byte[] signedBytes = signed.bytes
-        try {
-            unsealJar(signed)
-            assert false : 'a signed, sealed jar must fail the build'
-        } catch (GradleException expected) {
-            assert expected.message.contains('signed.jar') && expected.message.contains('signed;')
-        }
-        assert Arrays.equals(signed.bytes, signedBytes) : 'a signed jar is left untouched'
-        assert !new File(jars, 'signed.jar.unsealing').exists()
-        logger.lifecycle('Verified unsealing of the application class path')
-    }
-}
-
-verifySupport.configure {
-    doLast {
         // Spec 2026-10-14 section 3.3: training runs in a copy that is gone before the cache is verified.
         File root = new File(temporaryDir, 'training copy')
         root.deleteDir()
@@ -560,5 +501,218 @@ verifySupport.configure {
             assert !copy.exists() : 'the leftover of the locked copy is removed again'
         }
         logger.lifecycle('Verified training in a throwaway copy')
+    }
+}
+
+// The build's runtime is the JetBrains Runtime with JCEF: the release file of one without it is refused, and so is
+// one that has the module but no JCEF version, and one that names another build than jcefRuntimeBuild.
+verifySupport.configure {
+    doLast {
+        String jcef = '''JAVA_VERSION="25.0.4.1"
+IMPLEMENTOR_VERSION="JBRSDK-25.0.4.1+1-635.75-jcef"
+MODULES="java.base java.desktop gluegen.rt jogl.all jcef jdk.jpackage"
+JCEF_VERSION="150.0.14.1233+g9df0879"
+JCEF_VERSION_DETAILED=150.0.14-g7c1aa68-chromium-150.0.7871.129-api-1.21-263-b16
+'''
+        String plain = '''JAVA_VERSION="25.0.4.1"
+IMPLEMENTOR_VERSION="JBRSDK-25.0.4.1+1-583.48-nomod"
+MODULES="java.base java.desktop jdk.jpackage"
+'''
+        assert jcefRuntimeProblem(jcef) == null
+        assert jcefRuntimeProblem(plain) == 'it has no jcef module'
+        assert jcefRuntimeProblem(jcef.replace(' jcef', '')) == 'it has no jcef module'
+        assert jcefRuntimeProblem(jcef.readLines().findAll { !it.startsWith('JCEF_VERSION_DETAILED') }.join('\n')) ==
+            'its release file names no JCEF version'
+        assert jcefRuntimeProblem('') == 'it has no jcef module'
+        assert jcefRuntimeProblem(jcef.replace(' jcef ', ' jcef.something ')) == 'it has no jcef module'
+        // Another build is refused too, however close: the first pinned value that differs is named.
+        assert jcefRuntimeProblem(jcef.replace('chromium-150.0.7871.129', 'chromium-150.0.7871.130')) ==
+            'its JCEF_VERSION_DETAILED is 150.0.14-g7c1aa68-chromium-150.0.7871.130-api-1.21-263-b16'
+        assert jcefRuntimeProblem(jcef.replace('263-b16', '263-b160')) ==
+            'its JCEF_VERSION_DETAILED is 150.0.14-g7c1aa68-chromium-150.0.7871.129-api-1.21-263-b160'
+        assert jcefRuntimeProblem(jcef.replace('1233+g9df0879', '1240+g0123abc')) == 'its JCEF_VERSION is 150.0.14.1240+g0123abc'
+        assert jcefRuntimeProblem(jcef.replace('635.75', '640.1')) == 'its IMPLEMENTOR_VERSION is JBRSDK-25.0.4.1+1-640.1-jcef'
+        assert jcefRuntimeProblem(jcef.replace('635.75', '640.1').replace('chromium-150.0.7871.129', 'chromium-151.0.7900.1')) ==
+            'its IMPLEMENTOR_VERSION is JBRSDK-25.0.4.1+1-640.1-jcef'
+        assert jcefRuntimeProblem(jcef.readLines().findAll { !it.startsWith('JCEF_VERSION=') }.join('\n')) ==
+            'its release file has no JCEF_VERSION'
+        // Quoting and CRLF line ends make no difference.
+        assert jcefRuntimeProblem(jcef.replace('DETAILED=150', 'DETAILED="150').replace('b16\n', 'b16"\n')) == null
+        assert jcefRuntimeProblem(jcef.replace('\n', '\r\n')) == null
+        File sdk = new File('/jbr') // the message prints the File, which is \jbr on Windows
+        requireJcefRuntime(sdk, jcef)
+        try {
+            requireJcefRuntime(sdk, plain)
+            assert false : 'a runtime without JCEF must be refused'
+        } catch (GradleException expected) {
+            assert expected.message == "The selected JBR SDK at ${sdk} is not the JCEF build JBRSDK-25.0.4.1+1-635.75-jcef: " +
+                'it has no jcef module. Install that build, or make Gradle use it (docs/packaging.md#requirements).'
+        }
+        try {
+            requireJcefRuntime(sdk, jcef.replace('635.75', '640.1'))
+            assert false : 'another JCEF build must be refused'
+        } catch (GradleException expected) {
+            assert expected.message == "The selected JBR SDK at ${sdk} is not the JCEF build JBRSDK-25.0.4.1+1-635.75-jcef: " +
+                'its IMPLEMENTOR_VERSION is JBRSDK-25.0.4.1+1-640.1-jcef. Install that build, or make Gradle use it ' +
+                '(docs/packaging.md#requirements).'
+        }
+        // The Licenses window names the Chromium, Chromium Embedded Framework and JCEF of the pinned build.
+        String notices = rootProject.file('jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml').getText('UTF-8')
+        Map<String, String> noticed = notices.split(/(?m)^\[\[component\]\]/).collectEntries { String component ->
+            def name = component =~ /(?m)^name = "([^"]*)"/
+            def version = component =~ /(?m)^version = "([^"]*)"/
+            name.find() && version.find() ? [(name.group(1)): version.group(1)] : [:]
+        }
+        def detailed = jcefRuntimeBuild.JCEF_VERSION_DETAILED =~ /^([0-9.]+)-g[0-9a-f]+-chromium-([0-9.]+)-/
+        assert detailed.find() : "JCEF_VERSION_DETAILED names no CEF and Chromium version: ${jcefRuntimeBuild.JCEF_VERSION_DETAILED}"
+        Map<String, String> pinned = ['Chromium': detailed.group(2), 'Chromium Embedded Framework': detailed.group(1),
+            'JCEF': jcefRuntimeBuild.JCEF_VERSION]
+        assert noticed.subMap(pinned.keySet()) == pinned :
+            "notices.toml names ${noticed.subMap(pinned.keySet())}, jcefRuntimeBuild in gradle/packaging-support.gradle ${pinned}"
+        logger.lifecycle('Verified the JCEF runtime check')
+    }
+}
+
+// Windows and Linux get Chromium from the runtime's own jcef.jmod: packaging/jcef lists its files as paths inside the
+// runtime, and verifyPackage requires every one. jlink drops the execute bit of the Linux helpers.
+verifySupport.configure {
+    doLast {
+        boolean windowsHost = System.getProperty('os.name').toLowerCase().contains('windows')
+        Map<String, Integer> sizes = ['windows-x64': 240, 'windows-aarch64': 238, 'linux-x64': 236, 'linux-aarch64': 236]
+        sizes.each { String platform, Integer size ->
+            def (os, arch) = platform.tokenize('-')
+            List<String> files = jcefPayload(os, arch)
+            assert files.size() == size : "${platform} lists ${files.size()} files"
+            assert files == files.toUnique() && files == files.toSorted()
+            assert files.every { !it.startsWith('/') && !it.contains('\\') && !it.tokenize('/').any { part -> part in ['.', '..'] } }
+            String dir = os == 'windows' ? 'bin' : 'lib'
+            assert files.any { it.endsWith(os == 'windows' ? 'libcef.dll' : 'libcef.so') }
+            assert files.any { it.endsWith(os == 'windows' ? 'jcef_helper.exe' : 'jcef_helper') }
+            ['libcef', 'jcef_helper', 'icudtl.dat', 'resources.pak', 'v8_context_snapshot.bin', 'chrome_100_percent.pak',
+                'chrome_200_percent.pak', 'locales/en-US.pak'].each { String name ->
+                assert files.any { it.startsWith("${dir}/${name}") } : "${platform} lacks ${name}"
+            }
+            List<String> locales = files.findAll { it.startsWith("${dir}/locales/") }
+            assert locales.size() > 50 && locales.every { it.endsWith('.pak') }
+            assert files.every { !it.startsWith('#') && !it.isBlank() }
+        }
+        assert jcefPayload('linux', 'x64').containsAll(jcefLinuxHelpers) && jcefPayload('linux', 'aarch64').containsAll(jcefLinuxHelpers)
+        assert !jcefPayload('windows', 'x64').any { it.endsWith('/libcef.so') }
+        try {
+            jcefPayload('macos', 'aarch64')
+            assert false : 'macOS has no list: its Chromium is a framework'
+        } catch (GradleException expected) {
+            assert expected.message.contains('macos-aarch64.txt')
+        }
+
+        // The package check on a runtime folder built from a list: complete, then missing files named in one message.
+        File linuxHome = new File(temporaryDir, 'jcef-runtime-linux')
+        delete(linuxHome)
+        jcefPayload('linux', 'x64').each { new File(linuxHome, it).with { parentFile.mkdirs(); text = 'x' } }
+        if (!windowsHost) {
+            // jlink's files come without it; markJcefHelpersExecutable gives the helpers owner, group and other execute and
+            // leaves the other files alone.
+            String locked = jcefPayloadProblem(linuxHome, 'linux', 'x64')
+            assert locked != null && locked.contains('lib/jcef_helper') && locked.contains('lib/cef_server') && locked.contains('not executable')
+            markJcefHelpersExecutable(linuxHome)
+            jcefLinuxHelpers.each { String helper ->
+                File file = new File(linuxHome, helper)
+                assert file.canExecute()
+                assert java.nio.file.Files.getPosixFilePermissions(file.toPath())*.name().containsAll(
+                    ['OWNER_EXECUTE', 'GROUP_EXECUTE', 'OTHERS_EXECUTE'])
+            }
+            assert !new File(linuxHome, 'lib/libcef.so').canExecute()
+        }
+        markJcefHelpersExecutable(linuxHome) // a no-op where the file system has no POSIX permissions (Windows)
+        assert jcefPayloadProblem(linuxHome, 'linux', 'x64') == null
+        assert new File(linuxHome, 'lib/libcef.so').delete() && new File(linuxHome, 'lib/locales/af.pak').delete()
+        String missing = jcefPayloadProblem(linuxHome, 'linux', 'x64')
+        assert missing.contains('lib/libcef.so') && missing.contains('lib/locales/af.pak') && missing.contains('2 of 236')
+        assert missing.contains(linuxHome.toString())
+        linuxHome.toPath().resolve('lib/locales').toFile().listFiles().each { it.delete() }
+        String many = jcefPayloadProblem(linuxHome, 'linux', 'x64')
+        assert many.contains('lib/libcef.so') && many.contains('and 201 more') && many.contains('221 of 236')
+        // Windows has no helper bit to check; a file of another architecture's list is missing from this one.
+        File windowsHome = new File(temporaryDir, 'jcef-runtime-windows')
+        delete(windowsHome)
+        jcefPayload('windows', 'aarch64').each { new File(windowsHome, it).with { parentFile.mkdirs(); text = 'x' } }
+        assert jcefPayloadProblem(windowsHome, 'windows', 'aarch64') == null
+        assert new File(windowsHome, 'bin/jcef_helper.exe').delete()
+        assert jcefPayloadProblem(windowsHome, 'windows', 'aarch64').contains('bin/jcef_helper.exe')
+        assert jcefPayloadProblem(windowsHome, 'windows', 'x64').contains('bin/dxil.dll') // another architecture's list
+        delete(linuxHome, windowsHome)
+        logger.lifecycle('Verified the JCEF payload lists and their package check')
+    }
+}
+
+// The workflows build on the JetBrains Runtime with JCEF: CI's check job refuses any other runtime (verifyJcefToolchain),
+// the packaging tasks of the release and Linux package workflows refuse it too (nativeContext), and the SDK release and
+// desktop-gtk-modern jobs, which run neither check, take the same runtime. Every setup-java step that installs the
+// JetBrains distribution therefore asks for java-package: jdk+jcef. The workflow files are read as text, one step at a
+// time: a step is a list item with the lines indented deeper than its dash, and it is a setup-java step when its own
+// lines say uses: actions/setup-java@.
+verifySupport.configure {
+    doLast {
+        // The JetBrains setup-java steps of one workflow file as [line: the step's first line (1-based), jcef: whether the
+        // same step asks for jdk+jcef]. Quoting, a trailing comment and CRLF line ends make no difference.
+        def jetbrainsSteps = { String text ->
+            List<String> lines = text.readLines().collect { String line ->
+                line.trim().startsWith('#') ? '' : line.replaceFirst(/\s+#.*$/, '')
+            }
+            List<Map> steps = []
+            lines.eachWithIndex { String first, int index ->
+                def dash = first =~ /^(\s*)-\s+\S/
+                if (!dash.find()) return
+                int indent = dash.group(1).length()
+                List<String> step = [first]
+                for (int next = index + 1; next < lines.size(); next++) {
+                    String following = lines[next]
+                    if (!following.isBlank() && following.length() - following.stripLeading().length() <= indent) break
+                    step << following
+                }
+                if (!step.any { it =~ /\buses:\s*(['"]?)actions\/setup-java@/ }) return
+                if (!step.any { it =~ /\bdistribution:\s*(['"]?)jetbrains\1\s*(?:[,}]|\z)/ }) return
+                steps << [line: index + 1, jcef: step.any { it =~ /\bjava-package:\s*(['"]?)jdk\+jcef\1\s*(?:[,}]|\z)/ }]
+            }
+            return steps
+        }
+
+        // The reader on text of its own, so that a mistake in it cannot make the real check pass for nothing.
+        def workflow = { String... withLines ->
+            "jobs:\n  build:\n    steps:\n      - uses: actions/checkout@v7\n      - uses: actions/setup-java@v6\n        with:\n" +
+                withLines.collect { "          ${it}\n" }.join('') +
+                "      - uses: gradle/actions/setup-gradle@v6\n        with:\n          java-package: jdk+jcef\n"
+        }
+        assert jetbrainsSteps(workflow('distribution: jetbrains', "java-version: '25'", 'java-package: jdk+jcef')) == [[line: 5, jcef: true]]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', "java-package: 'jdk+jcef'"))*.jcef == [true]
+        assert jetbrainsSteps(workflow('distribution: "jetbrains"', 'java-package: "jdk+jcef"  # the JCEF build'))*.jcef == [true]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', 'java-package: jdk+jcef').replace('\n', '\r\n'))*.jcef == [true]
+        assert jetbrainsSteps(workflow('distribution: jetbrains'))*.jcef == [false]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', 'java-package: jdk'))*.jcef == [false]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', 'java-package: jre+jcef'))*.jcef == [false]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', 'java-package: jdk+jcefx'))*.jcef == [false]
+        assert jetbrainsSteps(workflow('distribution: jetbrains', '# java-package: jdk+jcef'))*.jcef == [false]
+        // The following step's java-package is not this step's.
+        assert jetbrainsSteps(workflow('distribution: jetbrains', "java-version: '25'"))*.jcef == [false]
+        assert jetbrainsSteps(workflow('distribution: temurin')) == []
+        assert jetbrainsSteps(workflow('distribution: jetbrainsx')) == []
+        assert jetbrainsSteps('jobs:\n  build:\n    steps:\n      - name: JBR\n        uses: actions/setup-java@v6\n' +
+            '        with: { distribution: jetbrains, java-package: jdk+jcef }\n      - run: true\n') == [[line: 4, jcef: true]]
+        assert jetbrainsSteps('jobs:\n  build:\n    steps:\n    - uses: actions/setup-java@v6\n      with:\n        distribution: jetbrains\n') ==
+            [[line: 4, jcef: false]]
+        assert jetbrainsSteps('jobs:\n  build:\n    steps:\n      - run: echo uses actions/setup-java\n') == []
+        assert jetbrainsSteps('') == []
+
+        List<String> missing = []
+        int found = 0
+        rootProject.file('.github/workflows').listFiles().findAll { it.name ==~ /.+\.ya?ml/ }.sort { it.name }.each { File file ->
+            jetbrainsSteps(file.getText('UTF-8')).each { Map step ->
+                found++
+                if (!step.jcef) missing << ".github/workflows/${file.name}:${step.line}".toString()
+            }
+        }
+        assert found > 0 : 'no workflow under .github/workflows has a setup-java step with distribution: jetbrains'
+        assert missing.isEmpty() : "These setup-java steps install the JetBrains Runtime without java-package: jdk+jcef: ${missing.join(', ')}".toString()
+        logger.lifecycle("Verified java-package: jdk+jcef on all ${found} JetBrains setup-java steps of the workflows")
     }
 }

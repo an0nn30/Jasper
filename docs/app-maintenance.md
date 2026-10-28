@@ -554,10 +554,22 @@ To add a bundled plugin:
 The [bundled Cygwin guide](../packaging/windows/cygwin/README.md) covers Windows Cygwin provisioning, the seed and its
 refresh, ownership and recovery, and native acceptance.
 
-`gradle/packaging-support.gradle` holds what packaging decides: the runtime's modules, the native libraries copied into
-the app and the AOT training launch. `verifyPackagingSupport` (in `check`) tests it with fixtures; `verifyPackage`
-checks a built image ([start-up performance](packaging.md#start-up-performance)).
+`gradle/packaging-support.gradle` holds what packaging decides: the build's runtime, the packaged runtime's modules, the
+native libraries copied into the app and the AOT training launch. `verifyPackagingSupport` (in `check`) tests it with
+fixtures; `verifyPackage` checks a built image ([start-up performance](packaging.md#start-up-performance)).
 
+- **Moving to a newer JBR.** Start with `jcefRuntimeBuild` in `gradle/packaging-support.gradle`: the new SDK's
+  `IMPLEMENTOR_VERSION`, `JCEF_VERSION` and `JCEF_VERSION_DETAILED`, as its `release` file has them on every platform.
+  `verifyJcefToolchain` (in `check`) and `nativeContext` read the toolchain's `release` file and refuse any other build
+  through `requireJcefRuntime`, which has `jcefRuntimeProblem` check the text (the `jcef` module, the JCEF version and
+  those three values) and names the build to install. CI's `setup-java` installs the newest JBR 25 with JCEF, so CI
+  fails from the day JetBrains publishes a newer build until this move is made. Update the fixtures in
+  `gradle/packaging-support-test.gradle` that pin the release text and the message, and the Chromium, Chromium Embedded
+  Framework and JCEF versions in `notices.toml`, which a fixture compares with the constant. Then regenerate
+  `packaging/jcef/<platform>.txt` from each archive's `jcef.jmod`, confirmed against the archive's own layout, update
+  the payload counts pinned in `gradle/packaging-support-test.gradle`, record the archives' SHA-512 in
+  `packaging/jcef/checksums.txt`, and check that `macJcefPayload` still names the helpers in the macOS bundle's
+  `Contents/Frameworks`.
 - **A plugin or library needs another JDK module.** Add it to `runtimeRootModules` (and to the required list in
   `runtimeModules` when it pulls in a module not yet listed), add it to the `runtime-modules` block of
   [The Java runtime](plugin-authoring.md#the-java-runtime), and rebuild: `verifyPackagingSupport` fails until the
@@ -577,14 +589,12 @@ checks a built image ([start-up performance](packaging.md#start-up-performance))
   export. A new bridge needs all three.
 - **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
   trained image, rebuild it. `trainAotCache` trains in a `ditto` copy of the image that it deletes before
-  `verifyAotCache`, because JBR 25 gives cached classes the code source of the path they were trained at
-  (JDK-8376576): the build machine then runs the trained image as every user's Mac does. For the same reason
-  `stagePackage` removes package sealing from class-path jars (`verifyPackage` rejects a sealed one) and Jasper finds
-  its own files with `CodeLocation`, never a code source. The training home's `workspace.toml` is
-  `startup-workspace.toml` beside `StartupRuns` (`aotTrainingWorkspace`), which the start-up benchmark also restores
-  before each run; after a change to `workspace.toml`'s format, write it again with `WorkspaceFile.write`, as
-  `StartupBenchTest` fails until it matches. Training opens a window: agents ask the user before `packageDist`,
-  `trainAotCache` or `-Pjasper.aot=true`.
+  `verifyAotCache`, so the build machine runs the trained image as every user's Mac does, without the paths the cache
+  was trained at. There a JBR with JDK-8376576 stops at a sealed package such as `jbr-api`'s; `verifyLauncherImage`
+  checks the JBR for it. The training home's `workspace.toml` is `startup-workspace.toml` beside `StartupRuns`
+  (`aotTrainingWorkspace`), which the start-up benchmark also restores before each run; after a change to
+  `workspace.toml`'s format, write it again with `WorkspaceFile.write`, as `StartupBenchTest` fails until it matches.
+  Training opens a window: agents ask the user before `packageDist`, `trainAotCache` or `-Pjasper.aot=true`.
 - **Jasper's launcher.** `packageApp` builds the image with Jasper's own build of jpackage's launcher
   (`gradle/launcher.gradle`, [packaging/launcher](../packaging/launcher/README.md)), which merges the user's
   `jasper.vmoptions` over these options. A JBR update means re-vendoring its launcher sources and re-applying the
@@ -624,8 +634,7 @@ the project publishes one) beside it; `verifyThirdPartyNotices` (in `check`) nam
 that no longer ships. A font file a bundled plugin ships is listed in its component's `files` as
 `<plugin id>/<path in its jar>`, and the check names any that is not. Read the new version's licence before updating
 the entry, and look inside the jar for bundled native binaries (DLLs, executables, shared libraries): their own
-licences need components too. When `stagePackage` logs that it unsealed a jar, record the change in that component's
-notice, as `jbr-api.NOTICE.txt` does. The Licenses window reads the same file. A component's `license` is an SPDX id
+licences need components too. The Licenses window reads the same file. A component's `license` is an SPDX id
 that `about.ThirdPartyNotices` maps to the name the window shows; a new licence needs its entry there.
 
 ## Themes

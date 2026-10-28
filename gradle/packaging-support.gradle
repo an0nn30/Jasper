@@ -1,18 +1,13 @@
 import groovy.json.JsonException
 import groovy.json.JsonSlurper
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.LinkOption
-import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.PosixFilePermission
 import java.util.concurrent.TimeUnit
-import java.util.jar.Attributes
-import java.util.jar.JarFile
-import java.util.jar.Manifest
-import java.util.zip.ZipEntry
-import java.util.zip.ZipFile
-import java.util.zip.ZipOutputStream
 
-// What packaging decides, as pure helpers: the runtime's modules, the native libraries copied into the app, class-path
-// unsealing, the launcher configuration, the AOT training launch in a throwaway copy and the DMG detach.
+// What packaging decides, as pure helpers: the runtime's modules, the native libraries copied into the app, the launcher
+// configuration, the AOT training launch in a throwaway copy and the DMG detach.
 // gradle/packaging.gradle applies this file; gradle/packaging-support-test.gradle checks it with fixtures
 // (verifyPackagingSupport, part of check). The imports serve helpers further down: Groovy accepts imports only before
 // the first statement.
@@ -58,26 +53,119 @@ ext.linuxPackageTasks = { String osRelease ->
 
 // The Java runtime packaged Jasper ships; docs/plugin-authoring.md ("The Java runtime") lists it for plugin authors.
 // jpackage's default for a class-path application is every module, and --bind-services then also bound javac,
-// jshell, jlink, jpackage and the JetBrains Runtime's JCEF and JOGL (192 MB). These roots keep all of Java SE for
-// plugins, the providers a desktop application needs (charsets, locale data, ZIP file system, PKCS#11, smart cards,
-// Kerberos, JAAS, DNS and RMI naming, socket options, the JDK HTTP server that File Server uses, sun.misc.Unsafe and
-// Swing interop) and the field diagnostics (JFR, JMX, attach). Windows adds its certificate stores. jdk.crypto.ec is
-// left out: it has been empty since JDK 22. jlink adds what the roots require.
+// jshell, jlink and jpackage. These roots keep all of Java SE for plugins, the providers a desktop application needs
+// (charsets, locale data, ZIP file system, PKCS#11, smart cards, Kerberos, JAAS, DNS and RMI naming, socket options,
+// the JDK HTTP server that File Server uses, sun.misc.Unsafe and Swing interop), the field diagnostics (JFR, JMX,
+// attach) and jcef, the JetBrains Runtime's Chromium (JCEF) for the browser plugin: a root, because nothing else
+// requires it. Windows adds its certificate stores. jdk.crypto.ec is left out: it has been empty since JDK 22. jlink
+// adds what the roots require.
 ext.runtimeRootModules = { String os ->
-    List<String> roots = ['java.se', 'java.smartcardio', 'jdk.accessibility', 'jdk.attach', 'jdk.charsets',
+    List<String> roots = ['java.se', 'java.smartcardio', 'jcef', 'jdk.accessibility', 'jdk.attach', 'jdk.charsets',
         'jdk.crypto.cryptoki', 'jdk.httpserver', 'jdk.jfr', 'jdk.localedata', 'jdk.management', 'jdk.management.agent',
         'jdk.management.jfr', 'jdk.naming.dns', 'jdk.naming.rmi', 'jdk.net', 'jdk.security.auth', 'jdk.security.jgss',
         'jdk.unsupported', 'jdk.unsupported.desktop', 'jdk.zipfs']
     os == 'windows' ? roots + ['jdk.crypto.mscapi'] : roots
 }
 
-// Every module of the packaged runtime, sorted: the roots and what they require (java.se's Java SE modules and
-// jdk.attach's jvmstat support). verifyPackage compares this with the MODULES line of the runtime's release file.
+// Every module of the packaged runtime, sorted: the roots and what they require (java.se's Java SE modules,
+// jdk.attach's jvmstat support and jcef's JOGL, jogl.all and gluegen.rt). verifyPackage compares this with the
+// MODULES line of the runtime's release file.
 ext.runtimeModules = { String os ->
-    (runtimeRootModules(os) + ['java.base', 'java.compiler', 'java.datatransfer', 'java.desktop', 'java.instrument',
-        'java.logging', 'java.management', 'java.management.rmi', 'java.naming', 'java.net.http', 'java.prefs',
-        'java.rmi', 'java.scripting', 'java.security.jgss', 'java.security.sasl', 'java.sql', 'java.sql.rowset',
-        'java.transaction.xa', 'java.xml', 'java.xml.crypto', 'jdk.internal.jvmstat']).toSorted()
+    (runtimeRootModules(os) + ['gluegen.rt', 'java.base', 'java.compiler', 'java.datatransfer', 'java.desktop',
+        'java.instrument', 'java.logging', 'java.management', 'java.management.rmi', 'java.naming', 'java.net.http',
+        'java.prefs', 'java.rmi', 'java.scripting', 'java.security.jgss', 'java.security.sasl', 'java.sql',
+        'java.sql.rowset', 'java.transaction.xa', 'java.xml', 'java.xml.crypto', 'jdk.internal.jvmstat',
+        'jogl.all']).toSorted()
+}
+
+// The one build of the JetBrains Runtime that Jasper is made with, JBR 25.0.4.1 b635.75 with JCEF, as the release file
+// of its SDK names it on all six platforms: the JBR build, and the JCEF and Chromium it carries. packaging/jcef's file
+// lists and checksums, macJcefPayload and notices.toml's Chromium, Chromium Embedded Framework and JCEF entries describe
+// this build, so a newer JBR starts here (docs/app-maintenance.md, "Moving to a newer JBR").
+ext.jcefRuntimeBuild = [
+    IMPLEMENTOR_VERSION: 'JBRSDK-25.0.4.1+1-635.75-jcef',
+    JCEF_VERSION: '150.0.14.1233+g9df0879',
+    JCEF_VERSION_DETAILED: '150.0.14-g7c1aa68-chromium-150.0.7871.129-api-1.21-263-b16',
+].asImmutable()
+
+// The build's runtime is the JetBrains Runtime with JCEF (Chromium) for the browser plugin. The plain build of the same
+// version has the same vendor and number, so its release file decides: the MODULES line must list jcef as a whole
+// token (jcef.something is another module), the file must record the JCEF version, and it must have jcefRuntimeBuild's
+// values, quoted or not. Null for that build, else the first problem in words.
+ext.jcefRuntimeProblem = { String releaseText ->
+    String text = releaseText ?: ''
+    def modules = text =~ /(?m)^MODULES="([^"]*)"/
+    if (!modules.find() || !('jcef' in modules.group(1).tokenize())) return 'it has no jcef module'
+    if (!(text =~ /(?m)^JCEF_VERSION_DETAILED=[ \t]*"?[^"\s]/).find()) return 'its release file names no JCEF version'
+    jcefRuntimeBuild.findResult { String key, String expected ->
+        def line = text =~ /(?m)^${key}=[ \t]*"?([^"\r\n]*)/
+        if (!line.find()) return "its release file has no ${key}".toString()
+        String found = line.group(1).trim()
+        found == expected ? null : "its ${key} is ${found}".toString()
+    }
+}
+
+// Refuses a runtime that is not jcefRuntimeBuild, in the words nativeContext and verifyJcefToolchain both throw.
+ext.requireJcefRuntime = { File sdkHome, String releaseText ->
+    String problem = jcefRuntimeProblem(releaseText)
+    if (problem != null) {
+        throw new GradleException("The selected JBR SDK at ${sdkHome} is not the JCEF build ${jcefRuntimeBuild.IMPLEMENTOR_VERSION}: ${problem}. Install that build, or make Gradle use it (docs/packaging.md#requirements).")
+    }
+}
+
+// On macOS Chromium is not part of the module image: the SDK keeps its framework and helper apps in
+// Contents/Frameworks beside Contents/Home, and JCEF looks for them at java.home/../Frameworks. packageApp copies that
+// folder to Jasper.app/Contents/runtime/Contents/; verifyPackage requires these paths in the copy.
+ext.macJcefFrameworks = 'Frameworks'
+ext.macJcefPayload = ['Chromium Embedded Framework.framework', 'jcef Helper.app', 'jcef Helper (GPU).app',
+    'jcef Helper (Renderer).app', 'jcef Helper (Plugin).app'].collect { "cef_server.app/Contents/Frameworks/${it}".toString() }
+
+// The SDK's Chromium folder on macOS, or the failure nativeContext and packageApp both throw when it is missing. The
+// home's real path decides: SDKMAN's candidates/java/<version> can be a link to the bundle's Contents/Home.
+ext.requireMacJcefFrameworks = { File sdkHome ->
+    File frameworks = new File(sdkHome.canonicalFile.parentFile, macJcefFrameworks)
+    if (!frameworks.isDirectory()) {
+        throw new GradleException("The JBR SDK has no Chromium framework at ${frameworks}; install the full jbrsdk_jcef bundle (SDKMAN's macOS install keeps only Contents/Home)")
+    }
+    frameworks
+}
+
+// On Windows and Linux Chromium's files come inside jcef.jmod, so jlink puts them in the runtime: packaging/jcef/
+// <os>-<architecture>.txt (windows or linux; x64 or aarch64) lists them as paths under the runtime home, one per line,
+// '#' lines being comments. verifyPackage requires each (jcefPayloadProblem). macOS has no list: its Chromium is a
+// framework (macJcefPayload).
+ext.jcefPayload = { String os, String architecture ->
+    File list = rootProject.file("packaging/jcef/${os}-${architecture}.txt")
+    if (!list.isFile()) throw new GradleException("There is no JCEF file list ${list} for ${os} on ${architecture}")
+    list.readLines('UTF-8').collect { it.trim() }.findAll { !it.isEmpty() && !it.startsWith('#') }
+}
+
+// Chromium starts these two as child processes. jlink sets the execute bit on a jmod's bin/ commands only, so these
+// files of the jmod's lib/ section lose it and packageApp restores it on Linux. Windows needs no bit.
+ext.jcefLinuxHelpers = ['lib/jcef_helper', 'lib/cef_server']
+
+// chmod a+x on the helpers that runtimeHome has. A helper that is missing is verifyPackage's to report. A file system
+// without POSIX permissions (Windows) has no execute bit to restore, so nothing happens there.
+ext.markJcefHelpersExecutable = { File runtimeHome ->
+    if (!FileSystems.default.supportedFileAttributeViews().contains('posix')) return
+    jcefLinuxHelpers.collect { new File(runtimeHome, it).toPath() }.findAll { Files.isRegularFile(it) }.each { path ->
+        Files.setPosixFilePermissions(path, (Files.getPosixFilePermissions(path) +
+            [PosixFilePermission.OWNER_EXECUTE, PosixFilePermission.GROUP_EXECUTE, PosixFilePermission.OTHERS_EXECUTE]) as Set)
+    }
+}
+
+// Why runtimeHome lacks what a Windows or Linux package needs of JCEF, or null: every jcefPayload file, all named in
+// one message (the first twenty, then a count), and on Linux executable helpers.
+ext.jcefPayloadProblem = { File runtimeHome, String os, String architecture ->
+    List<String> payload = jcefPayload(os, architecture)
+    List<String> missing = payload.findAll { !new File(runtimeHome, it).isFile() }
+    if (missing) {
+        String named = missing.take(20).join(', ') + (missing.size() > 20 ? ", and ${missing.size() - 20} more" : '')
+        return "JCEF's files are missing from ${runtimeHome}: ${missing.size()} of ${payload.size()}: ${named}".toString()
+    }
+    List<String> locked = os == 'linux' ?
+        jcefLinuxHelpers.findAll { !Files.isExecutable(new File(runtimeHome, it).toPath()) } : []
+    locked ? "JCEF's helpers are not executable in ${runtimeHome}: ${locked.join(', ')}".toString() : null
 }
 
 // No --bind-services: the roots name every provider Jasper wants. --generate-cds-archive writes the runtime's default
@@ -334,58 +422,6 @@ ext.modificationTimeMismatches = { File expectedRoot, File actualRoot ->
         }
     }
     mismatches.sort()
-}
-
-// The manifest sections of jar that declare Sealed (any value): 'main' for the main attributes, then the per-entry
-// section names, sorted. Classes the JBR 25 AOT cache loads get no code source once the cache's training paths are gone
-// (JDK-8376576, spec 2026-10-14 section 2), and a package sealed by the manifest then refuses its second class, which
-// stops the JVM; so stagePackage unseals the class path and verifyPackage rejects a sealed jar in the image.
-ext.sealingSections = { File jar ->
-    Manifest manifest = new JarFile(jar, false).withCloseable { it.manifest }
-    if (manifest == null) return []
-    List<String> sections = manifest.entries.findAll { String name, Attributes attributes ->
-        attributes.getValue(Attributes.Name.SEALED) != null
-    }.keySet().sort()
-    manifest.mainAttributes.getValue(Attributes.Name.SEALED) != null ? ['main'] + sections : sections
-}
-
-// Rewrites jar without its manifest's Sealed attributes (main and per-entry; a section left empty is dropped) and adds
-// the main attribute "Jasper-Modified: package sealing removed", the notice Apache-2.0 section 4(b) asks of modified
-// files. Every other entry is copied in order with its bytes, time, comment and extra field. Returns whether it changed
-// the jar. Rewriting the manifest of a signed jar would break its signature, so a signed jar that declares Sealed fails.
-ext.unsealJar = { File jar ->
-    if (sealingSections(jar).isEmpty()) return false
-    Manifest manifest = new JarFile(jar, false).withCloseable { it.manifest }
-    manifest.mainAttributes.remove(Attributes.Name.SEALED)
-    manifest.mainAttributes.put(new Attributes.Name('Jasper-Modified'), 'package sealing removed')
-    manifest.entries.values().each { it.remove(Attributes.Name.SEALED) }
-    manifest.entries.values().removeIf { it.isEmpty() }
-    File rewritten = new File(jar.parentFile, jar.name + '.unsealing')
-    new ZipFile(jar).withCloseable { zip ->
-        List<ZipEntry> entries = zip.entries().toList()
-        if (entries.any { it.name ==~ /(?i)META-INF\/[^\/]+\.(SF|RSA|DSA|EC)/ }) {
-            throw new GradleException("Packaging: ${jar.name} seals packages and is signed; unsealing it would break its signature")
-        }
-        rewritten.withOutputStream { raw ->
-            new ZipOutputStream(raw).withCloseable { out ->
-                entries.each { ZipEntry entry ->
-                    ZipEntry copy = new ZipEntry(entry.name)
-                    copy.time = entry.time
-                    if (entry.comment != null) copy.comment = entry.comment
-                    if (entry.extra != null) copy.extra = entry.extra
-                    out.putNextEntry(copy)
-                    if (entry.name.equalsIgnoreCase(JarFile.MANIFEST_NAME)) {
-                        manifest.write(out)
-                    } else if (!entry.directory) {
-                        zip.getInputStream(entry).withCloseable { out << it }
-                    }
-                    out.closeEntry()
-                }
-            }
-        }
-    }
-    Files.move(rewritten.toPath(), jar.toPath(), StandardCopyOption.REPLACE_EXISTING)
-    true
 }
 
 // Runs train on a copy of image at copy, made by copier (which must keep modification times, as ditto does: the JVM
