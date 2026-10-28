@@ -121,7 +121,10 @@ class BundledSamplePluginTest {
                 var extensions = contributions.actions().stream().filter(action -> dev.jasper.app.config.KeyBindings.extensionId(action.id()))
                     .map(dev.jasper.app.contributions.ActionEntry::extension).toList();
                 assertThat(extensions).extracting(dev.jasper.app.config.KeyBindings.Extension::id)
-                    .contains("dev.jasper.sample.demo", "dev.jasper.sample.greetings.open", "dev.jasper.vault.lock");
+                    .contains("dev.jasper.sample.demo", "dev.jasper.sample.greetings.open", "dev.jasper.vault.lock",
+                        // The Browser's Web menu: content keys that reuse History's Cmd+R and SFTP's Alt+Left and Alt+Right.
+                        "dev.jasper.browser.open_location", "dev.jasper.browser.back", "dev.jasper.browser.forward",
+                        "dev.jasper.browser.reload", "dev.jasper.history.open", "dev.jasper.remote.sftp.back");
                 for (boolean macOs : new boolean[]{true, false}) {
                     assertThat(dev.jasper.app.config.KeyBindings.defaults(macOs).withExtensions(extensions).problems())
                         .as("dropped defaults with macOS=" + macOs).isEmpty();

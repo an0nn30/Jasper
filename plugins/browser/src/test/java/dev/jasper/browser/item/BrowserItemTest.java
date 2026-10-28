@@ -118,6 +118,28 @@ class BrowserItemTest {
         } });
     }
 
+    /**
+     * Jasper's Copy and Paste, on whatever keys the keymap gives them and from the Edit menu, run a content tab's
+     * {@code copy} and {@code paste}: on macOS the page's Cmd+C and Cmd+V do nothing by themselves, as Chromium leaves
+     * them to the browser's menu there. The commands name no key of their own, so the keymap's keys are the ones.
+     */
+    @Test void itsCopyAndPasteAreContentCommandsWithNoKeyOfTheirOwn() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var item = items(host, page -> { }).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var commands = host.contentCommands(item.tab());
+            assertThat(commands).extracting(dev.jasper.sdk.ui.ContentCommand::id).containsExactly("copy", "paste");
+            assertThat(commands).extracting(dev.jasper.sdk.ui.ContentCommand::title).containsExactly("Copy", "Paste");
+            assertThat(commands).allSatisfy(command -> {
+                assertThat(command.shortcut()).isNull();
+                assertThat(command.enabled()).isTrue();
+            });
+            commands.forEach(command -> command.run().run()); // a page with no browser yet: nothing to copy or paste into
+            item.close();
+            commands.forEach(command -> command.run().run());
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
     @Test void theItemsViewIsTheToolbarAboveTheCanvasAsPreviewContent() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             items(host, page -> { }).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());

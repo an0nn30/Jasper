@@ -1,7 +1,9 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.page.NavigationButton;
 import dev.jasper.browser.page.Page;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.ui.ContentCommand;
 import dev.jasper.sdk.ui.ContentPresentation;
 import dev.jasper.sdk.ui.ContentSpec;
 import dev.jasper.sdk.ui.ContentStatus;
@@ -25,7 +27,8 @@ import javax.swing.JComponent;
  * One page in one pane: a content tab whose one view holds the toolbar above the page's canvas, a custom content of
  * kind PREVIEW. The item asks for its page, and so for Chromium, the first time its view shows, not when it opens. Its
  * tab shows the page's title (as {@link TabTitle} gives it), the globe and, as its location and status, the page's
- * address. UI thread.
+ * address. Its content commands {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and the mouse's
+ * back and forward buttons over the page go back and forward. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -48,6 +51,7 @@ public final class BrowserItem implements AutoCloseable {
         this.target = target;
         this.url = url;
         page = new Page(url, this::changed);
+        page.onNavigationButton(this::navigationButton);
         title = TabTitle.of("", host(url.toString()), "", false);
         view = items.context().kit().create(spec(), this::event);
         view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.PREVIEW, page.view(), page));
@@ -86,6 +90,9 @@ public final class BrowserItem implements AutoCloseable {
             throw failure;
         }
         tab.setFocusTarget(page::focus);
+        // No key of their own: Jasper's Copy and Paste run them, on the keys the keymap gives those.
+        tab.setCommands(List.of(new ContentCommand("copy", "Copy", null, true, this::copy),
+            new ContentCommand("paste", "Paste", null, true, this::paste)));
         tab.onClosed(this::closed);
         items.opened(this);
         present();
@@ -150,6 +157,16 @@ public final class BrowserItem implements AutoCloseable {
         if (!closed) page.stop();
     }
 
+    /** Copies the page's selection. */
+    public void copy() {
+        if (!closed) page.copy();
+    }
+
+    /** Pastes the clipboard into the page. */
+    public void paste() {
+        if (!closed) page.paste();
+    }
+
     /** Focuses the address field and selects its text, as Open Location does. */
     public void focusAddress() {
         if (closed) return;
@@ -184,6 +201,12 @@ public final class BrowserItem implements AutoCloseable {
         items.closed(this);
         view.close();
         page.close();
+    }
+
+    /** The mouse's back or forward button was released over the page. */
+    private void navigationButton(NavigationButton button) {
+        if (button == NavigationButton.BACK) goBack();
+        else goForward();
     }
 
     /** The page's address, title, loading state or where it can go changed. */

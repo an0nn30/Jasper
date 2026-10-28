@@ -10,6 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import javax.swing.JComponent;
 import org.cef.CefClient;
+import org.cef.browser.CefFrame;
 
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title, whether it loads
@@ -22,6 +23,7 @@ public final class Page implements AutoCloseable {
     private final PageView view = new PageView();
     private final Runnable changed;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
+    private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
     // What the page loads once its browser can: first its start, then the last address asked for before that.
     private URI requested;
     // Where the page is, as Chromium last reported it, or what it was last asked to load since.
@@ -42,6 +44,7 @@ public final class Page implements AutoCloseable {
         requested = Objects.requireNonNull(url, "url");
         address = url.toString();
         this.changed = Objects.requireNonNull(changed, "changed");
+        view.onNavigationButton(this::navigationButton);
     }
 
     /**
@@ -114,6 +117,28 @@ public final class Page implements AutoCloseable {
         if (ready && !closed) browser.stopLoad();
     }
 
+    /** Copies the selection of the page's focused frame, as its Edit menu's Copy would. */
+    public void copy() {
+        CefFrame frame = focusedFrame();
+        if (frame == null) return;
+        try {
+            frame.copy();
+        } finally {
+            frame.dispose();
+        }
+    }
+
+    /** Pastes the clipboard into the page's focused frame, as its Edit menu's Paste would. */
+    public void paste() {
+        CefFrame frame = focusedFrame();
+        if (frame == null) return;
+        try {
+            frame.paste();
+        } finally {
+            frame.dispose();
+        }
+    }
+
     /** Gives the page the keyboard focus. */
     public void focus() {
         view.requestFocusInWindow();
@@ -165,6 +190,19 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Tells {@code listener} each time the mouse's back or forward button is released over the page, on Windows and
+     * Linux. The page itself never sees those buttons.
+     *
+     * @param listener told which, on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onNavigationButton(Consumer<NavigationButton> listener) {
+        Objects.requireNonNull(listener, "listener");
+        navigationButtons.add(listener);
+        return () -> navigationButtons.remove(listener);
+    }
+
+    /**
      * Tells {@code listener} each time the page's main frame starts loading, with the address it loads.
      *
      * @param listener told on the UI thread
@@ -181,9 +219,24 @@ public final class Page implements AutoCloseable {
         if (closed) return;
         closed = true;
         loadStarts.clear();
+        navigationButtons.clear();
         view.setHoverUrl("");
         PageBrowser page = browser;
         if (page != null) page.close(true);
+    }
+
+    /**
+     * The frame that has the page's focus, or none before the page has its browser or after its close; the caller
+     * disposes it, which releases only this handle to the frame.
+     */
+    private CefFrame focusedFrame() {
+        return ready && !closed ? browser.getFocusedFrame() : null;
+    }
+
+    /** The mouse's back or forward button was released over the page. */
+    private void navigationButton(NavigationButton button) {
+        if (closed) return;
+        for (Consumer<NavigationButton> listener : navigationButtons) listener.accept(button);
     }
 
     /** The client is ready: makes the browser, which loads what the page was last asked to. */

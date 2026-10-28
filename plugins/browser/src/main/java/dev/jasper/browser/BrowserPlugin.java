@@ -3,6 +3,7 @@ package dev.jasper.browser;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
+import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -19,8 +20,8 @@ import java.util.concurrent.RejectedExecutionException;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
- * item, the globe they show, Settings › Browser and the welcome page, and makes Chromium's engine, which starts Chromium
- * only when a browser item first shows, so starting the plugin loads no Chromium class.
+ * item, the globe they show, the Web menu, Settings › Browser and the welcome page, and makes Chromium's engine, which
+ * starts Chromium only when a browser item first shows, so starting the plugin loads no Chromium class.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -59,6 +60,7 @@ public class BrowserPlugin implements Plugin {
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(NEW_TAB);
         file.add(NEW_WINDOW);
+        WebMenu.register(context, items);
         running = true;
     }
 

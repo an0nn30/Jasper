@@ -109,7 +109,7 @@ class PageViewKeysTest {
     }
 
     private PageView view(Predicate<KeyEvent> taken) {
-        return new PageView(taken, shown -> { }, rate -> { }, page::add);
+        return new PageView(taken, shown -> { }, rate -> { }, page::add, NavigationButton::of);
     }
 
     /** A key's press, typed character and release, as AWT delivers them. */

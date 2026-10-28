@@ -31,8 +31,10 @@ import java.text.AttributedCharacterIterator;
 import java.text.AttributedString;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
+import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import javax.swing.JComponent;
 import javax.swing.Timer;
@@ -48,7 +50,8 @@ import javax.swing.Timer;
  * pass left it unconsumed. A press a binding takes keeps its typed and released events from the page too.
  *
  * <p><b>Mouse.</b> An event the window consumes before the view hears it, as the pane drag's press, does not reach the
- * page. Each press the page gets is its {@link #lastPress()}.
+ * page. Each press the page gets is its {@link #lastPress()}. The mouse's back and forward buttons, on Windows and Linux,
+ * never reach the page: releasing one tells the view's {@link #onNavigationButton listener}.
  *
  * <p><b>Showing.</b> While the view does not show (its tab is hidden, or it is out of its window) its page is told it is
  * hidden and draws one frame a second; showing again restores 60. Network work goes on.
@@ -60,6 +63,9 @@ public final class PageView extends JComponent {
     private static final String ELLIPSIS = "…";
 
     private final Predicate<KeyEvent> taken;
+    // Which of AWT's buttons are the mouse's back and forward buttons here.
+    private final IntFunction<Optional<NavigationButton>> navigationButtons;
+    private volatile Consumer<NavigationButton> navigation = button -> { };
     // Made with the page's browser: it names Chromium's types, which an item that has not shown yet does not load.
     private volatile ImeAdapter ime;
     // The view's input method client from the start, so a view focused before its page attaches is an active client.
@@ -87,6 +93,7 @@ public final class PageView extends JComponent {
     /** A canvas without a page yet; its {@link PageBrowser} attaches to it. UI thread. Only {@link Page} makes one. */
     public PageView() {
         taken = KeyEvent::isConsumed;
+        navigationButtons = NavigationButton::of;
         install();
     }
 
@@ -97,11 +104,14 @@ public final class PageView extends JComponent {
      * @param visibility told whether the view shows
      * @param frameRate told the frames a second the page draws
      * @param keys handed each key event that reaches the page
+     * @param navigationButtons which navigation button, if any, each of AWT's mouse buttons is
      */
-    PageView(Predicate<KeyEvent> taken, Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys) {
+    PageView(Predicate<KeyEvent> taken, Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys,
+             IntFunction<Optional<NavigationButton>> navigationButtons) {
         this.taken = Objects.requireNonNull(taken, "taken");
         hooks = new Hooks(Objects.requireNonNull(visibility, "visibility"), Objects.requireNonNull(frameRate, "frameRate"),
             Objects.requireNonNull(keys, "keys"));
+        this.navigationButtons = Objects.requireNonNull(navigationButtons, "navigationButtons");
         install();
     }
 
@@ -155,6 +165,16 @@ public final class PageView extends JComponent {
      */
     public LastPress lastPress() {
         return lastPress;
+    }
+
+    /**
+     * Tells {@code listener} each time the mouse's back or forward button is released over the view, in place of the
+     * page. UI thread.
+     *
+     * @param listener told which; it replaces the one before
+     */
+    void onNavigationButton(Consumer<NavigationButton> listener) {
+        navigation = Objects.requireNonNull(listener, "listener");
     }
 
     /**
@@ -251,6 +271,12 @@ public final class PageView extends JComponent {
     @Override protected void processMouseEvent(MouseEvent event) {
         super.processMouseEvent(event);
         if (event.isConsumed()) return; // the window's, as the pane drag's press and click are
+        Optional<NavigationButton> navigationButton = navigationButtons.apply(event.getButton());
+        if (navigationButton.isPresent()) { // its press, release and click are not the page's
+            event.consume();
+            if (event.getID() == MouseEvent.MOUSE_RELEASED) navigation.accept(navigationButton.get());
+            return;
+        }
         boolean press = event.getID() == MouseEvent.MOUSE_PRESSED;
         if (press) lastPress = new LastPress(event.getButton(), event.getModifiersEx(), event.getWhen());
         PageBrowser target = browser;
