@@ -71,7 +71,7 @@ hosts and distributions there are, with **New session** (+) and **Import session
 - Rows: the [WSL group](#wsl-distributions) first, then your groups in alphabetical order with the default group last
   (**Other** until you rename it), hosts alphabetical within each. While every host is ungrouped and the default group
   is still **Other**, the list has no group headers.
-- Hosts sort by name by default; the header's **Sort sessions** menu (default look) or a click on the Name, Host or Port header (Enterprise look) sorts them within each group by that column, and the sort and column widths are remembered.
+- Hosts sort by name by default; the header's **Sort sessions** menu (default look) or a click on the Name, Host or Port header (Enterprise look) sorts them within each group by that column (both share one sort), and the sort and column widths are remembered.
 - A click on a group header collapses or expands it, as do Enter and a double click. Collapsed groups are remembered;
   a search shows their hosts.
 - A host row shows a dot (green while one of its SSH panes runs), its name and hostname, and a star: click the star to
@@ -371,7 +371,8 @@ and Alt+Up on Linux and Windows (Back, Forward, Parent Folder) work anywhere in 
 
 The list shows Name and Size, sorted by name ignoring case (folders mixed in with files) until you click a header, with each entry's modified time in its tooltip.
 In a window of its own or docked at the bottom it shows Name, Modified (date and time), Permissions (`rwxr-xr-x`) and Size.
-Click a header to sort the whole folder by that column, again to reverse; drag a column boundary to resize it and double-click it to fit. The sort is shared by every SFTP browser and both layouts, and the sort and widths are remembered.
+Click a header to sort the whole folder by that column, again to reverse; drag a column boundary to resize it and double-click it to fit. The sort is shared by every SFTP browser and both layouts, and the sort and widths are remembered. A sort by Modified or
+Permissions chosen in the wide layout also orders the narrow table, which shows no arrow because it lacks that column.
 Select several rows for the file actions. A folder of more than 200 entries is shown 200 at a time ("1–200 of 950",
 **Previous page**, **Next page**). Names starting with a dot stay hidden until you press **Show hidden items**; the
 choice is remembered and applies to every browser opened afterwards. Enter or a double click opens a folder, opens a
