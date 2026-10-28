@@ -6860,18 +6860,18 @@ keep it as one line of text, which <a href="#dev.jasper.sdk.ui.ColumnStateFile">
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> columnId,
         <span class="kw">boolean</span> ascending)</code></pre>
 <div class="doc"><p>A state sorted by one column with no widths.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>columnId</code> the sort column's id</dd><dd><code>ascending</code> true for ascending</dd><dt>Returns</dt><dd>the state</dd></dl>
+<dl class="tags"><dt>Parameters</dt><dd><code>columnId</code> the sort column's id</dd><dd><code>ascending</code> true for ascending</dd><dt>Returns</dt><dd>the state</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when the id is blank or contains one of <code>;,:=</code></dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.ColumnState.sorted(String)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ColumnState.sorted(String)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.ColumnState">ColumnState</a> <b>sorted</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a> columnId)</code></pre>
 <div class="doc"><p>The state after a click on a column header: the same column flips direction, another column starts ascending.
 The widths are kept.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>columnId</code> the clicked column's id</dd><dt>Returns</dt><dd>the new state</dd></dl>
+<dl class="tags"><dt>Parameters</dt><dd><code>columnId</code> the clicked column's id</dd><dt>Returns</dt><dd>the new state</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when the id is blank or contains one of <code>;,:=</code></dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.ColumnState.resized(Map)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ColumnState.resized(Map)" aria-label="Link to this member">#</a><code><a class="tl" href="#dev.jasper.sdk.ui.ColumnState">ColumnState</a> <b>resized</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Map.html" title="java.util.Map">Map</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>, <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html" title="java.lang.Integer">Integer</a>&gt; widths)</code></pre>
 <div class="doc"><p>This state with other widths.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>widths</code> column id to unscaled width in pixels, each positive</dd><dt>Returns</dt><dd>the new state</dd></dl>
+<dl class="tags"><dt>Parameters</dt><dd><code>widths</code> column id to unscaled width in pixels, each positive</dd><dt>Returns</dt><dd>the new state</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when an id is blank or contains one of <code>;,:=</code>, or a width is not positive</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.ColumnState.apply(List)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.ColumnState.apply(List)" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.Column">Column</a>&gt; <b>apply</b>(<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.Column">Column</a>&gt; columns)</code></pre>
@@ -6913,8 +6913,8 @@ column widths across runs.</p></div>
         <a class="tl" href="#dev.jasper.sdk.ui.ColumnState">ColumnState</a> state)
     <span class="kw">throws</span> <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/IOException.html" title="java.io.IOException">IOException</a></code></pre>
 <div class="doc"><p>Stores a state under a key and keeps the file's other keys. The file is written to a temporary file and moved
-into place.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>key</code> the key, for example a table's id</dd><dd><code>state</code> the state to keep</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/IOException.html">IOException</a> when the file cannot be written</dd></dl>
+into place; a missing file starts empty, and a file that cannot be read is left as it is.</p></div>
+<dl class="tags"><dt>Parameters</dt><dd><code>key</code> the key, for example a table's id</dd><dd><code>state</code> the state to keep</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/IOException.html">IOException</a> when the file exists but cannot be read, or cannot be written</dd></dl>
 </div>
 </article>
 <article class="type" id="dev.jasper.sdk.ui.ContentCommand">
