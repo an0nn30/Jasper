@@ -1,0 +1,24 @@
+Apache Thrift 0.23.0 is in the JetBrains Runtime's JCEF twice: as the C++ library linked into the cef_server executable, and as a
+copy of the Java runtime inside the jcef module with the package org.apache.thrift renamed to com.jetbrains.cef.remote.thrift
+(JetBrains changed three of its files; the README in that package lists them).
+Source: https://github.com/apache/thrift, tag v0.23.0.
+
+NOTICE (from the upstream NOTICE):
+Apache Thrift
+Copyright (C) 2006 - 2019, The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+From the upstream LICENSE, the one subcomponent notice that applies to the C++ library on Windows:
+For lib/cpp/src/thrift/windows/SocketPair.cpp
+
+/* socketpair.c
+ * Copyright 2007 by Nathan C. Myers <ncm@cantrip.org>; some rights reserved.
+ * This code is Free Software.  It may be copied freely, in original or
+ * modified form, subject only to the restrictions that (1) the author is
+ * relieved from all responsibilities for any use for any purpose, and (2)
+ * this copyright notice must be retained, unchanged, in its entirety.  If
+ * for any reason the author might be held responsible for any consequences
+ * of copying or use, license is withheld.
+ */

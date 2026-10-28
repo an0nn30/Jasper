@@ -12,6 +12,58 @@
 
 **Full windows plan 1 — 2026-10-27** (`claude/full-windows`, commits `257f4827b..HEAD`, not merged or pushed; [plan](superpowers/plans/2026-10-26-full-windows-1-full-windows.md), [spec](superpowers/specs/2026-10-26-jasper-full-windows-design.md); executed with per-task subagents and reviews). Every window is a full window: its own header and toolbar, menus, tool window dock and stripes, status bar, Zen, rail and notification layer. `MainWindow`, `ChildWindow` and `WindowRole` are gone (`JasperWindow` is final, made only in `WindowManager.open`); cmd+n (ctrl+shift+n) is **New Window** (`new_window`); **Move Tab to Window ▸** replaced Move to Main Window; anything with no window of its own (a handoff, `jasper` paths, a plugin tab without an owner, the Errors tab) goes to the most recently active window, restoring the saved windows first when none is open; the Buddy follows the most recently active window. SDK 0.23.0 removes `WindowHandle.isMain()` and `ContentTab.moveToMainWindow()` and adds `Panels.show(panelId, window)` and `ContentTab.moveToWindow(window)`; the bundled plugins are one minor higher, and File Server, Tunnels, Transfers, SFTP and Sessions keep a panel per window. The guides, the SDK reference, the packaged CLI README and the code comments say "window" or "the most recently active window" where they said main or child; `Contributions.panelRoute` was removed. Interim until plans 2-5: the fallback picks the first-opened window. Final-review fix wave (Controller Rulings 10 and 11): a window opened while another is open starts out of Zen with its Float and Window tool windows hidden (kept saved as showing); the Buddy stays shown while the active window changes; repeated New Window cascades on; New Window opens none while the last window closes; `WindowManager.closeEveryWindow` was removed (Quit and background ask through `JasperApplication.windowsMayClose`). The memory benchmark of one extra window (spec risk 2) is pending the user's go-ahead. Plans 2-5 are next: they replace those three interim behaviours and add the layouts (spec sections 6 to 8). Deviations and rulings R1-R11 are in the plan's status banner. GUI checks for the user: cmd+n opens a full window; tool windows, Zen, rail and status bar act per window; a tab torn out is a full window; Move Tab to Window; closing one window leaves the others; the menu bar item's New Window; File Server, Tunnels, Transfers and SFTP shown from a second window; a new window while another is open shows no duplicate Float or Window tool windows and is not in Zen; switching windows keeps the Buddy and its bubble. No GUI launched.
 
+**JDK-8376576 workarounds retired — 2026-10-27** (`claude/great-wilson-b8a1e4`, merged into
+`claude/browser-jcef-runtime-0c197e` at `aa58e637f`; the user chose each option). JBR 25.0.4.1 b635.75 fixes JDK-8376576, so
+`stagePackage` no longer unseals class-path jars, `verifyPackage` no longer rejects sealed ones, and `jbr-api` ships as
+published (no `Jasper-Modified` attribute, no modification notice in the Licenses window). `verifyLauncherImage`'s
+trained cache now runs from its copy once the training image is gone and checks the sealed probe's two classes and the
+probe's code source, so `check` fails on a JBR with the bug. `CodeSourceScanTest` is gone; `CodeLocation` and its
+callers stay, its Javadoc without the bug. `trainAotCache` still trains in a deleted copy, now documented for what it
+does. Headless `check` on macOS aarch64 (b635.75 jcef, after `cleanTest`) passed in 23m 59s: 13,451 JUnit tests (plan 2's
+13,452 less `CodeSourceScanTest`), zero failures and errors, 30 skips; `packageApp` and `verifyPackage` without AOT pass
+and the image's `jbr-api-1.9.0.jar` is byte-identical to Maven's. The user-approved `trainAotCache` run passed (73 MB
+cache): with the training copy deleted, `verifyAotCache` and `verifyPackage` accepted the cache, and the image's
+`java -XX:AOTMode=on -version` loaded all 13 classes it loads from `jbr-api`'s sealed package `com.jetbrains` (and
+3,015 of Jasper's) from the cache. Open: not pushed; main's `e0f4de63e` gave the image test another killing
+cache and removed the sealed probe, so its merge with this branch must keep the sealed probe and the trained cache's
+case; a normal start of a trained `Jasper.app` (GUI) is the user's; Windows and Linux runs of the image test wait for CI.
+
+**JCEF runtime (browser plan 2) — 2026-10-27** (`claude/browser-jcef-runtime-0c197e`;
+[plan](superpowers/plans/2026-10-27-browser-2-jcef-runtime.md); executed with per-task subagents and reviews). Jasper
+builds, tests and packages on JBR 25.0.4.1 b635.75 with JCEF, so every package carries Chromium; nothing starts it.
+`verifyJcefToolchain` (in `check`) and `packageApp` refuse any other runtime; the packaged runtime has
+44 modules (45 on Windows). On macOS the SDK's `Contents/Frameworks` is copied into `Jasper.app/Contents/runtime`, the
+runtime bundle and then the app are re-sealed ad hoc (JetBrains' helper signatures stay), and `verifyPackage` checks the
+payload and `codesign --verify --deep --strict` of both; `Jasper.app` is 644 MB (`Contents/runtime` 547 MB: Home 228,
+Frameworks 319). Windows and Linux list Chromium's files in `packaging/jcef/<os>-<arch>.txt`, and Linux packaging
+restores the helpers' execute bit. CI takes `jdk+jcef`, the Linux packaging jobs install Chromium's Ubuntu 22.04
+libraries, and the Licenses window lists Chromium, CEF, JCEF, JOGL, GlueGen, Apache Thrift and Boost, and Microsoft's
+Direct3D HLSL Compiler (`d3dcompiler_47.dll`, x64 and ARM64) and DirectX IL (`dxil.dll`, x64) under the Windows SDK
+licence terms (`LicenseRef-Windows-SDK`); `dxcompiler.dll` (x64) has no entry of its own because Chromium builds it
+from source (Dawn's DirectX Shader Compiler, LLVM licence) and its credits cover it. The launcher
+sources vendored at b583.48 are identical to b635.75's (the same git tree in every vendored folder), so they stay, and
+`packaging/jcef/checksums.txt` records the six archives' SHA-512. Task 1b (added during the run): b635.75 fixes
+JDK-8376576, so `verifyLauncherImage`'s killing cache is now `-XX:AOTMode=on` with a class-path jar whose modification
+time changed. Final headless `check` on macOS aarch64, after the final review's fixes (`jcefRuntimeBuild` pins the exact
+build, with a fixture tying the Licenses window's Chromium, CEF and JCEF versions to it; tests run after
+`verifyJcefToolchain`), passed in 24m 34s (every test task rerun after `cleanTest`): 13,452 JUnit tests, zero failures
+and errors, 30 skips. Not run: Windows and Linux packaging (no host may run the downloaded JDKs, and the Actions budget
+blocks CI, so those `verifyPackage` lines and the Linux `apt-get` additions first run in CI; Task 3's substitute read
+libcef's direct `DT_NEEDED`, the rpm path's view, while the deb path's `ldd` also lists transitive libraries, so CI's
+install job first sees the `.deb`'s dependencies). Task 7 ran, and the user accepted
+[its record](benchmarks/2026-10-27-jcef-runtime.md) on 2026-10-27. The warm start and memory are within noise, the early
+cold milestones about 30 ms faster and the output-phase allocation 5 to 8 % higher; the cold window-to-output milestones
+are inconclusive (a load spike). Merged into local `main` by `73286aaef` (not pushed), which keeps main's zeroed
+killing cache in `verifyLauncherImage` beside Task 1b's and the sealed probe's trained-cache case. Open: two questions
+for the user on the Windows SDK files (the ARM64 `d3dcompiler_47.dll` is not on Microsoft's REDIST list, and the SDK
+terms ask more than attribution: section 2.a.ii asks for end-user terms at least as protective, a copyright notice and
+indemnifying Microsoft, and the REDIST list allows Classic Windows apps only and files unmodified); today's code
+starts cold in about 4.8 s on both images (2.06 s on 2026-10-02), and the memory benchmark's default matrix stops at
+search-resize-font with 1 pane and 100,000 lines on both images; GUI check of the Licenses window's longest
+caption ("JogAmp licenses (BSD 2-Clause and others)", 41 characters) on a narrow window; plan 4's first Chromium start
+shows whether the framework is found; Linux `lib/chrome-sandbox` keeps jlink's mode. The JDK-8376576 workarounds
+(unsealing `jbr-api`, training in a deleted copy, their wording) are retired or re-justified in the entry above.
+
 **Theme-selected splash artwork — 2026-10-26** (`codex/theme-splashes`; [plan](superpowers/plans/2026-10-26-theme-splashes.md)).
 Ordinary launches choose one of seven approved landscapes and recolored/coated Buddy illustrations from the saved
 interface theme; changes apply at the next launch. Custom/Desktop themes use Meadow; branded looks keep their own
@@ -617,7 +669,8 @@ a window with a terminal tab and an Editor file in another tab, the Editor's rig
 terminal's tab by its title.
 
 **Browser plan 3: link routing — 2026-10-22** (`claude/browser-link-routing`, worktree
-`.claude/worktrees/browser-link-routing`, from `claude/browser-plugin-design`; not merged or pushed): Jasper routes web
+`.claude/worktrees/browser-link-routing`, from `claude/browser-plugin-design`; merged into `main` with plan 3b as
+`ec86c61c2` and pushed): Jasper routes web
 addresses through one plugin-provided web browser role, as it routes files through the editor role
 (`docs/superpowers/plans/2026-10-22-browser-3-link-routing.md`). The SDK, still 0.21.0, gains `WebBrowser`,
 `LinkOrigin` (`CLICK`, `PROGRAM`), `Platform.browser` (the thirteenth capability, `browser.provide`: one plugin at a
@@ -651,7 +704,8 @@ meanwhile, become 0.17.0 and 0.18.0. `docs/sdk-reference.html` is regenerated. `
 25.0.4.1 b635.75): **13,474 tests, 0 failures, 0 errors, 30 skipped**; the example external plugin builds against
 `build/sdk-release` (1 test, 0 failures). No GUI was launched.
 **Plan 3b, the routing amendment — 2026-10-27** (`claude/browser-routing-3b-b72db8`, worktree
-`.claude/worktrees/browser-routing-3b-b72db8`, from `claude/browser-link-routing` at `665d4bce5`; not merged or pushed):
+`.claude/worktrees/browser-routing-3b-b72db8`, from `claude/browser-link-routing` at `665d4bce5`; merged into `main` with
+plan 3 as `ec86c61c2` and pushed):
 plan 3's routing brought in line with the approved iTerm2-parity design
 (`docs/superpowers/plans/2026-10-27-browser-3b-routing-amendment.md`). The SDK, still 0.23.0, replaces
 `LinkOrigin.PROGRAM` with `EXTERNAL` (`CLICK` stays) and gains `LinkPlacement` (`TAB`, `SPLIT_RIGHT`, `SPLIT_DOWN`) and

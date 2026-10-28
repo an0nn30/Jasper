@@ -1,0 +1,9 @@
+Jasper's Windows packages ship Microsoft's Direct3D HLSL Compiler, bin/d3dcompiler_47.dll (file version 10.0.26100.7705), in the
+JetBrains Runtime's JCEF, whose Chromium build copies it from the Windows SDK. The x64 and ARM64 files are unmodified:
+byte-identical to Redist\D3D\x64\d3dcompiler_47.dll and Redist\D3D\arm64\d3dcompiler_47.dll of Windows SDK 10.0.26100.7705
+(the NuGet package Microsoft.Windows.SDK.CPP 10.0.26100.7705).
+© Microsoft Corporation. All rights reserved.
+
+The licence text is the Windows SDK licence terms that package names (https://aka.ms/WinSDKLicenseURL, Microsoft's
+sdk_license.rtf), as plain text. The Windows SDK files that programs may distribute are listed at
+https://learn.microsoft.com/en-us/legal/windows-sdk/redist.
