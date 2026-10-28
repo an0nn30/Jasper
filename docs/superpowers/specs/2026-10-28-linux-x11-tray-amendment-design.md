@@ -3,8 +3,8 @@
 **Status: PROPOSED, not approved — 2026-10-28.** This is the scoped amendment required by the
 [approved residency design](2026-10-27-linux-residency-design.md#legacy-x11-implementation) after
 [Plan 2 Task 2 failed its native gate](../plans/2026-10-27-linux-residency-2-verification.md#task-2-native-result--2026-10-28-public-awt-gate-failed).
-Task 6 remains stopped. Builder review and user approval precede a revised implementation plan; this document
-authorizes neither implementation nor new GUI runs. The user selected the Java D-Bus plus X11/JNA contingency;
+Task 6 remains stopped. Independent builder review found no important unanswered design questions on 2026-10-28.
+User approval precedes a revised implementation plan; this document authorizes neither implementation nor new GUI runs. The user selected the Java D-Bus plus X11/JNA contingency;
 the concrete XCB, rendering, transport and popup decisions below are engineering proposals for that approval.
 
 ## Reason and boundary
@@ -176,8 +176,10 @@ must pass with no other Jasper windows open. If this public Swing composition fa
 
 ## Decisive gates and delivery
 
-The revised plan must put an owned native characterization gate before production fallback wiring. Passing the
-failed AWT probe's positive rows is insufficient. Required evidence:
+The revised plan must put an owned native characterization gate before production fallback wiring. Preserve the
+user-directed validation split: execute on the authorized Fedora aarch64 host; x86_64 and Ubuntu 22.04 remain CI
+release gates, not claims of locally executed coverage. Passing the failed AWT probe's positive rows is insufficient.
+Required evidence:
 
 1. **ABI and cancellation:** x86_64 and aarch64 layouts/symbols, bounded auth/setup, unanswered requests,
    backpressured output including implicit flushes, BadWindow/BadMatch, adapter socket loss, FD reuse, close during
@@ -208,6 +210,6 @@ connect-to-FD, poll event/reply, connection error, disconnect/flush, RENDER quer
 This proves installed availability only. No display, desktop bus, authority cookie, GUI or native implementation
 was accessed for this amendment. Runtime baseline/library packaging and every new native behavior remain unproven.
 
-Approval selects this scoped architecture and its gates. After builder review and user approval, write the revised
+Approval selects this scoped architecture and its gates. After user approval, write the revised
 Task 6 deliverable plan, preserve completed Tasks 1/3/4/5, and record the superseded AWT sections in Plan 2. No fallback
 production code is committed until the new cancellation and legacy characterization gates pass.
