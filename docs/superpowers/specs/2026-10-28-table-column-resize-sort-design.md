@@ -61,7 +61,7 @@ renders the new spec. This design keeps that pattern.
 
 - **Sort:** unchanged protocol. `UiEvent.Sorted(id, columnId)` already exists; the plugin keeps a sort key and direction,
   orders the rows, and sets `Column.sorted` on the sorted column. The plugin persists the choice in its own data
-  (Remote: `data/panel-state.toml` via `PanelState`, alongside `collapsed` and `sftp_show_hidden`).
+  (`data/columns.properties`, through the SDK's `ColumnStateFile`; amended in the plan).
 - **Resize:** a new event in the SDK, mirrored in `dev.jasper.ui.model.UiEvent` and converted in
   `dev.jasper.app.plugins.KitValues`, reports a finished drag on a table's or tree's header with the new width of every
   column, keyed by column id, in unscaled pixels (*my call*). `Column` gains an optional width (unscaled pixels,
