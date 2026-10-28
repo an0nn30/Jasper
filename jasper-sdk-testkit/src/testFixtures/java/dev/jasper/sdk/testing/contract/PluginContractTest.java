@@ -784,6 +784,45 @@ public abstract class PluginContractTest {
     }
 
     /**
+     * Browser plan 4a: a content menu is a top-level menu with {@code create}'s rules, in a window's menu bar only while
+     * that window's current item is one of its plugin's content tabs.
+     */
+    @Test void aContentMenuShowsOnlyWhileThePluginsItemIsCurrentInThatWindow() {
+        UUID one = h.addTerminalWindow(), shell = h.addTerminalTab(one, "zsh");
+        UUID pane = h.addTerminalPane(shell, "zsh", Path.of("/"));
+        UUID two = h.addTerminalWindow(), other = h.addTerminalTab(two, "zsh");
+        h.addTerminalPane(other, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var menus = alpha.get().menus();
+            alpha.get().actions().register(ActionSpec.of("test.alpha.back", "Back"), invoked -> { });
+            menus.createForContent("test.alpha.web", "Web").add("test.alpha.back");
+            menus.create("test.alpha.tools", "Alpha").add("test.alpha.back");
+            menus.createForContent("test.alpha.empty", "Empty");
+            assertThatIllegalArgumentException().as("an id in use").isThrownBy(() -> menus.createForContent("test.alpha.web", "Again"));
+            assertThatIllegalArgumentException().as("one id space with create").isThrownBy(() -> menus.create("test.alpha.web", "Again"));
+            assertThatIllegalArgumentException().as("another plugin's id").isThrownBy(() -> menus.createForContent("test.beta.web", "Web"));
+            assertThatIllegalArgumentException().as("no namespace").isThrownBy(() -> menus.createForContent("web", "Web"));
+            assertThatIllegalArgumentException().as("no title").isThrownBy(() -> menus.createForContent("test.alpha.blank", " "));
+        });
+        assertThat(h.menu("top:test.alpha.web")).containsExactly("item:test.alpha.back");
+        assertThat(h.menuBar(one)).as("no content tab of its plugin yet").containsExactly("top:test.alpha.tools");
+        var page = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        h.ui(() -> page.set(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"),
+            alpha.get().terminals().window(one).orElseThrow(), kitView(alpha.get()))));
+        assertThat(h.menuBar(one)).containsExactly("top:test.alpha.web", "top:test.alpha.tools");
+        assertThat(h.menuBar(two)).as("only in that window").containsExactly("top:test.alpha.tools");
+        h.focusTerminalPane(pane);
+        assertThat(h.menuBar(one)).as("a terminal tab is current").containsExactly("top:test.alpha.tools");
+        h.ui(() -> page.get().select());
+        assertThat(h.menuBar(one)).as("its content tab again").containsExactly("top:test.alpha.web", "top:test.alpha.tools");
+        h.addContentTab(one, "Document");
+        assertThat(h.menuBar(one)).as("a content tab that is not its plugin's").containsExactly("top:test.alpha.tools");
+        assertThat(h.menuBar(UUID.randomUUID())).as("no such window").isEmpty();
+    }
+
+    /**
      * Browser plan 3b Task 6 (Review Focus 4): a web-address item shows in a pane's right-click menu only while the pane's
      * selection, trimmed, is one http or https address with a host, and the action chosen from it hears that address.
      */
@@ -1606,6 +1645,50 @@ public abstract class PluginContractTest {
         });
     }
 
+    /**
+     * Browser plan 4a: a window has a modal while a modal dialog of any plugin or an overlay shows over it, asked through
+     * the window or a content tab in it; a modeless dialog is none, and a closed owner has none.
+     */
+    @Test void hasModalIsTrueWhileADialogShows() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        UUID other = h.addTerminalWindow(), leaving = h.addTerminalTab(other, "zsh");
+        h.addTerminalPane(leaving, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.beta"), Set.of(), Set.of(), beta::set);
+        var elsewhere = new AtomicReference<dev.jasper.sdk.terminal.WindowHandle>();
+        h.ui(() -> {
+            var windows = alpha.get().windows();
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            elsewhere.set(alpha.get().terminals().window(other).orElseThrow());
+            var page = windows.openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), owner, kitView(alpha.get()));
+            assertThat(windows.hasModal(owner)).isFalse();
+            var modeless = windows.dialog(new DialogSpec("Find", owner, false));
+            modeless.show();
+            assertThat(windows.hasModal(owner)).as("a modeless dialog").isFalse();
+            var modal = beta.get().windows().dialog(new DialogSpec("Confirm", beta.get().terminals().window(main).orElseThrow(), true));
+            assertThat(windows.hasModal(owner)).as("a modal dialog not shown yet").isFalse();
+            modal.show();
+            assertThat(windows.hasModal(owner)).as("another plugin's modal dialog over that window").isTrue();
+            assertThat(windows.hasModal(page)).as("asked through a content tab in that window").isTrue();
+            assertThat(windows.hasModal(elsewhere.get())).as("only that window").isFalse();
+            modal.close();
+            assertThat(windows.hasModal(owner)).as("closed").isFalse();
+            var overlay = windows.overlay(new dev.jasper.sdk.ui.OverlaySpec("Working", owner));
+            overlay.show();
+            assertThat(windows.hasModal(owner)).as("an overlay").isTrue();
+            overlay.close();
+            modeless.close();
+            assertThat(windows.hasModal(owner)).isFalse();
+            assertThatNullPointerException().isThrownBy(() -> windows.hasModal(null));
+        });
+        // A window closes when a move takes its last tab (full windows spec 5.3).
+        h.moveTab(leaving, main);
+        h.ui(() -> assertThat(alpha.get().windows().hasModal(elsewhere.get())).as("a closed owner").isFalse());
+    }
+
     /** Quit asks the content tabs' guards and closes nothing; a dialog's guard is not asked. */
     @Test void quitAsksThePluginsContentTabGuardAndClosesNothing() {
         var allow = new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -2284,6 +2367,33 @@ public abstract class PluginContractTest {
                 dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW)).as("an open key is selected where it is").isSameAs(below.get());
             assertThat(below.get().window().id()).isEqualTo(main);
         });
+    }
+
+    /** Browser plan 4a: NEXT_TAB opens a new tab right after the window's shown tab, and at the end of a window that shows none. */
+    @Test void aNextTabOpensRightAfterTheCurrentTab() {
+        UUID main = h.addTerminalWindow(), first = h.addTerminalTab(main, "first");
+        h.addTerminalPane(first, "zsh", Path.of("/"));
+        UUID second = h.addTerminalTab(main, "second");
+        UUID secondPane = h.addTerminalPane(second, "zsh", Path.of("/"));
+        UUID third = h.addTerminalTab(main, "third");
+        h.addTerminalPane(third, "zsh", Path.of("/"));
+        h.focusTerminalPane(secondPane);
+        UUID empty = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), alpha::set);
+        var opened = new AtomicReference<List<UUID>>();
+        h.ui(() -> {
+            var windows = alpha.get().windows();
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            windows.openTab(new dev.jasper.sdk.ui.ContentSpec("next", "Next"), owner, kitView(alpha.get()), dev.jasper.sdk.ui.TabPlacement.NEXT_TAB);
+            UUID next = owner.activeTab().orElseThrow().id();
+            var lone = alpha.get().terminals().window(empty).orElseThrow();
+            windows.openTab(new dev.jasper.sdk.ui.ContentSpec("lone", "Lone"), lone, kitView(alpha.get()), dev.jasper.sdk.ui.TabPlacement.NEXT_TAB);
+            opened.set(List.of(next, lone.activeTab().orElseThrow().id()));
+        });
+        assertThat(h.windowTabs(main)).as("the new tab is third, and the old third is fourth")
+            .containsExactly(List.of(first), List.of(second), List.of(opened.get().get(0)), List.of(third));
+        assertThat(h.windowTabs(empty)).as("at the end of a window that shows no tab").containsExactly(List.of(opened.get().get(1)));
     }
 
     /**
@@ -4119,6 +4229,49 @@ public abstract class PluginContractTest {
         }
         assertThat(calls).containsExactlyInAnyOrder("notes.txt", "declined.txt");
         assertThat(h.openedInEditor()).as("only the declined file reaches the desktop").containsExactly(HERE.resolve("declined.txt"));
+    }
+
+    /**
+     * Browser plan 4a: openFile follows the terminal click's file rule without the browser: the provided editor, with the
+     * active window and no line, even for a page a provided browser could show; the desktop edits or shows a file the
+     * editor declines, and a path that is no file opens nothing and is posted in the plugin's group.
+     */
+    @Test void openFileUsesTheDefaultEditorEvenWithABrowserProvided(@org.junit.jupiter.api.io.TempDir Path folder) throws Exception {
+        UUID window = h.addTerminalWindow();
+        h.activateTerminalWindow(window);
+        Path page = java.nio.file.Files.writeString(folder.resolve("index.html"), "<p>page</p>");
+        Path declined = java.nio.file.Files.writeString(folder.resolve("declined.html"), "<p>declined</p>");
+        var editor = new AtomicReference<PluginContext>();
+        var browser = new AtomicReference<PluginContext>();
+        var user = new AtomicReference<PluginContext>();
+        h.start(info("test.editor", Capabilities.EDITOR_PROVIDE), Set.of(), Set.of(), editor::set);
+        h.start(info("test.browser", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), browser::set);
+        h.start(info("test.user"), Set.of(), Set.of(), user::set);
+        List<String> edits = new CopyOnWriteArrayList<>();
+        List<String> links = new CopyOnWriteArrayList<>();
+        dev.jasper.sdk.ui.FileEditor recording = recordingEditor(edits, true);
+        h.ui(() -> {
+            editor.get().platform().editor((file, line, owner) -> recording.edit(file, line, owner) && !file.equals(declined));
+            browser.get().platform().browser(recordingBrowser(links, true));
+        });
+        h.ui(() -> {
+            user.get().platform().openFile(page);
+            user.get().platform().openFile(declined);
+            user.get().platform().openFile(folder.resolve("missing.html"));
+            assertThatNullPointerException().isThrownBy(() -> user.get().platform().openFile(null));
+        });
+        h.flush();
+        // Up to 10 s: the app host's worker hops to the UI thread, which a loaded CI can delay.
+        for (int i = 0; i < 1000 && (edits.size() < 2 || h.openedFiles().isEmpty() || h.notifications().isEmpty()); i++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            h.flush();
+        }
+        assertThat(edits).containsExactlyInAnyOrder("index.html|-|" + window, "declined.html|-|" + window);
+        assertThat(links).as("never the provided browser").isEmpty();
+        assertThat(h.openedFiles()).as("the declined file reaches the desktop").containsExactly(declined);
+        assertThat(h.openedInEditor()).as("never the desktop's open action").isEmpty();
+        assertThat(h.notifications()).as("a path that is no file").singleElement()
+            .satisfies(line -> assertThat(line).startsWith("test.user|ERROR|Could not open a file|missing.html|"));
     }
 
     /** A browser that records {@code <address>|<origin>|<window id or ->} and answers {@code answer}. */

@@ -57,6 +57,33 @@ class AuxiliaryWindowsTest {
         assertThat(cancelled.openFile(window, java.util.Optional.empty())).isEmpty();
     }
 
+    /**
+     * Browser plan 4a: a window has a modal while a modal dialog it owns, directly or through a dialog, or an overlay
+     * inside it shows; a modeless dialog, a surface not shown yet and an overlay inside a dialog are none.
+     */
+    @Test void aWindowHasAModalWhileAModalDialogItOwnsOrAnOverlayInsideItShows() {
+        UUID window = UUID.randomUUID(), other = UUID.randomUUID();
+        var modeless = windows.dialog("Find", false, window);
+        modeless.show();
+        assertThat(windows.hasModal(window)).as("a modeless dialog").isFalse();
+        var inside = windows.modalOverlay("Inside", modeless);
+        inside.show();
+        assertThat(windows.hasModal(window)).as("an overlay inside a dialog").isFalse();
+        inside.close();
+        var nested = windows.dialog("Confirm", true, modeless);
+        assertThat(windows.hasModal(window)).as("not shown yet").isFalse();
+        nested.show();
+        assertThat(windows.hasModal(window)).as("through the dialog that owns it").isTrue();
+        assertThat(windows.hasModal(other)).as("only its own window").isFalse();
+        nested.close();
+        var progress = windows.overlay("Working", window);
+        progress.show();
+        assertThat(windows.hasModal(window)).as("an overlay inside the window").isTrue();
+        progress.close();
+        modeless.close();
+        assertThat(windows.hasModal(window)).isFalse();
+    }
+
     @Test void onlyOneOverlayCanOwnAJasperWindow() {
         UUID owner = UUID.randomUUID();
         var first = windows.overlay("Connecting", owner);

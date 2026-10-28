@@ -130,6 +130,8 @@ final class HostedUi {
      * answer. Its context sets it; unset, no plugin may.
      */
     java.util.function.BooleanSupplier tabTitles = () -> false;
+    /** A Jasper window's native window by id, or null; its context sets it, and a headless host has none. */
+    Function<java.util.UUID, java.awt.Window> nativeWindows = id -> null;
     /**
      * The id of this plugin's action whose handler is running on the UI thread, or null: a toggle or show its panel's
      * own toggle action makes as it runs activates the panel (plan 15b Rulings 1).
@@ -353,12 +355,20 @@ final class HostedUi {
             }
             @Override public PluginMenu create(String menuId, String title) {
                 guard("create");
+                return topLevel(menuId, title, MenuTarget.topLevel(menuId, title));
+            }
+            @Override public PluginMenu createForContent(String menuId, String title) {
+                guard("createForContent");
+                return topLevel(menuId, title, MenuTarget.content(menuId, title, pluginId));
+            }
+            /** A top-level menu of this plugin's; a content menu shares the id rules and namespace of the others. */
+            private PluginMenu topLevel(String menuId, String title, MenuTarget target) {
                 if (menuId == null || !dev.jasper.sdk.PluginInfo.validId(menuId))
                     throw new IllegalArgumentException("Not a namespaced menu id: " + menuId);
                 requireNamespace(menuId, "A menu");
                 if (title == null || title.isBlank()) throw new IllegalArgumentException("A menu needs a title");
                 // The model rejects a duplicate top-level id and frees it again when the menu closes.
-                return HostedMenu.root(HostedUi.this, model.addMenuSection(MenuTarget.topLevel(menuId, title)));
+                return HostedMenu.root(HostedUi.this, model.addMenuSection(target));
             }
             @Override public PluginMenu terminalContext() {
                 guard("terminalContext");
@@ -847,6 +857,7 @@ final class HostedUi {
                 }
                 var entry = model.tabs().open(pluginId, spec.key(), spec.title(), window, component, switch (placement) {
                     case NEW_TAB -> dev.jasper.app.contributions.TabRegistry.Placement.NEW_TAB;
+                    case NEXT_TAB -> dev.jasper.app.contributions.TabRegistry.Placement.NEXT_TAB;
                     case SPLIT_RIGHT -> dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT;
                     case SPLIT_DOWN -> dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_DOWN;
                     case NEW_WINDOW -> dev.jasper.app.contributions.TabRegistry.Placement.NEW_WINDOW;
@@ -987,6 +998,17 @@ final class HostedUi {
                 surface.onClosed(ownerClosed::close);
                 closers.add(surface::close);
                 return new OwnedDialog(surface);
+            }
+            @Override public boolean hasModal(WindowOwner owner) {
+                guard("hasModal");
+                java.util.Objects.requireNonNull(owner, "owner");
+                java.util.UUID window = null;
+                if (owner instanceof OwnedContent content) {
+                    if (ownedContent.get(content.entry) == content && !content.entry.closed()) window = content.entry.window();
+                } else if (owner instanceof WindowHandle handle && terminals.ownsOpenWindow(handle)) window = handle.id();
+                if (window == null) return false;
+                // Jasper's surfaces over the window, which a headless host has too, then whatever its native window shows.
+                return windows.hasModal(window) || dev.jasper.app.platform.WindowInput.showsModal(nativeWindows.apply(window));
             }
             @Override public dev.jasper.sdk.ui.PluginPopover popover(dev.jasper.sdk.ui.UiAnchor value) {
                 guard("popover");var anchor=HostedAnchor.require(value,windows);

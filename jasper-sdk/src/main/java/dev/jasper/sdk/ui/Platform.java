@@ -20,6 +20,23 @@ public interface Platform {
     void openInEditor(Path file);
 
     /**
+     * Opens a local file the way a Cmd-click (Ctrl-click on Linux and Windows) on its path in a terminal opens it, except
+     * that the web browser a plugin provides is never asked: the editor a plugin provides (see {@link #editor}), with the
+     * active Jasper window and no line, then the desktop's edit action, then showing the file in the file manager; never
+     * the desktop's open action, which runs programs and scripts. UI thread only; elsewhere it throws
+     * {@code IllegalStateException}. Returns at once; a path that is not a regular file, and a file nothing could open,
+     * are posted in the plugin's notification group, never thrown.
+     *
+     * @param file the file
+     * @throws NullPointerException when {@code file} is null
+     * @throws UnsupportedOperationException if the host predates this call
+     * @since 0.25.0
+     */
+    default void openFile(Path file) {
+        throw new UnsupportedOperationException("Opening files is unavailable");
+    }
+
+    /**
      * Opens a web address in the system browser, never asking the web browser a plugin provides
      * ({@link #openInBrowser} asks that one first, with a {@link WebLink}). Runs in the background; a failure is posted
      * in the plugin's notification group, never thrown.
@@ -79,14 +96,14 @@ public interface Platform {
 
     /**
      * Makes this plugin the editor Jasper opens files with: {@code config.toml}, the plugin settings files, the custom VM
-     * options file, every {@link #openInEditor} and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a
-     * local terminal pane go to {@code editor} first, on the UI thread; a click brings the path's line and the clicked
-     * window. A clicked path comes from program output, and an OSC 8 link's address can differ from the text shown, so
-     * an editor edits the file and never runs it. One at a time: a bundled plugin's registration replaces a plugin's
-     * that is not bundled; otherwise the first stays and any later one, this plugin's own included, throws. When the
-     * editor returns false or throws, when no plugin provides one, and when Jasper waited 30 seconds for the UI
-     * thread's answer, the desktop opens the file as before; for a click it edits the file or shows it in the file
-     * manager instead, and never opens it. Needs {@code editor.provide}. UI thread only. The registration ends with
+     * options file, every {@link #openInEditor} and {@link #openFile}, and a Cmd-click (Ctrl-click on Linux and Windows)
+     * on a file path in a local terminal pane go to {@code editor} first, on the UI thread; a click brings the path's line
+     * and the clicked window. A clicked path comes from program output, and an OSC 8 link's address can differ from the
+     * text shown, so an editor edits the file and never runs it. One at a time: a bundled plugin's registration replaces
+     * a plugin's that is not bundled; otherwise the first stays and any later one, this plugin's own included, throws.
+     * When the editor returns false or throws, when no plugin provides one, and when Jasper waited 30 seconds for the UI
+     * thread's answer, the desktop opens the file as before; for a click and an {@link #openFile} it edits the file or
+     * shows it in the file manager instead, and never opens it. Needs {@code editor.provide}. UI thread only. The registration ends with
      * the plugin.
      *
      * @param editor opens a file

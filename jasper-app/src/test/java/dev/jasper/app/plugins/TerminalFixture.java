@@ -226,6 +226,27 @@ final class TerminalFixture {
     /** A content tab, such as a plugin's view, with the id and title its window gives it, in a new tab at the end of the strip; it opens selected. */
     void addContentTab(UUID windowId, UUID tabId, Supplier<String> title) { addContentTab(windowId, tabId, title, false); }
 
+    /** As above, in a new tab right after the window's shown tab, at the end of the strip when it shows none: a next tab. */
+    void addNextContentTab(UUID windowId, UUID tabId, Supplier<String> title) {
+        Window window = windows.get(windowId);
+        var tab = new Tab(); tab.id = tabId; tab.title = title; tab.kind = TabEntry.Kind.CONTENT;
+        tabs.put(tab.id, tab);
+        int index = window.tabs.size();
+        for (int i = 0; i < window.tabs.size(); i++) if (window.tabs.get(i).group == window.active()) index = i + 1;
+        var group = new Group();
+        window.recent.add(group);
+        tab.window = window;
+        tab.group = group;
+        window.tabs.add(index, tab);
+        group.recent.add(tab);
+        registry.atomically(() -> { registry.publish(new TerminalEvent.TabOpened(window.id, tab.id)); select(tab); });
+    }
+
+    /** The id of the window's selected item, the focused pane's item in its shown tab; empty for none or a window that is not open. */
+    Optional<UUID> selected(UUID windowId) {
+        return Optional.ofNullable(windows.get(windowId)).map(window -> window.selected).map(tab -> tab.id);
+    }
+
     /** As above; with {@code beside}, in a new pane right after the window's selected item, as a split placement opens it. */
     void addContentTab(UUID windowId, UUID tabId, Supplier<String> title, boolean beside) {
         Window window = windows.get(windowId);

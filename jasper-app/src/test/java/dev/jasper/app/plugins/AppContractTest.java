@@ -164,7 +164,8 @@ class AppContractTest extends PluginContractTest {
                 (tab, number) -> {
                     if (terminalFixture.moveToTab(tab.id().value(), number))
                         for (var other : tabs.inWindow(id)) other.active(other == tab);
-                }));
+                },
+                tab -> terminalFixture.addNextContentTab(id, tab.id().value(), tab::title)));
             terminalFixture.onWindowClosed(id, registration::close);
             return id;
         };
@@ -215,6 +216,8 @@ class AppContractTest extends PluginContractTest {
         List<Runnable> clipboardClears = new CopyOnWriteArrayList<>();
         onEdt(() -> host.clipboard = new dev.jasper.app.platform.HostClipboard(() -> clipboardContents,
             (delay, task) -> { clipboardClears.add(task); return () -> clipboardClears.remove(task); }));
+        List<Path> openedFiles = new CopyOnWriteArrayList<>();
+        onEdt(() -> host.editOrReveal = openedFiles::add);
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
@@ -326,6 +329,23 @@ class AppContractTest extends PluginContractTest {
                         render(contributions, section.entries(), "", lines, true);
                     }
                     return lines;
+                });
+            }
+            @Override public List<String> menuBar(UUID windowId) {
+                return onEdtValue(() -> {
+                    if (terminalFixture.registry.window(windowId).isEmpty()) return List.<String>of();
+                    // The window's rule (WindowChrome): a content menu shows only while its plugin's tab is the current item.
+                    var current = terminalFixture.selected(windowId).flatMap(id -> contributions.tabs().tab(new dev.jasper.app.layout.TabId(id)))
+                        .orElse(null);
+                    List<String> menus = new java.util.ArrayList<>();
+                    for (var section : contributions.menus()) {
+                        var where = section.target();
+                        if (where.type() != dev.jasper.app.contributions.MenuTarget.Type.TOP_LEVEL || !where.showsFor(current)) continue;
+                        List<String> lines = new java.util.ArrayList<>();
+                        render(contributions, section.entries(), "", lines, true);
+                        if (lines.stream().anyMatch(line -> line.strip().startsWith("item:"))) menus.add("top:" + where.key());
+                    }
+                    return menus;
                 });
             }
             @Override public List<String> contextMenu(UUID paneId) {
@@ -679,6 +699,7 @@ class AppContractTest extends PluginContractTest {
                         @Override public boolean runNotificationAction(String title, String label) { return notifications.runAction(title, label); }
                         @Override public boolean clickNotification(String title) { return notifications.click(title); }
                         @Override public List<Path> openedInEditor() { return List.copyOf(edited); }
+                        @Override public List<Path> openedFiles() { return List.copyOf(openedFiles); }
                         @Override public List<java.net.URI> browsed() { return List.copyOf(browsed); }
                         @Override public java.util.Optional<String> clipboard() { return onEdtValue(() -> host.clipboard.text()); }
                         @Override public void userCopies(String text) {

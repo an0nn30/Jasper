@@ -9,13 +9,13 @@ namespaced: they start with the plugin's id and a dot. Registration needs the UI
 <thead><tr><th>Contribution</th><th>Entry point</th><th>Capability</th><th>Where it appears</th></tr></thead>
 <tbody>
 <tr><td>Actions</td><td>{@link Actions#register(ActionSpec,Consumer)}</td><td></td><td>The command palette of every window, Settings › Keymap and its default shortcut; then wherever the plugin places it</td></tr>
-<tr><td>Menu entries</td><td>{@link Menus#standard(StandardMenu)}, {@link Menus#create(String,String)}, {@link Menus#terminalContext()}</td><td></td><td>A section at the end of a built-in menu, a top-level menu of its own, the pane right-click menu</td></tr>
+<tr><td>Menu entries</td><td>{@link Menus#standard(StandardMenu)}, {@link Menus#create(String,String)}, {@link Menus#createForContent(String,String)}, {@link Menus#terminalContext()}</td><td></td><td>A section at the end of a built-in menu, a top-level menu of its own, one shown only for its content tabs, the pane right-click menu</td></tr>
 <tr><td>Toolbar items</td><td>{@link Toolbar#add(ToolbarItem)}</td><td></td><td>In every window's toolbar, after Jasper's Split and Maximize buttons and before Find and Settings</td></tr>
 <tr><td>Status items and progress</td><td>{@link StatusBar#add(StatusItemSpec)}, {@link StatusBar#addProgress(StatusItemSpec)}</td><td></td><td>Either end of every window's status bar</td></tr>
 <tr><td>Rail buttons</td><td>{@link Rail#add(String)}</td><td></td><td>The left tool window stripe, after the tool window buttons</td></tr>
 <tr><td>Tool windows</td><td>{@link Panels#register(PanelSpec,PanelFactory)}, {@link Panels#toggle(String,WindowHandle)}, {@link Panels#show(String,WindowHandle)}</td><td></td><td>A stripe button and a tool window in one of six dock slots of every window or in a window of its own; View › Tool Windows</td></tr>
 <tr><td>Dialogs</td><td>{@link Windows#dialog(DialogSpec)}, {@link Windows#overlay(OverlaySpec)}, {@link Windows#popover(UiAnchor)}</td><td></td><td>Dialogs and sheets, in-window overlays, popovers below a control</td></tr>
-<tr><td>Content tabs</td><td>{@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)}</td><td></td><td>A document in a new tab, a new pane beside the focused one or a new window, beside terminals</td></tr>
+<tr><td>Content tabs</td><td>{@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)}</td><td></td><td>A document in a new tab, at the end of the strip or after the shown one, a new pane beside the focused one or a new window, beside terminals</td></tr>
 <tr><td>Split items</td><td>{@link Windows#splitItem(SplitItemSpec,BiConsumer)}</td><td></td><td>Every Split list, after the terminal, with two bindable actions</td></tr>
 <tr><td>Restorers</td><td>{@link Windows#restorer(String,TabRestorer)}</td><td></td><td>The plugin's saved tabs coming back when Jasper restores its windows</td></tr>
 <tr><td>File choosers</td><td>{@link Windows#choose(FileChoice)}, {@link Windows#chooseFiles(WindowOwner,String,Optional)}, {@link Windows#chooseDirectory(WindowOwner,String,Optional)}, {@link Windows#chooseSaveFile(WindowOwner,String,Optional)}</td><td></td><td>Jasper's file chooser, over a Jasper window or one of the plugin's content tabs</td></tr>
@@ -81,7 +81,8 @@ disabled action's key, except in a terminal pane, where it does nothing.</p>
 after a separator. Jasper has no Tools, Session or Transfer items of its own, so those menus show only while a
 plugin has entries in them: Tools for utility commands, Session for connecting to hosts and working with sessions,
 Transfer for file browsers, transfers and file servers. {@link Menus#create(String,String)} adds a top-level menu, placed
-with the other plugins' menus. {@link Menus#terminalContext()} is a section at the end of every pane's right-click menu;
+with the other plugins' menus; {@link Menus#createForContent(String,String)} adds one that a window shows only while one
+of the plugin's content tabs is that window's current item. {@link Menus#terminalContext()} is a section at the end of every pane's right-click menu;
 an action run from it receives that pane. A section is a {@link PluginMenu}: add actions, separators and submenus, and
 rebuild it at any time with {@link PluginMenu#clear()}. In the terminal section and its submenus,
 {@link PluginMenu#addForWebAddress(String)} adds an action that shows only while the pane's selection is one {@code http}
@@ -150,11 +151,13 @@ outside clicks do not dismiss it, so give it a Cancel action.</li>
 <li>{@link Windows#popover(UiAnchor)}: a popup below (or above) a button or picker, from {@link UiView#anchor(String)};
 Escape and clicks outside close it.</li>
 </ul>
+<p>{@link Windows#hasModal(WindowOwner)} tells whether a Jasper window shows a modal now: a modal dialog over it,
+Jasper's or any plugin's, or an overlay inside it.</p>
 
 <h3>Content tabs</h3>
 <p>{@link Windows#openTab(ContentSpec,WindowOwner,UiView)} opens a view as a document in a new tab of the owner's window,
 or of the most recently active window, as the Editor does; {@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)} opens it
-where a {@link TabPlacement} says: a new tab, a new pane beside the focused one, or a new window. The {@link ContentSpec}'s key identifies the document: opening a key the plugin
+where a {@link TabPlacement} says: a new tab at the end of the strip or right after the shown one, a new pane beside the focused one, or a new window. The {@link ContentSpec}'s key identifies the document: opening a key the plugin
 already has open selects that tab and returns its handle. Through the {@link ContentTab} the plugin sets the tab's
 title, detail, icon, unsaved marker and location ({@link ContentTab#setPresentation(ContentPresentation)}), its commands
 ({@link ContentTab#setCommands(List)}), which its context menu lists and whose shortcuts apply while it is active, and
@@ -266,7 +269,7 @@ program's settings. See <a href="command-line.md">the command line</a>.</p>
 
 <h3>The editor role</h3>
 <p>{@link Platform#editor(FileEditor)} makes the plugin the editor Jasper opens files with: its configuration files,
-every {@link Platform#openInEditor(Path)} and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local
+every {@link Platform#openInEditor(Path)} and {@link Platform#openFile(Path)}, and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local
 terminal pane reach the plugin's {@link FileEditor} first; returning {@code false} hands the file to the desktop. One plugin at a time holds the role: a bundled plugin's registration
 replaces one that is not bundled; otherwise the first stays and a later one throws. The Editor plugin takes it. Shell
 variables ({@link Terminals#environment(Function)}) and program tabs ({@link LocalSpec#running(List,Optional)}) are
@@ -275,7 +278,9 @@ described in <a href="#terminals">Terminals</a>.</p>
 <h3>Desktop integration</h3>
 <p>{@link Platform#copy(String)} puts text on the clipboard; {@link Platform#copySecret(String)} also clears it 30 seconds
 later if it is still there. {@link Platform#browse(URI)} opens an http or https address in the browser, and
-{@link Platform#openInEditor(Path)} opens a file in the user's editor. {@link Platform#openInBrowser(URI)} opens a link the
+{@link Platform#openInEditor(Path)} opens a file in the user's editor. {@link Platform#openFile(Path)} opens a local file as a
+Cmd-click on its path in a terminal does, without the web browser role, and never with the desktop's open action.
+{@link Platform#openInBrowser(URI)} opens a link the
 user asked for, offering it to the web browser role first, while {@link Platform#browse(URI)} always uses the system
 browser. Their failures are posted in the plugin's default notification group, never thrown.</p>
 </section>

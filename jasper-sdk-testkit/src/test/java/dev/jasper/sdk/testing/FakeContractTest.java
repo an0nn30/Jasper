@@ -56,6 +56,7 @@ class FakeContractTest extends PluginContractTest {
                 throw new AssertionError("No toolbar view button " + buttonId + " in " + windowId);
             }
             @Override public List<String> menu(String target) { return host.menu(target); }
+            @Override public List<String> menuBar(java.util.UUID windowId) { return host.menuBar(windowId); }
             @Override public List<String> contextMenu(java.util.UUID paneId) { return host.contextMenu(paneId); }
             @Override public boolean chooseFromContextMenu(java.util.UUID paneId, String actionId) { return host.chooseFromContextMenu(paneId, actionId); }
             @Override public List<String> status() { return host.status(); }
@@ -102,6 +103,7 @@ class FakeContractTest extends PluginContractTest {
             @Override public boolean runNotificationAction(String title, String label) { return host.notifications().runAction(title, label); }
             @Override public boolean clickNotification(String title) { return host.notifications().click(title); }
             @Override public List<java.nio.file.Path> openedInEditor() { return host.openedInEditor(); }
+            @Override public List<java.nio.file.Path> openedFiles() { return host.openedFiles(); }
             @Override public List<java.net.URI> browsed() { return host.browsed(); }
             @Override public java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory) {
                 return host.addTerminalPane(tabId, new dev.jasper.sdk.terminal.PaneInfo(title, java.util.Optional.ofNullable(directory), java.util.Optional.empty(), 80, 24,

@@ -92,6 +92,8 @@ public final class FakePluginHost implements AutoCloseable {
     private final List<dev.jasper.sdk.files.FileChoice> fileChoices = new ArrayList<>();
         final List<String> paletteOpens = new ArrayList<>();
         final List<Path> openedInEditor = new ArrayList<>();
+    /** Every file {@code Platform.openFile} handed to the desktop: those no provided editor opened. */
+    final List<Path> openedFiles = new CopyOnWriteArrayList<>();
     final List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
     final FakeClipboard clipboard = new FakeClipboard();
     final FakeNotifications notifications = new FakeNotifications(this);
@@ -789,6 +791,39 @@ public final class FakePluginHost implements AutoCloseable {
             }
         }
         return lines;
+    }
+
+    /**
+     * The plugin menus a window's menu bar shows: each {@code Menus.create} menu, and each {@code Menus.createForContent}
+     * menu while the window's current item, its focused pane's item, is one of that plugin's content tabs. A menu shows
+     * only while it holds an item of a registered action, as the application's.
+     *
+     * @param windowId a window
+     * @return {@code top:<menuId>} lines, each plugin's menus in the order they were created; empty for a window that is
+     *     not open
+     * @since 0.25.0
+     */
+    public List<String> menuBar(UUID windowId) {
+        var window = workspace.window(windowId);
+        if (window.isEmpty()) return List.of();
+        List<String> menus = new ArrayList<>();
+        for (FakePluginContext context : contexts.values()) {
+            for (FakeUi.Menu section : context.ui.sections) {
+                if (!section.target.startsWith("top:") || section.content && !context.ui.showsContent(window.get().selected)) continue;
+                List<String> lines = new ArrayList<>();
+                section.render(lines, "", true);
+                if (lines.stream().anyMatch(line -> line.strip().startsWith("item:"))) menus.add(section.target);
+            }
+        }
+        return menus;
+    }
+
+    /** Whether a shown modal dialog of any plugin, or a shown overlay, is over Jasper window {@code windowId}. */
+    boolean hasModal(UUID windowId) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeUi.FakeWindow shown : context.ui.windows)
+                if (shown.shown && !shown.closed && windowId.equals(shown.window) && (shown.modal || shown.id.equals("overlay"))) return true;
+        return false;
     }
 
     /**
@@ -2005,6 +2040,15 @@ public final class FakePluginHost implements AutoCloseable {
 
         /** Every file a plugin asked to open in the editor that no provided editor opened (the desktop's share). */
         public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }
+
+    /**
+     * Every file a plugin's {@code Platform.openFile} handed to the desktop, which edits it or shows it in the file manager:
+     * those no provided editor opened.
+     *
+     * @return the files in request order
+     * @since 0.25.0
+     */
+    public List<Path> openedFiles() { return List.copyOf(openedFiles); }
 
     /**
      * Every web address that reached the system browser: each {@code Platform.browse}, and each

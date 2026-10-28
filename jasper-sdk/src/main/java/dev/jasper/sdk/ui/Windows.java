@@ -155,6 +155,21 @@ public interface Windows {
     PluginDialog overlay(OverlaySpec spec);
 
     /**
+     * Whether a Jasper window shows a modal now: a modal dialog over it, Jasper's or any plugin's, or an overlay inside
+     * it. A modeless dialog is none.
+     *
+     * @param owner a Jasper window, or a content tab of this plugin, whose window is asked
+     * @return whether that window shows a modal; false for a closed window or content tab, and for any other owner
+     * @throws NullPointerException when {@code owner} is null
+     * @throws IllegalStateException for a closed context or off-UI call
+     * @throws UnsupportedOperationException if the host predates this query
+     * @since 0.25.0
+     */
+    default boolean hasModal(WindowOwner owner) {
+        throw new UnsupportedOperationException("The modal query is unavailable");
+    }
+
+    /**
      * Selects existing local files in Jasper's file chooser, attached to the owner. The synchronous call pumps UI
      * events; closing the owner or stopping the plugin cancels and discards the result.
      * @param owner an open Jasper window, or a content tab of this plugin

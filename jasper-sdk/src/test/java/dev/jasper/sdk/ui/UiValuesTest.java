@@ -188,6 +188,30 @@ class UiValuesTest {
         assertThat(LinkPlacement.values()).containsExactly(LinkPlacement.TAB, LinkPlacement.SPLIT_RIGHT, LinkPlacement.SPLIT_DOWN);
     }
 
+    /**
+     * Browser plan 4a: opening a file, content menus and the modal query are defaults that an older host refuses, and a
+     * next tab is a placement of its own.
+     */
+    @Test void theBrowserCoreMembersAreDefaultsThatAnOlderHostRefuses() throws Exception {
+        assertThat(Platform.class.getMethod("openFile", Path.class).isDefault()).isTrue();
+        assertThat(Menus.class.getMethod("createForContent", String.class, String.class).isDefault()).isTrue();
+        assertThat(Windows.class.getMethod("hasModal", dev.jasper.sdk.WindowOwner.class).isDefault()).isTrue();
+        assertThatExceptionOfType(UnsupportedOperationException.class)
+            .isThrownBy(() -> older(Platform.class).openFile(Path.of("/tmp/index.html")));
+        assertThatExceptionOfType(UnsupportedOperationException.class)
+            .isThrownBy(() -> older(Menus.class).createForContent("dev.x.web", "Web"));
+        assertThatExceptionOfType(UnsupportedOperationException.class)
+            .isThrownBy(() -> older(Windows.class).hasModal(new dev.jasper.sdk.WindowOwner() { }));
+        assertThat(TabPlacement.values()).containsExactly(TabPlacement.NEW_TAB, TabPlacement.NEXT_TAB, TabPlacement.SPLIT_RIGHT,
+            TabPlacement.SPLIT_DOWN, TabPlacement.NEW_WINDOW);
+    }
+
+    /** A host that implements only the abstract members of {@code type}, as one built for an older SDK does. */
+    private static <T> T older(Class<T> type) {
+        return type.cast(java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type},
+            (proxy, method, args) -> method.isDefault() ? java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args) : null));
+    }
+
     /** Browser plan 3b: a web link is an http or https address with a host, as the user clicked or an outside program gave it. */
     @Test void aWebLinkTakesHttpAndHttpsAddressesWithAHost() {
         var link = new WebLink(URI.create("https://example.com/a"), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(), Optional.empty());

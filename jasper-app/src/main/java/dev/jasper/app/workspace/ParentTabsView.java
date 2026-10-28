@@ -113,6 +113,9 @@ final class ParentTabsView extends JPanel {
      */
     WorkspaceView openParentTab(Tab tab) { return openParentTab(tab, ParentTabId.random(), count()); }
 
+    /** As {@link #openParentTab(Tab)}, right after the shown parent tab in the bar (browser plan 4a's next tab). */
+    WorkspaceView openNextTab(Tab tab) { return openParentTab(tab, ParentTabId.random(), model.indexOf(model.active()) + 1); }
+
     /**
      * As {@link #openParentTab(Tab)}, under {@code id} at {@code index} of the bar (its end past it): a parent tab moving
      * in from another window keeps its id (parent tabs spec 11; workspace plan 7b Rulings 10). While the window's only

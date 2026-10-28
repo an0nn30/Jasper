@@ -64,6 +64,8 @@ final class WindowChrome {
     private WindowContributions contributions;
     private boolean renderingMenus;
     private boolean menusDirty;
+    /** The current item's plugin the last menu pass built for, which decides its content menus; null for none. */
+    private String menuContent;
 
     WindowChrome(WindowContent owner) {
         this.owner = owner;
@@ -427,7 +429,26 @@ final class WindowChrome {
         }
     }
 
+    /**
+     * The window's current item changed: its content menus ({@code Menus.createForContent}; browser plan 4a) are built
+     * again when a pass for the new item would show other ones.
+     */
+    void currentItemChanged() {
+        String now = contentPlugin(owner.selectedContent());
+        if (java.util.Objects.equals(now, menuContent)) return;
+        String before = menuContent;
+        menuContent = now;
+        if (contributions == null) return;
+        for (MenuSection section : contributions.model().menus()) {
+            String content = section.target().content();
+            if (!content.isEmpty() && (content.equals(now) || content.equals(before))) { renderContributedMenus(); return; }
+        }
+    }
+
+    private static String contentPlugin(dev.jasper.app.contributions.Tab tab) { return tab == null ? null : tab.plugin(); }
+
     private void rebuildContributedMenus() {
+        menuContent = contentPlugin(owner.selectedContent());
         contributedSections.forEach((menu, added) -> added.forEach(menu::remove));
         contributedSections.clear();
         contributedMenus.forEach(menuBar::remove);
@@ -460,8 +481,10 @@ final class WindowChrome {
                 for (Component child : built) { menu.add(child); added.add(child); }
             }
             var topLevel = new ArrayList<MenuBarLayout.TopMenu>();
+            dev.jasper.app.contributions.Tab current = owner.selectedContent();
             for (MenuSection section : sections) {
-                if (section.target().type() != MenuTarget.Type.TOP_LEVEL) continue;
+                // A content menu shows only while one of its plugin's content tabs is the window's current item.
+                if (section.target().type() != MenuTarget.Type.TOP_LEVEL || !section.target().showsFor(current)) continue;
                 List<Component> built = build(section.entries(), MenuBarItems.Item::new);
                 if (built.isEmpty()) continue;
                 JMenu menu = observe(PlainText.menu(section.target().title()));

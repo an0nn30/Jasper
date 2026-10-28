@@ -84,6 +84,8 @@ public final class TabRegistry {
     public enum Placement {
         /** In a new tab of the window, at the end of its strip and shown (tabs and panes spec 13). */
         NEW_TAB,
+        /** In a new tab of the window right after its shown tab, and shown; at the end of its strip when it shows none. */
+        NEXT_TAB,
         /** In a new pane to the right of the window's focused pane. */
         SPLIT_RIGHT,
         /** In a new pane below the window's focused pane. */
@@ -235,7 +237,8 @@ public final class TabRegistry {
 
     /**
      * As {@link #open(String, String, String, UUID, JComponent)}, the new tab where {@code placement} puts it: in a new
-     * tab of that window or a new pane beside its focused pane, or in a new window of its own (workspace tabs spec 14). A
+     * tab of that window, at the end of its strip or right after its shown tab, or a new pane beside its focused pane, or
+     * in a new window of its own (workspace tabs spec 14). A
      * (plugin, key) already open is selected where it is. One asked for while the saved window is being restored waits
      * for them and opens in a new tab of the first, whatever its placement.
      */
@@ -289,6 +292,7 @@ public final class TabRegistry {
             switch (placement) {
                 case SPLIT_RIGHT -> host.attachBeside().attach(tab, null, Side.RIGHT);
                 case SPLIT_DOWN -> host.attachBeside().attach(tab, null, Side.DOWN);
+                case NEXT_TAB -> host.attachNext().accept(tab);
                 case NEW_TAB, NEW_WINDOW -> host.attach().accept(tab);
             }
         }

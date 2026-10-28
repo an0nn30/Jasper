@@ -1306,7 +1306,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             },
             this::mayMoveToNewTab, this::moveToNewTab,
             // Move Pane to Tab, as ContentTab.moveToTab asks, numbered from 1 (pane flexibility spec 4).
-            this::paneTargets, (tab, number) -> moveToTab(tab, number - 1));
+            this::paneTargets, (tab, number) -> moveToTab(tab, number - 1),
+            // A next tab, right after the shown tab (browser plan 4a).
+            tab -> attach(tab, false, null, null, true));
     }
 
     /**
@@ -1321,7 +1323,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * As {@link #attach(Tab)}; with {@code opened} a new terminal's pane is announced as opened, and with {@code beside}
      * the item opens in a new pane on {@code side} of that pane, in the tab holding it.
      */
-    private void attach(Tab tab, boolean opened, GroupId beside, Side side) {
+    private void attach(Tab tab, boolean opened, GroupId beside, Side side) { attach(tab, opened, beside, side, false); }
+
+    /** As above; with {@code next} and no {@code beside}, the new tab opens right after the shown tab (browser plan 4a). */
+    private void attach(Tab tab, boolean opened, GroupId beside, Side side, boolean next) {
         JComponent component = tab.component();
         boolean announced = false;
         try {
@@ -1333,6 +1338,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if (beside == null && landing != null && tab.moving()) parentTabs.land(tab, landing.parentTab(), landing.index());
             // Whatever opens without a pane opens as a new tab; the window's empty workspace takes it in its place.
             else if (beside == null && parentTabs.isEmpty()) workspace().open(tab);
+            else if (beside == null && next) parentTabs.openNextTab(tab);
             else if (beside == null) parentTabs.openParentTab(tab);
             else parentTabs.holding(beside).orElseThrow(() -> new IllegalArgumentException("Group " + beside + " is not in this window"))
                 .openBeside(tab, beside, side);
@@ -2502,6 +2508,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             pane.session().columns() + " \u00d7 " + pane.session().rows();
         chrome.status().setMetadata(pane == null ? null : pane.snapshot(), pane == null ? "" : size, pane != null && pane.running());
         chrome.status().setContent(selectedContent());
+        chrome.currentItemChanged();
         onTitle.accept(selected == null ? "Jasper" : tabTitle(selected));
         syncContentBindings();
         updateActions(); refreshTabs(); onMinimumSizeChanged.run();
