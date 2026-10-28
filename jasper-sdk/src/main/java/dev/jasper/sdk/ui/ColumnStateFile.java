@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Properties;
@@ -31,16 +32,17 @@ public final class ColumnStateFile {
      * @return the state; {@link ColumnState#NONE} when the file or key is missing or unreadable
      */
     public synchronized ColumnState get(String key) {
-        return ColumnState.decode(load().getProperty(key, ""));
+        try { return ColumnState.decode(load().getProperty(key, "")); }
+        catch (IOException unreadable) { return ColumnState.NONE; }
     }
 
     /**
      * Stores a state under a key and keeps the file's other keys. The file is written to a temporary file and moved
-     * into place.
+     * into place; a missing file starts empty, and a file that cannot be read is left as it is.
      *
      * @param key the key, for example a table's id
      * @param state the state to keep
-     * @throws IOException when the file cannot be written
+     * @throws IOException when the file exists but cannot be read, or cannot be written
      */
     public synchronized void put(String key, ColumnState state) throws IOException {
         var properties = load();
@@ -54,10 +56,12 @@ public final class ColumnStateFile {
         } finally { Files.deleteIfExists(temp); }
     }
 
-    private Properties load() {
+    /** The file's properties; none when it is missing. */
+    private Properties load() throws IOException {
         var properties = new Properties();
         try (InputStream in = Files.newInputStream(file)) { properties.load(in); }
-        catch (IOException | IllegalArgumentException unreadable) { return new Properties(); }
+        catch (NoSuchFileException missing) { return new Properties(); }
+        catch (IllegalArgumentException malformed) { throw new IOException("Malformed column state file " + file, malformed); }
         return properties;
     }
 }

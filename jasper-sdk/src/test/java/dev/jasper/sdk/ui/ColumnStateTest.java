@@ -46,4 +46,14 @@ class ColumnStateTest {
             assertThatThrownBy(() -> new ColumnState(Optional.empty(), true, Map.of(id, 80))).as(id).isInstanceOf(IllegalArgumentException.class);
         }
     }
+    @Test void putOverACorruptFileThrowsAndLeavesItUnchanged(@TempDir Path dir) throws IOException {
+        var path = dir.resolve("columns.properties");
+        Files.writeString(path, "sessions=sort=host,desc\nbroken=\\u00zz");
+        var file = new ColumnStateFile(path);
+        assertThat(file.get("sessions")).isEqualTo(ColumnState.NONE);
+        String before = Files.readString(path);
+        assertThatThrownBy(() -> file.put("sftp", ColumnState.sortedBy("name", true))).isInstanceOf(IOException.class);
+        assertThat(Files.readString(path)).isEqualTo(before);
+        try (var listing = Files.list(dir)) { assertThat(listing).containsExactly(path); }
+    }
 }
