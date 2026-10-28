@@ -58,8 +58,8 @@ public final class Page implements AutoCloseable {
 
     /**
      * Makes the page's browser: asks {@code chromium} for its client, starting Chromium when no page has yet, and makes
-     * the browser once the client is ready, which then loads what the page was last asked to. The client's display and
-     * load handlers are installed before any page is made on it. Once; nothing after {@link #close()}.
+     * the browser once the client is ready, which then loads what the page was last asked to. The client's display, load
+     * and keyboard handlers are installed before any page is made on it. Once; nothing after {@link #close()}.
      *
      * @param chromium the plugin's Chromium
      */

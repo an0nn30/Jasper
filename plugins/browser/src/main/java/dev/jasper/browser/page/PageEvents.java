@@ -7,12 +7,14 @@ import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.handler.CefDisplayHandlerAdapter;
+import org.cef.handler.CefKeyboardHandler;
+import org.cef.handler.CefKeyboardHandlerAdapter;
 import org.cef.handler.CefLoadHandlerAdapter;
 import org.cef.network.CefRequest;
 
 /**
- * The client's one display handler and one load handler. JCEF keeps the first handler of each kind a client is given,
- * so these two serve every page: each callback goes to the {@link Page} of the browser it is about. Chromium calls them
+ * The client's one display, load and keyboard handler. JCEF keeps the first handler of each kind a client is given,
+ * so these serve every page: each callback goes to the {@link Page} of the browser it is about. Chromium calls them
  * on its own UI thread (on macOS, AppKit's main thread), never Swing's, so what a page shows changes on the UI thread.
  * The hover address goes straight to the canvas, which takes it from any thread.
  */
@@ -21,7 +23,7 @@ final class PageEvents {
 
     private PageEvents() { }
 
-    /** Has Chromium install the two handlers on its client before any page is made on it; once, however often asked. */
+    /** Has Chromium install the handlers on its client before any page is made on it; once, however often asked. */
     static void prepare(Chromium chromium) {
         chromium.onClient(INSTALL);
     }
@@ -29,6 +31,7 @@ final class PageEvents {
     private static void install(CefClient client) {
         client.addDisplayHandler(new Display());
         client.addLoadHandler(new Load());
+        client.addKeyboardHandler(new Keyboard());
     }
 
     /** The page {@code browser} shows; null for a browser that is not a page's. */
@@ -54,6 +57,33 @@ final class PageEvents {
         @Override public void onStatusMessage(CefBrowser browser, String value) {
             Page page = page(browser);
             if (page != null) page.hovered(value);
+        }
+    }
+
+    /**
+     * The keys a page and its scripts left alone that are an {@link EditingCommand}: on macOS, Select All, Cut, Undo and
+     * Redo, which Chromium leaves to the browser's Edit menu there. Chromium asks only after the page declined the key,
+     * so a script that takes Cmd+Z itself undoes once.
+     */
+    private static final class Keyboard extends CefKeyboardHandlerAdapter {
+        @Override public boolean onKeyEvent(CefBrowser browser, CefKeyboardHandler.CefKeyEvent event) {
+            if (page(browser) == null) return false;
+            var command = EditingCommand.of(event.type == CefKeyboardHandler.CefKeyEvent.EventType.KEYEVENT_RAWKEYDOWN,
+                event.modifiers, event.windows_key_code);
+            if (command.isEmpty()) return false;
+            CefFrame frame = browser.getFocusedFrame();
+            if (frame == null) return false;
+            try {
+                switch (command.get()) {
+                    case SELECT_ALL -> frame.selectAll();
+                    case CUT -> frame.cut();
+                    case UNDO -> frame.undo();
+                    case REDO -> frame.redo();
+                }
+            } finally {
+                frame.dispose();
+            }
+            return true;
         }
     }
 
