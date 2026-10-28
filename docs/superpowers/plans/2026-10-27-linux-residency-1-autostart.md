@@ -12,7 +12,7 @@
 
 **Status (2026-10-27):** Tasks 1–4 implemented on `codex/linux-residency`; production revision
 `1080c1ec1f77c38df0639ed5357d14b47b1406fc` (Tasks 1–3 reviewed at `112558b40`, `7c36bf1b7`, `1080c1ec1`).
-Task 4 and whole-branch reviews remain pending. Headless `./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage
+All four per-task reviews and the whole-branch review (`d7c96dd08..3d415e6a1`) approved; no blocking findings. Headless `./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage
 -Pjasper.aot=false -Pjasper.python=/Users/dustin/.local/share/uv/python/cpython-3.13.15-macos-aarch64-none/bin/python3.13`
 passed in 28m 56s on macOS arm64/JBR 25: 13,628 XML tests, 0 failures/errors, 33 skipped (13,595 executed);
 72 theme-tool Python tests passed; CLI/launcher core checks 133/152, 0 failures; macOS bridge and package checks passed.
@@ -24,8 +24,9 @@ acceptance is claimed. The Ubuntu 22.04 x86_64/aarch64 package baseline is uncha
 a partial-write race; Task 2 also added failed-replacement cleanup coverage. Controller Ruling 3: Task 4 adds one
 `nonvisual-helper` row in `docs/design/theme-engine/migration.csv` for the new test's `ArrayList` discovery false positive,
 beyond the planned guide file list. The initial full check failed only on this missing row; the focused inventory
-rerun passed all 5 tests, then the full command above passed. No behavior change. Logs and exact per-module XML counts
-are in `.superpowers/sdd/2026-10-27-linux-residency-1-autostart/task-4-report.md`.
+rerun passed all 5 tests, then the full command above passed. No behavior change. Controller Ruling 2 used the configured JBR and authorized headless worktree/cache access.
+Controller Ruling 4 defers the nonblocking settled-startup no-indicator test refinement: the new regression closes
+before startup settles; existing `ResidentIndicatorTest` covers indicator installation and cleanup.
 
 ## Global Constraints
 

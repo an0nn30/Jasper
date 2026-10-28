@@ -2,10 +2,9 @@
 
 **Linux residency Plan 1 — 2026-10-27** (`codex/linux-residency`; [approved design](superpowers/specs/2026-10-27-linux-residency-design.md),
 [plan](superpowers/plans/2026-10-27-linux-residency-1-autostart.md); production revision `1080c1ec1f77c38df0639ed5357d14b47b1406fc`).
-Tasks 1–3 are implemented and reviewed (`112558b40`, `7c36bf1b7`, `1080c1ec1`); Task 4 updates the guides and records
-verification. Linux residency defaults on, preserves saved opt-outs, registers installed Jasper for the current user's
-XDG desktop login and serializes login-setting writes so the latest pending save wins. Task 4 and whole-branch reviews
-are next; no merge or push. [Plan 2](superpowers/plans/2026-10-27-linux-residency-2-tray.md) remains unexecuted.
+Tasks 1–4 are implemented and their per-task reviews approved; whole-branch review of `d7c96dd08..3d415e6a1`
+found no blocking issues. Linux residency defaults on, preserves saved opt-outs, registers installed Jasper for the current user's
+XDG desktop login and serializes login-setting writes so the latest pending save wins. The branch remains unmerged and unpushed. [Plan 2](superpowers/plans/2026-10-27-linux-residency-2-tray.md) remains unexecuted.
 Verification on macOS arm64/JBR 25: `./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage -Pjasper.aot=false
 -Pjasper.python=/Users/dustin/.local/share/uv/python/cpython-3.13.15-macos-aarch64-none/bin/python3.13` passed in 28m 56s;
 13,628 XML tests, 0 failures/errors, 33 skipped (13,595 executed); 72 theme-tool Python tests passed; CLI/launcher core
@@ -13,7 +12,9 @@ Verification on macOS arm64/JBR 25: `./gradlew check :jasper-app:packageApp :jas
 Deviations: Controller Ruling 1 makes Task 2's argv fixture await complete output instead of the first nonempty bytes;
 Task 2 also added failed-replacement cleanup coverage. Controller Ruling 3 adds one nonvisual test row to the theme
 migration inventory after its broad `ArrayList` discovery failed the first full check; 5 focused inventory tests then
-passed, followed by the full rerun. No behavior change. Exact counts and logs: `.superpowers/sdd/2026-10-27-linux-residency-1-autostart/task-4-report.md`.
+passed, followed by the full rerun. No behavior change. Ruling 2 used the configured JBR and authorized headless worktree/cache access.
+Ruling 4 defers the nonblocking settled-startup no-indicator test refinement: the new regression closes before startup
+settles; existing `ResidentIndicatorTest` covers indicator installation and cleanup.
 Linux-native parser/`desktop-file-validate` and focused bootstrap/config/login tests remain pending on an authorized
 Linux host. User-run acceptance remains pending on Ubuntu 24.04 GNOME, Debian 12/13 XFCE or LXDE and Fedora 44
 GNOME/Plasma, recording actual installed versions: fresh login, explicit off, close/reopen same PID, Quit/no restart,
