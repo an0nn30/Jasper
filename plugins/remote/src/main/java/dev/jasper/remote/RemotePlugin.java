@@ -104,6 +104,8 @@ public class RemotePlugin implements Plugin {
     private RemoteSettings.Declared settings;
     private HostStore store;
     private PanelState panelState;
+    /** The sort and column widths the plugin's tables keep, one key per column set (columns.properties). */
+    private dev.jasper.sdk.ui.ColumnStateFile columnStates;
     private KnownHosts trust;
     private Connections connections;
     private Optional<VaultApi> vault = Optional.empty();
@@ -202,6 +204,8 @@ public class RemotePlugin implements Plugin {
         sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::strip,transferUi::release,layout);
         sftpUi.hiddenItems(panelState.sftpShowHidden(),shown-> { try { panelState.saveSftpShowHidden(shown); }
             catch(IOException failure) { context.log().log(System.Logger.Level.WARNING,"panel state: {0}",failure.getMessage()); } });
+        columnStates=new dev.jasper.sdk.ui.ColumnStateFile(context.dataDirectory().resolve("columns.properties"));
+        sftpUi.columns(columnStates);
         tunnelStore = new dev.jasper.remote.tunnels.TunnelStore(context.dataDirectory().resolve("tunnels.toml"), context.background(), ui);
         tunnelsUi = new dev.jasper.remote.ui.tunnels.TunnelsUi(context, ui, tunnelStore,
             new dev.jasper.remote.tunnels.TunnelManager(connections, () -> settings.connection().connectTimeout(), context.background(), ui),

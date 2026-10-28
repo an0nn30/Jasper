@@ -89,7 +89,7 @@ class CompositionParityTest {
             sftp.actions(new SftpPanel.Actions(path -> events.add("navigate " + path), () -> events.add("up"), () -> events.add("refresh"),
                 follow -> events.add("follow " + follow), () -> events.add("upload"), () -> events.add("upload folder"), () -> events.add("download"),
                 () -> events.add("new folder"), () -> events.add("delete"), () -> events.add("copy paths"), () -> events.add("copy to host"),
-                () -> events.add("cancel"), page -> events.add("page " + page), shown -> events.add("hidden " + shown)));
+                () -> events.add("cancel"), (page, order) -> events.add("page " + page), shown -> events.add("hidden " + shown)));
             sftp.navigation(() -> events.add("back"), () -> events.add("forward"));
             sftp.onChooseSession(h -> events.add("choose " + h.name()));
             sftp.sessions(List.of(mac));
