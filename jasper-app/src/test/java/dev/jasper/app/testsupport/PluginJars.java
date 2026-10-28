@@ -33,6 +33,16 @@ public final class PluginJars {
     public static Path build(Path pluginDirectory, String jarName, String descriptorOrNull,
                              Map<String, String> sources, List<Path> classpath) throws IOException {
         Path work = Files.createTempDirectory("plugin-fixture");
+        try {
+            return build(work, pluginDirectory, jarName, descriptorOrNull, sources, classpath);
+        } finally {
+            // The sources and classes are only the jar's raw material; the jar is the plugin directory's.
+            TempFolders.delete(work);
+        }
+    }
+
+    private static Path build(Path work, Path pluginDirectory, String jarName, String descriptorOrNull,
+                              Map<String, String> sources, List<Path> classpath) throws IOException {
         Path sourceRoot = Files.createDirectories(work.resolve("src"));
         Path classes = Files.createDirectories(work.resolve("classes"));
         List<Path> files = new ArrayList<>();

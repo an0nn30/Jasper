@@ -15,7 +15,6 @@ import dev.jasper.sdk.palette.PaletteVerb;
 import dev.jasper.sdk.palette.ScopeSpec;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -28,6 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
 import static org.assertj.core.api.Assertions.*;
@@ -39,9 +39,9 @@ class HostedPaletteTest {
     Contributions contributions = onEdtValue(Contributions::new);
     TerminalFixture fixture = onEdtValue(TerminalFixture::new);
     PluginHost host;
+    @TempDir Path data;
 
     PluginHost host() throws Exception {
-        Path data = Files.createTempDirectory("jasper-palette");
         host = onEdtValue(() -> new PluginHost(new PluginHost.Environment(javax.swing.SwingUtilities::invokeLater,
             javax.swing.SwingUtilities::isEventDispatchThread, data::resolve, diagnostic -> { },
             Duration.ofMillis(200), contributions, () -> true, AppContractTest.headlessWindows(), fixture.registry,

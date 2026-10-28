@@ -704,7 +704,10 @@ class AppContractTest extends PluginContractTest {
                 return onEdtValue(() -> host.webBrowsers.open(address, origin, placement, target, windowId));
             }
             @Override public void commandClient(Path client) { onEdt(() -> host.commandClient = Optional.of(client)); }
-            @Override public void close() { stopAll(); flush(); }
+            @Override public void close() {
+                try { stopAll(); flush(); }
+                finally { dev.jasper.app.testsupport.TempFolders.delete(data); }
+            }
         };
     }
 

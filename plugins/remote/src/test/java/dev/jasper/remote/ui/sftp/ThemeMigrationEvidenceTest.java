@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.remote.testsupport.Kits.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ThemeMigrationEvidenceTest {
     static final Path OUTPUT = Path.of("build/theme-migration-evidence/remote-sftp-descriptors");
+
+    @TempDir Path destinationFolder;
 
     static void save(String state, UiView view) throws Exception {
         Files.createDirectories(OUTPUT);
@@ -55,7 +58,7 @@ class ThemeMigrationEvidenceTest {
             assertThat(folder.error()).isEqualTo("Enter one folder name");
             save("new-folder-invalid", folder.view());
             try (var workers = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
-                var destination = new DestinationPanel(kit, "1 items from fixture:/fixture", List.of(host), Files.createTempDirectory("sftp-evidence"),
+                var destination = new DestinationPanel(kit, "1 items from fixture:/fixture", List.of(host), destinationFolder,
                     workers, UI, id -> new CompletableFuture<>(), identity -> new CompletableFuture<>(), capture -> { }, capture -> { }, () -> { }, () -> { });
                 save("copy-to-host", destination.view());
                 assertThat(find(destination.view(), SftpPanel.FILES)).isPresent();
