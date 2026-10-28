@@ -143,12 +143,11 @@ class CoreSettingsTest {
         assertThat(snapshot.keybindings()).containsExactly(Map.entry("copy", "none"));
     }
 
-    @Test void residencyIsOnByDefaultWhereAWindowlessJasperStaysReachable() {
-        assertThat(CoreSettings.runsInBackgroundByDefault("Mac OS X")).as("menu bar item and Dock").isTrue();
-        assertThat(CoreSettings.runsInBackgroundByDefault("Windows 11")).as("notification-area icon").isTrue();
-        assertThat(CoreSettings.runsInBackgroundByDefault("Linux")).as("no tray").isFalse();
-        assertThat(CoreSettings.runsInBackgroundByDefault("FreeBSD")).isFalse();
-        assertThat(CoreSettings.runsInBackgroundByDefault(null)).isFalse();
+    @Test void residencyIsOnByDefaultOnSupportedDesktopPlatforms() {
+        for (String os : List.of("Linux", "linux", "LINUX", "Mac OS X", "Windows 11"))
+            assertThat(CoreSettings.runsInBackgroundByDefault(os)).as(os).isTrue();
+        for (String os : new String[]{null, "", "FreeBSD"})
+            assertThat(CoreSettings.runsInBackgroundByDefault(os)).as(os).isFalse();
         assertThat(CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue())
             .isEqualTo(CoreSettings.runsInBackgroundByDefault(System.getProperty("os.name")));
         assertThat(ConfigSnapshot.defaults().backgroundEnabled()).isEqualTo(CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue());
