@@ -180,6 +180,8 @@ watcher tests. Wire declarations and exact exported signatures must still pass i
 
 ### Task 2: Prove the public AWT fallback before relying on it
 
+**2026-10-28 execution:** The user authorized approved LXDE/XFCE package installation and isolated Xvfb probes. The exact `sudo -n dnf install` attempt failed before changes (`sudo: a password is required`). Native evidence and Task 6 remain pending installation access.
+
 **Files:** Create test-only `LinuxTrayProbe.java`; modify verification report; no production fallback until the gate passes.
 
 **Interfaces:** Explicit opt-in test-class `main(String[] args)`; no Gradle `check` dependency. It runs for at most three minutes and never launches Jasper or a shell.

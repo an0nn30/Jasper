@@ -385,5 +385,23 @@ coalesced host/support reversals. Both deterministic transition regressions fail
 healthy-duplicate case already passed. The final portable controller/policy run passed 31 tests with no
 failures, errors or skips. Scoped re-review approved all findings with no new breakage. The native
 50-test run above predates this controller-only fix; the adapter is unchanged. Tasks 1, 3, 4 and 5 are
-reviewed. Task 2's compiled probe still awaits explicit installation/GUI authorization, so Task 6
+reviewed. Task 2's compiled probe has installation/GUI authorization as of 2026-10-28 but awaits prerequisite installation access (below), so Task 6
 production composition, Task 7 final checks and whole-branch review remain pending.
+
+
+## Task 2 authorized native attempt — 2026-10-28
+
+The user approved installing the exact prerequisite list and running isolated Xvfb probes with
+temporary HOME/XDG directories, private buses and no active Plasma changes. The authorized attempt:
+
+```sh
+ssh -o BatchMode=yes -o ConnectTimeout=10 dustin@10.211.55.13 \
+  'sudo -n dnf install -y lxpanel lxde-common lxsession openbox xfce4-panel xfce4-session xfwm4 xdotool xwd xwininfo'
+```
+
+Exited **1** immediately with `sudo: a password is required`. Raw output is retained at
+`/home/dustin/jasper-tray-gate.1yPuL3/task-2-install.log`. No package was installed, no graphical
+probe/display/panel/session was started and no credentials were read. The native gate remains
+**PENDING**, not failed recovery: no recovery observation was possible. Required next step is
+installation of the already-approved package list by the user or narrowly scoped installation
+access. Graphical authorization remains granted; it need not be requested again for this scope.
