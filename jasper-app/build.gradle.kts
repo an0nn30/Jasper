@@ -19,7 +19,19 @@ dependencies {
     // flatlaf-extras brings jsvg at runtime only; javac needs its SVGDocument to resolve FlatSVGUtils.svg2image.
     // Keep this the version flatlaf-extras declares.
     compileOnly("com.github.weisj:jsvg:2.0.0")
-    runtimeOnly("org.slf4j:slf4j-nop:2.0.13")
+    // Candidate transport: the released JDK transport rejects abstract Unix addresses.
+    // Linux address/packaged-runtime gates remain pending; see the Linux residency Plan 2 verification.
+    implementation("com.github.hypfvieh:dbus-java-core:5.2.0")
+    runtimeOnly("com.github.hypfvieh:dbus-java-transport-junixsocket:5.2.0") {
+        // Its Maven type=pom aggregator becomes a runtime file in Gradle (and breaks jdeps).
+        exclude(group = "com.kohlschutter.junixsocket", module = "junixsocket-core")
+        // The transport POM leaks compile-time annotations; junixsocket marks them provided/static.
+        exclude(group = "com.kohlschutter", module = "compiler-annotations")
+    }
+    // Exact runtime jars declared by the released junixsocket-core 2.10.1 POM.
+    runtimeOnly("com.kohlschutter.junixsocket:junixsocket-common:2.10.1")
+    runtimeOnly("com.kohlschutter.junixsocket:junixsocket-native-common:2.10.1")
+    runtimeOnly("org.slf4j:slf4j-nop:2.0.17")
 }
 
 // Workspace glass (macOS only): AWT refuses translucency on a decorated frame, so WindowGlass reaches the peer

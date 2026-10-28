@@ -10,7 +10,7 @@
 
 **Spec:** [Approved Linux residency design](../specs/2026-10-27-linux-residency-design.md).
 
-**Status (2026-10-27):** Written, not executed. Depends on reviewed Plan 1. Tasks 1–2 are mandatory dependency/AWT gates. Tasks 3–7 are a conditional implementation sequence: confirm their library bindings and recovery assumptions against those gates before executing them. A failed gate requires the spec's scoped amendment, not an invented passing result. No design deviation or desktop certification is claimed.
+**Status (2026-10-27):** Task 1 passed the user-directed Fedora 44 aarch64 gate: 49 focused tests and both packaged-runtime address cases, notices/architecture and headless packaging. [Verification](2026-10-27-linux-residency-2-verification.md) records exact versions and evidence. Rulings 9–10 follow the user's split: x86_64 and Ubuntu 22.04 remain CI-pending; after Task 1 review, Tasks 4–5 may proceed with the pinned 5.2.0 bindings below. Task 6 retains its separate AWT gate. Rulings 1–2 allow local preparation and replace the fixture sketch with short `/tmp` paths and bounded reader/process cleanup. Ruling 4 selects junixsocket after the released JDK transport's abstract-address rejection; Ruling 5 aligns application SLF4J API/nop to 2.0.17. Ruling 7 replaces the non-JAR aggregator with its exact common/native-common 2.10.1 jars. Ruling 8 excludes the confirmed compile-only annotation leak after packaging reproduced its module failure, superseding Ruling 6's temporary EPL investigation. Costs: native artifacts, explicit dependency tracking and a logging-version regression surface. The CI baseline and desktop matrix are not certified.
 
 ## Global Constraints
 
@@ -60,7 +60,7 @@ No source file is created merely as scaffolding: each lands with its behavior an
 
 **Interfaces:** Test fixture `LinuxTestBus.start(Path directory, boolean abstractAddress)`, `String address()`, `close()`; a successful private-bus connection through `DBusConnectionBuilder.forAddress(String).withShared(false).build()`. Later code uses owned, unshared connections.
 
-- [ ] **Step 1: Add the test fixture and failing transport test.** This is Linux-only and uses no display or existing session bus. Imports in these complete classes are explicit.
+- [x] **Step 1: Add the test fixture and failing transport test.** This is Linux-only and uses no display or existing session bus. Imports in these complete classes are explicit.
 
 ```java
 package dev.jasper.app.platform;
@@ -142,24 +142,35 @@ class LinuxTrayTransportTest {
 }
 ```
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:compileTestJava`; expect unresolved dbus imports. Do not run a transport test against `DBUS_SESSION_BUS_ADDRESS` from the user's desktop.
-- [ ] **Step 3: Resolve artifacts and select exactly one transport.** The publisher's release/tag `dbus-java-parent-5.2.0` was inspected during planning; start with this released candidate, not upstream main's 6.x documentation. Confirm Maven publication and current maintenance/security suitability at execution time. Candidate build entries:
+- [x] **Step 2: Run** `./gradlew :jasper-app:compileTestJava`; expect unresolved dbus imports. Do not run a transport test against `DBUS_SESSION_BUS_ADDRESS` from the user's desktop.
+- [x] **Step 3: Resolve artifacts and select exactly one transport.** Published dbus-java 5.2.0 and junixsocket 2.10.1 are pinned; released JDK transport source explicitly rejects abstract addresses. Fedora aarch64 private-bus and packaged-runtime tests pass. Exact runtime declarations (Rulings 4–8):
 
 ```kotlin
 implementation("com.github.hypfvieh:dbus-java-core:5.2.0")
-runtimeOnly("com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.0")
+runtimeOnly("com.github.hypfvieh:dbus-java-transport-junixsocket:5.2.0") {
+    exclude(group = "com.kohlschutter.junixsocket", module = "junixsocket-core")
+    exclude(group = "com.kohlschutter", module = "compiler-annotations")
+}
+runtimeOnly("com.kohlschutter.junixsocket:junixsocket-common:2.10.1")
+runtimeOnly("com.kohlschutter.junixsocket:junixsocket-native-common:2.10.1")
+runtimeOnly("org.slf4j:slf4j-nop:2.0.17")
 ```
 
-Run the two-address test on Linux. If the JDK transport rejects abstract addresses, replace that one runtime line with:
+The verification report records exact artifact/license/native inventory, maintenance/advisory evidence,
+provider discovery, the two metadata failures and their corrections. Exactly one application NOP provider
+and transport are present. The plugin-private 2.0.13 providers remain separate.
 
-```kotlin
-runtimeOnly("com.github.hypfvieh:dbus-java-transport-junixsocket:5.2.0")
-```
+- [x] **Step 4: Run the user-directed aarch64 gate.** `dependencies`, the two-address private-bus test, notices/architecture, `installDist`, `packageApp` and `verifyPackage -Pjasper.aot=false` passed on Fedora 44/JBR 25 aarch64. The test also passed twice using only packaged JBR/production jars plus test artifacts. **Rulings 9–10 leave x86_64 and Ubuntu 22.04 baseline execution/install pending in CI**, with explicit release evidence required; no macOS skip is counted as Linux evidence. Windows headless compatibility and final full check remain pending.
+- [x] **Step 5: Commit the dependency pin and evidence** with the required trailer. **Gate under the user-directed split:** Tasks 4–5 may begin after Task 1 review. Task 6 still waits for Task 2's AWT evidence. Remaining CI rows stay required acceptance.
 
-Never retain both. If a newer maintained release is required, first repeat these tests and update all plan library bindings/version references in this task's commit and status banner. Extract exact transitive versions, license texts and native resources from resolved artifacts; do not guess them from README examples. Use the existing `[[component]]` schema (`name`, `version`, `license`, `homepage`, `modules`, `text`, optional `notice`). Include junixsocket's native component licensing if selected, not only its Java wrapper. Verify SLF4J resolution against Jasper's existing `slf4j-nop:2.0.13`; do not silently add a second provider.
-
-- [ ] **Step 4: Run** `./gradlew :jasper-app:dependencies --configuration runtimeClasspath`, `./gradlew :jasper-app:test --tests '*LinuxTrayTransportTest'`, and `./gradlew :jasper-app:installDist :jasper-app:packageApp :jasper-app:verifyPackage -Pjasper.aot=false`. Repeat the transport test using the **packaged runtime and packaged jars**, with only test-fixture/JUnit artifacts added to execute the test (no Gradle runtime dependency jars as a substitute). Require filesystem and abstract PASS on both Linux architectures and the Ubuntu 22.04 baseline. Record native extraction/ABI requirements and provider discovery. Other-platform headless `check`/packaging must load without Linux initialization. Missing Linux access is pending evidence, not a pass.
-- [ ] **Step 5: Commit** `build: validate and pin Linux tray D-Bus transport` with trailer and evidence. **Gate:** do not execute library-bound Tasks 4–5 until this passes. Update the conditional plan to the verified API if necessary; if neither transport meets requirements, amend the design rather than dropping abstract-address support.
+**Frozen 5.2.0 bindings:** `DBusConnectionBuilder.forAddress(String).withShared(false).build()`,
+`withDisconnectCallback(IDisconnectCallback)`, `transportConfig().withTimeout(int).back()`, connection
+`getRemoteObject(..., Class<T>)`, `exportObject`/`unExportObject`, `close`, and `addSigHandler` returning
+an `AutoCloseable` subscription. `Properties` has generic `Get`/`Set` and `Map<String,Variant<?>> GetAll`;
+`Variant(value, String signature)` and the three planned property error classes are present.
+**Timeout caveat:** transport timeout config controls selection/retry, not blocking connection/call duration;
+`MethodCall.setDefaultTimeout` is global. Task 4 owns scoped deadlines, cancellation/close and unresponsive
+watcher tests. Wire declarations and exact exported signatures must still pass its private-bus tests.
 
 ### Task 2: Prove the public AWT fallback before relying on it
 
