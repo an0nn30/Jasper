@@ -300,3 +300,42 @@ menu/activation there, with stdout and captured pixels at 1×/2×. Xvfb screensh
 raster alpha/scaling; physical display/HiDPI appearance still needs user inspection. Neither Xvfb
 nor a panel was launched during preparation. The package-provider file-list query lacked cached
 metadata; exact package-name queries above succeeded. Any GUI/session run still requires authorization.
+
+## Task 4 protocol and deadline evidence — 2026-10-27
+
+On the retained isolated Fedora 44 aarch64/JBR 25.0.4.1-b635.75 workspace,
+`./gradlew :jasper-app:test --tests '*LinuxStatusNotifierTest' --tests '*LinuxTrayWireTest'
+verifyApplicationArchitecture verifyThirdPartyNotices` passes: 16 tests, zero failures/errors/skips;
+37 shipped-module notices verified. The same local command plus `--tests '*ThemeMigrationCoverageTest'`
+passes with 20 XML tests (6 executed, 14 Linux-only skips), architecture and notices. Only the four Task 4
+sources and the reviewed Task 3 `LinuxTrayMenu` prerequisite were transferred. No desktop bus, GUI,
+installed application, AOT cache or dependencies changed.
+
+Both private filesystem and abstract buses pass actual Properties/method replies and independent
+`gdbus introspect --xml` comparison of every item/menu property, method and signal signature.
+Independent `gdbus call` records the pinned error names
+`org.freedesktop.dbus.errors.UnknownInterface`, `org.freedesktop.dbus.errors.UnknownProperty` and
+`org.freedesktop.dbus.errors.PropertyReadOnly`. Tests also cover filtered/depth-limited layouts,
+empty/compound property variants, grouped events, stale senders, freedesktop alias, host absence,
+subscription-before-snapshot, owner replacement during registration, publication-name loss,
+captured-address bus restart, unresponsive registration and stalled authentication with peer-observed EOF.
+A single admitted worker owns each attempt and cleanup; a scoped 1.9-second interrupt deadline leaves
+headroom for the two-second publication result. No global method timeout is changed. The controller owns
+retry timing; closing blocks new callbacks and returns without waiting for library teardown.
+
+Controller Ruling 12: 5.2.0 marshalling rejects nongeneric Tuple return types, and unwrapping a compound
+or empty property value loses its required Variant signature. Generic tuple carriers and returning the
+explicit Variant from `Properties.Get` pass actual wire tests. Controller Ruling 13: released
+`ExportedObject.createReturnArguments` emits generic tuple outputs in two consecutive loops; this
+makes introspection advertise doubled outputs although the actual reply is correct. The adapter uses
+public `ExportedObject` and `ObjectTree.add` APIs to remove exactly the duplicate output suffix from
+`GetLayout` and `AboutToShowGroup` before registration. Any unexpected shape logs and refuses publication.
+This version-specific metadata accommodation must be removed or revalidated on a dependency upgrade.
+No reflection, replacement RPC layer or vendored library was introduced.
+
+Review evidence is retained in `.superpowers/sdd/2026-10-27-linux-residency-2-tray/task-4-evidence/`:
+RED logs, final Linux/local logs, native XML results, source SHA-256 identities and independent XML/error
+outputs. Remote originals remain in `/tmp/task4-wire-final.log` and the isolated workspace's
+`jasper-app/build/linux-tray-wire/`. The Task 1 source archive at
+`/tmp/jasper-dbus-evidence/dbus-java-core-5.2.0-sources.jar` supplies the binding evidence.
+Full `check`, desktop host acceptance, x86_64 and Ubuntu 22.04 CI remain assigned to their existing gates.

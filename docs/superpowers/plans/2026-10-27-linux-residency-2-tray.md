@@ -10,7 +10,7 @@
 
 **Spec:** [Approved Linux residency design](../specs/2026-10-27-linux-residency-design.md).
 
-**Status (2026-10-27):** Task 1 passed the user-directed Fedora 44 aarch64 gate: 49 focused tests and both packaged-runtime address cases, notices/architecture and headless packaging. [Verification](2026-10-27-linux-residency-2-verification.md) records exact versions and evidence. Rulings 9–10 follow the user's split: x86_64 and Ubuntu 22.04 remain CI-pending; after Task 1 review, Tasks 4–5 may proceed with the pinned 5.2.0 bindings below. Task 6 retains its separate AWT gate. Rulings 1–2 allow local preparation and replace the fixture sketch with short `/tmp` paths and bounded reader/process cleanup. Ruling 4 selects junixsocket after the released JDK transport's abstract-address rejection; Ruling 5 aligns application SLF4J API/nop to 2.0.17. Ruling 7 replaces the non-JAR aggregator with its exact common/native-common 2.10.1 jars. Ruling 8 excludes the confirmed compile-only annotation leak after packaging reproduced its module failure, superseding Ruling 6's temporary EPL investigation. Costs: native artifacts, explicit dependency tracking and a logging-version regression surface. The CI baseline and desktop matrix are not certified. Task 2 preparation is compiled locally and on Fedora ARM64; native legacy recovery remains pending. Task 3's shared menu, ARGB conversion and capability/retry policy pass focused tests and architecture/inventory checks. Deviation: add Task 3's four new Java sources to the theme source inventory because its source discovery scans AWT imports, including headless tests. Earlier deviations: add the native test probe to the theme source inventory and correct Task 1 evidence wording (ARM64 passed; existing cold Linux compiler warnings retained).
+**Status (2026-10-27):** Task 1 passed the user-directed Fedora 44 aarch64 gate: 49 focused tests and both packaged-runtime address cases, notices/architecture and headless packaging. [Verification](2026-10-27-linux-residency-2-verification.md) records exact versions and evidence. Rulings 9–10 follow the user's split: x86_64 and Ubuntu 22.04 remain CI-pending; after Task 1 review, Tasks 4–5 may proceed with the pinned 5.2.0 bindings below. Task 6 retains its separate AWT gate. Rulings 1–2 allow local preparation and replace the fixture sketch with short `/tmp` paths and bounded reader/process cleanup. Ruling 4 selects junixsocket after the released JDK transport's abstract-address rejection; Ruling 5 aligns application SLF4J API/nop to 2.0.17. Ruling 7 replaces the non-JAR aggregator with its exact common/native-common 2.10.1 jars. Ruling 8 excludes the confirmed compile-only annotation leak after packaging reproduced its module failure, superseding Ruling 6's temporary EPL investigation. Costs: native artifacts, explicit dependency tracking and a logging-version regression surface. The CI baseline and desktop matrix are not certified. Task 2 preparation is compiled locally and on Fedora ARM64; native legacy recovery remains pending. Task 3's shared menu, ARGB conversion and capability/retry policy pass focused tests and architecture/inventory checks. Deviation: add Task 3's four new Java sources to the theme source inventory because its source discovery scans AWT imports, including headless tests. Task 4 implements the typed wire exports and bounded owner-scoped adapter; 16 Fedora private-bus tests pass, including independent exact `gdbus` introspection for both address forms. Controller Ruling 12 requires generic Tuple carriers and explicit Variant returns from `Properties.Get`; Ruling 13 narrowly repairs the pinned library's duplicated tuple-output introspection through public metadata APIs. Both accommodations are version-specific and must be revalidated on upgrade. Two required source-inventory rows were added. Earlier deviations: add the native test probe to the theme source inventory and correct Task 1 evidence wording (ARM64 passed; existing cold Linux compiler warnings retained).
 
 ## Global Constraints
 
@@ -168,6 +168,12 @@ and transport are present. The plugin-private 2.0.13 providers remain separate.
 `getRemoteObject(..., Class<T>)`, `exportObject`/`unExportObject`, `close`, and `addSigHandler` returning
 an `AutoCloseable` subscription. `Properties` has generic `Get`/`Set` and `Map<String,Variant<?>> GetAll`;
 `Variant(value, String signature)` and the three planned property error classes are present.
+Task 4 additionally verifies `transportConfig().withRegisterSelf(false)` followed by owned `register()`;
+interruptible scoped deadlines bound authentication and calls without a global timeout. Ruling 12 uses
+generic Tuple carriers and returns the explicit Variant from `Properties.Get` to preserve compound/empty
+signatures. Ruling 13 corrects only the duplicate output suffixes of `GetLayout` and `AboutToShowGroup`
+in 5.2.0's generated metadata using public `ExportedObject`/`getObjectTree().add` before registration;
+an unexpected metadata shape refuses publication. Typed dispatch and actual replies remain unchanged.
 **Timeout caveat:** transport timeout config controls selection/retry, not blocking connection/call duration;
 `MethodCall.setDefaultTimeout` is global. Task 4 owns scoped deadlines, cancellation/close and unresponsive
 watcher tests. Wire declarations and exact exported signatures must still pass its private-bus tests.
@@ -339,7 +345,7 @@ final class LinuxTrayMenu {
 
 **Interfaces:** Adapter `LinuxStatusNotifier(String address, Consumer<Host> changed)`; `void start()`, `boolean publish(Host host, IntConsumer action)`, `void withdraw()`, `close()`. `Host(String service, String owner, boolean registered)` is immutable and identifies the watcher owner, not Jasper's owner. `start` subscribes before taking a snapshot; `changed` reports availability (including none) on the controller's serialized queue. `publish` succeeds only after export and registration against that same owner; it returns false on bounded failure. `withdraw` unexports and closes a separate publication connection so watcher registration disappears without needing a nonstandard unregister method. Discovery has its own connection. D-Bus types remain in these two platform files.
 
-- [ ] **Step 1: Add wire tests first.** Use `LinuxTestBus`, two independent client connections, a test-only watcher exporting the real watcher interface, and exported objects queried through `org.freedesktop.dbus.interfaces.Properties` plus `org.freedesktop.dbus.interfaces.Introspectable`. A recording action `IntConsumer` is sufficient; no application windows. Exact assertions:
+- [x] **Step 1: Add wire tests first.** Use `LinuxTestBus`, two independent client connections, a test-only watcher exporting the real watcher interface, and exported objects queried through `org.freedesktop.dbus.interfaces.Properties` plus `org.freedesktop.dbus.interfaces.Introspectable`. A recording action `IntConsumer` is sufficient; no application windows. Exact assertions:
 
 ```java
 assertThat(itemProperties.GetAll("org.kde.StatusNotifierItem").get("Category").getValue())
@@ -360,8 +366,8 @@ assertThat(actions.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS)).isNull
 
 Test names: `publishesStandardPropertiesAndMenu`, `getLayoutHonorsDepthAndPropertyFilter`, `groupEventsReportUnknownIds`, `pixmapsAndEmptyArraysHaveExactSignatures`, `watcherWithoutHostDoesNotPublish`, `subscribesBeforeInitialSnapshot`, `ownerReplacementRejectsOldRegistration`, `withdrawDropsThePublicationName`, `unresponsiveWatcherTimesOut`. Implement the fixture in the test file using the wire interfaces below; registration records the caller's unique name/path and exposes `IsStatusNotifierHostRegistered` as a mutable test property. Use latches for races and wait for the bus's name-owner event on withdrawal. Do not merely call the server Java methods from the same object.
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*LinuxStatusNotifierTest' --tests '*LinuxTrayWireTest'`; expect missing exports/classes or failed wire assertions.
-- [ ] **Step 3: Implement the wire contract.** Declare annotated interfaces and `@Position` structs/tuples in `LinuxTrayDbus.java`. Public nested classes are required by dbus-java reflection; do not expose them outside the platform package in application signatures. The following is the complete protocol contract to implement (Java carriers use `UInt32`, `DBusPath`, `Variant<?>`, `Struct`, `Tuple`, and `DBusInterface` from the pinned dependency). Preserve capitalization of wire method names:
+- [x] **Step 2: Run** `./gradlew :jasper-app:test --tests '*LinuxStatusNotifierTest' --tests '*LinuxTrayWireTest'`; expect missing exports/classes or failed wire assertions.
+- [x] **Step 3: Implement the wire contract.** Declare annotated interfaces and `@Position` structs/tuples in `LinuxTrayDbus.java`. Public nested classes are required by dbus-java reflection; do not expose them outside the platform package in application signatures. The following is the complete protocol contract to implement (Java carriers use `UInt32`, `DBusPath`, `Variant<?>`, `Struct`, `Tuple`, and `DBusInterface` from the pinned dependency). Preserve capitalization of wire method names:
 
 | Interface/object | Method/property | Wire signature and behavior |
 |---|---|---|
@@ -409,7 +415,7 @@ and its exact `interfaceName` field:
     Variant<?> value = GetAll(requested).get(property);
     if (value == null)
         throw new org.freedesktop.dbus.errors.UnknownProperty("Unknown property: " + property);
-    return (A) value.getValue();
+    return (A) value; // Ruling 12: retain the explicit compound/empty variant signature.
 }
 @Override public <A> void Set(String requested, String property, A value) {
     throw new org.freedesktop.dbus.errors.PropertyReadOnly("Read-only property: " + property);
@@ -431,8 +437,8 @@ the system bus. Capture `DBUS_SESSION_BUS_ADDRESS` at launch; accept its support
 If neither is usable, report unavailable and allow legacy fallback. Retry the captured address; do not switch to a
 system bus or a different user session.
 
-- [ ] **Step 4: Run** real Linux wire tests using private filesystem and abstract buses. Independently check `gdbus introspect --address <private-test-address> --dest <publication-unique-name> --object-path /StatusNotifierItem` and `/MenuBar` while a fixture is running. Compare signatures to the table; no real tray host needed. A gate mismatch requires updating the conditional binding and banner before proceeding.
-- [ ] **Step 5: Commit** `feat: export Linux StatusNotifier item and native menu protocol` with trailer, including dependency-backed wire declarations and test fixture.
+- [x] **Step 4: Run** real Linux wire tests using private filesystem and abstract buses. Independently check `gdbus introspect --address <private-test-address> --dest <publication-unique-name> --object-path /StatusNotifierItem` and `/MenuBar` while a fixture is running. Compare signatures to the table; no real tray host needed. A gate mismatch requires updating the conditional binding and banner before proceeding.
+- [x] **Step 5: Commit** `feat: export Linux StatusNotifier item and native menu protocol` with trailer, including dependency-backed wire declarations and test fixture.
 
 ### Task 5: Recoverable controller with one publication
 
