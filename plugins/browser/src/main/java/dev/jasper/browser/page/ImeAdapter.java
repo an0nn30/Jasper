@@ -25,15 +25,13 @@ import org.cef.misc.CefRange;
 final class ImeAdapter implements InputMethodRequests, InputMethodListener {
     private static final CefRange NO_RANGE = new CefRange(-1, -1);
     private final JComponent view;
-    private volatile CefBrowser browser;
+    private final CefBrowser browser;
     private volatile String selectedText = "";
     private volatile Rectangle[] characterBounds = {};
 
-    ImeAdapter(JComponent view) {
+    /** The input method side of {@code view}'s page, made with the page's browser. */
+    ImeAdapter(JComponent view, PageBrowser browser) {
         this.view = view;
-    }
-
-    void setBrowser(CefBrowser browser) {
         this.browser = browser;
     }
 

@@ -45,6 +45,22 @@ class AddressInputTest {
             .contains(URI.create("https://example.com/a%20b"));
     }
 
+    /** Only the characters a URI refuses are escaped: the escapes a pasted address already has stay as they are. */
+    @Test void aPastedAddressKeepsItsEscapes() {
+        assertThat(AddressInput.resolve("https://fonts.googleapis.com/css?family=Roboto|Open%20Sans").map(URI::toString))
+            .contains("https://fonts.googleapis.com/css?family=Roboto%7COpen%20Sans");
+        assertThat(AddressInput.resolve("https://example.com/?q=%E2%9C%93&x={1}").map(URI::toString))
+            .contains("https://example.com/?q=%E2%9C%93&x=%7B1%7D");
+        assertThat(AddressInput.resolve("https://example.com/100% sure").map(URI::toString)).as("a % that starts no escape")
+            .contains("https://example.com/100%25%20sure");
+        assertThat(AddressInput.resolve("https://example.com/caf\u00e9 menu").map(URI::toString)).as("non-ASCII as UTF-8")
+            .contains("https://example.com/caf%C3%A9%20menu");
+        assertThat(AddressInput.resolve("https://example.com/a b#one#two").map(URI::toString)).contains("https://example.com/a%20b#one%23two");
+        assertThat(AddressInput.resolve("http://[::1]:8080/a b").map(URI::toString)).as("an IPv6 host keeps its brackets")
+            .contains("http://[::1]:8080/a%20b");
+        assertThat(AddressInput.resolve("example.com/a|b").map(URI::toString)).contains("https://example.com/a%7Cb");
+    }
+
     @Test void chromePagesAndEmptyTextGiveNothing() {
         assertThat(AddressInput.resolve("chrome://version")).isEqualTo(Optional.empty());
         assertThat(AddressInput.resolve("CHROME://settings")).isEmpty();

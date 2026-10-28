@@ -1,5 +1,6 @@
 package dev.jasper.browser.page;
 
+import com.jetbrains.cef.JCefAppConfig;
 import java.awt.EventQueue;
 import java.awt.Point;
 import java.awt.datatransfer.DataFlavor;
@@ -57,6 +58,27 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
         return settings;
     }
 
+    /**
+     * Becomes its view's page: the view draws it, hands it the mouse, the wheel, keys, input methods and drops, and
+     * tells it whether it shows. The native browser is made once the view is in a window. UI thread; once.
+     */
+    void attach() {
+        PageView target = view;
+        target.browser = this;
+        target.attached(new PageView.Hooks(this::setWindowVisibility, this::setWindowlessFrameRate, this::sendKeyEvent),
+            new ImeAdapter(target, this), new Drops());
+    }
+
+    /** Makes the native browser, unless that has begun. The view calls this once it is in a window. UI thread. */
+    void create() {
+        if (!CefClient.isNativeBrowserCreationStarted(this)) createImmediately();
+    }
+
+    /** Device pixels per view pixel on {@code view}'s screen. */
+    double deviceScale(PageView view) {
+        return JCefAppConfig.getDeviceScaleFactor(view);
+    }
+
     /** The page this browser shows, or null before it has one. Any thread. */
     Page owner() {
         return owner;
@@ -91,11 +113,6 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
      */
     @Override public boolean doClose() {
         return false;
-    }
-
-    /** Hands file and text drags over the view to the page, as JCEF's own (package-private) drop listener does. */
-    DropTargetListener drops() {
-        return new Drops();
     }
 
     // Adapted from JetBrains/jcef (java/org/cef/browser/CefDropTargetListener.java) at 9df0879, under JCEF's BSD-3-Clause licence.

@@ -1,7 +1,6 @@
 // Adapted from JetBrains/jcef java_tests/tests (JBCefOsrComponent.java) at 9df0879, under JCEF's BSD-3-Clause licence.
 package dev.jasper.browser.page;
 
-import com.jetbrains.cef.JCefAppConfig;
 import java.awt.AWTEvent;
 import java.awt.AlphaComposite;
 import java.awt.Color;
@@ -15,6 +14,7 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Transparency;
 import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.HierarchyEvent;
@@ -32,7 +32,6 @@ import java.util.function.IntConsumer;
 import java.util.function.Predicate;
 import javax.swing.JComponent;
 import javax.swing.Timer;
-import org.cef.CefClient;
 
 /**
  * The canvas a page is drawn on. Chromium renders the page off screen and its {@link PageRenderer} hands each frame
@@ -57,10 +56,13 @@ public final class PageView extends JComponent {
     private static final String ELLIPSIS = "…";
 
     private final Predicate<KeyEvent> taken;
-    private final ImeAdapter ime = new ImeAdapter(this);
+    // Made with the page's browser: it names Chromium's types, which an item that has not shown yet does not load.
+    private volatile ImeAdapter ime;
     private final Timer resize = new Timer(RESIZE_DELAY_MILLIS, event -> resized());
     private volatile Hooks hooks = Hooks.NONE;
-    private volatile PageBrowser browser;
+    // Set by the browser as it attaches; no method of the view names it, because the view's construction reflects on
+    // its methods' types, and the browser's type loads Chromium's.
+    volatile PageBrowser browser;
     private volatile LastPress lastPress = LastPress.NONE;
     private volatile String hoverUrl = "";
     private volatile double scale = 1;
@@ -72,11 +74,11 @@ public final class PageView extends JComponent {
     private int takenKey = KeyEvent.VK_UNDEFINED;
 
     /** Where the view's showing state and keys go: its browser's, or before it has one, nowhere. */
-    private record Hooks(Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys) {
+    record Hooks(Consumer<Boolean> visibility, IntConsumer frameRate, Consumer<KeyEvent> keys) {
         static final Hooks NONE = new Hooks(shown -> { }, rate -> { }, key -> { });
     }
 
-    /** A canvas without a page yet; {@link #setBrowser} gives it one. UI thread. Only {@link Page} makes one. */
+    /** A canvas without a page yet; its {@link PageBrowser} attaches to it. UI thread. Only {@link Page} makes one. */
     public PageView() {
         taken = KeyEvent::isConsumed;
         install();
@@ -102,7 +104,6 @@ public final class PageView extends JComponent {
         enableEvents(AWTEvent.KEY_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_WHEEL_EVENT_MASK
             | AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.INPUT_METHOD_EVENT_MASK);
         enableInputMethods(true);
-        addInputMethodListener(ime);
         setFocusable(true);
         setRequestFocusEnabled(true);
         setFocusTraversalKeysEnabled(false); // Tab and Shift+Tab are the page's
@@ -126,18 +127,18 @@ public final class PageView extends JComponent {
     }
 
     /**
-     * Gives the view its page. The page's native browser is made once the view is in a window, and the page is told
-     * whether the view shows. UI thread; once.
-     *
-     * @param browser the page
+     * The view's page is the browser that set {@link #browser}: it takes the page's showing state, keys, input methods
+     * and drops. The page's native browser is made once the view is in a window, and the page is told whether the view
+     * shows. UI thread; once, from {@link PageBrowser#attach()}.
      */
-    public void setBrowser(PageBrowser browser) {
-        this.browser = Objects.requireNonNull(browser, "browser");
-        hooks = new Hooks(browser::setWindowVisibility, browser::setWindowlessFrameRate, browser::sendKeyEvent);
-        ime.setBrowser(browser);
-        if (!GraphicsEnvironment.isHeadless()) new DropTarget(this, browser.drops()); // the view's drop target from now on
+    void attached(Hooks page, ImeAdapter adapter, DropTargetListener drops) {
+        hooks = Objects.requireNonNull(page, "page");
+        ime = Objects.requireNonNull(adapter, "adapter");
+        addInputMethodListener(adapter);
+        if (!GraphicsEnvironment.isHeadless()) new DropTarget(this, drops); // the view's drop target from now on
         rescale();
-        if (isDisplayable()) create(browser);
+        PageBrowser target = browser;
+        if (isDisplayable() && target != null) target.create();
         showing(isShowing());
     }
 
@@ -165,7 +166,7 @@ public final class PageView extends JComponent {
     @Override public void addNotify() {
         super.addNotify();
         PageBrowser target = browser;
-        if (target != null) create(target);
+        if (target != null) target.create();
     }
 
     @Override public void setBounds(int x, int y, int width, int height) {
@@ -173,6 +174,7 @@ public final class PageView extends JComponent {
         resize.restart(); // tells the page its size once the view has kept it for 100 ms
     }
 
+    /** The page's input method requests; none before the view has a page. */
     @Override public InputMethodRequests getInputMethodRequests() {
         return ime;
     }
@@ -254,7 +256,7 @@ public final class PageView extends JComponent {
         showing(isShowing());
     }
 
-    /** The view's input method side, which the renderer tells where the page's composition sits. */
+    /** The view's input method side, which the renderer tells where the page's composition sits; null before it has a page. */
     ImeAdapter ime() {
         return ime;
     }
@@ -307,14 +309,10 @@ public final class PageView extends JComponent {
         target.frameRate().accept(shown ? SHOWN_FRAME_RATE : HIDDEN_FRAME_RATE);
     }
 
-    private static void create(PageBrowser target) {
-        if (!CefClient.isNativeBrowserCreationStarted(target)) target.createImmediately();
-    }
-
     private void rescale() {
         PageBrowser target = browser;
         if (target == null) return;
-        scale = JCefAppConfig.getDeviceScaleFactor(this);
+        scale = target.deviceScale(this);
         target.notifyScreenInfoChanged();
     }
 

@@ -84,7 +84,8 @@ public final class AddressInput {
     }
 
     /**
-     * {@code text}, which names a scheme, as a URI, with any character a URI cannot hold escaped.
+     * {@code text}, which names a scheme, as a URI. When it holds characters a URI refuses, those are escaped and the
+     * escapes it already has are kept.
      *
      * @param text an address with a scheme
      * @return the URI; empty when it still is not one
@@ -94,13 +95,44 @@ public final class AddressInput {
         try {
             return Optional.of(new URI(text));
         } catch (URISyntaxException strict) {
-            int colon = text.indexOf(':'), hash = text.indexOf('#', colon + 1);
-            String part = hash < 0 ? text.substring(colon + 1) : text.substring(colon + 1, hash);
             try {
-                return Optional.of(new URI(text.substring(0, colon), part, hash < 0 ? null : text.substring(hash + 1)));
-            } catch (URISyntaxException lenient) {
+                return Optional.of(new URI(escaped(text)));
+            } catch (URISyntaxException still) {
                 return Optional.empty();
             }
         }
+    }
+
+    /**
+     * {@code text} with each character a URI refuses written as its UTF-8 bytes, {@code %XX} each: spaces,
+     * {@code "<>\^`{|}}, other control and non-ASCII characters, square brackets outside the authority (where they hold
+     * an IPv6 address) and every {@code #} after the first. A valid {@code %XX} escape stays as it is; a {@code %} that
+     * starts none is written {@code %25}.
+     */
+    private static String escaped(String text) {
+        int colon = text.indexOf(':');
+        int authority = text.startsWith("//", colon + 1) ? colon + 3 : text.length(), end = authority;
+        while (end < text.length() && "/?#".indexOf(text.charAt(end)) < 0) end++;
+        var out = new StringBuilder(text.length() + 16);
+        boolean fragment = false;
+        for (int i = 0; i < text.length(); ) {
+            int c = text.codePointAt(i);
+            int width = Character.charCount(c);
+            boolean keep;
+            if (c == '%') keep = i + 2 < text.length() && hex(text.charAt(i + 1)) && hex(text.charAt(i + 2));
+            else if (c == '#') {
+                keep = !fragment;
+                fragment = true;
+            } else if (c == '[' || c == ']') keep = i >= authority && i < end;
+            else keep = c > 0x20 && c < 0x7f && "\"<>\\^`{|}".indexOf(c) < 0;
+            if (keep) out.appendCodePoint(c);
+            else for (byte b : new String(Character.toChars(c)).getBytes(StandardCharsets.UTF_8)) out.append(String.format("%%%02X", b & 0xFF));
+            i += width;
+        }
+        return out.toString();
+    }
+
+    private static boolean hex(char c) {
+        return c >= '0' && c <= '9' || c >= 'A' && c <= 'F' || c >= 'a' && c <= 'f';
     }
 }

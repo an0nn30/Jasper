@@ -165,11 +165,13 @@ public final class PageRenderer implements CefNativeRenderHandler {
     @Override public void updateDragCursor(CefBrowser browser, int operation) { }
 
     @Override public void OnImeCompositionRangeChanged(CefBrowser browser, CefRange selectionRange, Rectangle[] characterBounds) {
-        view.ime().compositionChanged(characterBounds);
+        ImeAdapter ime = view.ime();
+        if (ime != null) ime.compositionChanged(characterBounds);
     }
 
     @Override public void OnTextSelectionChanged(CefBrowser browser, String selectedText, CefRange selectionRange) {
-        view.ime().selectionChanged(selectedText);
+        ImeAdapter ime = view.ime();
+        if (ime != null) ime.selectionChanged(selectedText);
     }
 
     private void locate() {

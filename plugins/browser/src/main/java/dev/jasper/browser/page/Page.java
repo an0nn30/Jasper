@@ -193,7 +193,7 @@ public final class Page implements AutoCloseable {
         PageBrowser page = new PageBrowser(client, made, null, new PageRenderer(view), view);
         page.owner(this);
         browser = page;
-        view.setBrowser(page);
+        page.attach();
     }
 
     /** The browser's native browser exists: from now on it hears what it is asked, and loads what it missed. */
