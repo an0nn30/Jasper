@@ -528,3 +528,60 @@ silently drop legacy support or hide the native exception. Protocol Tasks 1/3/4/
 No production fallback, Jasper GUI, benchmark, AOT, merge or push was performed.
 
 Cleanup audit: all **113 recorded owned PIDs** were gone, and no test display socket/lock for :101–:121 remained. Eight temporary homes contained only late Mesa shader caches after initial cleanup; those exact audited directories were removed. Final temporary-home list is empty. Raw audit: `native-task2/cleanup-audit.json`. Both automated live-app probe runs exited 0 at their normal three-minute deadline.
+
+## Task 6 owned XCB transport — 2026-10-28: Fedora aarch64 gate passed
+
+Implemented the concrete worker-owned XCB boundary, local DISPLAY/setup parsing, bounded authority framing and
+native Xau decoding, cooperative regular-file acquisition, wake pipe, protected deadline duplicates, scoped
+replies/errors and bounded event preservation. The opt-in probe uses private protocol fixtures and watchdog
+children; no display server, panel, desktop bus or native window is required. Production routing remains Task 9.
+
+The user approved the [authority-I/O correction](../specs/2026-10-28-linux-x11-tray-amendment-design.md#authority-io-correction--approved-2026-10-28).
+Held open/read fixtures prove one owned daemon attempt, responsive cancellation, no late connection, and cleanup
+after release. They do not prove interruption of filesystem syscalls. A real stalled syscall may retain one worker
+and authority FD plus its wake pipe until kernel return. Modern publication and Quit must remain independent in
+Tasks 7/9. Only final-component symlinks are rejected; normal local regular files are the operational scope.
+
+Fedora 44 aarch64 used JBR `25.0.4.1+1-b635.75`, libxcb/libxcb-devel `1.17.0-7.fc44.aarch64`,
+libXau/libXau-devel `1.0.12-4.fc44.aarch64` and glibc-devel `2.43-9.fc44.aarch64`. Matching public headers were
+already installed; no RPM extraction or system installation was needed. The C helper compiles with `cc -std=c11
+-Wall -Wextra -Werror`, `pkg-config --cflags xcb xcb-render xau`, and no native library link flags. Its 102 exact
+sizes/offsets/constants match the Java boundary, including 8-byte pointer/long, 4-byte XID/cookie, auth/Xauth,
+stat identity/timestamps and wire layouts. **Ruling 21:** the C gate and symlink regression disproved the plan's
+common `O_NOFOLLOW=0x20000`: aarch64 requires `0x8000`; x86_64 retains `0x20000`. Unknown architectures fail
+unavailable. Both supported ABIs require their own native assertion; x86_64 is still CI-pending.
+
+Commands executed under `/home/dustin/jasper-tray-gate.1yPuL3`, with
+`JAVA_HOME=/home/dustin/.sdkman/candidates/java/current`:
+
+```sh
+./gradlew :jasper-app:linuxTrayNativeTest --tests '*LinuxTrayXcbTest'
+./gradlew :jasper-app:linuxX11TrayProbe --args='--gate transport --require-native --output build/tray-gate/transport' verifyApplicationArchitecture
+```
+
+Final focused native XML: **21 tests, zero failures/errors/skips**. The last full watchdog execution passed
+**20 children, zero required skips, zero watchdog failures**: ABI, held authority, 32 forced stale-callback FD-reuse
+iterations, four fail/reconnect cycles (BadAuth/BadWindow/BadMatch/EOF), and setup/unanswered-reply/explicit-flush/
+implicit-flush stalls with both socket forms and timeout/close termination. Backpressure reached `EAGAIN` after
+233,152 bytes; active-native-call acknowledgements verified actual explicit/implicit stalls. Timeout phases
+completed in 2,005–2,012 ms; close cases completed in 110–116 ms including the deliberate 100 ms stall observation.
+Every child returned to 45 FDs and eight live thread names; live duplicates/auth records, stranded workers and
+unexpected exceptions were zero. Every replacement socket remained usable after its delayed old deadline callback.
+JNA auth allocations, Xau records/streams and XCB reply/event allocations have explicit release assertions.
+
+Self-review RED regressions exposed and fixed event loss at barriers, same-size authority changes, idle-poll timeout
+handling, old-connection double-close releasing a later attempt slot, and cumulative retained-event byte limits.
+The final two fixes were followed by the complete 21-test focused native run; the 20-child watchdog evidence precedes
+those two small fixes. No broad suite was repeated. Local macOS focused boundary/inventory checks and
+`verifyApplicationArchitecture` pass: **26 XML tests, nine executed, 17 Linux skips**, zero failures/errors.
+Three discovered source-inventory rows were added. Source hygiene and `git diff --check` pass.
+
+Raw evidence: remote `native-{expanded,gate,review-red,review-green-idle-red,final,last-review-red,last-review-green}.log`,
+`jasper-app/build/tray-gate/transport/{summary.txt,abi-c.txt,abi-java.txt,*.log}` and
+`jasper-app/build/test-results/linuxTrayNativeTest/TEST-dev.jasper.app.platform.LinuxTrayXcbTest.xml`.
+Local copies and portable RED/GREEN logs are in `.superpowers/sdd/2026-10-27-linux-residency-2-tray/task-6-native-evidence/`;
+`task-6-report.md` records the implementation handoff. Fixture sockets/path reservations, workers and descriptors
+were closed; watchdog children exited normally. Active Plasma and actual authority credentials were untouched.
+No Jasper GUI, AOT, benchmark, push or merge ran. Native legacy hosts remain Task 7, production ownership/composition
+Tasks 7/9, and final full check/packages/packaged-runtime proofs Task 10. x86_64 and Ubuntu 22.04 remain required CI
+release gates. Independent per-task review is pending.

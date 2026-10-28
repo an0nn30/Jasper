@@ -306,3 +306,21 @@ tasks.register<JavaExec>("pluginManagerStatesPreview") {
 }
 
 apply(from = rootProject.file("gradle/cygwin.gradle"))
+
+// Private X11 protocol fixture only; neither task is part of check or launches a desktop window.
+tasks.register<Test>("linuxTrayNativeTest") {
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    include("**/LinuxTrayXcbTest*", "**/LinuxLegacyTrayTest*")
+    systemProperty("jasper.tray.requireNative", "true")
+    jvmArgs("--enable-native-access=ALL-UNNAMED", "-Djava.awt.headless=true")
+}
+tasks.register<JavaExec>("linuxX11TrayProbe") {
+    group = "verification"
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.jasper.app.platform.LinuxX11TrayProbe"
+    jvmArgs("--enable-native-access=ALL-UNNAMED", "-Djava.awt.headless=true")
+}
