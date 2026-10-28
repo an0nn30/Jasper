@@ -55,6 +55,19 @@ class RemotePluginTest {
         }
     }
 
+    @Test void aStartPointsSqliteAtJaspersOwnTemporaryFolder(@TempDir Path dir) {
+        String saved = System.getProperty("org.sqlite.tmpdir");
+        System.clearProperty("org.sqlite.tmpdir");
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), plugin(dir.resolve("ssh"))); settle(host);
+            assertThat(host.failures()).isEmpty();
+            assertThat(System.getProperty("org.sqlite.tmpdir"))
+                .isEqualTo(dev.jasper.remote.transfer.store.SqliteNatives.folder().toString());
+        } finally {
+            if (saved == null) System.clearProperty("org.sqlite.tmpdir"); else System.setProperty("org.sqlite.tmpdir", saved);
+        }
+    }
+
     @Test void aStartUnderEnterpriseReadsTheClassicLayoutOnce(@TempDir Path dir) {
         try (var host = new FakePluginHost()) {
             host.setPresentation(FakePresentations.CLASSIC);
