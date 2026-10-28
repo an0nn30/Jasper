@@ -43,6 +43,8 @@ public final class VaultManagerDialog implements AutoCloseable {
     private WindowHandle owner;
     private UnlockPrompt unlockPrompt;
     ManagerPanel panel;
+    private dev.jasper.sdk.ui.ColumnState columnState = dev.jasper.sdk.ui.ColumnState.NONE;
+    private java.util.function.Consumer<dev.jasper.sdk.ui.ColumnState> columnsChanged = state -> { };
     PasswordPanel passwordPanel;
 
     public VaultManagerDialog(PluginContext context, LockManager lock, VaultManager manager,
@@ -58,6 +60,13 @@ public final class VaultManagerDialog implements AutoCloseable {
         this.status = status; this.generate = generate;this.editors=new EntryPresenter(context, layout);
         this.copies = CopyCards.declare(context);
     }
+    /**
+     * The manager table's sort and column widths, and who hears each change the user makes; every manager opened after
+     * this starts from them.
+     */
+    public void columns(dev.jasper.sdk.ui.ColumnState state, java.util.function.Consumer<dev.jasper.sdk.ui.ColumnState> changed) {
+        columnState = java.util.Objects.requireNonNull(state); columnsChanged = java.util.Objects.requireNonNull(changed);
+    }
     public boolean isOpen() { return dialog != null; }
     /** The plugin's kit, for the forms the manager owns. */
     public UiKit kit() { return context.kit(); }
@@ -71,6 +80,7 @@ public final class VaultManagerDialog implements AutoCloseable {
             grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
             () -> service.requestUnlock(owner), this::close);
         shown.copies(copies);
+        shown.columns(columnState, state -> { columnState = state; columnsChanged.accept(state); });
         panel = shown;
         PluginDialog opened = context.windows().dialog(new DialogSpec(TITLE, owner, false));
         dialog = opened;

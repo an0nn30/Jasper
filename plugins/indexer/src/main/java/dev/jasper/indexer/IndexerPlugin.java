@@ -156,8 +156,13 @@ public final class IndexerPlugin implements Plugin {
         context.menus().standard(StandardMenu.FILE).add(INDEX_FOLDER);
         context.palette().register(new FilesScope(projects, new FilesScope.Hooks(this::current, this::openBlocked, this::reachable,
             this::hostLabel, this::connected, this::open, this::terminal, this::copyText, text -> context.platform().copy(text)), GOTO, icon));
+        var columnStates = new dev.jasper.sdk.ui.ColumnStateFile(context.dataDirectory().resolve("columns.properties"));
         context.settings().page(new IndexerSettingsPanel(context.kit(), settings, projects, indexer, this::location, this::reachable, this::connected,
-            () -> context.terminals().activeWindow().ifPresent(this::indexFolder), this::confirmRemove));
+            () -> context.terminals().activeWindow().ifPresent(this::indexFolder), this::confirmRemove)
+            .columns(columnStates.get("projects"), state -> {
+                try { columnStates.put("projects", state); }
+                catch (java.io.IOException failure) { context.log().log(System.Logger.Level.WARNING, "Project Index columns: {0}", failure.getMessage()); }
+            }));
         watcher = new CwdWatcher(projects, indexer, settings, prompts, new CwdWatcher.Hooks(this::detect, this::connectedPlace,
             this::detectRemote, pane -> context.terminals().pane(pane).map(handle -> handle.tab().window()), environment.after(),
             environment.home()));

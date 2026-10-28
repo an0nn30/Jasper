@@ -296,4 +296,26 @@ class ServerEditorTest {
         choose(editor, ServerEditor.REACHABLE, "bind.1");
         assertThat(notice(editor)).contains("Writable and reachable from other computers");
     }
+
+    @Test void keysTableSortsFlipsAndReportsResizes() {
+        var holder = new java.util.concurrent.atomic.AtomicReference<ServerEditor>();
+        var heard = new java.util.ArrayList<dev.jasper.sdk.ui.ColumnState>();
+        UiTestAccess.edt(() -> holder.set(new ServerEditor(new dev.jasper.sdk.testing.FakeKit("dev.jasper.fileserver"), java.util.List.of(),
+            java.util.Optional.empty(), false, java.util.Set.of(dev.jasper.fileserver.definition.Protocol.SFTP), java.util.List.of(), false,
+            id -> java.util.Optional.empty(), () -> java.util.concurrent.CompletableFuture.completedFuture(java.util.Optional.empty()),
+            java.util.Optional::empty, new ServerEditor.KeySources(() -> java.util.Optional.of(ED25519 + "\n" + ECDSA), java.util.Optional::empty), false,
+            definition -> { }, () -> { }).layout(dev.jasper.fileserver.workstation.Layout.CLASSIC).columns(dev.jasper.sdk.ui.ColumnState.NONE, heard::add)));
+        var view = (dev.jasper.sdk.testing.FakeKitView) holder.get().view();
+        UiTestAccess.edt(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Action(ServerEditor.ADD_KEY)));
+        java.util.function.Supplier<dev.jasper.sdk.ui.Nodes.Table> keys = () -> (dev.jasper.sdk.ui.Nodes.Table) UiTestAccess.node(view, ServerEditor.KEYS);
+        assertThat(keys.get().rows()).extracting(row -> row.cells().get("type")).containsExactly("ssh-ed25519", "ecdsa-sha2-nistp256");
+        UiTestAccess.edt(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Sorted(ServerEditor.KEYS, "type")));
+        assertThat(keys.get().columns().stream().filter(c -> c.id().equals("type")).findFirst().orElseThrow().sorted()).contains(true);
+        assertThat(keys.get().rows()).extracting(row -> row.cells().get("type")).containsExactly("ecdsa-sha2-nistp256", "ssh-ed25519");
+        UiTestAccess.edt(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Sorted(ServerEditor.KEYS, "type")));
+        assertThat(keys.get().rows()).extracting(row -> row.cells().get("type")).containsExactly("ssh-ed25519", "ecdsa-sha2-nistp256");
+        UiTestAccess.edt(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.ColumnsResized(ServerEditor.KEYS, java.util.Map.of("type", 70))));
+        assertThat(heard.getLast().widths()).containsEntry("type", 70);
+        assertThat(heard.getLast().sortColumn()).contains("type");
+    }
 }

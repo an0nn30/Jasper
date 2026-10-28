@@ -8,6 +8,7 @@ import dev.jasper.fileserver.runtime.ServerRegistry;
 import dev.jasper.fileserver.runtime.ServerState.Phase;
 import dev.jasper.fileserver.workstation.Layout;
 import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.ColumnState;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
@@ -23,6 +24,7 @@ import java.nio.file.Path;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -79,6 +81,9 @@ public final class FileServersPanel implements AutoCloseable {
     /** The row the user (or {@link #select}) selected, shown as selected; {@code selected} falls back to the first row. */
     private UUID chosen;
     private boolean detailsOpen, closed;
+    /** The classic table's sort and widths; the owner hears each change the user makes. */
+    private ColumnState tableState = ColumnState.NONE;
+    private Consumer<ColumnState> columnsChanged = state -> { };
     /** Whether the panel is asked for its wide layout (a window of its own, or docked at the bottom). */
     private boolean wide;
 
@@ -130,6 +135,39 @@ public final class FileServersPanel implements AutoCloseable {
                 () -> { if (!closed) actions.edit().accept(Optional.empty()); }))));
     }
 
+    /**
+     * The classic table's sort and column widths, and who hears each change the user makes; a sort column the table lacks
+     * reads as no sort.
+     */
+    public void setColumns(ColumnState state, Consumer<ColumnState> changed) {
+        java.util.Objects.requireNonNull(state); columnsChanged = java.util.Objects.requireNonNull(changed);
+        tableState = state.sortColumn().filter(id -> TABLE_COLUMNS.stream().anyMatch(column -> column.id().equals(id))).isPresent() ? state
+            : new ColumnState(Optional.empty(), true, state.widths());
+        if (!closed) render();
+    }
+
+    /** The servers in the classic table's sort: the column's shown text (the address by host, then port), then name, then id; none keeps the order given. */
+    private List<ServerRegistry.View> ordered() {
+        if (tableState.sortColumn().isEmpty()) return servers;
+        String column = tableState.sortColumn().get();
+        Comparator<ServerRegistry.View> primary = switch (column) {
+            case "address" -> Comparator.comparing((ServerRegistry.View server) -> addressHost(server).toLowerCase(Locale.ROOT))
+                .thenComparingInt(FileServersPanel::addressPort).thenComparing(FileServersPanel::addressHost);
+            case "status" -> Comparator.comparing((ServerRegistry.View server) -> ServerRows.state(server.state()).toLowerCase(Locale.ROOT));
+            default -> Comparator.comparing((ServerRegistry.View server) -> server.definition().name().toLowerCase(Locale.ROOT))
+                .thenComparing(server -> server.definition().name());
+        };
+        Comparator<ServerRegistry.View> byName = Comparator.comparing((ServerRegistry.View server) -> server.definition().name().toLowerCase(Locale.ROOT))
+            .thenComparing(server -> server.definition().name()).thenComparing(server -> server.definition().id());
+        return servers.stream().sorted((tableState.ascending() ? primary : primary.reversed()).thenComparing(byName)).toList();
+    }
+
+    private static String addressHost(ServerRegistry.View server) { String address = ServerRows.address(server); return address.substring(0, address.lastIndexOf(':')); }
+    private static int addressPort(ServerRegistry.View server) {
+        String address = ServerRows.address(server);
+        try { return Integer.parseInt(address.substring(address.lastIndexOf(':') + 1)); } catch (NumberFormatException none) { return 0; }
+    }
+
     public void setServers(List<ServerRegistry.View> next, Optional<String> problem) {
         if (closed) return;
         servers = List.copyOf(next); this.problem = problem;
@@ -172,6 +210,16 @@ public final class FileServersPanel implements AutoCloseable {
         switch (event) {
             case UiEvent.Selected selection when selection.id().equals(ROWS) -> {
                 selection.ids().stream().findFirst().flatMap(FileServersPanel::rowUuid).ifPresent(id -> { selected = id; chosen = id; refreshActivity(); render(); revealLatestActivity(); });
+            }
+            case UiEvent.Sorted sorted when sorted.id().equals(ROWS) -> {
+                if (TABLE_COLUMNS.stream().noneMatch(column -> column.id().equals(sorted.columnId()))) return;
+                tableState = tableState.sorted(sorted.columnId());
+                columnsChanged.accept(tableState);
+                render();
+            }
+            case UiEvent.ColumnsResized resized when resized.id().equals(ROWS) -> {
+                tableState = tableState.resized(resized.widths());
+                columnsChanged.accept(tableState);
             }
             case UiEvent.Toggled toggle when toggle.id().startsWith("switch:") ->
                 rowUuid(toggle.id().substring("switch:".length())).ifPresent(id -> server(id)
@@ -367,7 +415,7 @@ public final class FileServersPanel implements AutoCloseable {
     private Nodes.Panel classicNode() {
         var header = new Nodes.Header(HEADER, ControlState.READY, "File Servers", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
         var rows = new ArrayList<TableRow>();
-        for (ServerRows.Row row : ServerRows.rows(servers, Optional.empty())) {
+        for (ServerRows.Row row : ServerRows.rows(ordered(), Optional.empty())) {
             switch (row) {
                 case ServerRows.Header heading -> rows.add(TableRow.heading("fileserver.temporary", heading.title(), OptionalInt.empty(), ""));
                 case ServerRows.Server server -> rows.add(tableRow(server.view()));
@@ -379,7 +427,7 @@ public final class FileServersPanel implements AutoCloseable {
             "No File Servers", "Share a local folder over HTTP with devices on your network.",
             List.of(new Nodes.Button("fileserver.empty.new", ControlState.READY, "Share Folder…", "", Nodes.ButtonKind.SECONDARY, "fileserver.empty.new", ""))))
             : Optional.empty();
-        var table = new Nodes.Table(ROWS, ControlState.READY, TABLE_COLUMNS, rows, chosen == null ? Set.of() : Set.of(rowId(chosen)), ENTER_TOGGLE, List.of(),
+        var table = new Nodes.Table(ROWS, ControlState.READY, tableState.apply(TABLE_COLUMNS), rows, chosen == null ? Set.of() : Set.of(rowId(chosen)), ENTER_TOGGLE, List.of(),
             Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD, empty, "");
         Optional<Nodes.Node> top = problem.map(error -> new Nodes.Stack(NOTICE + ".stack", ControlState.READY, Nodes.LayoutRole.VERTICAL,
             List.of(new Nodes.Notice(NOTICE, ControlState.READY, Nodes.Severity.DANGER, "servers.toml: " + error, List.of()))));

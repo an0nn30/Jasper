@@ -104,4 +104,45 @@ class TunnelsTableTest {
     static String menuAction(TableRow row, String label) {
         return row.contextActions().orElseThrow().stream().filter(item -> item.label().equals(label)).findFirst().orElseThrow().action();
     }
+
+    List<String> names() { return table().rows().stream().filter(r -> r.heading().isEmpty()).map(r -> r.id()).toList(); }
+    Optional<Boolean> sortedOf(String column) { return table().columns().stream().filter(c -> c.id().equals(column)).findFirst().orElseThrow().sorted(); }
+
+    @Test void headerClickSortsAndFlips() throws Exception {
+        edt(() -> {
+            panel(List.of(socks, test), Optional.empty());
+            assertThat(names()).containsExactly(TunnelsPanel.rowId(socks.id()), TunnelsPanel.rowId(test.id()));
+            assertThat(table().columns()).allMatch(c -> c.sorted().isEmpty());
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "local"));
+            assertThat(names()).containsExactly(TunnelsPanel.rowId(socks.id()), TunnelsPanel.rowId(test.id()));
+            assertThat(sortedOf("local")).contains(true);
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "type"));
+            assertThat(names()).containsExactly(TunnelsPanel.rowId(socks.id()), TunnelsPanel.rowId(test.id()));
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "type"));
+            assertThat(sortedOf("type")).contains(false);
+            assertThat(names()).containsExactly(TunnelsPanel.rowId(test.id()), TunnelsPanel.rowId(socks.id()));
+        });
+    }
+
+    @Test void resizeIsReportedAndApplied() throws Exception {
+        edt(() -> {
+            var heard = new ArrayList<dev.jasper.sdk.ui.ColumnState>();
+            panel(List.of(socks, test), Optional.empty());
+            panel.setColumns(dev.jasper.sdk.ui.ColumnState.NONE, heard::add);
+            emit(panel.view(), new UiEvent.ColumnsResized(TunnelsPanel.ROWS, Map.of("via", 140)));
+            assertThat(heard).hasSize(1);
+            assertThat(heard.getFirst().widths()).containsEntry("via", 140);
+            panel.refresh();
+            assertThat(table().columns().stream().filter(c -> c.id().equals("via")).findFirst().orElseThrow().width()).hasValue(140);
+        });
+    }
+
+    @Test void unknownStoredSortColumnReadsAsNoSort() throws Exception {
+        edt(() -> {
+            panel(List.of(socks, test), Optional.empty());
+            panel.setColumns(dev.jasper.sdk.ui.ColumnState.sortedBy("bogus", false), state -> { });
+            assertThat(names()).containsExactly(TunnelsPanel.rowId(socks.id()), TunnelsPanel.rowId(test.id()));
+            assertThat(table().columns()).allMatch(c -> c.sorted().isEmpty());
+        });
+    }
 }

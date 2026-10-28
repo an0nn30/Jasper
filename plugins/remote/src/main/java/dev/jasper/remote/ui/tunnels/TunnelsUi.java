@@ -185,6 +185,22 @@ public final class TunnelsUi implements AutoCloseable {
         manager.close();
     }
 
+    private static final String COLUMNS_KEY = "tunnels";
+    private dev.jasper.sdk.ui.ColumnStateFile columnStates;
+
+    /** Where the Tunnels tables keep their sort and column widths (key {@code tunnels}); call before any panel opens. */
+    public void columns(dev.jasper.sdk.ui.ColumnStateFile file) { columnStates = file; }
+
+    /** A Tunnels table was sorted or resized in {@code source}: keep it and show it in every other window's panel. */
+    private void columnsChanged(dev.jasper.sdk.ui.ColumnState state, TunnelsPanel source) {
+        try { columnStates.put(COLUMNS_KEY, state); }
+        catch (java.io.IOException failure) { context.log().log(System.Logger.Level.WARNING, "Tunnels columns: {0}", failure.getMessage()); }
+        for (var instance : List.copyOf(panels.values())) {
+            var other = instance.panel();
+            if (other != source) other.setColumns(state, changed -> columnsChanged(changed, other));
+        }
+    }
+
     private dev.jasper.sdk.ui.UiView create(PanelHost host) {
         WindowHandle window = host.window();
         // The switch, Enter and the menu act through the manager, whose confirmed state alone redraws the row.
@@ -193,6 +209,7 @@ public final class TunnelsUi implements AutoCloseable {
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::browse, this::copyAddress,
             () -> edit(window, Optional.empty(), Optional.empty())), layout);
         panel.onHeaderChanged(host::setHeader);
+        if (columnStates != null) panel.setColumns(columnStates.get(COLUMNS_KEY), state -> columnsChanged(state, panel));
         // In a window of its own or docked at the bottom the list sits beside the detail; the panel is right from the start
         // and follows each move.
         panel.wide(Layout.wide(host.placement()));

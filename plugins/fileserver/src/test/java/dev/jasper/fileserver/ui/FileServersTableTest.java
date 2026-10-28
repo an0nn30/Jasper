@@ -92,4 +92,44 @@ class FileServersTableTest {
         emit(panel, new UiEvent.Action("fileserver.empty.new"));
         assertThat(events).containsExactly("edit new");
     }
+
+    ServerRegistry.View server(String name, String address, ServerState state) {
+        var definition = ServerDefinition.create(name, Protocol.HTTP, HOME.resolve(name));
+        return new ServerRegistry.View(definition, false, state, List.of(URI.create("http://" + address)), Optional.empty(), false);
+    }
+    static List<String> shown(FileServersPanel panel) { return table(panel).rows().stream().map(row -> row.cells().get("address")).toList(); }
+
+    @Test void headerClickSortsAndFlips() {
+        var b = server("b", "10.0.0.2:9000", ServerState.STOPPED);
+        var a = server("a", "10.0.0.9:80", ServerState.STOPPED);
+        var panel = panel(List.of(b, a), Optional.empty());
+        assertThat(shown(panel)).containsExactly("10.0.0.2:9000", "10.0.0.9:80");
+        assertThat(table(panel).columns()).allMatch(column -> column.sorted().isEmpty());
+        emit(panel, new UiEvent.Sorted(FileServersPanel.ROWS, "address"));
+        assertThat(shown(panel)).containsExactly("10.0.0.2:9000", "10.0.0.9:80");
+        assertThat(table(panel).columns().stream().filter(column -> column.id().equals("address")).findFirst().orElseThrow().sorted()).contains(true);
+        emit(panel, new UiEvent.Sorted(FileServersPanel.ROWS, "folder"));
+        assertThat(shown(panel)).containsExactly("10.0.0.9:80", "10.0.0.2:9000");
+        emit(panel, new UiEvent.Sorted(FileServersPanel.ROWS, "folder"));
+        assertThat(table(panel).columns().stream().filter(column -> column.id().equals("folder")).findFirst().orElseThrow().sorted()).contains(false);
+        assertThat(shown(panel)).containsExactly("10.0.0.2:9000", "10.0.0.9:80");
+    }
+
+    @Test void resizeIsReportedAndApplied() {
+        var heard = new ArrayList<dev.jasper.sdk.ui.ColumnState>();
+        var panel = panel(List.of(test), Optional.empty());
+        UiTestAccess.edt(() -> panel.setColumns(dev.jasper.sdk.ui.ColumnState.NONE, heard::add));
+        emit(panel, new UiEvent.ColumnsResized(FileServersPanel.ROWS, java.util.Map.of("status", 90)));
+        assertThat(heard).hasSize(1);
+        assertThat(heard.getFirst().widths()).containsEntry("status", 90);
+        UiTestAccess.edt(() -> panel.setServers(List.of(test), Optional.empty()));
+        assertThat(table(panel).columns().stream().filter(column -> column.id().equals("status")).findFirst().orElseThrow().width()).hasValue(90);
+    }
+
+    @Test void unknownStoredSortColumnReadsAsNoSort() {
+        var panel = panel(List.of(server("b", "10.0.0.2:9000", ServerState.STOPPED), server("a", "10.0.0.9:80", ServerState.STOPPED)), Optional.empty());
+        UiTestAccess.edt(() -> panel.setColumns(dev.jasper.sdk.ui.ColumnState.sortedBy("bogus", false), state -> { }));
+        assertThat(shown(panel)).containsExactly("10.0.0.2:9000", "10.0.0.9:80");
+        assertThat(table(panel).columns()).allMatch(column -> column.sorted().isEmpty());
+    }
 }

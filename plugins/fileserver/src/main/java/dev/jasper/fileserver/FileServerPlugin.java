@@ -135,6 +135,9 @@ public final class FileServerPlugin implements Plugin {
     private boolean activityRefreshPending;
     private ServerEditor currentEditor;
     private ConfirmPanel currentConfirm;
+    /** The sort and column widths the plugin's tables keep, one key per column set (columns.properties). */
+    private dev.jasper.sdk.ui.ColumnStateFile columnStates;
+    private static final String SERVERS_COLUMNS = "servers", KEYS_COLUMNS = "server-keys";
 
     public FileServerPlugin() { this(Environment.system()); }
 
@@ -144,6 +147,7 @@ public final class FileServerPlugin implements Plugin {
         this.context = context;
         Files.createDirectories(context.dataDirectory());
         settings = new FileServerSettings(context.settings());
+        columnStates = new dev.jasper.sdk.ui.ColumnStateFile(context.dataDirectory().resolve("columns.properties"));
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
         layout = dev.jasper.fileserver.workstation.Layout.of(context.appearance().presentation());
         var logins = new LoginResolver(vault, () -> System.getProperty("user.name", "jasper"), SessionPasswords::generate);
@@ -273,6 +277,7 @@ public final class FileServerPlugin implements Plugin {
             registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone(),
             "add", layout);
         panel.onHeaderChanged(host::setHeader);
+        panel.setColumns(columnStates.get(SERVERS_COLUMNS), state -> serverColumns(state, panel));
         // In a window of its own or docked at the bottom the list sits beside the details; the panel is right from the start
         // and follows each move.
         panel.wide(dev.jasper.fileserver.workstation.Layout.wide(host.placement()));
@@ -285,6 +290,20 @@ public final class FileServerPlugin implements Plugin {
         host.onVisibility(visible -> { if (visible) registry.refreshAddresses(); });
         host.onClosed(() -> { panel.close(); panels.remove(window.id(), instance); });
         return panel.view();
+    }
+
+    /** The user sorted or resized the File Servers table in {@code source}: keep it and show it in every other window's panel. */
+    private void serverColumns(dev.jasper.sdk.ui.ColumnState state, FileServersPanel source) {
+        remember(SERVERS_COLUMNS, state);
+        for (var instance : List.copyOf(panels.values())) {
+            var other = instance.panel();
+            if (other != source) other.setColumns(state, changed -> serverColumns(changed, other));
+        }
+    }
+
+    private void remember(String key, dev.jasper.sdk.ui.ColumnState state) {
+        try { columnStates.put(key, state); }
+        catch (java.io.IOException failure) { context.log().log(System.Logger.Level.WARNING, "File Servers columns: {0}", failure.getMessage()); }
     }
 
     void toggle(WindowHandle window, UUID id) {
@@ -321,6 +340,7 @@ public final class FileServerPlugin implements Plugin {
             },
             dialog::close);
         editor[0].layout(layout);
+        editor[0].columns(columnStates.get(KEYS_COLUMNS), state -> remember(KEYS_COLUMNS, state));
         currentEditor = editor[0];
         dialog.setContent(editor[0].view());
         dialog.onClosed(() -> { closed[0] = true; editor[0].close(); if (currentEditor == editor[0]) currentEditor = null; });

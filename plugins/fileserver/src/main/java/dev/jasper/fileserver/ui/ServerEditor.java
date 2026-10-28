@@ -9,6 +9,7 @@ import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.engine.ServerAddresses;
 import dev.jasper.fileserver.workstation.Layout;
 import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.ColumnState;
 import dev.jasper.sdk.ui.TableRow;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.UiAnchor;
@@ -211,6 +212,16 @@ public final class ServerEditor implements AutoCloseable {
                 }
                 render();
             }
+            case UiEvent.Sorted sorted when sorted.id().equals(KEYS) -> {
+                if (KEY_COLUMNS.stream().noneMatch(column -> column.id().equals(sorted.columnId()))) return;
+                keyColumns = keyColumns.sorted(sorted.columnId());
+                keyColumnsChanged.accept(keyColumns);
+                render();
+            }
+            case UiEvent.ColumnsResized resized when resized.id().equals(KEYS) -> {
+                keyColumns = keyColumns.resized(resized.widths());
+                keyColumnsChanged.accept(keyColumns);
+            }
             case UiEvent.Action action -> act(action.id());
             default -> { }
         }
@@ -386,17 +397,48 @@ public final class ServerEditor implements AutoCloseable {
         new Column("comment", "Comment", Nodes.TextRole.BODY, false, 125, Optional.empty()));
 
     /** The authorized keys: today's compact list, or under CLASSIC a table of their type, fingerprint and comment. */
+    private ColumnState keyColumns = ColumnState.NONE;
+    private Consumer<ColumnState> keyColumnsChanged = state -> { };
+
+    /**
+     * The classic keys table's sort and column widths, and who hears each change the user makes; a sort column the table
+     * lacks reads as no sort. Call right after construction.
+     */
+    public ServerEditor columns(ColumnState state, Consumer<ColumnState> changed) {
+        java.util.Objects.requireNonNull(state); keyColumnsChanged = java.util.Objects.requireNonNull(changed);
+        keyColumns = state.sortColumn().filter(id -> KEY_COLUMNS.stream().anyMatch(column -> column.id().equals(id))).isPresent() ? state
+            : new ColumnState(Optional.empty(), true, state.widths());
+        if (!closed) render();
+        return this;
+    }
+
+    /** The keys' indexes in the table's sort (the shown text, then the stored line); none keeps the order added. */
+    private List<Integer> keyOrder(List<String[]> cells) {
+        var order = new ArrayList<Integer>();
+        for (int i = 0; i < cells.size(); i++) order.add(i);
+        if (keyColumns.sortColumn().isEmpty()) return order;
+        int column = switch (keyColumns.sortColumn().get()) { case "type" -> 0; case "fingerprint" -> 1; default -> 2; };
+        java.util.Comparator<Integer> primary = java.util.Comparator.<Integer, String>comparing(i -> cells.get(i)[column].toLowerCase(java.util.Locale.ROOT))
+            .thenComparing(i -> cells.get(i)[column]);
+        java.util.Comparator<Integer> byLine = java.util.Comparator.<Integer, String>comparing(i -> cells.get(i)[1]).thenComparing(i -> keyLines.get(i));
+        order.sort((keyColumns.ascending() ? primary : primary.reversed()).thenComparing(byLine));
+        return order;
+    }
+
     private Nodes.Node keysNode(List<ListItem> keys) {
         if (layout == Layout.ROWS) return new Nodes.ItemList(KEYS, ControlState.READY, Nodes.ListKind.COMPACT, keys, selectedKeys, "", List.of(),
             Nodes.SelectionMode.MULTIPLE, Optional.empty(), OptionalInt.of(3));
         var rows = new ArrayList<TableRow>();
+        var cells = new ArrayList<String[]>();
         for (int i = 0; i < keyLines.size(); i++) {
             String type = "", fingerprint = keyLines.get(i), comment = "";
             try { var key = AuthorizedKeys.parse(keyLines.get(i)); type = key.type(); fingerprint = key.fingerprint(); comment = key.comment(); }
             catch (IllegalArgumentException unreadable) { /* the stored line shows whole */ }
-            rows.add(new TableRow("key." + i, java.util.Map.of("type", type, "fingerprint", fingerprint, "comment", comment), Optional.empty()));
+            cells.add(new String[] {type, fingerprint, comment});
         }
-        return new Nodes.Table(KEYS, ControlState.READY, KEY_COLUMNS, rows, selectedKeys, "", List.of(), Nodes.SelectionMode.MULTIPLE,
+        for (int i : keyOrder(cells))
+            rows.add(new TableRow("key." + i, java.util.Map.of("type", cells.get(i)[0], "fingerprint", cells.get(i)[1], "comment", cells.get(i)[2]), Optional.empty()));
+        return new Nodes.Table(KEYS, ControlState.READY, keyColumns.apply(KEY_COLUMNS), rows, selectedKeys, "", List.of(), Nodes.SelectionMode.MULTIPLE,
             Nodes.ScrollPolicy.STANDARD, Optional.empty(), "No keys added");
     }
     private static ControlState state(boolean visible, boolean enabled) { return new ControlState(visible, enabled, false, ""); }
