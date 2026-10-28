@@ -87,7 +87,7 @@ class KitCompatibilityTest {
         rejects(reference("dev.jasper.sdk.ui.ShortcutContext","window","(Ljava/lang/String;)Ldev/jasper/sdk/ui/ShortcutContext;"),
             "dev/jasper/sdk/ui/ShortcutContext#window(Ljava/lang/String;)Ldev/jasper/sdk/ui/ShortcutContext;","0.20");
         rejects(constant("dev.jasper.sdk.ui.ShortcutContext$Kind","WINDOW"),"dev/jasper/sdk/ui/ShortcutContext$Kind#WINDOWLdev/jasper/sdk/ui/ShortcutContext$Kind;","0.20");
-        var current=candidate(">=0.24.0, <0.25",Map.of("test/kit/Probe.class",reference("dev.jasper.sdk.ui.ContentTab","moveToNewWindow","()V")),false);
+        var current=candidate(">=0.25.0, <0.26",Map.of("test/kit/Probe.class",reference("dev.jasper.sdk.ui.ContentTab","moveToNewWindow","()V")),false);
         try(var loader=PluginLoader.load(current,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the member that took its place").isNotNull();}
     }
     @Test void theNamesSdkZeroEighteenGaveThemAreAdmitted() throws Exception {

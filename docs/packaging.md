@@ -526,7 +526,7 @@ Windows job fails while [`validation.json`](#bundled-cygwin) lacks native and in
 architecture. The publish job refuses to continue if the tag moved during the build, requires exactly the nine packages,
 the two Cygwin source archives (`amd64` and `aarch64`) and the five SDK jars (`jasper-sdk-<v>.jar`,
 `jasper-sdk-<v>-sources.jar`, `jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and
-`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.24.0), and writes `SHA256SUMS`. It
+`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.25.0), and writes `SHA256SUMS`. It
 creates a draft prerelease titled `Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds
 exactly those files, and publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which
 a rerun finishes; a published release for the tag is never overwritten.

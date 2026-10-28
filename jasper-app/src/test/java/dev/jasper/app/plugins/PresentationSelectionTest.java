@@ -13,18 +13,18 @@ import org.junit.jupiter.api.Test;
 
 /** Spec 4.4 and 4.5: one presentation at a time, chosen inside the pure resolver. */
 class PresentationSelectionTest {
-    static final Version SDK = Version.parse("0.24.0");
+    static final Version SDK = Version.parse("0.25.0");
     static final String BUILD = "/app/jasper-app.jar@1";
 
     static PluginCandidate provider(String id, PluginCandidate.Origin origin, PluginDescriptor.Requirement... requires) {
-        var descriptor = new PluginDescriptor(id, "Look " + id, Version.parse("0.1.0"), "x.Main", VersionRange.parse(">=0.24.0, <0.25"),
+        var descriptor = new PluginDescriptor(id, "Look " + id, Version.parse("0.1.0"), "x.Main", VersionRange.parse(">=0.25.0, <0.26"),
             "", "", Set.of("presentation.provide"), Set.of(), List.of(requires), "", "", dev.jasper.ui.model.Nodes.Hue.NEUTRAL,
             dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED, List.of(), "look.kit.toml", List.of(), true);
         return new PluginCandidate(descriptor, Path.of(id), List.of(), origin);
     }
 
     static PluginCandidate plain(String id, PluginDescriptor.Requirement... requires) {
-        var descriptor = new PluginDescriptor(id, id, Version.parse("1.0.0"), "x.Main", VersionRange.parse(">=0.24.0, <0.25"), "", "",
+        var descriptor = new PluginDescriptor(id, id, Version.parse("1.0.0"), "x.Main", VersionRange.parse(">=0.25.0, <0.26"), "", "",
             Set.of(), Set.of(), List.of(requires), "", "");
         return new PluginCandidate(descriptor, Path.of(id), List.of(), PluginCandidate.Origin.BUNDLED);
     }
@@ -136,7 +136,7 @@ class PresentationSelectionTest {
     }
 
     @Test void onlyTheLookStatusesAndSupersededCopiesAreQuiet() {
-        var other = new PluginDescriptor("e.sdk", "e.sdk", Version.parse("1.0.0"), "x.Main", VersionRange.parse(">=0.25.0"), "", "",
+        var other = new PluginDescriptor("e.sdk", "e.sdk", Version.parse("1.0.0"), "x.Main", VersionRange.parse(">=0.26.0"), "", "",
             Set.of(), Set.of(), List.of(), "", "");
         PluginCandidate broken = provider("f.look", PluginCandidate.Origin.DEV), needs = provider("g.look", PluginCandidate.Origin.DEV,
             new PluginDescriptor.Requirement("h.look", VersionRange.ANY, false)), winner = provider("h.look", PluginCandidate.Origin.DEV);

@@ -9,18 +9,18 @@ member.</p>
 
 <h3>The sdk range</h3>
 <p>Every manifest says which SDK versions the plugin runs on, as a range. Build against SDK {@sdk.version} and declare:</p>
-<pre><code class="language-toml">sdk = "&gt;=0.24.0, &lt;0.25"</code></pre>
-<p>That admits 0.24.0 and every later 0.24 version, and nothing from 0.25 on. A plugin that uses something only a later
-0.24 version has starts its range there. Every bundled plugin declares {@code sdk = ">=0.24.0, <0.25"}.</p>
+<pre><code class="language-toml">sdk = "&gt;=0.25.0, &lt;0.26"</code></pre>
+<p>That admits 0.25.0 and every later 0.25 version, and nothing from 0.26 on. A plugin that uses something only a later
+0.25 version has starts its range there. Every bundled plugin declares {@code sdk = ">=0.25.0, <0.26"}.</p>
 <table>
 <thead><tr><th>Form</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td>{@code >=0.24.0}, {@code >0.24.0}, {@code <=0.24.2}, {@code <0.25}, {@code =0.24.0}</td><td>A comparator and a version of one to three numbers; missing numbers are 0, so {@code <0.25} means {@code <0.25.0}.</td></tr>
-<tr><td>{@code >=0.24.0, <0.25}</td><td>Comparators separated by commas; every one must hold.</td></tr>
+<tr><td>{@code >=0.25.0}, {@code >0.25.0}, {@code <=0.25.2}, {@code <0.26}, {@code =0.25.0}</td><td>A comparator and a version of one to three numbers; missing numbers are 0, so {@code <0.26} means {@code <0.26.0}.</td></tr>
+<tr><td>{@code >=0.25.0, <0.26}</td><td>Comparators separated by commas; every one must hold.</td></tr>
 <tr><td>{@code ""}</td><td>An empty range admits every SDK version.</td></tr>
 </tbody>
 </table>
-<p>A bare version such as {@code "0.24.0"} is not a range and makes the manifest invalid, and so does a version with a
+<p>A bare version such as {@code "0.25.0"} is not a range and makes the manifest invalid, and so does a version with a
 pre-release or build suffix. The {@code version} of a {@code requires} entry uses the same syntax.</p>
 
 <h3>How Jasper checks</h3>

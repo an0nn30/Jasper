@@ -1,5 +1,6 @@
 package dev.jasper.sdk.ui;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -110,4 +111,18 @@ public sealed interface UiEvent {
      * @param columnId the clicked column's id
      */
     record Sorted(String id, String columnId) implements UiEvent { public Sorted { ModelChecks.id(id); ModelChecks.id(columnId); } }
+    /**
+     * A drag of a column header's edge ended: id is the table or tree owner. The view's owner stores the widths and
+     * passes them back as {@link Column#width()}.
+     *
+     * @param id the {@link Nodes.Table} or {@link Nodes.Tree} node
+     * @param widths every column's id to its unscaled width in pixels, each positive; copied
+     * @since 0.25.0
+     */
+    record ColumnsResized(String id, Map<String, Integer> widths) implements UiEvent {
+        public ColumnsResized {
+            ModelChecks.id(id); widths = Map.copyOf(widths);
+            for (var e : widths.entrySet()) { ModelChecks.id(e.getKey()); if (e.getValue() <= 0) throw new IllegalArgumentException("Column width must be positive"); }
+        }
+    }
 }

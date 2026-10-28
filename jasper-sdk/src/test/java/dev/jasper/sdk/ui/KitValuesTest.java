@@ -300,6 +300,11 @@ class KitValuesTest {
         assertThatThrownBy(() -> new Column("name", "Name", TextRole.BODY, false, 0, Optional.empty())).isInstanceOf(IllegalArgumentException.class);
         assertThat(new Column("name", "Name", TextRole.BODY, false).weight()).isEqualTo(1);
         assertThat(new Column("name", "Name", TextRole.BODY, false).sorted()).isEmpty();
+        assertThat(new Column("name", "Name", TextRole.BODY, false).width()).isEmpty();
+        assertThat(new Column("name", "Name", TextRole.BODY, false, 1, Optional.empty(), OptionalInt.of(180)).width()).hasValue(180);
+        assertThatThrownBy(() -> new Column("name", "Name", TextRole.BODY, false, 1, Optional.empty(), OptionalInt.of(0))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(new UiEvent.ColumnsResized("files", Map.of("name", 180)).widths()).containsEntry("name", 180);
+        assertThatThrownBy(() -> new UiEvent.ColumnsResized("files", Map.of("name", 0))).isInstanceOf(IllegalArgumentException.class);
         var pin = new MenuItem("pin", "Pin", "", "pin", true, false);
         assertThatThrownBy(() -> new TableRow("r", Map.of(), Optional.empty(), false, Optional.of(List.of(pin, pin)))).isInstanceOf(IllegalArgumentException.class);
         assertThat(new TableRow("r", Map.of(), Optional.empty()).muted()).isFalse();
