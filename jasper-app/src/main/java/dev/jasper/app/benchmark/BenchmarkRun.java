@@ -240,7 +240,7 @@ final class BenchmarkRun implements AutoCloseable {
             result.put("outputRendering", rendering.snapshot()); sample();
             phase = "output-settle"; pause(options.settleMillis()); sample();
         }
-        if (options.scenarios().contains("interactive")) interactive();
+        if (options.scenarios().contains("interactive")) interactive(result);
         if (options.scenarios().contains("cycles")) cycles();
         phase = "final-settle"; pause(options.settleMillis()); sample();
         result.put("finalPaneLayout", layout());
@@ -272,16 +272,15 @@ final class BenchmarkRun implements AutoCloseable {
         }
     }
 
-    private void interactive() throws Exception {
+    private void interactive(Map<String, Object> result) throws Exception {
         phase = "search-resize-font";
+        int askedAgain = 0;
         for (int i = 0; i < options.cycles(); i++) {
-            AtomicInteger completed = new AtomicInteger();
-            int count = edt(() -> {
-                var panes = panes(window);
-                for (TerminalPane pane : panes) pane.view().findAsync(new SearchQuery("jasper", false, true), ignored -> completed.incrementAndGet());
-                return panes.size();
-            });
-            await(() -> completed.get() == count, "search callbacks");
+            List<BenchmarkSearch> searches = edt(() -> panes(window).stream()
+                .map(pane -> BenchmarkSearch.start(pane.view(), pane.session(), new SearchQuery("jasper", false, true))).toList());
+            while (!edt(() -> BenchmarkSearch.answered(searches))) { check(); Thread.sleep(10); }
+            deadline.check("search callbacks");
+            askedAgain += edt(() -> searches.stream().mapToInt(search -> search.asked() - 1).sum());
             int cycle = i;
             edt(() -> {
                 for (TerminalPane pane : panes(window)) pane.view().setFontSize(cycle % 2 == 0 ? 17 : 16);
@@ -292,6 +291,7 @@ final class BenchmarkRun implements AutoCloseable {
         edt(() -> { for (TerminalPane pane : panes(window)) pane.view().setFontSize(16);
             window.nativeWindow().setSize(new Dimension(1100, 850)); return null; });
         drain(window); sample();
+        result.put("searchesAskedAgain", askedAgain);
     }
 
     private void cycles() throws Exception {

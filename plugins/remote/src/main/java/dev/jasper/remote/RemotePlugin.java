@@ -163,6 +163,8 @@ public class RemotePlugin implements Plugin {
     @Override public void start(PluginContext context) throws Exception {
         this.context = context;
         Files.createDirectories(context.dataDirectory());
+        // Before the transfer queue opens its store on start: the folder sqlite-jdbc loads its native library from.
+        dev.jasper.remote.transfer.store.SqliteNatives.extractInto(dev.jasper.remote.transfer.store.SqliteNatives.folder());
         settings = new RemoteSettings.Declared(context.settings());
         store = new HostStore(context.dataDirectory().resolve("hosts.toml"), context.background(), ui);
         panelState = new PanelState(context.dataDirectory().resolve("panel-state.toml"));
