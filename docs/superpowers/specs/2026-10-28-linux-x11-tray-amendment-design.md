@@ -44,7 +44,10 @@ classes and the existing function-record test seams, not another backend interfa
 | `LinuxTrayPopup` | EDT-owned, short-lived public Swing menu. Owns only its popup window/listeners and immutable shared rows; adapter/controller epochs guard display and action execution. |
 
 Bind `Legacy(adapter::install, adapter::removeAndAwait, adapter::close)`. `install` and confirmed removal are
-controller-worker calls with a two-second overall bound, including queue admission; EDT never waits for them.
+controller-worker calls with a two-second caller bound, including queue admission; EDT never waits for them.
+Authority timeout invalidates its attempt before returning unavailable; authority-only pending work cannot later
+connect or publish and does not block modern publication. Its daemon worker retains the attempt slot until the
+filesystem returns, under the approved limitation below.
 `false` from install means no live or pending publication remains. If teardown is still owed, throw a scoped
 runtime failure so the existing controller retains its cleanup obligation and refuses replacement. Removal returns
 only after server-confirmed destruction, or after connection termination has been established; a timeout is a
@@ -68,13 +71,21 @@ Capture `DISPLAY`, screen and authority location from launch; support the normal
 socket forms. Remote TCP/SSH-forwarded displays are outside this fallback scope and leave modern/no-icon
 residency available. This approved scope leaves modern/no-icon residency available on other display transports.
 
-Use a nonblocking owned Unix socket and finite `poll` for connection establishment, then `xcb_connect_to_fd` with
-the launch session's authority. Use normal X authority matching/decoding APIs, with explicit lifetime for returned
-auth memory; never log cookies or modify authority/access controls. Bound the authority input and reject malformed
-or excessive records. Authority acquisition itself must pass the cancellation gate: a blocking
-`XauGetBestAuthByAddr` call hidden behind a timed Java Future is insufficient. A bounded, cancellable file snapshot
-decoded through `XauReadAuth` on an in-memory stream is the approved way to retain native decoding without an
-unbounded native file scan. Validate local-family/wildcard matching and missing-cookie behavior with fixture files.
+Use a nonblocking owned Unix socket and finite `poll` for connection establishment, then `xcb_connect_to_fd`
+with the launch session's authority. Authority acquisition takes a size-bounded regular-file snapshot and checks
+cancellation and the shared two-second deadline before and after each filesystem syscall and between 16 KiB reads.
+Decode the bounded snapshot through `XauReadAuth` on an in-memory stream, with explicit lifetime for native records
+and matching cookie memory. Reject final-component symlinks, special files, malformed/excessive records and changed
+snapshots; never log cookies or modify access controls. Normal local regular files are the supported operational
+scope. Filesystem acquisition is cooperative: a stalled pathname lookup, open, stat or read may retain the sole
+worker and its file descriptor until the kernel returns. At most one authority/connection attempt may remain
+outstanding. Close invalidates admissions immediately and never waits on the filesystem; canceled acquisition
+cannot subsequently connect or publish. Cleanup runs on the owning worker once the syscall returns. No replacement
+authority/connection attempt is admitted before that worker finishes cleanup. Authority discovery creates no native
+icon; a stalled authority attempt therefore does not block modern publication. The sole native worker is a daemon,
+and application exit never waits for it. Socket setup and every XCB operation that can flush retain the
+protected-duplicate shutdown deadline and native cancellation gate. Validate authority matching, malformed input
+and missing-cookie behavior with fixture files.
 
 One daemon native worker owns every XCB call and resource free; one bounded/coalesced command slot gives cleanup
 priority. It drains event/reply batches with count and byte limits, then yields to commands. Poll the connection FD
@@ -123,8 +134,9 @@ On owner loss, icon destruction, reparent-to-root or stale handshake, invalidate
 popup, withdraw old resources and re-observe. Never reuse an old XID as proof of host identity. Removal destroys the
 owned icon/pixmaps/GC/pictures/colormap with confirmation; discovery may retain the connection. Failed removal
 terminates that owned connection before replacement is permitted. Final close disables admissions, cancels timers,
-wakes the worker, detaches observations and disposes the popup on EDT, then closes all native resources in bounded
-cleanup. No library/global desktop state is modified. Repeated close and callbacks queued before close are harmless.
+wakes the worker, detaches observations and disposes the popup on EDT, then closes socket/native resources in bounded
+cleanup. Authority-file cleanup waits for any pending filesystem syscall to return; Quit never awaits that daemon
+worker. No library/global desktop state is modified. Repeated close and callbacks queued before close are harmless.
 
 The [system tray specification](https://specifications.freedesktop.org/systemtray/latest-single/) defines selection
 discovery, docking, preferred visual, hints and arbitrary host-assigned icon sizes. The adapter implements that
@@ -176,10 +188,13 @@ user-directed validation split: execute on the authorized Fedora aarch64 host; x
 release gates, not claims of locally executed coverage. Passing the failed AWT probe's positive rows is insufficient.
 Required evidence:
 
-1. **ABI and cancellation:** x86_64 and aarch64 layouts/symbols, bounded auth/setup, unanswered requests,
+1. **ABI and cancellation:** x86_64 and aarch64 layouts/symbols, bounded socket setup, cooperative authority
+   acquisition, unanswered requests,
    backpressured output including implicit flushes, BadWindow/BadMatch, adapter socket loss, FD reuse, close during
    each phase and repeated retries. JVM survives adapter failure; no concurrent native free, stuck worker growth,
-   leaked descriptors/buffers or stale callbacks. Exercise an isolated adapter connection so JBR display loss cannot
+   leaked descriptors/buffers or stale callbacks after cleanup. A deterministic held-authority test proves one
+   attempt, immediate invalidation, modern availability, discarded late results and cleanup after release; it
+   does not claim syscall interruption. Exercise an isolated adapter connection so JBR display loss cannot
    mask the result. Packaged JBR must repeat the gate on Fedora and the Ubuntu 22.04 baseline.
 2. **Real legacy hosts:** authorized isolated LXDE and XFCE, initially no host, late host, repeated slow/fast panel
    restart, actual live applet removal/re-add, selection replacement without process death, host loss during docking
@@ -210,52 +225,16 @@ and records the failed public-AWT approach; remaining Tasks 6–10 implement thi
 production code is committed until the new cancellation and legacy characterization gates pass.
 
 
-## PROPOSED authority-I/O correction — 2026-10-28
+## Authority-I/O correction — approved 2026-10-28
 
-**Pending user approval; Task 6 is blocked.** This proposal preserves the approved text above until accepted.
-Linux [open(2)](https://man7.org/linux/man-pages/man2/open.2.html) specifies that `O_NONBLOCK` has no effect on
-regular-file I/O and `O_NOFOLLOW` rejects only the final symlink. Path resolution/open may also wait on
-network/FUSE/automount activity. [close(2)](https://man7.org/linux/man-pages/man2/close.2.html) explains that a
-blocked Linux syscall retains its open-file-description; concurrent close cannot guarantee cancellation.
-Deadline checks between reads therefore cannot prove the approved two-second authority-acquisition bound.
-Ordinary local-filesystem timings do not prove cancellation of those stalls.
+The user approved the narrow authority-I/O correction after Linux [open(2)](https://man7.org/linux/man-pages/man2/open.2.html)
+and [close(2)](https://man7.org/linux/man-pages/man2/close.2.html) established that regular-file `O_NONBLOCK` and concurrent
+close cannot guarantee syscall cancellation. The contract above supersedes the original strict authority-acquisition
+bound. A filesystem stall may retain one daemon worker and one authority FD, in addition to its owned wake pipe,
+until the kernel returns. Legacy fallback remains unavailable during that stall; modern publication and nonblocking
+app exit remain available. No additional worker/retry accumulates and a canceled late result is discarded.
 
-Proposed replacement authority contract:
-
-> Use a nonblocking owned Unix socket and finite `poll` for connection establishment, then `xcb_connect_to_fd`
-> with the launch session's authority. Authority acquisition takes a size-bounded regular-file snapshot and checks
-> cancellation and the shared two-second deadline before and after each filesystem syscall and between 16 KiB reads.
-> Decode the bounded snapshot through `XauReadAuth` on an in-memory stream, with explicit lifetime for native records
-> and matching cookie memory. Reject final-component symlinks, special files, malformed/excessive records and changed
-> snapshots; never log cookies or modify access controls. Normal local regular files are the supported operational
-> scope. Filesystem acquisition is cooperative: a stalled pathname lookup, open, stat or read may retain the sole
-> worker and its file descriptor until the kernel returns. At most one authority/connection attempt may remain
-> outstanding. Close invalidates admissions immediately and never waits on the filesystem; canceled acquisition
-> cannot subsequently connect or publish. Cleanup runs on the owning worker once the syscall returns. No replacement
-> authority/connection attempt is admitted before that worker finishes cleanup. Authority discovery creates no native
-> icon; a stalled authority attempt therefore does not block modern publication. The sole native worker is a daemon,
-> and application exit never waits for it. Socket setup and every XCB operation that can flush retain the
-> protected-duplicate shutdown deadline and native cancellation gate. Validate authority matching, malformed input
-> and missing-cookie behavior with fixture files.
-
-If approved, apply these corresponding changes together:
-
-- **Task 6 and this amendment's lifetime/gate clauses:** distinguish a bounded caller wait from filesystem syscall
-  completion. At authority timeout, invalidate the attempt before returning unavailable, preventing late connect or
-  publication. Preserve all authority input limits and ownership checks. Replace the strict authority-cancellation
-  row with a deterministic held-acquisition test of one attempt, immediate invalidation, modern availability,
-  discarded late results and worker cleanup after release. Keep the strict socket setup/request/flush deadline and
-  500 ms cleanup allowance, ABI checks, FD-reuse proofs and watchdog requirements unchanged.
-- **Tasks 7/9:** retain one authority-attempt slot until its worker returns; admit no second acquisition worker/retry.
-  Authority-only work creates no connection/icon and does not block modern publication. An actual socket/icon cleanup
-  obligation still refuses replacement until confirmed. Bound caller waits, preserve nonblocking EDT close and ensure
-  Quit does not await the daemon acquisition worker.
-- **Task 10, plan status, verification and maintenance:** record the changed guarantee and residual risk explicitly;
-  normal acquisition timings are not proof of syscall cancellation. Preserve the Fedora native gate and required
-  x86_64/Ubuntu 22.04 CI release gates. Update the Task 6 brief consistently.
-
-Residual risk requiring approval: a filesystem stall may retain one daemon worker and one authority FD, in addition
-to its owned wake pipe, and leave legacy fallback unavailable until the syscall returns. Modern publication and app
-exit remain available. In-process resource cleanup waits for that return. This limits accumulation but weakens the
-approved cleanup guarantee; no new gate has passed. Keeping the strict requirement instead requires a separately
-reviewed acquisition design before implementation; this proposal introduces no helper or abandoned-worker retry.
+Task 6 separates the strict socket cancellation gate from held-authority admission/cleanup evidence; Tasks 7/9 retain
+one authority-attempt slot and distinguish it from an actual icon/socket cleanup obligation; Task 10 records the
+residual limit in verification and maintenance. The native socket gate, Fedora execution and required x86_64/Ubuntu
+22.04 CI release gates are unchanged. Approval is not native cancellation evidence.
