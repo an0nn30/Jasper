@@ -4,6 +4,7 @@ import static dev.jasper.app.files.ChooserKit.*;
 import static dev.jasper.app.files.ChooserRequest.Mode.*;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.ui.model.UiEvent;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.KitTestSupport;
 import dev.jasper.ui.model.Nodes;
@@ -580,6 +581,21 @@ class FileChooserPanelTest {
         assertThat(table(panel).columns().getFirst().sorted()).as("clicking the sorted column reverses it").contains(false);
         assertThat(rows(panel)).containsExactly("docs", "todo.md", "notes.txt");
         assertThat(table(panel).scroll()).as("the listing keeps its overlay scroll bar").isEqualTo(Nodes.ScrollPolicy.OVERLAY);
+    }
+
+    @Test void sortAndResizeAreRememberedForTheNextChooser() throws IOException {
+        Files.writeString(dir.resolve("todo.md"), "x");
+        Files.setLastModifiedTime(dir.resolve("notes.txt"), java.nio.file.attribute.FileTime.fromMillis(1_000_000L));
+        Files.setLastModifiedTime(dir.resolve("todo.md"), java.nio.file.attribute.FileTime.fromMillis(9_000_000L));
+        var first = panel(OPEN, Optional.empty());
+        first.event(new UiEvent.Sorted("files", "modified"));
+        first.event(new UiEvent.ColumnsResized("files", java.util.Map.of("name", 300, "modified", 120, "size", 80)));
+        var expected = rows(first);
+        first.close();
+        var second = panel(OPEN, Optional.empty());
+        assertThat(rows(second)).isEqualTo(expected);
+        assertThat(table(second).columns().stream().filter(c -> c.id().equals("modified")).findFirst().orElseThrow().sorted()).contains(true);
+        assertThat(table(second).columns().getFirst().width()).hasValue(300);
     }
 
     @Test void selectionScrollAndPreviewSurviveAThemeSwitch() throws IOException {

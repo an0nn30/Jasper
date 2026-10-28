@@ -146,6 +146,7 @@ public final class FileChooserPanel extends JPanel {
         loadingDelay.setRepeats(false);
         if (request.mode() == ChooserRequest.Mode.SAVE) name = request.suggestedName().orElse("");
         previewVisible = prefs.preview();
+        model.sortBy(prefs.sortColumn(), prefs.sortAscending());
         rebuildNavigationItems();
         navigationView = view(navigationSpec());
         pathView = view(pathSpec());
@@ -428,7 +429,7 @@ public final class FileChooserPanel extends JPanel {
 
     // ---- Kit events -------------------------------------------------------------------------------------------------
 
-    private void event(UiEvent event) {
+    void event(UiEvent event) {
         if (closed) return;
         switch (event) {
             case UiEvent.Action action -> action(action.id());
@@ -459,7 +460,9 @@ public final class FileChooserPanel extends JPanel {
                     case "size" -> model.sortBy(ChooserModel.Column.SIZE);
                     default -> { }
                 }
+                prefs.setSort(model.sortColumn(), model.ascending());
             }
+            case UiEvent.ColumnsResized resized when resized.id().equals(FILES) -> prefs.setWidths(resized.widths());
             case UiEvent.Toggled toggled when toggled.id().equals(PREVIEW_TOGGLE) -> setPreviewVisible(toggled.checked());
             // Section headings stay open; their disclosure arrow changes nothing.
             case UiEvent.Expanded expanded -> render(placesView, placesSpec());
@@ -707,8 +710,10 @@ public final class FileChooserPanel extends JPanel {
     }
 
     private Column column(String id, String title, Nodes.TextRole role, boolean numeric, DesignMetrics.Role width, ChooserModel.Column column) {
+        Integer stored = prefs.widths().get(id);
         return new Column(id, title, role, numeric, kit.metrics().value(width),
-            model.sortColumn() == column ? Optional.of(model.ascending()) : Optional.empty());
+            model.sortColumn() == column ? Optional.of(model.ascending()) : Optional.empty(),
+            stored == null ? java.util.OptionalInt.empty() : java.util.OptionalInt.of(stored));
     }
 
     /**

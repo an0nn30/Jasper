@@ -5,6 +5,7 @@ import dev.jasper.app.dock.Slot;
 import dev.jasper.app.dock.ToolWindowMode;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -73,10 +74,17 @@ public final class UiState {
         }
     }
 
-    /** The file chooser's remembered folders (absolute paths; recent is newest first) and its two toggles. */
-    public record Chooser(List<String> recent, List<String> pinned, boolean preview, boolean showHidden) {
-        public static final Chooser DEFAULT = new Chooser(List.of(), List.of(), false, true);
-        public Chooser { recent = List.copyOf(recent); pinned = List.copyOf(pinned); }
+    /**
+     * The file chooser's remembered folders (absolute paths; recent is newest first), its two toggles, its sort (a column id and
+     * direction) and the listing's column widths in unscaled pixels by column id.
+     */
+    public record Chooser(List<String> recent, List<String> pinned, boolean preview, boolean showHidden, String sortColumn,
+                          boolean sortAscending, Map<String, Integer> widths) {
+        public static final Chooser DEFAULT = new Chooser(List.of(), List.of(), false, true, "name", true, Map.of());
+        public Chooser {
+            recent = List.copyOf(recent); pinned = List.copyOf(pinned); widths = Map.copyOf(widths);
+            Objects.requireNonNull(sortColumn);
+        }
     }
 
     /**
@@ -122,6 +130,7 @@ public final class UiState {
     private final Path file;
     private final Map<String, Bounds> windows = new TreeMap<>();
     private static final int MAX_CHOOSER_PATHS = 50;
+    private static final int MAX_CHOOSER_WIDTHS = 8;
     private Chooser chooser = Chooser.DEFAULT;
     private PalettePosition palettePosition;
     private RunWindowPosition runWindowPosition;
@@ -168,7 +177,9 @@ public final class UiState {
             runWindowPosition = new RunWindowPosition(left.doubleValue(), bottom.doubleValue());
         if (toml.get(List.of("chooser")) instanceof TomlTable table)
             chooser = new Chooser(strings(table, "recent"), strings(table, "pinned"),
-                Boolean.TRUE.equals(table.get(List.of("preview"))), !Boolean.FALSE.equals(table.get(List.of("show_hidden"))));
+                Boolean.TRUE.equals(table.get(List.of("preview"))), !Boolean.FALSE.equals(table.get(List.of("show_hidden"))),
+                table.get(List.of("sort")) instanceof String sort && !sort.isBlank() && sort.length() <= 32 ? sort : "name",
+                !Boolean.FALSE.equals(table.get(List.of("sort_ascending"))), widths(table));
     }
 
     /** One window's bounds, or empty when a key is missing, not an integer or the size is not positive: it falls back alone. */
@@ -181,6 +192,15 @@ public final class UiState {
     static Optional<Integer> number(TomlTable table, String key) {
         return table.get(List.of(key)) instanceof Long value && value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE
             ? Optional.of(value.intValue()) : Optional.empty();
+    }
+
+    private static Map<String, Integer> widths(TomlTable table) {
+        var widths = new LinkedHashMap<String, Integer>();
+        if (table.get(List.of("widths")) instanceof TomlTable entries)
+            for (String key : entries.keySet())
+                if (widths.size() < MAX_CHOOSER_WIDTHS && key.length() <= 32 && entries.get(List.of(key)) instanceof Long value && value > 0 && value <= 10_000)
+                    widths.put(key, value.intValue());
+        return widths;
     }
 
     private static List<String> strings(TomlTable table, String key) {
@@ -213,7 +233,12 @@ public final class UiState {
             text.append("\n[palette.run_window]\nleft = ").append(runWindowPosition.left()).append("\nbottom = ").append(runWindowPosition.bottom()).append('\n');
         if (!chooser.equals(Chooser.DEFAULT))
             text.append("\n[chooser]\nrecent = ").append(array(chooser.recent())).append("\npinned = ").append(array(chooser.pinned()))
-                .append("\npreview = ").append(chooser.preview()).append("\nshow_hidden = ").append(chooser.showHidden()).append('\n');
+                .append("\npreview = ").append(chooser.preview()).append("\nshow_hidden = ").append(chooser.showHidden()).append("\nsort = ").append(quote(chooser.sortColumn()))
+                .append("\nsort_ascending = ").append(chooser.sortAscending()).append('\n');
+        if (!chooser.equals(Chooser.DEFAULT) && !chooser.widths().isEmpty()) {
+            text.append("\n[chooser.widths]\n");
+            new TreeMap<>(chooser.widths()).forEach((id, width) -> text.append(quote(id)).append(" = ").append(width).append('\n'));
+        }
         try { TomlStateFile.writeAtomically(file, ".ui-state-", text.toString()); }
         catch (IOException failure) { LOG.log(System.Logger.Level.WARNING, "Could not save UI state to " + file, failure); }
     }

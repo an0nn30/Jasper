@@ -189,7 +189,7 @@ class UiStateTest {
         Path file = dir.resolve("ui-state.toml");
         UiState state = UiState.load(file);
         assertThat(state.chooser()).isEqualTo(UiState.Chooser.DEFAULT);
-        state.setChooser(new UiState.Chooser(List.of("/work/a \"quoted\"", "C:\\Users\\me"), List.of("/pinned\ttab"), true, false));
+        state.setChooser(new UiState.Chooser(List.of("/work/a \"quoted\"", "C:\\Users\\me"), List.of("/pinned\ttab"), true, false, "name", true, java.util.Map.of()));
         state.save();
         assertThat(Files.readString(file)).contains("[chooser]",
             "recent = [\"/work/a \\\"quoted\\\"\", \"C:\\\\Users\\\\me\"]", "pinned = [\"/pinned\\u0009tab\"]",
@@ -197,10 +197,22 @@ class UiStateTest {
         assertThat(UiState.load(file).chooser()).isEqualTo(state.chooser());
     }
 
+    @Test void chooserSortAndWidthsRoundTrip() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        UiState state = UiState.load(file);
+        state.setChooser(new UiState.Chooser(List.of(), List.of(), false, true, "size", false, java.util.Map.of("name", 320, "size", 90)));
+        state.save();
+        assertThat(Files.readString(file)).contains("sort = \"size\"", "sort_ascending = false", "[chooser.widths]", "\"name\" = 320");
+        assertThat(UiState.load(file).chooser()).isEqualTo(state.chooser());
+        Files.writeString(file, "version = 3\n[chooser]\nsort = 7\nwidths = \"x\"\n");
+        assertThat(UiState.load(file).chooser().sortColumn()).isEqualTo("name");
+        assertThat(UiState.load(file).chooser().widths()).isEmpty();
+    }
+
     @Test void unreadableChooserValuesFallBackOneKeyAtATime() throws Exception {
         Path file = dir.resolve("ui-state.toml");
         Files.writeString(file, "version = 3\n[chooser]\nrecent = [1, \"/ok\"]\npinned = \"not a list\"\npreview = \"yes\"\n");
-        assertThat(UiState.load(file).chooser()).isEqualTo(new UiState.Chooser(List.of("/ok"), List.of(), false, true));
+        assertThat(UiState.load(file).chooser()).isEqualTo(new UiState.Chooser(List.of("/ok"), List.of(), false, true, "name", true, java.util.Map.of()));
     }
 
     @Test void roundTripsTheDraggedPalettePositionAndFallsBackAloneWhenItIsBad() throws Exception {
