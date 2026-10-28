@@ -35,6 +35,7 @@ final class LinuxLegacyTray implements AutoCloseable {
     record PopupHint(long window, boolean activation, BooleanSupplier valid, Consumer<Boolean> complete) {
         PopupHint(long window, Consumer<Boolean> complete) { this(window, false, () -> true, complete); }
     }
+    private record UnavailableState(Class<?> type, String message) { }
     private record HintWork(long token, PopupHint hint, long userTime, long deadline, long connection, long host, int icon) { }
     private HintWork pendingHint, activeHint;
     private static final class Install {
@@ -158,6 +159,7 @@ final class LinuxLegacyTray implements AutoCloseable {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Legacy native work cannot block EDT");
     }
     private void run() {
+        UnavailableState unavailable = null;
         advertise(false);
         for (;;) {
             synchronized (lock) {
@@ -173,11 +175,16 @@ final class LinuxLegacyTray implements AutoCloseable {
                         xcb = connection;
                         synchronized (lock) { connected = true; ++connectionEpoch; }
                         initialize(deadline);
+                        unavailable = null;
                         loop();
                     } finally { xcb = null; }
                 }
             } catch (LinuxTrayXcb.Unavailable | LinkageError | IllegalArgumentException failure) {
-                LOG.log(System.Logger.Level.DEBUG, "Owned XEmbed connection unavailable", failure);
+                var state = new UnavailableState(failure.getClass(), failure.getMessage());
+                if (!state.equals(unavailable)) {
+                    unavailable = state;
+                    LOG.log(System.Logger.Level.DEBUG, "Owned XEmbed connection unavailable", failure);
+                }
             } finally {
                 HintWork hintPending, hintActive;
                 synchronized (lock) {

@@ -1,5 +1,6 @@
 package dev.jasper.app.platform;
 
+import dev.jasper.app.testsupport.LogRecorder;
 import java.awt.Rectangle;
 import java.util.List;
 import java.util.Map;
@@ -8,6 +9,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +27,39 @@ class LinuxLegacyTrayTest {
         assertThat(request.rootScreenBounds()).isEqualTo(new Rectangle(0, 0, 1280, 800));
         bounds.width = 500; request.rootBounds().height = 500;
         assertThat(request.rootBounds()).isEqualTo(new Rectangle(10, 20, 24, 40));
+    }
+    @Test void repeatedUnavailableAttemptsLogOnceUntilRecovery() throws Exception {
+        nativeOnly();
+        var logger = Logger.getLogger(LinuxLegacyTray.class.getName());
+        var previousLevel = logger.getLevel(); logger.setLevel(Level.ALL);
+        try (var log = LogRecorder.of(LinuxLegacyTray.class.getName());
+             var server = LinuxX11TestServer.filesystem()) {
+            server.mode = LinuxX11TestServer.Mode.BAD_AUTH;
+            var host = server.new TrayHost();
+            var available = new CopyOnWriteArrayList<Boolean>(); var retired = new AtomicInteger();
+            var tray = new LinuxLegacyTray(Map.of("DISPLAY", server.address()), available::add, ignored -> {}, retired::incrementAndGet);
+            try {
+                tray.start(); await(() -> retired.get() >= 3, "three failed attempts retired");
+                assertThat(server.connections).isGreaterThanOrEqualTo(3);
+                assertThat(log.records()).hasSize(1);
+                var failure = log.records().getFirst().getThrown();
+                assertThat(failure).isInstanceOf(LinuxTrayXcb.Unavailable.class);
+                assertThat(available).containsExactly(false);
+
+                server.mode = LinuxX11TestServer.Mode.NORMAL; tray.probe();
+                await(() -> available.contains(true), "initialized native connection recovered");
+                assertThat(tray.install(ignored -> {})).isTrue(); assertThat(host.docks).isEqualTo(1);
+                int beforeLoss = retired.get();
+                server.mode = LinuxX11TestServer.Mode.BAD_AUTH; server.drop();
+                await(() -> retired.get() >= beforeLoss + 4, "lost connection and three further failures retired");
+                assertThat(log.records().stream().filter(record -> record.getThrown().getClass() == failure.getClass()
+                    && java.util.Objects.equals(record.getThrown().getMessage(), failure.getMessage()))).hasSize(2);
+                assertThat(available).containsExactly(false, true, false);
+            } finally {
+                tray.close(); var worker = (Thread)LinuxTrayXcbTest.field(tray, "worker"); worker.join(2500);
+                assertThat(worker.isAlive()).isFalse();
+            }
+        } finally { logger.setLevel(previousLevel); }
     }
     @Test void subscribesBeforeInitialOwnerSnapshot() throws Exception {
         nativeOnly();
