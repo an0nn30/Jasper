@@ -339,3 +339,21 @@ outputs. Remote originals remain in `/tmp/task4-wire-final.log` and the isolated
 `jasper-app/build/linux-tray-wire/`. The Task 1 source archive at
 `/tmp/jasper-dbus-evidence/dbus-java-core-5.2.0-sources.jar` supplies the binding evidence.
 Full `check`, desktop host acceptance, x86_64 and Ubuntu 22.04 CI remain assigned to their existing gates.
+
+### Task 4 review fix 1
+
+The handoff regressions deterministically pause the adapter at the former cleanup/admission gap.
+Close and withdraw both failed to drop the publication before the fix. Cleanup requests now drain
+before ownership is released under the same lock; close/withdraw return while connection cleanup
+continues on the sole worker. A package-private Runnable seam supplies this latch boundary in tests;
+the production constructor supplies a no-op. The two-private-bus regression starts the earlier
+captured endpoint only after discovery falls back to the second bus, with both watchers deliberately
+using the same unique name. It reproduced registration on the wrong bus. Publication now retains
+the discovery endpoint and compares the daemon's `GetId` before registering. Introspection subprocesses
+are forcibly terminated in `finally`, including failed waits/assertions.
+
+`LinuxStatusNotifierTest` and `LinuxTrayWireTest` pass 19 tests on Fedora ARM64, zero failures/errors/skips.
+The three new regression cases first failed on the prior implementation. Local focused/inventory tests
+pass 22 XML tests (6 executed, 16 Linux skips); application architecture passes. Both final logs have
+zero compiler warnings. Evidence is in `task-4-evidence/fix-1/` beside the original task report; no
+full suite, graphical session, dependencies, installed app or packaging was changed.

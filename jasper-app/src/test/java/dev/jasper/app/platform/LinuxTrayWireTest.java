@@ -48,13 +48,90 @@ class LinuxTrayWireTest {
             for (String path : List.of("/StatusNotifierItem", "/MenuBar")) {
                 var process = new ProcessBuilder("gdbus", "introspect", "--address", f.bus.address(),
                     "--dest", f.publication, "--object-path", path, "--xml").redirectErrorStream(true).start();
-                assertThat(process.waitFor(5, TimeUnit.SECONDS)).isTrue();
-                String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-                assertThat(process.exitValue()).as(output).isZero();
-                Files.createDirectories(Path.of("build/linux-tray-wire"));
-                Files.writeString(Path.of("build/linux-tray-wire", (abstractAddress ? "abstract" : "path") + path.replace('/', '-') + ".txt"), output);
-                assertSignatures(output, path.equals("/MenuBar"));
+                try {
+                    assertThat(process.waitFor(5, TimeUnit.SECONDS)).isTrue();
+                    String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    assertThat(process.exitValue()).as(output).isZero();
+                    Files.createDirectories(Path.of("build/linux-tray-wire"));
+                    Files.writeString(Path.of("build/linux-tray-wire", (abstractAddress ? "abstract" : "path") + path.replace('/', '-') + ".txt"), output);
+                    assertSignatures(output, path.equals("/MenuBar"));
+                } finally { process.destroyForcibly(); }
             }
+        }
+    }
+
+    @ParameterizedTest(name = "cleanup at handoff, close={0}") @ValueSource(booleans = {false, true})
+    void cleanupAtWorkerHandoffCannotBeLost(boolean close) throws Exception {
+        var armed = new java.util.concurrent.atomic.AtomicBoolean();
+        var boundary = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        Runnable handoff = () -> {
+            if (!armed.compareAndSet(true, false)) return;
+            boundary.countDown();
+            boolean interrupted = false;
+            try {
+                while (true) {
+                    try { if (!release.await(4, TimeUnit.SECONDS)) throw new AssertionError("Handoff not released"); break; }
+                    catch (InterruptedException cancelled) { interrupted = true; }
+                }
+            } finally { if (interrupted) Thread.currentThread().interrupt(); }
+        };
+        try (var f = new Fixture(false, true, fixture -> { }, handoff)) {
+            f.publish();
+            var daemon = f.observer.getRemoteObject("org.freedesktop.DBus", "/org/freedesktop/DBus", org.freedesktop.dbus.interfaces.DBus.class);
+            var discovered = java.util.Arrays.stream(daemon.ListNames()).filter(name -> name.startsWith(":"))
+                .filter(name -> !name.equals(f.observer.getUniqueName()) && !name.equals(f.watcherConnection.getUniqueName())
+                    && !name.equals(f.publication)).toList();
+            assertThat(discovered).hasSize(1);
+            var publicationLost = new CountDownLatch(1);
+            var discoveryLost = new CountDownLatch(1);
+            try (var subscription = f.observer.addSigHandler(org.freedesktop.dbus.interfaces.DBus.NameOwnerChanged.class, event -> {
+                if (!event.newOwner.isEmpty()) return;
+                if (event.name.equals(f.publication)) publicationLost.countDown();
+                if (event.name.equals(discovered.getFirst())) discoveryLost.countDown();
+            })) {
+                assertThat(subscription).isNotNull();
+                armed.set(true);
+                f.adapter.start();
+                assertThat(boundary.await(2, TimeUnit.SECONDS)).isTrue();
+                if (close) f.adapter.close(); else f.adapter.withdraw();
+                release.countDown();
+                assertThat(publicationLost.await(2, TimeUnit.SECONDS)).as("publication dropped after handoff").isTrue();
+                if (close) assertThat(discoveryLost.await(2, TimeUnit.SECONDS)).as("discovery dropped after close").isTrue();
+                assertThat(daemon.NameHasOwner(f.publication)).isFalse();
+            } finally { release.countDown(); }
+        }
+    }
+
+    @Test void publicationStaysOnDiscoveryBusWhenEarlierAddressAppears() throws Exception {
+        Path earlierDirectory = Files.createTempDirectory(Path.of("/tmp"), "jta-");
+        Path selectedDirectory = Files.createTempDirectory(Path.of("/tmp"), "jtb-");
+        try (var selected = LinuxTestBus.start(selectedDirectory, false);
+             var selectedWatcher = DBusConnectionBuilder.forAddress(selected.address()).withShared(false).build()) {
+            var expected = new Watcher(true);
+            selectedWatcher.exportObject("/StatusNotifierWatcher", expected);
+            selectedWatcher.requestBusName(LinuxTrayDbus.WATCHER);
+            var hosts = new LinkedBlockingQueue<LinuxStatusNotifier.Host>();
+            String addresses = "unix:path=" + earlierDirectory.resolve("bus") + ";" + selected.address();
+            try (var adapter = new LinuxStatusNotifier(addresses, hosts::add)) {
+                adapter.start();
+                var host = hosts.poll(3, TimeUnit.SECONDS);
+                assertThat(host).isNotNull();
+                assertThat(host.owner()).isEqualTo(selectedWatcher.getUniqueName());
+                try (var earlier = LinuxTestBus.start(earlierDirectory, false);
+                     var unrelatedWatcher = DBusConnectionBuilder.forAddress(earlier.address()).withShared(false).build()) {
+                    var unrelated = new Watcher(true);
+                    unrelatedWatcher.exportObject("/StatusNotifierWatcher", unrelated);
+                    unrelatedWatcher.requestBusName(LinuxTrayDbus.WATCHER);
+                    assertThat(unrelatedWatcher.getUniqueName()).isEqualTo(host.owner());
+                    assertThat(adapter.publish(host, id -> { })).isTrue();
+                    assertThat(expected.registrations.poll(2, TimeUnit.SECONDS)).as("registration on discovered bus").isNotNull();
+                    assertThat(unrelated.registrations).as("no registration on earlier unrelated bus").isEmpty();
+                }
+            }
+        } finally {
+            Files.deleteIfExists(earlierDirectory.resolve("bus")); Files.delete(earlierDirectory);
+            Files.deleteIfExists(selectedDirectory.resolve("bus")); Files.delete(selectedDirectory);
         }
     }
 
@@ -360,6 +437,9 @@ class LinuxTrayWireTest {
         String publication;
         Fixture(boolean abstractAddress, boolean host) throws Exception { this(abstractAddress, host, f -> { }); }
         Fixture(boolean abstractAddress, boolean host, java.util.function.Consumer<Fixture> setup) throws Exception {
+            this(abstractAddress, host, setup, () -> { });
+        }
+        Fixture(boolean abstractAddress, boolean host, java.util.function.Consumer<Fixture> setup, Runnable beforeHandoff) throws Exception {
             directory = Files.createTempDirectory(Path.of("/tmp"), "jtw-");
             bus = LinuxTestBus.start(directory, abstractAddress);
             watcherConnection = DBusConnectionBuilder.forAddress(bus.address()).withShared(false).build();
@@ -368,7 +448,7 @@ class LinuxTrayWireTest {
             watcherConnection.exportObject("/StatusNotifierWatcher", watcher);
             watcherConnection.requestBusName(LinuxTrayDbus.WATCHER);
             setup.accept(this);
-            adapter = new LinuxStatusNotifier(bus.address(), hosts::add);
+            adapter = new LinuxStatusNotifier(bus.address(), hosts::add, beforeHandoff);
             adapter.start();
         }
         LinuxStatusNotifier.Host nextHost() throws Exception {

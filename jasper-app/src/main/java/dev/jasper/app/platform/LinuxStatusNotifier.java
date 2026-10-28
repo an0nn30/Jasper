@@ -30,6 +30,7 @@ final class LinuxStatusNotifier implements AutoCloseable {
     private static final String WATCHER_PATH = "/StatusNotifierWatcher";
     private final List<String> addresses;
     private final Consumer<Host> changed;
+    private final Runnable beforeHandoff;
     private final ThreadPoolExecutor worker = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
         new ArrayBlockingQueue<>(1), Thread.ofPlatform().daemon().name("jasper-tray-dbus").factory());
     private final ScheduledThreadPoolExecutor deadlines = new ScheduledThreadPoolExecutor(1,
@@ -45,12 +46,17 @@ final class LinuxStatusNotifier implements AutoCloseable {
     private volatile Map<String, String> owners = Map.of();
     private volatile DBusConnection discovery;
     private volatile DBusConnection publication;
+    private String discoveryAddress;
+    private String discoveryBusId;
     private Host observed;
     private Host pendingObservation;
     private final Object deadlineLock = new Object();
     private long attempt;
 
-    LinuxStatusNotifier(String address, Consumer<Host> changed) {
+    LinuxStatusNotifier(String address, Consumer<Host> changed) { this(address, changed, () -> { }); }
+
+    LinuxStatusNotifier(String address, Consumer<Host> changed, Runnable beforeHandoff) {
+        this.beforeHandoff = beforeHandoff;
         this.addresses = addresses(address, System.getenv("XDG_RUNTIME_DIR"));
         this.changed = changed;
         deadlines.setRemoveOnCancelPolicy(true);
@@ -96,9 +102,13 @@ final class LinuxStatusNotifier implements AutoCloseable {
             if (closed || requestedGeneration != generation.get()) return false;
             closePublication();
             if (discovery == null || !discovery.isConnected() || !host.equals(currentHost())) return false;
-            DBusConnection connection = connect();
+            DBusConnection connection = connect(discoveryAddress);
             if (connection == null) return false;
             publication = connection;
+            if (!discoveryBusId.equals(bus(connection).GetId())) {
+                closePublication();
+                return false;
+            }
             long ticket = generation.incrementAndGet();
             IntConsumer guarded = id -> {
                 if (!closed && generation.get() == ticket) action.accept(id);
@@ -120,21 +130,22 @@ final class LinuxStatusNotifier implements AutoCloseable {
         if (future == null) return false;
         try { return future.get(2, TimeUnit.SECONDS); }
         catch (Exception failure) {
-            withdrawRequested = true;
-            generation.incrementAndGet();
-            Thread thread = running;
-            if (thread != null) thread.interrupt();
+            withdraw();
             if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
             return false;
         }
     }
 
     void withdraw() {
-        generation.incrementAndGet();
-        withdrawRequested = true;
-        Thread thread = running;
-        if (thread != null) thread.interrupt();
-        submit(() -> { closePublication(); return true; });
+        synchronized (deadlineLock) {
+            if (closed) return;
+            generation.incrementAndGet();
+            withdrawRequested = true;
+            Thread thread = running;
+            if (thread != null) thread.interrupt();
+            // An active operation drains this request before releasing ownership.
+            submit(() -> false);
+        }
     }
 
     private Future<Boolean> submit(Callable<Boolean> operation) {
@@ -157,21 +168,36 @@ final class LinuxStatusNotifier implements AutoCloseable {
                     report(NONE);
                 } finally {
                     expiry.cancel(false);
-                    synchronized (deadlineLock) { ++attempt; running = null; }
+                    synchronized (deadlineLock) { ++attempt; }
                     if (Thread.currentThread().isInterrupted()) {
                         result = false;
                         closePublication();
                         closeDiscovery();
                         report(NONE);
                     }
-                    if (withdrawRequested || closed) { result = false; closePublication(); }
-                    if (closed) closeDiscovery();
-                    Thread.interrupted();
-                    Host notification = pendingObservation;
-                    pendingObservation = null;
-                    synchronized (deadlineLock) {
-                        active.set(false);
-                        if (closed) { worker.shutdown(); deadlines.shutdownNow(); }
+                    beforeHandoff.run();
+                    Host notification;
+                    while (true) {
+                        boolean closeAll;
+                        synchronized (deadlineLock) {
+                            // Cleanup requests and release of worker ownership share one handoff.
+                            // Close/withdraw either join this drain or submit work after its release.
+                            if (withdrawRequested || (closed && (publication != null || discovery != null))) {
+                                withdrawRequested = false;
+                                closeAll = closed;
+                            } else {
+                                Thread.interrupted();
+                                running = null;
+                                notification = pendingObservation;
+                                pendingObservation = null;
+                                active.set(false);
+                                if (closed) { worker.shutdown(); deadlines.shutdownNow(); }
+                                break;
+                            }
+                        }
+                        result = false;
+                        closePublication();
+                        if (closeAll) closeDiscovery();
                     }
                     if (!closed && notification != null) changed.accept(notification);
                     if (!closed && dirty.get()) requestSnapshot();
@@ -181,38 +207,40 @@ final class LinuxStatusNotifier implements AutoCloseable {
         }
     }
 
-    private DBusConnection connect() throws Exception {
-        for (String address : addresses) {
-            if (Thread.currentThread().isInterrupted() || closed) return null;
-            DBusConnection connection = null;
-            try {
-                // Do Hello separately so cancellation can always close a fully constructed connection.
-                var owned = new java.util.concurrent.atomic.AtomicReference<DBusConnection>();
-                var builder = DBusConnectionBuilder.forAddress(address).withShared(false)
-                    .withDisconnectCallback(new IDisconnectCallback() {
-                        @Override public void disconnectOnError(IOException error) {
-                            DBusConnection failed = owned.get();
-                            if (failed != null && (failed == discovery || failed == publication)) {
-                                busFailed.set(true);
-                                requestSnapshot();
-                            }
+    private DBusConnection connect(String address) throws Exception {
+        if (Thread.currentThread().isInterrupted() || closed) return null;
+        DBusConnection connection = null;
+        try {
+            // Do Hello separately so cancellation can always close a fully constructed connection.
+            var owned = new java.util.concurrent.atomic.AtomicReference<DBusConnection>();
+            var builder = DBusConnectionBuilder.forAddress(address).withShared(false)
+                .withDisconnectCallback(new IDisconnectCallback() {
+                    @Override public void disconnectOnError(IOException error) {
+                        DBusConnection failed = owned.get();
+                        if (failed != null && (failed == discovery || failed == publication)) {
+                            busFailed.set(true);
+                            requestSnapshot();
                         }
-                    });
-                builder.transportConfig().withTimeout(1).withRegisterSelf(false);
-                connection = builder.build();
-                owned.set(connection);
-                connection.register();
-                if (Thread.currentThread().isInterrupted() || closed) {
-                    closeConnection(connection);
-                    return null;
-                }
-                return connection;
-            } catch (Exception failure) {
+                    }
+                });
+            builder.transportConfig().withTimeout(1).withRegisterSelf(false);
+            connection = builder.build();
+            owned.set(connection);
+            connection.register();
+            if (Thread.currentThread().isInterrupted() || closed) {
                 closeConnection(connection);
-                if (Thread.currentThread().isInterrupted()) throw failure;
+                return null;
             }
+            return connection;
+        } catch (Exception failure) {
+            closeConnection(connection);
+            if (Thread.currentThread().isInterrupted()) throw failure;
+            return null;
         }
-        return null;
+    }
+
+    private static DBus bus(DBusConnection connection) throws org.freedesktop.dbus.exceptions.DBusException {
+        return connection.getRemoteObject("org.freedesktop.DBus", "/org/freedesktop/DBus", DBus.class);
     }
 
     private void snapshot() throws Exception {
@@ -222,7 +250,14 @@ final class LinuxStatusNotifier implements AutoCloseable {
         }
         if (discovery == null || !discovery.isConnected()) {
             closeDiscovery();
-            discovery = connect();
+            for (String address : addresses) {
+                discovery = connect(address);
+                if (discovery != null) {
+                    discoveryAddress = address;
+                    discoveryBusId = bus(discovery).GetId();
+                    break;
+                }
+            }
             if (discovery == null) { report(NONE); return; }
             // Subscribe before any owner/property query. Every signal schedules an authoritative snapshot.
             subscriptions.add(discovery.addSigHandler(DBus.NameOwnerChanged.class, event -> {
@@ -244,7 +279,7 @@ final class LinuxStatusNotifier implements AutoCloseable {
     }
 
     private Host currentHost() throws Exception {
-        var bus = discovery.getRemoteObject("org.freedesktop.DBus", "/org/freedesktop/DBus", DBus.class);
+        var bus = bus(discovery);
         var found = new java.util.LinkedHashMap<String, String>();
         Host selected = NONE;
         for (String service : List.of(LinuxTrayDbus.WATCHER, LinuxTrayDbus.FREEDESKTOP_WATCHER)) {
@@ -275,7 +310,6 @@ final class LinuxStatusNotifier implements AutoCloseable {
         generation.incrementAndGet();
         DBusConnection connection = publication;
         publication = null;
-        withdrawRequested = false;
         closeConnection(connection);
     }
 
@@ -285,6 +319,8 @@ final class LinuxStatusNotifier implements AutoCloseable {
         owners = Map.of();
         DBusConnection connection = discovery;
         discovery = null;
+        discoveryAddress = null;
+        discoveryBusId = null;
         closeConnection(connection);
     }
 
