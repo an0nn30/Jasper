@@ -1,13 +1,21 @@
 package dev.jasper.app.platform;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class LoginItemTest {
     @TempDir Path home;
@@ -61,8 +69,6 @@ class LoginItemTest {
                 assertThat(LoginItem.plan(os, enabled, "  ", home)).as(os).isEqualTo(LoginItem.Plan.NONE);
             }
         }
-        // Linux autostart is out of scope; residency itself is not.
-        assertThat(LoginItem.plan("Linux", true, "/opt/jasper/bin/Jasper", home)).isEqualTo(LoginItem.Plan.NONE);
     }
 
     @Test void anAppPathWithXmlMetacharactersCannotBreakThePlist() {
@@ -147,5 +153,99 @@ class LoginItemTest {
         // And the delete direction is just as forgiving.
         assertThatNoException().isThrownBy(() ->
             LoginItem.apply(new LoginItem.Plan(target, null, java.util.List.of())));
+    }
+
+    @Test void linuxUsesXdgAutostartAndTheInstalledExecutable() {
+        Path xdg = home.resolve("xdg config");
+        var plan = LoginItem.plan("Linux", true, "/opt/Jasper Work/bin/Jasper", home,
+            Map.of("XDG_CONFIG_HOME", xdg.toString()));
+        assertThat(plan.file()).isEqualTo(xdg.resolve("autostart/dev.jasper.background.desktop"));
+        assertThat(plan.commands()).isEmpty();
+        assertThat(plan.contents()).isEqualTo("""
+            [Desktop Entry]
+            Type=Application
+            Name=Jasper
+            Exec="/opt/Jasper Work/bin/Jasper" --background
+            TryExec=/opt/Jasper Work/bin/Jasper
+            Terminal=false
+            """);
+        assertThat(LoginItem.plan("Linux", false, "/opt/Jasper Work/bin/Jasper", home,
+            Map.of("XDG_CONFIG_HOME", xdg.toString())).contents()).isNull();
+    }
+
+    @Test void unusableXdgRootsFallBackToTheUsersConfigDirectory() {
+        for (String root : List.of("", "relative", "bad\0root")) {
+            var plan = LoginItem.plan("Linux", true, "/opt/jasper-workstation/bin/Jasper", home,
+                Map.of("XDG_CONFIG_HOME", root));
+            assertThat(plan.file()).isEqualTo(home.resolve(".config/autostart/dev.jasper.background.desktop"));
+        }
+    }
+
+    @Test void desktopExecQuotesMetacharactersWithoutAShell() {
+        assertThat(LoginItem.execToken("/opt/a b/Jasper")).isEqualTo("\"/opt/a b/Jasper\"");
+        assertThat(LoginItem.execToken("/opt/100%/Jasper")).isEqualTo("\"/opt/100%%/Jasper\"");
+        String encoded = LoginItem.execToken("/opt/$x`q\"\\/Jasper");
+        assertThat(encoded).isEqualTo("\"/opt/\\\\$x\\\\`q\\\\\"\\\\\\\\/Jasper\"");
+        assertThat(LoginItem.plan("Linux", true, "/opt/$x/Jasper", home).contents())
+            .contains("TryExec=/opt/$x/Jasper\n").doesNotContain("sh -c", "OnlyShowIn=");
+    }
+
+    @Test void invalidExecutablesCannotInjectDesktopEntries() {
+        for (String executable : List.of("relative/Jasper", "/opt/a\nTerminal=true", "/opt/a=b/Jasper"))
+            assertThatIllegalArgumentException().isThrownBy(() ->
+                LoginItem.plan("Linux", true, executable, home));
+    }
+
+    @Test void linuxCanRemoveItsEntryEvenAfterTheExecutableDisappears() {
+        var on = LoginItem.plan("Linux", true, "/missing/Jasper", home);
+        LoginItem.apply(on);
+        assertThat(on.file()).exists();
+        LoginItem.apply(LoginItem.plan("Linux", false, "/missing/Jasper", home));
+        assertThat(on.file()).doesNotExist();
+    }
+
+    @Test void aFailedReplacementLeavesNoTemporaryFile() throws Exception {
+        Path parent = home.resolve("autostart");
+        Path target = parent.resolve("dev.jasper.background.desktop");
+        Files.createDirectories(target);
+        Path existing = target.resolve("existing");
+        Files.writeString(existing, "preserved");
+        assertThatNoException().isThrownBy(() ->
+            LoginItem.apply(new LoginItem.Plan(target, "replacement", List.of())));
+        assertThat(existing).content().isEqualTo("preserved");
+        try (var files = Files.list(parent)) {
+            assertThat(files).containsExactly(target);
+        }
+    }
+
+    @EnabledOnOs(OS.LINUX)
+    @EnabledIfSystemProperty(named = "jasper.test.desktopEntryParser", matches = "true")
+    @Test void aRealDesktopParserPreservesTheExecutableAndBackgroundArgument() throws Exception {
+        Path directory = home.resolve("space % $ ` quote\" back\\slash");
+        Files.createDirectories(directory);
+        Path executable = directory.resolve("Jasper");
+        Files.writeString(executable, "#!/bin/sh\nprintf '%s\\n' \"$#\" \"$1\" > \"$JASPER_LOGIN_TEST_OUTPUT\"\n");
+        Files.setPosixFilePermissions(executable, PosixFilePermissions.fromString("rwx------"));
+        Path output = home.resolve("arguments.txt");
+        var plan = LoginItem.plan("Linux", true, executable.toString(), home,
+            Map.of("XDG_CONFIG_HOME", home.resolve("test-xdg").toString()));
+        LoginItem.apply(plan);
+        Path log = home.resolve("gio.log");
+        ProcessBuilder builder = new ProcessBuilder("gio", "launch", plan.file().toString())
+            .redirectErrorStream(true).redirectOutput(log.toFile());
+        builder.environment().put("JASPER_LOGIN_TEST_OUTPUT", output.toString());
+        Process process = builder.start();
+        try {
+            assertThat(process.waitFor(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(process.exitValue()).as(Files.readString(log)).isZero();
+            String expected = "1\n--background\n";
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while ((!Files.exists(output) || !Files.readString(output).equals(expected))
+                && System.nanoTime() < deadline)
+                Thread.sleep(10);
+            assertThat(Files.readString(output)).isEqualTo(expected);
+        } finally {
+            if (process.isAlive()) process.destroyForcibly();
+        }
     }
 }

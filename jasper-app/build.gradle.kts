@@ -82,6 +82,11 @@ tasks.named<JavaExec>("run") {
         ?: layout.buildDirectory.dir("dev-home").get().asFile.absolutePath)
 }
 
+tasks.withType<Test>().configureEach {
+    systemProperty("jasper.test.desktopEntryParser",
+        providers.gradleProperty("jasper.test.desktopEntryParser").getOrElse("false"))
+}
+
 tasks.test {
     // Explicit opt-in scaled geometry tests; use the same property as headless previews.
     providers.gradleProperty("jasper.uiScale").orNull?.let { systemProperty("flatlaf.uiScale", it) }
