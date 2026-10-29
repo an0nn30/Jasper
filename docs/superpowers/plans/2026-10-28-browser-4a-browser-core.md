@@ -149,19 +149,25 @@ deviations from the plan's text:
   - `docs/README.md` lists the guide under Plugins, with the other plugin guides;
   - the SDK reference overview's bundled plugin table gained the Browser, so `docs/sdk-reference.html` is regenerated;
   - other lists of bundled plugins gained it too: `docs/plugins.md`, `docs/app-maintenance.md`, `docs/workspace.md`,
-    `docs/plugin-authoring.md` and the jasper-app and SDK READMEs.
+    `docs/plugin-authoring.md` and the jasper-app and SDK READMEs;
   - `./gradlew check --continue` passed: 13,850 tests, 0 failures, 0 errors, 32 skipped; the example external plugin's
     `check pluginZip` passed (1 test).
 
-Known gaps and follow-ups: macOS two-finger swipe (no JBR gesture API); drags that start in a page are cancelled
-(R33); links and popups at other schemes, such as `mailto:`, open nothing in pages (R36); Alt-click, a Chromium
-download, does nothing; double-clicking a URL in a terminal does not select it whole, so Open URL in Split works on a
-drag selection (R45); select-all on a mouse click into the address field (R15, plan 4b); hidden pages drop to 1 fps but
-are not told they are hidden (R32); the opener bridge's `focus()` needs the user's activation (stricter than
-Chromium); a page's rapid repeated dialogs are refused (R43); saved URLs keep any `user:password@`, which R46 drops in
-the final fix wave; the Web menu's and the Open URL in Split actions are listed in the palette and Keymap where they do
-nothing. Questions for the user: the prompt does not show the address; restored tabs that never showed show the host
-rather than their saved title; R43's refusal departs from iTerm2's copy.
+Known gaps and follow-ups: macOS two-finger swipe (no JBR gesture API); drags that start in a page are cancelled (R33);
+links and popups at other schemes, such as `mailto:`, open nothing in pages (R36); nothing downloads (no download
+handler), so a link or response that downloads a file, and an Alt-click, which Chromium makes a download, do nothing,
+and the downloads plan's handler needs a one-shot guard to load an Alt-click in place; double-clicking a URL in a
+terminal does not select it whole, so Open URL in Split works on a drag selection (R45); select-all on a mouse click
+into the address field (R15, plan 4b); the address field gives `localhost:3000` and `192.168.1.10` `https://`, and a
+typed local path, underscored hosts and trailing-dot domains become searches (plan 4b); hidden pages drop to 1 fps but
+are not told they are hidden (R32); the opener bridge's `focus()` needs the user's activation (stricter than Chromium);
+a page's rapid repeated dialogs are refused (R43); saved URLs keep any `user:password@`, which R46 drops in the final
+fix wave; the Web menu's and the Open URL in Split actions are listed in the palette and Keymap where they do nothing;
+Edit › Copy and Paste chosen with the mouse while the address field has focus act on the page (an app follow-up); Ctrl+H
+deletes a character in the address field, which plan 5's History key must allow for; a local web file sent to the
+Default editor from the prompt opens without the clicked line. Questions for the user: the prompt does not show the
+address; restored tabs that never showed show the host rather than their saved title; R43's refusal departs from
+iTerm2's copy.
 
 Task 13 (the GUI check on macOS, memory and AOT, each batch with the user's OK) has not run; Windows and Linux have not
 run.

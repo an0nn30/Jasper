@@ -126,17 +126,30 @@ Other deviations from the plan's text, one line each (the plan's banner groups a
   opens `#plugins` for every plugin page), and lists the guide under Plugins in `docs/README.md`.
 
 Known gaps and follow-ups: macOS two-finger swipe (JBR has no gesture API); drags that start in a page are cancelled
-(R33); links and popups at other schemes, such as `mailto:`, open nothing in pages (R36); Alt-click, a Chromium
-download, does nothing; double-clicking a URL in a terminal does not select it whole (R45); select-all on a mouse click
-into the address field (R15, plan 4b); hidden pages drop to 1 fps but are not told they are hidden (R32); the opener
+(R33); links and popups at other schemes, such as `mailto:`, open nothing in pages (R36); nothing downloads (no download
+handler), so a link or response that downloads a file, and an Alt-click, which Chromium makes a download, do nothing,
+and the downloads plan's handler needs a one-shot guard to load an Alt-click in place; double-clicking a URL in a
+terminal does not select it whole (R45); select-all on a mouse click into the address field (R15, plan 4b); the address
+field gives `localhost:3000` and `192.168.1.10` `https://`, and a typed local path, underscored hosts and trailing-dot
+domains become searches (plan 4b); hidden pages drop to 1 fps but are not told they are hidden (R32); the opener
 bridge's `focus()` needs the user's activation, stricter than Chromium; a page's rapid repeated dialogs are refused
 (R43); R46's userinfo drop; the Web menu's and Open URL in Split actions show in the palette and Keymap where they do
-nothing; a local web file sent to the Default editor from the prompt opens without the clicked line. Questions for the
-user: the "Open in Jasper?" prompt
-does not show the address; restored tabs that never showed show the host rather than their saved title; R43 departs
-from iTerm2's copy. For the user (Task 13, not run, each batch with their OK): the GUI check on macOS (the plan's ten
-lines), the memory run (`run-macos.sh memory`: RSS unused, after one page, two minutes after closing) and the AOT check
-(a trained cache holds no `org.cef` class); Windows and Linux are not run.
+nothing; Edit › Copy and Paste chosen with the mouse while the address field has focus act on the page (an app
+follow-up); Ctrl+H deletes a character in the address field, which plan 5's History key must allow for; a local web file
+sent to the Default editor from the prompt opens without the clicked line. Questions for the user: the "Open in Jasper?"
+prompt does not show the address; restored tabs that never showed show the host rather than their saved title; R43
+departs from iTerm2's copy. For the user (Task 13, not run, each batch with their OK): the GUI check on macOS, the
+plan's ten lines plus those the task reviews added (hasModal with a native modal and the macOS screen menu's Web menu;
+Chromium's real start, `jasper-about` in its subprocesses and its charset, a quit within the 1.5 s drain grace;
+`<select>` popups; the welcome page's Settings action, a title-less page's tab, `about:` addresses, live toolbar updates
+and the address shown once in the status bar; the key codes of the declined macOS Cmd keys, Copy and Paste in a page,
+the mouse buttons under Wayland and the field's placement; Cmd and middle clicks and `target=_blank` reaching Jasper's
+handlers; the bridge script's timing, its query function in every frame, back-forward cache restores; page dialogs'
+stacking, long messages and closing the window or quitting past one; a tab opened from the prompt, Enter on Open in
+Jasper, its toggle, the prompt with Settings or a native dialog open; the saved address after a failed load and the
+welcome page's address form; a drag that starts in a page), the memory run (`run-macos.sh memory`: RSS unused, after one
+page, two minutes after closing) and the AOT check (a trained cache holds no `org.cef` class); Windows and Linux are not
+run.
 
 **PR #3 Windows check sharding — 2026-10-29: REVIEW PENDING.** App and other module checks run on isolated Windows runners with one Gradle worker each; both must pass. Each verifies its task graph against the original Check graph and records the graphs. Local graph and failure fixtures pass; hosted Windows validation remains pending. The existing watchdog limits remain. This extends Task 10 CI execution.
 

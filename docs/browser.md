@@ -24,7 +24,7 @@ Each page is the item of one pane. Its tab shows the page's title; while a page 
 its previous name, and once loaded it shows the address's host, else "Web Browser". The tab's icon is a globe. The
 status bar shows the page's address, as the tab's tooltip does.
 
-- **Close Pane** closes a browser pane at once: Jasper does not ask, even when the page asks before it unloads.
+- **Close Pane** closes a browser pane at once.
 - A page in a tab that is not shown draws one frame a second; its network requests go on.
 - Chromium starts the first time a browser page shows, not when Jasper starts, and runs until Jasper quits. When it
   cannot start, Jasper posts "The browser could not start" with the reason, such as "Chromium did not start within 90
@@ -81,6 +81,7 @@ them in Settings › Keymap, under Browser ([Keyboard shortcuts](keyboard-shortc
 - A Cmd+Option drag (Ctrl+Alt on Linux and Windows) moves the pane, as over any pane, and the page does not get it.
 - Files and text dropped on a page reach it. A drag that starts in the page, such as a link, an image, selected text or
   a page's own draggable item, is cancelled.
+- Find, zoom and a right-click menu on the page do nothing yet in a browser tab.
 
 ## Links in a page
 
@@ -91,7 +92,8 @@ them in Settings › Keymap, under Browser ([Keyboard shortcuts](keyboard-shortc
 | Split | Cmd+Shift-click | Ctrl+Shift-click | in a new pane beside this one: to the right when the page is wider than tall, otherwise below |
 | Middle click | middle click | middle click | in a new tab right after this one |
 
-A Shift-click loads the link in the same page. An Alt-click, which Chromium makes a download, opens nothing.
+A Shift-click loads the link in the same page. Jasper does not download files yet: a link or page that downloads a
+file does nothing, and so does an Alt-click, which Chromium makes a download.
 
 Links that open a new tab or pane, and popups, open only at `http`, `https`, `file`, `about` and `jasper-about`
 addresses. A `mailto:` or `tel:` link opens nothing, however it is clicked.
@@ -121,9 +123,9 @@ their opener:
   page of the same kind.
 
 The link ends, and both stand-ins report `closed`, when the popup closes; when you send either page elsewhere from
-Jasper (the address field, Back or Forward); and when a page's new document has a `Cross-Origin-Opener-Policy` that
-would put it in a window group of its own, as Chromium would. When the opener closes, the popup's
-`window.opener.closed` is `true`.
+Jasper, such as from the address field, Back, Forward or an OSC 8 link that loads there; and when a page's new document
+has a `Cross-Origin-Opener-Policy` that would put it in a window group of its own, as Chromium would. When the opener
+closes, the popup's `window.opener.closed` is `true`.
 
 A page whose `Content-Security-Policy` sandboxes it without `allow-popups` cannot open popups. A page whose origin is
 opaque, a `file:` page or one sandboxed without `allow-same-origin`, sends its messages from `"null"` and receives only
@@ -194,7 +196,7 @@ Jasper?" with **Use Default Editor**, **Cancel** and **Open in Jasper**. **Open 
 desktop's edit action, else in the file manager), never running it. **Cancel** and Escape open nothing. With **Remember
 my choice** on, choosing **Open in Jasper** or **Use Default Browser** (**Use Default Editor**) saves that choice as the
 setting, Built-in Browser or Default Browser (Default Editor); Cancel saves nothing. While the window shows another
-dialog, such as Settings or About, the prompt cannot show, and the link opens in the system browser (the file in the
+dialog, such as Settings, the prompt cannot show, and the link opens in the system browser (the file in the
 Default editor) that once.
 
 **Open URL in Split Right** and **Open URL in Split Down** are in a terminal's right-click menu while the pane's

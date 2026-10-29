@@ -324,8 +324,8 @@ to that server; a WSL pane's own `\\wsl.localhost` share works.
 The bundled [Browser](browser.md) provides Jasper's web browser. While it is on, an `http` or `https` link you click
 opens as its **Open Links From Terminal** setting says, and a local web file as its **Open Local Web Files** says; both
 ask "Open in Jasper?" by default ([Links from terminals and Jasper](browser.md#links-from-terminals-and-jasper)).
-An OSC 8 link that names a target (`target=NAME` among its parameters) loads in the browser page opened for that name,
-in whatever window it is; the first such link opens that page.
+When an OSC 8 link that names a target (`target=NAME` among its parameters) opens in the Browser, it loads in the
+browser page opened for that name, in whatever window it is; the first such link opens that page.
 
 On macOS Cmd-click always stays in Jasper, even while a program asks for mouse reports. On Linux and Windows a
 Ctrl-click then goes to the program; Ctrl+Shift-click opens the link.
