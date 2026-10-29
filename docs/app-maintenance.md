@@ -573,8 +573,8 @@ fixtures; `verifyPackage` checks a built image ([start-up performance](packaging
   `IMPLEMENTOR_VERSION`, `JCEF_VERSION` and `JCEF_VERSION_DETAILED`, as its `release` file has them on every platform.
   `verifyJcefToolchain` (in `check`) and `nativeContext` read the toolchain's `release` file and refuse any other build
   through `requireJcefRuntime`, which has `jcefRuntimeProblem` check the text (the `jcef` module, the JCEF version and
-  those three values) and names the build to install. CI's `setup-java` installs the newest JBR 25 with JCEF, so CI
-  fails from the day JetBrains publishes a newer build until this move is made. Update the fixtures in
+  those three values) and names the build to install. CI's `.github/actions/setup-jbr` installs the full SDK
+  selected and SHA-512-verified by `packaging/jcef/checksums.txt`. Update the fixtures in
   `gradle/packaging-support-test.gradle` that pin the release text and the message, and the Chromium, Chromium Embedded
   Framework and JCEF versions in `notices.toml`, which a fixture compares with the constant, and re-check its Apache
   Thrift, Boost, Direct3D HLSL Compiler and DirectX IL entries. Then regenerate

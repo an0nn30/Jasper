@@ -21,6 +21,7 @@ on:
       - jasper-app/build.gradle.kts
       - packaging/**
       - .github/workflows/linux-packages.yml
+      - .github/actions/setup-jbr/**
       - .github/workflows/desktop-qt-sdk.yml
   pull_request:
     paths:
@@ -37,6 +38,7 @@ on:
       - jasper-app/build.gradle.kts
       - packaging/**
       - .github/workflows/linux-packages.yml
+      - .github/actions/setup-jbr/**
       - .github/workflows/desktop-qt-sdk.yml
 
 permissions:
@@ -89,11 +91,7 @@ jobs:
             libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxkbcommon0 libcairo2 libpango-1.0-0 \
             libx11-6 libxext6 libxcb1 libexpat1 libudev1 \
             libglib2.0-bin dbus-daemon libxcb-render0 libxau6 libxcb1-dev libxcb-render0-dev libxau-dev
-      - uses: actions/setup-java@v6
-        with:
-          distribution: jetbrains
-          java-version: '25'
-          java-package: jdk+jcef
+      - uses: ./.github/actions/setup-jbr
       - uses: gradle/actions/setup-gradle@v6
       - uses: actions/download-artifact@v8
         with:

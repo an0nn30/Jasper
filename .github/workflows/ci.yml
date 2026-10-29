@@ -42,14 +42,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
-        with:
-          distribution: jetbrains
-          java-version: '25'
-          java-package: jdk+jcef
+      - uses: ./.github/actions/setup-jbr
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      - name: Test pinned JBR installer
+        if: runner.os == 'Linux'
+        run: python3 .github/actions/setup-jbr/test_install.py
       - uses: gradle/actions/setup-gradle@v6
       - name: Install Linux fonts and desktop probe dependencies
         if: runner.os == 'Linux'
@@ -98,13 +97,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Modern toolkit dependencies
-        run: apt-get update && apt-get install -y ca-certificates git build-essential pkg-config libglib2.0-dev libgtk-3-dev libgtk-4-dev libadwaita-1-dev xvfb xauth dbus locales
+        run: apt-get update && apt-get install -y ca-certificates curl git build-essential pkg-config libglib2.0-dev libgtk-3-dev libgtk-4-dev libadwaita-1-dev xvfb xauth dbus locales
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
-        with:
-          distribution: jetbrains
-          java-version: '25'
-          java-package: jdk+jcef
+      - uses: ./.github/actions/setup-jbr
       - uses: gradle/actions/setup-gradle@v6
       - name: GTK 4.16+ native extraction gate
         run: |

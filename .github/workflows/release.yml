@@ -75,12 +75,7 @@ jobs:
           ref: ${{ needs.prepare.outputs.commit }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-java@v6
-        with:
-          distribution: jetbrains
-          java-version: '25'
-          java-package: jdk+jcef
-          architecture: ${{ matrix.architecture }}
+      - uses: ./.github/actions/setup-jbr
       - uses: gradle/actions/setup-gradle@v6
       - name: Select Xcode 26 SDK
         if: runner.os == 'macOS'
