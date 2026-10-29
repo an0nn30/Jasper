@@ -216,7 +216,12 @@ class LinuxNotificationsTest {
         Path target = directory.resolve("config/jasper/notification-icon.png");
         assertThat(LinuxNotifications.iconIn(target)).contains(target);
         assertThat(Files.readAllBytes(target)).startsWith((byte) 0x89, (byte) 'P', (byte) 'N', (byte) 'G');
+        Files.writeString(target, "old installation icon");
         assertThat(LinuxNotifications.iconIn(target)).as("again, over the old one").contains(target);
+        try (var resource = LinuxNotificationsTest.class.getResourceAsStream("/dev/jasper/app/icons/app/linux/icon-128.png")) {
+            assertThat(resource).isNotNull();
+            assertThat(Files.readAllBytes(target)).isEqualTo(resource.readAllBytes());
+        }
     }
 
     @Test void anIconThatCannotBeWrittenIsLeftOut(@TempDir Path directory) throws IOException {
