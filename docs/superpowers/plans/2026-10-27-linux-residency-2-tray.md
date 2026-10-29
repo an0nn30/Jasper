@@ -1,5 +1,7 @@
 # Linux residency 2: modern and legacy trays Implementation Plan
 
+**Task 10 Windows runtime deviation (2026-10-29): REVIEW PENDING.** Replace expensive splash pixel collection diffs with exact array comparisons. The Windows app suite passed but the diagnostic deadline expired in Editor tests; hosted timing and complete Check remain pending.
+
 **Task 10 Windows app CI deviation (2026-10-29): REVIEW PENDING.** Wait for asynchronous plugin cleanup in the presentation fixture, load a fitting near-limit layout once for the size refusal test, and capture virtual threads when SingleInstance times out. The timeout cause and hosted Windows results remain unconfirmed; the watchdog deadline and rendering coverage are unchanged.
 
 **Task 10 scroll-link fixture deviation (2026-10-29): REVIEW PENDING.** Queue the edit before the first geometry continuation to remove a test-thread scheduling race. A controlled delay reproduces Ubuntu’s failure; yield and cancellation mutations fail the corrected test. Local focused verification passes; hosted rerun remains pending.

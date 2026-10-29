@@ -46,8 +46,9 @@ class ThemeSplashTest {
         for (String id : List.of("custom-theme", "desktop-colors", "../meadow", "", "Catppuccin-Mocha")) {
             var fallback = SplashPainter.themed(id, "1.2.3", 1);
             assertThat(fallback.animated()).as(id).isFalse();
-            assertThat(SplashPainterTest.pixels(render(fallback, "Ready", .2, 1))).as(id)
-                .containsExactly(SplashPainterTest.pixels(render(SplashPainter.themed("jasper-meadow", "1.2.3", 1), "Ready", .2, 1)));
+            assertThat(java.util.Arrays.equals(SplashPainterTest.pixels(render(fallback, "Ready", .2, 1)),
+                SplashPainterTest.pixels(render(SplashPainter.themed("jasper-meadow", "1.2.3", 1), "Ready", .2, 1))))
+                .as(id).isTrue();
         }
     }
 
@@ -120,10 +121,10 @@ class ThemeSplashTest {
     @Test void progressIsClampedAndVersionAndStatusRemainRuntimeText() {
         var painter = SplashPainter.themed("slate-cobalt", "build one", 1);
         for (double fraction : new double[]{-1, Double.NaN})
-            assertThat(SplashPainterTest.pixels(render(painter, "Ready", fraction, 1)))
-                .containsExactly(SplashPainterTest.pixels(render(painter, "Ready", 0, 1)));
-        assertThat(SplashPainterTest.pixels(render(painter, "Ready", 9, 1)))
-            .containsExactly(SplashPainterTest.pixels(render(painter, "Ready", 1, 1)));
+            assertThat(java.util.Arrays.equals(SplashPainterTest.pixels(render(painter, "Ready", fraction, 1)),
+                SplashPainterTest.pixels(render(painter, "Ready", 0, 1)))).as("fraction %s", fraction).isTrue();
+        assertThat(java.util.Arrays.equals(SplashPainterTest.pixels(render(painter, "Ready", 9, 1)),
+            SplashPainterTest.pixels(render(painter, "Ready", 1, 1)))).as("fraction 9").isTrue();
         assertThat(SplashPainterTest.pixels(render(painter, "Ready", 0, 1)))
             .isNotEqualTo(SplashPainterTest.pixels(render(SplashPainter.themed("slate-cobalt", "build two", 1), "Ready", 0, 1)));
         assertThat(SplashPainterTest.pixels(render(painter, "Ready", 0, 1)))

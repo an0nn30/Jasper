@@ -1,5 +1,7 @@
 # Jasper — Status and Handoff
 
+**PR #3 Windows runtime follow-up — 2026-10-29: REVIEW PENDING.** The hosted app suite passed after the cleanup and layout fixture changes; its 26-minute watchdog expired after Editor testing began. Splash image comparisons now use exact array equality, avoiding the collection diff sampled in the Windows worker while retaining every pixel check. Local focused tests and mutations pass; hosted timing and the SingleInstance intermittent timeout remain unconfirmed. This extends Task 10 CI portability.
+
 **PR #3 Windows app CI follow-up — 2026-10-29: REVIEW PENDING.** The presentation test waits for plugin resources before TempDir cleanup, and the oversized-layout fixture loads a fitting near-limit layout once instead of repeatedly rewriting it. The failing SingleInstance test now captures virtual threads on timeout; its cause remains unconfirmed, with a prior Windows AF_UNIX blocking-read issue a matching hypothesis. Local scoped checks and a forced diagnostic probe pass; hosted Windows remains pending. The 26-minute deadline and rendering matrix remain unchanged. This extends Task 10 test portability and diagnostics.
 
 **PR #3 scroll-link CI follow-up — 2026-10-29: REVIEW PENDING.** The Editor test now queues its edit between the first geometry slice and its continuation on the EDT. A controlled delay reproduces Ubuntu’s assertion; mutations removing slicing or edit cancellation fail the corrected test. Focused verification passes locally; hosted rerun remains pending. This extends Task 10 test portability.
