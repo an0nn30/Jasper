@@ -4,3 +4,13 @@ gradle.projectsEvaluated {
         testLogging.events 'started', 'passed', 'skipped', 'failed'
     }
 }
+
+// A fresh marker is required by the watchdog before it accepts a zero exit.
+gradle.buildFinished { result ->
+    if (result.failure == null) {
+        def marker = System.getenv('JASPER_CI_SUCCESS_MARKER')
+        if (marker != null) {
+            new File(marker).text = 'Gradle build completed successfully\n'
+        }
+    }
+}

@@ -1,3 +1,4 @@
+import os
 import pathlib
 import subprocess
 import sys
@@ -14,6 +15,47 @@ class WindowsCheckTest(unittest.TestCase):
                 '--capture-at', '0.1', '--diagnostics', folder, '--', sys.executable, '-c', script],
                 capture_output=True, text=True, timeout=15)
             return result, list(pathlib.Path(folder).glob('*'))
+
+    def test_zero_exit_without_fresh_marker_fails(self):
+        with tempfile.TemporaryDirectory() as folder:
+            marker = pathlib.Path(folder) / 'marker'
+            marker.touch()
+            result = subprocess.run([sys.executable, str(SCRIPT), '--timeout', '5',
+                '--diagnostics', folder, '--success-marker', str(marker), '--',
+                sys.executable, '-c', 'pass'], capture_output=True, text=True, timeout=15)
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn('completion marker', result.stdout)
+
+    def test_zero_exit_with_fresh_marker_succeeds(self):
+        with tempfile.TemporaryDirectory() as folder:
+            marker = pathlib.Path(folder) / 'marker'
+            child = "import os,pathlib; pathlib.Path(os.environ['JASPER_CI_SUCCESS_MARKER']).touch()"
+            result = subprocess.run([sys.executable, str(SCRIPT), '--timeout', '5',
+                '--diagnostics', folder, '--success-marker', str(marker), '--',
+                sys.executable, '-c', child], capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
+    def test_failure_is_preserved_without_marker(self):
+        with tempfile.TemporaryDirectory() as folder:
+            marker = pathlib.Path(folder) / 'marker'
+            result = subprocess.run([sys.executable, str(SCRIPT), '--timeout', '5',
+                '--diagnostics', folder, '--success-marker', str(marker), '--',
+                sys.executable, '-c', 'raise SystemExit(7)'],
+                capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 7, result.stderr)
+
+    @unittest.skipUnless(os.name == 'nt', 'requires Windows Git Bash and cmd.exe')
+    def test_git_bash_batch_launch_preserves_arguments_and_exit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            batch_dir = pathlib.Path(folder) / 'batch with spaces'
+            batch_dir.mkdir()
+            batch = batch_dir / 'fixture.bat'
+            batch.write_bytes(b'@echo off\r\necho ARGS:%*\r\nexit /b 7\r\n')
+            command = '"$1" "$2" --timeout 5 --diagnostics "$3" --windows-batch -- "$4" check --max-workers=1 --continue --stacktrace --console=plain'
+            result = subprocess.run(['bash', '-c', command, 'fixture', sys.executable,
+                str(SCRIPT), folder, str(batch)], capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
+            self.assertIn('ARGS:check --max-workers=1 --continue --stacktrace --console=plain', result.stdout)
 
     def test_preserves_child_failure(self):
         result, _ = self.run_check('raise SystemExit(7)', 5)

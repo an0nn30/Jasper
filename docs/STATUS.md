@@ -1,5 +1,7 @@
 # Jasper — Status and Handoff
 
+**PR #3 Windows watchdog launch — 2026-10-29: REVIEW PENDING.** The Windows job printed a cmd.exe prompt and exited successfully without running Gradle. The watchdog constructs the Windows batch invocation inside Python and requires a fresh successful Gradle completion marker. Targeted portable tests pass; actual Git Bash and hosted Windows validation remain pending. The 26-minute deadline remains diagnostic, and the underlying slowdown is unresolved. This extends Task 10 CI diagnostics.
+
 **PR #3 repeated Windows timeout — 2026-10-29: REVIEW PENDING.** Two attempts exhausted the 30-minute job limit after about 20 minutes in the app test task; the active test remains unknown. Windows CI now logs app test progress and takes bounded JVM snapshots before a 26-minute Check deadline, leaving time to upload completed test results. Local watchdog and JVM-attachment checks pass; hosted Windows behavior and the underlying slowdown remain unverified. This extends Task 10 CI diagnostics.
 
 **PR #3 Windows CI follow-up — 2026-10-29: REVIEW PENDING.** Installer shortcut ownership now recognizes existing target aliases by file identity; portable alias regressions cover upgrade and uninstall. The Editor tab-paint test compares ink with adjacent background for opaque and blended rendering, preserving its caret, hit and ink-position checks. Local installer and 18 PreviewPane tests pass; Windows CI remains pending, and its missing image prevents confirming the rendering failure's exact cause. This extends Task 10 CI portability.

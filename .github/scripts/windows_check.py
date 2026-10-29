@@ -38,19 +38,34 @@ def main():
     parser.add_argument('--timeout', type=float, required=True)
     parser.add_argument('--capture-at', type=float, action='append', default=[])
     parser.add_argument('--diagnostics', type=Path, required=True)
+    parser.add_argument('--success-marker', type=Path)
+    parser.add_argument('--windows-batch', action='store_true')
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     command = args.command[1:] if args.command[:1] == ['--'] else args.command
     if not command or args.timeout <= 0:
         parser.error('a command and positive timeout are required')
     args.diagnostics.mkdir(parents=True, exist_ok=True)
-    process = subprocess.Popen(command, start_new_session=os.name != 'nt')
+    env = os.environ.copy()
+    if args.success_marker:
+        marker = args.success_marker.resolve()
+        marker.unlink(missing_ok=True)
+        env['JASPER_CI_SUCCESS_MARKER'] = str(marker)
+    if args.windows_batch:
+        if os.name != 'nt':
+            parser.error('--windows-batch requires Windows')
+        command = [os.environ.get('COMSPEC', 'cmd.exe'), '/c', *command]
+    process = subprocess.Popen(command, env=env, start_new_session=os.name != 'nt')
     start = time.monotonic()
     captures = iter(sorted(t for t in args.capture_at if 0 < t < args.timeout))
     next_capture = next(captures, args.timeout)
     while True:
         try:
-            return process.wait(timeout=max(0.01, start + next_capture - time.monotonic()))
+            result = process.wait(timeout=max(0.01, start + next_capture - time.monotonic()))
+            if result == 0 and args.success_marker and not marker.is_file():
+                print('Gradle completion marker missing; check did not complete', flush=True)
+                return 1
+            return result
         except subprocess.TimeoutExpired:
             if next_capture == args.timeout:
                 print('Check timed out; collecting JVM diagnostics', flush=True)

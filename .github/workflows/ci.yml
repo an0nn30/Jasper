@@ -79,7 +79,7 @@ jobs:
         run: |
           # Leave four minutes of the job budget for bounded snapshots and artifact upload.
           if [ "$RUNNER_OS" = Windows ]; then
-            python .github/scripts/windows_check.py --timeout 1560 --capture-at 900 --capture-at 1440 --diagnostics build/ci-jvm-diagnostics -- cmd /c gradlew.bat check --parallel --max-workers="$GRADLE_WORKERS" --continue --stacktrace --console=plain --init-script .github/scripts/windows-test-progress.gradle
+            python .github/scripts/windows_check.py --timeout 1560 --capture-at 900 --capture-at 1440 --diagnostics build/ci-jvm-diagnostics --success-marker build/ci-jvm-diagnostics/gradle-completed --windows-batch -- gradlew.bat check --parallel --max-workers="$GRADLE_WORKERS" --continue --stacktrace --console=plain --init-script .github/scripts/windows-test-progress.gradle
           else
             ./gradlew check --parallel --max-workers="$GRADLE_WORKERS" --continue --stacktrace
           fi
