@@ -50,8 +50,12 @@ class LayoutCommandsTest {
 
     /** Windows with a layouts store in {@code folder}, whose window answers the name dialog with {@code answers} in turn. */
     private JasperWindow window(Path folder, Deque<String> answers, boolean confirm) {
+        return window(answers, confirm, new LayoutStore(folder.resolve("layouts.toml"), Runnable::run));
+    }
+
+    private JasperWindow window(Deque<String> answers, boolean confirm, LayoutStore layouts) {
         windows = new TestWindows();
-        store = new LayoutStore(folder.resolve("layouts.toml"), Runnable::run);
+        store = layouts;
         windows.manager.layouts(store);
         JasperWindow window = windows.manager.ensureWindow("cold", null).orElseThrow();
         seams(window.content(), answers, confirm);
@@ -132,15 +136,17 @@ class LayoutCommandsTest {
 
     @Test void aLayoutTooLargeToSaveIsRefusedWithAMessage(@TempDir Path folder) throws Exception {
         edt(() -> {
-            JasperWindow window = window(folder, new ArrayDeque<>(List.of("Big")), true);
-            // A window larger than the room the fillers leave.
+            var initial = new LayoutsFile.Layouts(Optional.empty(), List.of(
+                new LayoutsFile.Named("filler", layoutOf("t".repeat(258_000)))));
+            assertThat(LayoutsFile.fits(initial)).as("the existing layout fits").isTrue();
+            var layouts = new LayoutStore(folder.resolve("layouts.toml"), Runnable::run, ignored -> initial);
+            JasperWindow window = window(new ArrayDeque<>(List.of("Big")), true, layouts);
+            // The window is larger than the room the existing layout leaves.
             window.content().currentTerminal().rename("w".repeat(8000));
-            int filler = 0;
-            while (store.saveAsNew("filler " + filler, layoutOf("t".repeat(2000))) == LayoutStore.Saved.SAVED) filler++;
-            int before = store.named().size();
             run(window.content(), ActionId.SAVE_LAYOUT_AS_NEW);
             run(window.content(), ActionId.SAVE_LAYOUT_AS_DEFAULT);
-            assertThat(store.named()).hasSize(before);
+            assertThat(store.named()).extracting(LayoutsFile.Named::name).containsExactly("filler");
+            assertThat(store.named().getFirst()).isSameAs(initial.named().getFirst());
             assertThat(store.defaultLayout()).isEmpty();
             assertThat(errors).containsExactly("Layout not saved|This layout is too large to save.",
                 "Layout not saved|This layout is too large to save.");

@@ -117,6 +117,7 @@ class PresentationReachTest {
                 .isEqualTo(classic + " 15");
         } finally {
             edt(() -> { if (application[0] != null) application[0].quitNow(); });
+            ApplicationPluginCleanup.await(application[0]);
             edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
         }
     }
