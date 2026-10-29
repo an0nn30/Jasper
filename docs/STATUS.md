@@ -1,5 +1,7 @@
 # Jasper — Status and Handoff
 
+**PR #3 Windows check sharding — 2026-10-29: REVIEW PENDING.** App and other module checks run on isolated Windows runners with one Gradle worker each; both must pass. Each verifies its task graph against the original Check graph and records the graphs. Local graph and failure fixtures pass; hosted Windows validation remains pending. The existing watchdog limits remain. This extends Task 10 CI execution.
+
 **PR #3 tray withdrawal CI follow-up — 2026-10-29: REVIEW PENDING.** The failed-withdrawal test first proves the legacy-to-modern handoff, then checks events from the withdrawal itself. A deterministic legacy-first ordering reproduces macOS CI’s failure before correction; mutations prove both discovery and legacy publication remain blocked. Local tray scope passes 45 tests with one Linux-only skip; hosted confirmation remains pending. This extends Task 10 test portability.
 
 **PR #3 desktop recovery CI follow-up — 2026-10-29: REVIEW PENDING.** The Qt/KDE crash test counts the requested helper launches independently of the asynchronous portal. Delaying portal startup reproduces Ubuntu’s failure and the corrected test passes; 61 related tests pass locally. Hosted confirmation remains pending. This extends Task 10 test portability.

@@ -1,0 +1,15 @@
+// Capture or enforce the exact task graph before executing a Windows CI shard.
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+gradle.taskGraph.whenReady { graph ->
+    def paths = graph.allTasks.collect { it.path }.sort()
+    def capture = System.getenv('JASPER_CI_GRAPH_FILE')
+    if (capture != null) new File(capture).setText(JsonOutput.toJson(paths), 'UTF-8')
+    def expected = System.getenv('JASPER_CI_EXPECTED_GRAPH')
+    if (expected != null) {
+        def wanted = new JsonSlurper().parse(new File(expected), 'UTF-8')
+        if (!(wanted instanceof List) || wanted != paths)
+            throw new GradleException('Windows shard task graph differs from its verified dry run')
+    }
+}

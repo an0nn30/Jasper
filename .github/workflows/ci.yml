@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-24.04, windows-latest]
+        os: [macos-latest, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     # Full Windows checks take about 20 minutes; bound hangs while retaining time for diagnostics.
     timeout-minutes: 30
@@ -101,6 +101,108 @@ jobs:
             jasper-app/build/enterprise-settings/**
             jasper-app/build/chrome-renders/**
           retention-days: 7
+
+  windows-check-app:
+    needs: desktop-sdk
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-jbr
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Test Windows watchdog and shard verification
+        shell: bash
+        run: |
+          JASPER_CI_GIT_BASH="$(cygpath -w "$BASH")" python .github/scripts/test_windows_check.py
+          python .github/scripts/test_windows_shards.py
+      - name: Check app
+        shell: bash
+        run: |
+          python .github/scripts/windows_check.py --timeout 1560 --capture-at 900 --capture-at 1440 --diagnostics build/ci-jvm-diagnostics --success-marker build/ci-jvm-diagnostics/gradle-completed -- python .github/scripts/windows_shards.py app --graph-evidence build/ci-jvm-diagnostics/graphs
+      - name: Upload graph evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: task-graphs-windows-app
+          path: build/ci-jvm-diagnostics/graphs
+          retention-days: 7
+      - name: Upload test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-diagnostics-windows-app
+          path: |
+            build/ci-jvm-diagnostics/**
+            **/build/test-results/**
+            **/build/reports/tests/**
+            jasper-app/build/enterprise-settings/**
+            jasper-app/build/chrome-renders/**
+          retention-days: 7
+
+  windows-check-other:
+    needs: desktop-sdk
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-jbr
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Test Windows watchdog and shard verification
+        shell: bash
+        run: |
+          JASPER_CI_GIT_BASH="$(cygpath -w "$BASH")" python .github/scripts/test_windows_check.py
+          python .github/scripts/test_windows_shards.py
+      - name: Check other
+        shell: bash
+        run: |
+          python .github/scripts/windows_check.py --timeout 1560 --capture-at 900 --capture-at 1440 --diagnostics build/ci-jvm-diagnostics --success-marker build/ci-jvm-diagnostics/gradle-completed -- python .github/scripts/windows_shards.py other --graph-evidence build/ci-jvm-diagnostics/graphs
+      - name: Upload graph evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: task-graphs-windows-other
+          path: build/ci-jvm-diagnostics/graphs
+          retention-days: 7
+      - name: Upload test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-diagnostics-windows-other
+          path: |
+            build/ci-jvm-diagnostics/**
+            **/build/test-results/**
+            **/build/reports/tests/**
+            jasper-app/build/enterprise-settings/**
+            jasper-app/build/chrome-renders/**
+          retention-days: 7
+
+  windows-check-complete:
+    if: always()
+    needs: [windows-check-app, windows-check-other]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require both Windows shards
+        env:
+          APP_RESULT: ${{ needs.windows-check-app.result }}
+          OTHER_RESULT: ${{ needs.windows-check-other.result }}
+        run: test "$APP_RESULT" = success && test "$OTHER_RESULT" = success
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: task-graphs-windows-app
+          path: ${{ runner.temp }}/windows-app-graphs
+      - uses: actions/download-artifact@v8
+        with:
+          name: task-graphs-windows-other
+          path: ${{ runner.temp }}/windows-other-graphs
+      - name: Verify actual Windows task graph union
+        run: python3 .github/scripts/verify_windows_shards.py "$RUNNER_TEMP/windows-app-graphs" "$RUNNER_TEMP/windows-other-graphs"
 
   desktop-gtk-modern:
     runs-on: ubuntu-24.04
