@@ -235,8 +235,9 @@ wheel sends Up and Down arrow keys, one per notch, unless the program asked for 
 
 A double-click on a link selects all of it, across the rows it wraps onto: an OSC 8 link's text, or a URL written as
 text exactly as Cmd-click or Ctrl-click opens it (see [Links and file paths](#links-and-file-paths)). Elsewhere a word
-is a run of letters, digits and `_-./~:@%+=?&#`, so a path selects whole; any other character selects itself. Dragging past the pane's edge does not scroll. The selection uses the scheme's selection colour. Typing clears
-the selection; so do output that overwrites the selected text, a width change (see [Resizing](#resizing)), clearing the
+is a run of letters, digits and `_-./~:@%+=?&#`, so a path selects whole; any other character selects itself.
+Dragging past the pane's edge does not scroll. The selection uses the scheme's selection colour. Typing clears the
+selection; so do output that overwrites the selected text, a width change (see [Resizing](#resizing)), clearing the
 scrollback and switching to or from the alternate screen.
 
 ## Copy and paste
@@ -278,9 +279,9 @@ Programs such as `vim`, `tmux` and `htop` can ask for mouse reports. While they 
 per notch) and, when asked, pointer movement go to the program, and right-click goes to the program too. Clicks on
 scrollback rows above the live screen are not reported.
 
-Hold **Shift** to keep the mouse in Jasper: Shift-drag selects, Shift-double-click selects a word, Shift-right-click
-opens Jasper's context menu and, on Linux and Windows, the Shift-wheel does what the wheel does without mouse reports:
-it scrolls the pane, or sends Up and Down arrow keys on the alternate screen.
+Hold **Shift** to keep the mouse in Jasper: Shift-drag selects, Shift-double-click selects a word or link,
+Shift-right-click opens Jasper's context menu and, on Linux and Windows, the Shift-wheel does what the wheel does
+without mouse reports: it scrolls the pane, or sends Up and Down arrow keys on the alternate screen.
 
 A left press with Cmd+Option held (Ctrl+Alt on Linux and Windows) starts a
 [pane drag](workspace.md#panes-and-splits) instead: the program gets no report of it, and it starts no selection.

@@ -2,6 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status (2026-10-29): done** on `claude/double-click-url` (from local main `2a3e8d0d0`), not merged or pushed.
+> Deviations: executed inline (one session, no per-task subagents), then one whole-branch review (no Critical or
+> Important findings). Its fixes: `SelectionController.extend` (not in Task 2's file list) now lets the pointer, not the
+> unit under it, decide which side of the anchor a drag is on and keeps the anchor whole, since a URL can now lie inside
+> a longer word (`url=https://…/docs.`); tests added for that, for rows below the scrollback, OSC 8 text with wide
+> characters, a drag from a two-row URL, a wide last URL character and the truncated logical line
+> (`TerminalLogicalLineTest`). The full `check` ran once, after those fixes.
+
 **Goal:** A double-click in a terminal pane on a link selects exactly the link: the cells `LinkDetector` finds there
 (soft wraps included), or an OSC 8 hyperlink's whole visible span; anywhere else it selects a word as today.
 
@@ -26,7 +34,7 @@ final review (I1, ruling R14) and plan 4a's ruling R45.
   lock, and regex matching runs outside it.
 - The selected URL is the one Cmd-click opens: the same regexes, the same trailing-punctuation rule
   (`PathDetector.TRAILING`), the same `LogicalLine` bounds (a truncated logical line has no plain-text URL).
-- Source hygiene: no raw control or private-use characters in source; write `\033`, `\007`, `` escapes.
+- Source hygiene: no raw control or private-use characters in source; write `\033`, `\007`, `\uE000` escapes.
 - Never launch the GUI.
 
 ## Review Focus
@@ -57,19 +65,19 @@ final review (I1, ruling R14) and plan 4a's ruling R45.
   covering `column`, else the `file://` URL (with its `:LINE[:COLUMN]`), as `urlAt` and `fileUrlAt` find them.
   `urlAt` and `fileUrlAt` keep their behaviour and share the matching.
 
-- [ ] **Step 1: Write the failing tests** in `LinkDetectorTest`:
+- [x] **Step 1: Write the failing tests** in `LinkDetectorTest`:
   - `aSpanCoversTheUrlsCellsWithoutTrailingPunctuation`: `urlSpanAt(row("(see https://jasper.dev/a_(b)_c)."), 12)`
     is `new UrlSpan("https://jasper.dev/a_(b)_c", 5, 30)`.
   - `aSpanFindsAFileUrlWithItsPosition`: `urlSpanAt(row("e: file:///tmp/Foo.kt:12:5 boom"), 6)` is
     `new UrlSpan("file:///tmp/Foo.kt:12:5", 3, 25)`.
-  - `aSpanCountsWideCharacterCells`: a row whose text is `日 https://a.dev` (width 60): `urlSpanAt(row, 5)` is
+  - `aSpanCountsWideCharacterCells`: a row whose text is `日\uE000 https://a.dev` (width 60): `urlSpanAt(row, 5)` is
     `new UrlSpan("https://a.dev", 3, 15)`.
   - `noSpanOutsideAUrl`: `urlSpanAt(row("see https://jasper.dev now"), 1)` is empty.
-- [ ] **Step 2: Run** `./gradlew :jasper-terminal:test --tests '*LinkDetectorTest'` — expect compile failure.
-- [ ] **Step 3: Implement** `UrlSpan` and `urlSpanAt`; make the private `at(Pattern, RowText, int)` return
+- [x] **Step 2: Run** `./gradlew :jasper-terminal:test --tests '*LinkDetectorTest'` — expect compile failure.
+- [x] **Step 3: Implement** `UrlSpan` and `urlSpanAt`; make the private `at(Pattern, RowText, int)` return
   `Optional<UrlSpan>` and `urlAt`/`fileUrlAt` map it to the text.
-- [ ] **Step 4: Run** the same command — expect PASS.
-- [ ] **Step 5: Commit** `Terminal: LinkDetector reports the cells a URL covers`.
+- [x] **Step 4: Run** the same command — expect PASS.
+- [x] **Step 5: Commit** `Terminal: LinkDetector reports the cells a URL covers`.
 
 ### Task 2: A double-click selects the link under it
 
@@ -91,7 +99,7 @@ final review (I1, ruling R14) and plan 4a's ruling R45.
   `WrappedRow` gains `firstRow` and `width` and a `Selection cells(int from, int to)` that maps joined-row cells
   (`rowIndex * width + column`) back to absolute rows.
 
-- [ ] **Step 1: Write the failing tests** in `TerminalViewLinkSelectionTest` (40 × 4 grid, `EmulationFixture.unstarted`,
+- [x] **Step 1: Write the failing tests** in `TerminalViewLinkSelectionTest` (40 × 4 grid, `EmulationFixture.unstarted`,
   `FakeConnector`, the press/drag helpers `TerminalViewInteractionTest` uses; each double-click is
   `press(column, row, 2, 0)` then `release`), asserting `view.selectedText()`:
   - `doubleClickingAUrlSelectsItWithoutTheFullStopAfterIt`: `see https://jasper.dev/docs. Then` at column 10 →
@@ -113,27 +121,27 @@ final review (I1, ruling R14) and plan 4a's ruling R45.
     (`\033]8;;https://a.dev/\007alpha\033]8;;https://b.dev/\007beta\033]8;;\007` at column 6 → `beta`),
     `anOsc8FileLinkSelectsItsWholeNameWithSpaces` (`\033]8;;file:///tmp/My%20Notes.txt\007My Notes.txt\033]8;;\007`
     at column 4 → `My Notes.txt`).
-- [ ] **Step 2: Run** `./gradlew :jasper-terminal:test --tests '*TerminalViewLinkSelectionTest'` — expect the URL and
+- [x] **Step 2: Run** `./gradlew :jasper-terminal:test --tests '*TerminalViewLinkSelectionTest'` — expect the URL and
   OSC 8 cases to fail (today's word rule) and the plain-word case to pass.
-- [ ] **Step 3: Implement** `wordSelection` as the Interfaces block says: under the lock read the clicked row, the
+- [x] **Step 3: Implement** `wordSelection` as the Interfaces block says: under the lock read the clicked row, the
   clicked cell's link, the OSC 8 walk (reading each row's styles once with `readCells(width, chars, styles)`), or the
   `WrappedRow` and the `WordBoundaries` fallback; run `urlSpanAt` after unlocking. Update the two Javadocs.
-- [ ] **Step 4: Run** the new test class, `SelectionSessionTest`, `TerminalViewInteractionTest` and
+- [x] **Step 4: Run** the new test class, `SelectionSessionTest`, `TerminalViewInteractionTest` and
   `WordBoundariesTest` — expect PASS.
-- [ ] **Step 5: Docs.** `docs/terminal.md`: the Double-click row reads "a word, or a whole link; dragging on extends
+- [x] **Step 5: Docs.** `docs/terminal.md`: the Double-click row reads "a word, or a whole link; dragging on extends
   word by word"; the paragraph under the table says a double-click on a link selects the URL a Cmd-click (Ctrl-click)
   would open, across wrapped rows and without trailing prose punctuation, or an OSC 8 link's whole text, and keeps the
   word rule for everything else. `docs/terminal-maintenance.md` step 2: `WordBoundaries` is the word rule and
   `LinkDetector` the link a double-click selects.
-- [ ] **Step 6: Commit** `Terminal: a double-click selects the whole link under it`.
+- [x] **Step 6: Commit** `Terminal: a double-click selects the whole link under it`.
 
 ### Task 3: Record and verify
 
 **Files:**
 - Modify: `docs/STATUS.md` (new top entry), this plan's banner if anything deviated.
 
-- [ ] **Step 1:** `./gradlew :jasper-terminal:check`, then `./gradlew check` once (background); read the totals from
+- [x] **Step 1:** `./gradlew :jasper-terminal:check`, then `./gradlew check` once (background); read the totals from
   `*/build/test-results/test/*.xml`.
-- [ ] **Step 2:** STATUS entry: branch, the behaviour, that plan 3b's I1 / plan 4a's R45 follow-up is done (the Open URL
+- [x] **Step 2:** STATUS entry: branch, the behaviour, that plan 3b's I1 / plan 4a's R45 follow-up is done (the Open URL
   in Split items now appear after a double-click on a URL), the exact totals, no GUI launched.
-- [ ] **Step 3: Commit** `Docs: STATUS records the double-click URL selection`.
+- [x] **Step 3: Commit** `Docs: STATUS records the double-click URL selection`.

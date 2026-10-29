@@ -45,12 +45,17 @@ final class SelectionController {
 
                 Selection next = selection == null ? pendingAnchor : selection;
                 if (wordAnchor != null) {
+                    // A link can lie inside a longer word, so the pointer decides the side and the anchor stays whole.
                     Selection word = terminal.wordSelection(row, column);
-                    boolean before = word.startRow() < wordAnchor.startRow()
-                        || (word.startRow() == wordAnchor.startRow() && word.startColumn() < wordAnchor.startColumn());
+                    boolean before = row < wordAnchor.startRow()
+                        || (row == wordAnchor.startRow() && column < wordAnchor.startColumn());
+                    boolean pastEnd = word.endRow() > wordAnchor.endRow()
+                        || (word.endRow() == wordAnchor.endRow() && word.endColumn() > wordAnchor.endColumn());
                     next = before
                         ? new Selection(wordAnchor.endRow(), wordAnchor.endColumn(), word.startRow(), word.startColumn(), false)
-                        : new Selection(wordAnchor.startRow(), wordAnchor.startColumn(), word.endRow(), word.endColumn(), false);
+                        : pastEnd
+                        ? new Selection(wordAnchor.startRow(), wordAnchor.startColumn(), word.endRow(), word.endColumn(), false)
+                        : wordAnchor;
                 } else if (next != null) {
                     next = next.withFocus(row, column);
                 }

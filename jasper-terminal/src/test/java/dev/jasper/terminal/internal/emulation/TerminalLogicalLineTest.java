@@ -30,6 +30,8 @@ class TerminalLogicalLineTest {
             Await.until(() -> session.title().equals("ready"), "complete boundary URL");
             assertThat(session.internalAccess().linkAt(0, 0)).map(LinkHit::uri).contains(url);
             assertThat(session.internalAccess().linkAt(511, 500)).map(LinkHit::uri).contains(url);
+            assertThat(session.internalAccess().wordSelection(511, 500)).as("a double-click selects all of it")
+                .isEqualTo(new Selection(0, 0, 511, 1023, false));
         }
     }
 
@@ -60,6 +62,8 @@ class TerminalLogicalLineTest {
                 assertThat(selection.endRow() - selection.startRow() + 1).isEqualTo(expectedRows);
                 assertThat(session.internalAccess().text(selection).length()).isEqualTo(expectedRows * width);
                 assertThat(session.internalAccess().linkAt(clicked, 0)).as("truncated logical URL context").isEmpty();
+                assertThat(session.internalAccess().wordSelection(clicked, 0)).as("a double-click selects the row's word")
+                    .isEqualTo(new Selection(clicked, 0, clicked, width - 1, false));
             }
             assertThat(session.internalAccess().text(session.internalAccess().lineSelection(lineRows))).isEqualTo("end");
         }

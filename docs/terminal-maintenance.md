@@ -183,7 +183,8 @@ crash.
 2. Change [Selection](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/Selection.java) (stream or
    block range), [SelectionText](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/SelectionText.java)
    (the copied text), [WordBoundaries](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/WordBoundaries.java)
-   (what a double-click selects off a link; on one, `BufferQueries.wordSelection` uses `LinkDetector`) or [LogicalLine](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/LogicalLine.java)
+   (the word a double-click selects; on a link `BufferQueries.wordSelection` takes the OSC 8 link's cells or
+   `LinkDetector`'s URL instead) or [LogicalLine](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/text/LogicalLine.java)
    (the soft-wrapped line a triple-click selects) for the rules, `BufferQueries` for the locked reads, and
    [SelectionController](../jasper-terminal/src/main/java/dev/jasper/terminal/view/SelectionController.java) for
    anchors and validation.

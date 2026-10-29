@@ -61,6 +61,18 @@ class TerminalViewLinkSelectionTest {
         assertThat(view.selectedText()).contains("https://jasper.dev/docs/terminal/selection/rules");
     }
 
+    /** Five lines first leave three in the scrollback, so the URL's absolute rows are not its screen rows. */
+    @Test
+    void doubleClickingASoftWrappedUrlBelowTheScrollbackSelectsItWhole() throws Exception {
+        show("1\r\n2\r\n3\r\n4\r\n5\r\nsee https://jasper.dev/docs/terminal/selection/rules", 3, "ection/rules");
+
+        doubleClick(10, 2);
+        assertThat(view.selectedText()).contains("https://jasper.dev/docs/terminal/selection/rules");
+
+        doubleClick(5, 3);
+        assertThat(view.selectedText()).contains("https://jasper.dev/docs/terminal/selection/rules");
+    }
+
     @Test
     void doubleClickingAUrlInParenthesesKeepsItsOwnParentheses() throws Exception {
         show("(see https://jasper.dev/a_(b)_c).", 0, "(see https://jasper.dev/a_(b)_c).");
@@ -93,6 +105,18 @@ class TerminalViewLinkSelectionTest {
         assertThat(view.selectedText()).contains(link);
     }
 
+    /** Either cell of a wide character in an OSC 8 link's text selects all of it. */
+    @Test
+    void doubleClickingAnOsc8LinkWithWideCharactersSelectsWholeCharacters() throws Exception {
+        show("\033]8;;https://jasper.dev/\007\u65e5\u672c docs\033]8;;\007 x", 0, " docs x");
+
+        doubleClick(6, 0);
+        assertThat(view.selectedText()).contains("\u65e5\u672c docs");
+
+        doubleClick(1, 0);
+        assertThat(view.selectedText()).contains("\u65e5\u672c docs");
+    }
+
     @Test
     void doubleClickingAWordThatIsNoLinkSelectsTheWord() throws Exception {
         show("echo foo.bar baz", 0, "echo foo.bar baz");
@@ -107,7 +131,7 @@ class TerminalViewLinkSelectionTest {
     /** Review Focus 2: the wide characters before the URL take two cells each. */
     @Test
     void aWideCharacterBeforeAUrlLeavesTheUrlCellsExact() throws Exception {
-        show("日本 https://jasper.dev/x", 0, "日");
+        show("\u65e5\u672c https://jasper.dev/x", 0, "https://jasper.dev/x");
 
         doubleClick(9, 0);
 
@@ -126,6 +150,45 @@ class TerminalViewLinkSelectionTest {
         view.handleMouse(drag(0, 0));
         assertThat(view.selectedText()).contains("go https://jasper.dev/(b)_c");
         view.handleMouse(release(0, 0));
+    }
+
+    /** A URL can lie inside a longer word: the pointer decides the side, and the URL stays selected whole. */
+    @Test
+    void draggingFromAUrlInsideALongerWordKeepsTheUrl() throws Exception {
+        show("url=https://jasper.dev/docs. x", 0, "url=https://jasper.dev/docs. x");
+
+        view.handleMouse(press(10, 0, 2));
+        view.handleMouse(drag(27, 0));
+        assertThat(view.selectedText()).contains("https://jasper.dev/docs.");
+
+        view.handleMouse(drag(1, 0));
+        assertThat(view.selectedText()).contains("url=https://jasper.dev/docs");
+        view.handleMouse(release(1, 0));
+    }
+
+    /** A double-clicked word that holds a URL stays whole while the pointer moves over the URL. */
+    @Test
+    void draggingOverAUrlInsideADoubleClickedWordKeepsTheWord() throws Exception {
+        show("foo:https://a.dev/x. y", 0, "foo:https://a.dev/x. y");
+
+        view.handleMouse(press(1, 0, 2));
+        view.handleMouse(drag(10, 0));
+        assertThat(view.selectedText()).contains("foo:https://a.dev/x.");
+        view.handleMouse(release(10, 0));
+    }
+
+    /** A double-clicked URL wrapped over two rows is the anchor a drag extends from, on either side. */
+    @Test
+    void draggingOnFromASoftWrappedUrlExtendsFromAllOfIt() throws Exception {
+        show("see https://jasper.dev/docs/terminal/selection/rules now", 1, "ection/rules now");
+
+        view.handleMouse(press(10, 0, 2));
+        view.handleMouse(drag(14, 1));
+        assertThat(view.selectedText()).contains("https://jasper.dev/docs/terminal/selection/rules now");
+
+        view.handleMouse(drag(1, 0));
+        assertThat(view.selectedText()).contains("see https://jasper.dev/docs/terminal/selection/rules");
+        view.handleMouse(release(1, 0));
     }
 
     /** Review Focus 4: two OSC 8 links side by side are two links. */
@@ -153,9 +216,9 @@ class TerminalViewLinkSelectionTest {
         view.handleMouse(release(column, row));
     }
 
-    private void show(String output, int row, String expectedStart) throws Exception {
+    private void show(String output, int row, String expected) throws Exception {
         connector.feed(output);
-        Await.until(() -> session.internalAccess().snapshot().lineText(row).startsWith(expectedStart), "\"" + expectedStart + "\"");
+        Await.until(() -> session.internalAccess().snapshot().lineText(row).contains(expected), "\"" + expected + "\"");
     }
 
     private MouseEvent press(int column, int row, int clicks) {

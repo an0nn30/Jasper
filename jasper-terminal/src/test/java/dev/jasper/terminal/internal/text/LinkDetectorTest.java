@@ -76,6 +76,12 @@ class LinkDetectorTest {
     }
 
     @Test
+    void aSpanEndsAfterTheContinuationCellOfAWideLastCharacter() {
+        assertThat(LinkDetector.urlSpanAt(row("see https://a.dev/\u65e5\uE000 x"), 19))
+            .contains(new LinkDetector.UrlSpan("https://a.dev/\u65e5", 4, 19));
+    }
+
+    @Test
     void noSpanOutsideAUrl() {
         assertThat(LinkDetector.urlSpanAt(row("see https://jasper.dev now"), 1)).isEmpty();
     }
