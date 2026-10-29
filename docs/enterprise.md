@@ -149,7 +149,7 @@ Plex Mono too ([defaults](#defaults)). Terminal text keeps `[terminal.font]`.
 
 The look has no branding of its own: windows, the Dock or taskbar keep Jasper's Shell Prompt icon, and a start that
 opens a window (not `--background`, `--no-window` or `--safe-mode`) shows the Protean splash until the first
-Jasper window has painted ([branding](looks.md#branding)). Its turtle is animated unless `config.toml` sets
+Jasper window has painted ([branding](looks.md#branding)). Its startup queue is animated unless `config.toml` sets
 `ui.animations.enabled = false`, which Settings hides under this look.
 
 ### Defaults

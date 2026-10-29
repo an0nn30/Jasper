@@ -277,6 +277,7 @@ public final class JasperApplication {
      */
     public void startupSteps(dev.jasper.app.startup.StartupSteps steps) {
         startupSteps = java.util.Objects.requireNonNull(steps, "steps");
+        startupSteps.reconcilePlugins(selection.loading());
     }
 
     /** What Jasper windows and the rehearsal's are made of under this process's presentation. */

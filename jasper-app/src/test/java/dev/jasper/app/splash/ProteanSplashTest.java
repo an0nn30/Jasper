@@ -10,6 +10,24 @@ class ProteanSplashTest {
     private static final String BUILD = new dev.jasper.app.platform.BuildInfo(false, java.util.Optional.of("1.2.3"),
         42, "abc123456789abcdef", "codex/protean", false, java.util.Optional.empty()).buildLine();
     static final List<String> LABELS = StartupSteps.queue("Protean", List.of("File Server", "Remote", "日本語 🚀"));
+    @Test void fallbackRendersTheEffectiveCurrentAndUpcomingLabelsImmediately() {
+        var effective = StartupSteps.queue("Protean", List.of("Remote", "Remote"));
+        var painter = SplashPainter.protean(BUILD,
+            StartupSteps.queue("Protean", List.of("Failed look", "Dependent", "Remote", "Remote")), 1);
+        painter.showStep(new StartupSteps.Step(StartupSteps.CONFIGURATION, 2, 8), 0, true);
+        var replacement = new StartupSteps.Step(StartupSteps.CONFIGURATION, 2, 6, effective);
+        painter.showStep(replacement, 120_000_000L, true);
+        var expected = SplashPainter.protean(BUILD, effective, 1);
+        expected.showStep(replacement, 120_000_000L, false);
+        assertThat(java.util.Arrays.equals(rgb(render(painter, replacement.fraction())),
+            rgb(render(expected, replacement.fraction())))).as("replacement resets stale outgoing ink and all upcoming rows").isTrue();
+        var plugin = new StartupSteps.Step("Loading plugin: Remote", 3, 6, effective);
+        painter.showStep(plugin, 120_000_001L, false);
+        expected.showStep(plugin, 120_000_001L, false);
+        assertThat(java.util.Arrays.equals(rgb(render(painter, plugin.fraction())),
+            rgb(render(expected, plugin.fraction())))).as("current label and bar follow effective selection").isTrue();
+    }
+
     @Test void geometryAndSettledRetargetingStayConsistentAtDeviceScales() {
         for (double sx : new double[] {1, 1.25, 1.5, 1.75, 2, 4}) {
             for (double sy : new double[] {sx, 1.5}) {

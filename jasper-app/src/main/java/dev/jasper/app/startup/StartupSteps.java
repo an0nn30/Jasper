@@ -10,7 +10,7 @@ import java.util.function.Consumer;
  * {@value #RUNTIME} as the splash opens, {@value #CONFIGURATION} while the application is made, "Loading plugin: "
  * with each selected plugin's name just before it loads, {@value #WORKSPACE} as the first window is composed, and
  * "Starting" with the product name and "Workstation…" just before it shows. The count, four plus the selected plugins,
- * is known once the plugins are selected, and step i of n fills i / n. Steps only move forward: a call that would not
+ * follows the effective plugin selection, and step i of n fills i / n. Steps only move forward: a call that would not
  * advance is ignored, and after {@link #done()} nothing shows. A splash that cannot show a step closes, and start-up
  * goes on. EDT.
  */
@@ -32,11 +32,17 @@ public final class StartupSteps {
      * @param text what the splash says
      * @param index the step's number, from 1
      * @param count how many steps this start has
+     * @param queue immutable resolved labels, empty for count-only callers
      */
-    public record Step(String text, int index, int count) {
+    public record Step(String text, int index, int count, List<String> queue) {
+        /** Count-only step for callers without resolved labels. */
+        public Step(String text, int index, int count) { this(text, index, count, List.of()); }
+
         /** The text is required and the number within the count. */
         public Step {
             Objects.requireNonNull(text, "text");
+            queue = List.copyOf(queue);
+            if (!queue.isEmpty() && queue.size() != count) throw new IllegalArgumentException("Queue count mismatch");
             if (count < 1 || index < 1 || index > count) throw new IllegalArgumentException("Step " + index + " of " + count);
         }
 
@@ -49,7 +55,7 @@ public final class StartupSteps {
 
     private List<String> queue = List.of();
     private final String product;
-    private final int plugins;
+    private int plugins;
     private Consumer<Step> show;
     private Runnable close;
     private Step current;
@@ -111,6 +117,7 @@ public final class StartupSteps {
         var labels = queue(product, plugins);
         var steps = of(product, labels.size() - 4, show, close);
         steps.queue = labels;
+        steps.current = new Step(RUNTIME, 1, labels.size(), labels);
         return steps;
     }
 
@@ -118,6 +125,20 @@ public final class StartupSteps {
      * @return resolved queue
      */
     public List<String> queue() { return queue; }
+
+    /** Refreshes the resolved queue after presentation fallback, before plugins start.
+     * @param names effective plugin names in startup order
+     */
+    public void reconcilePlugins(List<String> names) {
+        if (done) return;
+        if (loaded != 0 || current.index() > 2) throw new IllegalStateException("Plugins already started");
+        var effective = queue(product, names);
+        if (effective.equals(queue) || (queue.isEmpty() && plugins == names.size())) return;
+        if (!queue.isEmpty()) queue = effective;
+        plugins = names.size();
+        current = new Step(current.text(), current.index(), count(), queue);
+        notifyStep();
+    }
 
     /** The step the splash shows now: the first until start-up reaches another. */
     public Step current() { return current; }
@@ -164,7 +185,11 @@ public final class StartupSteps {
 
     private void advance(int index, String text) {
         if (done || index <= current.index()) return;
-        current = new Step(text, index, count());
+        current = new Step(text, index, count(), queue);
+        notifyStep();
+    }
+
+    private void notifyStep() {
         try { show.accept(current); }
         catch (RuntimeException failure) {
             // A splash never stops start-up: one that cannot show a step closes.

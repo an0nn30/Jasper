@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-29-protean-splash-design.md` (approved conversation; read before implementation).
 
-**Status:** Implemented; controller review pending. One integrated runnable deliverable. Focused headless scope passes 162 tests; subsequent idle-frame/theme-preference scope passes 36, all without failures/errors/skips; architecture passes. Full check attempted once and blocked by installed non-JCEF JBR b583.48 at the unchanged JCEF b635.75 gate. All 1/2/4x static and transition sheets inspected; GUI/package acceptance pending. Deviations: removed obsolete selector test seam; `animationTime` returns whether a frame needs painting to skip idle redraws; Enterprise has no explicit branding and uses Protean. See `.superpowers/sdd/2026-10-29-protean-splash/task-1-report.md` for commands and retained XML/evidence.
+**Status:** Implemented; controller review pending. One integrated runnable deliverable. Focused headless scope passes 162 tests; subsequent idle-frame/theme-preference scope passes 36, all without failures/errors/skips; architecture passes. Full check attempted once and blocked by installed non-JCEF JBR b583.48 at the unchanged JCEF b635.75 gate. All 1/2/4x static and transition sheets inspected; GUI/package acceptance pending. Deviations: final-review fix carries immutable queue snapshots in Step and reconciles the effective plugin selection before startup, cancelling stale queue motion; removed obsolete selector test seam; `animationTime` returns whether a frame needs painting to skip idle redraws; Enterprise has no explicit branding and uses Protean. See `.superpowers/sdd/2026-10-29-protean-splash/task-1-report.md` for commands and retained XML/evidence.
 
 ## Global Constraints
 

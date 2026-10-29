@@ -22,7 +22,6 @@ final class ProteanSplash {
     private static final int BAR_X = 29, BAR_Y = 441, BAR_WIDTH = 783, BAR_HEIGHT = 6;
     private static final Color BACKGROUND = SplashColors.PROTEAN_BACKGROUND, RED = SplashColors.PROTEAN_RED,
         WHITE = SplashColors.PROTEAN_WHITE, DIM = SplashColors.PROTEAN_DIM;
-    private final List<String> labels;
     private final SplashQueue queue;
     private final String build;
     private final Font mono;
@@ -32,7 +31,6 @@ final class ProteanSplash {
 
     ProteanSplash(String build, List<String> labels, int scale) {
         this.build = java.util.Objects.requireNonNull(build, "build");
-        this.labels = List.copyOf(labels);
         queue = new SplashQueue(labels);
         try (var art = ProteanSplash.class.getResourceAsStream("protean-mark.svg");
              var face = ProteanSplash.class.getResourceAsStream("/dev/jasper/app/fonts/cousine/CousineNerdFontMono-Regular.ttf")) {
@@ -87,6 +85,7 @@ final class ProteanSplash {
 
     private void paintQueue(Graphics2D g) {
         var frame = queue.frame(now);
+        var labels = queue.labels();
         double eased = 1 - Math.pow(1 - frame.progress(), 3);
         var rows = (Graphics2D) g.create();
         try {

@@ -406,7 +406,7 @@ class ApplicationBootstrapTest {
             assertThat(steps).isNotSameAs(dev.jasper.app.startup.StartupSteps.NONE);
             assertThat(steps.active()).isTrue();
             assertThat(steps.current()).isEqualTo(new dev.jasper.app.startup.StartupSteps.Step("Starting Java runtime…", 1,
-                4 + branded.loading().size()));
+                4 + branded.loading().size(), steps.queue()));
             SwingUtilities.invokeAndWait(steps::workstation);
             assertThat(steps.current().text()).as("the product name").isEqualTo("Starting JasperOps Workstation…");
             SwingUtilities.invokeAndWait(steps::done);
