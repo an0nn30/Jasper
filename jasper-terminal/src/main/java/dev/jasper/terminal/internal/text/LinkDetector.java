@@ -19,7 +19,7 @@ public final class LinkDetector {
 
     /** The {@code http}, {@code https} or {@code ftp} URL covering {@code column}, without trailing punctuation. */
     public static Optional<String> urlAt(RowText row, int column) {
-        return at(URL, row, column);
+        return at(URL, row, column).map(UrlSpan::url);
     }
 
     /**
@@ -27,7 +27,21 @@ public final class LinkDetector {
      * is this machine is the caller's decision.
      */
     public static Optional<String> fileUrlAt(RowText row, int column) {
-        return at(FILE_URL, row, column);
+        return at(FILE_URL, row, column).map(UrlSpan::url);
+    }
+
+    /**
+     * A URL on a row and the cells it covers.
+     *
+     * @param url the URL, as {@link #urlAt} or {@link #fileUrlAt} finds it
+     * @param firstColumn the first cell it covers
+     * @param lastColumn the last cell it covers, inclusive; a wide last character's continuation cell included
+     */
+    public record UrlSpan(String url, int firstColumn, int lastColumn) { }
+
+    /** The URL covering {@code column}, as {@link #urlAt} finds it or else as {@link #fileUrlAt} does, with its cells. */
+    public static Optional<UrlSpan> urlSpanAt(RowText row, int column) {
+        return at(URL, row, column).or(() -> at(FILE_URL, row, column));
     }
 
     /**
@@ -54,7 +68,7 @@ public final class LinkDetector {
         return new UrlPosition(fileUrl, 0, 0);
     }
 
-    private static Optional<String> at(Pattern pattern, RowText row, int column) {
+    private static Optional<UrlSpan> at(Pattern pattern, RowText row, int column) {
         String text = row.text();
         Matcher matcher = pattern.matcher(text);
         while (matcher.find()) {
@@ -68,7 +82,7 @@ public final class LinkDetector {
             int firstColumn = row.columns()[matcher.start()];
             int lastColumn = row.lastColumns()[end - 1];
             if (column >= firstColumn && column <= lastColumn) {
-                return Optional.of(text.substring(matcher.start(), end));
+                return Optional.of(new UrlSpan(text.substring(matcher.start(), end), firstColumn, lastColumn));
             }
         }
         return Optional.empty();
