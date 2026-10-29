@@ -3,6 +3,8 @@ package dev.jasper.browser.item;
 import dev.jasper.browser.page.DialogPlace;
 import dev.jasper.browser.page.NavigationButton;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.restore.BrowserRestore;
+import dev.jasper.sdk.RestoreState;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.ui.ContentCommand;
 import dev.jasper.sdk.ui.ContentPresentation;
@@ -29,7 +31,9 @@ import javax.swing.JComponent;
  * kind PREVIEW. The item asks for its page, and so for Chromium, the first time its view shows, not when it opens. Its
  * tab shows the page's title (as {@link TabTitle} gives it), the globe and, as its location and status, the page's
  * address. Its content commands {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and the mouse's
- * back and forward buttons over the page go back and forward. UI thread.
+ * back and forward buttons over the page go back and forward. It saves its URL and target with Jasper's workspace
+ * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
+ * UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -56,6 +60,7 @@ public final class BrowserItem implements AutoCloseable {
         page.onOpenItem(this::openItem);
         page.onCloseItem(this::close);
         page.onShowItem(this::show);
+        page.onAddressChange(this::committed);
         title = TabTitle.of("", host(url.toString()), "", false);
         view = items.context().kit().create(spec(), this::event);
         view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.PREVIEW, page.view(), page));
@@ -87,8 +92,9 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     private void attach(TabPlacement placement, Optional<WindowOwner> window) {
+        var spec = new ContentSpec(KEY + UUID.randomUUID(), title);
         try {
-            tab = items.context().windows().openTab(new ContentSpec(KEY + UUID.randomUUID(), title), window.orElse(null), view, placement);
+            tab = items.context().windows().openTab(restore(url).map(spec::withRestore).orElse(spec), window.orElse(null), view, placement);
         } catch (RuntimeException | Error failure) {
             view.close();
             throw failure;
@@ -132,7 +138,8 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     /**
-     * Loads {@code url} in the item; the address field gives up what was typed in it.
+     * Loads {@code url} in the item; the address field gives up what was typed in it. Before the item first shows, it is
+     * also what the item saves, as it is what the item will load.
      *
      * @param url the address
      */
@@ -141,6 +148,7 @@ public final class BrowserItem implements AutoCloseable {
         if (closed) return;
         toolbar.restore();
         page.load(url);
+        if (!asked && tab != null) tab.setRestore(restore(url));
     }
 
     /** Goes back in the page's history. */
@@ -237,6 +245,17 @@ public final class BrowserItem implements AutoCloseable {
             items.context().log().log(System.Logger.Level.WARNING, "A link could not open: " + closing.getMessage(), closing);
             return Optional.empty();
         }
+    }
+
+    /** The page's main frame committed a navigation to {@code address}: the item saves it. */
+    private void committed(String address) {
+        if (closed || tab == null) return;
+        AddressInput.parse(address).ifPresent(committed -> tab.setRestore(restore(committed)));
+    }
+
+    /** The item's restore state at {@code at}, for the target it was opened for. */
+    private Optional<RestoreState> restore(URI at) {
+        return BrowserRestore.state(at, target);
     }
 
     /** The page asks to be shown, as a script's {@code focus()} of its window does: selects the tab and raises its window. */

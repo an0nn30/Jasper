@@ -6,6 +6,7 @@ import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.links.PageNavigation;
+import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.routing.BrowserRole;
 import dev.jasper.browser.routing.WebAddressItems;
 import dev.jasper.browser.settings.BrowserSettings;
@@ -24,9 +25,10 @@ import java.util.concurrent.RejectedExecutionException;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
- * item, the globe they show, the Web menu, Settings › Browser, the welcome page, the Browser as Jasper's web browser and
- * the terminal's Open URL in Split items, and makes Chromium's engine, which starts Chromium only when a browser item
- * first shows, so starting the plugin loads no Chromium class.
+ * item, the globe they show, the Web menu, Settings › Browser, the welcome page, the Browser as Jasper's web browser,
+ * the terminal's Open URL in Split items and the restorer of saved browser items, and makes Chromium's engine, which
+ * starts Chromium only when a browser item first shows, so starting the plugin, and restoring its items, loads no
+ * Chromium class.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -77,6 +79,11 @@ public class BrowserPlugin implements Plugin {
         var role = new BrowserRole(context, items, settings);
         context.platform().browser(role);
         WebAddressItems.register(context, role, settings);
+        // Spec section 16: a saved item comes back at once, and its page loads the first time it shows.
+        context.windows().restorer(BrowserRestore.KIND, request -> {
+            items.restore(request.state(), settings.read().startAddress(), request.window());
+            return Optional.empty();
+        });
         running = true;
     }
 

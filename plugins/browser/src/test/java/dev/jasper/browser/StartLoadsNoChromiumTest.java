@@ -15,8 +15,8 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Starting and stopping the Browser costs no Chromium, and nor does opening a browser item that is not shown, as a
- * restored one is: no {@code org.cef} or {@code com.jetbrains.cef} class loads until a page is first shown. A forked
+ * Starting and stopping the Browser costs no Chromium, and nor does opening a browser item that is not shown, or
+ * restoring a window of them: no {@code org.cef} or {@code com.jetbrains.cef} class loads until a page is first shown. A forked
  * headless JVM runs the plugin with the SDK's fake host and logs every class it
  * loads, because a class loaded in this JVM cannot be told apart from one another test loaded. The log goes to the
  * fork's standard output, not a file: {@code -Xlog} splits its options at colons, which Windows paths hold. The output
@@ -36,6 +36,14 @@ class StartLoadsNoChromiumTest {
         List<String> loaded = fork(Main.OPEN);
         assertThat(loaded).as("the log shows the item, its page and its canvas")
             .contains("dev.jasper.browser.item.BrowserItem", "dev.jasper.browser.page.Page", "dev.jasper.browser.page.PageView");
+        assertThat(chromium(loaded)).as("Chromium classes loaded").isEmpty();
+    }
+
+    /** Spec section 19: restored items hold only their saved state until shown. */
+    @Test void restoringAWindowOfBrowserItemsLoadsNoChromiumClass() throws Exception {
+        List<String> loaded = fork(Main.RESTORE);
+        assertThat(loaded).as("the log shows the restore, the items and their pages")
+            .contains("dev.jasper.browser.restore.BrowserRestore", "dev.jasper.browser.item.BrowserItem", "dev.jasper.browser.page.Page");
         assertThat(chromium(loaded)).as("Chromium classes loaded").isEmpty();
     }
 
@@ -67,11 +75,16 @@ class StartLoadsNoChromiumTest {
 
     /**
      * The forked JVM's entry: starts the plugin on the fake host, on the UI thread as Jasper starts plugins; in
-     * {@link #OPEN} mode runs New Browser Tab, whose item the fake host never shows; stops it; and exits non-zero on any
+     * {@link #OPEN} mode runs New Browser Tab, whose item the fake host never shows; in {@link #RESTORE} mode restores a
+     * window of saved browser items, which the fake host places and never shows; stops it; and exits non-zero on any
      * failure.
      */
     public static final class Main {
-        static final String START = "start", OPEN = "open";
+        static final String START = "start", OPEN = "open", RESTORE = "restore";
+        // A window of saved items: pages, a target, Jasper's own page, and one that saved no url (the start page).
+        private static final List<java.util.Map<String, String>> SAVED = List.of(java.util.Map.of("url", "https://example.com/"),
+            java.util.Map.of("url", "https://example.org/docs?q=1#top", "target", "docs"), java.util.Map.of("url", "jasper-about:welcome"),
+            java.util.Map.of(), java.util.Map.of("url", "file:///tmp/index.html"), java.util.Map.of("url", "http://localhost:8080/"));
 
         private Main() { }
 
@@ -84,6 +97,13 @@ class StartLoadsNoChromiumTest {
                     host.start(new PluginInfo("dev.jasper.browser", "Browser", "0.1.0", Set.of("browser.provide")), Set.of(), Set.of(), new BrowserPlugin());
                     if (args[1].equals(OPEN) && (!host.invoke("dev.jasper.browser.new_tab", window, null) || host.contentTabs().size() != 1))
                         failures.add("New Browser Tab opened no item");
+                    if (args[1].equals(RESTORE)) {
+                        for (var values : SAVED)
+                            if (host.restoreTab("dev.jasper.browser", window, "Saved", new dev.jasper.sdk.RestoreState("dev.jasper.browser.page", values)).isEmpty())
+                                failures.add("A saved browser item did not come back: " + values);
+                        if (host.contentTabs().size() != SAVED.size()) failures.add("Restored " + host.contentTabs().size() + " items");
+                        failures.addAll(host.declinedRestores());
+                    }
                     host.stopAll();
                     failures.addAll(host.failures());
                 }

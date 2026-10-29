@@ -30,6 +30,7 @@ public final class Page implements AutoCloseable {
     private final List<Runnable> closes = new CopyOnWriteArrayList<>();
     private final List<Runnable> navigations = new CopyOnWriteArrayList<>();
     private final List<Runnable> dialogResets = new CopyOnWriteArrayList<>();
+    private final List<Consumer<String>> addressChanges = new CopyOnWriteArrayList<>();
     private BiFunction<String, TabPlacement, Optional<Page>> opener = (url, placement) -> Optional.empty();
     private Runnable itemCloser = () -> { }, itemShower = () -> { };
     // Where the page's dialogs and file choosers show; its item gives it.
@@ -230,6 +231,20 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Tells {@code listener} each time Chromium reports a new address for the page's main frame: a navigation that
+     * commits, to another document or within this one. A load that only starts, or is asked for, tells nothing.
+     *
+     * @param listener told the address, as Chromium writes it, on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onAddressChange(Consumer<String> listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) return () -> { };
+        addressChanges.add(listener);
+        return () -> addressChanges.remove(listener);
+    }
+
+    /**
      * Has {@code opener} open each link or popup of the page that goes to an item of its own, beside the page's item: the
      * page's item sets it. It replaces the one before.
      *
@@ -377,6 +392,7 @@ public final class Page implements AutoCloseable {
         navigationButtons.clear();
         navigations.clear();
         dialogResets.clear();
+        addressChanges.clear();
         opener = (url, placement) -> Optional.empty();
         itemCloser = () -> { };
         itemShower = () -> { };
@@ -431,6 +447,7 @@ public final class Page implements AutoCloseable {
         if (closed || url == null) return;
         address = url;
         changed.run();
+        for (Consumer<String> listener : addressChanges) listener.accept(url);
     }
 
     /** The page's title changed. */

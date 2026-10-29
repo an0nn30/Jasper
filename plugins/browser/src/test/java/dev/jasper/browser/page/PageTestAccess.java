@@ -13,4 +13,15 @@ public final class PageTestAccess {
     public static void loadStarted(Page page, String url) {
         page.loadStarted(url);
     }
+
+    /**
+     * The page's main frame is at {@code url}, as the client's display handler tells it when a navigation commits. UI
+     * thread.
+     *
+     * @param page a page
+     * @param url where it is
+     */
+    public static void addressChanged(Page page, String url) {
+        page.addressChanged(url);
+    }
 }

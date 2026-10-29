@@ -1,12 +1,16 @@
 package dev.jasper.browser;
 
 import dev.jasper.browser.item.BrowserItems;
+import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.WorkspacePalette;
 import java.awt.Color;
+import java.net.URI;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -90,6 +94,32 @@ class BrowserPluginTest {
             assertThat(host.invoke(BrowserPlugin.NEW_TAB, window, null)).isTrue();
             assertThat(host.contentPresentation(host.contentTabs().getLast()).location()).as("a refused value is not used")
                 .isEqualTo("jasper-about:welcome");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Spec section 16: the plugin restores its saved browser items, each at once, unshown, at its saved address, or at
+     * the start page when it saved none.
+     */
+    @Test void savedBrowserItemsComeBackAtTheirAddressOrElseTheStartPage() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            host.setSetting(ID, "start_page", "example.org");
+            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            var saved = BrowserRestore.state(URI.create("https://example.com/docs"), Optional.of("docs")).orElseThrow();
+            assertThat(host.restoreTab(ID, window, "Docs", saved)).isPresent();
+            var docs = host.contentTabs().getLast();
+            assertThat(docs.window().id()).isEqualTo(window);
+            assertThat(docs.isActive()).as("placed, not shown").isFalse();
+            assertThat(host.contentPresentation(docs).location()).isEqualTo("https://example.com/docs");
+            assertThat(host.contentPresentation(docs).icon()).isEqualTo(BrowserItems.GLOBE);
+            assertThat(host.restoreState(docs)).contains(saved);
+            assertThat(host.restoreTab(ID, window, "Data", new dev.jasper.sdk.RestoreState(BrowserRestore.KIND, Map.of()))).isPresent();
+            assertThat(host.contentPresentation(host.contentTabs().getLast()).location()).as("the start page")
+                .isEqualTo("https://example.org");
+            assertThat(host.contentTabs()).hasSize(2);
+            assertThat(host.declinedRestores()).isEmpty();
             assertThat(host.failures()).isEmpty();
         } });
     }
