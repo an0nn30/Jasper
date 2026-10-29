@@ -1,6 +1,6 @@
 # Protean startup splash design
 
-**Status:** Composition, unified theme behavior and upward queue motion approved in conversation on 2026-10-29; implementation pending. Dimensions, timings and font choices below are implementation defaults. This amendment replaces the standard theme-dependent splash while retaining explicit presentation-plugin branding.
+**Status:** Composition, unified theme behavior and upward queue motion approved in conversation on 2026-10-29; implemented and independently reviewed. Dimensions, timings and font choices below are implementation defaults. This amendment replaces the standard theme-dependent splash while retaining explicit presentation-plugin branding.
 
 The user supplied `/Users/dustin/Downloads/Protean Terminal Startup Screen.png` and approved one Protean splash across every interface theme, including light, dark, imported and Desktop themes. The approved composition places a large, unboxed chevron/underscore mark on the left and **Protean** with **The terminal, transformed.** on the right. A live four-row startup queue sits below the tagline, with the actual build line beneath it and a red progress bar along the bottom. Jasper remains the application's identity outside this splash. Explicit plugin branding retains its supplied splash; an interface theme alone never changes the default splash.
 
