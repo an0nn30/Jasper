@@ -5,6 +5,7 @@
  * {@link dev.jasper.browser.page.Page}: the page loads it, or its item opens an item of its own beside itself.
  * {@code OpenerBridge}, with its page script {@code opener-bridge.js} and {@code BridgeJson}, opens a script's
  * {@code window.open} the same way and keeps the popup's {@code window.opener} working through the client's message
- * router. Depends on {@code engine} and {@code page}; it loads only once a page first asks for Chromium.
+ * router, within the limits {@code Isolation} reads from each main frame's response: its origin, a sandbox, and its
+ * opener policy. Depends on {@code engine} and {@code page}; it loads only once a page first asks for Chromium.
  */
 package dev.jasper.browser.links;

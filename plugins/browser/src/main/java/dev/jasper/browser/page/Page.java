@@ -28,6 +28,7 @@ public final class Page implements AutoCloseable {
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
     private final List<Runnable> closes = new CopyOnWriteArrayList<>();
+    private final List<Runnable> navigations = new CopyOnWriteArrayList<>();
     private BiFunction<String, TabPlacement, Optional<Page>> opener = (url, placement) -> Optional.empty();
     private Runnable itemCloser = () -> { }, itemShower = () -> { };
     // What the page loads once its browser can: first its start, then the last address asked for before that.
@@ -99,18 +100,23 @@ public final class Page implements AutoCloseable {
         if (closed) return;
         requested = url;
         address = url.toString();
+        navigated();
         if (ready) browser.loadURL(address);
         changed.run();
     }
 
     /** Goes back in the page's history, when it can. */
     public void back() {
-        if (ready && !closed) browser.goBack();
+        if (!ready || closed) return;
+        navigated();
+        browser.goBack();
     }
 
     /** Goes forward in the page's history, when it can. */
     public void forward() {
-        if (ready && !closed) browser.goForward();
+        if (!ready || closed) return;
+        navigated();
+        browser.goForward();
     }
 
     /** Loads the page again. */
@@ -275,6 +281,21 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Tells {@code listener} each time Jasper, not the page's document, sends the page elsewhere: {@link #load},
+     * {@link #back} or {@link #forward}, as the user's address field, Web menu and mouse buttons do. Chromium puts such a
+     * page in a window group of its own, apart from its opener and its popups.
+     *
+     * @param listener told on the UI thread, before the page goes
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onNavigate(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) return () -> { };
+        navigations.add(listener);
+        return () -> navigations.remove(listener);
+    }
+
+    /**
      * Tells {@code listener} once, when the page closes with its item; at once when it has closed already.
      *
      * @param listener told on the UI thread
@@ -310,6 +331,7 @@ public final class Page implements AutoCloseable {
         closed = true;
         loadStarts.clear();
         navigationButtons.clear();
+        navigations.clear();
         opener = (url, placement) -> Optional.empty();
         itemCloser = () -> { };
         itemShower = () -> { };
@@ -327,6 +349,11 @@ public final class Page implements AutoCloseable {
      */
     private CefFrame focusedFrame() {
         return ready && !closed ? browser.getFocusedFrame() : null;
+    }
+
+    /** Jasper sends the page elsewhere. */
+    private void navigated() {
+        for (Runnable listener : navigations) listener.run();
     }
 
     /** The mouse's back or forward button was released over the page. */

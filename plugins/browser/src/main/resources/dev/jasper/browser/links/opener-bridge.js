@@ -11,8 +11,9 @@
  *   page's own window.open.
  * - In a popup, window.opener is a stand-in for the opener with closed, focus() and postMessage(), and window.close()
  *   asks Jasper to close the popup's item.
- * - A message must be JSON, at most 1 MiB of it. Jasper checks its target origin against where the receiving page is,
- *   and the receiver gets a message event from the sender's origin whose source is its stand-in for the sender.
+ * - A message must be JSON, at most 1 MiB of it. Jasper checks its target origin against the receiving document's
+ *   origin, and the receiver gets a message event from the sender's origin whose source is its stand-in for the sender.
+ *   Origins are the documents' own (window.origin), which a sandbox can make opaque ("null").
  *
  * Running it again in the same document only applies the configuration again. A popup's location and document cannot
  * be read through its stand-in.
@@ -94,7 +95,7 @@
       let target = options !== null && typeof options === 'object' ? options.targetOrigin : options;
       target = target === undefined ? '/' : String(target);
       if (target === '/') {
-        target = window.location.origin;
+        target = window.origin;
       } else if (target !== '*') {
         try {
           target = new URL(target).origin;
@@ -198,7 +199,7 @@
 
     // Jasper delivers a message from the page at the other end of link `id`: its opener, or one of its popups.
     function deliver(id, from, data, origin, target) {
-      if (target !== '*' && target !== window.location.origin) return;
+      if (target !== '*' && target !== window.origin) return;
       let source;
       if (from === 'opener') {
         if (opener === null || opener.id !== id) return;

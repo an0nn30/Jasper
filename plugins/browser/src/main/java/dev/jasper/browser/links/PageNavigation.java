@@ -13,6 +13,9 @@ import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.handler.CefLifeSpanHandlerAdapter;
 import org.cef.handler.CefRequestHandlerAdapter;
+import org.cef.handler.CefResourceRequestHandler;
+import org.cef.misc.BoolRef;
+import org.cef.network.CefRequest;
 
 /**
  * Where a page's links and popups go (spec section 8): the client's one request handler, for a link Chromium would open
@@ -37,8 +40,8 @@ public final class PageNavigation {
 
     /**
      * Has Chromium install the handlers and the opener bridge on its client before any page is made on it; once, however
-     * often asked. Call it
-     * when a page first asks for Chromium, never at the plugin's start: this class names Chromium's types.
+     * often asked. Call it when a page first asks for Chromium, never at the plugin's start: this class names Chromium's
+     * types.
      *
      * @param chromium the plugin's Chromium
      */
@@ -47,13 +50,28 @@ public final class PageNavigation {
     }
 
     private static void install(CefClient client) {
-        client.addRequestHandler(new Links());
+        client.addRequestHandler(new Links(OpenerBridge.install(client)));
         client.addLifeSpanHandler(new Popups());
-        OpenerBridge.install(client);
     }
 
-    /** Links Chromium would open in a new tab or window, or download: Jasper places them itself. */
+    /**
+     * Links Chromium would open in a new tab or window, or download: Jasper places them itself. A main frame's navigation
+     * response also goes to the opener bridge, which keeps the limits its opener and content security policies set.
+     */
     private static final class Links extends CefRequestHandlerAdapter {
+        private final OpenerBridge bridge;
+
+        Links(OpenerBridge bridge) {
+            this.bridge = bridge;
+        }
+
+        @Override public CefResourceRequestHandler getResourceRequestHandler(CefBrowser browser, CefFrame frame, CefRequest request,
+                                                                             boolean isNavigation, boolean isDownload, String initiator,
+                                                                             BoolRef disableDefaultHandling) {
+            return isNavigation && browser instanceof PageBrowser && request.getResourceType() == CefRequest.ResourceType.RT_MAIN_FRAME
+                ? bridge.responses() : null;
+        }
+
         @Override public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String url, boolean userGesture) {
             if (browser instanceof PageBrowser page)
                 LinkRoute.link(url, page.view().lastPress(), userGesture, System.currentTimeMillis(), MAC_OS)
