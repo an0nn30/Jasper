@@ -180,8 +180,22 @@ final class OpenerBridge {
      * A document a page's main frame shows: its origin, empty when opaque; its opener policy; its sandbox; and whether
      * it is a page's first, empty document.
      */
-    private record Document(Optional<String> origin, OpenerPolicy policy, Sandbox sandbox, boolean initial) {
+    record Document(Optional<String> origin, OpenerPolicy policy, Sandbox sandbox, boolean initial) {
         static final Document FIRST = new Document(Optional.empty(), OpenerPolicy.UNSAFE_NONE, Sandbox.NONE, true);
+    }
+
+    /**
+     * The document a request came from as Chromium's thread saw it when it took the request: its address, and what the
+     * bridge knew of it then. A request is judged by this, never by what the page shows by the time the UI thread
+     * answers, so a document cannot send as the one that replaces it.
+     *
+     * @param address the document's address
+     * @param document what the bridge knew of it: its sandbox, opener policy and origin
+     */
+    record Sender(String address, Document document) {
+        Sender {
+            Objects.requireNonNull(document, "document");
+        }
     }
 
     /** One page's main frame. Guarded by the bridge's lock. */
@@ -267,23 +281,52 @@ final class OpenerBridge {
     }
 
     /**
-     * Answers a page's request. UI thread; it never throws for what a page sent.
+     * The document {@code page}'s main frame shows now, at the address {@code address} gives, read together under the
+     * lock a load start takes to record a new document. Chromium's thread, as it takes a request.
+     *
+     * @param page the page that asks
+     * @param address the main frame's address
+     * @return the sender
+     */
+    Sender sender(Page page, Supplier<String> address) {
+        synchronized (lock) {
+            return new Sender(address.get(), document(page));
+        }
+    }
+
+    /**
+     * Answers a page's request from the document it shows now: as {@link #request(Party, boolean, Sender, String, long)},
+     * with the sender taken at once.
      *
      * @param sender the page that asked
      * @param mainFrame whether its main frame asked, rather than a sub-frame
-     * @param senderAddress the address of the document that asked, as Chromium gave it with the request
+     * @param senderAddress the address of the document that asked
      * @param text the request, as the page's script sent it
      * @param nowMillis when it asked, in milliseconds since the epoch
      * @return the answer
      */
     Answer request(Party sender, boolean mainFrame, String senderAddress, String text, long nowMillis) {
+        return request(sender, mainFrame, sender(sender.page(), () -> senderAddress), text, nowMillis);
+    }
+
+    /**
+     * Answers a page's request. UI thread; it never throws for what a page sent.
+     *
+     * @param sender the page that asked
+     * @param mainFrame whether its main frame asked, rather than a sub-frame
+     * @param from the document that asked, as Chromium's thread saw it when it took the request
+     * @param text the request, as the page's script sent it
+     * @param nowMillis when it asked, in milliseconds since the epoch
+     * @return the answer
+     */
+    Answer request(Party sender, boolean mainFrame, Sender from, String text, long nowMillis) {
         if (!mainFrame) return SUB_FRAME;
         if (text != null && text.length() > REQUEST_LIMIT) return TOO_LONG;
         Map<String, Object> request = BridgeJson.object(text).orElse(null);
         if (request == null) return MALFORMED_REQUEST;
         return switch (request.get("op") instanceof String op ? op : "") {
-            case "open" -> open(sender, senderAddress, request, nowMillis);
-            case "post" -> post(sender, senderAddress, request);
+            case "open" -> open(sender, from, request, nowMillis);
+            case "post" -> post(sender, from, request);
             case "close" -> close(sender, request);
             case "focus" -> focus(sender, request, nowMillis);
             default -> MALFORMED_REQUEST;
@@ -379,18 +422,40 @@ final class OpenerBridge {
     }
 
     /**
+     * Answers an admitted query and settles it: {@code reply} is told the answer once, whatever happens. A failure inside
+     * is answered as one; an {@link Error} is answered and then thrown on. UI thread.
+     *
+     * @param sender the page that asked
+     * @param from the document that asked, as Chromium's thread saw it
+     * @param text the request
+     * @param nowMillis when it asked
+     * @param reply told the answer
+     */
+    void answer(Party sender, Sender from, String text, long nowMillis, Consumer<Answer> reply) {
+        Answer answer = new Answer(REFUSED, "Jasper could not answer this request.");
+        try {
+            answer = request(sender, true, from, text, nowMillis);
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "The opener bridge could not answer a page", failure);
+        } finally {
+            settled(sender.page());
+            reply.accept(answer);
+        }
+    }
+
+    /**
      * {@code window.open}: with the page's activation, which it consumes, opens the address in a new tab next to the
      * page's and links the two, answering the link's id; with {@code noopener}, opens it without a link. Only what the
      * page could open itself, and nothing from a document whose sandbox blocks popups; either refusal keeps the
      * activation.
      */
-    private Answer open(Party sender, String senderAddress, Map<String, Object> request, long nowMillis) {
+    private Answer open(Party sender, Sender asker, Map<String, Object> request, long nowMillis) {
         if (!only(request, "url", "noopener") || !(request.get("url") instanceof String url)
                 || !(request.getOrDefault("noopener", Boolean.FALSE) instanceof Boolean detached))
             return MALFORMED_REQUEST;
-        if (!LinkRoute.opensFrom(senderAddress, url))
+        if (!LinkRoute.opensFrom(asker.address(), url))
             return new Answer(REFUSED, "A page can open only http, https and about:blank addresses, and local ones only from a local page.");
-        Document from = document(sender.page());
+        Document from = asker.document();
         if (from.sandbox().blocksPopups()) return new Answer(REFUSED, "This page's sandbox does not allow popups.");
         if (!sender.activation().consume(nowMillis)) return new Answer(REFUSED, "A popup opens only after a click or key press in the page.");
         Optional<Page> opened = sender.page().openItem(url, TabPlacement.NEXT_TAB);
@@ -403,7 +468,7 @@ final class OpenerBridge {
             link = new Link(id, sender, opened.get());
             links.put(id, link);
             // Until it loads, the popup shows its first, empty document, which takes the opener's origin and policy.
-            Optional<String> origin = from.sandbox().opaque() ? Optional.empty() : Isolation.origin(senderAddress);
+            Optional<String> origin = from.sandbox().opaque() ? Optional.empty() : Isolation.origin(asker.address());
             frames.computeIfAbsent(link.popup, any -> new Frame()).document = new Document(origin, from.policy(), Sandbox.NONE, true);
         }
         watch(link);
@@ -415,7 +480,7 @@ final class OpenerBridge {
      * the target origin is {@code "*"} or the receiving document's origin now. A message to a popup that has not started
      * loading is lost, as one to a popup's first empty page is, and the answer never tells whether the origin matched.
      */
-    private Answer post(Party sender, String senderAddress, Map<String, Object> request) {
+    private Answer post(Party sender, Sender asker, Map<String, Object> request) {
         if (!only(request, "id", "targetOrigin", "data") || !(request.get("targetOrigin") instanceof String target)
                 || !(request.get("data") instanceof String data))
             return MALFORMED_REQUEST;
@@ -424,20 +489,19 @@ final class OpenerBridge {
         if (data.length() > MESSAGE_LIMIT) return TOO_LONG;
         boolean fromOpener;
         Party receiver;
-        Document sent, received;
+        Document received;
         synchronized (lock) {
             Link link = links.get(id);
             if (link == null || !link.has(sender.page())) return NOT_PARTY;
             if (link.opener == null) return OTHER_CLOSED;
             fromOpener = link.opener == sender.page();
             receiver = fromOpener ? link.popupParty : link.openerParty;
-            sent = document(sender.page());
             received = document(fromOpener ? link.popup : link.opener);
         }
         if (receiver == null) return DONE;
         Optional<String> origin = received.sandbox().opaque() ? Optional.empty() : Isolation.origin(receiver.address().get());
         if (!target.equals("*") && !origin.map(target::equals).orElse(false)) return DONE;
-        String from = sent.sandbox().opaque() ? "null" : Isolation.origin(senderAddress).orElse("null");
+        String from = asker.document().sandbox().opaque() ? "null" : Isolation.origin(asker.address()).orElse("null");
         tell(receiver, call("deliver", Long.toString(id), fromOpener ? "opener" : "popup", data, from, target));
         return DONE;
     }
@@ -650,21 +714,9 @@ final class OpenerBridge {
                 }
                 admitted = true;
                 Party sender = Party.of(shown, page);
-                String address = frame.getURL();
+                Sender from = bridge.sender(page, frame::getURL);
                 long now = System.currentTimeMillis();
-                Page asking = page;
-                EventQueue.invokeLater(() -> {
-                    Answer answer;
-                    try {
-                        answer = bridge.request(sender, true, address, request, now);
-                    } catch (RuntimeException failure) {
-                        LOG.log(System.Logger.Level.WARNING, "The opener bridge could not answer a page", failure);
-                        answer = new Answer(REFUSED, "Jasper could not answer this request.");
-                    } finally {
-                        bridge.settled(asking);
-                    }
-                    reply(callback, answer);
-                });
+                EventQueue.invokeLater(() -> bridge.answer(sender, from, request, now, answer -> reply(callback, answer)));
                 return true;
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "The opener bridge could not take a page's request", failure);

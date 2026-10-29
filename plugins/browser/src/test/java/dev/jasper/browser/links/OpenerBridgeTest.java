@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The opener bridge's Java side (spec section 8; plan 4a Task 8). Each page's document is a recording stand-in that
@@ -248,6 +249,76 @@ class OpenerBridgeTest {
             bridge.loadStarted(opener.party(), APP);
             assertThat(ask(opener, open(LOGIN)).ok()).as("a response for another address is not this document's").isTrue();
             assertThat(opener.opened).hasSize(2);
+        });
+    }
+
+    /**
+     * A request is judged by the document that sent it as Chromium's thread saw it when it took the request: a sandboxed
+     * document whose page has since committed an unsandboxed one sends from "null" still, and still opens nothing.
+     */
+    @Test void aRequestKeepsTheSandboxItsDocumentHadWhenItWasTaken() throws Exception {
+        onUiThread(() -> {
+            var link = link();
+            bridge.responded(link.popup.page, LOGIN, null, List.of("sandbox allow-scripts allow-popups"));
+            bridge.loadStarted(link.popup.party(), LOGIN);
+            var sandboxed = bridge.sender(link.popup.page, () -> LOGIN);
+            bridge.loadStarted(link.popup.party(), LOGIN);
+            assertThat(bridge.request(link.popup.party(), true, sandboxed, post(link.id, "*", "1"), NOW).ok()).isTrue();
+            assertThat(link.opener.scripts).singleElement().asString().contains(",\"1\",\"null\",\"*\")");
+            assertThat(ask(link.popup, post(link.id, "*", "2")).ok()).isTrue();
+            assertThat(link.opener.scripts).as("the unsandboxed document that followed").hasSize(2).last().asString()
+                .contains(",\"2\",\"https://login.example\",\"*\")");
+
+            var opener = new Document(APP);
+            bridge.responded(opener.page, APP, null, List.of("sandbox allow-scripts allow-same-origin"));
+            bridge.loadStarted(opener.party(), APP);
+            var blocked = bridge.sender(opener.page, () -> APP);
+            bridge.loadStarted(opener.party(), APP);
+            opener.activation.activate(NOW - 100);
+            assertThat(bridge.request(opener.party(), true, blocked, open(LOGIN), NOW).code()).isEqualTo(OpenerBridge.REFUSED);
+            assertThat(opener.activation.active(NOW)).isTrue();
+            assertThat(opener.opened).isEmpty();
+            assertThat(ask(opener, open(LOGIN)).ok()).as("the unsandboxed document that followed").isTrue();
+        });
+    }
+
+    /**
+     * A stray Back or Forward over a page with no history that way, such as a sign-in popup, does nothing and keeps its
+     * link; one the page's history allows sends the page elsewhere and ends it.
+     */
+    @Test void backOrForwardEndsALinkOnlyWhenThePagesHistoryAllowsIt() throws Exception {
+        onUiThread(() -> {
+            var link = link();
+            history(link.popup.page, false, false);
+            link.popup.page.back();
+            link.popup.page.forward();
+            assertThat(bridge.links()).isEqualTo(1);
+            assertThat(link.opener.scripts).isEmpty();
+            history(link.popup.page, false, true);
+            // The page here has no browser, so going forward fails once the link has ended.
+            assertThatThrownBy(link.popup.page::forward).isInstanceOf(NullPointerException.class);
+            assertThat(bridge.links()).isZero();
+            assertThat(link.opener.scripts).singleElement().asString().contains(".closed(\"" + link.id + "\")");
+        });
+    }
+
+    /** An admitted query is answered and settled whatever happens on the UI thread; an Error is answered, then thrown on. */
+    @Test void anAdmittedQueryIsAnsweredAndSettledEvenWhenAnErrorEscapes() throws Exception {
+        onUiThread(() -> {
+            var link = link();
+            var answers = new java.util.ArrayList<Answer>();
+            var from = bridge.sender(link.popup.page, () -> LOGIN);
+            assertThat(bridge.admit(link.popup.page, true, post(link.id, "*", "1"))).isEmpty();
+            bridge.answer(link.popup.party(), from, post(link.id, "*", "1"), NOW, answers::add);
+            assertThat(answers).singleElement().satisfies(answer -> assertThat(answer.ok()).isTrue());
+            assertThat(bridge.waiting()).isZero();
+
+            var broken = new Error("the page's browser broke");
+            link.opener.breaking = broken;
+            assertThat(bridge.admit(link.popup.page, true, post(link.id, "*", "2"))).isEmpty();
+            assertThatThrownBy(() -> bridge.answer(link.popup.party(), from, post(link.id, "*", "2"), NOW, answers::add)).isSameAs(broken);
+            assertThat(answers).hasSize(2).last().satisfies(answer -> assertThat(answer.code()).isEqualTo(OpenerBridge.REFUSED));
+            assertThat(bridge.waiting()).isZero();
         });
     }
 
@@ -623,6 +694,7 @@ class OpenerBridgeTest {
         final List<Document> popups = new java.util.ArrayList<>();
         String address;
         boolean showing = true, failing;
+        Error breaking;
         int closes, shows;
 
         Document(String address) {
@@ -643,6 +715,7 @@ class OpenerBridgeTest {
 
         Party party() {
             return new Party(page, activation, () -> showing, script -> {
+                if (breaking != null) throw breaking;
                 if (failing) throw new IllegalStateException("the page's browser has gone");
                 scripts.add(script);
             }, () -> address);
@@ -704,6 +777,26 @@ class OpenerBridgeTest {
         assertThat(bridge.holds(opener.page)).isFalse();
         assertThat(bridge.holds(popup.page)).isTrue();
         return new WeakReference<>(opener.page);
+    }
+
+    /**
+     * Gives {@code page} the history Chromium would report, and has it ready, as a page whose browser exists is; its
+     * browser stays absent, so going where its history allows fails once the page has told its listeners.
+     */
+    private static void history(Page page, boolean back, boolean forward) {
+        try {
+            for (var field : List.of("ready", "canGoBack", "canGoForward")) {
+                var each = Page.class.getDeclaredField(field);
+                each.setAccessible(true);
+                each.setBoolean(page, switch (field) {
+                    case "canGoBack" -> back;
+                    case "canGoForward" -> forward;
+                    default -> true;
+                });
+            }
+        } catch (ReflectiveOperationException unexpected) {
+            throw new AssertionError(unexpected);
+        }
     }
 
     private static void awaitCollected(WeakReference<?> reference, String what) {

@@ -105,16 +105,16 @@ public final class Page implements AutoCloseable {
         changed.run();
     }
 
-    /** Goes back in the page's history, when it can. */
+    /** Goes back in the page's history, when it can: a page with nothing before this entry does nothing. */
     public void back() {
-        if (!ready || closed) return;
+        if (!ready || closed || !canGoBack) return;
         navigated();
         browser.goBack();
     }
 
-    /** Goes forward in the page's history, when it can. */
+    /** Goes forward in the page's history, when it can: a page with nothing after this entry does nothing. */
     public void forward() {
-        if (!ready || closed) return;
+        if (!ready || closed || !canGoForward) return;
         navigated();
         browser.goForward();
     }
@@ -281,8 +281,9 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * Tells {@code listener} each time Jasper, not the page's document, sends the page elsewhere: {@link #load},
-     * {@link #back} or {@link #forward}, as the user's address field, Web menu and mouse buttons do. Chromium puts such a
+     * Tells {@code listener} each time Jasper, not the page's document, sends the page elsewhere: {@link #load}, or a
+     * {@link #back} or {@link #forward} the page's history allows, as the user's address field, Web menu and mouse buttons
+     * do. Chromium puts such a
      * page in a window group of its own, apart from its opener and its popups.
      *
      * @param listener told on the UI thread, before the page goes
