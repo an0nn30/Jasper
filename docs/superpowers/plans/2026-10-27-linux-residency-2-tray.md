@@ -1,5 +1,7 @@
 # Linux residency 2: modern and legacy trays Implementation Plan
 
+**Task 10 tray withdrawal fixture deviation (2026-10-29): REVIEW PENDING.** Prove the legacy-to-modern handoff before checking only the subsequent failed withdrawal. Deterministic legacy-first ordering reproduces macOS CI’s failure; discovery and legacy-publication mutations fail the corrected test. Local tray scope passes 45 tests with one Linux-only skip; hosted confirmation remains pending.
+
 **Task 10 desktop recovery fixture deviation (2026-10-29): REVIEW PENDING.** Count the requested Qt/KDE helper launches independently of the asynchronous portal. A delayed portal reproduces Ubuntu’s failure before correction; 61 related local tests pass. Hosted confirmation remains pending.
 
 **Task 10 Windows runtime deviation (2026-10-29): REVIEW PENDING.** Replace expensive splash pixel collection diffs with exact array comparisons. The Windows app suite passed but the diagnostic deadline expired in Editor tests; hosted timing and complete Check remain pending.

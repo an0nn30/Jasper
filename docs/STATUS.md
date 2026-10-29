@@ -1,5 +1,7 @@
 # Jasper — Status and Handoff
 
+**PR #3 tray withdrawal CI follow-up — 2026-10-29: REVIEW PENDING.** The failed-withdrawal test first proves the legacy-to-modern handoff, then checks events from the withdrawal itself. A deterministic legacy-first ordering reproduces macOS CI’s failure before correction; mutations prove both discovery and legacy publication remain blocked. Local tray scope passes 45 tests with one Linux-only skip; hosted confirmation remains pending. This extends Task 10 test portability.
+
 **PR #3 desktop recovery CI follow-up — 2026-10-29: REVIEW PENDING.** The Qt/KDE crash test counts the requested helper launches independently of the asynchronous portal. Delaying portal startup reproduces Ubuntu’s failure and the corrected test passes; 61 related tests pass locally. Hosted confirmation remains pending. This extends Task 10 test portability.
 
 **PR #3 Windows runtime follow-up — 2026-10-29: REVIEW PENDING.** The hosted app suite passed after the cleanup and layout fixture changes; its 26-minute watchdog expired after Editor testing began. Splash image comparisons now use exact array equality, avoiding the collection diff sampled in the Windows worker while retaining every pixel check. Local focused tests and mutations pass; hosted timing and the SingleInstance intermittent timeout remain unconfirmed. This extends Task 10 CI portability.

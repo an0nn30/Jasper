@@ -64,10 +64,12 @@ class LinuxTrayRuntimeTest {
     }
     @Test void failedWithdrawalDoesNotResumeDiscoveryOrPublishLegacy() throws Exception {
         try (var f = new Fixture()) {
-            f.runtime.start(); f.observations.get().legacy().accept(true);
+            f.runtime.start(); f.observations.get().legacy().accept(true); f.settle();
             f.observations.get().host().accept(HOST); f.settle();
+            assertThat(f.events).endsWith("legacy.add", "legacy.remove", "modern.add", "discovery false");
+            f.events.clear();
             f.failWithdraw = true; f.observations.get().host().accept(null); f.settle();
-            assertThat(f.events).doesNotContain("discovery true", "legacy.add");
+            assertThat(f.events).containsExactly("modern.remove");
             assertThat(f.scheduler.getQueue()).hasSize(1); // retry only
         }
     }
