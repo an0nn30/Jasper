@@ -1,6 +1,7 @@
 package dev.jasper.browser.item;
 
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
@@ -67,6 +68,51 @@ class BrowserItemTest {
             assertThat(host.contentStatus(item.tab())).singleElement().satisfies(status -> assertThat(status.text()).isEqualTo("https://example.org/docs"));
             var welcome = items.open(URI.create("jasper-about:welcome"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
             assertThat(host.contentPresentation(welcome.tab()).title()).as("no title and no host").isEqualTo("Web Browser");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Spec section 16: the tab's location and status and the address field show an address without its credentials. */
+    @Test void anAddressWithAUserNameAndPasswordShowsWithoutThemAndSavesWithoutThem() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var item = items(host, page -> { }).open(URI.create("https://ada:secret@example.com/docs"), TabPlacement.NEW_TAB,
+                Optional.empty(), Optional.empty());
+            String shown = "https://example.com/docs";
+            assertThat(host.contentPresentation(item.tab()))
+                .isEqualTo(new ContentPresentation("example.com", "", BrowserItems.GLOBE, false, shown, ""));
+            assertThat(host.contentStatus(item.tab())).singleElement().satisfies(status -> {
+                assertThat(status.text()).isEqualTo(shown);
+                assertThat(status.tooltip()).isEqualTo(shown);
+            });
+            assertThat(Views.field(host.contentView(ID, "example.com").orElseThrow(), BrowserToolbar.ADDRESS).value()).isEqualTo(shown);
+            assertThat(host.restoreState(item.tab()).orElseThrow().values()).containsEntry("url", shown);
+            assertThat(item.url()).as("the page keeps them").isEqualTo(URI.create("https://ada:secret@example.com/docs"));
+            PageTestAccess.addressChanged(item.page(), "https://ada:secret@example.org/next");
+            assertThat(host.contentPresentation(item.tab()).location()).isEqualTo("https://example.org/next");
+            assertThat(host.restoreState(item.tab()).orElseThrow().values()).containsEntry("url", "https://example.org/next");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Spec section 5: while a new document without a title loads, the tab keeps the name it had, and once loaded it
+     * shows the address's host, whatever title the document before had.
+     */
+    @Test void aNewDocumentWithoutATitleKeepsTheTabsNameWhileItLoadsThenShowsItsHost() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var item = items(host, page -> { }).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            Page page = item.page();
+            PageTestAccess.titleChanged(page, "Example Domain");
+            assertThat(host.contentPresentation(item.tab()).title()).isEqualTo("Example Domain");
+            PageTestAccess.loadingChanged(page, true, true, false);
+            PageTestAccess.loadStarted(page, "https://example.org/");
+            PageTestAccess.addressChanged(page, "https://example.org/");
+            assertThat(page.title()).as("the document before's title is gone").isEmpty();
+            assertThat(host.contentPresentation(item.tab()).title()).as("loading: the name it had").isEqualTo("Example Domain");
+            PageTestAccess.loadingChanged(page, false, true, false);
+            assertThat(host.contentPresentation(item.tab()).title()).as("loaded without a title: its host").isEqualTo("example.org");
+            PageTestAccess.titleChanged(page, "Example Org");
+            assertThat(host.contentPresentation(item.tab()).title()).isEqualTo("Example Org");
             assertThat(host.failures()).isEmpty();
         } });
     }

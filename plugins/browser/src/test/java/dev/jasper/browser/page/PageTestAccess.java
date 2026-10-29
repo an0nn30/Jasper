@@ -24,4 +24,26 @@ public final class PageTestAccess {
     public static void addressChanged(Page page, String url) {
         page.addressChanged(url);
     }
+
+    /**
+     * The page's title is {@code title}, as the client's display handler tells it. UI thread.
+     *
+     * @param page a page
+     * @param title its title, or null
+     */
+    public static void titleChanged(Page page, String title) {
+        page.titleChanged(title);
+    }
+
+    /**
+     * The page loads or has stopped, and where it can go, as the client's load handler tells it. UI thread.
+     *
+     * @param page a page
+     * @param loading whether it loads
+     * @param canGoBack whether it can go back
+     * @param canGoForward whether it can go forward
+     */
+    public static void loadingChanged(Page page, boolean loading, boolean canGoBack, boolean canGoForward) {
+        page.loadingChanged(loading, canGoBack, canGoForward);
+    }
 }

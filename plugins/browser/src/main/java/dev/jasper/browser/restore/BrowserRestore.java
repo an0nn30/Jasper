@@ -32,6 +32,7 @@ public final class BrowserRestore {
      * The restore state of an item at {@code url}, opened for {@code target}: the keys {@code url} and {@code target},
      * each when present, within {@link RestoreState#MAX_CHARACTERS} counted over keys and values.
      * <ul>
+     *   <li>A URL is saved without its user name and password ({@link #withoutUserInfo}).</li>
      *   <li>A URL that would pass that budget is saved without its query and fragment; when it still would, no
      *       {@code url} is saved.</li>
      *   <li>A {@code data:} or {@code blob:} page saves no {@code url}.</li>
@@ -53,7 +54,7 @@ public final class BrowserRestore {
             - values.entrySet().stream().mapToInt(entry -> entry.getKey().length() + entry.getValue().length()).sum();
         String scheme = url.getScheme() == null ? "" : url.getScheme().toLowerCase(Locale.ROOT);
         if (!UNSAVED.contains(scheme)) {
-            String address = url.toString();
+            String address = withoutUserInfo(url).toString();
             if (address.length() > budget) address = withoutQueryAndFragment(address);
             if (address.length() <= budget && parses(address)) values.put(URL, address);
         }
@@ -79,6 +80,26 @@ public final class BrowserRestore {
         } catch (URISyntaxException notAnAddress) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * {@code url} without its user name and password, which an item neither saves nor shows: everything else in it
+     * stays as written, escapes included.
+     *
+     * @param url an address
+     * @return the address without its user information; {@code url} itself when it has none
+     */
+    public static URI withoutUserInfo(URI url) {
+        String userInfo = url.getRawUserInfo();
+        if (userInfo == null) return url;
+        // A URI with user information has a server authority, which starts with it and its '@'.
+        var address = new StringBuilder();
+        if (url.getScheme() != null) address.append(url.getScheme()).append(':');
+        address.append("//").append(url.getRawAuthority(), userInfo.length() + 1, url.getRawAuthority().length());
+        if (url.getRawPath() != null) address.append(url.getRawPath());
+        if (url.getRawQuery() != null) address.append('?').append(url.getRawQuery());
+        if (url.getRawFragment() != null) address.append('#').append(url.getRawFragment());
+        return URI.create(address.toString());
     }
 
     /**

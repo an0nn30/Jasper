@@ -20,6 +20,7 @@ import dev.jasper.sdk.ui.UiView;
 import dev.jasper.sdk.ui.ViewSpec;
 import java.awt.event.HierarchyEvent;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -30,7 +31,7 @@ import javax.swing.JComponent;
  * One page in one pane: a content tab whose one view holds the toolbar above the page's canvas, a custom content of
  * kind PREVIEW. The item asks for its page, and so for Chromium, the first time its view shows, not when it opens. Its
  * tab shows the page's title (as {@link TabTitle} gives it), the globe and, as its location and status, the page's
- * address. Its content commands {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and the mouse's
+ * address, which the address field shows too, each without a user name or password. Its content commands {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and the mouse's
  * back and forward buttons over the page go back and forward. It saves its URL and target with Jasper's workspace
  * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
  * UI thread.
@@ -309,7 +310,7 @@ public final class BrowserItem implements AutoCloseable {
 
     private void present() {
         if (closed || tab == null) return;
-        String address = page.address();
+        String address = shown(page.address());
         title = TabTitle.of(page.title(), host(address), title, page.loading());
         String shown = address.length() <= SHOWN_ADDRESS ? address : address.substring(0, SHOWN_ADDRESS) + "…";
         tab.setPresentation(new ContentPresentation(title, "", BrowserItems.GLOBE, false, shown, ""));
@@ -318,11 +319,21 @@ public final class BrowserItem implements AutoCloseable {
 
     private ViewSpec spec() {
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT, List.of(
-            toolbar.node(page.address(), page.loading(), page.canGoBack(), page.canGoForward()),
+            toolbar.node(shown(page.address()), page.loading(), page.canGoBack(), page.canGoForward()),
             new Nodes.Custom(PAGE, ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page"))));
     }
 
     private static Optional<String> host(String address) {
         return AddressInput.parse(address).map(URI::getHost);
+    }
+
+    /** {@code address} as the item shows it: without a user name or password. */
+    private static String shown(String address) {
+        if (address.indexOf('@') < 0) return address; // user information needs one; a data: address can run to megabytes
+        try {
+            return BrowserRestore.withoutUserInfo(new URI(address)).toString();
+        } catch (URISyntaxException notAUri) {
+            return address;
+        }
     }
 }

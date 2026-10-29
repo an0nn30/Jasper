@@ -95,6 +95,28 @@ class BrowserRestoreTest {
         assertThat(BrowserRestore.target(untargeted)).isEmpty();
     }
 
+    /** Spec section 16: an item never saves credentials, so a URL is saved without its user name and password. */
+    @Test void aUrlIsSavedWithoutItsUserNameAndPassword() {
+        URI url = URI.create("https://ada:s%40cret@example.com:8443/a%2Fb%20c?q=%E2%9C%93&x=1#part");
+        RestoreState state = BrowserRestore.state(url, Optional.of("docs")).orElseThrow();
+        assertThat(state.values()).containsOnly(entry("url", "https://example.com:8443/a%2Fb%20c?q=%E2%9C%93&x=1#part"), entry("target", "docs"));
+        assertThat(BrowserRestore.url(state)).contains(URI.create("https://example.com:8443/a%2Fb%20c?q=%E2%9C%93&x=1#part"));
+        assertThat(BrowserRestore.state(URI.create("http://ada@example.com/"), Optional.empty()).orElseThrow().values())
+            .as("a user name alone").containsExactly(entry("url", "http://example.com/"));
+        assertThat(BrowserRestore.state(URI.create("ftp://ada:pw@example.com"), Optional.empty()).orElseThrow().values())
+            .as("no path").containsExactly(entry("url", "ftp://example.com"));
+        assertThat(BrowserRestore.state(URI.create("http://ada:pw@[::1]:8080/x"), Optional.empty()).orElseThrow().values())
+            .as("an IPv6 host").containsExactly(entry("url", "http://[::1]:8080/x"));
+    }
+
+    @Test void anAddressWithoutAUserNameIsKeptAsItIs() {
+        for (URI url : List.of(EXAMPLE, START, URI.create("file:///Users/me/index.html"), URI.create("about:blank"),
+                URI.create("https://example.com/@ada?to=ada@example.com#@"), URI.create("mailto:ada@example.com")))
+            assertThat(BrowserRestore.withoutUserInfo(url)).as(url.toString()).isSameAs(url);
+        assertThat(BrowserRestore.withoutUserInfo(URI.create("HTTPS://Ada:pw@Example.COM/Path"))).as("the rest as written")
+            .hasToString("HTTPS://Example.COM/Path");
+    }
+
     /**
      * {@code workspace.toml} is plain text anyone can edit, so a saved url comes back only as an address the address field
      * would load, with one of its schemes, and a saved target only as WebLink allows one.
