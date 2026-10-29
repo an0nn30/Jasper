@@ -61,6 +61,8 @@ class ScrollLinkTest {
                 return null;
             });
             edt(() -> {
+                try {assertThat((java.util.List<?>)geometry.get(f.area.scrollLink)).as("previous map is populated").isNotEmpty();}
+                catch(IllegalAccessException e){throw new AssertionError(e);}
                 f.area.scrollLink.geometryChanged();
                 // Queue the edit behind the first rebuild, before that rebuild can queue its continuation.
                 SwingUtilities.invokeLater(edit);
