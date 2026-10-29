@@ -329,8 +329,18 @@ public final class BufferQueries {
         return localFiles.apply(uri).map(path -> new FileTarget(path.toString(), line, column));
     }
 
-    /** Soft-wrapped rows joined into one, and the clicked column on it. */
-    private record WrappedRow(RowText text, int column) { }
+    /** Soft-wrapped rows joined into one from {@code firstRow}, {@code width} cells a row, and the clicked column on it. */
+    private record WrappedRow(RowText text, int column, long firstRow, int width) {
+        /** The joined row's cells {@code from} to {@code to}, inclusive, as a stream selection over absolute rows. */
+        Selection cells(int from, int to) {
+            return joinedCells(firstRow, width, from, to);
+        }
+    }
+
+    /** Cells {@code from} to {@code to} of soft-wrapped rows read as one from {@code firstRow}, as a stream selection. */
+    private static Selection joinedCells(long firstRow, int width, int from, int to) {
+        return new Selection(firstRow + from / width, from % width, firstRow + to / width, to % width, false);
+    }
 
     /**
      * The wrapped screen rows around {@code absoluteRow} joined into one row, within {@link LogicalLine}'s bounds, and
@@ -357,21 +367,81 @@ public final class BufferQueries {
             }
         }
         int virtualColumn = (int) ((absoluteRow - range.firstRow()) * width) + column;
-        return Optional.of(new WrappedRow(new RowText(text.toString(), columns, lastColumns), virtualColumn));
+        return Optional.of(new WrappedRow(new RowText(text.toString(), columns, lastColumns), virtualColumn,
+            range.firstRow(), width));
     }
 
-    /** The word at an absolute row and column, as a stream selection. */
+    /**
+     * What a double-click at an absolute row and column selects, as a stream selection: the cells of the clicked cell's
+     * OSC 8 link, whatever its scheme; else the plain-text URL {@link LinkDetector#urlSpanAt} finds there, the one a
+     * Cmd-click opens; else the word {@link WordBoundaries} finds on the row. A link is followed across soft wraps within
+     * {@link LogicalLine}'s bounds; the URL is matched outside the lock, as {@link #fileLinkAt} matches.
+     */
     public Selection wordSelection(long row, int column) {
+        Selection word;
+        Optional<WrappedRow> wrapped;
         buffer.lock();
         try {
             TerminalRow line = lineAtLocked(row);
             if (line == null) {
                 return Selection.at(row, column, false);
             }
-            int[] word = WordBoundaries.wordAt(line, buffer.getWidth(), column);
-            return new Selection(row, word[0], row, word[1], false);
+            int width = buffer.getWidth();
+            int at = Math.max(0, Math.min(width - 1, column));
+            String link = at < line.length() ? line.attributesAt(at).link() : null;
+            if (link != null) {
+                return hyperlinkLocked(row, at, link);
+            }
+            int[] cells = WordBoundaries.wordAt(line, width, at);
+            word = new Selection(row, cells[0], row, cells[1], false);
+            wrapped = wrappedRowLocked(row, at);
         } finally {
             buffer.unlock();
+        }
+        return wrapped.flatMap(joined -> LinkDetector.urlSpanAt(joined.text(), joined.column())
+            .map(url -> joined.cells(url.firstColumn(), url.lastColumn()))).orElse(word);
+    }
+
+    /**
+     * The run of cells around an absolute row and column that carry {@code link}, followed across the soft-wrapped rows
+     * of its {@link LogicalLine}. Call with the buffer lock held.
+     */
+    private Selection hyperlinkLocked(long row, int column, String link) {
+        int width = buffer.getWidth();
+        LogicalLine range = LogicalLine.around(row, width, this::lineAtLocked);
+        long firstRow = range.firstRow();
+        int last = range.rowCount() * width - 1;
+        int from = (int) (row - firstRow) * width + column;
+        int to = from;
+        RowLinks links = new RowLinks(width);
+        while (from > 0 && link.equals(links.at(firstRow + (from - 1) / width, (from - 1) % width))) {
+            from--;
+        }
+        while (to < last && link.equals(links.at(firstRow + (to + 1) / width, (to + 1) % width))) {
+            to++;
+        }
+        return joinedCells(firstRow, width, from, to);
+    }
+
+    /** The OSC 8 links of a row's cells, read again only when asked about another row. Use with the buffer lock held. */
+    private final class RowLinks {
+        private final char[] chars;
+        private final CellAttributes[] styles;
+        private long row;
+        private boolean read;
+
+        RowLinks(int width) {
+            chars = new char[width];
+            styles = new CellAttributes[width];
+        }
+
+        String at(long absoluteRow, int column) {
+            if (!read || absoluteRow != row) {
+                lineAtLocked(absoluteRow).readCells(chars.length, chars, styles);
+                row = absoluteRow;
+                read = true;
+            }
+            return styles[column].link();
         }
     }
 

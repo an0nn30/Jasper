@@ -230,11 +230,12 @@ wheel sends Up and Down arrow keys, one per notch, unless the program asked for 
 |---|---|
 | Drag | the text from where you pressed, flowing across lines |
 | Option-drag (macOS), Alt-drag (Linux, Windows) | a rectangle |
-| Double-click | a word; dragging on extends word by word |
+| Double-click | a word or a whole link; dragging on extends word by word |
 | Triple-click | the whole line, including the rows it wrapped onto |
 
-A word is a run of letters, digits and `_-./~:@%+=?&#`, so a path or URL selects whole; any other character selects
-itself. Dragging past the pane's edge does not scroll. The selection uses the scheme's selection colour. Typing clears
+A double-click on a link selects all of it, across the rows it wraps onto: an OSC 8 link's text, or a URL written as
+text exactly as Cmd-click or Ctrl-click opens it (see [Links and file paths](#links-and-file-paths)). Elsewhere a word
+is a run of letters, digits and `_-./~:@%+=?&#`, so a path selects whole; any other character selects itself. Dragging past the pane's edge does not scroll. The selection uses the scheme's selection colour. Typing clears
 the selection; so do output that overwrites the selected text, a width change (see [Resizing](#resizing)), clearing the
 scrollback and switching to or from the alternate screen.
 
