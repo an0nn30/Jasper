@@ -10,6 +10,8 @@
 
 **Spec:** [Approved Linux residency design](../specs/2026-10-27-linux-residency-design.md) and [approved XCB amendment](../specs/2026-10-28-linux-x11-tray-amendment-design.md).
 
+**Task 10 Windows CI deviation (2026-10-29): REVIEW PENDING.** Installer shortcut ownership recognizes equivalent existing paths by file identity; the tab-paint fixture detects ink against its background across opaque and blended rendering. Local installer and 18 PreviewPane tests pass; hosted Windows confirmation remains pending, and its retained diagnostics lack the image needed to establish the exact paint failure cause.
+
 **Task 10 Editor feedback fixture deviation (2026-10-29): REVIEW PENDING.** The hosted Vim feedback test waits for the bell flash to finish instead of assuming 250 ms timer delivery. A deliberately delayed timer reproduces the CI color mismatch before correction; six hosted preservation and 26 related Editor tests pass locally. Hosted rerun remains pending.
 
 **Task 10 markdown budget fixture deviation (2026-10-28): REVIEW PENDING.** Ubuntu CI timed out in the vendor lexer on one token-dense line; the output-budget fixture now distributes its tokens across short lines and separately checks escaped-markup accounting. Focused markdown/controller checks pass 67 tests each on Fedora and macOS; targeted mutations fail. A pathological token-dense single line remains a production performance limitation; hosted CI remains pending.
