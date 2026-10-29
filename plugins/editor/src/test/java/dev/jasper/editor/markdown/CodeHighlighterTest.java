@@ -2,6 +2,7 @@ package dev.jasper.editor.markdown;
 
 import dev.jasper.editor.testsupport.MarkdownFixture;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.fife.ui.rsyntaxtextarea.TokenTypes;
@@ -29,11 +30,14 @@ class CodeHighlighterTest {
         var probe = new MarkdownFixture.Probe(true);
         var failure = new AtomicReference<Throwable>();
         var completed = new AtomicLong();
-        String source = "```" + MarkdownFixture.LANGUAGE + "\n" + "int ".repeat(520_000) + "\n```\n";
+        // Keep a near-limit line without creating a million tokens: the vendor token pool grows by ten.
+        String source = "int " + "x".repeat(2_080_000) + ";";
+        var out = new MarkdownLimits.Html();
         try (var ignored = MarkdownFixture.lexer(probe)) {
+            var highlighter = new CodeHighlighter(MarkdownFixture.LANGUAGE, MarkdownRendererTest.palette());
             long started = System.nanoTime();
             var worker = new Thread(() -> {
-                try { MarkdownRendererTest.render(source); }
+                try { highlighter.line(source, out); }
                 catch (Throwable thrown) { failure.set(thrown); }
                 finally {
                     completed.set(System.nanoTime());
@@ -41,18 +45,21 @@ class CodeHighlighterTest {
                     probe.firstToken.countDown();
                 }
             }, "markdown-cancel-measurement");
+            worker.setDaemon(true);
             worker.start();
             long interrupted;
             try {
-                probe.firstToken.await();
+                assertThat(probe.firstToken.await(10, TimeUnit.SECONDS)).as("real lexer reached its first token").isTrue();
                 assertThat(probe.sawToken.get()).isTrue();
                 interrupted = System.nanoTime();
                 worker.interrupt();
             } finally {
                 probe.release.countDown();
-                worker.join();
+                worker.join(10_000);
             }
+            assertThat(worker.isAlive()).as("cancelled lexer finished").isFalse();
             assertThat(failure.get()).isInstanceOf(CancellationException.class);
+            assertThat(out.toString()).as("interruption precedes highlighted markup").isEmpty();
             assertThat(probe.passes.get()).isEqualTo(1);
             assertThat(probe.lexerReturned).isGreaterThanOrEqualTo(interrupted);
             assertThat(completed.get()).isGreaterThanOrEqualTo(probe.lexerReturned);
