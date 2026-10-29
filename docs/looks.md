@@ -187,7 +187,7 @@ The base gives every key its starting value (the columns below) and also decides
 | `status_bar` | `segments`, `cells` | `segments` | `cells` | Slash-separated segments, or ruled cells. |
 | `palette` | `anchored`, `run_window` | `anchored` | `run_window` | The command palette card under the title field, or the Run window, which opens centred across the upper part of the workspace until it has a saved place, with **▶ Run…** leading the status bar ([the Run window](command-palette.md#the-run-window)). |
 | `dialogs` | `as_requested`, `classic` | `as_requested` | `classic` | Dialogs as each one asks ([`DialogSpec.Presentation`](sdk-reference.html#dev.jasper.sdk.ui.DialogSpec.Presentation)), or overlay and attached-sheet dialogs drawn inside their window as classic dialogs. |
-| `motion` | `standard`, `none` | `standard` | `none` | Motion as `ui.animations.enabled` says, or none in the windows; `none` hides that setting. The [fallback splash](#branding)'s turtle follows the setting under either value. |
+| `motion` | `standard`, `none` | `standard` | `none` | Motion as `ui.animations.enabled` says, or none in the windows; `none` hides that setting. The [Protean splash](#branding)'s queue follows the setting under either value. |
 | `icons` | `new_ui`, `classic` | `new_ui` | `classic` | The workspace chrome's icons: the New UI artwork, or IntelliJ's classic icons. `classic` draws them for add, split, maximize, settings, new window and search in each window's header and status bar, in tool window headers and in plugins' toolbar views (the New UI artwork for the rest, and a panel's or window's body keeps its own), and on a labelled stripe draws IntelliJ's classic tool-window icons for `network`, `folder`, `tunnel`, `download`, `server` and `bell` and any other icon as a monochrome glyph in the label's colour (an identity name such as `more.vertical` keeps its authored art). Under `new_ui` a stripe label draws what the icon rails draw. |
 | `toolbar_search` | `field`, `icon` | `field` | `field` | Under a `native` or `classic` title bar: the toolbar's "Search everywhere" field with the palette's shortcut, or IntelliJ Classic's **Search Everywhere** button, an icon-only magnifier before **Settings…** whose tooltip names the palette's shortcut, icon-only in every `window.toolbar` mode. Either opens the palette. `icon` needs `palette = "run_window"` and `title_bar = "native"` or `"classic"`. |
 
@@ -364,13 +364,13 @@ All three keys are required when the table is present.
 | `icons` | a folder path, or `@jasper` | The folder holding `icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-64.png`, `icon-128.png`, `icon-256.png` and `icon-1024.png`, each a PNG of exactly that many pixels square. They replace Jasper's application icon in every window and in the Dock or taskbar, on every launch. `@jasper` keeps Jasper's own icon, in the windows, the Dock or taskbar and the splash. |
 | `splash_art` | an `.svg` path | The art at the top of the splash screen. |
 
-A start that opens a window (not `--background`, `--no-window` or `--safe-mode`) shows a 720 × 440 splash screen until
+A start that opens a window (not `--background`, `--no-window` or `--safe-mode`) shows a splash screen until
 the first Jasper window has painted, or until start-up stops. It names each step as start-up reaches it ("Starting
 Java runtime…", "Reading configuration…", "Loading plugin: *name*" for each plugin, "Restoring workspace…", then
-"Starting *product* Workstation…", *product* being `[branding] product` or else Jasper), and a progress bar along its
+"Starting *product* Workstation…", *product* being `[branding] product` or else Protean), and a progress bar along its
 bottom edge fills with each step. A splash that cannot be drawn is skipped and logged.
 
-With `[branding]` the splash is the look's: the art drawn into its top 718 × 250 pixels, the 64-pixel icon (128 on a 2×
+With `[branding]` the 720 × 440 splash is the look's: the art drawn into its top 718 × 250 pixels, the 64-pixel icon (128 on a 2×
 screen), the product name in the interface face's semibold, Jasper's version in the data face, the step and the
 copyright line. Jasper draws the rest the same for every look and theme: a grey border, a grey rule under the art, a
 dark-blue gradient below it with the name in white and the version, step and copyright lines in light blue, and the
@@ -380,12 +380,11 @@ The splash art must be an `svg` document without a DOCTYPE, processing instructi
 `animate`, `animateTransform` or `set` elements, `on…` or `base` attributes, links or CSS `url()` other than to `#id`
 fragments in the file, `\` or `@` in an attribute value or a `<style>` element, or nesting deeper than 128 elements.
 
-A look without `[branding]`, such as the default look or Enterprise, keeps Jasper's Shell Prompt icon and shows
-a still landscape and turtle illustration for the saved interface theme active at startup: Jasper Meadow, Slate
-Cobalt, Ubuntu Yaru or one of Catppuccin's four flavours. Custom themes and Desktop colors use Meadow art. A theme
-change chooses new artwork on the next launch. Runtime text shows "Jasper", "Make yourself at 127.0.0.1", the version,
-the step and "Your infrastructure. One workspace.", above the progress bar. If an illustration cannot be drawn, the
-original Meadow splash draws instead; its turtle is animated unless `ui.animations.enabled = false`.
+A look without `[branding]`, such as the default look or Enterprise, keeps Jasper's application icon and shows the
+840 × 480 Protean splash across interface themes. Its four-row queue uses the resolved plugin names, with the active
+step in white and upcoming steps dimmed. Completed rows slide upward and fade as the next rises, unless
+`ui.animations.enabled = false`. The actual build line sits below the queue. Startup completion or failure closes it
+immediately, including during motion.
 
 ### Messages
 
@@ -515,7 +514,7 @@ font_family = "IBM Plex Mono"
   base's values, except `title_bar` (`classic` for the base's `native`), `window_title` and `toolbar_search` (`icon`
   for the base's `field`).
 - The fonts sit in `presentation/fonts/`, inside the kit file's folder. There is no `[branding]`, so the look keeps
-  Jasper's Shell Prompt icon and Meadow splash.
+  Jasper's application icon and Protean splash.
 - `[defaults]` makes Jasper Meadow (`jasper-meadow`) the theme for both appearances, as the core defaults do, shows 8
   Run window rows, makes the toolbar 28 pixels high, IntelliJ's, and shows its buttons as icons only; its Editor table
   draws the Editor's documents in IBM Plex Mono, the look's data face.

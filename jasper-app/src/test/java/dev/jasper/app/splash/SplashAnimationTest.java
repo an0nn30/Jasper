@@ -18,9 +18,12 @@ class SplashAnimationTest {
     @Test void framesRunWithoutTheEventThreadAndStopWhenClosed() throws Exception {
         var rendered = new CountDownLatch(2);
         var frames = new AtomicInteger();
+        var previous = new java.util.concurrent.atomic.AtomicLong();
         var animator = new SplashAnimation(tick -> {
             assertThat(javax.swing.SwingUtilities.isEventDispatchThread()).isFalse();
             assertThat(Thread.currentThread().isDaemon()).isTrue();
+            assertThat(tick).isGreaterThan(previous.getAndSet(tick));
+            assertThat(tick).as("monotonic elapsed-time clock, not frame counter").isGreaterThan(1_000_000L);
             frames.incrementAndGet(); rendered.countDown();
         });
         try {

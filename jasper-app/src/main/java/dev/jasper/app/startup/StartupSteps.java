@@ -1,6 +1,8 @@
 package dev.jasper.app.startup;
 
 import java.util.Objects;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.function.Consumer;
 
 /**
@@ -45,6 +47,7 @@ public final class StartupSteps {
     /** No splash: every call does nothing. */
     public static final StartupSteps NONE = new StartupSteps("Jasper", 0, step -> { }, () -> { }, true);
 
+    private List<String> queue = List.of();
     private final String product;
     private final int plugins;
     private Consumer<Step> show;
@@ -79,6 +82,42 @@ public final class StartupSteps {
         if (plugins < 0) throw new IllegalArgumentException("Negative plugin count: " + plugins);
         return new StartupSteps(product, plugins, show, close, false);
     }
+
+    /** Resolved startup labels, copied in startup order.
+     * @param product splash product name
+     * @param plugins resolved plugin names
+     * @return immutable labels
+     */
+    public static List<String> queue(String product, List<String> plugins) {
+        Objects.requireNonNull(product, "product");
+        if (product.isBlank()) throw new IllegalArgumentException("A splash names its product");
+        var labels = new ArrayList<String>();
+        labels.add(RUNTIME);
+        labels.add(CONFIGURATION);
+        for (String plugin : List.copyOf(plugins)) labels.add(PLUGIN + plugin);
+        labels.add(WORKSPACE);
+        labels.add("Starting " + product + " Workstation…");
+        return List.copyOf(labels);
+    }
+
+    /** Steps with the complete resolved queue.
+     * @param product splash product
+     * @param plugins resolved plugin names
+     * @param show step callback
+     * @param close close callback
+     * @return startup steps
+     */
+    public static StartupSteps of(String product, List<String> plugins, Consumer<Step> show, Runnable close) {
+        var labels = queue(product, plugins);
+        var steps = of(product, labels.size() - 4, show, close);
+        steps.queue = labels;
+        return steps;
+    }
+
+    /** Immutable resolved labels; empty for count-only callers.
+     * @return resolved queue
+     */
+    public List<String> queue() { return queue; }
 
     /** The step the splash shows now: the first until start-up reaches another. */
     public Step current() { return current; }

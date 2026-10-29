@@ -74,12 +74,6 @@ distributions { main { contents {
 } } }
 // Jasper's own license has one copy, at the root; the Licenses window reads it from the jar.
 tasks.named<ProcessResources>("processResources") {
-    // Package the same approved artwork as the companion, without importing Buddy internals.
-    from(rootProject.file("jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png")) {
-        into("dev/jasper/app/splash")
-        rename { "jasper-pixel.png" }
-    }
-
     from(rootProject.file("LICENSE.md")) {
         into("dev/jasper/app/about/licenses")
         rename { "jasper.md" }
