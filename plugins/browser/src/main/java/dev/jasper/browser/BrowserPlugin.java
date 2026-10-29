@@ -1,5 +1,6 @@
 package dev.jasper.browser;
 
+import dev.jasper.browser.dialogs.PageDialogs;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
@@ -49,6 +50,7 @@ public class BrowserPlugin implements Plugin {
         Chromium engine = chromium;
         var items = new BrowserItems(context, page -> {
             PageNavigation.prepare(engine);
+            PageDialogs.prepare(engine);
             page.start(engine);
         });
         var welcome = new WelcomePage(context.appearance());

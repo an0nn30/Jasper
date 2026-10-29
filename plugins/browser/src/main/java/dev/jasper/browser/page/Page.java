@@ -31,6 +31,8 @@ public final class Page implements AutoCloseable {
     private final List<Runnable> navigations = new CopyOnWriteArrayList<>();
     private BiFunction<String, TabPlacement, Optional<Page>> opener = (url, placement) -> Optional.empty();
     private Runnable itemCloser = () -> { }, itemShower = () -> { };
+    // Where the page's dialogs and file choosers show; its item gives it.
+    private DialogPlace dialogPlace;
     // What the page loads once its browser can: first its start, then the last address asked for before that.
     private URI requested;
     // Where the page is, as Chromium last reported it, or what it was last asked to load since.
@@ -281,6 +283,26 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Has the page's dialogs and file choosers show at {@code place}: the page's item gives it once it has its tab. It
+     * replaces the one before.
+     *
+     * @param place over the item's tab, with the plugin's kit and windows
+     */
+    public void setDialogPlace(DialogPlace place) {
+        Objects.requireNonNull(place, "place");
+        if (!closed) dialogPlace = place;
+    }
+
+    /**
+     * Where the page's dialogs and file choosers show.
+     *
+     * @return the place its item gave, or empty before that and after {@link #close()}
+     */
+    public Optional<DialogPlace> dialogPlace() {
+        return closed ? Optional.empty() : Optional.ofNullable(dialogPlace);
+    }
+
+    /**
      * Tells {@code listener} each time Jasper, not the page's document, sends the page elsewhere: {@link #load}, or a
      * {@link #back} or {@link #forward} the page's history allows, as the user's address field, Web menu and mouse buttons
      * do. Chromium puts such a
@@ -336,6 +358,7 @@ public final class Page implements AutoCloseable {
         opener = (url, placement) -> Optional.empty();
         itemCloser = () -> { };
         itemShower = () -> { };
+        dialogPlace = null;
         view.setHoverUrl("");
         PageBrowser page = browser;
         if (page != null) page.close(true);

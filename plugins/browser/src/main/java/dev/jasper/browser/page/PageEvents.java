@@ -25,10 +25,19 @@ import org.cef.network.CefRequest;
  * on its own UI thread (on macOS, AppKit's main thread), never Swing's, so what a page shows changes on the UI thread.
  * The hover address goes straight to the canvas, which takes it from any thread. A main frame's load start also goes,
  * at once and on Chromium's thread, to the hooks the {@code links} package gave the client
- * ({@link #onMainFrameLoadStart}).
+ * ({@link #onMainFrameLoadStart}). A page that enters fullscreen is told at once to leave it: Jasper refuses
+ * fullscreen (spec section 5).
  */
 public final class PageEvents {
     private static final Consumer<CefClient> INSTALL = PageEvents::install;
+    /**
+     * What a page that entered fullscreen runs in its main frame: it leaves fullscreen. Chromium may tell Jasper before
+     * the document's fullscreen element is set, so a document without one yet leaves on its next fullscreen change.
+     */
+    private static final String EXIT_FULLSCREEN = "(function () { function leave() { if (document.fullscreenElement) "
+        + "document.exitFullscreen().catch(function () { }); } if (document.fullscreenElement) leave(); "
+        + "else document.addEventListener('fullscreenchange', leave, { once: true }); })();";
+    private static final String EXIT_FULLSCREEN_URL = "jasper-about:exit-fullscreen.js";
     // The hooks each client was given, which hear its pages' main-frame load starts on Chromium's thread.
     private static final Map<CefClient, List<BiConsumer<PageBrowser, CefFrame>>> LOAD_STARTS =
         Collections.synchronizedMap(new WeakHashMap<>());
@@ -72,7 +81,10 @@ public final class PageEvents {
         if (page != null) EventQueue.invokeLater(() -> event.accept(page));
     }
 
-    /** The main frame's address and the page's title, and the address of the link under the pointer. */
+    /**
+     * The main frame's address and the page's title, the address of the link under the pointer, and the fullscreen a
+     * page is refused.
+     */
     private static final class Display extends CefDisplayHandlerAdapter {
         @Override public void onAddressChange(CefBrowser browser, CefFrame frame, String url) {
             if (frame != null && frame.isMain()) later(browser, page -> page.addressChanged(url));
@@ -85,6 +97,11 @@ public final class PageEvents {
         @Override public void onStatusMessage(CefBrowser browser, String value) {
             Page page = page(browser);
             if (page != null) page.hovered(value);
+        }
+
+        /** Jasper refuses fullscreen: a page that enters it leaves it at once. */
+        @Override public void onFullscreenModeChange(CefBrowser browser, boolean fullscreen) {
+            if (fullscreen && page(browser) != null) browser.executeJavaScript(EXIT_FULLSCREEN, EXIT_FULLSCREEN_URL, 0);
         }
     }
 

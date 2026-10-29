@@ -1,5 +1,6 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.page.DialogPlace;
 import dev.jasper.browser.page.NavigationButton;
 import dev.jasper.browser.page.Page;
 import dev.jasper.sdk.WindowOwner;
@@ -97,6 +98,8 @@ public final class BrowserItem implements AutoCloseable {
         tab.setCommands(List.of(new ContentCommand("copy", "Copy", null, true, this::copy),
             new ContentCommand("paste", "Paste", null, true, this::paste)));
         tab.onClosed(this::closed);
+        // The page's alerts, confirmations and file choosers show over this item's tab, and close with it.
+        page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
         items.opened(this);
         present();
     }
@@ -193,8 +196,12 @@ public final class BrowserItem implements AutoCloseable {
         return page.view();
     }
 
-    /** The item's page. */
-    Page page() {
+    /**
+     * The item's page.
+     *
+     * @return the page, which closes with the item
+     */
+    public Page page() {
         return page;
     }
 
