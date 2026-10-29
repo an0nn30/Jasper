@@ -22,13 +22,18 @@ The start page is `jasper-about:welcome` by default: Jasper's welcome page, in t
 
 Each page is the item of one pane. Its tab shows the page's title; while a page without a title loads, the tab keeps
 its previous name, and once loaded it shows the address's host, else "Web Browser". The tab's icon is a globe. The
-status bar shows the page's address, as the tab's tooltip does.
+status bar shows the page's address, as the tab's tooltip and the address field do, without any user name and password
+in it.
 
-- **Close Pane** closes a browser pane at once.
+- **Close Pane** closes a browser pane at once. A page's own `window.close()` closes its pane too, as Chrome closes the
+  tab; Chromium lets a page's script do so only while the page's history has a single entry, and a linked popup can
+  always close itself ([Popups](#popups)).
 - A page in a tab that is not shown draws one frame a second; its network requests go on.
 - Chromium starts the first time a browser page shows, not when Jasper starts, and runs until Jasper quits. When it
   cannot start, Jasper posts "The browser could not start" with the reason, such as "Chromium did not start within 90
-  seconds", and the plugin's log has it too.
+  seconds", and the plugin's log has it too. From then on the links Jasper hands the Browser open in the system browser
+  (a local web file in the Default editor), and New Browser Tab, New Browser Window and the Browser split item post the
+  notification again instead of opening a page.
 - All pages share one Chromium profile, kept across runs: cookies, session cookies included, the cache and other site
   data ([Files](#files)).
 
@@ -81,7 +86,7 @@ them in Settings › Keymap, under Browser ([Keyboard shortcuts](keyboard-shortc
 - A Cmd+Option drag (Ctrl+Alt on Linux and Windows) moves the pane, as over any pane, and the page does not get it.
 - Files and text dropped on a page reach it. A drag that starts in the page, such as a link, an image, selected text or
   a page's own draggable item, is cancelled.
-- Find, zoom and a right-click menu on the page do nothing yet in a browser tab.
+- Find, zoom and a right-click menu on the page do nothing in a browser tab.
 
 ## Links in a page
 
@@ -92,8 +97,8 @@ them in Settings › Keymap, under Browser ([Keyboard shortcuts](keyboard-shortc
 | Split | Cmd+Shift-click | Ctrl+Shift-click | in a new pane beside this one: to the right when the page is wider than tall, otherwise below |
 | Middle click | middle click | middle click | in a new tab right after this one |
 
-A Shift-click loads the link in the same page. Jasper does not download files yet: a link or page that downloads a
-file does nothing, and so does an Alt-click, which Chromium makes a download.
+A Shift-click loads the link in the same page. A link or page that downloads a file does nothing, and so does an
+Alt-click, which Chromium makes a download.
 
 Links that open a new tab or pane, and popups, open only at `http`, `https`, `file`, `about` and `jasper-about`
 addresses. A `mailto:` or `tel:` link opens nothing, however it is clicked.
@@ -133,7 +138,7 @@ those sent to `"*"`.
 
 Not supported:
 
-- reading the popup's `location` or `document` through its stand-in;
+- reading or setting the popup's `location`, or reading its `document`, through its stand-in;
 - messages that are not JSON, such as a `Blob`, an `ArrayBuffer` or transferred objects;
 - message handlers that require `event.isTrusted`;
 - reusing a named window: a `window.open` with a name opens a new tab each time, and does not target a named frame;
@@ -214,6 +219,7 @@ It loads the first time it shows, so restoring starts no Chromium; until then it
 - An address too long for the saved state (4,096 characters, counted with the target) is saved without its query and
   fragment, and when it is still too long, not at all.
 - A `data:` or `blob:` page saves no address. A `jasper-about:` page saves its address.
+- An address is saved without any user name and password in it.
 - A page that saved no address, or one the address field would not load, comes back at the start page.
 
 A page's back and forward history, form contents and scroll position do not come back.

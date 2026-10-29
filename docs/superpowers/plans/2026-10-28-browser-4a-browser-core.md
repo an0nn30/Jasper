@@ -3,10 +3,10 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Execution status (2026-10-28): Tasks 1-12 executed; Task 13 waits for the user** (commits `9f1d63fd1` to
-`eb1911b85`, then "Docs: the Browser plugin's core"; not merged or pushed; see `docs/STATUS.md`). Executed with per-task
-subagents and reviews; the controller's rulings are numbered R0-R46 (no R3 or R4). The task reviews recorded these
-deviations from the plan's text:
+**Execution status (2026-10-29): Tasks 1-12 executed, and the final review's fix wave; Task 13 waits for the user**
+(commits `9f1d63fd1` to `8258e223e`, then the fix wave; not merged or pushed; see `docs/STATUS.md`). Executed with
+per-task subagents and reviews; the controller's rulings are numbered R0-R48 (no R3 or R4). The task reviews recorded
+these deviations from the plan's text:
 - **Branch (R0):** executed on `claude/browser-core-88616a` (worktree `.claude/worktrees/infallible-shamir-39ac4e`),
   cut from `claude/browser-plugin-design` (`main` `0849270a3` plus this plan, `ec5395f79`), not on
   `claude/browser-core`.
@@ -152,6 +152,30 @@ deviations from the plan's text:
     `docs/plugin-authoring.md` and the jasper-app and SDK READMEs;
   - `./gradlew check --continue` passed: 13,850 tests, 0 failures, 0 errors, 32 skipped; the example external plugin's
     `check pluginZip` passed (1 test).
+- **The final review's fix wave (R48):**
+  - a page's own `window.close()` closes its item: `PageBrowser.doClose()` holds back a close Java did not ask for and
+    has the item close, whose close of the browser then goes ahead (it used to let every close go ahead, leaving a dead
+    pane);
+  - saved addresses drop their `user:password@` (R46), and the tab's tooltip, the status bar and the address field show
+    the address without it;
+  - `HostedUi` (app) lets go of a plugin dialog or overlay once it closes, instead of keeping it until the plugin stops;
+  - once Chromium has failed to start or has stopped, the role hands every link back, as it does an Open in Jasper
+    answered after that, and New Browser Tab, New Browser Window and the split item post the notification again
+    instead of opening a dead item;
+  - a main-frame load start clears the page's title; Javadoc and guide wording fixed (hidden pages, the plugin's stop,
+    `jasper-about` actions from `file:` pages, no "yet", a popup's `location`);
+  - `./gradlew check --continue` passed: 13,863 tests, 0 failures, 0 errors, 32 skipped; the example external plugin's
+    `check pluginZip` passed (1 test);
+  - deferred minors: sub-frame popups share the page's activation; a `NEXT_TAB` popup from a background opener lands
+    after the shown tab; hidden pages keep a full-resolution frame in memory (for Task 13's memory check); `NEXT_TAB`
+    was inserted mid-enum.
+
+**Release blocker, unverified (F5, R48):** Chromium runs in Jasper's process with its sandbox on, and JBR adds no
+`--no-sandbox`. On Linux distributions that restrict unprivileged user namespaces (Ubuntu 23.10 and later, through
+AppArmor), with no setuid `chrome-sandbox`, Chromium's zygote host may stop on `LOG(FATAL)` "No usable sandbox!" when
+the first browser item shows, ending Jasper and its terminals. Verify it on Linux before release; the mitigations are a
+setuid `chrome-sandbox` in the Linux packages, or a no-sandbox fallback only where Chromium would otherwise abort. On
+Windows, `java.exe` does not link `cef_sandbox`, so the sandbox is likely not in effect there (unverified).
 
 Known gaps and follow-ups: macOS two-finger swipe (no JBR gesture API); drags that start in a page are cancelled (R33);
 links and popups at other schemes, such as `mailto:`, open nothing in pages (R36); nothing downloads (no download
@@ -161,8 +185,7 @@ terminal does not select it whole, so Open URL in Split works on a drag selectio
 into the address field (R15, plan 4b); the address field gives `localhost:3000` and `192.168.1.10` `https://`, and a
 typed local path, underscored hosts and trailing-dot domains become searches (plan 4b); hidden pages drop to 1 fps but
 are not told they are hidden (R32); the opener bridge's `focus()` needs the user's activation (stricter than Chromium);
-a page's rapid repeated dialogs are refused (R43); saved URLs keep any `user:password@`, which R46 drops in the final
-fix wave; the Web menu's and the Open URL in Split actions are listed in the palette and Keymap where they do nothing;
+a page's rapid repeated dialogs are refused (R43); the Web menu's and the Open URL in Split actions are listed in the palette and Keymap where they do nothing;
 Edit › Copy and Paste chosen with the mouse while the address field has focus act on the page (an app follow-up); Ctrl+H
 deletes a character in the address field, which plan 5's History key must allow for; a local web file sent to the
 Default editor from the prompt opens without the clicked line. Questions for the user: the prompt does not show the
@@ -170,7 +193,8 @@ address; restored tabs that never showed show the host rather than their saved t
 iTerm2's copy.
 
 Task 13 (the GUI check on macOS, memory and AOT, each batch with the user's OK) has not run; Windows and Linux have not
-run.
+run. On Linux the first browser item must show, with Jasper staying up, on Ubuntu 24.04 with unprivileged user
+namespaces restricted and no setuid `chrome-sandbox` (F5).
 
 **Goal:** A bundled Browser plugin that shows Chromium pages as Jasper items, with:
 - the navigation toolbar, the Web menu and its keys;
