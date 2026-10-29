@@ -32,10 +32,10 @@ class ProteanSplashTest {
         for (double sx : new double[] {1, 1.25, 1.5, 1.75, 2, 4}) {
             for (double sy : new double[] {sx, 1.5}) {
                 var p = SplashPainter.protean(BUILD, LABELS, 1);
-                assertThat(p.width()).isEqualTo(840);
-                assertThat(p.height()).isEqualTo(480);
+                assertThat(p.width()).isEqualTo(672);
+                assertThat(p.height()).isEqualTo(384);
                 var buffer = new SplashBuffer(p);
-                var image = new BufferedImage((int) Math.ceil(840 * sx), (int) Math.ceil(480 * sy), BufferedImage.TYPE_INT_RGB);
+                var image = new BufferedImage((int) Math.ceil(672 * sx), (int) Math.ceil(384 * sy), BufferedImage.TYPE_INT_RGB);
                 var first = new StartupSteps.Step(LABELS.getFirst(), 1, LABELS.size());
                 var last = new StartupSteps.Step(LABELS.getLast(), LABELS.size(), LABELS.size());
                 var g = image.createGraphics();
@@ -53,7 +53,7 @@ class ProteanSplashTest {
                 fresh.paint(eg, last.text(), last.fraction());
                 eg.dispose();
                 assertThat(java.util.Arrays.equals(rgb(image), rgb(expected))).as("full pixel parity at %s x %s", sx, sy).isTrue();
-                assertThat(image.getRGB((int) (30 * sx), (int) (444 * sy)) & 0xffffff).isEqualTo(0xf34532);
+                assertThat(image.getRGB((int) (24 * sx), (int) (355 * sy)) & 0xffffff).isEqualTo(0xf34532);
             }
         }
     }
@@ -63,8 +63,8 @@ class ProteanSplashTest {
         var first = render(SplashPainter.protean("Build " + "long ".repeat(200), labels, 1), .2);
         var second = render(SplashPainter.protean("Build " + "long ".repeat(200), alternate, 1), .2);
         assertThat(java.util.Arrays.equals(rgb(first), rgb(second))).as("fifth row is outside the viewport").isTrue();
-        for (int y = 270; y < 390; y++) {
-            for (int x = 801; x < 840; x++) {
+        for (int y = 216; y < 312; y++) {
+            for (int x = 641; x < 672; x++) {
                 assertThat(first.getRGB(x, y) & 0xffffff).as("text ends before right margin").isEqualTo(0x212a33);
             }
         }
@@ -90,12 +90,14 @@ class ProteanSplashTest {
         assertThat(java.util.Arrays.equals(rgb(end), rgb(render(settled, .5)))).isTrue();
     }
 
+    // Region bounds use the approved composition coordinates.
     private static int ink(BufferedImage image, int left, int top, int right, int bottom) {
         int ink = 0;
-        for (int y = top; y < bottom; y++) for (int x = left; x < right; x++) {
-            int color = image.getRGB(x, y);
-            if (((color >> 16) & 255) > 140 && ((color >> 8) & 255) > 140) ink++;
-        }
+        for (int y = (int) Math.ceil(top * .8); y < (int) (bottom * .8); y++)
+            for (int x = (int) Math.ceil(left * .8); x < (int) (right * .8); x++) {
+                int color = image.getRGB(x, y);
+                if (((color >> 16) & 255) > 140 && ((color >> 8) & 255) > 140) ink++;
+            }
         return ink;
     }
 
@@ -123,27 +125,27 @@ class ProteanSplashTest {
         var directory = java.nio.file.Path.of("build/protean-splash-evidence");
         java.nio.file.Files.createDirectories(directory);
         for (int scale : new int[] {1, 2, 4}) {
-            var sheet = new BufferedImage(840 * scale, 480 * scale * 3, BufferedImage.TYPE_INT_RGB);
+            var sheet = new BufferedImage(672 * scale, 384 * scale * 3, BufferedImage.TYPE_INT_RGB);
             for (int row = 0; row < 3; row++) {
                 var p = SplashPainter.protean(BUILD, LABELS, scale);
                 int index = row == 0 ? 1 : row == 1 ? 3 : LABELS.size();
                 var step = new StartupSteps.Step(LABELS.get(index - 1), index, LABELS.size());
                 p.showStep(step, 0, false);
                 var g = sheet.createGraphics();
-                g.translate(0, 480 * scale * row);
+                g.translate(0, 384 * scale * row);
                 g.scale(scale, scale);
                 p.paint(g, step.text(), step.fraction());
                 g.dispose();
             }
             javax.imageio.ImageIO.write(sheet, "png", directory.resolve("static-" + scale + "x.png").toFile());
-            var motion = new BufferedImage(840 * scale, 480 * scale * 3, BufferedImage.TYPE_INT_RGB);
+            var motion = new BufferedImage(672 * scale, 384 * scale * 3, BufferedImage.TYPE_INT_RGB);
             for (int row = 0; row < 3; row++) {
                 var p = SplashPainter.protean(BUILD, LABELS, scale);
                 var step = new StartupSteps.Step(LABELS.get(1), 2, LABELS.size());
                 p.showStep(step, 1_000_000_000L, true);
                 p.animationTime(1_000_000_000L + 120_000_000L * row);
                 var g = motion.createGraphics();
-                g.translate(0, 480 * scale * row);
+                g.translate(0, 384 * scale * row);
                 g.scale(scale, scale);
                 p.paint(g, step.text(), step.fraction());
                 g.dispose();

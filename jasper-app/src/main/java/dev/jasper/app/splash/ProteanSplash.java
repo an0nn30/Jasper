@@ -17,7 +17,9 @@ import java.util.Map;
 
 /** Standard splash composition. All mutable state is owned by Splash's paint lock. */
 final class ProteanSplash {
-    static final int WIDTH = 840, HEIGHT = 480;
+    static final int WIDTH = 672, HEIGHT = 384;
+    private static final int DESIGN_WIDTH = 840, DESIGN_HEIGHT = 480;
+    private static final double COMPOSITION_SCALE = 0.8;
     private static final int TEXT_X = 348, TEXT_WIDTH = 450, QUEUE_BASELINE = 294, ROW_HEIGHT = 20;
     private static final int BAR_X = 29, BAR_Y = 441, BAR_WIDTH = 783, BAR_HEIGHT = 6;
     private static final Color BACKGROUND = SplashColors.PROTEAN_BACKGROUND, RED = SplashColors.PROTEAN_RED,
@@ -61,16 +63,27 @@ final class ProteanSplash {
         return rasters.computeIfAbsent(scale, factor -> mark.raster(212 * factor, 168 * factor));
     }
 
-    void paint(Graphics2D g, double fraction) {
+    void paint(Graphics2D target, double fraction) {
+        var g = (Graphics2D) target.create();
+        try {
+            g.scale(COMPOSITION_SCALE, COMPOSITION_SCALE);
+            paintComposition(g, fraction);
+        } finally {
+            g.dispose();
+        }
+    }
+
+    private void paintComposition(Graphics2D g, double fraction) {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
         g.setColor(BACKGROUND);
-        g.fillRect(0, 0, WIDTH, HEIGHT);
+        g.fillRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
         g.setPaint(new RadialGradientPaint(240, 240, 260, new float[] {0, 1},
             new Color[] {SplashColors.PROTEAN_GLOW, SplashColors.PROTEAN_CLEAR}));
-        g.fillRect(0, 0, WIDTH, HEIGHT);
+        g.fillRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
         int scale = Math.clamp((int) Math.ceil(Math.max(g.getTransform().getScaleX(), g.getTransform().getScaleY())), 1, 4);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         g.drawImage(raster(scale), 80, 134, 212, 168, null);
         text(g, "Protean", new Font(Font.SANS_SERIF, Font.BOLD, 96), WHITE, TEXT_X, 215, TEXT_WIDTH);
         text(g, "The terminal, transformed.", new Font(Font.SANS_SERIF, Font.PLAIN, 32), WHITE, TEXT_X, 255, TEXT_WIDTH);

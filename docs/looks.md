@@ -381,7 +381,7 @@ The splash art must be an `svg` document without a DOCTYPE, processing instructi
 fragments in the file, `\` or `@` in an attribute value or a `<style>` element, or nesting deeper than 128 elements.
 
 A look without `[branding]`, such as the default look or Enterprise, keeps Jasper's application icon and shows the
-840 × 480 Protean splash across interface themes. Its four-row queue uses the resolved plugin names, with the active
+672 × 384 Protean splash across interface themes. Its four-row queue uses the resolved plugin names, with the active
 step in white and upcoming steps dimmed. Completed rows slide upward and fade as the next rises, unless
 `ui.animations.enabled = false`. The actual build line sits below the queue. Startup completion or failure closes it
 immediately, including during motion.
