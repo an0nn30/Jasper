@@ -196,12 +196,8 @@ public final class BrowserItem implements AutoCloseable {
         return page.view();
     }
 
-    /**
-     * The item's page.
-     *
-     * @return the page, which closes with the item
-     */
-    public Page page() {
+    /** The item's page. */
+    Page page() {
         return page;
     }
 

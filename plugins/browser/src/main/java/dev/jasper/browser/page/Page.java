@@ -29,6 +29,7 @@ public final class Page implements AutoCloseable {
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
     private final List<Runnable> closes = new CopyOnWriteArrayList<>();
     private final List<Runnable> navigations = new CopyOnWriteArrayList<>();
+    private final List<Runnable> dialogResets = new CopyOnWriteArrayList<>();
     private BiFunction<String, TabPlacement, Optional<Page>> opener = (url, placement) -> Optional.empty();
     private Runnable itemCloser = () -> { }, itemShower = () -> { };
     // Where the page's dialogs and file choosers show; its item gives it.
@@ -303,6 +304,26 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Tells {@code listener} each time Chromium cancels the page's dialogs, as it does when a new document replaces the
+     * page's: a dialog shown or waiting to show for the page is then no longer asked.
+     *
+     * @param listener told on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onDialogsReset(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) return () -> { };
+        dialogResets.add(listener);
+        return () -> dialogResets.remove(listener);
+    }
+
+    /** Chromium cancels the page's dialogs: tells those who asked {@link #onDialogsReset}. Nothing after {@link #close()}. */
+    public void dialogsReset() {
+        if (closed) return;
+        for (Runnable listener : dialogResets) listener.run();
+    }
+
+    /**
      * Tells {@code listener} each time Jasper, not the page's document, sends the page elsewhere: {@link #load}, or a
      * {@link #back} or {@link #forward} the page's history allows, as the user's address field, Web menu and mouse buttons
      * do. Chromium puts such a
@@ -355,6 +376,7 @@ public final class Page implements AutoCloseable {
         loadStarts.clear();
         navigationButtons.clear();
         navigations.clear();
+        dialogResets.clear();
         opener = (url, placement) -> Optional.empty();
         itemCloser = () -> { };
         itemShower = () -> { };

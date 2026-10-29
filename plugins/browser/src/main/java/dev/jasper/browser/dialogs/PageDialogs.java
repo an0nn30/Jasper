@@ -3,6 +3,7 @@ package dev.jasper.browser.dialogs;
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
+import java.awt.EventQueue;
 import java.util.Vector;
 import java.util.function.Consumer;
 import org.cef.CefClient;
@@ -18,10 +19,10 @@ import org.cef.misc.BoolRef;
  * A page's dialogs (spec section 5): the client's one JavaScript dialog handler and one file dialog handler, which
  * answer every page's dialogs themselves, so Chromium shows none of its own. {@code alert()} and {@code confirm()} are
  * Jasper's modals over the page's item ({@link ScriptDialog}); {@code prompt()} shows nothing and returns null, as
- * iTerm2 has no handler for it; a page that asks before it unloads closes without asking; and a file input opens
- * Jasper's chooser over the item ({@link FileInput}). Chromium calls both handlers on its own UI thread; what Jasper
- * shows is posted to Swing's. A page's fullscreen request is refused by the {@code page} package's display handler, the
- * client's only one.
+ * iTerm2 has no handler for it; a page that asks before it unloads closes without asking; Chromium's reset of a page's
+ * dialogs ends the one shown or waiting; and a file input opens Jasper's chooser over the item ({@link FileInput}).
+ * Chromium calls both handlers on its own UI thread; what Jasper shows is posted to Swing's. A page's fullscreen request
+ * is refused by the {@code page} package's display handler, the client's only one.
  *
  * <p>JCEF keeps a client's first handler of each kind, so these are the only ones.
  */
@@ -66,6 +67,15 @@ public final class PageDialogs {
         @Override public boolean onBeforeUnloadDialog(CefBrowser browser, String message, boolean reload, CefJSDialogCallback callback) {
             callback.Continue(true, "");
             return true;
+        }
+
+        /**
+         * Chromium cancels the page's dialogs, as when a new document replaces the page's: the one shown or waiting goes,
+         * answered as cancelled. A callback Chromium has let go of takes the answer harmlessly.
+         */
+        @Override public void onResetDialogState(CefBrowser browser) {
+            Page page = page(browser);
+            if (page != null) EventQueue.invokeLater(page::dialogsReset);
         }
     }
 
