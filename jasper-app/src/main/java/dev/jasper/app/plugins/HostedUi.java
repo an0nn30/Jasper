@@ -244,6 +244,16 @@ final class HostedUi {
         return subscription(() -> { closers.remove(removal); removal.run(); });
     }
 
+    /**
+     * A dialog or overlay closes when the plugin stops, if it has not closed by then: once it closes, the plugin no
+     * longer holds it, so a plugin that opens many keeps only the open ones. UI thread.
+     */
+    private void closeWithPlugin(AuxiliarySurface surface) {
+        Runnable closer = surface::close;
+        closers.add(closer);
+        surface.onClosed(() -> closers.remove(closer));
+    }
+
     /** UI thread: removes whatever the plugin left registered, newest first. Removals are idempotent. */
     void closeAll() {
         List<Runnable> pending = new ArrayList<>(closers);
@@ -996,7 +1006,7 @@ final class HostedUi {
                 AuxiliarySurface surface = windows.overlay(spec.title(), spec.owner().id());
                 var ownerClosed = terminals.onWindowClosed(spec.owner().id(), () -> windows.closeOwned(spec.owner().id()));
                 surface.onClosed(ownerClosed::close);
-                closers.add(surface::close);
+                closeWithPlugin(surface);
                 return new OwnedDialog(surface);
             }
             @Override public boolean hasModal(WindowOwner owner) {
@@ -1040,7 +1050,7 @@ final class HostedUi {
                     var registration = content.entry.onClosed(surface::close);
                     surface.onClosed(() -> { registration.close(); if (pin != null) pin.close(); });
                 }
-                closers.add(surface::close);
+                closeWithPlugin(surface);
                 return new OwnedDialog(surface);
             }
         };
