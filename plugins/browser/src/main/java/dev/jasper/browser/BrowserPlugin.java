@@ -6,6 +6,8 @@ import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.links.PageNavigation;
+import dev.jasper.browser.routing.BrowserRole;
+import dev.jasper.browser.routing.WebAddressItems;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -22,8 +24,9 @@ import java.util.concurrent.RejectedExecutionException;
 
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
- * item, the globe they show, the Web menu, Settings › Browser and the welcome page, and makes Chromium's engine, which
- * starts Chromium only when a browser item first shows, so starting the plugin loads no Chromium class.
+ * item, the globe they show, the Web menu, Settings › Browser, the welcome page, the Browser as Jasper's web browser and
+ * the terminal's Open URL in Split items, and makes Chromium's engine, which starts Chromium only when a browser item
+ * first shows, so starting the plugin loads no Chromium class.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -70,6 +73,10 @@ public class BrowserPlugin implements Plugin {
         file.add(NEW_TAB);
         file.add(NEW_WINDOW);
         WebMenu.register(context, items);
+        // Spec section 9: the links Jasper opens come to the Browser first.
+        var role = new BrowserRole(context, items, settings);
+        context.platform().browser(role);
+        WebAddressItems.register(context, role, settings);
         running = true;
     }
 

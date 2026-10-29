@@ -58,7 +58,8 @@ class BrowserPluginTest {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
             host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
-            assertThat(host.declared(ID)).containsExactly("start_page");
+            assertThat(host.declared(ID)).containsExactly("start_page", "open_links_from_terminal", "open_local_web_files");
+            assertThat(host.browserPlugin()).as("Jasper's web browser").contains(ID);
             assertThat(host.invoke(BrowserPlugin.NEW_TAB, window, null)).isTrue();
             var tab = host.contentTabs().getLast();
             assertThat(tab.window().id()).isEqualTo(window);
