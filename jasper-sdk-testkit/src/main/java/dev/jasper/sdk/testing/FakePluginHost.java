@@ -801,7 +801,7 @@ public final class FakePluginHost implements AutoCloseable {
      * @param windowId a window
      * @return {@code top:<menuId>} lines, each plugin's menus in the order they were created; empty for a window that is
      *     not open
-     * @since 0.25.0
+     * @since 0.26.0
      */
     public List<String> menuBar(UUID windowId) {
         var window = workspace.window(windowId);
@@ -2046,7 +2046,7 @@ public final class FakePluginHost implements AutoCloseable {
      * those no provided editor opened.
      *
      * @return the files in request order
-     * @since 0.25.0
+     * @since 0.26.0
      */
     public List<Path> openedFiles() { return List.copyOf(openedFiles); }
 

@@ -163,7 +163,7 @@ public interface Windows {
      * @throws NullPointerException when {@code owner} is null
      * @throws IllegalStateException for a closed context or off-UI call
      * @throws UnsupportedOperationException if the host predates this query
-     * @since 0.25.0
+     * @since 0.26.0
      */
     default boolean hasModal(WindowOwner owner) {
         throw new UnsupportedOperationException("The modal query is unavailable");

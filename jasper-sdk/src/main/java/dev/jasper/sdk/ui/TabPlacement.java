@@ -17,7 +17,7 @@ public enum TabPlacement {
      * In a new tab of that window right after its shown tab, and shown; at the end of its strip when it shows none, as
      * {@link #NEW_TAB} places it.
      *
-     * @since 0.25.0
+     * @since 0.26.0
      */
     NEXT_TAB,
     /** In a new pane to the right of the focused pane of that window's shown tab. */

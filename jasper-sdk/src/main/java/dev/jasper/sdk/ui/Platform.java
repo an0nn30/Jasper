@@ -30,7 +30,7 @@ public interface Platform {
      * @param file the file
      * @throws NullPointerException when {@code file} is null
      * @throws UnsupportedOperationException if the host predates this call
-     * @since 0.25.0
+     * @since 0.26.0
      */
     default void openFile(Path file) {
         throw new UnsupportedOperationException("Opening files is unavailable");

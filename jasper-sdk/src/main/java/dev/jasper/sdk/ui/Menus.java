@@ -30,7 +30,7 @@ public interface Menus {
      * @return the menu
      * @throws IllegalArgumentException when the id is malformed, foreign or already in use
      * @throws UnsupportedOperationException if the host predates content menus
-     * @since 0.25.0
+     * @since 0.26.0
      */
     default PluginMenu createForContent(String menuId, String title) {
         throw new UnsupportedOperationException("Content menus are unavailable");
