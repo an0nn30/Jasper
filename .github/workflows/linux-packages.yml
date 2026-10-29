@@ -1,8 +1,8 @@
 name: linux-packages
 
 # jpackage builds only for the machine it runs on, so each architecture is packaged on its own native
-# runner. Ubuntu 22.04 keeps the detected .deb dependencies on their pre-t64 names, which Debian 12 has
-# and newer releases still provide. Each package is then installed into disposable containers of other
+# runner. Ubuntu 22.04 keeps direct .deb requirements on their baseline package names; the providers own
+# their distro's transitive library dependencies. Each package is installed into disposable containers of other
 # distributions to prove its dependencies resolve there.
 on:
   push:

@@ -28,8 +28,8 @@ checked by hand with the [native acceptance checklist](#native-acceptance-checkl
   [user installation](#user-installation-without-a-compiler) needs none.
 - **macOS**: Xcode 26 or later for the [macOS 26 window controls](#macos-26-window-controls); an older SDK builds an app
   with the earlier controls and `verifyPackage` warns.
-- **Linux**: `dpkg-deb` and `fakeroot` for the `.deb`; `rpmbuild` (the `rpm` package on Debian and Ubuntu), `readelf`
-  (binutils), `rpm2cpio` and `cpio` for the `.rpm`.
+- **Linux**: `readelf` (binutils) for both formats; `dpkg-deb` and `fakeroot` for the `.deb`; `rpmbuild` (the `rpm`
+  package on Debian and Ubuntu), `rpm2cpio` and `cpio` for the `.rpm`.
 - **Windows setup wizard**: WiX 3 (`candle.exe` and `light.exe`) on `PATH`. The portable ZIP needs no WiX.
 - **Windows Cygwin seed**: the first Windows build downloads about 500 MB of pinned Cygwin packages from
   `mirrors.kernel.org` into `jasper-app/build/cygwin/downloads`, unless `-Pjasper.cygwinSnapshot=<folder>` names a
@@ -546,8 +546,8 @@ Run by hand, it keeps the jars as the workflow artifact `jasper-sdk-jars`.
 
 **linux-packages** ([`linux-packages.yml`](../.github/workflows/linux-packages.yml)) runs on pushes to `main` and pull
 requests that change `gradle/packaging.gradle`, `gradle/packaging-support.gradle`, `packaging/**` or the workflow. It
-builds both packages on `ubuntu-22.04` and `ubuntu-22.04-arm`, whose detected `.deb` dependencies keep the pre-t64
-names that Debian 12 has and newer releases still provide, and uploads them as the artifacts `jasper-linux-x64` and
+builds both packages on `ubuntu-22.04` and `ubuntu-22.04-arm`, declares the distro providers of each shipped ELF's
+direct dependencies, and uploads them as the artifacts `jasper-linux-x64` and
 `jasper-linux-aarch64` (with a `-work` artifact on failure). It then installs each package as root in disposable
 `debian:12`, `ubuntu:24.04`, `fedora:latest` and `opensuse/tumbleweed` containers of both architectures with
 [`packaging/linux/check-install.sh`](../packaging/linux/check-install.sh), which checks that the launcher,

@@ -329,6 +329,15 @@ def testDesktopPackagePolicy = tasks.register('testDesktopPackagePolicy', Exec) 
 }
 tasks.named('check') { dependsOn(testDesktopPackagePolicy) }
 
+def testDesktopRuntimeEnvironment = tasks.register('testDesktopRuntimeEnvironment', Exec) {
+    group = 'verification'
+    description = 'Tests distro locale preparation before native runtime verification.'
+    commandLine(providers.gradleProperty('jasper.python').getOrElse('python3'),
+        new File(fixtures, 'runtime_environment_test.py').absolutePath)
+    inputs.files(new File(fixtures, 'check-runtime.sh'), new File(fixtures, 'runtime_environment_test.py'))
+}
+tasks.named('check') { dependsOn(testDesktopRuntimeEnvironment) }
+
 tasks.register('compileDesktopQtNativeTests') {
     group = 'verification'
     description = 'Builds matching baseline native fixtures for exact-artifact system-runtime CI (never packaged).'
