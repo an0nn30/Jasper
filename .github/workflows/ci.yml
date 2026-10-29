@@ -68,7 +68,8 @@ jobs:
           printf '\njasper.qt5Prefix=%s/.desktop-qt-sdk/prefixes/qt5\njasper.qt6Prefix=%s/.desktop-qt-sdk/prefixes/qt6\njasper.kf5Prefix=%s/.desktop-qt-sdk/prefixes/kf5\njasper.kde6QtPrefix=%s/.desktop-qt-sdk/prefixes/kde6-qt\njasper.kf6Prefix=%s/.desktop-qt-sdk/prefixes/kf6\n' "$PWD" "$PWD" "$PWD" "$PWD" "$PWD" >> gradle.properties
       - name: Test Windows check watchdog
         if: runner.os == 'Windows'
-        run: python .github/scripts/test_windows_check.py
+        shell: bash
+        run: JASPER_CI_GIT_BASH="$(cygpath -w "$BASH")" python .github/scripts/test_windows_check.py
       - name: Check
         shell: bash
         # Windows subprocess/cleanup tests hit deadlines with concurrent test JVMs.

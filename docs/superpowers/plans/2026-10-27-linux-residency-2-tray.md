@@ -1,5 +1,7 @@
 # Linux residency 2: modern and legacy trays Implementation Plan
 
+**Task 10 Git Bash fixture deviation (2026-10-29): REVIEW PENDING.** The Windows watchdog test receives the workflow-selected Git Bash path to avoid the WSL shim earlier on PATH. Portable watchdog tests pass; hosted Windows fixture and Gradle execution remain pending.
+
 **Task 10 repeated Windows timeout deviation (2026-10-29): REVIEW PENDING.** A bounded Check watchdog, app test progress and JVM snapshots preserve diagnostics before the existing job deadline; hosted Windows verification and slowdown diagnosis remain pending.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
