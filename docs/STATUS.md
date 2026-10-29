@@ -1,5 +1,8 @@
 # Jasper — Status and Handoff
 
+**PR #3 scroll-link CI follow-up — 2026-10-29: REVIEW PENDING.** The Editor test now queues its edit between the first geometry slice and its continuation on the EDT. A controlled delay reproduces Ubuntu’s assertion; mutations removing slicing or edit cancellation fail the corrected test. Focused verification passes locally; hosted rerun remains pending. This extends Task 10 test portability.
+
+
 **PR #3 Git Bash fixture — 2026-10-29: REVIEW PENDING.** The watchdog fixture now receives the workflow-selected Git Bash path instead of resolving bare `bash`, which selected the WSL shim in Windows CI. Portable watchdog tests pass; hosted Windows fixture and Gradle execution remain pending. This extends Task 10 CI diagnostics.
 
 **PR #3 Windows watchdog launch — 2026-10-29: REVIEW PENDING.** The Windows job printed a cmd.exe prompt and exited successfully without running Gradle. The watchdog constructs the Windows batch invocation inside Python and requires a fresh successful Gradle completion marker. Targeted portable tests pass; actual Git Bash and hosted Windows validation remain pending. The 26-minute deadline remains diagnostic, and the underlying slowdown is unresolved. This extends Task 10 CI diagnostics.

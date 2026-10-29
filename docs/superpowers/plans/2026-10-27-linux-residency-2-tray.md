@@ -1,5 +1,8 @@
 # Linux residency 2: modern and legacy trays Implementation Plan
 
+**Task 10 scroll-link fixture deviation (2026-10-29): REVIEW PENDING.** Queue the edit before the first geometry continuation to remove a test-thread scheduling race. A controlled delay reproduces Ubuntu’s failure; yield and cancellation mutations fail the corrected test. Local focused verification passes; hosted rerun remains pending.
+
+
 **Task 10 Git Bash fixture deviation (2026-10-29): REVIEW PENDING.** The Windows watchdog test receives the workflow-selected Git Bash path to avoid the WSL shim earlier on PATH. Portable watchdog tests pass; hosted Windows fixture and Gradle execution remain pending.
 
 **Task 10 repeated Windows timeout deviation (2026-10-29): REVIEW PENDING.** A bounded Check watchdog, app test progress and JVM snapshots preserve diagnostics before the existing job deadline; hosted Windows verification and slowdown diagnosis remain pending.
