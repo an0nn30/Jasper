@@ -29,11 +29,22 @@ class WindowsCheckTest(unittest.TestCase):
     def test_zero_exit_with_fresh_marker_succeeds(self):
         with tempfile.TemporaryDirectory() as folder:
             marker = pathlib.Path(folder) / 'marker'
-            child = "import os,pathlib; pathlib.Path(os.environ['JASPER_CI_SUCCESS_MARKER']).touch()"
+            child = "import os,pathlib; pathlib.Path(os.environ['JASPER_CI_SUCCESS_MARKER']).write_bytes(b'Gradle build completed successfully\\n')"
             result = subprocess.run([sys.executable, str(SCRIPT), '--timeout', '5',
                 '--diagnostics', folder, '--success-marker', str(marker), '--',
                 sys.executable, '-c', child], capture_output=True, text=True, timeout=15)
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
+    def test_fresh_empty_and_malformed_markers_fail(self):
+        for contents in (b'', b'Gradle build completed successfully', b'wrong'):
+            with self.subTest(contents=contents), tempfile.TemporaryDirectory() as folder:
+                marker = pathlib.Path(folder) / 'marker'
+                child = "import os,pathlib; pathlib.Path(os.environ['JASPER_CI_SUCCESS_MARKER']).write_bytes(%r)" % contents
+                result = subprocess.run([sys.executable, str(SCRIPT), '--timeout', '5',
+                    '--diagnostics', folder, '--success-marker', str(marker), '--',
+                    sys.executable, '-c', child], capture_output=True, text=True, timeout=15)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn('completion marker', result.stdout)
 
     def test_failure_is_preserved_without_marker(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -51,11 +62,11 @@ class WindowsCheckTest(unittest.TestCase):
             batch_dir.mkdir()
             batch = batch_dir / 'fixture.bat'
             batch.write_bytes(b'@echo off\r\necho ARGS:%*\r\nexit /b 7\r\n')
-            command = '"$1" "$2" --timeout 5 --diagnostics "$3" --windows-batch -- "$4" check --max-workers=1 --continue --stacktrace --console=plain'
+            command = '"$1" "$2" --timeout 5 --diagnostics "$3" --windows-batch -- "$4" check --parallel --max-workers=1 --continue --stacktrace --console=plain --init-script .github/scripts/windows-test-progress.gradle'
             result = subprocess.run(['bash', '-c', command, 'fixture', sys.executable,
                 str(SCRIPT), folder, str(batch)], capture_output=True, text=True, timeout=15)
             self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
-            self.assertIn('ARGS:check --max-workers=1 --continue --stacktrace --console=plain', result.stdout)
+            self.assertIn('ARGS:check --parallel --max-workers=1 --continue --stacktrace --console=plain --init-script .github/scripts/windows-test-progress.gradle', result.stdout)
 
     def test_preserves_child_failure(self):
         result, _ = self.run_check('raise SystemExit(7)', 5)

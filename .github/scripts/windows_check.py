@@ -62,9 +62,14 @@ def main():
     while True:
         try:
             result = process.wait(timeout=max(0.01, start + next_capture - time.monotonic()))
-            if result == 0 and args.success_marker and not marker.is_file():
-                print('Gradle completion marker missing; check did not complete', flush=True)
-                return 1
+            if result == 0 and args.success_marker:
+                try:
+                    valid_marker = marker.read_bytes() == b'Gradle build completed successfully\n'
+                except OSError:
+                    valid_marker = False
+                if not valid_marker:
+                    print('Gradle completion marker missing or invalid; check did not complete', flush=True)
+                    return 1
             return result
         except subprocess.TimeoutExpired:
             if next_capture == args.timeout:

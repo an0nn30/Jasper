@@ -10,7 +10,7 @@ gradle.buildFinished { result ->
     if (result.failure == null) {
         def marker = System.getenv('JASPER_CI_SUCCESS_MARKER')
         if (marker != null) {
-            new File(marker).text = 'Gradle build completed successfully\n'
+            new File(marker).bytes = 'Gradle build completed successfully\n'.getBytes('UTF-8')
         }
     }
 }
