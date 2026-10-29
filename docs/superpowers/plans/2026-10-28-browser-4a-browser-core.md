@@ -3,6 +3,10 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Rebased (2026-10-29)** onto `origin/main` `5c7e97279` as `claude/browser-core` (worktree `.claude/worktrees/browser-core`):
+`origin/main`'s table work took SDK 0.25.0, so this plan's SDK additions are `@since 0.26.0` and every bundled range is
+`>=0.26.0, <0.27`; `claude/double-click-url` (R45) and `claude/tunnels-sort-tie` are folded in on top.
+
 **Execution status (2026-10-29): Tasks 1-12 executed, and the final review's fix wave; Task 13 waits for the user**
 (commits `9f1d63fd1` to `8258e223e`, then the fix wave; not merged or pushed; see `docs/STATUS.md`). Executed with
 per-task subagents and reviews; the controller's rulings are numbered R0-R48 (no R3 or R4). The task reviews recorded

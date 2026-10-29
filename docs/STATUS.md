@@ -36,6 +36,10 @@ plugin settings, terminal links (split clicks, the prompts, OSC 8 targets, the r
 `check pluginZip` against `build/sdk-release` passes (1 test, 0 failures). Source hygiene is clean over 3,149 Java
 files. No GUI was launched and Chromium never started.
 
+**Rebased 2026-10-29** onto `origin/main` `5c7e97279` as `claude/browser-core` (worktree `.claude/worktrees/browser-core`;
+`claude/browser-core-88616a` is unchanged): `origin/main`'s table work took SDK 0.25.0, so plan 4a's additions are SDK
+0.26.0 (every bundled range `>=0.26.0, <0.27`); `claude/double-click-url` and `claude/tunnels-sort-tie` are folded in.
+
 The final review's fix wave (R48):
 - a page's own `window.close()` closes its item, as Chrome closes the tab: `PageBrowser.doClose()` holds back a close
   Java did not ask for and has the item close, whose close of the browser then goes ahead (it used to let every close
