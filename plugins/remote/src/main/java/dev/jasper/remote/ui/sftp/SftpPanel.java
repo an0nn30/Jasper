@@ -28,13 +28,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
  * The compact SFTP file explorer on host-rendered kit descriptors (Plan 2 Task 8c). In the sidebar it owns one kit
  * Panel: a row of icon buttons (Back, Forward, Refresh and Upload, whose menu holds the folder's other actions) over the
- * path as breadcrumbs, the folder's entries as a two-column table (folders first, a folder, file or link glyph, the
- * modified time in the row tooltip), and a footer with paging, the status line, the last operation's result, the Follow
+ * path as breadcrumbs, the folder's entries as a two-column table (a folder, file or link glyph, the modified time in the
+ * row tooltip), and a footer with paging, the status line, the last operation's result, the Follow
  * terminal folder switch and the window's transfers. While nothing is connected the body is a "Not Connected" empty
  * state whose Choose Session menu lists the saved hosts; choosing one browses it. In a Copy to host dialog the same browser is embedded in another owner's form
  * ({@link #destination}): folders only, single selection, no menus, no follow switch, a New folder button.
@@ -47,6 +48,10 @@ import java.util.function.Consumer;
  * <p>In a window of its own or docked at the bottom ({@link #wide(boolean)}) the table of either look adds Modified (date
  * and time) and Permissions columns; the tools, breadcrumbs and footer stay as they are.
  *
+ * <p>A header click sorts the whole folder by that column, folders mixed in with the files; clicking it again flips the
+ * direction (Name ascending until the user picks one). The sort is shared by every browser and each column set keeps the
+ * widths the user dragged ({@link SftpColumns}).
+ *
  * <p>Rows are keyed by entry name. A new listing or page selects its first row. Enter or a double click on one entry
  * opens a folder (or a link, without the Editor) or hands a file or link to the Editor. Each row's own context menu acts
  * on the selection when the row is selected and on that row alone otherwise; outside every row (an empty folder too) a
@@ -57,7 +62,7 @@ import java.util.function.Consumer;
 public final class SftpPanel implements AutoCloseable {
     public record Actions(Consumer<String> navigate,Runnable up,Runnable refresh,Consumer<Boolean> follow,
                           Runnable upload,Runnable uploadFolder,Runnable download,Runnable newFolder,
-                          Runnable delete,Runnable copyPath,Runnable copyToHost,Runnable cancel,Consumer<Long> page,
+                          Runnable delete,Runnable copyPath,Runnable copyToHost,Runnable cancel,BiConsumer<Long,DirectoryCache.Order> page,
                           Consumer<Boolean> hidden) {}
     /** What double-click, Enter and Open in Editor do with files and links; set only when the Editor is installed. */
     public record Editing(Consumer<FileEntry> activate,Runnable open) {}
@@ -95,6 +100,8 @@ public final class SftpPanel implements AutoCloseable {
     /** While a row's own menu item runs on that row alone: what {@link #selection()} reports. */
     private List<FileEntry> acting;
     private long offset,total;
+    private SftpColumns columns;
+    private Runnable stopSortListening=()->{};
 
     /** The sidebar explorer, owning its kit view. */
     public SftpPanel(UiKit kit) { this(kit, Layout.ROWS); }
@@ -102,12 +109,12 @@ public final class SftpPanel implements AutoCloseable {
     /** The sidebar explorer in {@code layout}'s composition. */
     public SftpPanel(UiKit kit, Layout layout) {
         this.layout=java.util.Objects.requireNonNull(layout);
-        changed=null;focuser=null;destination=false;
+        changed=null;focuser=null;destination=false;columns(SftpColumns.memory());
         view=kit.create(new ViewSpec(panel()),event->{ if(!closed) handle(event); });
     }
 
     private SftpPanel(Runnable changed,Consumer<String> focus) {
-        this.changed=Objects.requireNonNull(changed);this.focuser=Objects.requireNonNull(focus);destination=true;view=null;layout=Layout.ROWS;
+        this.changed=Objects.requireNonNull(changed);this.focuser=Objects.requireNonNull(focus);destination=true;view=null;layout=Layout.ROWS;columns(SftpColumns.memory());
     }
 
     /**
@@ -123,6 +130,26 @@ public final class SftpPanel implements AutoCloseable {
     public void wide(boolean value) {
         if(closed || destination || value==wide) return;
         wide=value;render();
+    }
+
+    /** The sort and widths this browser shares with the others; a sort change there asks for the first page again. */
+    void columns(SftpColumns shared) {
+        stopSortListening.run();columns=Objects.requireNonNull(shared);stopSortListening=shared.onSorted(this::sortChanged);render();
+    }
+
+    /** The order the folder's pages take. */
+    public DirectoryCache.Order order() { return columns.order(); }
+
+    private void sortChanged() {
+        if(closed) return;render();
+        if(actions!=null) actions.page().accept(0L,columns.order());
+    }
+
+    /** Which column set the table shows, the key its widths are kept under. */
+    private String columnsKey() {
+        if(destination) return SftpColumns.NARROW;
+        if(layout==Layout.CLASSIC) return wide?SftpColumns.CLASSIC_WIDE:SftpColumns.CLASSIC;
+        return wide?SftpColumns.WIDE:SftpColumns.NARROW;
     }
 
     /** Whether the wide table is asked for, as {@link #wide(boolean)} last set it. */
@@ -262,7 +289,7 @@ public final class SftpPanel implements AutoCloseable {
         Optional<Nodes.Empty> empty = loaded ? Optional.empty() : Optional.of(new Nodes.Empty(EMPTY, ControlState.READY,
             new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "folder", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "SFTP"), "Not Connected",
             "Connect to an SSH session to browse its files.", List.of()));
-        return new Nodes.Table(FILES, state(true, !working), wide ? CLASSIC_WIDE_COLUMNS : CLASSIC_COLUMNS, rows, loaded ? selected : Set.of(), OPEN, loaded ? menu(MENU, "", selection()) : List.of(),
+        return new Nodes.Table(FILES, state(true, !working), columns.apply(columnsKey(), wide ? CLASSIC_WIDE_COLUMNS : CLASSIC_COLUMNS), rows, loaded ? selected : Set.of(), OPEN, loaded ? menu(MENU, "", selection()) : List.of(),
             Nodes.SelectionMode.MULTIPLE, Nodes.ScrollPolicy.STANDARD, empty, "");
     }
 
@@ -272,7 +299,7 @@ public final class SftpPanel implements AutoCloseable {
     }
 
     @Override public void close() {
-        if(closed) return;closed=true;headerChanged=header->{};
+        if(closed) return;closed=true;headerChanged=header->{};stopSortListening.run();
         if(transfers!=null) transfers.onChanged(()->{});
         if(view!=null) view.close();
     }
@@ -292,6 +319,8 @@ public final class SftpPanel implements AutoCloseable {
                 return true;
             }
             case UiEvent.Edited edited when edited.id().equals(PATH) -> { pathValue=edited.text();return true; }
+            case UiEvent.Sorted sorted when sorted.id().equals(FILES) -> { columns.sorted(sorted.columnId());return true; }
+            case UiEvent.ColumnsResized resized when resized.id().equals(FILES) -> { columns.resized(columnsKey(),resized.widths());render();return true; }
             case UiEvent.Selected chosen when chosen.id().equals(CHOOSE_DROPDOWN) -> {
                 chosen.ids().stream().findFirst().filter(id -> id.startsWith(SESSION)).ifPresent(this::act);
                 render();return true;
@@ -316,8 +345,8 @@ public final class SftpPanel implements AutoCloseable {
             case UPLOAD -> { if(ready) actions.upload().run(); }
             case NEW_FOLDER -> { if(ready) actions.newFolder().run(); }
             case CANCEL -> { if(actions!=null) actions.cancel().run(); }
-            case PREVIOUS -> { if(ready && offset>0) actions.page().accept(Math.max(0,offset-PAGE_SIZE)); }
-            case NEXT -> { if(ready && offset+entries.size()<total) actions.page().accept(offset+PAGE_SIZE); }
+            case PREVIOUS -> { if(ready && offset>0) actions.page().accept(Math.max(0,offset-PAGE_SIZE),columns.order()); }
+            case NEXT -> { if(ready && offset+entries.size()<total) actions.page().accept(offset+PAGE_SIZE,columns.order()); }
             case PATH_EDIT -> {
                 if(browsingEnabled && !working && (loaded || destination)) { editingPath=true;pathValue=directory;render();focus(PATH); }
             }
@@ -490,7 +519,7 @@ public final class SftpPanel implements AutoCloseable {
                 Optional.of(destination?List.<MenuItem>of():menu(ROW_MENU,":"+id,selected.contains(id)?selection():List.of(entry))),
                 entry.name()+" — "+formatSize(entry)+" — "+modified(entry)));
         }
-        return new Nodes.Table(FILES,state(true,!working),columns?WIDE_COLUMNS:COLUMNS,
+        return new Nodes.Table(FILES,state(true,!working),this.columns.apply(columnsKey(),columns?WIDE_COLUMNS:COLUMNS),
             // The shared menu (on the selection) opens on a context press outside every row, empty folders included, as the
             // old table's component popup did; each row's own menu takes precedence on the row.
             rows,selected,OPEN,destination?List.of():menu(MENU,"",selection()),destination?Nodes.SelectionMode.SINGLE:Nodes.SelectionMode.MULTIPLE,Nodes.ScrollPolicy.STANDARD);

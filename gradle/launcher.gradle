@@ -653,12 +653,31 @@ def launcherProbeJar = tasks.register('launcherProbeJar', Jar) {
     destinationDirectory.set(launcherBuild.map { it.dir('probe-input') })
 }
 
+// A sealed package for the image test's cache-training probe: the copy that starts with the trained cache once the training
+// image is gone must still load both its classes, which JDK-8376576 broke.
+def launcherSealedProbeJar = tasks.register('launcherSealedProbeJar', Jar) {
+    description = "Packs the launcher image test's sealed package."
+    from(compileLauncherProbes)
+    include('sealedprobe/**')
+    manifest { attributes('Sealed': 'true') }
+    archiveFileName.set('sealed-probe.jar')
+    destinationDirectory.set(launcherBuild.map { it.dir('probe-sealed') })
+}
+
+def launcherAotProbeInput = tasks.register('launcherAotProbeInput', Sync) {
+    description = "Collects the jars of the launcher image test's cache-training probe."
+    from(launcherProbeJar)
+    from(launcherSealedProbeJar)
+    into(launcherBuild.map { it.dir('probe-aot-input') })
+}
+
 def verifyLauncherImage = tasks.register('verifyLauncherImage') {
     group = 'verification'
     description = "Packages a probe app with Jasper's launcher and jasper-watch and checks both end to end, headlessly."
-    dependsOn(buildLauncher, launcherProbeJar, buildWatcher)
+    dependsOn(buildLauncher, launcherProbeJar, buildWatcher, launcherAotProbeInput)
     inputs.dir(launcherResources).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(launcherProbeJar.flatMap { it.archiveFile })
+    inputs.files(launcherAotProbeInput).withPropertyName('aotProbeInput').withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(buildWatcher).withPropertyName('watcher').withPathSensitivity(PathSensitivity.NONE)
     outputs.file(launcherBuild.map { it.file('image-test/passed') })
     doLast {
@@ -975,40 +994,71 @@ def verifyLauncherImage = tasks.register('verifyLauncherImage') {
         expect('JASPER_AOT_CACHE_SKIP', one(report, 'aotCacheSkipped') == 'manual' && one(report, 'aotSkipVariable') == 'null' &&
             !usesCache(report), 'the variable skips the cache and never reaches the JVM', report)
 
-        // A cache that kills the JVM (startup recovery spec section 2): the probe's trained cache with everything after its
-        // first 64 KiB, which hold the header the JVM checks, zeroed. Mapping it ends the JVM with SIGSEGV before the VM
-        // exists, and the watcher starts the probe once more without it. No core dump, so macOS reports no crash.
-        File aotImages = new File(work, 'aot')
-        File aot = image('LauncherProbeAot', true, aotImages, probeInput,
-            ['--jlink-options', '--strip-debug --no-man-pages --no-header-files']) // keeps bin/java, which writes the cache
-        installWatcher(aot)
-        File aotConfig = configIn(aotImages, 'LauncherProbeAot')
-        File trainedCache = new File(aotConfig.parentFile, 'probe.aot')
-        report = launch('aot-training', aot, environment([JASPER_HOME: home('aot-training-home', null).absolutePath,
+        // The probe's trained cache, run from a copy of its image with -XX:AOTMode=on, under which HotSpot ends a start that
+        // cannot use the cache.
+        File trainingImages = new File(work, 'aot-training')
+        File training = image('LauncherProbeAot', true, trainingImages, launcherAotProbeInput.get().destinationDir,
+            // Keeps bin/java, which writes the cache, and writes the default CDS archive.
+            ['--jlink-options', '--strip-debug --no-man-pages --no-header-files --generate-cds-archive'])
+        installWatcher(training)
+        File trainedCache = new File(work, 'probe.aot')
+        report = launch('aot-training', training, environment([JASPER_HOME: home('aot-training-home', null).absolutePath,
             JAVA_TOOL_OPTIONS: javaToolOptions(["-XX:AOTCacheOutput=${trainedCache.absolutePath}".toString()])]))
         int keptBytes = 64 * 1024
         if (!trainedCache.isFile() || trainedCache.length() <= keptBytes) {
             throw new GradleException("verifyLauncherImage: AOT training wrote no cache\n${new File(work, 'aot-training.log').text}")
         }
-        String aotOptions = withJavaOption(aotConfig.getText('UTF-8'), '-XX:AOTCache=$APPDIR/probe.aot')
+        expect('AOT training', one(report, 'sealed') == 'First+Second', 'the probe loaded both classes of the sealed package', report)
+        File installedImages = new File(work, 'aot-installed')
+        copyTree(imageRoot(trainingImages, 'LauncherProbeAot'), imageRoot(installedImages, 'LauncherProbeAot'))
+        File installedConfig = configIn(installedImages, 'LauncherProbeAot')
+        File installedCache = new File(installedConfig.parentFile, 'probe.aot')
+        Files.copy(trainedCache.toPath(), installedCache.toPath(), StandardCopyOption.COPY_ATTRIBUTES)
+        String aotOptions = withJavaOption(installedConfig.getText('UTF-8'), '-XX:AOTCache=$APPDIR/probe.aot')
+        aotOptions = withJavaOption(aotOptions, '-XX:AOTMode=on')
+        // No core dump when a cache kills the JVM, so macOS reports no crash, and the error file stays in the image.
         aotOptions = withJavaOption(aotOptions, '-XX:-CreateCoredumpOnCrash')
-        aotConfig.setText(withJavaOption(aotOptions, '-XX:ErrorFile=$APPDIR/hs_err.log'), 'UTF-8')
+        installedConfig.setText(withJavaOption(aotOptions, '-XX:ErrorFile=$APPDIR/hs_err.log'), 'UTF-8')
+        File installed = launcherIn(installedImages, 'LauncherProbeAot')
+        File probeJar = new File(installedConfig.parentFile, 'launcher-probe.jar')
+        // JDK-8376576, fixed in JBR 25.0.4.1 b635.75: with the training image gone, a JBR that has it gives cached classes no
+        // code source, so a sealed package refuses its second class and the JVM stops. jbr-api, on Jasper's class path, seals
+        // its package.
+        delete(trainingImages)
         File aotHome = home('aot-home', null)
-        report = launch('aot-used', aot, environment([JASPER_HOME: aotHome.absolutePath]))
-        expect('trained cache', one(report, 'aotCacheSkipped') == 'null' && usesCache(report), 'the probe starts with the cache',
-            report)
-        new RandomAccessFile(trainedCache, 'rw').withCloseable { raf ->
+        report = launch('aot-used', installed, environment([JASPER_HOME: aotHome.absolutePath]))
+        String codeSource = one(report, 'codeSource')
+        expect('trained cache', one(report, 'aotCacheSkipped') == 'null' && one(report, 'sealed') == 'First+Second' && usesCache(report) &&
+            codeSource != null && new File(codeSource).canonicalFile == probeJar.canonicalFile,
+            'the copy starts with the cache once the training image is gone, loads both classes of the sealed package and ' +
+            "names its own jar as the probe's code source; a JBR that fails this has JDK-8376576 (packaging/launcher/README.md)", report)
+        // A cache that kills the JVM (startup recovery spec section 2): the trained cache with everything after its first
+        // 64 KiB, which hold the header the JVM checks, zeroed. Mapping it ends the JVM with SIGSEGV before the VM exists,
+        // and the watcher starts the probe once more without it.
+        new RandomAccessFile(installedCache, 'rw').withCloseable { raf ->
             byte[] zeros = new byte[1024 * 1024]
             raf.seek(keptBytes)
             for (long left = raf.length() - keptBytes; left > 0; left -= zeros.length) {
                 raf.write(zeros, 0, (int) Math.min(left, zeros.length))
             }
         }
-        report = launch('aot-killing', aot, environment([JASPER_HOME: aotHome.absolutePath]))
-        expect('a cache that kills the JVM', one(report, 'aotCacheSkipped') == 'launch-failed' &&
+        report = launch('aot-zeroed', installed, environment([JASPER_HOME: home('aot-zeroed-home', null).absolutePath]))
+        expect('a zeroed cache that kills the JVM', one(report, 'aotCacheSkipped') == 'launch-failed' &&
             one(report, 'aotSkipVariable') == 'null' && !usesCache(report),
             'the watcher starts the probe once more without the cache. If this start kept the cache, the JVM survived the ' +
             'zeroed cache: give this case another cache that kills the JVM (packaging/launcher/README.md)', report)
+        // Another cache that kills the JVM: the trained cache again, which goes stale once a jar on its class path has another
+        // modification time (HotSpot checks each jar's size and time). The watcher starts the probe once more without the
+        // cache option; -XX:AOTMode=on stays, so that start maps the runtime's default CDS archive instead.
+        Files.copy(trainedCache.toPath(), installedCache.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+        if (!probeJar.setLastModified(probeJar.lastModified() - TimeUnit.DAYS.toMillis(1))) {
+            throw new GradleException("verifyLauncherImage: could not change the modification time of ${probeJar}")
+        }
+        report = launch('aot-killing', installed, environment([JASPER_HOME: aotHome.absolutePath]))
+        expect('a stale cache that kills the JVM', one(report, 'aotCacheSkipped') == 'launch-failed' &&
+            one(report, 'aotSkipVariable') == 'null' && one(report, 'sealed') == 'First+Second' && !usesCache(report),
+            'the watcher starts the probe once more without the cache, which -XX:AOTMode=on refuses once a jar on its ' +
+            'class path has another modification time (packaging/launcher/README.md)', report)
 
         // An image whose bundled options kill the JVM: nothing is left to skip, so the watcher reports what Java said.
         // On Windows the windowed launcher too, which Jasper.exe is: its output reaches the watcher as well.

@@ -4,6 +4,8 @@ import dev.jasper.remote.sftp.FileEntry;
 import dev.jasper.remote.ui.transfers.TransferRows;
 import dev.jasper.remote.ui.transfers.TransferStrip;
 import dev.jasper.sdk.testing.FakeKit;
+import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.ColumnStateFile;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PanelHeader;
@@ -29,25 +31,26 @@ class SftpPanelTest {
 
     final List<String> commands=new ArrayList<>();
     final List<Long> pages=new ArrayList<>();
+    final List<DirectoryCache.Order> orders=new ArrayList<>();
     final List<Boolean> followed=new ArrayList<>();
 
     SftpPanel.Actions actions() {
         return new SftpPanel.Actions(path->commands.add("navigate "+path),()->commands.add("up"),()->commands.add("refresh"),followed::add,
             ()->commands.add("upload"),()->commands.add("upload folder"),()->commands.add("download"),()->commands.add("new folder"),
-            ()->commands.add("delete"),()->commands.add("copy paths"),()->commands.add("copy to host"),()->commands.add("cancel"),pages::add,
+            ()->commands.add("delete"),()->commands.add("copy paths"),()->commands.add("copy to host"),()->commands.add("cancel"),(offset,order)-> { pages.add(offset);orders.add(order); },
             shown->commands.add("hidden "+shown));
     }
 
     static SftpPanel panel() { return new SftpPanel(new FakeKit("dev.jasper.remote")); }
 
-    @Test void cacheKeepsHundredThousandEntriesOffTheUiAndPagesDirectoriesFirst(@TempDir Path root) throws Exception {
+    @Test void cacheKeepsHundredThousandEntriesOffTheUiAndPagesByName(@TempDir Path root) throws Exception {
         Path file;
         try(var cache=new DirectoryCache(root)) {
             file=cache.path();var batch=new ArrayList<FileEntry>();
             for(int i=0;i<100_000;i++) { batch.add(new FileEntry("file-"+i,FileEntry.Kind.FILE,i,1000,0644,""));if(batch.size()==256) { cache.append(batch);batch.clear(); } }
             if(!batch.isEmpty()) cache.append(batch);
             cache.append(List.of(new FileEntry("z-directory",FileEntry.Kind.DIRECTORY,0,1000,0755,"")));
-            assertThat(cache.count()).isEqualTo(100_001);assertThat(cache.page(0,200).getFirst().name()).isEqualTo("z-directory");assertThat(cache.page(100_000,200)).hasSize(1);
+            assertThat(cache.count()).isEqualTo(100_001);assertThat(cache.page(0,200).getFirst().name()).isEqualTo("file-0");assertThat(cache.page(100_000,200).getFirst().name()).as("folders sort with the files").isEqualTo("z-directory");assertThat(cache.page(100_000,200)).hasSize(1);
             assertThatThrownBy(()->cache.page(0,100_000)).isInstanceOf(IllegalArgumentException.class);
         }
         assertThat(file).doesNotExist();
@@ -78,7 +81,7 @@ class SftpPanelTest {
         try(var cache=new DirectoryCache(root)) {
             cache.append(List.of(new FileEntry(".config",FileEntry.Kind.DIRECTORY,0,1000,0755,""),new FileEntry(".env",FileEntry.Kind.FILE,1,1000,0644,""),
                 new FileEntry("docs",FileEntry.Kind.DIRECTORY,0,1000,0755,""),new FileEntry("notes.toml",FileEntry.Kind.FILE,6,1000,0644,"")));
-            assertThat(cache.page(0,200,false,true)).extracting(FileEntry::name).containsExactly(".config","docs",".env","notes.toml");
+            assertThat(cache.page(0,200,false,true)).extracting(FileEntry::name).containsExactly(".config",".env","docs","notes.toml");
             assertThat(cache.page(0,200,false,false)).extracting(FileEntry::name).containsExactly("docs","notes.toml");
             assertThat(cache.page(0,200,true,false)).extracting(FileEntry::name).containsExactly("docs");
             assertThat(cache.page(0,200,true,true)).extracting(FileEntry::name).containsExactly(".config","docs");
@@ -285,7 +288,7 @@ class SftpPanelTest {
         edt(()-> {
             var panel=panel();var seen=new ArrayList<List<String>>();
             panel.actions(new SftpPanel.Actions(p->{},()->{},()->{},f->{},()->{},()->{},()->seen.add(names(panel.selection())),()->{},
-                ()->seen.add(names(panel.selection())),()->seen.add(names(panel.selection())),()->{},()->{},p->{},shown->{}));
+                ()->seen.add(names(panel.selection())),()->seen.add(names(panel.selection())),()->{},()->{},(p,o)->{},shown->{}));
             panel.showPage("host","/srv",List.of(FOLDER,FILE,LINK),0,3,false);
             emit(panel.view(),new UiEvent.Selected(SftpPanel.FILES,Set.of(SftpPanel.ROW+"conf",SftpPanel.ROW+"notes.toml")));
             pressRowItem(panel.view(),"notes.toml","Download selected…");
@@ -389,6 +392,80 @@ class SftpPanelTest {
             assertThat(headers).hasSize(published);
             assertThat(panel.handle(new UiEvent.Action(SftpPanel.REFRESH))).isFalse();
         });
+    }
+
+    static SftpColumns columns(Path file) { return new SftpColumns(new ColumnStateFile(file),failure-> { throw new AssertionError(failure); }); }
+    static Column column(SftpPanel panel,String id) { return SftpTestAccess.table(panel.view()).columns().stream().filter(c->c.id().equals(id)).findFirst().orElseThrow(); }
+
+    /** A header click sorts the whole folder: the column shows the direction and page 0 is asked for in that order. */
+    @Test void sortClickMarksTheColumnAndAsksForPageZeroInThatOrder(@TempDir Path root) throws Exception {
+        edt(()-> {
+            var panel=panel();panel.columns(columns(root.resolve("columns.properties")));panel.actions(actions());
+            panel.showPage("host","/srv",List.of(FOLDER,FILE,LINK),200,450,false);
+            assertThat(column(panel,"name").sorted()).as("Name ascending until the user picks a column").contains(true);
+            emit(panel.view(),new UiEvent.Sorted(SftpPanel.FILES,"size"));
+            assertThat(column(panel,"size").sorted()).contains(true);assertThat(column(panel,"name").sorted()).isEmpty();
+            assertThat(pages).containsExactly(0L);assertThat(orders).containsExactly(new DirectoryCache.Order("size",true));
+            emit(panel.view(),new UiEvent.Sorted(SftpPanel.FILES,"size"));
+            assertThat(column(panel,"size").sorted()).contains(false);
+            assertThat(pages).containsExactly(0L,0L);assertThat(orders).last().isEqualTo(new DirectoryCache.Order("size",false));
+            click(panel.view(),SftpPanel.NEXT);
+            assertThat(pages).last().isEqualTo(400L);assertThat(orders).as("paging keeps the order").last().isEqualTo(new DirectoryCache.Order("size",false));
+        });
+    }
+
+    /** A sort click in one browser sorts every browser sharing the columns, whatever its layout. */
+    @Test void aSortClickInOneBrowserReordersTheOthers(@TempDir Path root) throws Exception {
+        edt(()-> {
+            var shared=columns(root.resolve("columns.properties"));
+            var narrow=panel();narrow.columns(shared);narrow.actions(actions());
+            var other=new ArrayList<DirectoryCache.Order>();
+            var wide=panel();wide.columns(shared);wide.wide(true);
+            wide.actions(new SftpPanel.Actions(p->{},()->{},()->{},f->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},(offset,order)->other.add(order),shown->{}));
+            narrow.showPage("host","/srv",List.of(FILE),0,1,false);wide.showPage("host","/srv",List.of(FILE),0,1,false);
+            emit(narrow.view(),new UiEvent.Sorted(SftpPanel.FILES,"size"));
+            assertThat(other).containsExactly(new DirectoryCache.Order("size",true));
+            assertThat(column(wide,"size").sorted()).contains(true);
+            assertThat(new ColumnStateFile(root.resolve("columns.properties")).get("sftp-classic-wide").sortColumn()).as("every layout keeps the sort").contains("size");
+        });
+    }
+
+    @Test void resizedWidthsAreSavedUnderTheLayoutsKeyAndAppliedOnTheNextRender(@TempDir Path root) throws Exception {
+        Path file=root.resolve("columns.properties");
+        edt(()-> {
+            var panel=panel();panel.columns(columns(file));panel.actions(actions());panel.wide(true);
+            panel.showPage("host","/srv",List.of(FOLDER,FILE),0,2,false);
+            var widths=Map.of("name",300,"modified",120,"permissions",90,"size",70);
+            emit(panel.view(),new UiEvent.ColumnsResized(SftpPanel.FILES,widths));
+            assertThat(new ColumnStateFile(file).get("sftp-wide").widths()).isEqualTo(widths);
+            for(var entry:widths.entrySet()) assertThat(column(panel,entry.getKey()).width()).isEqualTo(OptionalInt.of(entry.getValue()));
+            panel.wide(false);
+            assertThat(SftpTestAccess.table(panel.view()).columns()).as("the narrow table keeps its own widths").allSatisfy(c->assertThat(c.width()).isEmpty());
+            assertThat(new ColumnStateFile(file).get("sftp").widths()).isEmpty();
+        });
+        var properties=new Properties();try(var in=java.nio.file.Files.newInputStream(file)) { properties.load(in); }
+        assertThat(properties).containsKey("sftp-wide");
+    }
+
+    /** The browser speaks SFTP's POSIX paths; LocalEndpoint stands in for SFTP only where local paths are POSIX too. */
+    @Test @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void restoredStateAppliesOnFirstRender(@TempDir Path root) throws Exception {
+        root=root.toRealPath();Path folder=java.nio.file.Files.createDirectory(root.resolve("home"));
+        java.nio.file.Files.writeString(folder.resolve("a"),"1");java.nio.file.Files.writeString(folder.resolve("b"),"x".repeat(300));java.nio.file.Files.writeString(folder.resolve("c"),"x".repeat(20));
+        Path file=root.resolve("columns.properties");java.nio.file.Files.writeString(file,"sftp=sort=size,desc;widths=name:260,size:80\n");
+        var holder=new SftpController[1];var panel=new SftpPanel[1];Path cache=root.resolve("cache");
+        try(var workers=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            javax.swing.SwingUtilities.invokeAndWait(()-> { panel[0]=panel();panel[0].columns(columns(file));
+                holder[0]=new SftpController(cache,workers,javax.swing.SwingUtilities::invokeLater,identity->java.util.concurrent.CompletableFuture.completedFuture(new dev.jasper.remote.sftp.LocalEndpoint()),panel[0]);
+                holder[0].open(UUID.randomUUID(),SftpControllerTest.host("sorted"),folder.toString(),true); });
+            try {
+                SftpControllerTest.awaitRows(panel[0],"b","c","a");
+                edt(()-> {
+                    assertThat(column(panel[0],"size").sorted()).contains(false);assertThat(column(panel[0],"name").sorted()).isEmpty();
+                    assertThat(column(panel[0],"name").width()).isEqualTo(OptionalInt.of(260));assertThat(column(panel[0],"size").width()).isEqualTo(OptionalInt.of(80));
+                });
+            } finally { javax.swing.SwingUtilities.invokeAndWait(holder[0]::close);holder[0].stopped().get(5,java.util.concurrent.TimeUnit.SECONDS); }
+        }
     }
 
     private static List<String> names(List<FileEntry> entries) { return entries.stream().map(FileEntry::name).toList(); }

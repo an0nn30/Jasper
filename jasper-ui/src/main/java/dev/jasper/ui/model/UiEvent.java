@@ -1,5 +1,6 @@
 package dev.jasper.ui.model;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -35,4 +36,11 @@ public sealed interface UiEvent {
     record Clicked(String id, String itemId) implements UiEvent { public Clicked { ModelChecks.id(id); ModelChecks.id(itemId); } }
     /** Sort intent: id is the table or tree owner, columnId the clicked column header; the host owns the order. */
     record Sorted(String id, String columnId) implements UiEvent { public Sorted { ModelChecks.id(id); ModelChecks.id(columnId); } }
+    /** A header edge drag ended: id is the table or tree owner, widths every column's id to its unscaled width in pixels. */
+    record ColumnsResized(String id, Map<String, Integer> widths) implements UiEvent {
+        public ColumnsResized {
+            ModelChecks.id(id); widths = Map.copyOf(widths);
+            for (var e : widths.entrySet()) { ModelChecks.id(e.getKey()); if (e.getValue() <= 0) throw new IllegalArgumentException("Column width must be positive"); }
+        }
+    }
 }

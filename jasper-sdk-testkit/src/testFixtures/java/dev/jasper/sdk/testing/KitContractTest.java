@@ -324,10 +324,10 @@ public abstract class KitContractTest {
         assertThat(view.spec()).isEqualTo(browser(false,Optional.of(true)));
         view.update(browser(true,Optional.of(false)));assertThat(view.spec()).isEqualTo(browser(true,Optional.of(false)));
         view.focus("path");
-        emit(view,new UiEvent.Sorted("files","size"));emit(view,new UiEvent.Selected("path",Set.of("docs")));emit(view,new UiEvent.Action("pin"));
+        emit(view,new UiEvent.Sorted("files","size"));emit(view,new UiEvent.ColumnsResized("files",Map.of("name",200,"size",80)));emit(view,new UiEvent.Selected("path",Set.of("docs")));emit(view,new UiEvent.Action("pin"));
         emit(view,new UiEvent.Edited("path","/tmp"));emit(view,new UiEvent.Action("go"));
         emit(view,new UiEvent.Selected("places",Set.of("box")));emit(view,new UiEvent.Clicked("places","box"));
-        assertThat(events).containsExactly(new UiEvent.Sorted("files","size"),new UiEvent.Selected("path",Set.of("docs")),new UiEvent.Action("pin"),
+        assertThat(events).containsExactly(new UiEvent.Sorted("files","size"),new UiEvent.ColumnsResized("files",Map.of("name",200,"size",80)),new UiEvent.Selected("path",Set.of("docs")),new UiEvent.Action("pin"),
             new UiEvent.Edited("path","/tmp"),new UiEvent.Action("go"),new UiEvent.Selected("places",Set.of("box")),new UiEvent.Clicked("places","box"));
         stop(kit);
     }); }

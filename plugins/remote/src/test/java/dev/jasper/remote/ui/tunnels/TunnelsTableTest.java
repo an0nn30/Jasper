@@ -104,4 +104,69 @@ class TunnelsTableTest {
     static String menuAction(TableRow row, String label) {
         return row.contextActions().orElseThrow().stream().filter(item -> item.label().equals(label)).findFirst().orElseThrow().action();
     }
+
+    List<String> names() { return table().rows().stream().filter(r -> r.heading().isEmpty()).map(r -> r.id()).toList(); }
+    Optional<Boolean> sortedOf(String column) { return table().columns().stream().filter(c -> c.id().equals(column)).findFirst().orElseThrow().sorted(); }
+
+    @Test void headerClickSortsAndFlips() throws Exception {
+        edt(() -> {
+            panel(List.of(socks, test), Optional.empty());
+            assertThat(names()).containsExactly(TunnelsPanel.rowId(socks.id()), TunnelsPanel.rowId(test.id()));
+            assertThat(table().columns()).allMatch(c -> c.sorted().isEmpty());
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "local"));
+            assertThat(names()).containsExactly(TunnelsPanel.rowId(socks.id()), TunnelsPanel.rowId(test.id()));
+            assertThat(sortedOf("local")).contains(true);
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "type"));
+            assertThat(names()).containsExactly(TunnelsPanel.rowId(socks.id()), TunnelsPanel.rowId(test.id()));
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "type"));
+            assertThat(sortedOf("type")).contains(false);
+            assertThat(names()).containsExactly(TunnelsPanel.rowId(test.id()), TunnelsPanel.rowId(socks.id()));
+        });
+    }
+
+    @Test void localAndRemoteSortTheirPortsAsNumbersAndGroupsSeparately() throws Exception {
+        edt(() -> {
+            var p80 = Tunnel.create("p80", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 80, "t", 1);
+            var p9000 = Tunnel.create("p9000", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 9000, "t", 1);
+            var p8080 = Tunnel.create("p8080", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 8080, "t", 1);
+            var dyn = Tunnel.create("dyn", MAC, TunnelKind.DYNAMIC, Tunnel.LOCALHOST, 1080, "", 0);
+            var q9000 = Tunnel.create("", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 9000, "t", 1);
+            var q80 = Tunnel.create("", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 80, "t", 1);
+            panel = new TunnelsPanel(new FakeKit("dev.jasper.remote"), actions, () -> 0, 500_000_000L, Layout.CLASSIC);
+            panel.setTunnels(List.of(p9000, p80, dyn, p8080), List.of(q9000, q80), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.of("Mac"));
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "local"));
+            assertThat(table().rows().stream().map(r -> r.id()).toList()).as("1080 sits between 80 and 8080, not after 9000").containsExactly(TunnelsPanel.rowId(p80.id()), TunnelsPanel.rowId(dyn.id()),
+                TunnelsPanel.rowId(p8080.id()), TunnelsPanel.rowId(p9000.id()), TunnelsPanel.QUICK_HEADING, TunnelsPanel.rowId(q80.id()), TunnelsPanel.rowId(q9000.id()));
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "remote"));
+            assertThat(table().rows().stream().map(r -> r.id()).toList()).as("SOCKS5 has no port and follows the ports")
+                .containsExactly(TunnelsPanel.rowId(p80.id()), TunnelsPanel.rowId(p8080.id()), TunnelsPanel.rowId(p9000.id()), TunnelsPanel.rowId(dyn.id()),
+                    TunnelsPanel.QUICK_HEADING, TunnelsPanel.rowId(q80.id()), TunnelsPanel.rowId(q9000.id()));
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "local"));
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "local"));
+            assertThat(table().rows().stream().map(r -> r.id()).toList()).containsExactly(TunnelsPanel.rowId(p9000.id()), TunnelsPanel.rowId(p8080.id()),
+                TunnelsPanel.rowId(dyn.id()), TunnelsPanel.rowId(p80.id()), TunnelsPanel.QUICK_HEADING, TunnelsPanel.rowId(q9000.id()), TunnelsPanel.rowId(q80.id()));
+        });
+    }
+
+    @Test void resizeIsReportedAndApplied() throws Exception {
+        edt(() -> {
+            var heard = new ArrayList<dev.jasper.sdk.ui.ColumnState>();
+            panel(List.of(socks, test), Optional.empty());
+            panel.setColumns(dev.jasper.sdk.ui.ColumnState.NONE, heard::add);
+            emit(panel.view(), new UiEvent.ColumnsResized(TunnelsPanel.ROWS, Map.of("via", 140)));
+            assertThat(heard).hasSize(1);
+            assertThat(heard.getFirst().widths()).containsEntry("via", 140);
+            panel.refresh();
+            assertThat(table().columns().stream().filter(c -> c.id().equals("via")).findFirst().orElseThrow().width()).hasValue(140);
+        });
+    }
+
+    @Test void unknownStoredSortColumnReadsAsNoSort() throws Exception {
+        edt(() -> {
+            panel(List.of(socks, test), Optional.empty());
+            panel.setColumns(dev.jasper.sdk.ui.ColumnState.sortedBy("bogus", false), state -> { });
+            assertThat(names()).containsExactly(TunnelsPanel.rowId(socks.id()), TunnelsPanel.rowId(test.id()));
+            assertThat(table().columns()).allMatch(c -> c.sorted().isEmpty());
+        });
+    }
 }

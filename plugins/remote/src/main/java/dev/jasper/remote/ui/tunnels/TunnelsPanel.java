@@ -5,6 +5,7 @@ import dev.jasper.remote.tunnels.TunnelKind;
 import dev.jasper.remote.tunnels.TunnelState;
 import dev.jasper.remote.workstation.Layout;
 import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.ColumnState;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
@@ -89,6 +90,9 @@ public final class TunnelsPanel implements AutoCloseable {
     /** Whether the panel is asked for its wide layout (a window of its own, or docked at the bottom). */
     private boolean wide;
     private boolean closed;
+    /** The classic table's sort and widths; the owner hears each change the user makes. */
+    private ColumnState tableState = ColumnState.NONE;
+    private Consumer<ColumnState> columnsChanged = state -> { };
 
     /** {@code icons} supplies the header action's artwork, which the window draws. */
     public TunnelsPanel(UiKit kit, Actions actions) {
@@ -129,6 +133,17 @@ public final class TunnelsPanel implements AutoCloseable {
         this.states = states;
         this.hostNames = hostNames;
         publishHeader();
+        render();
+    }
+
+    /**
+     * The classic table's sort and column widths, and who hears each change the user makes; a sort column the table lacks
+     * reads as no sort. Another window's change arrives through here too.
+     */
+    public void setColumns(ColumnState state, Consumer<ColumnState> changed) {
+        Objects.requireNonNull(state); columnsChanged = Objects.requireNonNull(changed);
+        tableState = state.sortColumn().filter(id -> TABLE_COLUMNS.stream().anyMatch(column -> column.id().equals(id))).isPresent() ? state
+            : new ColumnState(Optional.empty(), true, state.widths());
         render();
     }
 
@@ -180,7 +195,7 @@ public final class TunnelsPanel implements AutoCloseable {
             "Forward a local port to a remote host, or use Forward Port from an SSH pane.",
             List.of(new Nodes.Button(EMPTY_NEW, ControlState.READY, "New Tunnel…", "", Nodes.ButtonKind.SECONDARY, EMPTY_NEW, "")))) : Optional.empty();
         boolean filtered = !none && tableRows.stream().noneMatch(row -> row.heading().isEmpty());
-        var table = new Nodes.Table(ROWS, ControlState.READY, TABLE_COLUMNS, tableRows, selectedRow == null ? Set.of() : Set.of(selectedRow), TOGGLE, List.of(),
+        var table = new Nodes.Table(ROWS, ControlState.READY, tableState.apply(TABLE_COLUMNS), tableRows, selectedRow == null ? Set.of() : Set.of(selectedRow), TOGGLE, List.of(),
             Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD, empty, filtered ? "No tunnels match" : "");
         var top = new ArrayList<Nodes.Node>();
         error.ifPresent(message -> top.add(new Nodes.Notice(PROBLEM, ControlState.READY, Nodes.Severity.DANGER, problemText(), List.of())));
@@ -284,6 +299,16 @@ public final class TunnelsPanel implements AutoCloseable {
                 selectedRow = selected.ids().stream().findFirst().filter(id -> tunnel(id).isPresent()).orElse(null);
                 render();
             }
+            case UiEvent.Sorted sorted when sorted.id().equals(ROWS) -> {
+                if (TABLE_COLUMNS.stream().noneMatch(column -> column.id().equals(sorted.columnId()))) return;
+                tableState = tableState.sorted(sorted.columnId());
+                columnsChanged.accept(tableState);
+                render();
+            }
+            case UiEvent.ColumnsResized resized when resized.id().equals(ROWS) -> {
+                tableState = tableState.resized(resized.widths());
+                columnsChanged.accept(tableState);
+            }
             case UiEvent.Toggled toggled when toggled.id().startsWith(SWITCH) -> switched(toggled.id().substring(SWITCH.length()));
             case UiEvent.Action action -> act(action.id());
             default -> { }
@@ -361,13 +386,43 @@ public final class TunnelsPanel implements AutoCloseable {
     private List<Row> shown() {
         var rows = new ArrayList<Row>();
         if (error.isPresent()) rows.add(new Row(PROBLEM_ROW, null));
-        saved.stream().filter(this::matches).forEach(tunnel -> rows.add(new Row(rowId(tunnel.id()), tunnel)));
-        List<Tunnel> quickShown = quick.stream().filter(this::matches).toList();
+        ordered(saved.stream().filter(this::matches).toList()).forEach(tunnel -> rows.add(new Row(rowId(tunnel.id()), tunnel)));
+        List<Tunnel> quickShown = ordered(quick.stream().filter(this::matches).toList());
         if (!quickShown.isEmpty()) {
             rows.add(new Row(QUICK_HEADING, null));
             quickShown.forEach(tunnel -> rows.add(new Row(rowId(tunnel.id()), tunnel)));
         }
         return rows;
+    }
+
+    /** The classic table's sort within the saved tunnels and within the quick forwards: the column's text, then name, then id; none keeps the order given. */
+    private List<Tunnel> ordered(List<Tunnel> tunnels) {
+        if (layout != Layout.CLASSIC || tableState.sortColumn().isEmpty()) return tunnels;
+        String column = tableState.sortColumn().get();
+        Comparator<Tunnel> text = Comparator.comparing((Tunnel tunnel) -> sortText(tunnel, column).toLowerCase(Locale.ROOT)).thenComparing(tunnel -> sortText(tunnel, column));
+        // The ends read host:port: by host, then by the port as a number; a value with no port (SOCKS5) follows those that have one.
+        Comparator<Tunnel> ends = Comparator.comparing((Tunnel tunnel) -> portOf(sortText(tunnel, column)) < 0)
+            .thenComparing(tunnel -> hostOf(sortText(tunnel, column)).toLowerCase(Locale.ROOT)).thenComparingInt(tunnel -> portOf(sortText(tunnel, column))).thenComparing(text);
+        Comparator<Tunnel> primary = column.equals("local") || column.equals("remote") ? ends : text;
+        Comparator<Tunnel> byName = Comparator.comparing((Tunnel tunnel) -> tunnel.name().toLowerCase(Locale.ROOT)).thenComparing(Tunnel::name).thenComparing(Tunnel::id);
+        return tunnels.stream().sorted((tableState.ascending() ? primary : primary.reversed()).thenComparing(byName)).toList();
+    }
+
+    private static int portOf(String end) {
+        int colon = end.lastIndexOf(':');
+        try { return colon < 0 ? -1 : Integer.parseInt(end.substring(colon + 1)); } catch (NumberFormatException none) { return -1; }
+    }
+
+    private static String hostOf(String end) { int colon = end.lastIndexOf(':'); return portOf(end) < 0 ? end : end.substring(0, colon); }
+
+    private String sortText(Tunnel tunnel, String column) {
+        Ends ends = ends(tunnel, states.apply(tunnel.id()));
+        return switch (column) {
+            case "type" -> kindWord(tunnel.kind());
+            case "local" -> ends.local();
+            case "remote" -> ends.remote();
+            default -> hostNames.apply(tunnel.hostId()).orElse("");
+        };
     }
 
     private boolean matches(Tunnel tunnel) { return TunnelRows.matches(tunnel, hostNames.apply(tunnel.hostId()).orElse(""), query); }

@@ -1,6 +1,7 @@
 package dev.jasper.vault.ui;
 
 import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.ColumnState;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
@@ -28,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -66,8 +68,8 @@ final class ManagerPanel implements AutoCloseable {
     private Card card = Card.ENTRIES;
     private String query = "", kind = ALL_TYPES;
     /** The classic table's sort (a header click) and the tree items the user collapsed; both survive refreshes. */
-    private String sortColumn = COLUMN_NAME;
-    private boolean ascending = true;
+    private ColumnState tableState = ColumnState.sortedBy(COLUMN_NAME, true);
+    private Consumer<ColumnState> columnsChanged = state -> { };
     private final Set<String> collapsed = new HashSet<>();
     private VaultManagerDialog.Status status = new VaultManagerDialog.Status("", "", "");
     private UUID selection, shownSecret;
@@ -95,6 +97,18 @@ final class ManagerPanel implements AutoCloseable {
         this.onRevoke = onRevoke; this.onGenerate = onGenerate;
         this.onLock = onLock; this.onUnlock = onUnlock; this.onClose = onClose;
         view = kit.create(new ViewSpec(node()), this::handle);
+    }
+
+    /**
+     * The classic table's sort and column widths (key {@code vault}), and who hears each change the user makes; a sort
+     * column the table lacks reads as the default, the name ascending.
+     */
+    void columns(ColumnState state, Consumer<ColumnState> changed) {
+        Objects.requireNonNull(state); columnsChanged = Objects.requireNonNull(changed);
+        boolean known = state.sortColumn().filter(id -> Set.of(COLUMN_NAME, COLUMN_USERNAME, COLUMN_TYPE, COLUMN_MODIFIED).contains(id)).isPresent();
+        tableState = known ? state : new ColumnState(Optional.of(COLUMN_NAME), true, state.widths());
+        if (closed) return;
+        filter(); render();
     }
 
     UiView view() { return view; }
@@ -166,8 +180,14 @@ final class ManagerPanel implements AutoCloseable {
                 render();
             }
             case UiEvent.Sorted sorted when sorted.id().equals(ROWS) -> {
-                if (sortColumn.equals(sorted.columnId())) ascending = !ascending; else { sortColumn = sorted.columnId(); ascending = true; }
+                if (!Set.of(COLUMN_NAME, COLUMN_USERNAME, COLUMN_TYPE, COLUMN_MODIFIED).contains(sorted.columnId())) return;
+                tableState = tableState.sorted(sorted.columnId());
+                columnsChanged.accept(tableState);
                 filter(); render();
+            }
+            case UiEvent.ColumnsResized resized when resized.id().equals(ROWS) -> {
+                tableState = tableState.resized(resized.widths());
+                columnsChanged.accept(tableState);
             }
             case UiEvent.Expanded expanded when expanded.id().equals(KIND) -> {
                 if (expanded.expanded()) collapsed.remove(expanded.itemId()); else collapsed.add(expanded.itemId());
@@ -536,8 +556,8 @@ final class ManagerPanel implements AutoCloseable {
 
     /** The item table: the kind's swatch and the name, then the username, the type and the date; a header click sorts it. */
     private Nodes.Table classicTable() {
-        var columns = List.of(column(COLUMN_NAME, "Name", Nodes.TextRole.BODY, 111), column(COLUMN_USERNAME, "Username", Nodes.TextRole.MONO, 80),
-            column(COLUMN_TYPE, "Type", Nodes.TextRole.DESCRIPTION, 72), column(COLUMN_MODIFIED, "Modified", Nodes.TextRole.DESCRIPTION, 85));
+        var columns = tableState.apply(List.of(column(COLUMN_NAME, "Name", Nodes.TextRole.BODY, 111), column(COLUMN_USERNAME, "Username", Nodes.TextRole.MONO, 80),
+            column(COLUMN_TYPE, "Type", Nodes.TextRole.DESCRIPTION, 72), column(COLUMN_MODIFIED, "Modified", Nodes.TextRole.DESCRIPTION, 85)));
         Optional<Nodes.Empty> none = allRows.isEmpty() ? Optional.of(new Nodes.Empty(EMPTY, ControlState.READY,
             new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "search", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Nothing to show"),
             "Nothing to show", "", List.of())) : Optional.empty();
@@ -547,7 +567,7 @@ final class ManagerPanel implements AutoCloseable {
     }
 
     private Column column(String id, String title, Nodes.TextRole role, double weight) {
-        return new Column(id, title, role, false, weight, sortColumn.equals(id) ? Optional.of(ascending) : Optional.empty());
+        return new Column(id, title, role, false, weight, Optional.empty());
     }
 
     private TableRow tableRow(VaultManager.Row row) {
@@ -562,14 +582,14 @@ final class ManagerPanel implements AutoCloseable {
 
     /** The classic order: the sorted column, then the name and the id, so equal keys keep a stable order. */
     private Comparator<VaultManager.Row> classicOrder() {
-        Comparator<VaultManager.Row> order = switch (sortColumn) {
+        Comparator<VaultManager.Row> order = switch (tableState.sortColumn().orElse(COLUMN_NAME)) {
             case COLUMN_USERNAME -> Comparator.comparing(this::username, String.CASE_INSENSITIVE_ORDER);
             case COLUMN_TYPE -> Comparator.comparing(this::typeText, String.CASE_INSENSITIVE_ORDER);
             case COLUMN_MODIFIED -> Comparator.comparing(row -> modified(row).orElse(java.time.Instant.EPOCH));
             default -> Comparator.comparing(VaultManager.Row::name, String.CASE_INSENSITIVE_ORDER);
         };
         order = order.thenComparing(VaultManager.Row::name, String.CASE_INSENSITIVE_ORDER).thenComparing(row -> row.id().toString());
-        return ascending ? order : order.reversed();
+        return tableState.ascending() ? order : order.reversed();
     }
 
     /** The Type cell: a login's method ("Password", as the Item selected mock's cells read), else the entry's kind. */

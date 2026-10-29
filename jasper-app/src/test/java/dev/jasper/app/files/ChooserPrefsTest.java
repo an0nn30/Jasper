@@ -31,11 +31,11 @@ class ChooserPrefsTest {
         assertThat(prefs.pinned()).containsExactly(remote);
         prefs.setPreview(true);
         prefs.setShowHidden(false);
-        assertThat(state.chooser()).isEqualTo(new UiState.Chooser(List.of(), List.of("@dev.x.hosts|box|/srv"), true, false));
+        assertThat(state.chooser()).isEqualTo(new UiState.Chooser(List.of(), List.of("@dev.x.hosts|box|/srv"), true, false, "name", true, java.util.Map.of()));
     }
 
     @Test void ignoresUnreadableStoredPaths() {
-        state.setChooser(new UiState.Chooser(List.of("relative", "@broken", root.resolve("ok").toString()), List.of(), false, true));
+        state.setChooser(new UiState.Chooser(List.of("relative", "@broken", root.resolve("ok").toString()), List.of(), false, true, "name", true, java.util.Map.of()));
         assertThat(prefs.recent()).containsExactly(at("ok"));
     }
 }

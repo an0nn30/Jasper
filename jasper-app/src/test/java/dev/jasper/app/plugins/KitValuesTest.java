@@ -101,7 +101,7 @@ class KitValuesTest {
   assertThat(new MenuItem("old","Old","key","open",true,false).hue()).isEqualTo(Hue.NEUTRAL);
  }
  @Test void everyEventProjectsItsOwnerItemAndPayload(){
-  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"),new dev.jasper.ui.model.UiEvent.Clicked("tree","leaf"));
+  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"),new dev.jasper.ui.model.UiEvent.Clicked("tree","leaf"),new dev.jasper.ui.model.UiEvent.ColumnsResized("files",Map.of("name",180)));
   assertThat(events).hasSize(UiEvent.class.getPermittedSubclasses().length);for(var event:events)assertThat(KitValues.toSdk(event).toString()).isEqualTo(event.toString());
   assertThat(Arrays.stream(SemanticColor.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.theme.SemanticColor.values()).map(Enum::name).toArray(String[]::new));
  }
@@ -126,7 +126,7 @@ class KitValuesTest {
  @Test void browserCapabilitiesProjectWithoutLoss(){
   var pin=List.of(new MenuItem("pin","Pin","bookmark","pin",true,false));
   List<Node> nodes=List.of(
-   new Table("files",READY,List.of(new Column("name","Name",TextRole.BODY,false,4.5,Optional.of(true)),new Column("size","Size",TextRole.DESCRIPTION,true,1,Optional.of(false)),new Column("plain","Plain",TextRole.DESCRIPTION,false)),
+   new Table("files",READY,List.of(new Column("name","Name",TextRole.BODY,false,4.5,Optional.of(true)),new Column("size","Size",TextRole.DESCRIPTION,true,1,Optional.of(false)),new Column("plain","Plain",TextRole.DESCRIPTION,false),new Column("wide","Wide",TextRole.BODY,false,1,Optional.empty(),OptionalInt.of(180))),
     List.of(new TableRow("docs",Map.of("name","docs"),Optional.of("folder"),false,Optional.of(pin)),new TableRow("notes",Map.of("name","notes"),Optional.empty(),true,Optional.of(List.of())),new TableRow("plain",Map.of(),Optional.empty())),
     Set.of("docs","notes"),"open",pin,SelectionMode.MULTIPLE,ScrollPolicy.OVERLAY),
    new Tree("keys",READY,List.of(new TreeItem("tabs","Tabs",Optional.of("folder"),false,List.of(new TreeItem("new","New tab",Optional.empty(),true,List.of(),OptionalInt.empty(),true,"Context",Optional.of(StatusKind.SUCCESS),List.of("Global","Cmd+T"),Optional.of(pin))),OptionalInt.of(1),false)),Set.of("tabs"),Set.of("new"),"edit"),
@@ -134,6 +134,8 @@ class KitValuesTest {
   for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString().replace("titleNote=, contextActions=[]", "titleNote=")).isEqualTo(spec.toString());}
   assertThat(Arrays.stream(ScrollPolicy.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ScrollPolicy.values()).map(Enum::name).toArray(String[]::new));
   assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.Sorted("files","size"))).isEqualTo(new UiEvent.Sorted("files","size"));
+  assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.ColumnsResized("files",Map.of("name",180,"size",70)))).isEqualTo(new UiEvent.ColumnsResized("files",Map.of("name",180,"size",70)));
+  assertThatThrownBy(()->new Column("c","C",TextRole.BODY,false,1,Optional.empty(),OptionalInt.of(0))).isInstanceOf(IllegalArgumentException.class);
  }
  /** Plan 2 Task 6c: row-owned list menus, switch tooltips and severity-tinted glyphs cross the projection unchanged. */
  @Test void managerAndNoticeCapabilitiesProjectWithoutLoss(){

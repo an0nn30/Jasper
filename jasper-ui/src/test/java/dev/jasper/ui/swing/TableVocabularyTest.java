@@ -433,7 +433,9 @@ class TableVocabularyTest {
                 .isEqualTo(ThemePainting.font(context, dev.jasper.ui.metrics.Typography.Role.MONO_SMALL));
             assertThat(tree.mounted.get("mac").trailing.getComponent(1).getWidth()).as("a column is as wide as its title")
                 .isGreaterThanOrEqualTo(ThemePainting.measureText(port.getFont(), "Port number"));
-            for (var listener : host.getMouseListeners()) listener.mouseClicked(BrowserKitTest.click(host, 0));
+            // A click on the title's middle: its leading pixels are the boundary a drag resizes.
+            var middle = new java.awt.event.MouseEvent(host, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, host.getWidth() / 2, 2, 1, false, java.awt.event.MouseEvent.BUTTON1);
+            for (var listener : host.getMouseListeners()) listener.mouseClicked(middle);
             assertThat(events).containsExactly(new UiEvent.Sorted("sessions", "host"));
             view.update(new ViewSpec(sessions(List.of()))); InteractiveRowsTest.layout(view);
             assertThat(tree.scroll.getColumnHeader()).as("no columns, no header").isNull();

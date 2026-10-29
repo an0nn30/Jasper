@@ -104,6 +104,8 @@ public class RemotePlugin implements Plugin {
     private RemoteSettings.Declared settings;
     private HostStore store;
     private PanelState panelState;
+    /** The sort and column widths the plugin's tables keep, one key per column set (columns.properties). */
+    private dev.jasper.sdk.ui.ColumnStateFile columnStates;
     private KnownHosts trust;
     private Connections connections;
     private Optional<VaultApi> vault = Optional.empty();
@@ -163,6 +165,8 @@ public class RemotePlugin implements Plugin {
     @Override public void start(PluginContext context) throws Exception {
         this.context = context;
         Files.createDirectories(context.dataDirectory());
+        // Before the transfer queue opens its store on start: the folder sqlite-jdbc loads its native library from.
+        dev.jasper.remote.transfer.store.SqliteNatives.extractInto(dev.jasper.remote.transfer.store.SqliteNatives.folder());
         settings = new RemoteSettings.Declared(context.settings());
         store = new HostStore(context.dataDirectory().resolve("hosts.toml"), context.background(), ui);
         panelState = new PanelState(context.dataDirectory().resolve("panel-state.toml"));
@@ -200,10 +204,13 @@ public class RemotePlugin implements Plugin {
         sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::strip,transferUi::release,layout);
         sftpUi.hiddenItems(panelState.sftpShowHidden(),shown-> { try { panelState.saveSftpShowHidden(shown); }
             catch(IOException failure) { context.log().log(System.Logger.Level.WARNING,"panel state: {0}",failure.getMessage()); } });
+        columnStates=new dev.jasper.sdk.ui.ColumnStateFile(context.dataDirectory().resolve("columns.properties"));
+        sftpUi.columns(columnStates);
         tunnelStore = new dev.jasper.remote.tunnels.TunnelStore(context.dataDirectory().resolve("tunnels.toml"), context.background(), ui);
         tunnelsUi = new dev.jasper.remote.ui.tunnels.TunnelsUi(context, ui, tunnelStore,
             new dev.jasper.remote.tunnels.TunnelManager(connections, () -> settings.connection().connectTimeout(), context.background(), ui),
             store::hosts, store::host, paneId -> Optional.ofNullable(panes.get(paneId)).flatMap(store::host), layout);
+        tunnelsUi.columns(columnStates);
         remoteHosts=new dev.jasper.remote.chooser.RemoteHosts(store::hosts,connections::connected,store::onChanged,connections::onChanged,
             paneId->context.terminals().pane(paneId).flatMap(this::sftpPane).map(target->new dev.jasper.remote.chooser.RemoteHosts.Located(target.identity(),target.directory())),
             connections::resolveIdentity,(identity,window)->endpoints.open(Optional.of(identity),window,status->{}),()->context.terminals().activeWindow());
@@ -878,6 +885,7 @@ public class RemotePlugin implements Plugin {
         panel.setCollapsed(panelState.collapsed());
         panel.setWslCollapsed(panelState.wslCollapsed());
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed(), panel.wslCollapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
+        panel.setColumns(columnStates.get(SESSIONS_COLUMNS), state -> sessionColumns(state, panel));
         panel.setHosts(store.hosts(), store.error());
         // In a window of its own or docked at the bottom the list sits beside the detail; the panel is right from the start
         // and follows each move.
@@ -893,6 +901,18 @@ public class RemotePlugin implements Plugin {
         // The host disposed the view; the panel goes inert so no later refresh touches it.
         host.onClosed(() -> { panel.close(); sessionsPanels.remove(window.id(), sessions); });
         return panel.view();
+    }
+
+    private static final String SESSIONS_COLUMNS = "sessions";
+
+    /** The user sorted or resized the Sessions table in {@code source}: keep it and show it in every other window's panel. */
+    private void sessionColumns(dev.jasper.sdk.ui.ColumnState state, HostsPanel source) {
+        try { columnStates.put(SESSIONS_COLUMNS, state); }
+        catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "Sessions columns: {0}", failure.getMessage()); }
+        for (var entry : List.copyOf(sessionsPanels.entrySet())) {
+            var other = entry.getValue().panel();
+            if (other != source) other.setColumns(state, changed -> sessionColumns(changed, other));
+        }
     }
 
     private void reportMutation(String title, CompletableFuture<Void> mutation) {

@@ -204,6 +204,41 @@ class ClassicManagerTest {
         });
     }
 
+    @Test void headerClickSortsAndFlipsAndReportsIt() throws Exception {
+        edt(() -> {
+            var panel = panel(); var view = panel.view();
+            var heard = new java.util.ArrayList<dev.jasper.sdk.ui.ColumnState>();
+            panel.columns(dev.jasper.sdk.ui.ColumnState.NONE, heard::add);
+            panel.refresh(rows(), List.of(), STATUS, true);
+            assertThat(node(view, ManagerPanel.ROWS, Nodes.Table.class).columns()).filteredOn(column -> column.sorted().isPresent())
+                .singleElement().satisfies(column -> { assertThat(column.id()).isEqualTo(ManagerPanel.COLUMN_NAME); assertThat(column.sorted()).hasValue(true); });
+            emit(view, new UiEvent.Sorted(ManagerPanel.ROWS, ManagerPanel.COLUMN_MODIFIED));
+            assertThat(node(view, ManagerPanel.ROWS, Nodes.Table.class).columns()).filteredOn(column -> column.sorted().isPresent())
+                .singleElement().satisfies(column -> { assertThat(column.id()).isEqualTo(ManagerPanel.COLUMN_MODIFIED); assertThat(column.sorted()).hasValue(true); });
+            emit(view, new UiEvent.Sorted(ManagerPanel.ROWS, ManagerPanel.COLUMN_MODIFIED));
+            assertThat(node(view, ManagerPanel.ROWS, Nodes.Table.class).columns()).filteredOn(column -> column.sorted().isPresent())
+                .singleElement().satisfies(column -> assertThat(column.sorted()).hasValue(false));
+            assertThat(heard.getLast().sortColumn()).contains(ManagerPanel.COLUMN_MODIFIED);
+            assertThat(heard.getLast().ascending()).isFalse();
+            panel.close();
+        });
+    }
+
+    @Test void resizeIsReportedAndApplied() throws Exception {
+        edt(() -> {
+            var panel = panel(); var view = panel.view();
+            var heard = new java.util.ArrayList<dev.jasper.sdk.ui.ColumnState>();
+            panel.columns(dev.jasper.sdk.ui.ColumnState.NONE, heard::add);
+            panel.refresh(rows(), List.of(), STATUS, true);
+            emit(view, new UiEvent.ColumnsResized(ManagerPanel.ROWS, java.util.Map.of(ManagerPanel.COLUMN_TYPE, 130)));
+            assertThat(heard.getLast().widths()).containsEntry(ManagerPanel.COLUMN_TYPE, 130);
+            panel.refresh(rows(), List.of(), STATUS, true);
+            assertThat(node(view, ManagerPanel.ROWS, Nodes.Table.class).columns()).filteredOn(column -> column.id().equals(ManagerPanel.COLUMN_TYPE))
+                .singleElement().satisfies(column -> assertThat(column.width()).hasValue(130));
+            panel.close();
+        });
+    }
+
     @Test void theSortSurvivesARefreshAndTheSelectionStays() throws Exception {
         edt(() -> {
             var panel = panel(); var view = panel.view();

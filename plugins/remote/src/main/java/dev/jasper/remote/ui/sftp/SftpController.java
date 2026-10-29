@@ -36,6 +36,8 @@ public final class SftpController implements AutoCloseable {
     private volatile boolean closed;
     private boolean visible=true,loading,foldersOnly;
     private volatile boolean showHidden;
+    /** The order pages take: the panel's at each listing, then each page request's; a listing still loading takes a newer one. */
+    private volatile DirectoryCache.Order order=DirectoryCache.Order.DEFAULT;
     private Consumer<UUID> followRequests=pane->{};
     private Consumer<Boolean> hiddenChanged=shown->{};
     public void foldersOnly(boolean value) { foldersOnly=value; }
@@ -133,7 +135,7 @@ public final class SftpController implements AutoCloseable {
     }
     private void load(String target,boolean focus) { load(target,focus,-1); }
     private void load(String target,boolean focus,int historyTarget) {
-        cancel();long token=generation;var requestedState=state;
+        cancel();long token=generation;var requestedState=state;order=panel.order();
         loading=true;panel.busy(true,"Loading folder…");
         try { opening=opener.apply(requestedState.identity); }
         catch(RuntimeException failure) { loading=false;panel.error(message(failure));return; }
@@ -152,7 +154,7 @@ public final class SftpController implements AutoCloseable {
                 endpoint.list(directory,entry-> { try { check(token);listingEndpoint.child(directory,entry.name());batch.add(entry);if(batch.size()==256) { writing.append(batch);batch.clear(); } } catch(IOException error) { throw new UncheckedIOException(error); } });
                 if(!batch.isEmpty()) fresh.append(batch);check(token);
                 closeCache();cache=fresh;fresh=null;cachedView=new View(requestedState.identity,directory);
-                boolean hidden=showHidden;var rows=cache.page(0,200,foldersOnly,hidden);long count=cache.count(foldersOnly,hidden);var view=cachedView;
+                boolean hidden=showHidden;var rows=cache.page(0,200,foldersOnly,hidden,order);long count=cache.count(foldersOnly,hidden);var view=cachedView;
                 publish(token,()-> { loading=false;displayed=view;requestedState.path=directory;visited(requestedState,directory,historyTarget);panel.showPage(view.identity().host().name(),directory,rows,0,count,focus); });
             } catch(Exception failure) { publish(token,()-> { loading=false;panel.error(message(failure)); }); }
             finally {
@@ -161,15 +163,17 @@ public final class SftpController implements AutoCloseable {
             }
         });
     }
-    public void page(long offset) {
+    /** Shows the page at {@code offset} of the folder sorted in {@code order}. */
+    public void page(long offset,DirectoryCache.Order order) {
+        this.order=order;
         if(closed || loading || displayed==null || state==null || !displayed.identity().equals(state.identity)) return;long token=generation;
-        boolean hidden=showHidden;
-        submit(()-> { try { if(cache==null || cachedView==null) return;var rows=cache.page(offset,200,foldersOnly,hidden);var view=cachedView;long count=cache.count(foldersOnly,hidden);publish(token,()-> { displayed=view;panel.showPage(view.identity().host().name(),view.path(),rows,offset,count,false); }); }
+        boolean hidden=showHidden;var sorted=order;
+        submit(()-> { try { if(cache==null || cachedView==null) return;var rows=cache.page(offset,200,foldersOnly,hidden,sorted);var view=cachedView;long count=cache.count(foldersOnly,hidden);publish(token,()-> { displayed=view;panel.showPage(view.identity().host().name(),view.path(),rows,offset,count,false); }); }
             catch(IOException failure) { publish(token,()-> { loading=false;panel.error(message(failure)); }); } });
     }
     /** The panel's toggle: the folder shown again from its first page, from the cache, without listing it again. */
     private void hidden(boolean shown) {
-        if(closed) return;showHidden(shown);hiddenChanged.accept(shown);page(0);
+        if(closed) return;showHidden(shown);hiddenChanged.accept(shown);page(0,panel.order());
     }
     private void submit(Runnable task) { if(closed) return;pending.set(task);wake.offer(true); }
     private void loop() {

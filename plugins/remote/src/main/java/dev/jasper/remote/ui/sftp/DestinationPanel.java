@@ -60,6 +60,8 @@ public final class DestinationPanel implements AutoCloseable {
     public UiView view() { return view; }
     /** Whether the browser shows hidden items at first, and who hears the user's choice when it changes. */
     public void hiddenItems(boolean shown,Consumer<Boolean> changed) { controller.showHidden(shown);controller.onShowHiddenChanged(changed); }
+    /** The sort and column widths the browser shares with the SFTP browsers. */
+    void columns(SftpColumns shared) { browser.columns(shared); }
     public void refresh() { controller.refresh(); }
     public void status(boolean busy,String text) { if(!closed) browser.operationStatus(busy,text); }
 

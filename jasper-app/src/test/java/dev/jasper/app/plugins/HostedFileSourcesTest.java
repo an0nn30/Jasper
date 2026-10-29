@@ -17,7 +17,6 @@ import dev.jasper.sdk.files.FileSource;
 import dev.jasper.sdk.files.FileSourceSpec;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.PaneHandle;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -31,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
 import static org.assertj.core.api.Assertions.*;
@@ -39,6 +39,7 @@ class HostedFileSourcesTest {
     Contributions contributions = onEdtValue(Contributions::new);
     TerminalFixture fixture = onEdtValue(TerminalFixture::new);
     PluginHost host;
+    @TempDir Path data;
     final List<String> calls = new ArrayList<>();
     boolean failRoots;
 
@@ -73,7 +74,6 @@ class HostedFileSourcesTest {
     }
 
     void start(FileSource source) throws Exception {
-        Path data = Files.createTempDirectory("jasper-files");
         host = onEdtValue(() -> new PluginHost(new PluginHost.Environment(javax.swing.SwingUtilities::invokeLater,
             javax.swing.SwingUtilities::isEventDispatchThread, data::resolve, diagnostic -> { },
             Duration.ofMillis(200), contributions, () -> true, AppContractTest.headlessWindows(), fixture.registry,

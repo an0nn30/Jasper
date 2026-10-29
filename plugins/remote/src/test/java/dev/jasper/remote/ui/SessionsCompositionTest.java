@@ -31,7 +31,7 @@ class SessionsCompositionTest {
                 assertThat(root.header().count()).as("total collection, never filtered count").hasValue(2);
                 assertThat(root.searchOrNavigation()).isPresent();
                 assertThat(publications.getLast().detail()).as("the kit count is the only count").isEmpty();
-                assertThat(root.header().primary()).as("host actions are independent from plugin primary").isEmpty();
+                assertThat(root.header().primary()).as("host actions are independent from plugin primary").get().isInstanceOf(Nodes.MenuButton.class);
                 assertThat(publications.getLast().actions()).hasSize(2);
                 assertThat(publications.getLast().actions()).extracting(dev.jasper.sdk.ui.PanelHeader.Action::icon)
                     .as("Import is the arrow into a corner, not the download tray").containsExactly("add", "import");

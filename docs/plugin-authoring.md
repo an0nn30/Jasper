@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
-describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.24.0, task by task.
+describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.25.0, task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
   exported APIs.
@@ -64,7 +64,7 @@ id = "dev.example.tool"
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.24.0, <0.25"
+sdk = ">=0.25.0, <0.26"
 description = "Runs the tool from the command palette."
 vendor = "Example"
 homepage = "https://example.dev/tool"
@@ -90,7 +90,7 @@ summary = "Run the tool"
 | `name` | string | yes | Must show something: not only spaces, zero-width or bidi characters. It titles the plugin's row, Settings page and notification groups. |
 | `version` | string | yes | One to three numbers separated by dots, without leading zeros or a pre-release tag; missing numbers are 0, so `1.0` is `1.0.0`. |
 | `entry` | string | yes | The qualified name of the [entry class](#the-entry-point-and-lifecycle), which must be in a package. |
-| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.24.0 declares `sdk = ">=0.24.0, <0.25"`. |
+| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.25.0 declares `sdk = ">=0.25.0, <0.26"`. |
 | `description` | string | no | The Overview on the plugin's details in Settings › Plugins; searched there. |
 | `vendor` | string | no | Shown in the plugin list, its details and its review sheet. |
 | `homepage` | string | no | An absolute `http` or `https` address, linked as "Plugin homepage ↗" on the plugin's details. Anything else is ignored with a warning in the log. |
@@ -1529,28 +1529,29 @@ Packaged Jasper runs on its own trimmed JetBrains Runtime 25, not on every JDK m
 modules, and a plugin may rely on them; `verifyPackage` checks every packaged runtime against this list:
 
 <!-- runtime-modules:start -->
-`java.base`, `java.compiler`, `java.datatransfer`, `java.desktop`, `java.instrument`, `java.logging`,
-`java.management`, `java.management.rmi`, `java.naming`, `java.net.http`, `java.prefs`, `java.rmi`,
-`java.scripting`, `java.se`, `java.security.jgss`, `java.security.sasl`, `java.smartcardio`, `java.sql`,
-`java.sql.rowset`, `java.transaction.xa`, `java.xml`, `java.xml.crypto`, `jdk.accessibility`, `jdk.attach`,
-`jdk.charsets`, `jdk.crypto.cryptoki`, `jdk.httpserver`, `jdk.internal.jvmstat`, `jdk.jfr`, `jdk.localedata`,
-`jdk.management`, `jdk.management.agent`, `jdk.management.jfr`, `jdk.naming.dns`, `jdk.naming.rmi`, `jdk.net`,
-`jdk.security.auth`, `jdk.security.jgss`, `jdk.unsupported`, `jdk.unsupported.desktop`, `jdk.zipfs`
+`gluegen.rt`, `java.base`, `java.compiler`, `java.datatransfer`, `java.desktop`, `java.instrument`,
+`java.logging`, `java.management`, `java.management.rmi`, `java.naming`, `java.net.http`, `java.prefs`,
+`java.rmi`, `java.scripting`, `java.se`, `java.security.jgss`, `java.security.sasl`, `java.smartcardio`,
+`java.sql`, `java.sql.rowset`, `java.transaction.xa`, `java.xml`, `java.xml.crypto`, `jcef`,
+`jdk.accessibility`, `jdk.attach`, `jdk.charsets`, `jdk.crypto.cryptoki`, `jdk.httpserver`,
+`jdk.internal.jvmstat`, `jdk.jfr`, `jdk.localedata`, `jdk.management`, `jdk.management.agent`,
+`jdk.management.jfr`, `jdk.naming.dns`, `jdk.naming.rmi`, `jdk.net`, `jdk.security.auth`, `jdk.security.jgss`,
+`jdk.unsupported`, `jdk.unsupported.desktop`, `jdk.zipfs`, `jogl.all`
 <!-- runtime-modules:end -->
 
 On Windows it also has `jdk.crypto.mscapi`, the Windows certificate stores. That is all of Java SE (`java.se`) plus
 the charsets, locale data, ZIP file system, PKCS#11 and smart-card providers, Kerberos and JAAS login modules, DNS and
-RMI naming, `jdk.net`'s socket options, the JDK HTTP server, `sun.misc.Unsafe` (`jdk.unsupported`), and JFR, JMX and
-attach for diagnostics.
+RMI naming, `jdk.net`'s socket options, the JDK HTTP server, `sun.misc.Unsafe` (`jdk.unsupported`), JFR, JMX and
+attach for diagnostics, and the JetBrains Runtime's Chromium (`jcef`) with the JOGL modules it requires (`jogl.all`,
+`gluegen.rt`).
 
 Not there: the compiler and the other development tools (`jdk.compiler`, so `ToolProvider.getSystemJavaCompiler()`
 returns null; `jdk.javadoc`, `jdk.jshell`, `jdk.jlink`, `jdk.jpackage`, `jdk.jdeps`, `jdk.jartool`, `jdk.jconsole`,
 `jdk.jstatd`, `jdk.editpad`), the debugger (`jdk.jdi`, `jdk.jdwp.agent`, so `-agentlib:jdwp` does not work in the
 packaged app), `jdk.dynalink` (a bundled Nashorn cannot run), `jdk.incubator.vector`, `jdk.sctp`, `jdk.xml.dom`,
-`jdk.jsobject`, `jdk.nio.mapmode`, and the JetBrains Runtime's JCEF and JOGL (`jcef`, `jogl.all`, `gluegen.rt`). A
-library that needs one of them fails with `NoClassDefFoundError` in the packaged app although it works under
-`./gradlew :jasper-app:run`, which uses the full JDK. Bundle a jar instead, or ask for the module to be added
-(`runtimeRootModules` in `gradle/packaging-support.gradle`).
+`jdk.jsobject` and `jdk.nio.mapmode`. A library that needs one of them fails with `NoClassDefFoundError` in the
+packaged app although it works under `./gradlew :jasper-app:run`, which uses the full JDK. Bundle a jar instead, or ask
+for the module to be added (`runtimeRootModules` in `gradle/packaging-support.gradle`).
 
 On macOS and Windows the packaged JVM loads JNA's native library from Jasper's own copy (`jna.boot.library.path`, JNA
 5.14.0) and points pty4j at Jasper's bundled files (`pty4j.preferred.native.folder`). Both properties are process-wide.

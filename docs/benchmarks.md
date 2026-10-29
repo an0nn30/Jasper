@@ -124,7 +124,8 @@ A default memory run covers all nine pane and scrollback configurations, each wi
 pane ownership and one controlled fixture per pane. Cold-ready and warm-idle snapshots precede the workload. Output
 emits one staged payload per pane concurrently and then stays idle; output-settle is a separate phase. The interactive
 phase also fills the output, then runs asynchronous literal searches for `jasper`, alternates 16 and 17 pt fonts and
-1100 and 1050 px window widths, and returns to 16 pt and 1100 px. A cycle creates a tab and a split beside it, closes
+1100 and 1050 px window widths, and returns to 16 pt and 1100 px. A search that a width reflow supersedes never calls
+back, so the phase asks it again; `searchesAskedAgain` counts those. A cycle creates a tab and a split beside it, closes
 both, opens a sibling window and closes it; the baseline window stays open. Closed sessions are released before the
 retention samples. The final settle and a post-cleanup sample are separate.
 

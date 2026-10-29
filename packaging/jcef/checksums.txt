@@ -1,0 +1,10 @@
+# SHA-512 checksums of the JetBrains Runtime SDK archives (JBR 25.0.4.1 b635.75 with JCEF) that Jasper builds and packages
+# with, in the format `shasum -a 512 -c` reads. The values are the .checksum files beside the archives at
+# https://cache-redirector.jetbrains.com/intellij-jbr/, read on 2026-10-27; the five archives other than osx-aarch64's
+# were downloaded and match them.
+8e6d82ae871e44d996fed519de079ca2af22abe8aa6be97e486b13597c77d069ad68a31ba3beec93dbd49b8abd16c848d1e461bc6f2b0ee58940e6d0d16f1bc9  jbrsdk_jcef-25.0.4.1-osx-aarch64-b635.75.tar.gz
+258bb7d1c419bf15bd06b49d299f4b2fe51fe1eab5493940d3ed449a6f0a65c005b6fc811c12f43fc206bf1431ac6a5a7216b332c5586b17cac3abf8dd1fc579  jbrsdk_jcef-25.0.4.1-osx-x64-b635.75.tar.gz
+3c376590c64d3ae0e1ac928385a454f1473ddc81e155a06881d9ef9b149d0ea95a781b09cdfc42f748228fafc764f888877c474d8e68377683dcb142c22f8ed1  jbrsdk_jcef-25.0.4.1-windows-x64-b635.75.tar.gz
+03179c31399270244668a782689c390d0b8c52c2b9447ef1d50040f3e6b94ed3f8d17e8e8730cd681d97a171a8259d86fdf59be0244bd31cd8b84dde558c4f84  jbrsdk_jcef-25.0.4.1-windows-aarch64-b635.75.tar.gz
+3f83f5c6a2d4ab953a1d5d7af8b6b5416dd9f5da237efb0d4bcc89b5f8c118a7830a243e3b6747d304f104849682095b49204485441aeec56a1280bd24b6703b  jbrsdk_jcef-25.0.4.1-linux-x64-b635.75.tar.gz
+4ce2ab6497b34fac29c6e3f37aff8f2906b937dcb4efb22423aabff16eb76ae7c1fec32720af5b8420f132bbeab02df564a3b96c4cc8f288c9597129f5140fee  jbrsdk_jcef-25.0.4.1-linux-aarch64-b635.75.tar.gz

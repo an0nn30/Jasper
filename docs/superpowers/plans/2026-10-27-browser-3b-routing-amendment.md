@@ -4,7 +4,7 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Execution status (2026-10-27): executed** (commits `f89fcee81` to `60599de5d`, then "STATUS: browser plan 3b's
-check"); see `docs/STATUS.md`. The task reviews recorded these deviations from the plan's text:
+check"), and merged into `main` with plan 3 as `ec86c61c2` and pushed; see `docs/STATUS.md`. The task reviews recorded these deviations from the plan's text:
 - **Branch:** executed on `claude/browser-routing-3b-b72db8`, cut from `claude/browser-link-routing` at `665d4bce5`, not
   on `claude/browser-link-routing` as the Global Constraints say.
 - **Spec, step 1 of Task 8:** section 23 puts the plugin-off notification for addresses from outside in this amendment.

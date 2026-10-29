@@ -59,7 +59,9 @@ class BrowserKitTest {
                 assertThat(SwingUtilities.convertPoint(cell, 0, 0, view).x).as("cells line up under their header")
                     .isEqualTo(SwingUtilities.convertPoint(modified, 0, 0, view).x);
                 assertThat(cell.getWidth()).isEqualTo(modified.getWidth());
-                for (var listener : modified.getMouseListeners()) listener.mouseClicked(click(modified, 0));
+                // A click on the title's middle: its leading pixels are the boundary a drag resizes.
+                var middle = new MouseEvent(modified, MouseEvent.MOUSE_CLICKED, 0, 0, modified.getWidth() / 2, 2, 1, false, MouseEvent.BUTTON1);
+                for (var listener : modified.getMouseListeners()) listener.mouseClicked(middle);
                 assertThat(events).containsExactly(new UiEvent.Sorted("files", "modified"));
                 view.update(new ViewSpec(files(5, Set.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD, Optional.of(false))));
                 InteractiveRowsTest.layout(view);

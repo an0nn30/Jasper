@@ -19,6 +19,7 @@ jobs:
         with:
           distribution: jetbrains
           java-version: '25'
+          java-package: jdk+jcef
       - uses: gradle/actions/setup-gradle@v6
       - name: Build the SDK jars
         run: ./gradlew sdkRelease verifySdkRelease --stacktrace

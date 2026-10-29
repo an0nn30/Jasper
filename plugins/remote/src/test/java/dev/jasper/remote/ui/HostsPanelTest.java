@@ -71,6 +71,72 @@ class HostsPanelTest {
         return all.stream().filter(n -> n instanceof Nodes.StatusDot).map(n -> ((Nodes.StatusDot) n).kind()).findFirst();
     }
 
+    static Nodes.MenuButton sortMenu(HostsPanel panel) {
+        return (Nodes.MenuButton) node(panel.view(), HostsPanel.HEADER, Nodes.Header.class).primary().orElseThrow();
+    }
+    static String sortIcon(HostsPanel panel, String id) { return sortMenu(panel).items().stream().filter(i -> i.id().equals(id)).findFirst().orElseThrow().icon(); }
+    static List<String> names(HostsPanel panel) { return rows(panel).stream().filter(HostRows.Host.class::isInstance).map(r -> ((HostRows.Host) r).host().name()).toList(); }
+    final RemoteHost alpha = RemoteHost.create("alpha", "zeta.example", 8080, "me", Auth.AGENT, "", Optional.empty());
+    final RemoteHost beta = RemoteHost.create("beta", "mid.example", 22, "me", Auth.AGENT, "", Optional.empty());
+    final RemoteHost gamma = RemoteHost.create("gamma", "alef.example", 2222, "me", Auth.AGENT, "", Optional.empty());
+
+    @Test void sortMenuOffersThreeColumnsAndMarksTheCurrentOne() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setHosts(List.of(alpha, beta, gamma), Optional.empty());
+            assertThat(sortMenu(panel).items()).extracting(dev.jasper.sdk.ui.MenuItem::id).containsExactly("sort:name", "sort:host", "sort:port");
+            assertThat(sortIcon(panel, "sort:name")).isEqualTo("chevron.up");
+            emit(panel.view(), new UiEvent.Action("sort:host"));
+            assertThat(sortIcon(panel, "sort:host")).isEqualTo("chevron.up");
+            assertThat(names(panel)).containsExactly("gamma", "beta", "alpha");
+            emit(panel.view(), new UiEvent.Action("sort:host"));
+            assertThat(sortIcon(panel, "sort:host")).isEqualTo("chevron.down");
+            assertThat(sortIcon(panel, "sort:name")).isEmpty();
+            assertThat(names(panel)).containsExactly("alpha", "beta", "gamma");
+        });
+    }
+
+    @Test void classicHeaderClickAndDefaultMenuShareOneSort() throws Exception {
+        edt(() -> {
+            var heard = new ArrayList<dev.jasper.sdk.ui.ColumnState>();
+            var classic = new HostsPanel(new FakeKit("dev.jasper.remote"), actions, dev.jasper.remote.workstation.Layout.CLASSIC);
+            classic.setColumns(dev.jasper.sdk.ui.ColumnState.NONE, heard::add);
+            classic.setHosts(List.of(alpha, beta, gamma), Optional.empty());
+            emit(classic.view(), new UiEvent.Sorted(HostsPanel.ROWS, "port"));
+            assertThat(names(classic)).containsExactly("beta", "gamma", "alpha");
+            assertThat(heard).containsExactly(dev.jasper.sdk.ui.ColumnState.sortedBy("port", true));
+            var rows = panel();
+            rows.setColumns(heard.get(0), state -> { });
+            rows.setHosts(List.of(alpha, beta, gamma), Optional.empty());
+            assertThat(names(rows)).containsExactly("beta", "gamma", "alpha");
+            assertThat(sortIcon(rows, "sort:port")).isEqualTo("chevron.up");
+        });
+    }
+
+    @Test void anUnknownStoredSortColumnReadsAsName() throws Exception {
+        edt(() -> {
+            var panel = panel();
+            panel.setHosts(List.of(alpha, beta, gamma), Optional.empty());
+            panel.setColumns(dev.jasper.sdk.ui.ColumnState.sortedBy("bogus", false), state -> { });
+            assertThat(names(panel)).containsExactly("alpha", "beta", "gamma");
+            assertThat(sortIcon(panel, "sort:name")).isEqualTo("chevron.up");
+        });
+    }
+
+    @Test void classicTreeAppliesAndReportsWidths() throws Exception {
+        edt(() -> {
+            var heard = new ArrayList<dev.jasper.sdk.ui.ColumnState>();
+            var classic = new HostsPanel(new FakeKit("dev.jasper.remote"), actions, dev.jasper.remote.workstation.Layout.CLASSIC);
+            classic.setColumns(dev.jasper.sdk.ui.ColumnState.NONE.resized(java.util.Map.of("host", 140)), heard::add);
+            classic.setHosts(List.of(alpha), Optional.empty());
+            var tree = node(classic.view(), HostsPanel.ROWS, Nodes.Tree.class);
+            assertThat(tree.columns()).filteredOn(c -> c.id().equals("host")).singleElement().satisfies(c -> assertThat(c.width()).hasValue(140));
+            emit(classic.view(), new UiEvent.ColumnsResized(HostsPanel.ROWS, java.util.Map.of("host", 200, "port", 60)));
+            assertThat(heard).hasSize(1);
+            assertThat(heard.get(0).widths()).containsEntry("host", 200).containsEntry("port", 60);
+        });
+    }
+
     @Test void connectedFooterActivatesExistingShellAndUpdatesWhenSessionsEnd() throws Exception {
         edt(() -> {
             var panel = panel();
@@ -106,7 +172,7 @@ class HostsPanelTest {
             });
             assertThat(all(panel.view())).as("new/import actions belong in the app header")
                 .noneMatch(n -> n instanceof Nodes.Button b && (b.tooltip().equals("New session") || b.label().equals("Import")));
-            assertThat(root.header().primary()).isEmpty();
+            assertThat(root.header().primary()).as("only the sort menu").get().isInstanceOf(Nodes.MenuButton.class);
         });
     }
 

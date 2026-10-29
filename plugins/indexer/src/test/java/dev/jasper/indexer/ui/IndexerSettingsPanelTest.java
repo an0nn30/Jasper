@@ -193,6 +193,56 @@ class IndexerSettingsPanelTest {
         });
     }
 
+    private static final ProjectKey ZED = ProjectKey.local(Path.of("/w/zed"));
+
+    /** Two projects, "app" (2 files) listed before "zed" (1 file), a panel over them and what it reported. */
+    private void withTwoProjects(java.util.function.BiConsumer<FakeKitView, List<dev.jasper.sdk.ui.ColumnState>> body) throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var projects = new Projects();
+            var notifications = new FakeNotifications();
+            var indexer = new Indexer(projects, new IndexStore(data.resolve("sort-store")), job -> new CompletableFuture<Listing>(),
+                new ManualExecutor(), new ManualExecutor(), Instant::now, text -> { }, notifications.group("r"), notifications.group("f"), System.getLogger("test"));
+            projects.loaded(new Project(APP, "app", false), Optional.of(new ProjectIndex(APP, List.of("a", "b"), Strategy.GIT, Instant.EPOCH, false)));
+            projects.loaded(new Project(ZED, "zed", false), Optional.of(new ProjectIndex(ZED, List.of("a"), Strategy.GIT, Instant.EPOCH, false)));
+            var heard = new ArrayList<dev.jasper.sdk.ui.ColumnState>();
+            try (var host = new FakePluginHost(data)) {
+                host.start(IndexerTesting.INFO, Set.of(), Set.of(), context -> context.settings().page(new IndexerSettingsPanel(context.kit(),
+                    new IndexerSettings(context.settings()), projects, indexer, key -> key.root(), key -> true, key -> true, () -> { }, (question, accepted) -> { })
+                    .columns(dev.jasper.sdk.ui.ColumnState.NONE, heard::add)));
+                host.settingsPanel(IndexerTesting.INFO.id()).orElseThrow();
+                body.accept(host.settingsPanelView(IndexerTesting.INFO.id()).orElseThrow(), heard);
+            }
+        });
+    }
+
+    private static List<String> names(FakeKitView view) { return table(view).rows().stream().map(row -> row.cells().get("name")).toList(); }
+
+    @Test void headerClickSortsAndFlips() throws Exception {
+        withTwoProjects((view, heard) -> {
+            assertThat(names(view)).containsExactly("app", "zed");
+            assertThat(table(view).columns()).allMatch(column -> column.sorted().isEmpty());
+            view.emit(new UiEvent.Sorted("indexer.projects", "files"));
+            assertThat(names(view)).containsExactly("zed", "app");
+            assertThat(table(view).columns()).filteredOn(column -> column.id().equals("files")).singleElement()
+                .satisfies(column -> assertThat(column.sorted()).contains(true));
+            view.emit(new UiEvent.Sorted("indexer.projects", "files"));
+            assertThat(names(view)).containsExactly("app", "zed");
+            assertThat(table(view).columns()).filteredOn(column -> column.id().equals("files")).singleElement()
+                .satisfies(column -> assertThat(column.sorted()).contains(false));
+            assertThat(heard.getLast().sortColumn()).contains("files");
+        });
+    }
+
+    @Test void resizeIsReportedAndApplied() throws Exception {
+        withTwoProjects((view, heard) -> {
+            view.emit(new UiEvent.ColumnsResized("indexer.projects", java.util.Map.of("name", 150)));
+            assertThat(heard.getLast().widths()).containsEntry("name", 150);
+            view.emit(new UiEvent.Sorted("indexer.projects", "name"));
+            assertThat(table(view).columns()).filteredOn(column -> column.id().equals("name")).singleElement()
+                .satisfies(column -> assertThat(column.width()).hasValue(150));
+        });
+    }
+
     private static Nodes.Table table(FakeKitView view) { return node(view, "indexer.projects", Nodes.Table.class); }
 
     private static dev.jasper.sdk.ui.TableRow row(FakeKitView view, int index) { return table(view).rows().get(index); }

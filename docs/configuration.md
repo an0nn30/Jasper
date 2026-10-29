@@ -640,7 +640,7 @@ dock, Zen and the rails) are in [`workspace.toml`](#workspacetoml). A file with 
 | `[windows."<id>"]` `x`, `y`, `width`, `height` | Where Settings (`app.settings`), the file chooser (`file-chooser`), About (`jasper.about`), Licenses (`jasper.licenses`) and a plugin's window-sized dialog, under its plugin id and title, such as the Credential Vault manager (`dev.jasper.vault\|Credential Vault`), were |
 | `[palette]` `center_x`, `top` | Where the palette card was dragged, as fractions of the window |
 | `[palette.run_window]` `left`, `bottom` | Where the Run window was dragged, as fractions of the window |
-| `[chooser]` `recent`, `pinned`, `preview`, `show_hidden` | The file chooser's recent and pinned folders and its two toggles |
+| `[chooser]` `recent`, `pinned`, `preview`, `show_hidden`, `sort`, `sort_ascending`, `[chooser.widths]` | The file chooser's recent and pinned folders, its two toggles, its sort and its column widths |
 
 ### workspace.toml
 

@@ -37,7 +37,7 @@ class SftpControllerTest {
         try(var workers=Executors.newVirtualThreadPerTaskExecutor()) {
             SwingUtilities.invokeAndWait(()-> { panel[0]=new SftpPanel(new dev.jasper.sdk.testing.FakeKit("dev.jasper.remote"));holder[0]=new SftpController(root.resolve("cache"),workers,SwingUtilities::invokeLater,identity->CompletableFuture.completedFuture(new LocalEndpoint()),panel[0]);holder[0].open(UUID.randomUUID(),host("links"),root.toString(),true); });
             try {
-                awaitRows(panel[0],"cache","real","alias");
+                awaitRows(panel[0],"alias","cache","real");
                 SftpTestAccess.enter(panel[0],"alias");
                 awaitRows(panel[0],"inside");
                 SwingUtilities.invokeAndWait(()->assertThat(panel[0].directory()).isEqualTo(real.toString()));

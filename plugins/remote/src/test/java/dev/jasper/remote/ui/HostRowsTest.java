@@ -30,6 +30,21 @@ class HostRowsTest {
         assertThat(HostRows.rows(List.of(zulu, alpha), "", Set.of(HostRows.OTHER))).containsExactly(new HostRows.Group(HostRows.OTHER, 2, true));
     }
 
+    @Test void sortsHostsWithinGroupsAndKeepsGroupOrder() {
+        var ssh = RemoteHost.create("a-ssh", "z.example", 22, "u", Auth.AGENT, "prod", Optional.empty());
+        var alt = RemoteHost.create("b-alt", "y.example", 2222, "u", Auth.AGENT, "prod", Optional.empty());
+        var web = RemoteHost.create("c-web", "x.example", 80, "u", Auth.AGENT, "prod", Optional.empty());
+        var other = RemoteHost.create("d-1", "w.example", 22, "u", Auth.AGENT, "", Optional.empty());
+        var other2 = RemoteHost.create("e-2", "v.example", 2222, "u", Auth.AGENT, "", Optional.empty());
+        var all = List.of(web, other, ssh, other2, alt);
+        assertThat(HostRows.rows(all, "", Set.of(), HostRows.OTHER, new HostRows.Order("port", false))).extracting(HostRowsTest::describe)
+            .containsExactly("prod(3)", "b-alt", "c-web", "a-ssh", "Other(2)", "e-2", "d-1");
+        assertThat(HostRows.rows(all, "", Set.of(), HostRows.OTHER, new HostRows.Order("host", true))).extracting(HostRowsTest::describe)
+            .containsExactly("prod(3)", "c-web", "b-alt", "a-ssh", "Other(2)", "e-2", "d-1");
+        assertThat(HostRows.rows(all, "", Set.of(), HostRows.OTHER, new HostRows.Order("unknown", false))).extracting(HostRowsTest::describe)
+            .containsExactly("prod(3)", "c-web", "b-alt", "a-ssh", "Other(2)", "e-2", "d-1");
+    }
+
     @Test void collapsedGroupsHideTheirHostsUnlessSearching() {
         assertThat(HostRows.rows(hosts, "", Set.of("Production", HostRows.OTHER))).extracting(HostRowsTest::describe).containsExactly("Production(2)-", "Staging(1)", "app", "Other(1)-");
         assertThat(HostRows.rows(hosts, "ap", Set.of("Production", "Staging"))).extracting(HostRowsTest::describe).containsExactly("Production(1)", "api*", "Staging(1)", "app");

@@ -1,0 +1,8 @@
+Jasper's Windows x64 package ships Microsoft's DirectX IL library, the DirectX Shader Compiler's DXIL validator, bin/dxil.dll
+(file version 101.7.2308.24), in the JetBrains Runtime's JCEF. The file is unmodified: byte-identical to
+Redist\D3D\x64\dxil.dll of Windows SDK 10.0.26100.3323 (the NuGet package Microsoft.Windows.SDK.CPP 10.0.26100.3323).
+(c) Microsoft Corporation. All rights reserved.
+
+The licence text is the Windows SDK licence terms that package names (https://aka.ms/WinSDKLicenseURL, Microsoft's
+sdk_license.rtf), as plain text. The Windows SDK files that programs may distribute are listed at
+https://learn.microsoft.com/en-us/legal/windows-sdk/redist.

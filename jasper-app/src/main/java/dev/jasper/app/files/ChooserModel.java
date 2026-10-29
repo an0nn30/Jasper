@@ -226,6 +226,14 @@ public final class ChooserModel {
         fire();
     }
 
+    /** Sorts by {@code column} in the given direction; the chooser restores its remembered sort with it. */
+    public void sortBy(Column column, boolean ascending) {
+        sortColumn = Objects.requireNonNull(column);
+        this.ascending = ascending;
+        recompute();
+        fire();
+    }
+
     /** Selects visible entries; without multiple selection only the first is kept. */
     public void select(List<ChooserEntry> entries) {
         List<ChooserEntry> chosen = entries.stream().filter(visible::contains).toList();

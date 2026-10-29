@@ -42,7 +42,7 @@ final class KitValues {
  static dev.jasper.ui.model.Option toModule(dev.jasper.sdk.ui.Option n) { return new dev.jasper.ui.model.Option(n.id(), n.label(), n.hue().map(KitValues::toModule), n.icon(), n.description(), n.preview().map(p -> new dev.jasper.ui.model.Option.Preview(toModule(p.primary()), p.alternate().map(KitValues::toModule)))); }
  static dev.jasper.ui.model.MenuItem toModule(dev.jasper.sdk.ui.MenuItem n) { return new dev.jasper.ui.model.MenuItem(n.id(), n.label(), n.icon(), n.action(), n.enabled(), n.separator(), dev.jasper.ui.model.Nodes.Hue.valueOf(n.hue().name()), n.shortcut()); }
  static dev.jasper.ui.model.ListItem toModule(dev.jasper.sdk.ui.ListItem n) { return new dev.jasper.ui.model.ListItem(n.id(), n.leading().map(KitValues::toModule), n.title().stream().map(KitValues::toModule).toList(), n.subtitle().stream().map(KitValues::toModule).toList(), n.trailing().stream().map(KitValues::toModule).toList(), n.heading(), n.contextActions().map(items -> items.stream().map(KitValues::toModule).toList()), n.tooltip()); }
- static dev.jasper.ui.model.Column toModule(dev.jasper.sdk.ui.Column n) { return new dev.jasper.ui.model.Column(n.id(), n.title(), toModule(n.role()), n.numeric(), n.weight(), n.sorted()); }
+ static dev.jasper.ui.model.Column toModule(dev.jasper.sdk.ui.Column n) { return new dev.jasper.ui.model.Column(n.id(), n.title(), toModule(n.role()), n.numeric(), n.weight(), n.sorted(), n.width()); }
  static dev.jasper.ui.model.TableRow toModule(dev.jasper.sdk.ui.TableRow n) { return new dev.jasper.ui.model.TableRow(n.id(), n.cells(), n.icon(), n.muted(), n.contextActions().map(items -> items.stream().map(KitValues::toModule).toList()), n.tooltip(), cellNodes(n.cellNodes()), n.heading().map(KitValues::toModule)); }
  /** Each column's cell node, projected; the model row keeps them in column-id order, as the SDK row does. */
  static java.util.Map<String, dev.jasper.ui.model.Nodes.Node> cellNodes(java.util.Map<String, dev.jasper.sdk.ui.Nodes.Node> nodes) { var result = new java.util.LinkedHashMap<String, dev.jasper.ui.model.Nodes.Node>(); nodes.forEach((column, node) -> result.put(column, toModule(node))); return result; }
@@ -78,6 +78,7 @@ final class KitValues {
  case dev.jasper.ui.model.UiEvent.Reordered n -> new dev.jasper.sdk.ui.UiEvent.Reordered(n.id(), n.itemId(), n.destination());
  case dev.jasper.ui.model.UiEvent.SecretChanged n -> new dev.jasper.sdk.ui.UiEvent.SecretChanged(n.id());
  case dev.jasper.ui.model.UiEvent.Sorted n -> new dev.jasper.sdk.ui.UiEvent.Sorted(n.id(), n.columnId());
+ case dev.jasper.ui.model.UiEvent.ColumnsResized n -> new dev.jasper.sdk.ui.UiEvent.ColumnsResized(n.id(), n.widths());
  case dev.jasper.ui.model.UiEvent.Clicked n -> new dev.jasper.sdk.ui.UiEvent.Clicked(n.id(), n.itemId());
  }; }
 }

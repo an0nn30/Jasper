@@ -47,6 +47,7 @@ public final class SftpUi implements AutoCloseable {
     private Consumer<UUID> followRequested=pane->{};
     private volatile boolean showHidden;
     private Consumer<Boolean> rememberHidden=shown->{};
+    private SftpColumns columns=SftpColumns.memory();
     private RemoteEditing editing;
     private volatile boolean closed;
     /** Which composition the sidebars take (spec 14.4). */
@@ -87,6 +88,13 @@ public final class SftpUi implements AutoCloseable {
      * opens, and a toggle in any of them changes it.
      */
     public void hiddenItems(boolean shown,Consumer<Boolean> remember) { showHidden=shown;rememberHidden=remember; }
+    /**
+     * Where every SFTP browser and Copy to host's browser keep their sort and column widths; call before any panel opens.
+     * A failed write is logged.
+     */
+    public void columns(ColumnStateFile file) {
+        columns=new SftpColumns(file,failure->context.log().log(System.Logger.Level.WARNING,"SFTP columns: {0}",failure.getMessage()));
+    }
     private void hiddenChanged(boolean shown) { showHidden=shown;rememberHidden.accept(shown); }
     /** The first open explorer, or null when no SFTP panel is open. */
     SftpPanel panel() { return explorers.values().stream().findFirst().map(View::panel).orElse(null); }
@@ -95,7 +103,7 @@ public final class SftpUi implements AutoCloseable {
     /** The host of {@code window}'s SFTP panel, while it is open. */
     Optional<PanelHost> panelHost(UUID window) { return Optional.ofNullable(explorers.get(window)).map(View::host); }
     private UiView create(PanelHost host) {
-        var panel=new SftpPanel(context.kit(),layout);var window=host.window();
+        var panel=new SftpPanel(context.kit(),layout);var window=host.window();panel.columns(columns);
         panel.onHeaderChanged(host::setHeader);
         // In a window of its own or docked at the bottom the table adds Modified and Permissions; the panel is right from the
         // start and follows each move.
@@ -231,7 +239,7 @@ public final class SftpUi implements AutoCloseable {
         var picker=new DestinationPanel(context.kit(),source.selection().size()+" items from "+source.identity().host().name()+":"+source.directory(),hosts.get(),context.dataDirectory().resolve("browser-cache"),background,ui,
             id->connections.resolveIdentity(id,owner),identity->endpoints.open(Optional.of(identity),owner,status->{}),destination->{dialog.close();background(()->new Queued(new TransferRequest(EndpointRef.remote(source.identity()),paths(source),EndpointRef.remote(destination.identity()),destination.directory()),source.selection().stream().map(FileEntry::name).toList()),owner);},
             destination->nameDialog(owner,destination,operations::mkdir),operations::cancel,dialog::close);
-        picker.hiddenItems(showHidden,this::hiddenChanged);
+        picker.hiddenItems(showHidden,this::hiddenChanged);picker.columns(columns);
         pickerReference.set(picker);dialog.onClosed(()-> { picker.close();operations.close(); });dialog.setContent(picker.view());dialog.show();
     }
     /** Whether {@code view} is still {@code owner}'s open explorer, showing the same identity and directory {@code capture} was taken from: a late result from the per-identity {@link RemoteEditing} queue must not act on a view that moved on in the meantime. */

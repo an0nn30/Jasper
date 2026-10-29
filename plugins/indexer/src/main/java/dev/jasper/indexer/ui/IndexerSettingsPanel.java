@@ -8,6 +8,7 @@ import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.settings.SettingsPanel;
 import dev.jasper.sdk.settings.SettingsPanelHost;
 import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.ColumnState;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.TableRow;
@@ -18,11 +19,13 @@ import dev.jasper.sdk.ui.ViewSpec;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.BiConsumer;
 import java.util.Objects;
@@ -49,6 +52,9 @@ public final class IndexerSettingsPanel implements SettingsPanel {
     private SettingsPanelHost host;
     private String selected;
     private long pageGeneration;
+    /** The projects table's sort and widths; the owner hears each change the user makes. */
+    private ColumnState tableState = ColumnState.NONE;
+    private Consumer<ColumnState> columnsChanged = state -> { };
 
     /** Project actions take effect immediately; declared settings still commit only on Apply. */
     public IndexerSettingsPanel(UiKit kit, IndexerSettings settings, Projects projects, Indexer indexer,
@@ -56,6 +62,44 @@ public final class IndexerSettingsPanel implements SettingsPanel {
                                 Predicate<ProjectKey> connected, Runnable addFolder, BiConsumer<String, Runnable> confirm) {
         this.kit = kit; this.settings = settings; this.projects = projects; this.indexer = indexer; this.location = location;
         this.reachable = reachable; this.connected = connected; this.addFolder = addFolder; this.confirm = confirm;
+    }
+
+    /** The projects table's columns, in order; the sort and widths apply to these. */
+    private static final List<Column> COLUMNS = List.of(
+        new Column("name", "Name", Nodes.TextRole.BODY, false, 1.2, Optional.empty()),
+        new Column("location", "Location", Nodes.TextRole.MONO_SMALL, false, 2.2, Optional.empty()),  // spec 13: a data value
+        new Column("state", "State", Nodes.TextRole.CAPTION, false, 1, Optional.empty()),
+        new Column("when", "Last indexed", Nodes.TextRole.CAPTION, false, 1.2, Optional.empty()),
+        new Column("files", "Files", Nodes.TextRole.MONO_SMALL, true, .7, Optional.empty()));
+
+    /**
+     * The projects table's sort and column widths (key {@code projects}), and who hears each change the user makes; a
+     * sort column the table lacks reads as no sort. Call before the page is created.
+     */
+    public IndexerSettingsPanel columns(ColumnState state, Consumer<ColumnState> changed) {
+        Objects.requireNonNull(state); columnsChanged = Objects.requireNonNull(changed);
+        tableState = state.sortColumn().filter(id -> COLUMNS.stream().anyMatch(column -> column.id().equals(id))).isPresent() ? state
+            : new ColumnState(Optional.empty(), true, state.widths());
+        render();
+        return this;
+    }
+
+    /** The projects in the table's sort (names and states as shown, files as numbers, times by instant), then name, then id; none keeps the order given. */
+    private List<Projects.Entry> ordered() {
+        if (tableState.sortColumn().isEmpty()) return projects.entries();
+        Comparator<Projects.Entry> primary = switch (tableState.sortColumn().get()) {
+            case "location" -> text(entry -> location.apply(entry.project().key()));
+            case "state" -> text(this::state);
+            case "when" -> Comparator.comparing((Projects.Entry entry) -> entry.index().map(index -> index.indexedAt()).orElse(java.time.Instant.MIN));
+            case "files" -> Comparator.comparingInt((Projects.Entry entry) -> entry.index().map(index -> index.size()).orElse(-1));
+            default -> text(entry -> entry.project().name());
+        };
+        Comparator<Projects.Entry> byName = text((Projects.Entry entry) -> entry.project().name()).thenComparing(entry -> entry.project().key().id());
+        return projects.entries().stream().sorted((tableState.ascending() ? primary : primary.reversed()).thenComparing(byName)).toList();
+    }
+
+    private static Comparator<Projects.Entry> text(Function<Projects.Entry, String> value) {
+        return Comparator.comparing((Projects.Entry entry) -> value.apply(entry).toLowerCase(Locale.ROOT)).thenComparing(value);
     }
 
     @Override public UiView create(SettingsPanelHost host) {
@@ -80,7 +124,15 @@ public final class IndexerSettingsPanel implements SettingsPanel {
 
     private void event(UiEvent event) {
         if (view == null) return;
-        if (event instanceof UiEvent.Selected choice && choice.id().equals(TABLE)) {
+        if (event instanceof UiEvent.Sorted sorted && sorted.id().equals(TABLE)) {
+            if (COLUMNS.stream().noneMatch(column -> column.id().equals(sorted.columnId()))) return;
+            tableState = tableState.sorted(sorted.columnId());
+            columnsChanged.accept(tableState);
+            render();
+        } else if (event instanceof UiEvent.ColumnsResized resized && resized.id().equals(TABLE)) {
+            tableState = tableState.resized(resized.widths());
+            columnsChanged.accept(tableState);
+        } else if (event instanceof UiEvent.Selected choice && choice.id().equals(TABLE)) {
             selected = choice.ids().stream().findFirst().orElse(null);
             render();
         } else if (event instanceof UiEvent.Action action) {
@@ -125,7 +177,7 @@ public final class IndexerSettingsPanel implements SettingsPanel {
 
     private Nodes.Stack projectsBody() {
         var rows = new ArrayList<TableRow>();
-        for (Projects.Entry entry : projects.entries()) {
+        for (Projects.Entry entry : ordered()) {
             var key = entry.project().key();
             rows.add(new TableRow(key.id(), Map.of(
                 "name", entry.project().name(),
@@ -135,12 +187,7 @@ public final class IndexerSettingsPanel implements SettingsPanel {
                 "state", state(entry)), Optional.of("folder")));
         }
         // The right-aligned count is the last column, so no left-aligned heading runs into it.
-        var table = new Nodes.Table(TABLE, ControlState.READY, List.of(
-            new Column("name", "Name", Nodes.TextRole.BODY, false, 1.2, Optional.empty()),
-            new Column("location", "Location", Nodes.TextRole.MONO_SMALL, false, 2.2, Optional.empty()),  // spec 13: a data value
-            new Column("state", "State", Nodes.TextRole.CAPTION, false, 1, Optional.empty()),
-            new Column("when", "Last indexed", Nodes.TextRole.CAPTION, false, 1.2, Optional.empty()),
-            new Column("files", "Files", Nodes.TextRole.MONO_SMALL, true, .7, Optional.empty())),
+        var table = new Nodes.Table(TABLE, ControlState.READY, tableState.apply(COLUMNS),
             rows, selected == null ? Set.of() : Set.of(selected), "", List.of(), Nodes.SelectionMode.SINGLE);
         var buttons = new Nodes.Stack(ACTIONS, ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
             add(),

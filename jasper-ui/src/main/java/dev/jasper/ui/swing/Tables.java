@@ -18,9 +18,10 @@ import java.util.Set;
 import javax.swing.*;
 
 /**
- * Column-aligned virtual rows; numeric cells align to the trailing column edge. Columns share the width by weight,
- * the header shows the host's sort and reports clicks as {@link UiEvent.Sorted}, and a muted row dims its plain cells and
- * Text cell nodes.
+ * Column-aligned virtual rows; numeric cells align to the trailing column edge. A column takes the width the user dragged
+ * it to, else its own width, and the others share the rest by weight; the header shows the host's sort, reports clicks
+ * as {@link UiEvent.Sorted} and a finished boundary drag as {@link UiEvent.ColumnsResized}, and a muted row dims its
+ * plain cells and Text cell nodes.
  * A column holds a plain cell or a cell node (a bare dropdown among them), and a heading row shows its title and its
  * muted count across the row.
  */
@@ -33,7 +34,7 @@ final class Tables {
 
     /**
      * A column title as a table's or a tree's header shows it: caption type, the host's sort indicator, and left clicks
-     * reported as {@link UiEvent.Sorted} for {@code owner}'s node.
+     * reported as {@link UiEvent.Sorted} for {@code owner}'s node, except on a boundary a {@link ColumnResizer} drags.
      */
     static JLabel headerLabel(ControlRegistry.Control owner, String prefix, Column column) {
         var context = owner.context();
@@ -54,7 +55,8 @@ final class Tables {
         label.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent event) {
-                if (SwingUtilities.isLeftMouseButton(event)) owner.emit(new UiEvent.Sorted(owner.node.id(), columnId));
+                if (SwingUtilities.isLeftMouseButton(event) && !ColumnResizer.inBoundary(label, event))
+                    owner.emit(new UiEvent.Sorted(owner.node.id(), columnId));
             }
         });
         return label;
@@ -119,7 +121,11 @@ final class Tables {
         private List<Column> measuredColumns=List.of();
         private List<TableRow> measuredRows=List.of();
         private List<Font> measuredFonts=List.of();
-        private int[] minimums=new int[0];
+        int[] minimums=new int[0];
+        /** The widths the user dragged this view's columns to, unscaled, by column id; they outrank the columns' own. */
+        final Map<String, Integer> kept = new HashMap<>();
+        /** The columns of the last refresh, whose own widths a kept width was measured against. */
+        private List<Column> keptColumns = List.of();
         private float measuredScale=-1;
         private void measureColumns(){
             var columns=value().columns();var fonts=columns.stream().map(c->ThemePainting.font(context(),Typography.Role.valueOf(c.role().name()))).toList();
@@ -144,7 +150,7 @@ final class Tables {
                 com.formdev.flatlaf.util.UIScale.scale(14)).getIconWidth()+new JLabel().getIconTextGap();
             // Allocation is monotonic only after existing column minima fit. Below that
             // boundary proportional fallback can give the first column a misleading usable width.
-            var layout=weights();int low=java.util.Arrays.stream(minimums).sum(),high=Math.max(low,Math.max(1,target));
+            var layout=new WeightLayout(weights(),minimums);int low=java.util.Arrays.stream(minimums).sum(),high=Math.max(low,Math.max(1,target));
             while(layout.allocation(high)[0]<target && high<Integer.MAX_VALUE/2)high*=2;
             while(low<high){int middle=low+(high-low)/2;if(layout.allocation(middle)[0]<target)low=middle+1;else high=middle;}
             return padding+high;
@@ -157,6 +163,7 @@ final class Tables {
             // The titles sit on whatever is behind the table, as a heading does: an opaque header viewport painted its
             // own strip over a rounded pane's top.
             scroll.getColumnHeader().setOpaque(false);
+            ColumnResizer.install(this, header, new Resizing());
             var box = context().faces().table.box(this);
             if (box != null) scroll.setBorder(box);
             refresh();
@@ -339,8 +346,87 @@ final class Tables {
             return row == null ? null : row.controls.get(id);
         }
 
-        WeightLayout weights() {
-            return new WeightLayout(value().columns().stream().mapToDouble(Column::weight).toArray(),minimums);
+        double[] weights() {
+            return value().columns().stream().mapToDouble(Column::weight).toArray();
+        }
+
+        /** The columns' layout: a kept or specified width (scaled, at least the column's minimum), else a share by weight. */
+        WeightLayout layout() {
+            var columns = value().columns();
+            var widths = new int[columns.size()];
+            for (int i = 0; i < widths.length; i++) {
+                var column = columns.get(i);
+                Integer kept = this.kept.get(column.id());
+                int width = kept != null ? kept : column.width().orElse(0);
+                widths[i] = width > 0 ? com.formdev.flatlaf.util.UIScale.scale(width) : 0;
+            }
+            return new WeightLayout(weights(), minimums, widths);
+        }
+
+        /** Lays the header and every mounted data row out again after a resize. */
+        private void relayout() {
+            header.setLayout(layout());
+            header.revalidate();
+            header.repaint();
+            for (var row : mounted.values())
+                if (row.title.getLayout() instanceof WeightLayout) { row.title.setLayout(layout()); row.title.revalidate(); }
+            canvas.repaint();
+        }
+
+        /** The header's width for its columns, inside its border. */
+        private int headerWidth() {
+            var insets = header.getInsets();
+            return Math.max(0, header.getWidth() - insets.left - insets.right);
+        }
+
+        /** The table's side of a header drag: boundaries from the header's allocation, widths kept for this view. */
+        private final class Resizing implements ColumnResizer.Target {
+            @Override public int[] edges() {
+                int[] sizes = layout().allocation(headerWidth());
+                var edges = new int[Math.max(0, sizes.length - 1)];
+                int x = header.getInsets().left;
+                for (int i = 0; i < edges.length; i++) edges[i] = x += sizes[i];
+                return edges;
+            }
+
+            @Override public void drag(int boundary, int dx) {
+                int[] sizes = layout().allocation(headerWidth());
+                if (boundary < 0 || boundary + 1 >= sizes.length) return;
+                dx = Math.max(dx, Math.min(0, minimums[boundary] - sizes[boundary]));
+                dx = Math.min(dx, Math.max(0, sizes[boundary + 1] - minimums[boundary + 1]));
+                if (dx == 0) return;
+                sizes[boundary] += dx;
+                sizes[boundary + 1] -= dx;
+                keep(sizes);
+                relayout();
+            }
+
+            @Override public boolean fit(int boundary) {
+                if (boundary < 0 || boundary >= header.getComponentCount()) return false;
+                int widest = header.getComponent(boundary).getPreferredSize().width;
+                for (var row : mounted.values())
+                    if (row.title.getLayout() instanceof WeightLayout && boundary < row.title.getComponentCount())
+                        widest = Math.max(widest, row.title.getComponent(boundary).getPreferredSize().width);
+                int[] before = layout().allocation(headerWidth());
+                drag(boundary, widest - before[boundary]);
+                return !java.util.Arrays.equals(before, layout().allocation(headerWidth()));
+            }
+
+            @Override public void finish() {
+                int[] sizes = layout().allocation(headerWidth());
+                keep(sizes);
+                var widths = new java.util.LinkedHashMap<String, Integer>();
+                var columns = value().columns();
+                for (int i = 0; i < columns.size(); i++) widths.put(columns.get(i).id(), kept.get(columns.get(i).id()));
+                emit(new UiEvent.ColumnsResized(node.id(), widths));
+            }
+
+            /** Keeps every column at {@code sizes}, unscaled, so the next layout reproduces them. */
+            private void keep(int[] sizes) {
+                var columns = value().columns();
+                for (int i = 0; i < columns.size() && i < sizes.length; i++)
+                    kept.put(columns.get(i).id(), Math.max(1, com.formdev.flatlaf.util.UIScale.unscale(sizes[i])));
+            }
         }
 
         /**
@@ -369,7 +455,7 @@ final class Tables {
             var insets = header.getInsets();
             // The header spans the viewport, as the rows do (or its preferred width, as a viewport sizes a plain view).
             int width = Math.max(scroll.getViewport().getExtentSize().width, header.getPreferredSize().width);
-            int[] sizes = weights().allocation(Math.max(0, width - insets.left - insets.right));
+            int[] sizes = layout().allocation(Math.max(0, width - insets.left - insets.right));
             int x = insets.left;
             for (int i = 0; i < count - 1 && i < sizes.length; i++) x += sizes[i];
             var last = header.getComponent(count - 1);
@@ -387,6 +473,7 @@ final class Tables {
             nodeRows.clear();
             for (int i = 0; i < size(); i++) for (var cell : value().rows().get(i).cellNodes().values()) index(cell, i);
             if (focusControl != null && !nodeRows.containsKey(focusControl)) focusControl = null;
+            keptColumns = ColumnResizer.reconcile(kept, keptColumns, value().columns());
             measureColumns();
             scroll.setMinimumSize(new Dimension(usableWidth(),0));
             // A manager list column's rows start at the face's column top below the header (today's: the rail's top inset,
@@ -394,7 +481,7 @@ final class Tables {
             scroll.setViewportBorder(column >= 0 ? BorderFactory.createEmptyBorder(view.hostColumn() >= 0
                 ? ThemePainting.metric(context(), dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_RAIL_TOP) : context().faces().table.columnTop(context()), 0, 0, 0) : null);
             header.removeAll();
-            header.setLayout(weights());
+            header.setLayout(layout());
             var titles = value().columns();
             for (int i = 0; i < titles.size(); i++) {
                 var title = headerLabel(this, "@table/", titles.get(i));
@@ -432,7 +519,7 @@ final class Tables {
                                 column.role()));
             }
             row.slot(row.title, nodes);
-            row.title.setLayout(weights());
+            row.title.setLayout(layout());
             // A stack's or a dropdown's own area (beside its content) selects, activates and opens the menu as a plain cell does.
             for (var cellNode : nodes)
                 if (row.controls.get(cellNode.id()) instanceof ControlRegistry.Control control
@@ -502,18 +589,35 @@ final class Tables {
         }
     }
 
-    /** Columns side by side, each taking its weight's share of the width; children beyond the weights get none. */
+    /**
+     * Columns side by side: a column with a width (scaled, at least its minimum) takes it, the others share the rest by
+     * weight, and when every column has one the last absorbs what is left. Widths that overflow shrink proportionally
+     * down to their minimums, so the columns always fill the width without scrolling; children beyond the weights get none.
+     */
     static final class WeightLayout implements LayoutManager {
         final double[] weights;
         final int[] minimums;
+        /** Each column's width in pixels, or 0 for a share by weight. */
+        final int[] widths;
 
         WeightLayout(double[] weights) {this(weights,new int[weights.length]);}
-        WeightLayout(double[] weights,int[] minimums) {this.weights=weights;this.minimums=minimums;}
+        WeightLayout(double[] weights,int[] minimums) {this(weights,minimums,new int[weights.length]);}
+        WeightLayout(double[] weights,int[] minimums,int[] widths) {this.weights=weights;this.minimums=minimums;this.widths=widths;}
         /** Preserve ordinary weighted widths; freeze only undersized columns and redistribute their deficit. */
-        private int[] allocation(int width){
+        int[] allocation(int width){
             int count=weights.length;var sizes=new double[count];var fixed=new boolean[count];
-            int required=java.util.Arrays.stream(minimums).sum();boolean feasible=required<=width;
-            double remaining=width,total=java.util.Arrays.stream(weights).sum();
+            boolean every=count>0;for(int i=0;i<count;i++)every&=widths[i]>0;
+            // The columns with a width take it; when every column has one, the last absorbs instead.
+            double fixedTotal=0,slack=0;int freeMinimum=0;
+            for(int i=0;i<count;i++){
+                if(widths[i]>0&&!(every&&i==count-1)){fixed[i]=true;sizes[i]=Math.max(minimums[i],widths[i]);fixedTotal+=sizes[i];slack+=sizes[i]-minimums[i];}
+                else freeMinimum+=minimums[i];
+            }
+            double excess=fixedTotal-Math.max(0,width-freeMinimum);
+            if(excess>0&&slack>0){double share=Math.min(1,excess/slack);for(int i=0;i<count;i++)if(fixed[i])sizes[i]-=(sizes[i]-minimums[i])*share;}
+            double remaining=width;for(int i=0;i<count;i++)if(fixed[i])remaining-=sizes[i];
+            double total=0;int required=0;for(int i=0;i<count;i++)if(!fixed[i]){total+=weights[i];required+=minimums[i];}
+            boolean feasible=required<=remaining;
             if(feasible)for(int pass=0;pass<count;pass++){
                 boolean changed=false;
                 for(int i=0;i<count;i++)if(!fixed[i]&&total>0&&remaining*weights[i]/total<minimums[i]){

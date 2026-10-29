@@ -2,7 +2,7 @@ id = "dev.example.hello"
 name = "Hello"
 version = "1.0.0"
 entry = "dev.example.hello.HelloPlugin"
-sdk = ">=0.24.0, <0.25"
+sdk = ">=0.25.0, <0.26"
 description = "An example external plugin: a Tools menu command that copies a greeting."
 vendor = "Example"
 capabilities = []

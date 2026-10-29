@@ -139,6 +139,11 @@ public class VaultPlugin implements Plugin {
         context.palette().register(scope);
         manager = new VaultManager(lock, context.background(), ui, this::vaultChanged);
         managerDialog = new VaultManagerDialog(context, lock, manager, service, this::managerStatus, this::showGenerator, layout);
+        var columnStates = new dev.jasper.sdk.ui.ColumnStateFile(context.dataDirectory().resolve("columns.properties"));
+        managerDialog.columns(columnStates.get("vault"), state -> {
+            try { columnStates.put("vault", state); }
+            catch (java.io.IOException failure) { context.log().log(System.Logger.Level.WARNING, "Vault columns: {0}", failure.getMessage()); }
+        });
         context.actions().register(ActionSpec.of(GENERATE, "Generate SSH Key...")
             .withKeywords(List.of("vault", "ssh", "key", "generate")),
             invoked -> openThen(invoked.window(), Optional.empty(), this::showGenerator));

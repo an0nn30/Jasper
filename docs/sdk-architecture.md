@@ -87,12 +87,13 @@ hygiene, not a sandbox.
 Exports are exact package names, not prefixes. An optional dependency that is absent exports nothing: referencing its
 classes throws `NoClassDefFoundError`.
 
-Before the loader exists, `PluginLoader` reads every class entry of every jar (multi-release aware) and refuses the
-plugin when a class is in a reserved package (`dev.jasper.sdk`, `dev.jasper.app`, `dev.jasper.terminal`,
-`dev.jasper.buddy`, `java`, `javax`, `jdk` and their subpackages) or in a package a dependency exports, when a class
-file is larger than 16 MiB, and when `KitCompatibility` finds a reference to an SDK type, member or enum constant this
-SDK no longer has. The entry class must implement `Plugin` and have a public no-argument constructor. A plugin that
-fails to load is posted as "*name* could not be loaded".
+Before the loader exists, `PluginLoader` reads the name of every class entry of every jar (multi-release aware) and
+refuses the plugin when a class is in a reserved package (`dev.jasper.sdk`, `dev.jasper.app`, `dev.jasper.terminal`,
+`dev.jasper.buddy`, `java`, `javax`, `jdk` and their subpackages) or in a package a dependency exports. For a plugin not
+bundled with Jasper it also reads the class files, and refuses the plugin when one is larger than 16 MiB or
+`KitCompatibility` finds a reference to an SDK type, member or enum constant this SDK no longer has; Jasper's build
+compiles the bundled plugins against this SDK. The entry class must implement `Plugin` and have a public no-argument
+constructor. A plugin that fails to load is posted as "*name* could not be loaded".
 
 ## Runtime rules
 

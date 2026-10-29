@@ -14,8 +14,10 @@ because it builds without a compiler. The user-facing rules are in
 ## Upstream sources
 
 `upstream/` holds the launcher sources of JetBrains Runtime tag `jbr-release-25.0.4.1b583.48` (commit
-`868e6eaecc700d03b903fcb3b723d30c17d64de4`) at their upstream paths, and that repository's `LICENSE`. The vendored files
-are GPL version 2 with the Classpath Exception, as the file headers say; Jasper's changes to them are the lines marked
+`868e6eaecc700d03b903fcb3b723d30c17d64de4`) at their upstream paths, and that repository's `LICENSE`. The JCEF build that
+Jasper builds with, JBR 25.0.4.1 b635.75 (tag `jbr-release-25.0.4.1b635.75`, commit
+`8a91bff64015b62d9a088d7e55ecb34da472ce05`), has identical sources in every vendored folder. The vendored files are GPL
+version 2 with the Classpath Exception, as the file headers say; Jasper's changes to them are the lines marked
 `JASPER-HOOK`, published here.
 
 `upstream/SHA256SUMS` records every vendored file as upstream ships it (LF line endings, no `JASPER-HOOK` lines).
@@ -158,9 +160,12 @@ All in `check`, on every OS:
   corrupted file, the skip variable, an ignored line without a dash, the fallback start with the arguments intact for
   options that end with `exit` and with `_exit`, a launch without the watcher, a relative launcher path, a directory in
   the file's place, a home with a space and a non-ASCII home, an image that cannot start (the watcher's report), a
-  diagnostic launch, the start-up cache's record and skip variable, and a cache that kills the JVM: the probe's trained cache with
-  everything after its first 64 KiB zeroed, which ends the JVM with SIGSEGV before the VM exists and needs another such
-  cache once the JVM survives it. On Windows it also checks the windowed launcher.
+  diagnostic launch, the start-up cache's record and skip variable, a cache trained with `test/sealedprobe` that a copy
+  uses with `-XX:AOTMode=on` once the training image is gone, loading both classes of the sealed package and naming the
+  copy's jar as the code source (a JBR that fails this has JDK-8376576, which JBR 25.0.4.1 b635.75 fixes), and two
+  caches that kill the JVM: the same copy's cache with everything after its first 64 KiB zeroed, which ends the JVM
+  with SIGSEGV before the VM exists and needs another such cache once the JVM survives it, and the same copy once a jar
+  on the cache's class path has another modification time. On Windows it also checks the windowed launcher.
 
 `verifyPackage` runs `testLauncherCore`, `testLauncherWatch` and `testWatcher` before it checks a package image; the
 Release workflow skips them because CI runs them.

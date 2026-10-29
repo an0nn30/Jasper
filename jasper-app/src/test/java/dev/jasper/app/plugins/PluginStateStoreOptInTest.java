@@ -17,13 +17,13 @@ import org.junit.jupiter.api.io.TempDir;
 /** Spec 4.3: a bundled plugin can be off by default, and the user's opt-in survives every prune path. */
 class PluginStateStoreOptInTest {
     private static final String ID = "dev.example.look";
-    private static final Version SDK = Version.parse("0.24.0");
+    private static final Version SDK = Version.parse("0.25.0");
     @TempDir Path home;
 
     private PluginStateStore store() { return new PluginStateStore(home.resolve("plugins.toml"), home.resolve("plugins.lock"), Duration.ofSeconds(2)); }
 
     private static PluginCandidate candidate(PluginCandidate.Origin origin, boolean enabledByDefault, Set<String> capabilities) {
-        var descriptor = new PluginDescriptor(ID, "Look", Version.parse("0.1.0"), "x.Main", VersionRange.parse(">=0.24.0, <0.25"),
+        var descriptor = new PluginDescriptor(ID, "Look", Version.parse("0.1.0"), "x.Main", VersionRange.parse(">=0.25.0, <0.26"),
             "", "", capabilities, Set.of(), List.of(), "", "", dev.jasper.ui.model.Nodes.Hue.NEUTRAL,
             dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED, List.of(), "", List.of(), enabledByDefault);
         return new PluginCandidate(descriptor, Path.of(ID), List.of(), origin);
