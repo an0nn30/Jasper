@@ -26,7 +26,8 @@ import org.cef.handler.CefRequestHandlerAdapter;
  *
  * <p>JCEF keeps a client's first request handler, so this is the only one: what else a request handler is asked goes to
  * its defaults. Life span handlers are a list, which JetBrains' runtime adds its own to, so this adds one and removes
- * none.
+ * none. The same installer wires the {@link OpenerBridge}, which a script's {@code window.open} goes through instead of
+ * {@code onBeforePopup}, so the popup keeps its {@code window.opener}.
  */
 public final class PageNavigation {
     private static final boolean MAC_OS = System.getProperty("os.name", "").startsWith("Mac");
@@ -35,7 +36,8 @@ public final class PageNavigation {
     private PageNavigation() { }
 
     /**
-     * Has Chromium install the handlers on its client before any page is made on it; once, however often asked. Call it
+     * Has Chromium install the handlers and the opener bridge on its client before any page is made on it; once, however
+     * often asked. Call it
      * when a page first asks for Chromium, never at the plugin's start: this class names Chromium's types.
      *
      * @param chromium the plugin's Chromium
@@ -47,6 +49,7 @@ public final class PageNavigation {
     private static void install(CefClient client) {
         client.addRequestHandler(new Links());
         client.addLifeSpanHandler(new Popups());
+        OpenerBridge.install(client);
     }
 
     /** Links Chromium would open in a new tab or window, or download: Jasper places them itself. */

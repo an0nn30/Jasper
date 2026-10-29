@@ -53,6 +53,8 @@ public final class BrowserItem implements AutoCloseable {
         page = new Page(url, this::changed);
         page.onNavigationButton(this::navigationButton);
         page.onOpenItem(this::openItem);
+        page.onCloseItem(this::close);
+        page.onShowItem(this::show);
         title = TabTitle.of("", host(url.toString()), "", false);
         view = items.context().kit().create(spec(), this::event);
         view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.PREVIEW, page.view(), page));
@@ -218,18 +220,25 @@ public final class BrowserItem implements AutoCloseable {
     /**
      * A link or popup of the page opens an item of its own beside this one, for no OSC 8 target: in a new tab right
      * after this item's tab, or split from this item's pane. A split opens beside the focused pane of the window's shown
-     * tab, so this item is selected first when it is not that. An address that is no URI opens nothing.
+     * tab, so this item is selected first when it is not that. An address that is no URI opens nothing. Answers the new
+     * item's page, which the opener bridge links to this one.
      */
-    private void openItem(String address, TabPlacement placement) {
-        if (closed || tab == null) return;
+    private Optional<Page> openItem(String address, TabPlacement placement) {
+        if (closed || tab == null) return Optional.empty();
         Optional<URI> link = AddressInput.parse(address);
-        if (link.isEmpty()) return;
+        if (link.isEmpty()) return Optional.empty();
         if (placement != TabPlacement.NEXT_TAB && !tab.isActive()) tab.select();
         try {
-            items.open(link.get(), placement, Optional.empty(), Optional.of(tab));
+            return Optional.of(items.open(link.get(), placement, Optional.empty(), Optional.of(tab)).page);
         } catch (IllegalStateException closing) { // the windows close, or Jasper quits
             items.context().log().log(System.Logger.Level.WARNING, "A link could not open: " + closing.getMessage(), closing);
+            return Optional.empty();
         }
+    }
+
+    /** The page asks to be shown, as a script's {@code focus()} of its window does: selects the tab and raises its window. */
+    private void show() {
+        if (!closed && tab != null) tab.select();
     }
 
     /** The page's address, title, loading state or where it can go changed. */

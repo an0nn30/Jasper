@@ -2,6 +2,13 @@ package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
 import java.awt.EventQueue;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.WeakHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
@@ -16,12 +23,33 @@ import org.cef.network.CefRequest;
  * The client's one display, load and keyboard handler. JCEF keeps the first handler of each kind a client is given,
  * so these serve every page: each callback goes to the {@link Page} of the browser it is about. Chromium calls them
  * on its own UI thread (on macOS, AppKit's main thread), never Swing's, so what a page shows changes on the UI thread.
- * The hover address goes straight to the canvas, which takes it from any thread.
+ * The hover address goes straight to the canvas, which takes it from any thread. A main frame's load start also goes,
+ * at once and on Chromium's thread, to the hooks the {@code links} package gave the client
+ * ({@link #onMainFrameLoadStart}).
  */
-final class PageEvents {
+public final class PageEvents {
     private static final Consumer<CefClient> INSTALL = PageEvents::install;
+    // The hooks each client was given, which hear its pages' main-frame load starts on Chromium's thread.
+    private static final Map<CefClient, List<BiConsumer<PageBrowser, CefFrame>>> LOAD_STARTS =
+        Collections.synchronizedMap(new WeakHashMap<>());
 
     private PageEvents() { }
+
+    /**
+     * Has {@code hook} hear each main-frame load start of the pages made on {@code client}, at once on Chromium's own
+     * thread, as Chromium starts loading the new document and before Swing hears of it: for what must reach the document
+     * itself, such as a script Jasper runs in it. Sub-frames' load starts are not told. Give it once, as the client is
+     * made, before any page.
+     *
+     * @param client the client the pages are made on
+     * @param hook told the page's browser and its main frame, which the hook must not dispose; it must return quickly
+     *     and must not throw
+     */
+    public static void onMainFrameLoadStart(CefClient client, BiConsumer<PageBrowser, CefFrame> hook) {
+        Objects.requireNonNull(client, "client");
+        Objects.requireNonNull(hook, "hook");
+        LOAD_STARTS.computeIfAbsent(client, any -> new CopyOnWriteArrayList<>()).add(hook);
+    }
 
     /** Has Chromium install the handlers on its client before any page is made on it; once, however often asked. */
     static void prepare(Chromium chromium) {
@@ -95,6 +123,10 @@ final class PageEvents {
 
         @Override public void onLoadStart(CefBrowser browser, CefFrame frame, CefRequest.TransitionType transition) {
             if (frame == null || !frame.isMain()) return;
+            if (browser instanceof PageBrowser shown) {
+                List<BiConsumer<PageBrowser, CefFrame>> hooks = LOAD_STARTS.get(browser.getClient());
+                if (hooks != null) for (BiConsumer<PageBrowser, CefFrame> hook : hooks) hook.accept(shown, frame);
+            }
             String url = frame.getURL();
             later(browser, page -> page.loadStarted(url));
         }

@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javax.swing.JPanel;
@@ -206,6 +207,44 @@ class BrowserItemTest {
             opener.close();
             page.openItem("https://example.com/next", TabPlacement.NEXT_TAB);
             assertThat(items.items()).isEmpty();
+            assertThat(host.contentTabs()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * The opener bridge reaches a popup through pages (Task 8): the page a link or popup opens is the new item's, and a
+     * page can show its item, close it, and tell who asks when it closes.
+     */
+    @Test void aPageReachesTheItemItOpenedAndCanShowAndCloseItsOwnItem() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var opener = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            Optional<Page> opened = opener.page().openItem("https://example.com/popup", TabPlacement.NEXT_TAB);
+            var popup = items.items().getLast();
+            assertThat(popup).isNotSameAs(opener);
+            assertThat(opened).containsSame(popup.page());
+            var closes = new AtomicInteger();
+            popup.page().onClose(closes::incrementAndGet);
+
+            opener.tab().select();
+            assertThat(popup.tab().isActive()).isFalse();
+            popup.page().showItem();
+            assertThat(popup.tab().isActive()).isTrue();
+
+            popup.page().closeItem();
+            assertThat(items.items()).containsExactly(opener);
+            assertThat(closes).hasValue(1);
+            popup.page().closeItem();
+            popup.page().showItem();
+            assertThat(closes).as("told once").hasValue(1);
+            var late = new AtomicInteger();
+            popup.page().onClose(late::incrementAndGet);
+            assertThat(late).as("a page already closed tells at once").hasValue(1);
+
+            assertThat(opener.page().openItem("no address", TabPlacement.NEXT_TAB)).isEmpty();
+            opener.close();
+            assertThat(opener.page().openItem("https://example.com/next", TabPlacement.NEXT_TAB)).isEmpty();
             assertThat(host.contentTabs()).isEmpty();
             assertThat(host.failures()).isEmpty();
         } });

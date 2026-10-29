@@ -7,8 +7,9 @@ import java.awt.EventQueue;
 import java.net.URI;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import javax.swing.JComponent;
 import org.cef.CefClient;
@@ -26,7 +27,9 @@ public final class Page implements AutoCloseable {
     private final Runnable changed;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
-    private BiConsumer<String, TabPlacement> opener = (url, placement) -> { };
+    private final List<Runnable> closes = new CopyOnWriteArrayList<>();
+    private BiFunction<String, TabPlacement, Optional<Page>> opener = (url, placement) -> Optional.empty();
+    private Runnable itemCloser = () -> { }, itemShower = () -> { };
     // What the page loads once its browser can: first its start, then the last address asked for before that.
     private URI requested;
     // Where the page is, as Chromium last reported it, or what it was last asked to load since.
@@ -221,9 +224,10 @@ public final class Page implements AutoCloseable {
      * Has {@code opener} open each link or popup of the page that goes to an item of its own, beside the page's item: the
      * page's item sets it. It replaces the one before.
      *
-     * @param opener told the address Chromium gave and where the new item goes, on the UI thread
+     * @param opener told the address Chromium gave and where the new item goes, on the UI thread; it answers the new
+     *     item's page, or empty when it opened none
      */
-    public void onOpenItem(BiConsumer<String, TabPlacement> opener) {
+    public void onOpenItem(BiFunction<String, TabPlacement, Optional<Page>> opener) {
         this.opener = Objects.requireNonNull(opener, "opener");
     }
 
@@ -232,11 +236,58 @@ public final class Page implements AutoCloseable {
      *
      * @param url the address, as Chromium gave it
      * @param placement where the new item goes: next to the page's tab, or split from its pane
+     * @return the new item's page, or empty when none opened
      */
-    public void openItem(String url, TabPlacement placement) {
+    public Optional<Page> openItem(String url, TabPlacement placement) {
         Objects.requireNonNull(url, "url");
         Objects.requireNonNull(placement, "placement");
-        if (!closed) opener.accept(url, placement);
+        return closed ? Optional.empty() : Objects.requireNonNull(opener.apply(url, placement), "opened");
+    }
+
+    /**
+     * Has {@code closer} close the page's item, as Close Pane would, when the page asks: the page's item sets it. It
+     * replaces the one before.
+     *
+     * @param closer closes the item, on the UI thread
+     */
+    public void onCloseItem(Runnable closer) {
+        itemCloser = Objects.requireNonNull(closer, "closer");
+    }
+
+    /** The page asks to close its item, as a script's {@code window.close()} does. Nothing after {@link #close()}. */
+    public void closeItem() {
+        if (!closed) itemCloser.run();
+    }
+
+    /**
+     * Has {@code shower} select the page's item in its window and raise that window, when the page asks: the page's item
+     * sets it. It replaces the one before.
+     *
+     * @param shower shows the item, on the UI thread
+     */
+    public void onShowItem(Runnable shower) {
+        itemShower = Objects.requireNonNull(shower, "shower");
+    }
+
+    /** The page asks to show its item, as a script's {@code focus()} of its window does. Nothing after {@link #close()}. */
+    public void showItem() {
+        if (!closed) itemShower.run();
+    }
+
+    /**
+     * Tells {@code listener} once, when the page closes with its item; at once when it has closed already.
+     *
+     * @param listener told on the UI thread
+     * @return the registration
+     */
+    public Subscription onClose(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) {
+            listener.run();
+            return () -> { };
+        }
+        closes.add(listener);
+        return () -> closes.remove(listener);
     }
 
     /**
@@ -250,16 +301,24 @@ public final class Page implements AutoCloseable {
         if (ready && !closed) browser.loadURL(url);
     }
 
-    /** Closes the page's browser, which ends only this page, and stops telling anything of it. Once. */
+    /**
+     * Closes the page's browser, which ends only this page, tells those who asked {@link #onClose}, and stops telling
+     * anything of it. Once.
+     */
     @Override public void close() {
         if (closed) return;
         closed = true;
         loadStarts.clear();
         navigationButtons.clear();
-        opener = (url, placement) -> { };
+        opener = (url, placement) -> Optional.empty();
+        itemCloser = () -> { };
+        itemShower = () -> { };
         view.setHoverUrl("");
         PageBrowser page = browser;
         if (page != null) page.close(true);
+        List<Runnable> told = List.copyOf(closes);
+        closes.clear();
+        for (Runnable listener : told) listener.run();
     }
 
     /**
