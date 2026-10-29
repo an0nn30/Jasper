@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** spec 5.4: start-up parses the bundled theme once and installs the configured default variant. */
 class JasperApplicationThemesTest {
     @TempDir Path home;
+    private static final String AUTHORED_THEMES = "[ui.theme]\ndark = 'jasper-meadow'\nlight = 'jasper-meadow'\n";
 
     private void start(String config, boolean dark, dev.jasper.ui.theme.TerminalScheme scheme) throws Exception {
         Files.writeString(home.resolve("config.toml"), config);
@@ -52,17 +53,17 @@ class JasperApplicationThemesTest {
 
     /** From a fresh look and feel (no Jasper snapshot), start-up installs its variant before any chrome reads the snapshot. */
     @Test void aFreshProcessInstallsTheConfiguredVariantBeforeAnyChromeReadsTheSnapshot() throws Exception {
-        start("[ui]\nappearance = 'light'\n[terminal]\nscheme = 'slate-cobalt/high-contrast'\n", false, dev.jasper.ui.theme.JasperTheme.bundled().scheme("high-contrast").orElseThrow());
+        start("[ui]\nappearance = 'light'\n[terminal]\nscheme = 'slate-cobalt/high-contrast'\n" + AUTHORED_THEMES, false, dev.jasper.ui.theme.JasperTheme.bundled().scheme("high-contrast").orElseThrow());
     }
 
     /** The default follows the operating system; a headless run has none, so it starts Dark. */
     @Test void withNoAppearanceAHeadlessStartIsDark() throws Exception {
-        start("", true, dev.jasper.ui.theme.JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(true));
+        start(AUTHORED_THEMES, true, dev.jasper.ui.theme.JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(true));
     }
 
     /** Review Focus 1: an older install's theme folders are neither read nor changed; nothing else appears beside them. */
     @Test void anOlderInstallsThemeFoldersAreIgnoredAndLeftAsTheyAre() throws Exception {
-        String config = "[ui]\nappearance = 'light'\n";
+        String config = "[ui]\nappearance = 'light'\n" + AUTHORED_THEMES;
         java.nio.file.Files.createDirectories(home.resolve("themes/nested"));
         java.nio.file.Files.createDirectories(home.resolve("terminal-themes"));
         java.nio.file.Files.writeString(home.resolve("themes/nord.toml"), "name = \"Nord\"\n");

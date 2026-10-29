@@ -34,7 +34,7 @@ class DesktopAppearanceTest {
                 if (newerSnapshot) input.portal(3, false, "");
                 return newerSnapshot ? input.service.current() : before;
             })) {
-                owner.update(ConfigSnapshot.defaults().toBuilder().appearance(AppearanceMode.SYSTEM).build());
+                owner.update(authoredConfig().toBuilder().appearance(AppearanceMode.SYSTEM).build());
                 while (!dispatch.isEmpty()) {
                     dispatch.remove().run();
                     if (newerSnapshot) assertThat(themes.current().chrome().dark()).isFalse();
@@ -56,11 +56,11 @@ class DesktopAppearanceTest {
 
     @Test void authoredOnlyConfigStartsNoToolkitAndDesktopDemandStopsAfterSwitchingBack() {
         try (var f = new Fixture()) {
-            f.owner.update(ConfigSnapshot.defaults()); f.drain();
+            f.owner.update(authoredConfig()); f.drain();
             assertThat(f.nativeInput.launches()).containsExactly("jasper-desktop-portal");
             f.owner.update(config("gtk3", true)); f.drain();
             f.nativeInput.awaitToolkit(Source.GTK3, true);
-            f.owner.update(ConfigSnapshot.defaults()); f.drain();
+            f.owner.update(authoredConfig()); f.drain();
             f.nativeInput.awaitToolkit(Source.GTK3, false);
         }
     }
@@ -190,7 +190,7 @@ class DesktopAppearanceTest {
 
     @Test void aPreviewKeepsItsToolkitDemandUntilDisposedEvenWithAuthoredAppliedTheme() throws Exception {
         try (var f = new Fixture()) {
-            f.owner.update(ConfigSnapshot.defaults()); f.drain();
+            f.owner.update(authoredConfig()); f.drain();
             var demand = f.owner.preview(DesktopPalette.SourceMode.GTK4, false, value -> {}); f.drain();
             f.nativeInput.palette(Source.GTK4, false, "0.95,0.95,0.95,1", ""); f.drain();
             // A serviced preview is still an open live demand.
@@ -245,7 +245,8 @@ class DesktopAppearanceTest {
 
 
     @Test void anAuthoredInstallFailureRemainsInConfigurationDiagnostics(@org.junit.jupiter.api.io.TempDir java.nio.file.Path home) throws Exception {
-        var file = home.resolve("config.toml"); java.nio.file.Files.writeString(file, "[ui]\nappearance = 'dark'\n");
+        var file = home.resolve("config.toml"); java.nio.file.Files.writeString(file,
+            "[ui]\nappearance = 'dark'\n[ui.theme]\ndark = 'jasper-meadow'\nlight = 'jasper-meadow'\n");
         var service = java.util.concurrent.CompletableFuture.supplyAsync(() -> new ConfigService(file, false)).get();
         try (var f = new Fixture(); var controller = new ConfigurationController(f.themes, service, path -> {},
                 dev.jasper.app.platform.SystemAppearance.Observation.dark(), null, LookMotion.STANDARD, f.owner)) {
@@ -570,6 +571,9 @@ class DesktopAppearanceTest {
         }
     }
 
+    static ConfigSnapshot authoredConfig() {
+        return ConfigSnapshot.defaults().toBuilder().darkTheme("jasper-meadow").lightTheme("jasper-meadow").build();
+    }
     static ConfigSnapshot config(String source, boolean dark) {
         return ConfigSnapshot.defaults().toBuilder().darkTheme("desktop-colors").lightTheme("desktop-colors")
             .desktopSource(source).appearance(dark ? AppearanceMode.DARK : AppearanceMode.LIGHT).build();

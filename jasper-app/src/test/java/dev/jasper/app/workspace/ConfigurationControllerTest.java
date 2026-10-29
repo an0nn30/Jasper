@@ -48,6 +48,10 @@ class ConfigurationControllerTest {
     final Queue<Runnable> pending = new ArrayDeque<>();
     final List<WindowContent> owners = new ArrayList<>();
 
+    private static String authoredThemes(String text) {
+        return text + "\n[ui.theme]\ndark='jasper-meadow'\nlight='jasper-meadow'\n";
+    }
+
     @AfterEach void cleanup() throws Exception {
         edt(() -> { owners.forEach(WindowContent::close); if (controller != null) controller.close(); });
         if (service != null) service.close();
@@ -83,7 +87,7 @@ class ConfigurationControllerTest {
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void savedFieldsApplyAcrossOwnersAndPendingHiddenViewsWithoutReplacingSessions() throws Exception {
-        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=19\n[ui]\nappearance='light'\n");
+        start(authoredThemes("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=19\n[ui]\nappearance='light'\n"));
         edt(() -> { owner(); owner(); }); launchAll();
         var first = owners.getFirst(); var second = owners.get(1);
         var retained = first.currentPane(); var session = retained.session();
@@ -96,7 +100,7 @@ class ConfigurationControllerTest {
             retained.findBar().open(); retained.findBar().queryField().setText("alpha");
             first.newTab(HOME); // pending and hides the retained terminal
         });
-        reload("[window]\ntab_height=50\ntoolbar='hidden'\n[terminal.font]\nsize=21\n");
+        reload(authoredThemes("[window]\ntab_height=50\ntoolbar='hidden'\n[terminal.font]\nsize=21\n"));
         launchAll();
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(50); assertThat(second.tabHeight()).isEqualTo(50);
@@ -114,13 +118,13 @@ class ConfigurationControllerTest {
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void reloadsReapplyTheSavedChromeKeepPaneFontSizesAndNewOwnersUseSavedDefaults() throws Exception {
-        start("[terminal.font]\nsize=19\n"); edt(this::owner); launchAll();
+        start(authoredThemes("[terminal.font]\nsize=19\n")); edt(this::owner); launchAll();
         var first = owners.getFirst();
         edt(() -> {
             first.setTabHeight(60); first.setToolbarMode(ToolbarMode.HIDDEN);
             first.setStatusVisible(false); first.currentPane().view().setFontSize(28);
         });
-        reload("# comment\n[terminal.font]\nsize=19\nunknown=1\n");
+        reload(authoredThemes("# comment\n[terminal.font]\nsize=19\nunknown=1\n"));
         edt(() -> {
             assertThat(first.tabHeight()).as("the saved chrome is reapplied").isEqualTo(30);
             assertThat(first.toolbar().isVisible()).isTrue();
@@ -131,7 +135,7 @@ class ConfigurationControllerTest {
             assertThat(next.theme().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(true));
         }); launchAll();
         edt(() -> assertThat(owners.get(1).currentPane().view().fontSize()).isEqualTo(19));
-        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=20\n[ui]\nappearance='light'\n");
+        reload(authoredThemes("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=20\n[ui]\nappearance='light'\n"));
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(45); assertThat(first.toolbar().isVisible()).isTrue();
             assertThat(first.currentPane().view().fontSize()).isEqualTo(20);
@@ -244,6 +248,7 @@ class ConfigurationControllerTest {
     }
 
     @Test void themeInstallFailureReportsToOwnersWhileOtherSettingsAndDiagnosticsStillApply() throws Exception {
+        Files.writeString(directory.resolve("config.toml"), authoredThemes(""));
         service = new ConfigService(directory.resolve("config.toml"), false);
         var errors = new ArrayList<String>();
         edt(() -> {
@@ -251,7 +256,7 @@ class ConfigurationControllerTest {
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = (title, message) -> errors.add(message);
             var snapshot = ConfigSnapshot.builder().tabHeight(53).toolbar(ToolbarMode.ICONS).font(FontConfig.defaults().withSize(18))
-                .appearance(AppearanceMode.LIGHT).build();
+                .appearance(AppearanceMode.LIGHT).darkTheme("jasper-meadow").lightTheme("jasper-meadow").build();
             var state = new ConfigService.State(snapshot, List.of(), directory.resolve("config.toml"), true);
             controller.accept(state);
             assertThat(owners.getFirst().tabHeight()).isEqualTo(53);
@@ -279,12 +284,12 @@ class ConfigurationControllerTest {
     }
 
     @Test void applicationCallbackFailuresAreNotReportedAsInstallationFailures() throws Exception {
-        start("");
+        start(authoredThemes(""));
         edt(() -> {
             var owner = owner();
             owner.onThemeChanged = ignored -> { throw new IllegalStateException("application callback"); };
             var snapshot = ConfigSnapshot.builder().tabHeight(38).toolbar(ToolbarMode.ICONS_AND_LABELS).font(FontConfig.defaults().withSize(16))
-                .appearance(AppearanceMode.LIGHT).build();
+                .appearance(AppearanceMode.LIGHT).darkTheme("jasper-meadow").lightTheme("jasper-meadow").build();
             var next = new ConfigService.State(snapshot, List.of(), directory.resolve("config.toml"), true);
             var published=new ArrayList<ResolvedTheme>();
             var listening=themes.subscribe((value,changed) -> published.add(value));published.clear();
@@ -371,10 +376,10 @@ class ConfigurationControllerTest {
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void typographyAndBehaviorChangesPreserveManualSizeAndThemeUntilSavedSizeChanges() throws Exception {
-        start("[terminal.font]\nsize=18\n"); edt(this::owner); launchAll();
+        start(authoredThemes("[terminal.font]\nsize=18\n")); edt(this::owner); launchAll();
         var owner = owners.getFirst(); var pane = owner.currentPane();
         edt(() -> { pane.view().setFontSize(27); owner.selectVariant(false); });
-        reload(liveSettings(18));
+        reload(authoredThemes(liveSettings(18)));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(27);
             assertThat(pane.view().options().fontFamily()).isEqualTo("Monospaced");
@@ -389,7 +394,7 @@ class ConfigurationControllerTest {
             assertThat(pane.view().fontSize()).isEqualTo(18);
             pane.view().setFontSize(29);
         });
-        reload(liveSettings(20));
+        reload(authoredThemes(liveSettings(20)));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(20);
             assertThat(pane.view().palette()).as("a reload applies the configured appearance").isEqualTo(meadowDarkPalette());
@@ -538,7 +543,7 @@ class ConfigurationControllerTest {
 
     @Test void reloadActionRetriesFailedSavedInstallationWithUnchangedFiles() throws Exception {
         Path file = directory.resolve("config.toml");
-        Files.writeString(file, "ui.appearance='dark'");
+        Files.writeString(file, authoredThemes("ui.appearance='dark'"));
         var configWorker = new java.util.concurrent.ScheduledThreadPoolExecutor(1) {
             @Override public java.util.concurrent.ScheduledFuture<?> scheduleWithFixedDelay(
                     Runnable command, long initialDelay, long delay, java.util.concurrent.TimeUnit unit) {
@@ -558,7 +563,7 @@ class ConfigurationControllerTest {
             assertThat(attempts).containsExactly(JasperTheme.bundled().generated(true), dark);
             broken.set(true);
         });
-        Files.writeString(file, "ui.appearance='light'");
+        Files.writeString(file, authoredThemes("ui.appearance='light'"));
         edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         edt(() -> {
@@ -672,9 +677,9 @@ class ConfigurationControllerTest {
     }
 
     @Test void savedTerminalSchemeAppliesLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
-        start("[ui]\nappearance='light'\n[terminal]\nscheme='slate-cobalt/dark'\n");
+        start(authoredThemes("[ui]\nappearance='light'\n[terminal]\nscheme='slate-cobalt/dark'\n"));
         edt(() -> assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.bundled().matching(true))));
-        reload("[ui]\nappearance='light'\n[terminal]\nscheme='match'\n");
+        reload(authoredThemes("[ui]\nappearance='light'\n[terminal]\nscheme='match'\n"));
         edt(() -> {
             assertThat(themes.current()).isEqualTo(meadowResolved(JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(false)));
             assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.") || d.key().startsWith("terminal."));

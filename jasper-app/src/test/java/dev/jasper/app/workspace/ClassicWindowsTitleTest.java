@@ -31,6 +31,7 @@ import javax.swing.JMenu;
 import javax.swing.JRootPane;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -81,9 +82,11 @@ class ClassicWindowsTitleTest {
     static void assertFullWindowButtons(JRootPane root, int width) {
         var buttons = windowButtons(root);
         assertThat(buttons).as("%d px: Close at least", width).extracting(button -> button.getAccessibleContext().getAccessibleName()).contains("Close");
+        var buttonSize = UIManager.getDimension("TitlePane.buttonSize");
+        assertThat(buttonSize).isNotNull();
         for (var button : buttons)
-            assertThat(button.getWidth()).as("%d px: %s keeps its 44 px", width, button.getAccessibleContext().getAccessibleName())
-                .isEqualTo(button.getPreferredSize().width).isEqualTo(UIScale.scale(44));
+            assertThat(button.getWidth()).as("%d px: %s keeps the host's full button width", width, button.getAccessibleContext().getAccessibleName())
+                .isEqualTo(button.getPreferredSize().width).isEqualTo(UIScale.scale(buttonSize.width));
     }
 
     @Test void theTitleBarIsTheToolbarsColourWithTheMenusThenTheTitle() throws Exception {
