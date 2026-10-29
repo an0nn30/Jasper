@@ -2,10 +2,10 @@
 
 Most of Jasper is plugins. The application provides the workspace (windows, tabs, panes and tool windows), the
 terminal, the command palette, notifications, Settings, themes and looks. SSH, SFTP and tunnels, the credential vault,
-the editor, file servers, the project index, shell history, snippets and the Enterprise look are bundled plugins,
-written against the same public SDK (`jasper-sdk`, see the [SDK reference](sdk-reference.html)) that any other plugin
-compiles against. Each of them can be turned off in Settings › Plugins, and a plugin you install or write uses the same
-calls they do.
+the editor, the web browser, file servers, the project index, shell history, snippets and the Enterprise look are
+bundled plugins, written against the same public SDK (`jasper-sdk`, see the [SDK reference](sdk-reference.html)) that
+any other plugin compiles against. Each of them can be turned off in Settings › Plugins, and a plugin you install or
+write uses the same calls they do.
 
 Bundled plugins ship inside the application, load without a review of their [capabilities](#capabilities), and can be
 disabled but not removed. Plugins reach each other only through the packages they export; see
@@ -52,6 +52,7 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 | Project Index | `dev.jasper.indexer` | 0.4.0 | Yes | [Project Index](project-index.md) |
 | Shell History | `dev.jasper.history` | 0.4.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
 | Snippets | `dev.jasper.snippets` | 0.4.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
+| Browser | `dev.jasper.browser` | 0.1.0 | Yes | [Browser](browser.md) |
 | Enterprise | `dev.jasper.enterprise` | 0.4.0 | No | [The Enterprise look](enterprise.md) |
 | Sample | `dev.jasper.sample` | 0.6.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
 
@@ -134,6 +135,17 @@ fields, or edit the file that holds them, `plugins/dev.jasper.snippets/data/snip
 - **Start with** Snippets… (Cmd+J / Ctrl+Shift+J).
 - **Capabilities** `palette.contribute`, `terminal.inject`.
 - **Exports** `dev.jasper.snippets.api`, which Shell History uses to save a command as a snippet.
+
+### Browser
+
+Web pages in workspace tabs and panes, drawn by Chromium, which comes with Jasper's runtime: a toolbar with Back,
+Forward, Reload and the address field, a Web menu whose keys win in browser tabs, links that open in a new tab or a
+split, and popups that keep a working `window.opener`. It is Jasper's web browser: links you click in a terminal,
+Jasper's own web links and `jasper URL...` can open here, by default after asking "Open in Jasper?". Chromium starts the
+first time a browser page shows.
+
+- **Start with** File › New Browser Tab.
+- **Capabilities** `browser.provide`.
 
 ### Enterprise
 

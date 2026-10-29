@@ -152,10 +152,17 @@ them under each plugin's name.
 | Project Index | Go to File… | `dev.jasper.indexer.goto` | Cmd+P | Ctrl+Alt+Shift+P | Anywhere |
 | Shell History | Search Shell History | `dev.jasper.history.open` | Cmd+R | Ctrl+Shift+R | Anywhere |
 | Snippets | Snippets… | `dev.jasper.snippets.open` | Cmd+J | Ctrl+Shift+J | Anywhere |
+| Browser | Open Location… | `dev.jasper.browser.open_location` | Cmd+L | Ctrl+L | Browser tabs |
+| Browser | Back | `dev.jasper.browser.back` | Cmd+[ | Alt+Left | Browser tabs |
+| Browser | Forward | `dev.jasper.browser.forward` | Cmd+] | Alt+Right | Browser tabs |
+| Browser | Reload Page | `dev.jasper.browser.reload` | Cmd+R | Ctrl+R | Browser tabs |
 
 The Sample plugin registers its demo actions only when its demo settings are on: **Run Sample Activity**
 (`dev.jasper.sample.demo`, Cmd+Option+J; Ctrl+Alt+Shift+J) and **Sample Greetings…**
 (`dev.jasper.sample.greetings.open`, Cmd+Option+Y; Ctrl+Alt+Shift+Y).
+
+The Browser's keys win in browser tabs, so on macOS Cmd+R there reloads the page and elsewhere opens Search Shell
+History ([Browser](browser.md#the-web-menu-and-keys)).
 
 While an Editor file's pane is active, the Editor's own commands take their keys, for example Cmd+S (Ctrl+S) to save.
 They are listed in the Editor tab's right-click menu and in [Editor](editor.md#commands-and-shortcuts), and are not part

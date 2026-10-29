@@ -1,8 +1,9 @@
 # Writing a Jasper plugin
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
-Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
-describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.25.0, task by task.
+Shell History, Snippets, the Browser and the Enterprise look are bundled plugins built only against the public plugin
+SDK this guide describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.25.0,
+task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
   exported APIs.

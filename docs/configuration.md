@@ -609,6 +609,7 @@ plugin with settings; Apply writes the plugin's file and keeps its comments.
 | File Server | `plugins/dev.jasper.fileserver/dev.jasper.fileserver.toml` | [File Server](file-server.md) |
 | Project Index | `plugins/dev.jasper.indexer/dev.jasper.indexer.toml` | [Project Index](project-index.md) |
 | Shell History | `plugins/dev.jasper.history/dev.jasper.history.toml` | [Shell History and Snippets](history-and-snippets.md) |
+| Browser | `plugins/dev.jasper.browser/dev.jasper.browser.toml` | [Browser](browser.md#settings): Start page, Open Links From Terminal, Open Local Web Files |
 | Sample | `plugins/dev.jasper.sample/dev.jasper.sample.toml` | [Plugins](plugins.md) |
 
 Snippets and Enterprise have no settings; Snippets keeps its snippets in `plugins/dev.jasper.snippets/data/`.

@@ -36,7 +36,8 @@ Right-clicking a pane (Shift-right-clicking while a program asks for [mouse repo
 opens its context menu: **Copy**, **Paste**, **Find**, **Clear Terminal**, **Split** (a terminal, an editor, a file you
 choose or a plugin's view, right or down), **Move Pane to New Tab**, **Move Pane to Tab**, **Maximize Pane** and **Close
 Pane**, then **Move Tab to New Window** and **Move Tab to Window ▸** and the items plugins add, such
-as Remote's **Open SFTP here** and File Server's **Share Path**.
+as Remote's **Open SFTP here**, File Server's **Share Path** and, while the selection is a web address, the Browser's
+**Open URL in Split Right** and **Open URL in Split Down** ([Links and file paths](#links-and-file-paths)).
 
 ## Shells and profiles
 
@@ -320,8 +321,22 @@ provides, and while a pane's shell reports a directory on another machine, file 
 on another computer's network share (`\\server\share`) opens nothing, because looking at it would make Windows sign in
 to that server; a WSL pane's own `\\wsl.localhost` share works.
 
+The bundled [Browser](browser.md) provides Jasper's web browser. While it is on, an `http` or `https` link you click
+opens as its **Open Links From Terminal** setting says, and a local web file as its **Open Local Web Files** says; both
+ask "Open in Jasper?" by default ([Links from terminals and Jasper](browser.md#links-from-terminals-and-jasper)).
+An OSC 8 link that names a target (`target=NAME` among its parameters) loads in the browser page opened for that name,
+in whatever window it is; the first such link opens that page.
+
 On macOS Cmd-click always stays in Jasper, even while a program asks for mouse reports. On Linux and Windows a
 Ctrl-click then goes to the program; Ctrl+Shift-click opens the link.
+
+A Cmd+Shift-click (Ctrl+Shift-click on Linux and Windows, while no program asks for mouse reports) on an `http` or
+`https` link asks for it in a split of the clicked pane: to the right of a pane wider than it is tall, otherwise below
+it. While the Browser is on, the link opens there in a browser pane without asking, unless Open Links From Terminal is
+Default Browser, which sends it to the system browser; with the Browser off, it opens as a Cmd-click does. When the
+selection is one `http` or `https` address and Open Links From Terminal is not Default Browser, the pane's right-click
+menu has the Browser's **Open URL in Split Right** and **Open URL in Split Down**, which open it the same way to the
+right of the pane or below it. Select the address by dragging: a double-click selects only part of it.
 
 ## Find
 

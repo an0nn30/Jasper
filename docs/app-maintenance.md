@@ -538,6 +538,7 @@ The bundled plugins are separate modules, compiled against the SDK only; their c
 | Project indexing and file search | `plugins/indexer` | `dev.jasper.indexer` | [Project Index](project-index.md) |
 | Shell history in the palette | `plugins/history` | `dev.jasper.history` | [Shell History](history-and-snippets.md#shell-history) |
 | Saved commands in the palette | `plugins/snippets` | `dev.jasper.snippets` | [Snippets](history-and-snippets.md#snippets) |
+| Web pages, drawn by the runtime's in-process Chromium (JCEF) | `plugins/browser` | `dev.jasper.browser` | [Browser](browser.md) |
 | The Enterprise look | `plugins/enterprise` | `dev.jasper.enterprise` | [Enterprise](enterprise.md) |
 | SDK example | `plugins/sample` | `dev.jasper.sample` | [plugin authoring](plugin-authoring.md) |
 

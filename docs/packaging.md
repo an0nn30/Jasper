@@ -2,7 +2,7 @@
 
 Jasper ships as a native application image that bundles a trimmed JetBrains Runtime, so users need no Java: a
 `Jasper.app` and DMG on macOS, a portable ZIP and a per-user setup wizard on Windows, and `.deb` and `.rpm` packages on
-Linux. Every package carries the application, all nine bundled plugins, Jasper's own launcher with its start-up recovery
+Linux. Every package carries the application, all ten bundled plugins, Jasper's own launcher with its start-up recovery
 helper `jasper-watch`, and the native [`jasper` command](command-line.md); the Windows packages also carry the offline
 [Cygwin starter environment](#bundled-cygwin). jpackage builds only for the machine it runs on, so each package is built
 on the operating system and architecture it is for (aarch64 or x64). Installing and using a package on the desktop is
@@ -141,9 +141,9 @@ and their libraries, and on Windows `cygwin-tool.jar`, which jpackage puts on th
 
 Each bundled plugin's folder holds its jar and the libraries it bundles: Remote (`dev.jasper.remote`), Credential
 Vault (`dev.jasper.vault`), Editor (`dev.jasper.editor`), File Server (`dev.jasper.fileserver`), Project Index
-(`dev.jasper.indexer`), Shell History (`dev.jasper.history`), Snippets (`dev.jasper.snippets`), Enterprise
-(`dev.jasper.enterprise`, off by default) and Sample (`dev.jasper.sample`, on but inert until its demo settings are
-set). [Plugins](plugins.md#bundled-plugins) describes each.
+(`dev.jasper.indexer`), Shell History (`dev.jasper.history`), Snippets (`dev.jasper.snippets`), Browser
+(`dev.jasper.browser`), Enterprise (`dev.jasper.enterprise`, off by default) and Sample (`dev.jasper.sample`, on but
+inert until its demo settings are set). [Plugins](plugins.md#bundled-plugins) describes each.
 
 ### Bundled plugins stay off the classpath
 

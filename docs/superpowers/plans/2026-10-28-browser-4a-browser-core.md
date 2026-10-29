@@ -3,6 +3,169 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Execution status (2026-10-28): Tasks 1-12 executed; Task 13 waits for the user** (commits `9f1d63fd1` to
+`eb1911b85`, then "Docs: the Browser plugin's core"; not merged or pushed; see `docs/STATUS.md`). Executed with per-task
+subagents and reviews; the controller's rulings are numbered R0-R46 (no R3 or R4). The task reviews recorded these
+deviations from the plan's text:
+- **Branch (R0):** executed on `claude/browser-core-88616a` (worktree `.claude/worktrees/infallible-shamir-39ac4e`),
+  cut from `claude/browser-plugin-design` (`main` `0849270a3` plus this plan, `ec5395f79`), not on
+  `claude/browser-core`.
+- **Spec section 23:** the manifest has no `exports`; `dev.jasper.browser.api` arrives with the Markdown preview
+  (plan 9).
+- **Task 1:**
+  - the entry type is `dev.jasper.sdk.plugin.Plugin`; "JasperPlugin" does not exist (R1);
+  - the manifest said `sdk = ">=0.24.0, <0.25"` until Task 2 moved every bundled range (R2);
+  - the only capability is `browser.provide` (R26);
+  - `ChromiumBoundaryTest` also allows `dialogs` (R6) and scans dotted `org.cef.` names; `StartLoadsNoChromiumTest`
+    (a forked JVM's class loads, R5) and two scanner fixture tests were added;
+  - the JCEF-visibility test is `PluginLoaderTest.aBundledPluginSeesTheRuntimesJcefModule`, not in `PluginJarsTest`
+    (R24);
+  - "`org.cef` for the browser only" is a new refusal in `plugin-architecture.gradle.kts`, and `gradle/packaging.gradle`
+    is untouched because packaging reads `applicationDefaultJvmArgs` (R23);
+  - a `migration.csv` row and `docs/packaging.md`'s JVM option list changed here, as two checks required;
+  - `PluginPresentationCheck` lets `PageView` construct only `JComponent` (its super call), with two more negative
+    fixtures.
+- **Task 2:**
+  - `Platform.openFile` follows the terminal click's file rule in the plugin host (`FileEditors.openFromWorker` with
+    `ConfigEditor::editOrReveal`), not `openRequestedFile` (R8), and posts a path that is not a regular file as "Could
+    not open a file";
+  - `WorkspaceHost` keeps a 12-argument constructor that defaults `attachNext` to `attach`;
+  - `ContractHarness` and `FakePluginHost` gained `menuBar(UUID)` and `openedFiles()` (`@since 0.25.0`);
+  - `MenuTarget` gained a `content` component, with a 3-argument constructor, instead of a new `Type`;
+  - native windows reach `hasModal` through `PluginRuntime.nativeWindows(...)`;
+  - extra guide edits (`docs/sdk-architecture.md`, the testkit README, SDK reference guide pages 07 and 13) and two
+    `migration.csv` rows;
+  - `check sdkReference` cannot run as one invocation, so `sdkReference` runs first, then `check` (ruling).
+- **Task 3:**
+  - `ChromiumOptions.apply(CefSettings, Path dataDir)` (R9);
+  - the start calls `CefApp.setIsRemoteEnabled(false)` and `CefApp.getInstance(args, settings, config.getServerExe())`
+    on the plugin's own platform thread, and fails after 90 s, "Chromium did not start within 90 seconds" (R10);
+  - `Chromium`'s constructor takes a fourth parameter, the start-failure callback behind the one notification (R27);
+  - `close()` returns at once on the UI thread and waits off it, and `BrowserPlugin.stop()` closes again on
+    `context.background()`, so a quit holds within Jasper's shutdown grace (R11);
+  - Chromium starts at most once per Jasper process; a later start, or `client()` after `close()`, fails with "Chromium
+    can start once each time Jasper runs. …", and a start cut short by `close()` is not told (R28);
+  - closing every browser is `client.dispose()`, and a close before initialization waits for it;
+  - extra classes `ChromiumApp`, `AboutSchemeFactory`, `StartOnce` and `ChromiumLife`, the tested state machine whose
+    answers `Chromium` carries out (R29, which renamed its hooks for `ChromiumApp`); extra tests `AboutSchemeTest`,
+    `BrowserPluginTest` and `ChromiumLifeTest`; `createClient` catches every `Throwable` (R30); `ChromiumOptions` and
+    `AboutScheme.answer` are package-private;
+  - `jasper-about` is registered standard, local, secure and CORS-enabled only.
+- **Task 4:**
+  - drops use `PageView`'s own `DropTarget` and `PageBrowser`'s protected drag-target methods (R12); files win over
+    text;
+  - notices: an Apache-2.0 component for `PageRenderer` only, the BSD-adapted files named on the JCEF component (R25);
+  - painting lives in `PageView` (R7): `AlphaComposite.Src`, the fallback frame scaled to the view, the union of dirty
+    rectangles repainted, the spike's bugs fixed (rectangle array, empty view rectangle, an early popup frame, the
+    `onPaint` clip, IME null text, `getLocationOffset`, `getScreenPoint` flipped on macOS only);
+  - keys have Swing's pass first and only unconsumed ones reach the page (R13, `PageViewKeysTest`); consumed mouse
+    events are not forwarded;
+  - pages start at 60 fps; Task 5's fix replaced `setBrowser` with package-private `PageBrowser.attach()`; `MyScale`,
+    the CefLog calls, `initLatch` and the FPS meter are gone; one restartable resize timer; the hover address is
+    painted from this task on;
+  - `PageViewHiddenTest` drives a package-private hooks constructor, and real `add`, `remove` and `setVisible` on a
+    headless parent fire the showing events, rather than events fired by hand;
+  - shared-memory popup frames are skipped, as in the spike (that path runs only out of process);
+  - hidden pages drop to 1 fps but are not told they are hidden (R32).
+- **Task 5:**
+  - `SettingsChromeMockTest`'s rows are unchanged: the Enterprise Settings mock fixture turns the Browser off;
+  - the split item is `dev.jasper.browser.browser` and the globe `dev.jasper.browser:globe`, registered in
+    `BrowserItems`' constructor (R16);
+  - one `UiView` holds the toolbar nodes and a `Nodes.Custom` slot of kind PREVIEW (R14);
+  - an item makes its page, and asks for Chromium, the first time it shows (R18), and an unshown item loads no Chromium
+    class (a forked-JVM test);
+  - `BrowserSettings` arrives with the Start page only (R17); `settings.toml` seeds `start_page` commented out;
+  - extra files `page.Page`, `page.PageEvents` (one handler of each type, R31), `WelcomePage`, `Views` and
+    `BrowserItemTest`;
+  - select-all on a mouse click into the address field moves to plan 4b (R15); the field fills the bar's width;
+  - `AboutScheme.registerAction`, answered 204, serves the welcome page's Settings;
+  - the plugin's tests start it on the EDT; `TabTitle` shows the host while loading when the previous name is blank;
+    the start page refuses text the field cannot load;
+  - pasted addresses keep their `%XX` escapes, and input methods work when the page had focus before its browser.
+- **Task 6:**
+  - `WebMenu.register(PluginContext, BrowserItems)`; the clash and terminal-rule tests are jasper-app's
+    `WebMenuKeysTest` and `BundledSamplePluginTest` (R19);
+  - macOS two-finger swipe not done: JBR's API has no gesture service, `com.apple.eawt.event` is not exported, and the
+    trackpad's swipe arrives as scroll events;
+  - under X11 the back and forward buttons are AWT's 6 and 7; they act on release and never reach the page; on macOS
+    the mouse's side buttons stay the page's;
+  - a `CefKeyboardHandler` runs Select All, Cut, Undo and Redo for macOS Cmd+A, Cmd+X, Cmd+Z and Cmd+Shift+Z the page
+    declined (R35);
+  - "exactly Command (plus Shift)" is read over the four modifier keys only.
+- **Task 7:**
+  - `LinkRoute` holds the pure decisions; `BrowserItems` takes a `Consumer<Page>` starter; the page package grew the
+    API links needs;
+  - `onOpenURLFromTab` always goes somewhere: where the press says while it activates the page or Chromium reports the
+    user's gesture, else the same item; a popup activated only by a key opens in the next tab;
+  - a forwarded key press activates the page (R34), Escape and a modifier alone do not, and each popup consumes the
+    activation (R37);
+  - links and popups at other schemes, such as `mailto:`, open nothing (R36);
+  - a split selects the opener's item first; `NEXT_TAB` never selects;
+  - Alt-click is a Chromium download, which reaches neither handler and does nothing.
+- **Task 8:**
+  - the bridge links `Page`s and is installed by `OpenerBridge.install(CefClient)`; `Page` gains `openItem`,
+    `closeItem`, `showItem` and `onClose`; `PageEvents` has a Chromium-thread main-frame load-start hook (R39); extra
+    file `BridgeJson`;
+  - every request is untrusted (R38): top frame only; `open` only to what the page could open itself, consuming the
+    activation; random 63-bit link ids, so a later document reaches a popup only through `event.source`; messages up
+    to 1 MiB, double-encoded in a request of at most 2 MiB + 4 KiB, through a real JSON encoder; the target origin
+    checked in Java at delivery; `noopener` opens no link;
+  - the popup's `window.close()` closes its item; `MessageEvent.source` is set with `Object.defineProperty`;
+    `targetOrigin` is canonicalised in the script;
+  - `focus()` needs the sender's unconsumed activation and that it shows, stricter than Chromium;
+  - at most 8 requests wait per page (failure `BUSY` = 5); a forgotten link answers `REFUSED`, not `GONE`;
+  - a `Cross-Origin-Opener-Policy` that switches window groups severs the link (R40); a CSP sandbox blocks popups or
+    makes the origin opaque, and does not carry over to popups; COEP is not read; JCEF exposes at most two CSP headers;
+  - user navigation (address field, Back, Forward) severs a link (R41), Back and Forward only with history (R42); the
+    sender's document is captured on Chromium's thread;
+  - a message to a popup that has not started loading is dropped; a named window always opens a new item.
+- **Task 9:**
+  - `<input accept>` filters are ignored, and OPEN and OPEN_MULTIPLE use `Windows.choose(FileChoice)` (R20); the
+    chooser titles are Open, Choose Folder and Save;
+  - the fullscreen exit waits for `fullscreenchange`;
+  - new cef-free `page.DialogPlace`; test bridges `ItemTestAccess` and `PageTestAccess` keep `BrowserItem.page()`
+    package-private (R44);
+  - dialogs wait until their item is active, a page's third quick dialog and later ones are refused until it loads
+    again (R43), and `onResetDialogState` dismisses the shown or waiting one (R44).
+- **Task 10:**
+  - `BrowserSettings.declare` returns `Declared` (`read`, `remember`, `onLinksChanged`); `LinkDecision.Decision` is
+    nested; `LinkDecision` and `LinkPrompt` are package-private;
+  - a split click whose target names no open item opens in that split, with the target;
+  - a prompt that cannot show when its turn comes hands the link back; `ASK` with no window hands it back (R21);
+  - the buttons read Use Default Browser (Editor), Cancel, Open in Jasper, the primary right-most;
+  - "Remember my choice" is a `Toggle` in a `SettingRow`;
+  - Open URL in Split Right and Down focus their pane first, send an address `WebLink` refuses to the system browser,
+    and do nothing without `webAddress()`;
+  - `settings.toml` seeds the two keys commented out; `BrowserSettingsTest` added; descriptions and palette keywords
+    are the implementer's wording; eight `migration.csv` rows.
+- **Task 11:**
+  - `BrowserRestore.url` checks its own copy of the five schemes (a package cycle), tied by a test;
+    `BrowserItems.restore` opens restored items; `Page.onAddressChange` is the committed-navigation signal;
+  - a load before the first show also replaces the restore state; an item with no savable URL still saves a state;
+    a restored item with no usable URL opens at the start page, so it saves the start page's URL if it never shows.
+- **Task 12:**
+  - the three settings are documented in `docs/browser.md#settings`, as every plugin guide documents its own; the
+    Plugins table of `docs/configuration.md`, which Settings' Help opens for every plugin page, links there;
+  - `docs/README.md` lists the guide under Plugins, with the other plugin guides;
+  - the SDK reference overview's bundled plugin table gained the Browser, so `docs/sdk-reference.html` is regenerated;
+  - other lists of bundled plugins gained it too: `docs/plugins.md`, `docs/app-maintenance.md`, `docs/workspace.md`,
+    `docs/plugin-authoring.md` and the jasper-app and SDK READMEs.
+  - `./gradlew check --continue` passed: 13,850 tests, 0 failures, 0 errors, 32 skipped; the example external plugin's
+    `check pluginZip` passed (1 test).
+
+Known gaps and follow-ups: macOS two-finger swipe (no JBR gesture API); drags that start in a page are cancelled
+(R33); links and popups at other schemes, such as `mailto:`, open nothing in pages (R36); Alt-click, a Chromium
+download, does nothing; double-clicking a URL in a terminal does not select it whole, so Open URL in Split works on a
+drag selection (R45); select-all on a mouse click into the address field (R15, plan 4b); hidden pages drop to 1 fps but
+are not told they are hidden (R32); the opener bridge's `focus()` needs the user's activation (stricter than
+Chromium); a page's rapid repeated dialogs are refused (R43); saved URLs keep any `user:password@`, which R46 drops in
+the final fix wave; the Web menu's and the Open URL in Split actions are listed in the palette and Keymap where they do
+nothing. Questions for the user: the prompt does not show the address; restored tabs that never showed show the host
+rather than their saved title; R43's refusal departs from iTerm2's copy.
+
+Task 13 (the GUI check on macOS, memory and AOT, each batch with the user's OK) has not run; Windows and Linux have not
+run.
+
 **Goal:** A bundled Browser plugin that shows Chromium pages as Jasper items, with:
 - the navigation toolbar, the Web menu and its keys;
 - iTerm2's link gestures, with popups that keep a working `window.opener`;

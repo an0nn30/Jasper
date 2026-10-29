@@ -2,8 +2,8 @@
 
 The Java API Jasper plugins compile against. Jasper is a pluggable DevOps workstation, and most of what it does is
 delivered by plugins built on this SDK alone: Remote (SSH, SFTP and tunnels), Credential Vault, Editor, File Server,
-Project Index, Shell History, Snippets and the Enterprise look are bundled plugins that use the same API as any
-third-party plugin. The SDK depends only on the JDK.
+Project Index, Shell History, Snippets, Browser and the Enterprise look are bundled plugins that use the same API as
+any third-party plugin. The SDK depends only on the JDK.
 
 - [The SDK reference](../docs/sdk-reference.html) is the complete reference: every package, type and member, generated
   from the Javadoc of the SDK, the testkit and the bundled plugins' exported API packages.

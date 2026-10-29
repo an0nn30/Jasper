@@ -6,10 +6,10 @@ that loads every plugin against the public SDK (`jasper-sdk`). The application o
 panes, tool windows and the dock), the terminal panes, commands and the command palette, notifications, Settings,
 themes and looks, background residency, the `jasper` command and native desktop integration.
 
-Remote (SSH, SFTP, tunnels), Credential Vault, Editor, File Server, Project Index, Shell History, Snippets, Sample and
-the Enterprise look are bundled plugins under the repository's `plugins/` directory. They compile against the SDK and
-the API packages of the bundled plugins they require, never against the application, and reach the application through
-the same API a third-party plugin uses; [plugins](../docs/plugins.md#bundled-plugins) lists them.
+Remote (SSH, SFTP, tunnels), Credential Vault, Editor, File Server, Project Index, Shell History, Snippets, Browser,
+Sample and the Enterprise look are bundled plugins under the repository's `plugins/` directory. They compile against the
+SDK and the API packages of the bundled plugins they require, never against the application, and reach the application
+through the same API a third-party plugin uses; [plugins](../docs/plugins.md#bundled-plugins) lists them.
 
 ## First checkout
 
