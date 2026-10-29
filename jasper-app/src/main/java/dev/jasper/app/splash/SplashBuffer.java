@@ -14,10 +14,10 @@ import java.util.Objects;
  * reaches the window as one copy. Windows and Linux show a window's pixels as they are drawn, so a splash painted on
  * screen showed its bare gradient at every step until the art and the text were drawn over it again; from the buffer
  * each pixel goes straight from one step's value to the next. A step draws again, and copies, only what it changes: the
- * step's line and the bar for branded art; Meadow redraws its whole frame for mascot poses; illustrated splashes do so to preserve fractional-scale resampling. Access is serialized by Splash.
+ * step's line and the bar for branded art; Protean redraws its whole frame for queue motion and fractional-scale sampling. Access is serialized by Splash.
  */
 final class SplashBuffer {
-    private static final Rectangle WHOLE = new Rectangle(0, 0, SplashPainter.WIDTH, SplashPainter.HEIGHT);
+    private final Rectangle whole;
     /**
      * The step line's top, a pixel below the icon: at a fractional scale no device row then holds both, and a scaled
      * image clipped across its edge would not draw it as the whole splash does.
@@ -41,6 +41,7 @@ final class SplashBuffer {
      */
     SplashBuffer(SplashPainter painter) {
         this.painter = Objects.requireNonNull(painter, "painter");
+        whole = new Rectangle(0, 0, painter.width(), painter.height());
     }
 
     /**
@@ -58,12 +59,12 @@ final class SplashBuffer {
             AffineTransform transform = target.getTransform();
             scaleX = transform.getScaleX();
             scaleY = transform.getScaleY();
-            image = new BufferedImage(ceil(SplashPainter.WIDTH * scaleX), ceil(SplashPainter.HEIGHT * scaleY), BufferedImage.TYPE_INT_RGB);
-            draw(WHOLE, step);
+            image = new BufferedImage(ceil(painter.width() * scaleX), ceil(painter.height() * scaleY), BufferedImage.TYPE_INT_RGB);
+            draw(whole, step);
         }
         drawn = step;
         Rectangle clip = target.getClipBounds();
-        copy(target, clip == null ? WHOLE : clip.intersection(WHOLE));
+        copy(target, clip == null ? whole : clip.intersection(whole));
     }
 
     /**
@@ -93,7 +94,7 @@ final class SplashBuffer {
 
     /** What showing {@code step} changes after the step drawn. */
     private List<Rectangle> changes(StartupSteps.Step step) {
-        if (painter.animated() || painter.illustrated()) return List.of(WHOLE);
+        if (painter.animated() || painter.illustrated()) return List.of(whole);
         var changes = new ArrayList<Rectangle>(2);
         if (!step.text().equals(drawn.text())) changes.add(LINE);
         if (SplashPainter.fillWidth(step.fraction()) != SplashPainter.fillWidth(drawn.fraction())) changes.add(BAR);

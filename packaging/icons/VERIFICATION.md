@@ -1,13 +1,9 @@
-# Shell Prompt icon verification
+# Protean icon verification — 2026-10-29
 
-The approved generated raster master is `shell-prompt-source.png`. Platform exports apply optical padding once; macOS is compiled through Icon Composer and rendered through the native icon service without launching an application.
+All 47 supplied files are retained byte for byte in `protean-source/`. Shipped ICNS/ICO and matching platform PNG/SVG representations match them exactly. Missing runtime/desktop sizes are resized by the importer.
 
-- Verified all 89 export manifest hashes, PNG dimensions and ZIP CRCs.
-- All ten ICNS representations round-trip through `iconutil` with identical composited RGB pixels on white and black backgrounds.
-- Windows retains 20 RGBA ICO frames; Linux retains its full hicolor tree and matching runtime PNGs.
-- The website icon is byte-identical to the Linux 256px asset.
-- All 11 application-icon tests pass, including forest surround and website/runtime parity assertions.
-- Full headless `check` and macOS `verifyPackage` pass with AOT disabled: XML inventory 11,633 tests, zero failures/errors and 25 existing platform skips.
-- The manual website bundle builds with 58 files; all five packaging tests pass.
+The static macOS catalog compiles from the ten supplied iconset entries. `assetutil --info` confirms ten Jasper icon representations, 16 through 1024 pixels with standard and Retina scales. Runtime images decode at their declared dimensions; visual inspection of all three 256 px platform assets matches the supplied artwork.
 
-Desktop appearance on Windows and Linux remains an installed-app check. No GUI or AOT training was launched for this integration.
+Focused application-icon, Linux/macOS notification, packaged-resource and presentation tests pass: 38 tests, no failures or skips. `verifyApplicationArchitecture` and `verifyPackagingSupport` pass. The Linux notification test replaces seeded stale cache bytes with the exact shipped 128 px resource.
+
+Headless `packageApp` was attempted with AOT disabled. Its strict runtime gate rejects the installed JBR b583.48 because the required JCEF b635.75 build is absent; `verifyPackage` remains pending. Native Windows/Linux package and desktop appearance remain manual acceptance checks.

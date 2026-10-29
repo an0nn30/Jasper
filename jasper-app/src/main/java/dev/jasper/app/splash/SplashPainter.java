@@ -68,8 +68,7 @@ public final class SplashPainter {
         }
     }
 
-    private final MeadowSplash meadow;
-    private final ThemeSplash themed;
+    private final ProteanSplash protean;
     private final String product, version, copyright;
     private final Image icon;
     private final EncodedArtwork art;
@@ -78,58 +77,45 @@ public final class SplashPainter {
 
     private SplashPainter(String product, String version, String copyright, Image icon, EncodedArtwork art, Font name,
                           Font versionFont, Font stepFont, Font copyrightFont) {
-        this.meadow = null;
-        this.themed = null;
+        this.protean = null;
         this.product = product; this.version = version; this.copyright = copyright; this.icon = icon; this.art = art;
         this.name = name; this.versionFont = versionFont; this.stepFont = stepFont; this.copyrightFont = copyrightFont;
     }
 
-    private SplashPainter(MeadowSplash meadow) {
-        this.meadow = meadow;
-        this.themed = null;
+    private SplashPainter(ProteanSplash protean) {
+        this.protean = protean;
         product = version = copyright = null;
-        icon = null; art = null;
+        icon = null;
+        art = null;
         name = versionFont = stepFont = copyrightFont = null;
     }
 
-    /**
-     * Decodes Jasper's standard Meadow splash before its window opens.
-     * @param version the build version to display
-     * @param scale initial device scale, clamped to 1 through 4
-     * @return the default splash painter
+    /** The standard Protean splash.
+     * @param buildLine actual build metadata
+     * @param queue resolved startup labels
+     * @param scale initial device scale
+     * @return decoded painter
      */
-    public static SplashPainter meadow(String version, int scale) {
-        return new SplashPainter(new MeadowSplash(version, scale));
+    public static SplashPainter protean(String buildLine, java.util.List<String> queue, int scale) {
+        return new SplashPainter(new ProteanSplash(buildLine, queue, scale));
     }
-
-    private SplashPainter(ThemeSplash themed) {
-        this.themed = themed; meadow = null;
-        product = version = copyright = null;
-        icon = null; art = null;
-        name = versionFont = stepFont = copyrightFont = null;
-    }
-
-    /**
-     * Decodes the bundled still illustration for an interface theme. Custom and Desktop themes use Meadow art;
-     * unreadable art falls back to the original animated Meadow.
-     * @param themeId the validated interface theme id
-     * @param version the build version to display
-     * @param scale initial device scale for the original Meadow fallback, clamped to 1 through 4
-     * @return the decoded painter
+    /** Selected logical width.
+     * @return width
      */
-    public static SplashPainter themed(String themeId, String version, int scale) {
-        Objects.requireNonNull(themeId, "themeId"); Objects.requireNonNull(version, "version");
-        try { return new SplashPainter(new ThemeSplash(themeId, version)); }
-        catch (RuntimeException undrawable) {
-            LOG.log(System.Logger.Level.WARNING, "The theme splash cannot be drawn; using Meadow", undrawable);
-            return meadow(version, scale);
-        }
+    public int width() { return protean == null ? WIDTH : ProteanSplash.WIDTH; }
+    /** Selected logical height.
+     * @return height
+     */
+    public int height() { return protean == null ? HEIGHT : ProteanSplash.HEIGHT; }
+    boolean animated() { return protean != null; }
+    boolean illustrated() { return protean != null; }
+    java.awt.Color background() { return protean != null ? SplashColors.PROTEAN_BACKGROUND : SplashColors.TOP; }
+    void showStep(dev.jasper.app.startup.StartupSteps.Step step, long nowNanos, boolean animations) {
+        if (protean != null) protean.show(step, nowNanos, animations);
     }
-
-    boolean animated() { return meadow != null; }
-    boolean illustrated() { return themed != null; }
-    java.awt.Color background() { return themed != null ? themed.background() : meadow == null ? SplashColors.TOP : SplashColors.MEADOW_PAPER; }
-    void animationFrame(int tick) { if (meadow != null) meadow.frame(tick); }
+    boolean animationTime(long nowNanos) {
+        return protean != null && protean.time(nowNanos);
+    }
 
     /**
      * Decodes {@code content} once and draws the art for {@code scale}, so the first paint decodes nothing. Any thread.
@@ -165,8 +151,7 @@ public final class SplashPainter {
         Objects.requireNonNull(step, "step");
         Graphics2D g = (Graphics2D) target.create();
         try {
-            if (themed != null) { themed.paint(g, step, fraction); return; }
-            if (meadow != null) { meadow.paint(g, step, fraction); return; }
+            if (protean != null) { protean.paint(g, fraction); return; }
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);

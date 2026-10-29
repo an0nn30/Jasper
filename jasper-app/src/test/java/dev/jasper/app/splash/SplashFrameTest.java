@@ -41,6 +41,33 @@ class SplashFrameTest {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource({"1,1", "1.25,1.25", "1.5,1.5", "1.75,1.75", "2,2", "4,4", "1.25,1.5"})
+    void proteanKeepsTargetOriginAndClipDuringWholeFrameUpdates(double scaleX, double scaleY) {
+        var labels = StartupSteps.queue("Protean", java.util.List.of());
+        var painter = SplashPainter.protean("build", labels, 1);
+        var actual = new BufferedImage(3500, 2000, BufferedImage.TYPE_INT_RGB);
+        var expected = new BufferedImage(3500, 2000, BufferedImage.TYPE_INT_RGB);
+        var next = new StartupSteps.Step(labels.get(2), 3, 4);
+        var target = target(actual, scaleX, scaleY);
+        var reference = target(expected, scaleX, scaleY);
+        try {
+            var transform = target.getTransform();
+            var clip = target.getClip().getBounds();
+            var buffer = new SplashBuffer(painter);
+            buffer.paint(target, FIRST);
+            painter.showStep(next, 0, false);
+            buffer.show(target, next);
+            new SplashBuffer(painter).paint(reference, next);
+            assertThat(java.util.Arrays.equals(SplashPainterTest.pixels(actual), SplashPainterTest.pixels(expected))).isTrue();
+            assertThat(target.getTransform()).isEqualTo(transform);
+            assertThat(target.getClip().getBounds()).isEqualTo(clip);
+        } finally {
+            target.dispose();
+            reference.dispose();
+        }
+    }
+
     /** A target offset by (7, 9), clipped to (4, 4, 1400, 850), at the given scale. */
     private static Graphics2D target(BufferedImage image, double scaleX, double scaleY) {
         Graphics2D g = image.createGraphics();

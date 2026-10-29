@@ -86,7 +86,7 @@ Starting points by change:
 | Buddy notices | `notifications/CommandNotifier`, `workspace/WorkspaceActivity`, `notifications/ActivityNotifier` |
 | Something plugins can do | `plugins/HostedContext`, `plugins/HostedUi`, `contributions/Contributions`, and the SDK |
 | A look's effect on the chrome | `presentation/Projections`, `workspace/WorkspaceChrome`, `windows/ShellChrome` |
-| The boot splash | `bootstrap/ApplicationBootstrap.openSplash`, `splash/SplashPainter`, `splash/MeadowSplash`, `startup/StartupSteps` |
+| The boot splash | `bootstrap/ApplicationBootstrap.openSplash`, `splash/SplashPainter`, `splash/ProteanSplash`, `startup/StartupSteps` |
 | Cygwin Bash on Windows | `cygwin/`, `launch/CygwinLaunch`, `application/CygwinFeature`, `packaging/windows/cygwin/` |
 
 ## Tests

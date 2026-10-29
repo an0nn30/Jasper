@@ -320,11 +320,11 @@ class ApplicationBootstrapTest {
         assertThat(ApplicationBootstrap.attemptBeforePresenting(background, true, true)).isFalse();
     }
 
-    /** Windowed starts show Meadow by default or the selected branded splash. */
+    /** Windowed starts show Protean by default or the selected branded splash. */
     @Test void aWindowedStartShowsTheDefaultOrBrandedSplash() {
         var plain = AppArguments.parse(new String[0], directory);
         assertThat(ApplicationBootstrap.splashWanted(plain, false, true)).isTrue();
-        assertThat(ApplicationBootstrap.splashWanted(plain, false, false)).as("default Meadow splash").isTrue();
+        assertThat(ApplicationBootstrap.splashWanted(plain, false, false)).as("default Protean splash").isTrue();
         assertThat(ApplicationBootstrap.splashWanted(plain, true, true)).as("headless").isFalse();
         for (String flag : java.util.List.of("--background", "--no-window", "--safe-mode"))
             assertThat(ApplicationBootstrap.splashWanted(AppArguments.parse(new String[] {flag}, directory), false, true)).as(flag).isFalse();
@@ -332,19 +332,39 @@ class ApplicationBootstrapTest {
 
     @Test void excludedStartsNeverSelectArtOrObserveSystemAppearance() {
         var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));
-        var unexpected = (java.util.function.Function<dev.jasper.app.config.ConfigSnapshot, String>) config -> {
-            throw new AssertionError("An excluded launch tried to select art or initialize its appearance snapshot");
-        };
         for (String flag : java.util.List.of("--background", "--no-window", "--safe-mode")) {
             var startup = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[]{flag}, directory), dirs,
                 null, dev.jasper.app.plugins.PluginSelection.none(), null);
-            assertThat(ApplicationBootstrap.openSplash(startup, false, unexpected)).as(flag)
+            assertThat(ApplicationBootstrap.openSplash(startup, false)).as(flag)
                 .isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
         }
         var plain = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs,
             null, dev.jasper.app.plugins.PluginSelection.none(), null);
-        assertThat(ApplicationBootstrap.openSplash(plain, true, unexpected)).as("headless")
+        assertThat(ApplicationBootstrap.openSplash(plain, true)).as("headless")
             .isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+    }
+
+    @Test void standardSplashKeepsResolvedProteanQueueAcrossThemePreferences() throws Exception {
+        var themes = List.of("jasper-meadow", "slate-cobalt", "ubuntu-yaru", "catppuccin-latte", "catppuccin-frappe",
+            "catppuccin-macchiato", "catppuccin-mocha", "desktop-colors", "imported-custom");
+        for (String theme : themes) {
+            Path home = Files.createDirectories(directory.resolve(theme));
+            Path config = home.resolve("config.toml");
+            Files.writeString(config, "[ui]\nappearance = 'system'\n[ui.theme]\ndark = '" + theme + "'\nlight = '" + theme + "'\n");
+            try (var service = new ConfigService(config, false)) {
+                var dirs = new AppDirs(home, config, home.resolve("logs"));
+                var startup = new ApplicationBootstrap.Startup(service, AppArguments.parse(new String[0], home), dirs,
+                    null, dev.jasper.app.plugins.PluginSelection.none(), null);
+                var steps = ApplicationBootstrap.openSplash(startup, false);
+                try {
+                    assertThat(steps.queue()).as(theme).containsExactly(dev.jasper.app.startup.StartupSteps.RUNTIME,
+                        dev.jasper.app.startup.StartupSteps.CONFIGURATION, dev.jasper.app.startup.StartupSteps.WORKSPACE,
+                        "Starting Protean Workstation…");
+                } finally {
+                    SwingUtilities.invokeAndWait(steps::done);
+                }
+            }
+        }
     }
 
     /** Review Focus 5: the look's icons reach every branded launch, the splash only one that opens a window. */
@@ -365,6 +385,7 @@ class ApplicationBootstrapTest {
             var standard = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null,
                 dev.jasper.app.plugins.PluginSelection.none(), null);
             var standardSteps = ApplicationBootstrap.openSplash(standard, false);
+            assertThat(standardSteps.queue()).contains("Starting Protean Workstation…");
             assertThat(standardSteps).isNotSameAs(dev.jasper.app.startup.StartupSteps.NONE);
             javax.swing.SwingUtilities.invokeAndWait(standardSteps::done);
             assertThat(dev.jasper.app.platform.ApplicationIcon.branded()).as("the default look keeps Jasper's icons").isFalse();
@@ -385,7 +406,7 @@ class ApplicationBootstrapTest {
             assertThat(steps).isNotSameAs(dev.jasper.app.startup.StartupSteps.NONE);
             assertThat(steps.active()).isTrue();
             assertThat(steps.current()).isEqualTo(new dev.jasper.app.startup.StartupSteps.Step("Starting Java runtime…", 1,
-                4 + branded.loading().size()));
+                4 + branded.loading().size(), steps.queue()));
             SwingUtilities.invokeAndWait(steps::workstation);
             assertThat(steps.current().text()).as("the product name").isEqualTo("Starting JasperOps Workstation…");
             SwingUtilities.invokeAndWait(steps::done);
@@ -406,7 +427,7 @@ class ApplicationBootstrapTest {
         assertThat(calls).containsExactly("show false", "show true", "icon", "show false", "show true", "icon");
     }
 
-    @Test void enterpriseUsesTheSameMeadowSplashBrandingAsNormalMode() {
+    @Test void enterpriseUsesTheSameProteanSplashBrandingAsNormalMode() {
         var parsed = dev.jasper.app.testsupport.EnterpriseResources.facts().parsed().orElseThrow();
         assertThat(parsed.branding()).isSameAs(dev.jasper.app.presentation.Branding.NONE);
     }

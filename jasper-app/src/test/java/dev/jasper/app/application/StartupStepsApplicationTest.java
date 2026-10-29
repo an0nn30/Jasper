@@ -58,8 +58,8 @@ class StartupStepsApplicationTest {
         }
     }
 
-    /** The default Meadow splash also stays alive throughout application composition. */
-    @Test void aLookWithoutBrandingKeepsTheMeadowSplashUntilVisible() throws Exception {
+    /** The default Protean splash also stays alive throughout application composition. */
+    @Test void aLookWithoutBrandingKeepsTheProteanSplashUntilVisible() throws Exception {
         Path dev = LookFixtures.plugin(home.resolve("dev"), "dev.example.look", LookFixtures.descriptor("dev.example.look", "Example")
             + LookFixtures.provider("look.kit.toml"), Map.of("look.kit.toml", LookFixtures.KIT));
         var selection = PluginSelection.of(dirs(), null, "", dev, false);

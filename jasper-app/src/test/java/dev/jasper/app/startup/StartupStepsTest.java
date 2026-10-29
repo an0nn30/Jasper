@@ -9,6 +9,34 @@ import org.junit.jupiter.api.Test;
 
 /** Spec 10.11: the splash's steps follow start-up as it happens; the fill is the step's number over the count. */
 class StartupStepsTest {
+    @Test void reconciliationPreservesCountOnlyCallersAndStopsAfterStartup() {
+        var shown = new ArrayList<StartupSteps.Step>();
+        var steps = StartupSteps.of("Protean", 2, shown::add, () -> {});
+        steps.configuration();
+        steps.reconcilePlugins(java.util.List.of("Remote", "Remote"));
+        assertThat(shown).containsExactly(new StartupSteps.Step(StartupSteps.CONFIGURATION, 2, 6));
+        steps.reconcilePlugins(java.util.List.of("Remote"));
+        assertThat(steps.current()).isEqualTo(new StartupSteps.Step(StartupSteps.CONFIGURATION, 2, 5));
+        steps.plugin("Remote");
+        assertThatThrownBy(() -> steps.reconcilePlugins(java.util.List.of())).isInstanceOf(IllegalStateException.class);
+        steps.done();
+        steps.reconcilePlugins(java.util.List.of());
+        assertThat(steps.current().count()).isEqualTo(5);
+    }
+
+    @Test void resolvedQueueCopiesNamesAndKeepsDuplicatePositions() {
+        var names = new ArrayList<>(java.util.List.of("Remote", "Remote", "日本語 🚀"));
+        var steps = StartupSteps.of("Protean", names, step -> {}, () -> {});
+        names.clear();
+        assertThat(steps.queue()).containsExactly(StartupSteps.RUNTIME, StartupSteps.CONFIGURATION,
+            StartupSteps.PLUGIN + "Remote", StartupSteps.PLUGIN + "Remote", StartupSteps.PLUGIN + "日本語 🚀",
+            StartupSteps.WORKSPACE, "Starting Protean Workstation…");
+        steps.configuration(); steps.plugin("Remote"); steps.plugin("Remote");
+        assertThat(steps.current().index()).isEqualTo(4);
+        steps.workspace(); assertThat(steps.current().index()).isEqualTo(6);
+        assertThat(StartupSteps.queue("Protean", java.util.List.of())).hasSize(4);
+    }
+
     @Test void theStepsFollowStartUpAndFillIndexOverCount() {
         var shown = new ArrayList<StartupSteps.Step>();
         var closed = new AtomicInteger();

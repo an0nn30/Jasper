@@ -226,6 +226,11 @@ class PresentationReachTest {
                 assertThat(application[0].themes().kit()).isSameAs(Kit.DEFAULT);
                 assertThat(application[0].themes().appearance().context(ThemeRoute.CHROME).kit()).isSameAs(Kit.DEFAULT);
                 assertThat(application[0].themes().animationsEnabled()).as("the fallback moves: its motion is the default look's").isTrue();
+                var steps = dev.jasper.app.startup.StartupSteps.of("Protean", selection.loading(), step -> {}, () -> {});
+                steps.configuration();
+                application[0].startupSteps(steps);
+                assertThat(steps.queue()).containsExactlyElementsOf(dev.jasper.app.startup.StartupSteps.queue("Protean", selection.blamed().loading()));
+                assertThat(steps.current().count()).isEqualTo(4 + selection.blamed().loading().size());
                 application[0].startPlugins(dirs);
                 assertThat(application[0].pluginRuntime().statusLines()).anySatisfy(line -> assertThat(line)
                     .contains("dev.example.look", "SKIPPED", "its look could not be installed; Jasper uses its standard look"));

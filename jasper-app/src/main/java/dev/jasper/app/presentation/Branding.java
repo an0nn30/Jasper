@@ -10,7 +10,7 @@ import java.util.stream.Stream;
 
 /**
  * A look's branding (spec 5.1, 9.1 and 10.11): the product name its splash shows, its application icons by pixel size
- * and its splash art. {@link #NONE} is a look without {@code [branding]}, which keeps Jasper's icon and uses the default Meadow splash;
+ * and its splash art. {@link #NONE} is a look without {@code [branding]}, which keeps Jasper's icon and uses the default Protean splash;
  * the default look and the fallback presentation have it. Holds the files' bytes, which {@link KitParser} checks without
  * decoding them, so the bootstrap pre-pass touches no AWT; the splash and the application icon decode them. Immutable;
  * compared by content.
@@ -18,7 +18,7 @@ import java.util.stream.Stream;
 public final class Branding {
     /** The icon sizes a branded look ships, in pixels, smallest first. */
     public static final List<Integer> SIZES = List.of(16, 32, 48, 64, 128, 256, 1024);
-    /** No branding: Jasper's icon and the default Meadow splash. */
+    /** No branding: Jasper's icon and the default Protean splash. */
     public static final Branding NONE = new Branding("", new TreeMap<>(), new byte[0]);
 
     private final String product;

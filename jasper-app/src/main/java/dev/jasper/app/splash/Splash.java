@@ -20,8 +20,8 @@ import java.util.function.Consumer;
  * graphics, because the event thread is busy starting Jasper and would not get to a queued repaint. Every paint is a copy
  * from {@code SplashBuffer}, which also preserves fractional-scale illustration sampling between steps. It is a plain AWT window, not
  * a Swing one, so opening it initializes no look and feel ahead of the application's. A window that cannot be made is
- * logged and the splash stays closed; start-up goes on. Window lifecycle and step updates are EDT-owned. The fallback
- * Meadow animation paints on a daemon while startup occupies the EDT; all buffer and live-window paint access is
+ * logged and the splash stays closed; start-up goes on. Window lifecycle and step updates are EDT-owned. The queue
+ * animation paints on a daemon while startup occupies the EDT; all buffer and live-window paint access is
  * serialized by a private lock, and closing cancels the worker before disposing the window outside that lock.
  */
 public final class Splash {
@@ -29,6 +29,7 @@ public final class Splash {
     private final Object paintLock = new Object();
     private final SplashPainter painter;
     private final SplashAnimation animation;
+    private final boolean animations;
     private final SplashBuffer buffer;
     private final List<Image> icons;
     private Window window;
@@ -54,6 +55,7 @@ public final class Splash {
      */
     public Splash(SplashPainter painter, List<Image> icons, boolean animations) {
         this.painter = Objects.requireNonNull(painter, "painter");
+        this.animations = animations;
         buffer = new SplashBuffer(painter);
         animation = new SplashAnimation(this::animate, painter.animated() && animations);
         this.icons = List.copyOf(icons);
@@ -66,7 +68,10 @@ public final class Splash {
      */
     public void open(StartupSteps.Step first) {
         if (closed || window != null) return;
-        step = Objects.requireNonNull(first, "first");
+        synchronized (paintLock) {
+            step = Objects.requireNonNull(first, "first");
+            painter.showStep(step, System.nanoTime(), animations);
+        }
         try {
             window = new Window((Frame) null) {
                 @Override public void paint(Graphics g) {
@@ -81,9 +86,9 @@ public final class Splash {
             // The native window's first fill, before the splash paints, matches the splash: no light flash.
             window.setBackground(painter.background());
             window.setIconImages(icons);
-            window.setSize(SplashPainter.WIDTH, SplashPainter.HEIGHT);
+            window.setSize(painter.width(), painter.height());
             window.setLocation(centred(GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice()
-                .getDefaultConfiguration().getBounds()));
+                .getDefaultConfiguration().getBounds(), painter.width(), painter.height()));
             window.setVisible(true);
             synchronized (paintLock) { paintNow(g -> buffer.paint(g, step)); }
             animation.start();
@@ -102,6 +107,7 @@ public final class Splash {
         synchronized (paintLock) {
             if (closed) return;
             step = Objects.requireNonNull(next, "next");
+            painter.showStep(step, System.nanoTime(), animations);
             if (window != null) paintNow(g -> buffer.show(g, step));
         }
     }
@@ -122,10 +128,10 @@ public final class Splash {
         }
     }
 
-    private void animate(int tick) {
+    private void animate(long nowNanos) {
         synchronized (paintLock) {
             if (closed || window == null) return;
-            painter.animationFrame(tick);
+            if (!painter.animationTime(nowNanos)) return;
             paintNow(g -> buffer.show(g, step));
         }
     }
@@ -140,6 +146,10 @@ public final class Splash {
 
     /** Where a splash centred on {@code screen} goes. */
     static Point centred(Rectangle screen) {
-        return new Point(screen.x + (screen.width - SplashPainter.WIDTH) / 2, screen.y + (screen.height - SplashPainter.HEIGHT) / 2);
+        return centred(screen, SplashPainter.WIDTH, SplashPainter.HEIGHT);
+    }
+
+    static Point centred(Rectangle screen, int width, int height) {
+        return new Point(screen.x + (screen.width - width) / 2, screen.y + (screen.height - height) / 2);
     }
 }

@@ -133,7 +133,7 @@ class PresentationConformanceTest {
     @Test void enterpriseSharesJaspersIconAndPreservesItsReferenceArtwork() throws Exception {
         var branding = EnterpriseResources.facts().parsed().orElseThrow().branding();
         assertThat(branding).isSameAs(dev.jasper.app.presentation.Branding.NONE);
-        assertThat(branding.iconFiles()).as("use the shared Shell Prompt platform icon").isEmpty();
+        assertThat(branding.iconFiles()).as("use the shared application icon platform icon").isEmpty();
         Path reference = EnterpriseResources.ROOT.resolve("docs/design/enterprise/reference");
         var sources = new java.util.LinkedHashMap<Integer, String>();
         sources.put(16, "09 App Icon/macOS/AppIcon.iconset/icon_16x16.png");

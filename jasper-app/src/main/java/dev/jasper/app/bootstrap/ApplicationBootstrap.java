@@ -133,31 +133,25 @@ public final class ApplicationBootstrap {
      * splash whose files cannot be drawn is skipped and logged; start-up goes on.
      */
     static StartupSteps openSplash(Startup startup, boolean headless) {
-        return openSplash(startup, headless, config -> SplashSelection.theme(config, startup.selection()));
-    }
-
-    /** The artwork selector is lazy: launch exclusions and explicit branding precede any appearance observation. */
-    static StartupSteps openSplash(Startup startup, boolean headless,
-                                  Function<dev.jasper.app.config.ConfigSnapshot, String> selectTheme) {
         Presentation presentation = startup.selection().presentation();
         Branding branding = presentation.branding();
-        String product = branding.present() ? branding.product() : "Jasper";
+        String product = branding.present() ? branding.product() : "Protean";
         long began = System.nanoTime();
         ApplicationIcon.useLook(branding.iconFiles());
         if (!splashWanted(startup.options(), headless, true)) return StartupSteps.NONE;
+        var plugins = startup.selection().loading();
+        var queue = StartupSteps.queue(product, plugins);
         SplashPainter painter;
         try { painter = branding.present()
             ? SplashPainter.of(splashContent(presentation, BuildInfo.current()), screenScale())
-            : SplashPainter.themed(selectTheme.apply(startup.service() == null ? dev.jasper.app.config.ConfigSnapshot.defaults()
-                : startup.service().initialState().snapshot()),
-                BuildInfo.current().buildLine(), screenScale()); }
+            : SplashPainter.protean(BuildInfo.current().buildLine(), queue, screenScale()); }
         catch (RuntimeException undrawable) {
             LOG.log(System.Logger.Level.WARNING, "The " + product + " splash cannot be drawn; starting without it", undrawable);
             return StartupSteps.NONE;
         }
         var splash = new Splash(painter, ApplicationIcon.images(), startup.service() == null
             || startup.service().initialState().snapshot().animations().enabled());
-        var steps = StartupSteps.of(product, startup.selection().loading().size(), splash::show, splash::close);
+        var steps = StartupSteps.of(product, plugins, splash::show, splash::close);
         SwingUtilities.invokeLater(() -> {
             ApplicationIcon.installTaskbarIcon();
             splash.open(steps.current());
@@ -358,7 +352,7 @@ public final class ApplicationBootstrap {
             steps.configuration();
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
                 () -> System.exit(0), integrationDir, dirs.themes(), selection);
-            // A look that fell back at start runs without its branding (spec 4.7 and 9.1): Jasper's icons and default Meadow splash.
+            // A look that fell back at start runs without its branding (spec 4.7 and 9.1): Jasper's icons and default Protean splash.
             ApplicationIcon.useLook(application.presentation().branding().iconFiles());
             ApplicationIcon.installTaskbarIcon();
             application.startupSteps(steps);
