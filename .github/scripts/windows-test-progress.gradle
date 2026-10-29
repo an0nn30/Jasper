@@ -1,0 +1,6 @@
+// CI-only progress: distinguish a slow class from a stuck test on Windows.
+gradle.projectsEvaluated {
+    rootProject.project(':jasper-app').tasks.named('test') {
+        testLogging.events 'started', 'passed', 'skipped', 'failed'
+    }
+}

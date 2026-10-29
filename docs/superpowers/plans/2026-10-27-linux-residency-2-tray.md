@@ -1,5 +1,7 @@
 # Linux residency 2: modern and legacy trays Implementation Plan
 
+**Task 10 repeated Windows timeout deviation (2026-10-29): REVIEW PENDING.** A bounded Check watchdog, app test progress and JVM snapshots preserve diagnostics before the existing job deadline; hosted Windows verification and slowdown diagnosis remain pending.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a recoverable Linux resident icon through Java D-Bus StatusNotifierItem/DBusMenu, falling back to X11 while retaining residency with no icon.

@@ -66,6 +66,9 @@ jobs:
         run: |
           tar -xzf desktop-qt-sdk.tar.gz
           printf '\njasper.qt5Prefix=%s/.desktop-qt-sdk/prefixes/qt5\njasper.qt6Prefix=%s/.desktop-qt-sdk/prefixes/qt6\njasper.kf5Prefix=%s/.desktop-qt-sdk/prefixes/kf5\njasper.kde6QtPrefix=%s/.desktop-qt-sdk/prefixes/kde6-qt\njasper.kf6Prefix=%s/.desktop-qt-sdk/prefixes/kf6\n' "$PWD" "$PWD" "$PWD" "$PWD" "$PWD" >> gradle.properties
+      - name: Test Windows check watchdog
+        if: runner.os == 'Windows'
+        run: python .github/scripts/test_windows_check.py
       - name: Check
         shell: bash
         # Windows subprocess/cleanup tests hit deadlines with concurrent test JVMs.
@@ -73,7 +76,13 @@ jobs:
         # Each project keeps its default single test JVM and sequential JUnit execution.
         env:
           GRADLE_WORKERS: ${{ runner.os == 'Windows' && '1' || '2' }}
-        run: ./gradlew check --parallel --max-workers="$GRADLE_WORKERS" --continue --stacktrace
+        run: |
+          # Leave four minutes of the job budget for bounded snapshots and artifact upload.
+          if [ "$RUNNER_OS" = Windows ]; then
+            python .github/scripts/windows_check.py --timeout 1560 --capture-at 900 --capture-at 1440 --diagnostics build/ci-jvm-diagnostics -- cmd /c gradlew.bat check --parallel --max-workers="$GRADLE_WORKERS" --continue --stacktrace --console=plain --init-script .github/scripts/windows-test-progress.gradle
+          else
+            ./gradlew check --parallel --max-workers="$GRADLE_WORKERS" --continue --stacktrace
+          fi
       # check built the release jars; the example plugin must keep building from them.
       - name: Example external plugin
         if: runner.os == 'Linux'
@@ -85,6 +94,7 @@ jobs:
         with:
           name: test-diagnostics-${{ matrix.os }}
           path: |
+            build/ci-jvm-diagnostics/**
             **/build/test-results/**
             **/build/reports/tests/**
             jasper-app/build/enterprise-settings/**
