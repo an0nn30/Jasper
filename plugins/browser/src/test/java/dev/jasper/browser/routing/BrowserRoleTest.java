@@ -1,5 +1,6 @@
 package dev.jasper.browser.routing;
 
+import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.settings.BrowserSettings;
@@ -201,6 +202,62 @@ class BrowserRoleTest {
             press(form().actions().getLast().action());
             assertThat(started.items.items()).hasSize(3);
             assertThat(started.items.find("docs").orElseThrow().url()).isEqualTo(URI.create("https://example.com/four"));
+            assertThat(started.host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * Once Chromium has failed to start, or has stopped, no browser item could show a page: every link goes back to Jasper,
+     * which opens it in the system browser or the Default editor, and nothing asks. While it starts or runs, links open.
+     */
+    @Test void onceChromiumCannotShowPagesEveryLinkGoesBackToJasperWithoutAPrompt() throws Exception {
+        started = start();
+        Path page = page();
+        onUiThread(() -> {
+            for (Chromium.State state : List.of(Chromium.State.STARTING, Chromium.State.RUNNING)) {
+                started.chromium.set(state);
+                assertThat(open(LINK, LinkPlacement.SPLIT_RIGHT, Optional.empty(), Optional.of(started.window))).as(state.name()).isTrue();
+            }
+            started.host.setSetting(ID, LINKS, "builtin");
+            assertThat(open(LINK, LinkPlacement.TAB, Optional.of("docs"), Optional.of(started.window))).isTrue();
+            started.host.setSetting(ID, LINKS, "ask");
+            assertThat(started.items.items()).hasSize(3);
+            for (Chromium.State state : List.of(Chromium.State.FAILED, Chromium.State.STOPPED)) {
+                started.chromium.set(state);
+                assertThat(open(LINK, LinkPlacement.TAB, Optional.empty(), Optional.of(started.window))).as(state + ": would ask").isFalse();
+                assertThat(open(page.toUri(), LinkPlacement.TAB, Optional.empty(), Optional.of(started.window))).as(state + ": a local file").isFalse();
+                assertThat(open(LINK, LinkPlacement.SPLIT_DOWN, Optional.empty(), Optional.of(started.window))).as(state + ": a split").isFalse();
+                assertThat(open(URI.create("https://example.com/two"), LinkPlacement.TAB, Optional.of("docs"), Optional.of(started.window)))
+                    .as(state + ": a target that names an open item").isFalse();
+                assertThat(started.host.openLink(LINK, LinkOrigin.EXTERNAL, LinkPlacement.TAB, Optional.empty(), Optional.of(started.window)))
+                    .as(state + ": from outside").isFalse();
+            }
+        });
+        onUiThread(() -> {
+            assertThat(started.host.windowView(ID, TITLE)).as("no prompt").isEmpty();
+            assertThat(started.items.items()).as("nothing more opened").hasSize(3);
+            assertThat(started.items.find("docs").orElseThrow().url()).as("nothing loaded").isEqualTo(LINK);
+            assertThat(started.host.failures()).isEmpty();
+        });
+    }
+
+    /** An Open in Jasper that can no longer open, as when Chromium failed while the prompt showed, goes where Jasper would. */
+    @Test void openInJasperAfterChromiumFailedSendsTheLinkWhereJasperWould() throws Exception {
+        started = start();
+        Path page = page();
+        for (URI address : List.of(LINK, page.toUri())) {
+            onUiThread(() -> assertThat(open(address, LinkPlacement.TAB, Optional.empty(), Optional.of(started.window))).isTrue());
+            onUiThread(() -> {
+                started.chromium.set(Chromium.State.FAILED);
+                press(button("Open in Jasper").action());
+                assertThat(started.host.windows()).as("the prompt closed").isEmpty();
+                started.chromium.set(Chromium.State.NOT_STARTED);
+            });
+        }
+        onUiThread(() -> {
+            assertThat(started.items.items()).isEmpty();
+            assertThat(started.host.browsed()).containsExactly(LINK);
+            assertThat(started.host.openedFiles()).containsExactly(page);
             assertThat(started.host.failures()).isEmpty();
         });
     }
@@ -412,13 +469,14 @@ class BrowserRoleTest {
             }
             var context = new AtomicReference<PluginContext>();
             var items = new AtomicReference<BrowserItems>();
+            var chromium = new AtomicReference<>(Chromium.State.NOT_STARTED);
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide")), Set.of(), Set.of(), plugin -> {
                 context.set(plugin);
                 var settings = BrowserSettings.declare(plugin.settings());
                 items.set(new BrowserItems(plugin, page -> { }));
-                plugin.platform().browser(new BrowserRole(plugin, items.get(), settings));
+                plugin.platform().browser(new BrowserRole(plugin, items.get(), settings, chromium::get));
             });
-            result.set(new Started(host, context.get(), items.get(), shown, shell, pane));
+            result.set(new Started(host, context.get(), items.get(), shown, shell, pane, chromium));
         });
         return result.get();
     }
@@ -442,5 +500,6 @@ class BrowserRoleTest {
         void run() throws Exception;
     }
 
-    private record Started(FakePluginHost host, PluginContext context, BrowserItems items, UUID window, UUID shell, UUID pane) { }
+    private record Started(FakePluginHost host, PluginContext context, BrowserItems items, UUID window, UUID shell, UUID pane,
+                           AtomicReference<Chromium.State> chromium) { }
 }

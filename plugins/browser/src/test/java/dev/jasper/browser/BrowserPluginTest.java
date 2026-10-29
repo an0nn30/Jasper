@@ -1,5 +1,6 @@
 package dev.jasper.browser;
 
+import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.sdk.PluginInfo;
@@ -33,6 +34,31 @@ class BrowserPluginTest {
             host.stopAll();
             plugin.startFailed(new IllegalStateException("late"));
             assertThat(host.notifications().lines()).as("a stopped plugin only logs").hasSize(1);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Once Chromium cannot serve pages, New Browser Tab, New Browser Window and the split item post the notification of
+     * why again, instead of opening an item no page could show. Closing a Chromium that never started touches no
+     * Chromium class.
+     */
+    @Test void onceChromiumCannotServePagesANewItemPostsWhyAgainInsteadOfOpening() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            var plugin = new BrowserPlugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            assertThat(host.invoke(BrowserPlugin.NEW_TAB, window, null)).isTrue();
+            assertThat(host.contentTabs()).as("not started: it opens").hasSize(1);
+            plugin.chromium().close();
+            assertThat(plugin.chromium().state()).isEqualTo(Chromium.State.STOPPED);
+            for (String action : new String[] { BrowserPlugin.NEW_TAB, BrowserPlugin.NEW_WINDOW, BrowserPlugin.SPLIT.rightAction(),
+                    BrowserPlugin.SPLIT.downAction() })
+                assertThat(host.invoke(action, window, null)).as(action).isTrue();
+            assertThat(host.contentTabs()).as("no more items").hasSize(1);
+            assertThat(host.notifications().lines()).hasSize(4).containsOnly("dev.jasper.browser|ERROR|The browser could not start|"
+                + "Chromium can start once each time Jasper runs. Quit and reopen Jasper to use the browser again.");
             assertThat(host.failures()).isEmpty();
         } });
     }

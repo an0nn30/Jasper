@@ -1,6 +1,7 @@
 package dev.jasper.browser.engine;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -18,6 +19,8 @@ final class ChromiumLife<C> {
     private Chromium.State state = Chromium.State.NOT_STARTED;
     private CompletableFuture<C> client;
     private IllegalStateException refusal;
+    // Why the start failed, once it has.
+    private Throwable failure;
     private boolean entered, threw, initialized, ended, told;
 
     ChromiumLife(StartOnce process) { this.process = process; }
@@ -57,6 +60,7 @@ final class ChromiumLife<C> {
             if (client != null) return new Asked<>(client, List.of());
             if (!process.claim()) {
                 state = Chromium.State.FAILED;
+                failure = refusal();
                 client = CompletableFuture.failedFuture(refusal());
                 return new Asked<>(client, tell(refusal()));
             }
@@ -145,6 +149,17 @@ final class ChromiumLife<C> {
         synchronized (lock) { return state; }
     }
 
+    /** Why Chromium cannot serve pages: the start's failure, or the refusal once closed; empty before then. */
+    Optional<Throwable> unavailable() {
+        synchronized (lock) {
+            return switch (state) {
+                case NOT_STARTED, STARTING, RUNNING -> Optional.empty();
+                case FAILED -> Optional.of(failure);
+                case STOPPED -> Optional.of(refusal());
+            };
+        }
+    }
+
     private List<Step<C>> end() {
         ended = true;
         return List.of(new Step.End<>());
@@ -153,6 +168,7 @@ final class ChromiumLife<C> {
     private List<Step<C>> fail(Throwable cause) {
         if (state != Chromium.State.STARTING) return List.of();
         state = Chromium.State.FAILED;
+        failure = cause;
         Step<C> failing = new Step.Fail<>(client, cause);
         List<Step<C>> tell = tell(cause);
         return tell.isEmpty() ? List.of(failing) : List.of(failing, tell.getFirst());

@@ -1,6 +1,7 @@
 package dev.jasper.browser.routing;
 
 import dev.jasper.browser.BrowserPlugin;
+import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.settings.BrowserSettings;
@@ -123,10 +124,11 @@ class WebAddressItemsTest {
             UUID pane = host.addTerminalPane(shell, PaneInfo.unknown());
             host.setSelection(pane, "https://example.com/c");
             var items = new AtomicReference<BrowserItems>();
+            var chromium = new AtomicReference<>(Chromium.State.NOT_STARTED);
             host.start(INFO, Set.of(), Set.of(), plugin -> {
                 var settings = BrowserSettings.declare(plugin.settings());
                 items.set(new BrowserItems(plugin, page -> { }));
-                var role = new BrowserRole(plugin, items.get(), settings);
+                var role = new BrowserRole(plugin, items.get(), settings, chromium::get);
                 plugin.platform().browser(role);
                 WebAddressItems.register(plugin, role, settings);
             });
@@ -134,6 +136,12 @@ class WebAddressItemsTest {
             assertThat(host.windows()).as("a split asks nothing").isEmpty();
             assertThat(items.get().items()).singleElement().extracting(BrowserItem::url).isEqualTo(URI.create("https://example.com/c"));
             assertThat(host.windowTabs(window)).singleElement().satisfies(tab -> assertThat(tab).hasSize(2).first().isEqualTo(shell));
+
+            chromium.set(Chromium.State.FAILED);
+            host.setSelection(pane, "https://example.com/d");
+            assertThat(host.chooseFromContextMenu(pane, RIGHT)).isTrue();
+            assertThat(items.get().items()).as("no page could show: nothing opens").hasSize(1);
+            assertThat(host.browsed()).as("the system browser").containsExactly(URI.create("https://example.com/d"));
             assertThat(host.failures()).isEmpty();
         } });
     }

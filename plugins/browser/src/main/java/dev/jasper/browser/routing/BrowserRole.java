@@ -1,5 +1,6 @@
 package dev.jasper.browser.routing;
 
+import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.item.BrowserItem;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.routing.LinkPrompt.Answer;
@@ -18,6 +19,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 /**
  * The Browser as Jasper's web browser (spec section 9), which the plugin registers with {@code Platform.browser}. Each
@@ -26,12 +28,14 @@ import java.util.concurrent.CompletableFuture;
  * there instead, in whatever window it is, without bringing it forward. One it hands back goes to the system browser,
  * or a local file to the Default editor. One that asks shows the "Open in Jasper?" prompt in the link's window once
  * {@link #open} has returned; a link with no window, or whose window already shows a modal such as Settings, goes back
- * to Jasper instead, this once. UI thread.
+ * to Jasper instead, this once. Once Chromium has failed to start, or has stopped, no page can show: every link goes back
+ * to Jasper, as does one answered Open in Jasper. UI thread.
  */
 public final class BrowserRole implements WebBrowser {
     private final PluginContext context;
     private final BrowserItems items;
     private final BrowserSettings.Declared settings;
+    private final Supplier<Chromium.State> chromium;
 
     /**
      * The role over the plugin's items.
@@ -39,15 +43,18 @@ public final class BrowserRole implements WebBrowser {
      * @param context the plugin's context
      * @param items the plugin's browser items
      * @param settings the Browser's settings, which decide each link and keep the prompt's remembered choice
+     * @param chromium where the life of the Chromium that shows the items' pages stands
      */
-    public BrowserRole(PluginContext context, BrowserItems items, BrowserSettings.Declared settings) {
+    public BrowserRole(PluginContext context, BrowserItems items, BrowserSettings.Declared settings, Supplier<Chromium.State> chromium) {
         this.context = Objects.requireNonNull(context, "context");
         this.items = Objects.requireNonNull(items, "items");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.chromium = Objects.requireNonNull(chromium, "chromium");
     }
 
     @Override public boolean open(WebLink link) {
         Objects.requireNonNull(link, "link");
+        if (!showsPages()) return false;
         return switch (LinkDecision.decide(link, settings.read())) {
             case OPEN -> show(link);
             case ASK -> ask(link);
@@ -100,8 +107,7 @@ public final class BrowserRole implements WebBrowser {
 
     private void answered(WebLink link, Kind kind, Answer answer, boolean remember) {
         if (remember) remember(kind, answer);
-        if (answer == Answer.OPEN_IN_JASPER) show(link);
-        else handBack(link);
+        if (answer != Answer.OPEN_IN_JASPER || !show(link)) handBack(link);
     }
 
     /** Saves the prompt's own setting: Open Local Web Files for a local file, Open Links From Terminal for a link. */
@@ -119,8 +125,10 @@ public final class BrowserRole implements WebBrowser {
     /**
      * Opens a link in a browser item: the open item its OSC 8 target names, wherever it is and left where it is, or a
      * new item where the link's placement says, in the link's window (the most recently active one when it has none).
+     * False when it opened nothing.
      */
     private boolean show(WebLink link) {
+        if (!showsPages()) return false;
         try {
             Optional<BrowserItem> named = link.target().flatMap(items::find);
             if (named.isPresent()) named.get().load(link.address());
@@ -130,6 +138,14 @@ public final class BrowserRole implements WebBrowser {
             context.log().log(System.Logger.Level.WARNING, "A link could not open: " + closing.getMessage(), closing);
             return false;
         }
+    }
+
+    /** Whether Chromium may still show pages: it has neither failed to start nor stopped. */
+    private boolean showsPages() {
+        return switch (chromium.get()) {
+            case NOT_STARTED, STARTING, RUNNING -> true;
+            case FAILED, STOPPED -> false;
+        };
     }
 
     /** What Jasper does with a link the Browser does not open: the system browser, or the Default editor for a file. */

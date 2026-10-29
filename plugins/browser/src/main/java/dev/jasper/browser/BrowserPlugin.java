@@ -10,6 +10,7 @@ import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.routing.BrowserRole;
 import dev.jasper.browser.routing.WebAddressItems;
 import dev.jasper.browser.settings.BrowserSettings;
+import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
@@ -64,19 +65,18 @@ public class BrowserPlugin implements Plugin {
         // Spec section 5: New Browser Tab and New Browser Window, in the File menu and the palette, with no default key.
         context.actions().register(ActionSpec.of(NEW_TAB, "New Browser Tab").withIcon(BrowserItems.GLOBE)
                 .withKeywords(List.of("browser", "web", "page", "new", "tab")),
-            invoked -> items.open(settings.read().startAddress(), TabPlacement.NEW_TAB, Optional.empty(), Optional.of(invoked.window())));
+            invoked -> openNew(items, settings, TabPlacement.NEW_TAB, invoked.window()));
         context.actions().register(ActionSpec.of(NEW_WINDOW, "New Browser Window").withIcon(BrowserItems.GLOBE)
                 .withKeywords(List.of("browser", "web", "page", "new", "window")),
-            invoked -> items.open(settings.read().startAddress(), TabPlacement.NEW_WINDOW, Optional.empty(), Optional.of(invoked.window())));
+            invoked -> openNew(items, settings, TabPlacement.NEW_WINDOW, invoked.window()));
         // The host's Split submenus offer Browser Right and Browser Down.
-        context.windows().splitItem(SPLIT,
-            (shown, placement) -> items.open(settings.read().startAddress(), placement, Optional.empty(), Optional.of(shown)));
+        context.windows().splitItem(SPLIT, (shown, placement) -> openNew(items, settings, placement, shown));
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(NEW_TAB);
         file.add(NEW_WINDOW);
         WebMenu.register(context, items);
         // Spec section 9: the links Jasper opens come to the Browser first.
-        var role = new BrowserRole(context, items, settings);
+        var role = new BrowserRole(context, items, settings, engine::state);
         context.platform().browser(role);
         WebAddressItems.register(context, role, settings);
         // Spec section 16: a saved item comes back at once, and its page loads the first time it shows.
@@ -88,9 +88,9 @@ public class BrowserPlugin implements Plugin {
     }
 
     /**
-     * Jasper quits, or the plugin is turned off. On the UI thread {@link Chromium#close()} only starts Chromium's dispose.
-     * The second close runs on the plugin's background executor and waits for Chromium's end: Jasper's quit waits for that
-     * work within its own shutdown grace, so quitting holds briefly for Chromium and never hangs on it.
+     * Jasper quits. On the UI thread {@link Chromium#close()} only starts Chromium's dispose. The second close runs on the
+     * plugin's background executor and waits for Chromium's end: Jasper's quit waits for that work within its own
+     * shutdown grace, so quitting holds briefly for Chromium and never hangs on it.
      */
     @Override public void stop() {
         running = false;
@@ -108,8 +108,32 @@ public class BrowserPlugin implements Plugin {
      * UI thread.
      */
     void startFailed(Throwable cause) {
-        String reason = cause.getMessage() == null || cause.getMessage().isBlank() ? cause.toString() : cause.getMessage();
-        context.log().log(System.Logger.Level.WARNING, "The browser could not start: " + reason, cause);
-        if (running) context.notifications().group().error("The browser could not start", reason);
+        context.log().log(System.Logger.Level.WARNING, "The browser could not start: " + reason(cause), cause);
+        tell(cause);
+    }
+
+    /** The plugin's Chromium. */
+    Chromium chromium() {
+        return chromium;
+    }
+
+    /**
+     * New Browser Tab, New Browser Window and the split item: a new browser item at the start page, in or from
+     * {@code window}. Once Chromium cannot serve pages, no page could show, so the notification of why is posted again
+     * instead.
+     */
+    private void openNew(BrowserItems items, BrowserSettings.Declared settings, TabPlacement placement, WindowOwner window) {
+        Optional<Throwable> unavailable = chromium.unavailable();
+        if (unavailable.isPresent()) tell(unavailable.get());
+        else items.open(settings.read().startAddress(), placement, Optional.empty(), Optional.of(window));
+    }
+
+    /** The notification that the browser could not start, with {@code cause}'s reason, while the plugin runs. */
+    private void tell(Throwable cause) {
+        if (running) context.notifications().group().error("The browser could not start", reason(cause));
+    }
+
+    private static String reason(Throwable cause) {
+        return cause.getMessage() == null || cause.getMessage().isBlank() ? cause.toString() : cause.getMessage();
     }
 }

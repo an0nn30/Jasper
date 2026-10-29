@@ -13,7 +13,8 @@ import java.util.regex.Pattern;
  * Jasper's own pages, at {@code jasper-about:<page>}, and its actions, addresses that do something in Jasper and leave
  * the page where it is. This registry is plain Java, so the plugin's start holds it without loading Chromium;
  * {@link AboutSchemeFactory} is Chromium's side of the scheme and loads only once Chromium starts. The scheme is local,
- * so web pages cannot link to it: only Jasper's own pages and the address field reach an action.
+ * so web pages cannot link to it: Jasper's own pages, local {@code file:} pages and the address field reach an action,
+ * and an action only does something in Jasper, such as opening Settings.
  */
 public final class AboutScheme {
     /** The scheme's name. */

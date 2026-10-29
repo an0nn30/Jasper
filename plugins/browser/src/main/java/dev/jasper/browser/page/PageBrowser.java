@@ -23,8 +23,8 @@ import org.cef.callback.CefDragData;
 
 /**
  * One page's Chromium browser, rendered off screen by its {@link PageRenderer} for its {@link PageView}. It draws 60
- * frames a second while its view shows. Closing it closes only the page. Its {@link Page} is where the client's handlers
- * send its callbacks.
+ * frames a second while its view shows. Closing it closes only the page, and a script that closes the page's window
+ * closes the page's item. Its {@link Page} is where the client's handlers send its callbacks.
  */
 public final class PageBrowser extends CefBrowserOsrWithHandler {
     private static final System.Logger LOG = System.getLogger(PageBrowser.class.getName());
@@ -36,6 +36,8 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     private final PageView view;
     // Set before the native browser is made, so before Chromium calls back for this browser.
     private volatile Page owner;
+    // Set once Java asks the browser to close: Jasper's close of its page, or JCEF's close of its client's browsers.
+    private volatile boolean closeAsked;
 
     /**
      * A page that loads {@code url} once its native browser is made, which its view asks for once it is in a window.
@@ -120,13 +122,28 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     }
 
     /**
-     * Lets Chromium close this browser and nothing else. JCEF's own answer cancels a close not first allowed with
-     * {@code setCloseAllowed}, and lets an allowed one go ahead only after asking the view's window, Jasper's, to close.
+     * Closes the browser, as Jasper's close of its page and JCEF's close of its client's browsers ask: Chromium's
+     * {@link #doClose()} then lets the close go ahead.
      *
-     * @return false, always
+     * @param force whether the page's {@code beforeunload} is skipped
+     */
+    @Override public void close(boolean force) {
+        closeAsked = true;
+        super.close(force);
+    }
+
+    /**
+     * Chromium's question, on its own thread, before it destroys this browser: true holds the close back, false lets
+     * it go ahead, and an off-screen browser is then destroyed at once. A close {@link #close(boolean)} asked for goes
+     * ahead. Any other, a script's {@code window.close()}, closes the page's item instead, as Chrome closes the tab, and
+     * the item's close then closes the browser. JCEF's own answer is never asked: it holds back a close not first
+     * allowed with {@code setCloseAllowed}, and lets an allowed one go ahead only after asking the view's window,
+     * Jasper's, to close.
+     *
+     * @return whether Chromium holds the close back
      */
     @Override public boolean doClose() {
-        return false;
+        return Page.holdsClose(closeAsked, owner, EventQueue::invokeLater);
     }
 
     // Adapted from JetBrains/jcef (java/org/cef/browser/CefDropTargetListener.java) at 9df0879, under JCEF's BSD-3-Clause licence.

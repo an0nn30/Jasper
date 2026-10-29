@@ -284,6 +284,23 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Whether Chromium holds back the close of {@code page}'s browser, as its {@code DoClose} asks: false lets Chromium
+     * destroy the browser at once. A close Java asked for, Jasper's close of the page or JCEF's of its client's browsers,
+     * goes ahead. Any other comes from the page itself, a script's {@code window.close()}: it is held back, and the
+     * page's item closes on the UI thread, as Chrome closes the tab, which closes the browser in turn. Any thread.
+     *
+     * @param asked whether Java asked the browser to close
+     * @param page the browser's page, or null before it has one
+     * @param ui runs a task on the UI thread
+     * @return whether Chromium holds the close back
+     */
+    static boolean holdsClose(boolean asked, Page page, Consumer<Runnable> ui) {
+        if (asked) return false;
+        if (page != null) ui.accept(page::closeItem);
+        return true;
+    }
+
+    /**
      * Has {@code shower} select the page's item in its window and raise that window, when the page asks: the page's item
      * sets it. It replaces the one before.
      *
@@ -466,9 +483,16 @@ public final class Page implements AutoCloseable {
         changed.run();
     }
 
-    /** The main frame started loading {@code url}. */
+    /**
+     * The main frame started loading {@code url}: the page has no title until the new document gives one, whatever
+     * Chromium reports for a document without one.
+     */
     void loadStarted(String url) {
         if (closed) return;
+        if (!title.isEmpty()) {
+            title = "";
+            changed.run();
+        }
         for (Consumer<String> listener : loadStarts) listener.accept(url == null ? "" : url);
     }
 

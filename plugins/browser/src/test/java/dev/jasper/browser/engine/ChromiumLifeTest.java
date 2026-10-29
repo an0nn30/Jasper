@@ -173,6 +173,40 @@ class ChromiumLifeTest {
         assertThat(life.state()).isEqualTo(Chromium.State.STOPPED);
     }
 
+    /** Why Chromium cannot serve pages, which the plugin tells again when asked for a new item: nothing until it can't. */
+    @Test void chromiumIsUnavailableOnlyOnceItsStartFailedOrItClosed() {
+        assertThat(life.unavailable()).as("not started").isEmpty();
+        ask();
+        assertThat(life.unavailable()).as("starting").isEmpty();
+        life.enter();
+        apply(life.initialized());
+        apply(life.clientCreated("client"));
+        assertThat(life.unavailable()).as("running").isEmpty();
+        apply(life.close());
+        assertThat(life.unavailable()).get().extracting(Throwable::getMessage).as("closed").isEqualTo(Chromium.ONCE);
+
+        var failing = new ChromiumLife<String>(new StartOnce());
+        failing.ask();
+        failing.enter();
+        var missing = new UnsatisfiedLinkError("no Chromium");
+        failing.threw(missing);
+        assertThat(failing.unavailable()).as("its start failed").containsSame(missing);
+        var slow = new ChromiumLife<String>(new StartOnce());
+        slow.ask();
+        var late = new TimeoutException(Chromium.SLOW);
+        slow.timedOut(late);
+        assertThat(slow.unavailable()).as("its start timed out").containsSame(late);
+        failing.close();
+        assertThat(failing.unavailable()).get().extracting(Throwable::getMessage).as("then closed").isEqualTo(Chromium.ONCE);
+
+        var claimed = new StartOnce();
+        assertThat(claimed.claim()).isTrue();
+        var second = new ChromiumLife<String>(claimed);
+        second.ask();
+        assertThat(second.state()).isEqualTo(Chromium.State.FAILED);
+        assertThat(second.unavailable()).get().extracting(Throwable::getMessage).as("another started in this process").isEqualTo(Chromium.ONCE);
+    }
+
     private CompletableFuture<String> ask() {
         var asked = life.ask();
         apply(asked.steps());

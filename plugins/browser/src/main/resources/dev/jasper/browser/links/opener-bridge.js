@@ -15,8 +15,8 @@
  *   origin, and the receiver gets a message event from the sender's origin whose source is its stand-in for the sender.
  *   Origins are the documents' own (window.origin), which a sandbox can make opaque ("null").
  *
- * Running it again in the same document only applies the configuration again. A popup's location and document cannot
- * be read through its stand-in.
+ * Running it again in the same document only applies the configuration again. A popup's location cannot be read or set,
+ * nor its document read, through its stand-in.
  */
 (function (configuration) {
   'use strict';

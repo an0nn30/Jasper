@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -134,6 +135,14 @@ public final class Chromium implements AutoCloseable {
      * @return the state
      */
     public State state() { return life.state(); }
+
+    /**
+     * Why Chromium cannot serve pages: what failed its start, as {@code startFailed} is told, or, once it is closed, that
+     * it can start only once each time Jasper runs. Any thread.
+     *
+     * @return the reason; empty while it has not started, starts or runs
+     */
+    public Optional<Throwable> unavailable() { return life.unavailable(); }
 
     /**
      * Closes Chromium: its client's every browser, then its app, once, however often this is called. On the UI thread

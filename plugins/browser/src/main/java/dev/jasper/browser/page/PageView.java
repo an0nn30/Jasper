@@ -55,8 +55,9 @@ import javax.swing.Timer;
  * page. Each press the page gets is its {@link #lastPress()} and activates it. The mouse's back and forward buttons, on
  * Windows and Linux, never reach the page: releasing one tells the view's {@link #onNavigationButton listener}.
  *
- * <p><b>Showing.</b> While the view does not show (its tab is hidden, or it is out of its window) its page is told it is
- * hidden and draws one frame a second; showing again restores 60. Network work goes on.
+ * <p><b>Showing.</b> While the view does not show (its tab is hidden, or it is out of its window) its page draws one
+ * frame a second; showing again restores 60. The page itself is not told it is hidden: its scripts and network work go
+ * on.
  */
 public final class PageView extends JComponent {
     static final int SHOWN_FRAME_RATE = 60, HIDDEN_FRAME_RATE = 1;
