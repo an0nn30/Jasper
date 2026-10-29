@@ -1,0 +1,16 @@
+// CI-only progress: distinguish a slow class from a stuck test on Windows.
+gradle.projectsEvaluated {
+    rootProject.project(':jasper-app').tasks.named('test') {
+        testLogging.events 'started', 'passed', 'skipped', 'failed'
+    }
+}
+
+// A fresh marker is required by the watchdog before it accepts a zero exit.
+gradle.buildFinished { result ->
+    if (result.failure == null) {
+        def marker = System.getenv('JASPER_CI_SUCCESS_MARKER')
+        if (marker != null) {
+            new File(marker).bytes = 'Gradle build completed successfully\n'.getBytes('UTF-8')
+        }
+    }
+}

@@ -50,7 +50,7 @@ public final class UserInstall {
         desktop.assertStopped(directory);
         Path executable = directory.resolve("Jasper.exe");
         assertPlainTree(shortcut);
-        if (exists(shortcut) && !executable.toString().equalsIgnoreCase(desktop.target(shortcut)))
+        if (exists(shortcut) && !sameTarget(executable, desktop.target(shortcut)))
             throw new IOException("Another installation owns " + shortcut);
         byte[] oldShortcut = exists(shortcut) ? Files.readAllBytes(shortcut) : null;
         Path stage = directory.resolveSibling(directory.getFileName() + ".staging-" + UUID.randomUUID());
@@ -105,9 +105,16 @@ public final class UserInstall {
         desktop.assertStopped(directory);
         Path executable = directory.resolve("Jasper.exe");
         assertPlainTree(shortcut);
-        if (executable.toString().equalsIgnoreCase(desktop.target(shortcut))) Files.delete(shortcut);
+        if (sameTarget(executable, desktop.target(shortcut))) Files.delete(shortcut);
         desktop.removeLogin(executable);
         deleteTree(directory);
+    }
+
+    private static boolean sameTarget(Path executable, String target) {
+        if (target == null) return false;
+        if (executable.toString().equalsIgnoreCase(target)) return true;
+        try { return Files.isSameFile(executable, Path.of(target)); }
+        catch (IOException | java.nio.file.InvalidPathException failure) { return false; }
     }
 
     static boolean windows() { return System.getProperty("os.name").toLowerCase(Locale.ROOT).startsWith("windows"); }

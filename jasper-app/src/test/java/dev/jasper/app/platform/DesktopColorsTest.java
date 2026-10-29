@@ -342,7 +342,7 @@ class DesktopColorsTest {
             h.retry(); h.awaitSample(source, 1);
             h.palette(source, true, "0,0,0,1", "recovered");
             assertThat(h.service.current().palettes().get(source).appearance()).isEqualTo(Polarity.DARK);
-            assertThat(h.launches()).hasSize(3);
+            assertThat(h.launches().stream().filter(source.helperName()::equals).count()).isEqualTo(2);
         }
     }
 

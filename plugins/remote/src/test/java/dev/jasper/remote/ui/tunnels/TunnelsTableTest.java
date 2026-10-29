@@ -126,19 +126,19 @@ class TunnelsTableTest {
 
     @Test void localAndRemoteSortTheirPortsAsNumbersAndGroupsSeparately() throws Exception {
         edt(() -> {
-            var p80 = Tunnel.create("p80", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 80, "t", 1);
-            var p9000 = Tunnel.create("p9000", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 9000, "t", 1);
-            var p8080 = Tunnel.create("p8080", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 8080, "t", 1);
+            var p80 = Tunnel.create("p80", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 80, "t", 80);
+            var p9000 = Tunnel.create("p9000", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 9000, "t", 9000);
+            var p8080 = Tunnel.create("p8080", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 8080, "t", 1080);
             var dyn = Tunnel.create("dyn", MAC, TunnelKind.DYNAMIC, Tunnel.LOCALHOST, 1080, "", 0);
-            var q9000 = Tunnel.create("", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 9000, "t", 1);
-            var q80 = Tunnel.create("", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 80, "t", 1);
+            var q9000 = Tunnel.create("", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 9000, "t", 9000);
+            var q80 = Tunnel.create("", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, 80, "t", 80);
             panel = new TunnelsPanel(new FakeKit("dev.jasper.remote"), actions, () -> 0, 500_000_000L, Layout.CLASSIC);
             panel.setTunnels(List.of(p9000, p80, dyn, p8080), List.of(q9000, q80), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.of("Mac"));
             emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "local"));
             assertThat(table().rows().stream().map(r -> r.id()).toList()).as("1080 sits between 80 and 8080, not after 9000").containsExactly(TunnelsPanel.rowId(p80.id()), TunnelsPanel.rowId(dyn.id()),
                 TunnelsPanel.rowId(p8080.id()), TunnelsPanel.rowId(p9000.id()), TunnelsPanel.QUICK_HEADING, TunnelsPanel.rowId(q80.id()), TunnelsPanel.rowId(q9000.id()));
             emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "remote"));
-            assertThat(table().rows().stream().map(r -> r.id()).toList()).as("SOCKS5 has no port and follows the ports")
+            assertThat(table().rows().stream().map(r -> r.id()).toList()).as("remote 1080 follows 80; SOCKS5 has no port and follows the ports")
                 .containsExactly(TunnelsPanel.rowId(p80.id()), TunnelsPanel.rowId(p8080.id()), TunnelsPanel.rowId(p9000.id()), TunnelsPanel.rowId(dyn.id()),
                     TunnelsPanel.QUICK_HEADING, TunnelsPanel.rowId(q80.id()), TunnelsPanel.rowId(q9000.id()));
             emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "local"));

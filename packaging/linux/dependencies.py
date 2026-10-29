@@ -22,8 +22,9 @@ def requirements(image, kind):
     mandatory, bundled = elf_inputs(image)
     needed = set()
     for binary in mandatory:
+        direct = set(re.findall(r"\(NEEDED\)\s+Shared library: \[([^\]]+)\]", output("readelf", "--dynamic", "--wide", str(binary))))
         if kind == "rpm":
-            needed.update(re.findall(r"\(NEEDED\)\s+Shared library: \[([^\]]+)\]", output("readelf", "--dynamic", "--wide", str(binary))))
+            needed.update(direct)
         else:
             # The selected JBR's lookup follows ldd's resolved absolute paths. Libraries
             # shipped in this same image are satisfied internally, even if ldd can't locate them.
@@ -33,7 +34,9 @@ def requirements(image, kind):
                 raise ValueError(f"unresolved mandatory image dependency: {binary}: {linked.stdout}{linked.stderr}")
             for library in re.findall(r"(?:=>\s*)?(/[^\s]+)", linked.stdout):
                 path = pathlib.Path(library)
-                if path.name in bundled:
+                # ldd includes the host's recursive closure. Distro providers own
+                # those indirect dependencies; only this ELF's direct ABI belongs here.
+                if path.name in bundled or path.name not in direct:
                     continue
                 provider = None
                 for candidate in dict.fromkeys((str(path.resolve()), str(path))):

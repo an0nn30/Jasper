@@ -105,12 +105,11 @@ public final class CoreSettings {
         .description("Live. How each group's notifications appear: \"card\" (a card that hides itself), \"sticky\" (a card\n"
             + "that stays until you close it), \"history\" (only the Notifications panel) or \"off\". Settings > Notifications\n"
             + "lists every group; a group not listed here keeps its default.").build();
-    /**
-     * Residency is on by default where a windowless Jasper stays reachable: macOS (its menu bar item and Dock) and
-     * Windows (its notification-area icon). Linux has no tray, so it stays off there.
-     */
+    /** Residency defaults on for the supported desktop platforms. */
     static boolean runsInBackgroundByDefault(String osName) {
-        return osName != null && (osName.startsWith("Mac") || osName.startsWith("Windows"));
+        if (osName == null) return false;
+        String os = osName.toLowerCase(java.util.Locale.ROOT);
+        return os.startsWith("mac") || os.startsWith("windows") || os.equals("linux");
     }
 
     public static final Setting<Boolean> SYSTEM_RUN_IN_BACKGROUND = Setting.of("system.run_in_background", SettingKind.bool(),
@@ -118,7 +117,7 @@ public final class CoreSettings {
         .alias("background.enabled").label("Run in background").keywords("resident", "login", "autostart", "background", "menu bar")
         .applies(Applies.RESTART)
         .description("Keep Jasper running with no windows so a new window opens instantly, and start it in the background\n"
-            + "at login. On by default on macOS and Windows, off on Linux. On macOS, Quit (Cmd+Q) closes every window and\n"
+            + "at login. On by default on macOS, Windows and Linux. On macOS, Quit (Cmd+Q) closes every window and\n"
             + "keeps Jasper in the menu bar; Quit Jasper Completely there ends it. Residency applies from the next start;\n"
             + "the login item updates as soon as you save. Autostart needs an installed Jasper, not a development run.").build();
     public static final Setting<ReopenMode> SYSTEM_REOPEN = Setting.of("system.reopen", SettingKind.choice(List.of(

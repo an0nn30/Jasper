@@ -502,10 +502,10 @@ named (`Jasper notes.txt src`): each folder as a terminal tab in that window, an
 a file or folder you open with Jasper in Finder (Open With), or drop on its Dock icon, opens the same way. A running
 Jasper that does not answer within 10 seconds is reported with its process id, and the launch starts no second one.
 
-With **Run in background** on (Settings › System Settings, `system.run_in_background`; on by default on macOS and
-Windows, off on Linux; applies after a restart), Jasper keeps running when you close its last window,
-with its plugins but no shells, so the next window opens quickly. In an installed Jasper on macOS and Windows it
-also starts at login, with no window. The menu bar item or notification-area icon appears once start-up has settled:
+With **Run in background** on (Settings › System Settings, `system.run_in_background`; on by default on macOS,
+Windows and Linux; applies after a restart), Jasper keeps running when you close its last window,
+with its plugins but no shells, so the next window opens quickly. An installed Jasper also starts at login, with no
+window. The menu bar item or tray icon appears once start-up has settled:
 when the first window has painted its shell's first output, 2 seconds after its first paint, or, at login, once Jasper
 has prepared its first window.
 
@@ -518,7 +518,10 @@ has prepared its first window.
 - **Windows:** the notification-area icon (Windows may keep it among the hidden icons until you pin it) has **Open
   Jasper** and **Quit Jasper**. Double-clicking it opens or raises a window, or, while a notification's balloon waits
   unread, opens that notification. Quit in the File menu quits.
-- **Linux:** there is no icon; launch Jasper again to get a window. Quit quits.
+- **Linux:** Jasper shows a tray icon when the desktop provides a compatible status notifier or local X11 tray.
+  Its menu provides **Open Jasper**, **New Window**, **Settings…** and **Quit Jasper**. Jasper keeps running without
+  an icon when no tray is available; launch it normally to reopen it and use Quit in the app to exit. GNOME needs
+  an enabled indicator extension to show the icon.
 
 With Run in background off, closing the last window quits Jasper. See
 [Configuration](configuration.md#background-residency).

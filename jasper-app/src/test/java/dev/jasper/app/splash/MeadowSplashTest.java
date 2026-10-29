@@ -41,7 +41,8 @@ class MeadowSplashTest {
             painter.animationFrame(9);
             buffer.show(a, next);
             new SplashBuffer(painter).paint(b, next);
-            assertThat(SplashPainterTest.pixels(actual)).containsExactly(SplashPainterTest.pixels(expected));
+            assertThat(java.util.Arrays.equals(SplashPainterTest.pixels(actual), SplashPainterTest.pixels(expected)))
+                .as("updated frame matches the fresh frame").isTrue();
         } finally { a.dispose(); b.dispose(); }
     }
 

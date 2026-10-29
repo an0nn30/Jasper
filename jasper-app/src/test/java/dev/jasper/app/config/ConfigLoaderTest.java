@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.swing.KeyStroke;
 import java.awt.event.InputEvent;
@@ -350,6 +351,18 @@ class ConfigLoaderTest {
         assertDiagnostic(unknown, "buddy.visible", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
 
+    @Test void savedResidencyChoicesAndAliasesSurviveTheNewDefault() {
+        for (String key : List.of("system.run_in_background", "background.enabled")) {
+            for (boolean value : new boolean[]{false, true}) {
+                var loaded = parse(key + " = " + value + "\n");
+                assertThat(loaded.rejected()).isFalse();
+                assertThat(loaded.snapshot().backgroundEnabled()).isEqualTo(value);
+            }
+        }
+        var both = parse("background.enabled = true\nsystem.run_in_background = false\n");
+        assertThat(both.snapshot().backgroundEnabled()).isFalse();
+    }
+
     @Test void backgroundEnabledFollowsThePlatformDefaultAndRejectsNonBooleans() {
         boolean platform = CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue();
         var on = parse("[system]\nrun_in_background = true\n");
@@ -357,7 +370,7 @@ class ConfigLoaderTest {
         assertThat(on.diagnostics()).isEmpty();
         assertThat(on.snapshot().backgroundEnabled()).isTrue();
         assertThat(parse("[system]\nrun_in_background = false\n").snapshot().backgroundEnabled()).isFalse();
-        // On by default on macOS and Windows, off on Linux: an absent table and an empty file both mean that default.
+        // An absent table and an empty file both mean the platform default.
         assertThat(ConfigSnapshot.defaults().backgroundEnabled()).isEqualTo(platform);
         assertThat(parse("# empty").snapshot().backgroundEnabled()).isEqualTo(platform);
         var bad = parse("[system]\nrun_in_background = 1\n");

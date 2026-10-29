@@ -30,7 +30,7 @@ case "$package" in
         test "$(dpkg-deb --field "$package" Package)" = "$identity"
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -qq
-        apt-get install -y -qq "$package"
+        apt-get install -y -q "$package"
         test "$(dpkg-query --show --showformat='${Package} ${Status}' "$identity")" = "$identity install ok installed"
         remove() { apt-get remove -y -qq "$identity" >/dev/null; }
         ;;

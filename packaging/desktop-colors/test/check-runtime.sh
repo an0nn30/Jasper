@@ -5,6 +5,7 @@ if command -v apt-get >/dev/null; then
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y -qq --no-install-recommends binutils cmake python3 xvfb xauth dbus locales fonts-dejavu-core libqt5widgets5 libqt5dbus5 libkf5configwidgets5 libqt6widgets6 libqt6dbus6 qt6-qpa-plugins libglib2.0-0
+    localedef -i de_DE -f UTF-8 de_DE.UTF-8
     targets="qt5 qt6 kde5"
     # Ubuntu22 supplies the Qt6.2 floor, not KF6/Qt6.5. Its KDE6 absence is a
     # legitimate platform capability skip; the Fedora all-four cell is mandatory.
@@ -15,7 +16,8 @@ else
     targets="qt5 qt6 kde5 kde6"
     runtime=required
 fi
-localedef -i de_DE -f UTF-8 de_DE.UTF-8
+# Fedora's langpack ships compiled locales; it does not ship localedef's source/charmaps.
+test "$(LC_ALL=de_DE.UTF-8 locale charmap)" = UTF-8
 unset LD_LIBRARY_PATH QT_PLUGIN_PATH QT_QPA_PLATFORM_PLUGIN_PATH
 # CTest exercises its CMake production paths; prove they are the staged release bytes.
 python3 - <<'PY_IDENTITY'

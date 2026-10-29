@@ -1,0 +1,8 @@
+name: Set up pinned JBR with JCEF
+description: Install the complete JetBrains SDK verified against packaging/jcef/checksums.txt
+runs:
+  using: composite
+  steps:
+    - name: Download and select the pinned SDK
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/install.sh"

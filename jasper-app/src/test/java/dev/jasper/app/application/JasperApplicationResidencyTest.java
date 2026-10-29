@@ -49,6 +49,26 @@ class JasperApplicationResidencyTest {
         assertThat(terminations.get()).isZero();
     }
 
+    @Test void residencyWithNoIndicatorStillClosesOnlyOnQuit() throws Exception {
+        var terminated = new CountDownLatch(1);
+        var removed = new AtomicInteger();
+        JasperApplication app = application(terminated::countDown);
+        try {
+            edt(() -> {
+                app.residentIndicator(actions -> removed::incrementAndGet);
+                app.residency(true);
+                app.windowClosed(null);
+            });
+            edt(() -> { });
+            assertThat(app.resident()).isTrue();
+            assertThat(terminated.getCount()).isEqualTo(1);
+            edt(app::quit);
+            assertThat(terminated.await(2, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            edt(app::quitNow);
+        }
+    }
+
     @Test void quitTerminatesAResidentApplicationJustTheSame() throws Exception {
         CountDownLatch terminated = new CountDownLatch(1);
         JasperApplication application = application(terminated::countDown);

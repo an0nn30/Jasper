@@ -21,7 +21,7 @@ class SystemThemeApplicationTest {
 
     @Test void withTheSystemAppearanceAnOsChangeReThemesWithoutPublishingOrWritingConfiguration() throws Exception {
         Path file = home.resolve("config.toml");
-        String text = "[ui]\nappearance = 'system'\n"; Files.writeString(file, text);
+        String text = "[ui]\nappearance = 'system'\n[ui.theme]\ndark = 'jasper-meadow'\nlight = 'jasper-meadow'\n"; Files.writeString(file, text);
         var service = java.util.concurrent.CompletableFuture.supplyAsync(() -> new ConfigService(file, true)).get();
         var themes = new ThemeController(true, TerminalSchemeChoice.MATCH);
         var controller = new ConfigurationController(themes, service, path -> {}, Observation.dark());
@@ -46,7 +46,7 @@ class SystemThemeApplicationTest {
     }
 
     @Test void anExplicitAppearanceIgnoresTheOperatingSystemAndTheSchemeApplies() throws Exception {
-        Path file = home.resolve("config.toml"); Files.writeString(file, "[ui]\nappearance = 'dark'\n[terminal]\nscheme = 'slate-cobalt/high-contrast'\n");
+        Path file = home.resolve("config.toml"); Files.writeString(file, "[ui]\nappearance = 'dark'\n[terminal]\nscheme = 'slate-cobalt/high-contrast'\n[ui.theme]\ndark = 'jasper-meadow'\nlight = 'jasper-meadow'\n");
         var service = java.util.concurrent.CompletableFuture.supplyAsync(() -> new ConfigService(file, true)).get();
         var themes = new ThemeController(false, TerminalSchemeChoice.MATCH);
         var controller = new ConfigurationController(themes, service, path -> {}, Observation.light());

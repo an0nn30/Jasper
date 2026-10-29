@@ -318,7 +318,8 @@ class SettingsPagesMockTest {
             assertWorkspace(CorePages.pages(AppearanceFixtures.CHOICES, system, ShellChoices.NONE,
                 NotificationGroupChoices.NONE, supplied).apply(context), com.formdev.flatlaf.util.SystemInfo.isMacOS);
             assertThat(draft.value(dev.jasper.app.config.CoreSettings.SYSTEM_RUN_IN_BACKGROUND))
-                .isEqualTo(com.formdev.flatlaf.util.SystemInfo.isMacOS || com.formdev.flatlaf.util.SystemInfo.isWindows);
+                .isEqualTo(com.formdev.flatlaf.util.SystemInfo.isMacOS || com.formdev.flatlaf.util.SystemInfo.isWindows
+                    || com.formdev.flatlaf.util.SystemInfo.isLinux);
         });
     }
 

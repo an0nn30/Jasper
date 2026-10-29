@@ -60,9 +60,9 @@ class SettingsAppearanceTest {
 
     @Test void renderedPageStartsOnlyStagedToolkitDemandAndClosingThenReopeningReleasesIt() throws Exception {
         try (var f = new DesktopAppearanceTest.Fixture(); var system = dev.jasper.app.platform.SystemAppearance.open()) {
-            f.owner.update(dev.jasper.app.config.ConfigSnapshot.defaults()); f.drain();
+            f.owner.update(DesktopAppearanceTest.authoredConfig()); f.drain();
             var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner, true);
-            var draft = draft("");
+            var draft = draft("[ui.theme]\ndark='jasper-meadow'\nlight='jasper-meadow'\n");
             var page = page(choices, draft); page.component(); f.drain();
             assertThat(f.nativeInput.launches()).containsExactly("jasper-desktop-portal");
             pick(page, "dark-theme", "desktop-colors"); f.drain();
@@ -82,9 +82,9 @@ class SettingsAppearanceTest {
 
     @Test void retiredPreviewCompletionsCannotRefreshClosedPageOrReplaceNewSourceCache() throws Exception {
         try (var f = new DesktopAppearanceTest.Fixture(); var system = dev.jasper.app.platform.SystemAppearance.open()) {
-            f.owner.update(dev.jasper.app.config.ConfigSnapshot.defaults()); f.drain();
+            f.owner.update(DesktopAppearanceTest.authoredConfig()); f.drain();
             var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner, true);
-            var page = page(choices, draft("[ui.theme]\ndark='desktop-colors'\ndesktop_source='gtk3'\n"));
+            var page = page(choices, draft("[ui.theme]\ndark='desktop-colors'\nlight='jasper-meadow'\ndesktop_source='gtk3'\n"));
             page.component(); f.drain();
             var before = f.themes.current();
             f.nativeInput.palette(dev.jasper.app.platform.DesktopObservation.Source.GTK3, true, "0.1,0.1,0.1,1", "");
@@ -102,7 +102,7 @@ class SettingsAppearanceTest {
 
     @Test void renderedTilesReceiveNativePreviewColorsForTheirOwnPolarityWithoutInstallingThem() throws Exception {
         try (var f = new DesktopAppearanceTest.Fixture(); var system = dev.jasper.app.platform.SystemAppearance.open()) {
-            f.owner.update(dev.jasper.app.config.ConfigSnapshot.defaults()); f.drain();
+            f.owner.update(DesktopAppearanceTest.authoredConfig()); f.drain();
             var choices = SettingsAppearance.choices(system, ThemeLibrary::bundledOnly, java.util.Optional.empty(), f.owner, true);
             var page = page(choices, draft("[ui.theme]\ndark='desktop-colors'\nlight='desktop-colors'\ndesktop_source='gtk4'\n"));
             try {

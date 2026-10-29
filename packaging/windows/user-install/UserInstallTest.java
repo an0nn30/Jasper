@@ -115,6 +115,18 @@ public final class UserInstallTest {
                 Files.delete(directory);
             }
             equal("user data", Files.readString(data));
+            // An existing target can have a different spelling for the same file (such as a Windows 8.3 path).
+            if (!UserInstall.windows()) {
+                installer.install(source, directory, shortcut);
+                Path alias = root.resolve("alias");
+                Files.createSymbolicLink(alias, directory);
+                Files.writeString(shortcut, alias.resolve("Jasper.exe").toString());
+                installer.install(source, directory, shortcut);
+                Files.writeString(shortcut, alias.resolve("Jasper.exe").toString());
+                installer.uninstall(directory, shortcut);
+                equal(false, Files.exists(shortcut));
+                Files.delete(alias);
+            }
             if (UserInstall.windows()) windows(root, source, directory, shortcut);
             System.out.println("User install tests: " + checks + " checks passed");
         } finally { UserInstall.deleteTree(root); }
@@ -131,7 +143,7 @@ public final class UserInstallTest {
             Files.setAttribute(source.resolve("Jasper.exe"), "dos:readonly", true);
             var installer = new UserInstall(desktop);
             installer.install(source, directory, shortcut);
-            equal(directory.resolve("Jasper.exe").toString(), desktop.target(shortcut));
+            equal(true, Files.isSameFile(directory.resolve("Jasper.exe"), Path.of(desktop.target(shortcut))));
             equal("long path payload", Files.readString(directory.resolve(source.relativize(deepFile))));
             installer.install(source, directory, shortcut);
             String previous = Files.readString(directory.resolve("Jasper.exe"));

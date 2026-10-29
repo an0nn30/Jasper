@@ -268,11 +268,19 @@ class EditorDocumentPreservationTest {
                 editor.contentTab().moveToNewWindow();
                 assertThat(editor.documentText().getDocument()).isSameAs(state[2]);
                 assertThat(output.getViewport().getViewPosition().y).as("moving preserves output scroll").isZero();
+                // Model a delayed Swing timer delivery without changing the hosted feedback path.
+                try {
+                    var barField=editor.selectedTab().getClass().getDeclaredField("vimBar"); barField.setAccessible(true);
+                    var bar=barField.get(editor.selectedTab());
+                    var flashField=bar.getClass().getDeclaredField("flash"); flashField.setAccessible(true);
+                    ((javax.swing.Timer)flashField.get(bar)).setInitialDelay(1000);
+                } catch(ReflectiveOperationException failure) { throw new AssertionError(failure); }
                 feed(editor,state[0],"<CR>\"qp");
                 assertThat(named(view,"vim.status",JLabel.class).getForeground()).isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT));
                 dev.jasper.sdk.contracts.ThemeMigrationCapture.save("editor-hosted","dark","document-vim-bell",view,1100,520);
             });
-            TimeUnit.MILLISECONDS.sleep(250);
+            StagedVaultHost.await(() -> named((KitView)state[1],"vim.status",JLabel.class).getForeground()
+                .equals(next.semantic().color(dev.jasper.ui.theme.SemanticColor.STATUS_DANGER)), "Vim bell flash ends");
             onEdt(() -> {
                 var view=(KitView)state[1];
                 assertThat(named(view,"vim.status",JLabel.class).getForeground()).isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.STATUS_DANGER));

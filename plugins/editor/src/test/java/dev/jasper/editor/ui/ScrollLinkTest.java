@@ -51,19 +51,30 @@ class ScrollLinkTest {
     }
     @Test void largeGeometryYieldsBetweenSlicesAndAnEditCancelsItsContinuation() throws Exception {
         try(var f=new Fixture("paragraph\n\n".repeat(600))) {
-            for(int i=0;i<20;i++)edt(() -> {});
             var queued=ScrollLink.class.getDeclaredField("queued");queued.setAccessible(true);
-            edt(() -> f.area.scrollLink.geometryChanged());
-            edt(() -> {
-                try {assertThat(queued.getBoolean(f.area.scrollLink)).as("geometry must yield before all 600 anchors").isTrue();}
-                catch(IllegalAccessException e){throw new AssertionError(e);}
+            var geometry=ScrollLink.class.getDeclaredField("geometry");geometry.setAccessible(true);
+            awaitGeometry(f,queued);
+            var edit=new java.util.concurrent.FutureTask<Void>(() -> {
+                assertThat(queued.getBoolean(f.area.scrollLink)).as("geometry must yield before all 600 anchors").isTrue();
+                assertThat((java.util.List<?>)geometry.get(f.area.scrollLink)).as("map is unpublished between slices").isEmpty();
                 f.area.area.insert("changed\n\n",0);
+                return null;
             });
+            edt(() -> {
+                try {assertThat((java.util.List<?>)geometry.get(f.area.scrollLink)).as("previous map is populated").isNotEmpty();}
+                catch(IllegalAccessException e){throw new AssertionError(e);}
+                f.area.scrollLink.geometryChanged();
+                // Queue the edit behind the first rebuild, before that rebuild can queue its continuation.
+                SwingUtilities.invokeLater(edit);
+            });
+            edit.get(10,java.util.concurrent.TimeUnit.SECONDS);
             for(int i=0;i<20;i++)edt(() -> {});
             edt(() -> {
                 int before=f.preview();f.source(120);assertThat(f.preview()).isEqualTo(before);
-                try {assertThat(queued.getBoolean(f.area.scrollLink)).isFalse();}
-                catch(IllegalAccessException e){throw new AssertionError(e);}
+                try {
+                    assertThat(queued.getBoolean(f.area.scrollLink)).isFalse();
+                    assertThat((java.util.List<?>)geometry.get(f.area.scrollLink)).as("edit cancels the pending map").isEmpty();
+                } catch(IllegalAccessException e){throw new AssertionError(e);}
             });
         }
     }

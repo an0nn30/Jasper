@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 @Timeout(30)
-@org.junit.jupiter.api.extension.ExtendWith(CommandListenerTest.VirtualThreadDump.class)
+@org.junit.jupiter.api.extension.ExtendWith(dev.jasper.app.testsupport.VirtualThreadDump.class)
 class CommandListenerTest {
     @TempDir Path dir;
     private final List<CommandListener> bound = new ArrayList<>();
@@ -237,24 +237,6 @@ class CommandListenerTest {
                     .as("round %s, exit %s", round, code)
                     .isEqualTo(CommandProtocol.exit(code == 255 ? 255 : 1));
             }
-        }
-    }
-
-    /** JUnit's standard thread dump omits virtual threads, including the command reader and writer. */
-    static final class VirtualThreadDump implements org.junit.jupiter.api.extension.PreInterruptCallback {
-        @Override public void beforeThreadInterrupt(org.junit.jupiter.api.extension.PreInterruptContext interrupted,
-                org.junit.jupiter.api.extension.ExtensionContext context) throws Exception {
-            Path output = Path.of("build/reports/tests/command-listener-threads").toAbsolutePath();
-            Files.createDirectories(output);
-            Path dump = Files.createTempFile(output, "threads-", ".txt");
-            String suffix = System.getProperty("os.name").startsWith("Windows") ? ".exe" : "";
-            Process diagnostic = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "jcmd" + suffix).toString(),
-                Long.toString(ProcessHandle.current().pid()), "Thread.dump_to_file", "-overwrite", dump.toString())
-                .redirectErrorStream(true).redirectOutput(output.resolve("jcmd.log").toFile()).start();
-            try {
-                if (diagnostic.waitFor(5, TimeUnit.SECONDS)) System.out.println(Files.readString(dump));
-                else System.out.println("Virtual thread dump timed out: " + dump);
-            } finally { diagnostic.destroyForcibly(); }
         }
     }
 

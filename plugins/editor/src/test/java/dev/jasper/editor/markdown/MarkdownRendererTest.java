@@ -144,9 +144,18 @@ class MarkdownRendererTest {
         assertThat(result.html()).contains("end");
     }
 
-    @Test void escapedMarkupAndTokenTagsCannotGrowPastTheHtmlBudget() {
-        assertThatThrownBy(() -> render("```java\n" + "int ".repeat(520_000) + "\n```\n"))
+    @Test void tokenTagsCannotGrowPastTheHtmlBudget() {
+        // Keep each lexer call small while the whole block still exceeds the HTML budget.
+        assertThatThrownBy(() -> render("```java\n" + ("int ".repeat(100) + "\n").repeat(5_200) + "```\n"))
             .isInstanceOf(PreviewLimitException.class);
+    }
+
+    @Test void escapedMarkupCannotGrowPastTheHtmlBudget() {
+        var out = new MarkdownLimits.Html();
+        out.append("a".repeat(16 * 1024 * 1024 - 4));
+        assertThatThrownBy(() -> MarkdownRenderer.text(out, "&"))
+            .isInstanceOf(PreviewLimitException.class);
+        assertThat(out.toString()).hasSize(16 * 1024 * 1024 - 4);
     }
 
     @Test void mapsBlankAndIndentedCodeLinesWithCrLfSource() {

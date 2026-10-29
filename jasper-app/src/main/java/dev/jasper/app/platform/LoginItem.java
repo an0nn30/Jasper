@@ -2,15 +2,19 @@ package dev.jasper.app.platform;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 /**
  * The per-platform autostart entry. Resolution is pure, like {@link AppDirs} and
- * {@link dev.jasper.app.launch.LaunchSettings}, so both platforms' output is asserted on any host; {@link #apply} is the
+ * {@link dev.jasper.app.launch.LaunchSettings}, so all platforms' output is asserted on any host; {@link #apply} is the
  * only part that touches the system.
  */
 public final class LoginItem {
@@ -39,6 +43,11 @@ public final class LoginItem {
      * registers nothing.
      */
     public static Plan plan(String osName, boolean enabled, String appPath, Path home) {
+        return plan(osName, enabled, appPath, home, Map.of());
+    }
+
+    public static Plan plan(String osName, boolean enabled, String appPath, Path home, Map<String, String> env) {
+        Objects.requireNonNull(env, "env");
         Objects.requireNonNull(osName, "osName");
         Objects.requireNonNull(home, "home");
         if (appPath == null || appPath.isBlank()) return Plan.NONE;
@@ -63,7 +72,51 @@ public final class LoginItem {
                     "/d", "\\\"" + appPath + "\\\" --background", "/f")
                 : List.of("reg", "delete", RUN_KEY, "/v", VALUE, "/f")));
         }
+        if (os.equals("linux")) return linux(enabled, appPath, home, env);
         return Plan.NONE;
+    }
+
+    private static Plan linux(boolean enabled, String appPath, Path home, Map<String, String> env) {
+        Path root = home.resolve(".config");
+        String configured = env.get("XDG_CONFIG_HOME");
+        if (configured != null && !configured.isBlank()) {
+            try {
+                Path candidate = Path.of(configured);
+                if (candidate.isAbsolute()) root = candidate;
+            } catch (InvalidPathException ignored) { }
+        }
+        Path file = root.resolve("autostart/dev.jasper.background.desktop");
+        if (!enabled) return new Plan(file, null, List.of());
+        String executable = execToken(appPath);
+        return new Plan(file, "[Desktop Entry]\nType=Application\nName=Jasper\nExec=" + executable
+            + " --background\nTryExec=" + desktopString(appPath) + "\nTerminal=false\n", List.of());
+    }
+
+    static String execToken(String path) {
+        if (!path.startsWith("/") || path.indexOf('=') >= 0 || path.codePoints().anyMatch(Character::isISOControl))
+            throw new IllegalArgumentException("The installed executable cannot be encoded in a desktop entry");
+        String quoted = path.replace("\\", "\\\\").replace("\"", "\\\"")
+            .replace("`", "\\`").replace("$", "\\$").replace("%", "%%");
+        return desktopString("\"" + quoted + "\"");
+    }
+
+    private static String desktopString(String text) {
+        return text.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+    }
+
+    private static void writeFile(Path target, String contents) throws IOException {
+        Files.createDirectories(target.getParent());
+        Path temporary = Files.createTempFile(target.getParent(), ".jasper-login-", ".tmp");
+        try {
+            Files.writeString(temporary, contents, StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException unsupported) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
     }
 
     /** Applies a plan, reporting rather than throwing: autostart is never worth failing a launch over. */
@@ -71,11 +124,8 @@ public final class LoginItem {
         if (plan.file() != null) {
             try {
                 if (plan.contents() == null) Files.deleteIfExists(plan.file());
-                else {
-                    Files.createDirectories(plan.file().getParent());
-                    Files.writeString(plan.file(), plan.contents(), StandardCharsets.UTF_8);
-                }
-            } catch (IOException failure) {
+                else writeFile(plan.file(), plan.contents());
+            } catch (IOException | SecurityException failure) {
                 LOG.log(System.Logger.Level.WARNING, "Could not update the login item " + plan.file(), failure);
             }
         }

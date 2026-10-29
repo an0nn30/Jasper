@@ -19,7 +19,7 @@ import static dev.jasper.app.workspace.DesktopTestSupport.launcher;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The resident process shows an indicator (the macOS menu bar item, the Windows notification-area icon) exactly while
+ * The resident process shows an indicator (the macOS menu bar item, the Windows/Linux tray icon) exactly while
  * it is resident, from the moment start-up has settled: the first output painted, a finished warm-up, or 2 s after
  * the first paint.
  */
@@ -126,6 +126,32 @@ class ResidentIndicatorTest {
         } finally {
             edt(application::quitNow);
         }
+    }
+
+    @Test void noIconDiscoveryStartsOnlyAfterActualWarmUpAndQuitCleansOnce() throws Exception {
+        var indicator = new Indicator();
+        var terminated = new CountDownLatch(1);
+        StartupTrace trace = StartupTrace.detached();
+        JasperApplication application = application(terminated::countDown, indicator, trace);
+        try {
+            fallback(application, Duration.ofHours(1));
+            resident(application);
+            assertThat(indicator.shown()).hasValue(0);
+            edt(() -> application.warmUp(() -> trace.mark(StartupTrace.Milestone.WARMED_UP)));
+            edt(() -> { });
+            assertThat(trace.millis(StartupTrace.Milestone.WARMED_UP)).isPresent();
+            assertThat(indicator.shown()).as("discovery begins after warm-up even when it creates no icon").hasValue(1);
+            assertThat(application.resident()).isTrue();
+            assertThat(application.acceptsRequests()).isTrue();
+            assertThat(trace.windows()).isEmpty();
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(application::reopened))
+                .as("a resident without an icon still accepts reopen; only composing a real window is unavailable headlessly")
+                .hasRootCauseInstanceOf(java.awt.HeadlessException.class);
+            edt(() -> indicator.actions().get().quit().run());
+            assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+            edt(application::quitNow);
+            assertThat(indicator.removed()).hasValue(1);
+        } finally { edt(application::quitNow); }
     }
 
     @Test void everyTriggerAtOnceStillInstallsOnce() throws Exception {

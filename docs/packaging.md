@@ -28,8 +28,8 @@ checked by hand with the [native acceptance checklist](#native-acceptance-checkl
   [user installation](#user-installation-without-a-compiler) needs none.
 - **macOS**: Xcode 26 or later for the [macOS 26 window controls](#macos-26-window-controls); an older SDK builds an app
   with the earlier controls and `verifyPackage` warns.
-- **Linux**: `dpkg-deb` and `fakeroot` for the `.deb`; `rpmbuild` (the `rpm` package on Debian and Ubuntu), `readelf`
-  (binutils), `rpm2cpio` and `cpio` for the `.rpm`.
+- **Linux**: `readelf` (binutils) for both formats; `dpkg-deb` and `fakeroot` for the `.deb`; `rpmbuild` (the `rpm`
+  package on Debian and Ubuntu), `rpm2cpio` and `cpio` for the `.rpm`.
 - **Windows setup wizard**: WiX 3 (`candle.exe` and `light.exe`) on `PATH`. The portable ZIP needs no WiX.
 - **Windows Cygwin seed**: the first Windows build downloads about 500 MB of pinned Cygwin packages from
   `mirrors.kernel.org` into `jasper-app/build/cygwin/downloads`, unless `-Pjasper.cygwinSnapshot=<folder>` names a
@@ -456,6 +456,11 @@ and its refresh, the relay, the native probes and the acceptance harnesses.
 
 ## Linux packages
 
+The Linux tray resolves system `libxcb.so.1`, `libxcb-render.so.0` and `libXau.so.6`; its XCB code is carried by the
+existing JNA dependency. Ubuntu 22.04 x64/aarch64 CI requires wire, native ABI/cancellation and exact packaged-runtime
+tray gates before release. Executed desktop rows and pending physical/session acceptance are recorded in the
+[Linux tray verification](superpowers/plans/2026-10-27-linux-residency-2-verification.md).
+
 `packageDist` on recognized RPM-family hosts (Fedora, RHEL and SUSE families) runs `packageRpm`; other Linux hosts,
 including Debian/Ubuntu, run both `packageDeb` and `packageRpm`. Both tasks remain individually callable and build
 their format from the verified image.
@@ -489,6 +494,10 @@ package tasks therefore generate the `postinst` and `prerm` (`.deb`) and `jasper
 selected JBR's own templates: the menu commands run inside a function, the install creates both folders first, and a
 menu failure only prints "jasper: the desktop menu entry was not registered" (or "…removed"). Every other line is
 jpackage's, and a JBR whose templates lack the expected placeholder fails the build.
+
+With the default `system.run_in_background`, the first eligible installed launch registers the current user's
+`$XDG_CONFIG_HOME/autostart/dev.jasper.background.desktop` (normally under `~/.config`) to run Jasper with
+`--background` at login. Package installation does not register every user's login startup.
 
 Settings installs the `jasper` command as `~/.local/bin/jasper`
 ([installing the jasper command](command-line.md#installing-the-jasper-command)). The packages do not install the
@@ -537,8 +546,8 @@ Run by hand, it keeps the jars as the workflow artifact `jasper-sdk-jars`.
 
 **linux-packages** ([`linux-packages.yml`](../.github/workflows/linux-packages.yml)) runs on pushes to `main` and pull
 requests that change `gradle/packaging.gradle`, `gradle/packaging-support.gradle`, `packaging/**` or the workflow. It
-builds both packages on `ubuntu-22.04` and `ubuntu-22.04-arm`, whose detected `.deb` dependencies keep the pre-t64
-names that Debian 12 has and newer releases still provide, and uploads them as the artifacts `jasper-linux-x64` and
+builds both packages on `ubuntu-22.04` and `ubuntu-22.04-arm`, declares the distro providers of each shipped ELF's
+direct dependencies, and uploads them as the artifacts `jasper-linux-x64` and
 `jasper-linux-aarch64` (with a `-work` artifact on failure). It then installs each package as root in disposable
 `debian:12`, `ubuntu:24.04`, `fedora:latest` and `opensuse/tumbleweed` containers of both architectures with
 [`packaging/linux/check-install.sh`](../packaging/linux/check-install.sh), which checks that the launcher,
@@ -671,6 +680,20 @@ cannot mask a packaging problem.
 - [ ] Launch Jasper from the desktop menu: Jasper's icon shows in the menu, the dock or taskbar and the window
   switcher, and the running window groups with its launcher on GNOME and KDE, under X11 and Wayland.
 - [ ] The login shell starts, UTF-8 text renders, and Jasper home is `~/.config/jasper` (or `$XDG_CONFIG_HOME/jasper`).
+- [ ] On Ubuntu 24.04 GNOME, Debian 12/13 XFCE or LXDE, and Fedora 44 GNOME/Plasma, record the installed distribution
+  and desktop versions. With a fresh default configuration, launch the installed app once: the current user's XDG
+  autostart entry appears. Log out and in: Jasper runs with no window and no shell.
+- [ ] Set `system.run_in_background = false` and save: the autostart entry is removed immediately. Restart Jasper:
+  closing its last window exits, and the next login does not start it.
+- [ ] With residency on, close the last window, then launch Jasper normally: a window opens in the same process (check
+  its PID). Check **Open Jasper**, **New Window**, **Settings…** and **Quit Jasper** once each. Repeat on a desktop
+  without a tray host; Jasper stays resident and a normal launch reopens it. On GNOME, test with the
+  [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/) enabled and disabled.
+- [ ] Quit in the app exits through the usual guards and does not restart Jasper during the same login session.
+- [ ] Log out and in with Jasper resident, then with a window open: logout completes and the next login starts one
+  resident process. Launch Jasper by hand during login too: only one process remains and the foreground window opens.
+- [ ] Quit Jasper, remove its installed executable, then log out and in: no Jasper process starts; the stale autostart
+  entry causes no desktop prompt.
 - [ ] The clipboard (including the primary selection, where the desktop has one) and links work.
 - [ ] **File › Manage Plugins…** lists the bundled plugins, with Enterprise off; a Remote SSH connection works.
 - [ ] Install the `jasper` command from Settings: `~/.local/bin/jasper --help` lists the plugin commands.

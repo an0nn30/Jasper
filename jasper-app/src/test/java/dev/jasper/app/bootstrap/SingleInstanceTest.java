@@ -42,6 +42,7 @@ import org.junit.jupiter.api.io.TempDir;
  * as another process's; {@code SingleInstanceProcessTest} repeats the essentials across real processes.
  */
 @Timeout(60)
+@org.junit.jupiter.api.extension.ExtendWith(dev.jasper.app.testsupport.VirtualThreadDump.class)
 class SingleInstanceTest {
     private static final SingleInstance.Timing QUICK =
         new SingleInstance.Timing(Duration.ofMillis(600), Duration.ofMillis(300), Duration.ofMillis(20));

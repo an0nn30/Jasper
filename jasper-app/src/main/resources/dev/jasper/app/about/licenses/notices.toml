@@ -269,10 +269,10 @@ text = "rsyntaxtextarea.LICENSE.txt"
 
 [[component]]
 name = "SLF4J"
-version = "2.0.13"
+version = "2.0.17 / 2.0.13"
 license = "MIT"
 homepage = "https://www.slf4j.org/"
-modules = ["org.slf4j:slf4j-api:2.0.13", "org.slf4j:slf4j-nop:2.0.13", "org.slf4j:slf4j-jdk14:2.0.13"]
+modules = ["org.slf4j:slf4j-api:2.0.17", "org.slf4j:slf4j-api:2.0.13", "org.slf4j:slf4j-nop:2.0.17", "org.slf4j:slf4j-jdk14:2.0.13"]
 text = "slf4j.LICENSE.txt"
 
 [[component]]
@@ -305,3 +305,20 @@ version = "0.4.3"
 license = "MIT"
 homepage = "https://github.com/rprichard/winpty"
 text = "winpty.LICENSE.txt"
+
+[[component]]
+name = "dbus-java"
+version = "5.2.0"
+license = "MIT"
+homepage = "https://github.com/hypfvieh/dbus-java"
+modules = ["com.github.hypfvieh:dbus-java-core:5.2.0", "com.github.hypfvieh:dbus-java-transport-junixsocket:5.2.0"]
+text = "dbus-java.LICENSE.txt"
+
+[[component]]
+name = "junixsocket (Java and bundled native libraries)"
+version = "2.10.1"
+license = "Apache-2.0"
+homepage = "https://github.com/kohlschutter/junixsocket"
+modules = ["com.kohlschutter.junixsocket:junixsocket-common:2.10.1", "com.kohlschutter.junixsocket:junixsocket-native-common:2.10.1"]
+text = "apache-2.0.txt"
+notice = "junixsocket.NOTICE.txt"
