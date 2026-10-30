@@ -187,10 +187,11 @@ follow-up.
 
 - **After a crash, restored pages wait to be loaded (a post-plan fix after the first macOS GUI check):** Chromium's
   crash ended Jasper, and each relaunch's restored browser tab started Chromium again, so the crash repeated. Chromium
-  now writes `chromium.running` in the plugin's data directory when it runs (before its client reaches any page) and
-  deletes it when it has ended (`engine.RunMarker`). The plugin's start reads and deletes it; when it was there, that
-  launch's restored items wait: in place of the page a `Nodes.Empty` says "Jasper closed while this page was open."
-  with a primary Load Page button, the page's slot stays in the view, hidden, and the tab's focus goes to Load Page.
+  now writes `chromium.running` in the plugin's data directory when its start enters JCEF and deletes it when Jasper
+  closes it or it has ended (`engine.RunMarker`; the review's rulings S1a and S1b). The plugin's start reads and deletes
+  it; when it was there, that launch's restored items wait: in place of the page a `Nodes.Empty` says "Jasper closed
+  while this page was open." with a primary Load Page button, the page's slot stays in the view, hidden, and the tab's
+  focus goes to Load Page.
   The controller ruled that every load the user asks for ends the wait too: Enter in the address field, Reload, and
   `BrowserItem.load` (a routed link for its OSC 8 target, Open in Jasper). Items opened any other way load as usual.
 
@@ -209,9 +210,9 @@ Default editor from the prompt opens without the clicked line. Questions for the
 address; restored tabs that never showed show the host rather than their saved title; R43's refusal departs from
 iTerm2's copy.
 
-Task 13 (the GUI check on macOS, memory and AOT, each batch with the user's OK) has not run; Windows and Linux have not
-run. On Linux the first browser item must show, with Jasper staying up, on Ubuntu 24.04 with unprivileged user
-namespaces restricted and no setuid `chrome-sandbox` (F5).
+Task 13 (the GUI check on macOS, memory and AOT, each batch with the user's OK): the GUI check on macOS ran on
+2026-10-30 and passed after the sandbox fix ([record](../../browser-verification.md)); memory, AOT, Windows and Linux
+have not run.
 
 **Goal:** A bundled Browser plugin that shows Chromium pages as Jasper items, with:
 - the navigation toolbar, the Web menu and its keys;

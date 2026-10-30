@@ -215,10 +215,10 @@ have no address and do nothing.
 When Jasper restores a window ([Saving and restoring the windows](workspace.md#saving-and-restoring-the-windows)), each
 browser page comes back in its tab and pane, at the address it last showed and for the OSC 8 target it was opened for.
 It loads the first time it shows, so restoring starts no Chromium; until then its tab is named after the address's host.
-Chromium runs inside Jasper from the first time a page shows until Jasper quits. If Jasper ends while it runs, for
-example in a Chromium crash or a force-quit, the pages the next launch restores wait instead: each says "Jasper closed
-while this page was open." and loads when you click **Load Page**, press Enter in its address field, click **Reload** or
-open a link in it.
+Chromium starts inside Jasper the first time a page shows and runs until Jasper quits. If Jasper ends while Chromium
+starts or runs, for example in a Chromium crash or a force-quit, the pages the next launch restores wait instead: each
+says "Jasper closed while this page was open." and loads when you click **Load Page**, press Enter in its address field,
+click **Reload** or open a link in it.
 
 - An address too long for the saved state (4,096 characters, counted with the target) is saved without its query and
   fragment, and when it is still too long, not at all.

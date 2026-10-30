@@ -66,10 +66,10 @@ also removes the Linux zygote risk (F5). Turning the sandbox back on is a follow
 
 **After a crash, restored pages wait to be loaded (2026-10-30, after the first macOS GUI check).** A Chromium crash ends
 Jasper, and each relaunch's restored browser tab started Chromium again. Chromium now writes `chromium.running` in the
-plugin's data directory when it runs and deletes it when it has ended (`engine.RunMarker`); the plugin's start reads and
-deletes it, and when it was there, that launch's restored items show "Jasper closed while this page was open." with
-Load Page instead of loading. Load Page, Enter in the address field, Reload and a routed link end the wait (the
-controller's ruling); items opened any other way load as usual.
+plugin's data directory when its start enters JCEF and deletes it when Jasper closes it or it has ended
+(`engine.RunMarker`); the plugin's start reads and deletes it, and when it was there, that launch's restored items show
+"Jasper closed while this page was open." with Load Page instead of loading. Load Page, Enter in the address field,
+Reload and a routed link end the wait (the controller's ruling); items opened any other way load as usual.
 
 The controller's rulings, one line each (there is no R3 or R4):
 - R0: work on `claude/browser-core-88616a`, not `claude/browser-core`.
@@ -177,8 +177,8 @@ nothing; Edit › Copy and Paste chosen with the mouse while the address field h
 follow-up); Ctrl+H deletes a character in the address field, which plan 5's History key must allow for; a local web file
 sent to the Default editor from the prompt opens without the clicked line. Questions for the user: the "Open in Jasper?"
 prompt does not show the address; restored tabs that never showed show the host rather than their saved title; R43
-departs from iTerm2's copy. For the user (Task 13, not run, each batch with their OK): the GUI check on macOS, the
-plan's ten lines plus those the task reviews added (hasModal with a native modal and the macOS screen menu's Web menu;
+departs from iTerm2's copy. Task 13 (each batch with the user's OK): the GUI check on macOS, the plan's ten lines plus
+those the task reviews added (hasModal with a native modal and the macOS screen menu's Web menu;
 Chromium's real start, `jasper-about` in its subprocesses and its charset, a quit within the 1.5 s drain grace;
 `<select>` popups; the welcome page's Settings action, a title-less page's tab, `about:` addresses, live toolbar updates
 and the address shown once in the status bar; the key codes of the declined macOS Cmd keys, Copy and Paste in a page,
@@ -187,8 +187,10 @@ handlers; the bridge script's timing, its query function in every frame, back-fo
 stacking, long messages and closing the window or quitting past one; a tab opened from the prompt, Enter on Open in
 Jasper, its toggle, the prompt with Settings or a native dialog open; the saved address after a failed load and the
 welcome page's address form; a drag that starts in a page; a page's own `window.close()` closing its pane; a link and New
-Browser Tab after a failed start), the memory run (`run-macos.sh memory`: RSS unused, after one page, two minutes after
-closing) and the AOT check (a trained cache holds no `org.cef` class); Windows and Linux are not run.
+Browser Tab after a failed start), ran on 2026-10-30 and passed after the sandbox fix
+([record](browser-verification.md)); still for the user: the GUI check after a crash (pending in that record), the
+memory run (`run-macos.sh memory`: RSS unused, after one page, two minutes after closing) and the AOT check (a trained
+cache holds no `org.cef` class); Windows and Linux are not run.
 
 **PR #3 Windows check sharding — 2026-10-29: REVIEW PENDING.** App and other module checks run on isolated Windows runners with one Gradle worker each; both must pass. Each verifies its task graph against the original Check graph and records the graphs. Local graph and failure fixtures pass; hosted Windows validation remains pending. The existing watchdog limits remain. This extends Task 10 CI execution.
 

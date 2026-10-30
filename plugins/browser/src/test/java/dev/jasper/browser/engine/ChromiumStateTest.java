@@ -4,15 +4,23 @@ import java.awt.EventQueue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +38,28 @@ class ChromiumStateTest {
     private final AtomicInteger tellings = new AtomicInteger();
     private final AtomicBoolean toldOnUi = new AtomicBoolean();
     private final CompletableFuture<Throwable> told = new CompletableFuture<>();
+    // The run marker's warnings, captured instead of printed. The logger is held, so it keeps the handler.
+    private final List<String> warnings = new CopyOnWriteArrayList<>();
+    private final Logger markerLog = Logger.getLogger(RunMarker.class.getName());
+    private final Handler capture = new Handler() {
+        @Override public void publish(LogRecord record) {
+            if (record.getLevel().intValue() >= Level.WARNING.intValue()) warnings.add(record.getMessage());
+        }
+        @Override public void flush() { }
+        @Override public void close() { }
+    };
+    private boolean parentHandlers;
+
+    @BeforeEach void listen() {
+        parentHandlers = markerLog.getUseParentHandlers();
+        markerLog.setUseParentHandlers(false);
+        markerLog.addHandler(capture);
+    }
+
+    @AfterEach void stopListening() {
+        markerLog.removeHandler(capture);
+        markerLog.setUseParentHandlers(parentHandlers);
+    }
 
     @Test void aChromiumWhoseStartIsNeverAskedForStaysNotStarted() throws Exception {
         Chromium chromium = chromium(recording, LIMIT);
@@ -154,63 +184,120 @@ class ChromiumStateTest {
     }
 
     /**
-     * A Chromium that runs marks it in its data directory before its client reaches any page, and the mark goes once
-     * Chromium has ended. No client can be made here, so the made client is a stand-in null.
+     * The start marks Chromium as it enters JCEF, before Chromium initializes, so a fatal error while it initializes, as
+     * a helper or the GPU process can raise, leaves the mark; the mark stays while Chromium runs. The worker here never
+     * runs the start, so the test enters it, and no client can be made, so the made client is a stand-in null.
      */
-    @Test void aRunningChromiumIsMarkedUntilItHasEnded() throws Exception {
+    @Test void aStartThatHasEnteredMarksChromiumBeforeItRuns() throws Exception {
         Chromium chromium = chromium(recording, LIMIT);
-        Path marker = data.resolve("chromium.running");
-        var markedWhenReady = new CompletableFuture<Boolean>();
-        var client = chromium.client();
-        client.whenComplete((made, failure) -> markedWhenReady.complete(Files.exists(marker)));
-        assertThat(marker).as("starting").doesNotExist();
+        chromium.client();
+        assertThat(marker()).as("asked for, not entered").doesNotExist();
+        assertThat(chromium.enter()).isTrue();
+        assertThat(chromium.state()).isEqualTo(Chromium.State.STARTING);
+        assertThat(marker()).as("entered, not running").isRegularFile().isEmptyFile();
         EventQueue.invokeAndWait(() -> chromium.clientCreated(null));
         assertThat(chromium.state()).isEqualTo(Chromium.State.RUNNING);
-        assertThat(client).isCompleted();
-        assertThat(markedWhenReady.get(5, TimeUnit.SECONDS)).as("marked before the client's future completes").isTrue();
-        assertThat(marker).isRegularFile().isEmptyFile();
-        chromium.close();
-        assertThat(chromium.state()).isEqualTo(Chromium.State.STOPPED);
-        assertThat(marker).as("ended").doesNotExist();
+        assertThat(marker()).as("running").isRegularFile();
+        end(chromium);
+        assertThat(warnings).isEmpty();
     }
 
-    @Test void aChromiumThatNeverStartsOrWhoseStartIsRefusedLeavesNoMarker() throws Exception {
-        Path marker = data.resolve("chromium.running");
+    /**
+     * Jasper's close deletes the marker at once: a quit's dispose can outlast Jasper's exit, and Chromium's end, which
+     * deletes it too, may never come. The close on the UI thread returns before Chromium ends.
+     */
+    @Test void jaspersCloseDeletesTheMarkerBeforeChromiumHasEnded() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        chromium.client();
+        chromium.enter();
+        EventQueue.invokeAndWait(() -> chromium.clientCreated(null));
+        assertThat(marker()).isRegularFile();
+        EventQueue.invokeAndWait(chromium::close);
+        assertThat(chromium.state()).isEqualTo(Chromium.State.STOPPED);
+        assertThat(marker()).as("closed, not ended").doesNotExist();
+        chromium.terminated();
+        assertThat(marker()).as("ended").doesNotExist();
+        assertThat(warnings).isEmpty();
+    }
+
+    @Test void aStartThatNeverEntersLeavesNoMarker() throws Exception {
         chromium(recording, LIMIT).close();
-        assertThat(marker).as("never started").doesNotExist();
+        assertThat(marker()).as("never asked for").doesNotExist();
         Chromium refused = chromium(task -> { throw new RejectedExecutionException("The worker stopped"); }, LIMIT);
         assertThat(refused.client()).isCompletedExceptionally();
         assertThat(refused.state()).isEqualTo(Chromium.State.FAILED);
-        assertThat(marker).as("its start failed").doesNotExist();
+        assertThat(marker()).as("the worker refused the start").doesNotExist();
         refused.close();
-        assertThat(marker).doesNotExist();
+        assertThat(marker()).doesNotExist();
     }
 
-    @Test void aClientMadeAfterTheStartFailedLeavesNoMarker() throws Exception {
-        Path marker = data.resolve("chromium.running");
+    @Test void aStartTheCloseCutShortBeforeItEntersLeavesNoMarker() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        chromium.client();
+        EventQueue.invokeAndWait(chromium::close);
+        assertThat(chromium.enter()).as("the worker comes too late").isFalse();
+        assertThat(marker()).doesNotExist();
+    }
+
+    /** A start that threw before Chromium had an app keeps its marker, as Chromium may have loaded, until the close. */
+    @Test void aStartThatThrewHasItsMarkerGoneOnceClosed() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        chromium.client();
+        chromium.enter();
+        chromium.threw(new UnsatisfiedLinkError("no Chromium libraries"));
+        assertThat(told()).isInstanceOf(UnsatisfiedLinkError.class);
+        assertThat(chromium.state()).isEqualTo(Chromium.State.FAILED);
+        assertThat(marker()).as("failed, not closed").isRegularFile();
+        long began = System.nanoTime();
+        chromium.close();
+        assertThat(Duration.ofNanos(System.nanoTime() - began)).as("nothing left to end").isLessThan(Duration.ofSeconds(2));
+        assertThat(marker()).doesNotExist();
+        assertThat(warnings).isEmpty();
+    }
+
+    /** A start that never initializes keeps its marker: Chromium may still be initializing, until Jasper closes it. */
+    @Test void aStartThatNeverInitializesKeepsItsMarkerUntilClosed() throws Exception {
         Chromium slow = chromium(recording, Duration.ofMillis(50));
         slow.client();
+        slow.enter();
         assertThat(told()).isInstanceOf(TimeoutException.class);
-        EventQueue.invokeAndWait(() -> slow.clientCreated(null));
         assertThat(slow.state()).isEqualTo(Chromium.State.FAILED);
-        assertThat(marker).doesNotExist();
-        slow.close();
-        assertThat(marker).doesNotExist();
+        assertThat(marker()).as("timed out").isRegularFile();
+        end(slow);
+        assertThat(warnings).isEmpty();
     }
 
-    /** A marker that cannot be written fails neither the start nor the close. */
+    /** A marker that cannot be written fails neither the start nor the close, and is a warning. */
     @Test void aMarkerThatCannotBeWrittenFailsNothing() throws Exception {
         Path notADirectory = Files.createFile(data.resolve("file"));
         Chromium chromium = new Chromium(notADirectory, recording, new AboutScheme(), cause -> tellings.incrementAndGet(), process, LIMIT);
         var client = chromium.client();
+        assertThat(chromium.enter()).isTrue();
+        assertThat(warnings).singleElement().asString().startsWith("The browser's run marker could not be written: ");
         EventQueue.invokeAndWait(() -> chromium.clientCreated(null));
         assertThat(client).isCompleted();
         assertThat(client.isCompletedExceptionally()).isFalse();
         assertThat(chromium.state()).isEqualTo(Chromium.State.RUNNING);
-        chromium.close();
+        end(chromium);
         assertThat(chromium.state()).isEqualTo(Chromium.State.STOPPED);
         flushUi();
         assertThat(tellings).hasValue(0);
+    }
+
+    /** The marker file in the data directory. */
+    private Path marker() {
+        return data.resolve("chromium.running");
+    }
+
+    /**
+     * Closes a Chromium whose start entered JCEF, as Jasper does on the UI thread, and ends it as JCEF would, so no thread
+     * is left waiting for its end. Leaves no marker.
+     */
+    private void end(Chromium chromium) throws Exception {
+        EventQueue.invokeAndWait(chromium::close);
+        assertThat(marker()).as("closed").doesNotExist();
+        chromium.terminated();
+        assertThat(marker()).doesNotExist();
     }
 
     private Chromium chromium(Executor worker, Duration limit) {

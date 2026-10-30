@@ -14,7 +14,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** The marker that Chromium runs: written, deleted, and read once at the next start; a marker that fails only warns. */
+/**
+ * The marker that Chromium starts or runs: written, deleted, not written again once Chromium has stopped, and read once
+ * at the next start. A marker that fails only warns; the warnings are captured here, not printed.
+ */
 class RunMarkerTest {
     @TempDir Path data;
     private final List<String> warnings = new CopyOnWriteArrayList<>();
@@ -27,19 +30,36 @@ class RunMarkerTest {
         @Override public void flush() { }
         @Override public void close() { }
     };
+    private boolean parentHandlers;
 
-    @BeforeEach void listen() { logger.addHandler(capture); }
+    @BeforeEach void listen() {
+        parentHandlers = logger.getUseParentHandlers();
+        logger.setUseParentHandlers(false);
+        logger.addHandler(capture);
+    }
 
-    @AfterEach void stopListening() { logger.removeHandler(capture); }
+    @AfterEach void stopListening() {
+        logger.removeHandler(capture);
+        logger.setUseParentHandlers(parentHandlers);
+    }
 
-    @Test void runningWritesAnEmptyMarkerAndEndedDeletesIt() throws Exception {
+    @Test void startedWritesAnEmptyMarkerAndStoppedDeletesIt() throws Exception {
         var marker = new RunMarker(data);
         Path file = data.resolve("chromium.running");
-        marker.running();
+        marker.started();
         assertThat(file).isRegularFile().isEmptyFile();
-        marker.ended();
+        marker.stopped();
         assertThat(file).doesNotExist();
-        marker.ended();
+        marker.stopped();
+        assertThat(warnings).isEmpty();
+    }
+
+    /** A close that comes between the start's entry and its write leaves no marker: once stopped, it is not written. */
+    @Test void onceStoppedTheMarkerIsNotWrittenAgain() throws Exception {
+        var marker = new RunMarker(data);
+        marker.stopped();
+        marker.started();
+        assertThat(data.resolve("chromium.running")).doesNotExist();
         assertThat(warnings).isEmpty();
     }
 
@@ -55,15 +75,15 @@ class RunMarkerTest {
 
     @Test void aMarkerThatCannotBeWrittenOrDeletedIsAWarningAndThrowsNothing() throws Exception {
         Path file = Files.createFile(data.resolve("file"));
-        new RunMarker(file).running();
+        new RunMarker(file).started();
         assertThat(warnings).singleElement().asString().startsWith("The browser's run marker could not be written");
 
         // A directory in the marker's place, with something in it, cannot be deleted as the marker is.
         Path stuck = Files.createDirectories(data.resolve("stuck").resolve("chromium.running"));
         Files.createFile(stuck.resolve("inside"));
-        new RunMarker(stuck.getParent()).ended();
+        new RunMarker(stuck.getParent()).stopped();
         assertThat(warnings).hasSize(2).last().asString().startsWith("The browser's run marker could not be deleted");
         assertThat(RunMarker.clear(stuck.getParent())).as("there, though it could not be deleted").isTrue();
-        assertThat(warnings).hasSize(3);
+        assertThat(warnings).hasSize(3).last().asString().startsWith("The browser's run marker could not be deleted");
     }
 }
