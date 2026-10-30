@@ -24,6 +24,48 @@ class ViewSpecTest {
             assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
                 Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", true)).withMessageContaining("never read-only");
     }
+    /** The PNG signature followed by {@code length - 8} zero bytes. */
+    static byte[] png(int length) {
+        byte[] data = new byte[length];
+        System.arraycopy(new byte[]{(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, 0, data, 0, 8);
+        return data;
+    }
+    /** Plan 4b Task 1: a pixel image is a PNG of at most 65,536 bytes, copied in and out and equal by its bytes. */
+    @Test void pixelImagesAreBoundedPngsComparedByTheirBytes() {
+        byte[] data = png(40);
+        var image = new PixelImage(data);
+        data[30] = 1;
+        assertThat(image.png()[30]).isZero();
+        image.png()[30] = 1;
+        assertThat(image.png()[30]).isZero();
+        assertThat(image).isEqualTo(new PixelImage(png(40))).hasSameHashCodeAs(new PixelImage(png(40))).hasToString("PixelImage[40 bytes]");
+        assertThatIllegalArgumentException().isThrownBy(() -> new PixelImage(png(65_537))).withMessage("A pixel image holds at most 65536 bytes, not 65537");
+        assertThatIllegalArgumentException().isThrownBy(() -> new PixelImage(new byte[]{'G', 'I', 'F', '8', '9', 'a', 0, 0})).withMessage("A pixel image must be a PNG");
+    }
+    /** Plan 4b Task 1: a leading image, its drag text and select-on-click, checked as the SDK checks them. */
+    @Test void leadingImagesDragTextAndSelectOnClickAreValidatedAndDefaultToNone() {
+        var plain = new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "");
+        assertThat(plain.leadingImage()).isEmpty();
+        assertThat(plain.leadingDrag()).isEmpty();
+        assertThat(plain.selectOnClick()).isFalse();
+        var image = new PixelImage(png(32));
+        var address = new Field("address", ControlState.READY, FieldKind.TEXT, "", "", "Address", "", Optional.empty(), FieldPresentation.EMBEDDED,
+            "", "", "", false, Optional.of(image), Optional.of("https://example.com/"), true);
+        assertThat(address.leadingImage()).contains(image);
+        assertThat(address.leadingDrag()).contains("https://example.com/");
+        assertThat(address.selectOnClick()).isTrue();
+        assertThatIllegalArgumentException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
+            FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), Optional.of("https://example.com/"), false))
+            .withMessage("A field's drag text needs a leading image");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
+            FieldPresentation.STANDARD, "", "", "", false, Optional.of(image), Optional.of(""), false)).withMessage("leadingDrag must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Field("notes", ControlState.READY, FieldKind.TEXTAREA, "", "", "Notes", "", Optional.empty(),
+            FieldPresentation.STANDARD, "", "", "", false, Optional.of(image), Optional.empty(), false)).withMessage("A multiline field takes no leading image");
+        for (var presentation : List.of(FieldPresentation.STEPPER, FieldPresentation.SLIDER))
+            assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
+                Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", false, Optional.empty(), Optional.empty(), true))
+                .withMessage("A stepper or slider takes no leading image and no select-on-click");
+    }
     /** Plan 3b (spec 8.2): EXCLUSIVE shows two to four options and TABS two or more, wherever the choice sits. */
     @Test void exclusiveChoicesShowTwoToFourOptionsAndTabsTwoOrMore() {
         for (int count = 0; count <= 6; count++) {

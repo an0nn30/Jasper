@@ -56,6 +56,18 @@ final class HostedKit implements UiKit,AutoCloseable {
         return icon;
     }
 
+    /**
+     * A plugin's image as a content tab shows it (SDK 0.27.0): decoded now and drawn in the box a named icon fills (the
+     * installed kit's rail glyph at the interface scale), its aspect and colours kept.
+     *
+     * @return the image's icon; empty when the PNG does not decode
+     */
+    Optional<javax.swing.Icon> image(dev.jasper.sdk.ui.PixelImage image){
+        int box=com.formdev.flatlaf.util.UIScale.scale(icons.size(FlatLafInstaller.installedKit().metrics(),dev.jasper.ui.model.Nodes.IconSize.RAIL));
+        try{return Optional.of(new dev.jasper.ui.icons.EncodedArtwork(dev.jasper.ui.icons.EncodedArtwork.Format.PNG,image.png()).icon(box));}
+        catch(IllegalArgumentException undecodable){return Optional.empty();}
+    }
+
     /** A semantic colour of one theme slot, as the kit paints it; registered specialized content follows its view's slot. */
     java.awt.Color color(ThemeRoute route,dev.jasper.ui.theme.SemanticColor role){return route.select(themes.get()).semantic().color(role);}
     boolean live(){return !closed.get() && open.getAsBoolean();}

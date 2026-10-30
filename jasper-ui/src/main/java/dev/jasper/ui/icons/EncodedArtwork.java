@@ -39,6 +39,32 @@ public final class EncodedArtwork {
     public java.awt.image.BufferedImage raster(int width, int height) { return decoded().raster(width, height); }
 
     /**
+     * The artwork drawn in an {@code extent} by {@code extent} box, as a registry draws authored artwork: scaled to fit,
+     * its aspect and colours kept, centred. It decodes first if needed and prepares every density now, so its paint
+     * allocates nothing.
+     *
+     * @param extent the box's side in user-space pixels (already scaled for the user's interface size), 1 to 512
+     * @return the icon
+     * @throws IllegalArgumentException when the artwork is invalid or the extent is out of range
+     */
+    public javax.swing.Icon icon(int extent) {
+        if (extent < 1 || extent > 512) throw new IllegalArgumentException("Invalid logical icon size");
+        var snapshot = decoded().snapshot(extent);
+        int width = snapshot.getWidth(null), height = snapshot.getHeight(null);
+        return new javax.swing.Icon() {
+            @Override public int getIconWidth() { return extent; }
+            @Override public int getIconHeight() { return extent; }
+            @Override public void paintIcon(java.awt.Component component, java.awt.Graphics graphics, int x, int y) {
+                var g = (java.awt.Graphics2D) graphics.create();
+                try {
+                    g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                    g.drawImage(snapshot, x + (extent - width) / 2, y + (extent - height) / 2, width, height, null);
+                } finally { g.dispose(); }
+            }
+        };
+    }
+
+    /**
      * Checks SVG bytes against the receiving rules without decoding or drawing them, so with no AWT: for a reader that
      * must refuse artwork before the desktop starts.
      *

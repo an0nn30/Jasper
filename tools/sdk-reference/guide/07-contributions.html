@@ -159,7 +159,7 @@ Jasper's or any plugin's, or an overlay inside it.</p>
 or of the most recently active window, as the Editor does; {@link Windows#openTab(ContentSpec,WindowOwner,UiView,TabPlacement)} opens it
 where a {@link TabPlacement} says: a new tab at the end of the strip or right after the shown one, a new pane beside the focused one, or a new window. The {@link ContentSpec}'s key identifies the document: opening a key the plugin
 already has open selects that tab and returns its handle. Through the {@link ContentTab} the plugin sets the tab's
-title, detail, icon, unsaved marker and location ({@link ContentTab#setPresentation(ContentPresentation)}), its commands
+title, detail, icon or image, unsaved marker and location ({@link ContentTab#setPresentation(ContentPresentation)}), its commands
 ({@link ContentTab#setCommands(List)}), which its context menu lists and whose shortcuts apply while it is active, and
 its status bar items ({@link ContentTab#setStatus(List)}). Commands with the ids {@code find}, {@code find-next},
 {@code find-previous}, {@code copy}, {@code paste}, {@code font-bigger}, {@code font-smaller} and {@code font-reset}

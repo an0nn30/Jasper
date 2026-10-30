@@ -49,6 +49,20 @@ class KitValuesTest {
    assertThat(((dev.jasper.ui.model.Nodes.Field)KitValues.toModule(spec).root()).readOnly()).isEqualTo(readOnly);
   }
  }
+ /** Plan 4b Task 1 (SDK 0.27.0): a field's leading image, drag text and select-on-click cross the projection unchanged. */
+ @Test void leadingImagesDragTextAndSelectOnClickProjectWithoutLoss(){
+  byte[] png=new byte[48];System.arraycopy(new byte[]{(byte)0x89,'P','N','G','\r','\n',0x1a,'\n'},0,png,0,8);png[40]=5;
+  var image=new PixelImage(png);
+  for(boolean select:List.of(false,true)){
+   var spec=new ViewSpec(new Field("address",READY,FieldKind.TEXT,"https://example.com/","Search or enter website name","Address","go",Optional.empty(),
+    FieldPresentation.EMBEDDED,"","revert","",false,Optional.of(image),select?Optional.of("https://example.com/"):Optional.empty(),select));
+   assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+   var field=(dev.jasper.ui.model.Nodes.Field)KitValues.toModule(spec).root();
+   assertThat(field.leadingImage().orElseThrow().png()).isEqualTo(png);
+   assertThat(field.leadingDrag()).isEqualTo(spec.root() instanceof Field f?f.leadingDrag():null);
+   assertThat(field.selectOnClick()).isEqualTo(select);
+  }
+ }
  /** Plan 3b: a technical caption crosses the projection unchanged. */
  @Test void technicalPickerCaptionsProjectWithoutLoss(){
   for(boolean technical:List.of(false,true)){

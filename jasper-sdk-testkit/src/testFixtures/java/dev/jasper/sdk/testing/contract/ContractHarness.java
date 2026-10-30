@@ -199,6 +199,13 @@ public interface ContractHarness extends AutoCloseable {
      */
     java.util.Optional<java.util.UUID> restoreTab(String pluginId, java.util.UUID windowId, String title, dev.jasper.sdk.RestoreState state);
 
+    /**
+     * UI thread: what a plugin's content tab shows as its icon: {@code image} while it shows its presentation's image,
+     * {@code icon:<name>} while it shows the presentation's icon name, and {@code -} while it shows neither or the tab is
+     * not a plugin's content tab.
+     */
+    String contentIcon(java.util.UUID tabId);
+
     /** UI thread: the restore state a tab gives, a content tab's or a provided session's; empty when it does not come back. */
     java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(java.util.UUID tabId);
 

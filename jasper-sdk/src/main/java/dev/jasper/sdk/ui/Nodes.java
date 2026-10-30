@@ -366,7 +366,13 @@ public final class Nodes {
      * Enter keeps its meaning in the field. A TEXTAREA takes neither {@code alternateAction} nor {@code listId}, and a
      * NUMBER field (whose arrows step it) takes no {@code listId}. A {@code readOnly} field (since 0.18.0) is focusable,
      * selectable and copyable but never edited, so it reports no {@link UiEvent.Edited}; a STEPPER or SLIDER is never
-     * read-only.
+     * read-only. A {@code leadingImage} (since 0.27.0), such as a web page's favicon, stands before the text in place
+     * of the kind's glyph (a SEARCH field's magnifier, a PATH field's folder, a PORT field's colon), drawn in that
+     * glyph's box, under every look. Dragging it offers {@code leadingDrag}, which needs the image: as a URL when it
+     * parses as one, as text, and as the file for a {@code file:} URL. A {@code selectOnClick} field (since 0.27.0)
+     * selects all its text when a click brings the focus into it, as focusing it from the keyboard does; once it has
+     * the focus, a click places the caret. A TEXTAREA takes no leading image, and a STEPPER or SLIDER neither a leading
+     * image nor {@code selectOnClick}.
      *
      * @param id the node id
      * @param state the node's state; a nonblank error shows under the field
@@ -383,9 +389,13 @@ public final class Nodes {
      * @param cancelAction what Escape runs; blank for none
      * @param listId the id of the ItemList the field's Up, Down, Page Up and Page Down keys move; blank for none
      * @param readOnly whether the field shows its value without ever being edited
+     * @param leadingImage the image before the text; empty for the kind's glyph
+     * @param leadingDrag the text a drag of the leading image offers, not blank; empty when the image is not dragged
+     * @param selectOnClick whether a click that brings the focus into the field selects all its text
      */
     public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
-                        String alternateAction, String cancelAction, String listId, boolean readOnly) implements Node {
+                        String alternateAction, String cancelAction, String listId, boolean readOnly, Optional<PixelImage> leadingImage,
+                        Optional<String> leadingDrag, boolean selectOnClick) implements Node {
         public Field {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -405,6 +415,17 @@ public final class Nodes {
             if (kind == FieldKind.NUMBER && !listId.isBlank()) throw new IllegalArgumentException("A number field's arrow keys step its value, not a list");
             if (readOnly && (presentation == FieldPresentation.STEPPER || presentation == FieldPresentation.SLIDER))
                 throw new IllegalArgumentException("A stepper or slider is never read-only");
+            Objects.requireNonNull(leadingImage); Objects.requireNonNull(leadingDrag);
+            leadingDrag.ifPresent(text -> ModelChecks.label(text, "leadingDrag"));
+            if (leadingDrag.isPresent() && leadingImage.isEmpty()) throw new IllegalArgumentException("A field's drag text needs a leading image");
+            if (kind == FieldKind.TEXTAREA && leadingImage.isPresent()) throw new IllegalArgumentException("A multiline field takes no leading image");
+            if ((presentation == FieldPresentation.STEPPER || presentation == FieldPresentation.SLIDER) && (leadingImage.isPresent() || selectOnClick))
+                throw new IllegalArgumentException("A stepper or slider takes no leading image and no select-on-click");
+        }
+        /** A field without a leading image, whose clicks place the caret. */
+        public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
+                     String alternateAction, String cancelAction, String listId, boolean readOnly) {
+            this(id, state, kind, value, hint, label, trailingAction, numeric, presentation, alternateAction, cancelAction, listId, readOnly, Optional.empty(), Optional.empty(), false);
         }
         /** An editable field. */
         public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,

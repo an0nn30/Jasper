@@ -30,6 +30,44 @@ class KitValuesTest {
             assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
                 Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", true)).withMessageContaining("never read-only");
     }
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a field has no leading image, drag text or select-on-click unless it says so; the drag
+     * text needs the image, and a multiline field, a stepper and a slider take none of them.
+     */
+    @Test void leadingImagesDragTextAndSelectOnClickAreValidatedAndDefaultToNone() {
+        var plain = new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "", Optional.empty(), FieldPresentation.STANDARD, "", "", "", true);
+        assertThat(plain.leadingImage()).isEmpty();
+        assertThat(plain.leadingDrag()).isEmpty();
+        assertThat(plain.selectOnClick()).isFalse();
+        assertThat(plain.readOnly()).isTrue();
+        var image = new PixelImage(UiValuesTest.png(32));
+        var address = new Field("address", ControlState.READY, FieldKind.TEXT, "https://example.com/", "Search or enter website name", "Address", "go",
+            Optional.empty(), FieldPresentation.EMBEDDED, "", "revert", "", false, Optional.of(image), Optional.of("https://example.com/"), true);
+        assertThat(address.leadingImage()).contains(image);
+        assertThat(address.leadingDrag()).contains("https://example.com/");
+        assertThat(address.selectOnClick()).isTrue();
+        assertThat(new Field("find", ControlState.READY, FieldKind.SEARCH, "", "", "Find", "", Optional.empty(), FieldPresentation.STANDARD, "", "", "",
+            false, Optional.of(image), Optional.empty(), false).leadingImage()).as("an image without a drag").contains(image);
+        assertThatIllegalArgumentException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
+            FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), Optional.of("https://example.com/"), false))
+            .withMessage("A field's drag text needs a leading image");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
+            FieldPresentation.STANDARD, "", "", "", false, Optional.of(image), Optional.of(" "), false)).withMessage("leadingDrag must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Field("notes", ControlState.READY, FieldKind.TEXTAREA, "", "", "Notes", "", Optional.empty(),
+            FieldPresentation.STANDARD, "", "", "", false, Optional.of(image), Optional.empty(), false)).withMessage("A multiline field takes no leading image");
+        for (var presentation : List.of(FieldPresentation.STEPPER, FieldPresentation.SLIDER)) {
+            assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
+                Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", false, Optional.of(image), Optional.empty(), false))
+                .withMessage("A stepper or slider takes no leading image and no select-on-click");
+            assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
+                Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", false, Optional.empty(), Optional.empty(), true))
+                .withMessage("A stepper or slider takes no leading image and no select-on-click");
+        }
+        assertThatNullPointerException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
+            FieldPresentation.STANDARD, "", "", "", false, null, Optional.empty(), false));
+        assertThatNullPointerException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
+            FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), null, false));
+    }
     /** Plan 3b: a rich face's caption is plain text unless it says it is a data value. */
     @Test void pickerFacesDefaultToAPlainCaption() {
         assertThat(new PickerFace("Mac", "dustin@host:22", "server", Hue.BLUE, PickerDensity.DEFAULT).technicalCaption()).isFalse();

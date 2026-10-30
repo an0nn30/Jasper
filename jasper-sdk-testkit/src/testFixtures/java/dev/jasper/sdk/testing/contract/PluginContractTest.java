@@ -252,6 +252,51 @@ public abstract class PluginContractTest {
             }).doesNotThrowAnyException();
         });
     }
+    /** A {@code size} by {@code size} PNG in one colour. */
+    static dev.jasper.sdk.ui.PixelImage png(int size, java.awt.Color color) {
+        var image = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { g.setColor(color); g.fillRect(0, 0, size, size); } finally { g.dispose(); }
+        var out = new java.io.ByteArrayOutputStream();
+        try { javax.imageio.ImageIO.write(image, "png", out); } catch (java.io.IOException failure) { throw new AssertionError(failure); }
+        return new dev.jasper.sdk.ui.PixelImage(out.toByteArray());
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a content tab's presentation image reaches the host, which shows it in place of the
+     * icon name until a presentation without one; the name is still checked, and a closed tab takes nothing.
+     */
+    @Test void aContentTabsPresentationImageReachesTheHost() {
+        UUID main = h.addTerminalWindow();
+        var started = new AtomicReference<PluginContext>();
+        h.start(info("test.image", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), started::set);
+        var context = started.get();
+        h.ui(() -> {
+            var window = context.terminals().window(main).orElseThrow();
+            var tab = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), window, kitView(context));
+            UUID id = window.activeTab().orElseThrow().id();
+            var plain = new dev.jasper.sdk.ui.ContentPresentation("Example", "", "file", false, "https://example.com/", "");
+            tab.setPresentation(plain);
+            assertThat(h.contentIcon(id)).isEqualTo("icon:file");
+            var favicon = png(16, java.awt.Color.BLUE);
+            tab.setPresentation(plain.withImage(favicon));
+            assertThat(h.contentIcon(id)).isEqualTo("image");
+            tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Example", "", null, false, "", "").withImage(favicon));
+            assertThat(h.contentIcon(id)).as("an image without an icon name").isEqualTo("image");
+            assertThatIllegalArgumentException().as("the name is checked beside an image")
+                .isThrownBy(() -> tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Example", "", "missing", false, "", "").withImage(favicon)));
+            assertThat(h.contentIcon(id)).isEqualTo("image");
+            tab.setPresentation(plain);
+            assertThat(h.contentIcon(id)).isEqualTo("icon:file");
+            tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Example", "", null, false, "", ""));
+            assertThat(h.contentIcon(id)).isEqualTo("-");
+            tab.setPresentation(plain);
+            tab.close();
+            assertThatCode(() -> tab.setPresentation(plain.withImage(favicon))).doesNotThrowAnyException();
+            assertThat(h.contentIcon(id)).as("a closed tab is no plugin's content tab").isEqualTo("-");
+        });
+    }
+
     private static PaletteScope iconScope(String icon) {
         return new PaletteScope() {
             public ScopeSpec spec(){return ScopeSpec.of("test.icons.scope","Scope","Search",List.of(PASTE)).withIcon(icon);}

@@ -33,6 +33,11 @@ final class TextFields {
         /** An input method holds uncommitted (composed) text in the field. */
         boolean composing;
         long valueRevision;
+        /** The leading image last decoded, and its artwork: each image is decoded once; null artwork when it does not decode. */
+        private dev.jasper.ui.model.PixelImage decodedImage;
+        private dev.jasper.ui.icons.EncodedArtwork leadingArtwork;
+        /** A left press brought the focus into a select-on-click field: its release selects all the text. */
+        private boolean selectOnRelease;
         @Override int firstLineHeight() {
             if (((Nodes.Field) node).kind() == Nodes.FieldKind.TEXTAREA) return ThemePainting.height(context(), DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY);
             return line.getHeight() > 0 ? line.getY() + line.getHeight() : line.getPreferredSize().height;
@@ -65,6 +70,7 @@ final class TextFields {
             } else { scroll = null; surface.add(input, BorderLayout.CENTER); }
             if (node.kind() == Nodes.FieldKind.SEARCH || node.kind() == Nodes.FieldKind.PORT || node.kind() == Nodes.FieldKind.PATH) surface.add(leading, BorderLayout.WEST);
             KitOwnership.mark(label, node.id() + ".label"); KitOwnership.mark(error, node.id() + ".error"); KitOwnership.mark(leading, node.id() + ".leading");
+            if (node.kind() != Nodes.FieldKind.TEXTAREA) { dragLeadingImage(); selectOnClick(); }
             label.setLabelFor(input); label.setText(node.label());
             line.setOpaque(false); line.add(surface, BorderLayout.CENTER);
             if (node.kind() == Nodes.FieldKind.PATH) {
@@ -112,6 +118,82 @@ final class TextFields {
             }
             surface.trailing = trailing == null ? null : trailing.component;
             refresh();
+        }
+        /**
+         * Dragging the leading image, once the pointer passes the platform's drag threshold, offers the field's drag text
+         * ({@link #leadingTransfer()}); the image is the drag image.
+         */
+        private void dragLeadingImage() {
+            leading.setTransferHandler(new TransferHandler() {
+                @Override public int getSourceActions(JComponent component) { return drags() ? COPY : NONE; }
+                @Override protected java.awt.datatransfer.Transferable createTransferable(JComponent component) { return leadingTransfer(); }
+            });
+            var gesture = new java.awt.event.MouseAdapter() {
+                Point pressed;
+                @Override public void mousePressed(java.awt.event.MouseEvent event) { pressed = SwingUtilities.isLeftMouseButton(event) ? event.getPoint() : null; }
+                @Override public void mouseReleased(java.awt.event.MouseEvent event) { pressed = null; }
+                @Override public void mouseDragged(java.awt.event.MouseEvent event) {
+                    if (pressed == null || !interactive() || !drags()) return;
+                    int threshold = java.awt.dnd.DragSource.getDragThreshold();
+                    if (Math.abs(event.getX() - pressed.x) <= threshold && Math.abs(event.getY() - pressed.y) <= threshold) return;
+                    pressed = null;
+                    var handler = leading.getTransferHandler();
+                    handler.setDragImage(dragImage());
+                    handler.exportAsDrag(leading, event, TransferHandler.COPY);
+                }
+            };
+            leading.addMouseListener(gesture); leading.addMouseMotionListener(gesture);
+            own(() -> { leading.removeMouseListener(gesture); leading.removeMouseMotionListener(gesture); leading.setTransferHandler(null); });
+        }
+        /** The leading image as the drag shows it, at its size; null without one. */
+        private Image dragImage() {
+            var icon = leading.getIcon();
+            if (icon == null) return null;
+            var image = new java.awt.image.BufferedImage(icon.getIconWidth(), icon.getIconHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var g = image.createGraphics();
+            try { icon.paintIcon(leading, g, 0, 0); } finally { g.dispose(); }
+            return image;
+        }
+        /**
+         * What a drag of the leading image offers: the field's drag text as a URL when it parses as one, the file a
+         * {@code file:} URL names when it exists, and the text. Null while the field shows no leading image or has no
+         * drag text.
+         */
+        java.awt.datatransfer.Transferable leadingTransfer() { return drags() ? new DragText(((Nodes.Field) node).leadingDrag().orElseThrow()) : null; }
+        /** Whether the field shows its leading image and has drag text for it. */
+        private boolean drags() { return !closed && leadingArtwork != null && ((Nodes.Field) node).leadingDrag().isPresent(); }
+        /**
+         * A left press that brings the focus into a select-on-click field selects all its text when it is released, as
+         * focusing the field from the keyboard does, unless the press dragged out a selection of its own; while the field
+         * has the focus, a click places the caret.
+         */
+        private void selectOnClick() {
+            var clicks = new java.awt.event.MouseAdapter() {
+                @Override public void mousePressed(java.awt.event.MouseEvent event) {
+                    selectOnRelease = ((Nodes.Field) node).selectOnClick() && SwingUtilities.isLeftMouseButton(event) && !event.isPopupTrigger()
+                        && !event.isShiftDown() && !input.isFocusOwner();
+                }
+                @Override public void mouseReleased(java.awt.event.MouseEvent event) {
+                    if (!selectOnRelease) return;
+                    selectOnRelease = false;
+                    if (!closed && input.getSelectionStart() == input.getSelectionEnd()) input.selectAll();
+                }
+            };
+            input.addMouseListener(clicks); own(() -> input.removeMouseListener(clicks));
+        }
+        /** The field's leading image decoded, once per image; null without one, or when it does not decode. */
+        private dev.jasper.ui.icons.EncodedArtwork leadingArtwork(Nodes.Field field) {
+            var image = field.leadingImage().orElse(null);
+            if (image == null) return null;
+            if (!image.equals(decodedImage)) {
+                decodedImage = image;
+                try {
+                    var artwork = new dev.jasper.ui.icons.EncodedArtwork(dev.jasper.ui.icons.EncodedArtwork.Format.PNG, image.png());
+                    artwork.prepare();
+                    leadingArtwork = artwork;
+                } catch (IllegalArgumentException undecodable) { leadingArtwork = null; }
+            }
+            return leadingArtwork;
         }
         /**
          * Enter in a single-line field with a trailing action runs that action (for example adding a typed entry) and
@@ -313,17 +395,22 @@ final class TextFields {
             error.setFont(ThemePainting.font(context(), Typography.Role.CAPTION)); error.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ERROR));
             surface.error = !field.state().error().isEmpty();
             leading.setFont(ThemePainting.font(context(), Typography.Role.MONO)); leading.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PLACEHOLDER));
-            leading.setText(field.kind() == Nodes.FieldKind.PORT ? ":" : "");
-            if (field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PATH) {
+            // A leading image takes the kind's glyph place and box under every look (Field.leadingImage).
+            var artwork = leadingArtwork(field);
+            boolean glyphKind = field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH;
+            // The palette's transparent query shows the rail-size glyph its reference depicts.
+            int extent=columnSearch ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_GLYPH) : com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), panelSearch || surface.transparent ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
+            leading.setText(artwork == null && field.kind() == Nodes.FieldKind.PORT ? ":" : "");
+            if (artwork != null) leading.setIcon(artwork.icon(extent));
+            else if (field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PATH) {
                 String name=field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : "search";
-                // The palette's transparent query shows the rail-size glyph its reference depicts.
-                int extent=columnSearch ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_GLYPH) : com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), panelSearch || surface.transparent ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
                 leading.setIcon(panelSearch ? context().icons().panel(name, context().theme().semantic(), SemanticColor.HUE_NEUTRAL,extent)
                     : context().icons().icon(name,context().theme(),SemanticColor.TEXT_PLACEHOLDER,extent));
-            }
-            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP
+            } else leading.setIcon(null);
+            if (artwork != null && leading.getParent() == null) surface.add(leading, BorderLayout.WEST);
+            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT && artwork == null ? DesignMetrics.Role.PORT_PREFIX_GAP
                 : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_ICON_GAP : settings && field.kind() == Nodes.FieldKind.SEARCH ? DesignMetrics.Role.SETTINGS_SEARCH_ICON_GAP : DesignMetrics.Role.ICON_GAP);
-            leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH && context().faces().fields.glyph(field.kind()));
+            leading.setVisible(artwork != null || glyphKind && field.presentation() != Nodes.FieldPresentation.PLAIN_PATH && context().faces().fields.glyph(field.kind()));
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
             int padding = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_PADDING : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_PADDING : field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
@@ -347,6 +434,51 @@ final class TextFields {
             Insets i=parent.getInsets();int width=Math.max(0,parent.getWidth()-i.left-i.right),height=Math.max(0,parent.getHeight()-i.top-i.bottom);
             int gap=Math.min(getHgap(),width),tw=Math.min(trailing.getPreferredSize().width,Math.max(0,(width-gap)/2));
             control.setBounds(i.left,i.top,Math.max(0,width-gap-tw),height);trailing.setBounds(parent.getWidth()-i.right-tw,i.top,tw,height);
+        }
+    }
+    /**
+     * A leading image's drag text: as a {@code java.net.URL} when it is an absolute URL Java can open, as the file a
+     * {@code file:} URL names when that file exists, and as text; drop targets take the first they understand.
+     */
+    static final class DragText implements java.awt.datatransfer.Transferable {
+        static final java.awt.datatransfer.DataFlavor URL = urlFlavor();
+        private final String text;
+        private final java.net.URL url;
+        private final java.util.List<java.io.File> files;
+        DragText(String text) {
+            this.text = text;
+            java.net.URI uri;
+            try { uri = new java.net.URI(text); } catch (java.net.URISyntaxException notUri) { uri = null; }
+            java.net.URL parsed = null;
+            if (uri != null && uri.isAbsolute()) try { parsed = uri.toURL(); } catch (java.net.MalformedURLException | IllegalArgumentException unknownScheme) { parsed = null; }
+            url = parsed;
+            files = parsed != null && "file".equalsIgnoreCase(uri.getScheme()) ? file(uri) : null;
+        }
+        private static java.util.List<java.io.File> file(java.net.URI uri) {
+            try {
+                var path = java.nio.file.Path.of(uri);
+                return java.nio.file.Files.exists(path) ? java.util.List.of(path.toFile()) : null;
+            } catch (IllegalArgumentException | java.nio.file.FileSystemNotFoundException | SecurityException notLocal) { return null; }
+        }
+        private static java.awt.datatransfer.DataFlavor urlFlavor() {
+            try { return new java.awt.datatransfer.DataFlavor("application/x-java-url; class=java.net.URL"); }
+            catch (ClassNotFoundException impossible) { throw new IllegalStateException(impossible); }
+        }
+        @Override public java.awt.datatransfer.DataFlavor[] getTransferDataFlavors() {
+            var flavors = new java.util.ArrayList<java.awt.datatransfer.DataFlavor>();
+            if (url != null) flavors.add(URL);
+            if (files != null) flavors.add(java.awt.datatransfer.DataFlavor.javaFileListFlavor);
+            flavors.add(java.awt.datatransfer.DataFlavor.stringFlavor);
+            return flavors.toArray(java.awt.datatransfer.DataFlavor[]::new);
+        }
+        @Override public boolean isDataFlavorSupported(java.awt.datatransfer.DataFlavor flavor) {
+            return java.util.Arrays.asList(getTransferDataFlavors()).contains(flavor);
+        }
+        @Override public Object getTransferData(java.awt.datatransfer.DataFlavor flavor) throws java.awt.datatransfer.UnsupportedFlavorException {
+            if (url != null && URL.equals(flavor)) return url;
+            if (files != null && java.awt.datatransfer.DataFlavor.javaFileListFlavor.equals(flavor)) return files;
+            if (java.awt.datatransfer.DataFlavor.stringFlavor.equals(flavor)) return text;
+            throw new java.awt.datatransfer.UnsupportedFlavorException(flavor);
         }
     }
     static final class NumericFilter extends DocumentFilter {

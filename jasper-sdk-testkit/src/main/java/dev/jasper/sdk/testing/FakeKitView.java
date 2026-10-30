@@ -96,6 +96,14 @@ public final class FakeKitView implements UiView {
  * @param fieldId field node
  * @param text the text typed */
  public void type(String fieldId,String text){guard();Objects.requireNonNull(text);if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(field.readOnly()||!live(fieldId))return;emit(new UiEvent.Edited(fieldId,text));}
+ /**
+ * Simulate a person clicking into a field, as the host's field takes the click: the field takes the focus
+ * ({@link #focused()}); a {@code selectOnClick} field that did not have the focus selects all its text
+ * ({@link #fieldSelection(String)}), and any other click selects nothing. A field that is hidden, disabled or busy
+ * (itself or a container above it) takes no click.
+ * @param fieldId field node
+ * @since 0.27.0 */
+ public void clickInto(String fieldId){guard();if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(!live(fieldId))return;boolean entering=!fieldId.equals(focused);focused=fieldId;if(field.selectOnClick()&&entering)fieldSelections.put(fieldId,new int[]{0,fieldText.get(fieldId).length()});else fieldSelections.remove(fieldId);}
  private boolean live(String id){var nodes=mounted(spec.root());for(String step:path(spec.root(),id)){var state=nodes.get(step).state();if(!state.visible()||!state.enabled()||state.busy())return false;}return true;}
  void contentFont(java.awt.Font font){for(var content:List.copyOf(contents.values()))content.component().setFont(font);}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);

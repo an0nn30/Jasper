@@ -36,6 +36,25 @@ class FakeKitTest { @Test void kitOwnsCreatedViews() throws Exception {
   assertThatIllegalArgumentException().isThrownBy(() -> view.type("root","typed"));
   kit.close();
  });}
+ /** Plan 4b Task 1: a click into a field focuses it; only a select-on-click field it brings the focus into selects all, and a hidden one takes no click. */
+ @Test void aClickIntoAFieldFocusesItAndSelectsAllOnlyWhenItBringsTheFocusIn() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
+  var kit=new FakeKit("sample");var ready=dev.jasper.sdk.ui.ControlState.READY;
+  var address=new dev.jasper.sdk.ui.Nodes.Field("address",ready,dev.jasper.sdk.ui.Nodes.FieldKind.TEXT,"example.com","","Address","",java.util.Optional.empty(),
+   dev.jasper.sdk.ui.Nodes.FieldPresentation.STANDARD,"","","",false,java.util.Optional.empty(),java.util.Optional.empty(),true);
+  var tucked=new dev.jasper.sdk.ui.Nodes.Field("tucked",ready,dev.jasper.sdk.ui.Nodes.FieldKind.TEXT,"x","","Tucked","",java.util.Optional.empty(),
+   dev.jasper.sdk.ui.Nodes.FieldPresentation.STANDARD,"","","",false,java.util.Optional.empty(),java.util.Optional.empty(),true);
+  var hidden=new dev.jasper.sdk.ui.Nodes.Stack("hidden",new dev.jasper.sdk.ui.ControlState(false,true,false,""),dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,java.util.List.of(tucked));
+  var view=(FakeKitView)kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("root",ready,dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,java.util.List.of(address,hidden))),e -> {});
+  view.clickInto("address");
+  assertThat(view.focused()).contains("address");
+  assertThat(view.fieldSelection("address")).containsExactly(0,"example.com".length());
+  view.clickInto("address");
+  assertThat(view.fieldSelection("address")).as("a click in the focused field places the caret").containsExactly(0,0);
+  view.clickInto("tucked");
+  assertThat(view.focused()).as("a hidden field takes no click").contains("address");
+  assertThatIllegalArgumentException().isThrownBy(() -> view.clickInto("root"));
+  kit.close();
+ });}
  /** Plan 3c: rows unmount a table's empty state, so the fake drops focus inside it and refuses its nodes, as the host does. */
  @Test void rowsReplacingAFocusedEmptyStateClearFocusInTheFake() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
   var kit=new FakeKit("sample");var view=(FakeKitView)kit.create(KitContractTest.tables("card",false),e -> {});
@@ -73,5 +92,6 @@ class FakeKitContractTest extends KitContractTest {
  protected void type(dev.jasper.sdk.ui.UiView view,String id,String text){((FakeKitView)view).type(id,text);}
  /** The fake has no components: a click is the event the host's button or option reports. */
  protected void click(dev.jasper.sdk.ui.UiView view,String id){int option=id.indexOf(".option.");emit(view,option<0?new dev.jasper.sdk.ui.UiEvent.Action(id):new dev.jasper.sdk.ui.UiEvent.Selected(id.substring(0,option),java.util.Set.of(id.substring(option+".option.".length()))));}
+ protected void clickInto(dev.jasper.sdk.ui.UiView view,String id){((FakeKitView)view).clickInto(id);}
  protected void stop(dev.jasper.sdk.ui.UiKit kit){((FakeKit)kit).close();}
 }

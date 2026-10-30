@@ -74,6 +74,7 @@ class VersionRangeTest {
         assertThat(VersionRange.parse(">=0.23.0, <0.24").contains(host)).as("the former bundled range").isFalse();
         assertThat(VersionRange.parse(">=0.24.0, <0.25").contains(host)).as("the former bundled range").isFalse();
         assertThat(VersionRange.parse(">=0.25.0, <0.26").contains(host)).as("the former bundled range").isFalse();
-        assertThat(VersionRange.parse(">=0.26.0, <0.27").contains(host)).as("every bundled range").isTrue();
+        assertThat(VersionRange.parse(">=0.26.0, <0.27").contains(host)).as("the former bundled range").isFalse();
+        assertThat(VersionRange.parse(">=0.27.0, <0.28").contains(host)).as("every bundled range").isTrue();
     }
 }

@@ -557,6 +557,11 @@ class AppContractTest extends PluginContractTest {
                     .flatMap(dev.jasper.app.contributions.Tab::restore).or(() -> terminalFixture.sessionRestore(tabId))
                     .map(saved -> new dev.jasper.sdk.RestoreState(saved.kind(), saved.state())));
             }
+            @Override public String contentIcon(UUID tabId) {
+                return onEdtValue(() -> contributions.tabs().tab(new dev.jasper.app.layout.TabId(tabId))
+                    .filter(tab -> tab.kind() == dev.jasper.app.contributions.Tab.Kind.HOSTED && !tab.closed()).map(dev.jasper.app.contributions.Tab::icon)
+                    .map(icon -> icon instanceof dev.jasper.app.platform.PresentationIcon named ? "icon:" + named.name() : "image").orElse("-"));
+            }
             @Override public void closeTab(UUID tabId) { onEdt(() -> terminalFixture.closeTab(tabId)); }
             @Override public List<List<UUID>> windowTabs(UUID windowId) { return onEdtValue(() -> terminalFixture.windowTabs(windowId)); }
             @Override public UUID addTerminalTab(UUID windowId, String title) { return onEdtValue(() -> terminalFixture.addTab(windowId, title)); }

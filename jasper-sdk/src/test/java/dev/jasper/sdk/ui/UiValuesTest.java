@@ -9,6 +9,49 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class UiValuesTest {
+    /** The PNG signature followed by {@code length - 8} zero bytes: a PNG to the SDK, which reads only the signature. */
+    static byte[] png(int length) {
+        byte[] data = new byte[length];
+        System.arraycopy(new byte[]{(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, 0, data, 0, 8);
+        return data;
+    }
+
+    /** Plan 4b Task 1 (SDK 0.27.0): a pixel image is a PNG of at most 65,536 bytes, copied in and out. */
+    @Test void aPixelImageIsAPngOfAtMost65536BytesCopiedInAndOut() {
+        byte[] data = png(64);
+        data[20] = 7;
+        var image = new PixelImage(data);
+        data[20] = 9;
+        assertThat(image.png()[20]).as("copied in").isEqualTo((byte) 7);
+        image.png()[20] = 9;
+        assertThat(image.png()[20]).as("copied out").isEqualTo((byte) 7);
+        assertThat(image).isEqualTo(new PixelImage(image.png())).hasSameHashCodeAs(new PixelImage(image.png()));
+        assertThat(image).isNotEqualTo(new PixelImage(png(64)));
+        assertThat(image).hasToString("PixelImage[64 bytes]");
+        assertThat(new PixelImage(png(65_536)).png()).hasSize(65_536);
+        assertThatIllegalArgumentException().isThrownBy(() -> new PixelImage(png(65_537)))
+            .withMessage("A pixel image holds at most 65536 bytes, not 65537");
+        byte[] gif = {'G', 'I', 'F', '8', '9', 'a', 1, 0, 1, 0};
+        for (byte[] refused : List.of(gif, new byte[0], java.util.Arrays.copyOf(png(8), 7)))
+            assertThatIllegalArgumentException().isThrownBy(() -> new PixelImage(refused)).withMessage("A pixel image must be a PNG");
+        assertThatNullPointerException().isThrownBy(() -> new PixelImage(null));
+    }
+
+    /** Plan 4b Task 1 (SDK 0.27.0): a content tab shows its presentation's image, and the icon name stays the fallback. */
+    @Test void aContentPresentationsImageKeepsItsIconAsTheFallback() {
+        var plain = new ContentPresentation("Example", "example.com", "file", true, "https://example.com/", "example.com");
+        assertThat(plain.image()).isEmpty();
+        var image = new PixelImage(png(32));
+        var shown = plain.withImage(image);
+        assertThat(shown.image()).contains(image);
+        assertThat(shown).isEqualTo(new ContentPresentation("Example", "example.com", "file", true, "https://example.com/", "example.com",
+            Optional.of(image)));
+        assertThat(shown.icon()).isEqualTo("file");
+        assertThat(new ContentPresentation("Example", "", null, false, "", "").withImage(image).icon()).isNull();
+        assertThatNullPointerException().isThrownBy(() -> plain.withImage(null));
+        assertThatNullPointerException().isThrownBy(() -> new ContentPresentation("Example", "", "file", false, "", "", null));
+    }
+
     /** Vim IdeaVim keys spec 4: a status item may carry an icon, a dimmed state and a menu. */
     @Test void contentStatusCarriesAnIconADimmedStateAndACopiedMenu() {
         Runnable r = () -> {};

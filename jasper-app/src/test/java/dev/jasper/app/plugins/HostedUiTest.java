@@ -753,6 +753,54 @@ class HostedUiTest {
             new dev.jasper.sdk.ui.ContentStatus("NORMAL", "Vim mode", null, "dev.x.tool:missing", false, List.of()))));
     }
 
+    /** A {@code size} by {@code size} PNG in one colour. */
+    static dev.jasper.sdk.ui.PixelImage png(int size, java.awt.Color color) {
+        var image = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { g.setColor(color); g.fillRect(0, 0, size, size); } finally { g.dispose(); }
+        var out = new java.io.ByteArrayOutputStream();
+        try { javax.imageio.ImageIO.write(image, "png", out); } catch (java.io.IOException failure) { throw new AssertionError(failure); }
+        return new dev.jasper.sdk.ui.PixelImage(out.toByteArray());
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a content tab shows its presentation's image, decoded once and drawn in its icon's box;
+     * the icon name is the fallback for an image that does not decode.
+     */
+    @Test void aContentTabShowsItsPresentationsImageInItsIconsBoxAndFallsBackToItsIconName() {
+        UUID window = terminalFixture.addWindow();
+        model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(window, tab -> { }, tab -> { }, tab -> { }, () -> { },
+            tab -> Optional.empty(), (tab, group, side) -> { }, (tab, side) -> false, tab -> false, tab -> { }, tab -> java.util.List.of(),
+            (tab, number) -> { }));
+        var page = ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), terminals.windowHandle(window), view());
+        var tab = model.tabs().inWindow(window).getFirst();
+        var plain = new dev.jasper.sdk.ui.ContentPresentation("Example", "", "file", false, "https://example.com/", "");
+        page.setPresentation(plain);
+        var named = tab.icon();
+        assertThat(named).isInstanceOf(dev.jasper.app.platform.PresentationIcon.class);
+        var red = png(32, java.awt.Color.RED);
+        page.setPresentation(plain.withImage(red));
+        var shown = tab.icon();
+        assertThat(shown).isNotInstanceOf(dev.jasper.app.platform.PresentationIcon.class);
+        assertThat(shown.getIconWidth()).as("the icon's box").isEqualTo(named.getIconWidth());
+        assertThat(shown.getIconHeight()).isEqualTo(named.getIconHeight());
+        int[] pixels = dev.jasper.app.testsupport.IconPixels.of(shown);
+        assertThat(pixels[pixels.length / 2 + shown.getIconWidth() / 2]).as("the image, scaled into the box").isEqualTo(0xffff0000);
+        page.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Example, reloaded", "", "file", true, "", "").withImage(png(32, java.awt.Color.RED)));
+        assertThat(tab.icon()).as("the same image is decoded once").isSameAs(shown);
+        assertThat(tab.title()).isEqualTo("Example, reloaded");
+        byte[] signatureOnly = new byte[64];
+        System.arraycopy(new byte[]{(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, 0, signatureOnly, 0, 8);
+        page.setPresentation(plain.withImage(new dev.jasper.sdk.ui.PixelImage(signatureOnly)));
+        assertThat(tab.icon()).as("the icon name is the fallback").isInstanceOf(dev.jasper.app.platform.PresentationIcon.class);
+        page.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Example", "", null, false, "", "").withImage(new dev.jasper.sdk.ui.PixelImage(signatureOnly)));
+        assertThat(tab.icon()).as("no icon to fall back to").isNull();
+        page.setPresentation(plain);
+        assertThat(tab.icon()).isInstanceOf(dev.jasper.app.platform.PresentationIcon.class);
+        assertThatIllegalArgumentException().as("an image does not excuse an unknown icon name")
+            .isThrownBy(() -> page.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Example", "", "missing", false, "", "").withImage(red)));
+    }
+
     /** A closed content tab's status, as its presentation, changes nothing, even with an icon no longer registered. */
     @Test void aClosedContentTabsStatusChangesNothing() {
         UUID window = terminalFixture.addWindow();

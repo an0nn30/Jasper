@@ -20,6 +20,8 @@ public abstract class KitContractTest {
     protected abstract void type(UiView view,String id,String text);
     /** Clicks what a person sees as {@code id}: a button whose action is its id, or a choice's option {@code choice.option.value}. */
     protected abstract void click(UiView view,String id);
+    /** Clicks into field {@code id} as a person would, the focus elsewhere. */
+    protected abstract void clickInto(UiView view,String id);
     protected static void edt(Runnable body) throws Exception { SwingUtilities.invokeAndWait(body); }
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
@@ -105,6 +107,25 @@ public abstract class KitContractTest {
             new Nodes.Field("locked", ControlState.READY, Nodes.FieldKind.TEXT, "", "", "Login", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", locked),
             new Nodes.Field("shown", ControlState.READY, Nodes.FieldKind.TEXT, "No folder selected", "", "Folder", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", true))));
     }
+
+    /** Plan 4b Task 1 (SDK 0.27.0): a click into a select-on-click field selects all its text; a click into another field selects none. */
+    @Test void aClickIntoASelectOnClickFieldSelectsAllItsText() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        String address = "https://example.com/";
+        var spec = new ViewSpec(new Nodes.Stack("root", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Field("address", ControlState.READY, Nodes.FieldKind.TEXT, address, "Search or enter website name", "Address", "", Optional.empty(),
+                Nodes.FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), Optional.empty(), true),
+            new Nodes.Field("plain", ControlState.READY, Nodes.FieldKind.TEXT, address, "", "Plain", ""))));
+        var view = kit.create(spec, events::add);
+        try {
+            clickInto(view, "address");
+            assertThat(fieldSelection(view, "address")).containsExactly(0, address.length());
+            clickInto(view, "plain");
+            var plain = fieldSelection(view, "plain");
+            assertThat(plain[1]).as("no selection").isEqualTo(plain[0]);
+            assertThat(events).isEmpty();
+        } finally { view.close(); stop(kit); }
+    }); }
 
     @Test void windowPlainPathAndDiscreetInputRetainTheAdditiveContract() throws Exception { edt(()->{
         var path=new Nodes.Field("path",ControlState.READY,Nodes.FieldKind.PATH,"/synthetic/key","Hint","Path","browse",Optional.empty(),Nodes.FieldPresentation.PLAIN_PATH);

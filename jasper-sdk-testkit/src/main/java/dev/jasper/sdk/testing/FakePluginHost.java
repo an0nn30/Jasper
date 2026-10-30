@@ -2145,6 +2145,13 @@ public final class FakePluginHost implements AutoCloseable {
         return workspace.tab(tabId).map(tab -> tab.pane).map(pane -> pane.session).flatMap(session -> session.spec.restore());
     }
 
+    /** The presentation of the plugin content tab with this id, for the contract harness; empty for any other tab. */
+    java.util.Optional<dev.jasper.sdk.ui.ContentPresentation> contentPresentation(UUID tabId) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeContent content : context.ui.contents) if (content.tab.id.equals(tabId)) return java.util.Optional.of(content.presentation);
+        return java.util.Optional.empty();
+    }
+
     /**
      * The restore state a plugin's content tab gives. Call it on the UI thread.
      *

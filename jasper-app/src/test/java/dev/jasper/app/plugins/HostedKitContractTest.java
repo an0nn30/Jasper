@@ -20,5 +20,9 @@ class HostedKitContractTest extends KitContractTest {
  static Component named(Component c,String name){if(name.equals(c.getName()))return c;if(c instanceof Container p)for(var child:p.getComponents()){var result=named(child,name);if(result!=null)return result;}return null;}
  /** Whether {@code c} and every container above it, up to {@code root}, is visible. */
  static boolean shown(Component c,Component root){for(var at=c;at!=null;at=at.getParent()){if(!at.isVisible())return false;if(at==root)return true;}return false;}
+ /** As a person clicks into a field whose window has the focus elsewhere: a left press and release on its input. */
+ protected void clickInto(UiView view,String id){var field=input(((HostedKitView)view).component(),id+".input");long when=System.currentTimeMillis();
+  for(int type:new int[]{java.awt.event.MouseEvent.MOUSE_PRESSED,java.awt.event.MouseEvent.MOUSE_RELEASED,java.awt.event.MouseEvent.MOUSE_CLICKED})
+   field.dispatchEvent(new java.awt.event.MouseEvent(field,type,when,type==java.awt.event.MouseEvent.MOUSE_PRESSED?java.awt.event.InputEvent.BUTTON1_DOWN_MASK:0,2,2,1,false,java.awt.event.MouseEvent.BUTTON1));}
  protected void stop(UiKit kit){((HostedKit)kit).close();}
 }

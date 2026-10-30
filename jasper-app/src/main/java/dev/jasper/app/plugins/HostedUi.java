@@ -664,8 +664,20 @@ final class HostedUi {
     private final java.util.Map<dev.jasper.app.contributions.Tab, OwnedContent> ownedContent = new java.util.IdentityHashMap<>();
     private final class OwnedContent implements dev.jasper.sdk.ui.ContentTab {
         final dev.jasper.app.contributions.Tab entry;
+        /** The image the tab last showed and its icon: a plugin sets the same image on every presentation, decoded once. */
+        private dev.jasper.sdk.ui.PixelImage shownImage;
+        private Optional<Icon> shownImageIcon = Optional.empty();
         OwnedContent(dev.jasper.app.contributions.Tab entry) { this.entry = entry; }
-        public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) { requireUi("content presentation"); if(entry.closed())return; entry.presentation(v.title(), v.detail(), icon(v.icon()), v.dirty(), v.location(), v.host()); }
+        /** The tab shows the presentation's image in its icon's box; the icon name, checked either way, is the fallback for one that does not decode. */
+        public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) {
+            requireUi("content presentation"); if(entry.closed())return;
+            Icon named = icon(v.icon());
+            entry.presentation(v.title(), v.detail(), v.image().flatMap(this::imageIcon).orElse(named), v.dirty(), v.location(), v.host());
+        }
+        private Optional<Icon> imageIcon(dev.jasper.sdk.ui.PixelImage image) {
+            if (!image.equals(shownImage)) { shownImage = image; shownImageIcon = kit.image(image); }
+            return shownImageIcon;
+        }
         public void setCommands(List<dev.jasper.sdk.ui.ContentCommand> values) { requireUi("content commands"); entry.commands(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentCommand(v.id(), v.title(), v.shortcut(), v.enabled(), () -> containment.run(pluginId, "content command", v.run()))).toList()); }
         public void setStatus(List<dev.jasper.sdk.ui.ContentStatus> values) { requireUi("content status"); if(entry.closed())return; entry.status(values.stream().map(v ->

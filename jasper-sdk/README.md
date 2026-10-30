@@ -40,7 +40,7 @@ any third-party plugin. The SDK depends only on the JDK.
 | Group | Types |
 | --- | --- |
 | Actions and where they appear | `Actions`, `ActionSpec`, `ActionContext`, `PluginAction`, `ShortcutContext`, `Toolbar`, `ToolbarItem`, `ToolbarViewFactory`, `Menus`, `StandardMenu`, `PluginMenu`, `StatusBar`, `StatusItemSpec`, `Side`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Rail` |
-| Declarative views | `UiKit`, `ViewSpec`, `Nodes`, `UiView`, `UiEvent`, `ControlState`, `ListItem`, `TableRow`, `TreeItem`, `Column`, `Option`, `MenuItem`, `Crumb`, `CustomContent`, `IconAsset`, `UiAnchor` |
+| Declarative views | `UiKit`, `ViewSpec`, `Nodes`, `UiView`, `UiEvent`, `ControlState`, `ListItem`, `TableRow`, `TreeItem`, `Column`, `Option`, `MenuItem`, `Crumb`, `CustomContent`, `IconAsset`, `PixelImage`, `UiAnchor` |
 | Tool windows | `Panels`, `PanelSpec`, `Anchor`, `PanelFactory`, `PanelHost`, `PanelPlacement`, `PanelMode`, `PanelHeader` |
 | Dialogs, content tabs and split items | `Windows`, `WindowSurface`, `DialogSpec`, `PluginDialog`, `OverlaySpec`, `PluginPopover`, `ContentSpec`, `ContentTab`, `TabPlacement`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `SplitItemSpec`, `SplitChoice`, `TabChoice`, `TabRestorer`, `RestoreRequest` |
 | Colours for custom content and the look | `Appearance`, `SemanticColor`, `WorkspacePalette`, `EditorPalette`, `EditorScheme`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Presentation`, `TerminalTypography` |
@@ -54,17 +54,17 @@ Jasper and the testkit implement the other service interfaces; `FileLocation`, `
 
 ## Versioning
 
-[`JasperSdk.VERSION`](../docs/sdk-reference.html#dev.jasper.sdk.JasperSdk.VERSION) is `0.26.0`. A plugin's
+[`JasperSdk.VERSION`](../docs/sdk-reference.html#dev.jasper.sdk.JasperSdk.VERSION) is `0.27.0`. A plugin's
 `plugin.toml` names the SDK versions it runs on as comma-separated comparators (`>=`, `>`, `<=`, `<`, `=`), all of
 which must hold. 0.x carries no compatibility promise, so a plugin admits the one minor version it was built against,
 as the bundled plugins do:
 
 ```toml
-sdk = ">=0.26.0, <0.27"
+sdk = ">=0.27.0, <0.28"
 ```
 
-A plugin that uses something only a later 0.26 version has starts its range there. Every bundled plugin declares
-`sdk = ">=0.26.0, <0.27"`.
+A plugin that uses something only a later 0.27 version has starts its range there. Every bundled plugin declares
+`sdk = ">=0.27.0, <0.28"`.
 
 Jasper checks the range at launch: a plugin whose range does not contain the running SDK is skipped, and Settings ›
 Plugins shows it as Skipped with the reason "needs SDK *range*; this is SDK *version*". Install from Zip… refuses such a
