@@ -30,43 +30,62 @@ class KitValuesTest {
             assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
                 Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", true)).withMessageContaining("never read-only");
     }
+    /** A field of {@code kind} with this leading slot and select-on-click; NUMBER takes a shape and {@code presentation}. */
+    private static Field leading(FieldKind kind, FieldPresentation presentation, Optional<PixelImage> image, String icon, String name,
+                                 Optional<String> drag, boolean selectOnClick) {
+        return new Field("f", ControlState.READY, kind, kind == FieldKind.NUMBER ? "1" : "", "", "Field", "",
+            kind == FieldKind.NUMBER ? Optional.of(new Numeric(0, 9, 1, 0)) : Optional.empty(), presentation, "", "", "", false,
+            image, icon, name, drag, selectOnClick);
+    }
     /**
-     * Plan 4b Task 1 (SDK 0.27.0): a field has no leading image, drag text or select-on-click unless it says so; the drag
-     * text needs the image, and a multiline field, a stepper and a slider take none of them.
+     * Plan 4b Task 1 (SDK 0.27.0): a field has no leading image, icon, name or drag text and no select-on-click unless it
+     * says so; the name and the drag text need an image or an icon, and a multiline field, a stepper and a slider take
+     * none of them.
      */
-    @Test void leadingImagesDragTextAndSelectOnClickAreValidatedAndDefaultToNone() {
+    @Test void leadingSlotsAndSelectOnClickAreValidatedAndDefaultToNone() {
         var plain = new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "", Optional.empty(), FieldPresentation.STANDARD, "", "", "", true);
         assertThat(plain.leadingImage()).isEmpty();
+        assertThat(plain.leadingIcon()).isEmpty();
+        assertThat(plain.leadingName()).isEmpty();
         assertThat(plain.leadingDrag()).isEmpty();
         assertThat(plain.selectOnClick()).isFalse();
         assertThat(plain.readOnly()).isTrue();
         var image = new PixelImage(UiValuesTest.png(32));
         var address = new Field("address", ControlState.READY, FieldKind.TEXT, "https://example.com/", "Search or enter website name", "Address", "go",
-            Optional.empty(), FieldPresentation.EMBEDDED, "", "revert", "", false, Optional.of(image), Optional.of("https://example.com/"), true);
+            Optional.empty(), FieldPresentation.EMBEDDED, "", "revert", "", false, Optional.of(image), "dev.jasper.browser:globe",
+            "Site icon - drag to copy URL", Optional.of("https://example.com/"), true);
         assertThat(address.leadingImage()).contains(image);
+        assertThat(address.leadingIcon()).isEqualTo("dev.jasper.browser:globe");
+        assertThat(address.leadingName()).isEqualTo("Site icon - drag to copy URL");
         assertThat(address.leadingDrag()).contains("https://example.com/");
         assertThat(address.selectOnClick()).isTrue();
-        assertThat(new Field("find", ControlState.READY, FieldKind.SEARCH, "", "", "Find", "", Optional.empty(), FieldPresentation.STANDARD, "", "", "",
-            false, Optional.of(image), Optional.empty(), false).leadingImage()).as("an image without a drag").contains(image);
-        assertThatIllegalArgumentException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
-            FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), Optional.of("https://example.com/"), false))
-            .withMessage("A field's drag text needs a leading image");
-        assertThatIllegalArgumentException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
-            FieldPresentation.STANDARD, "", "", "", false, Optional.of(image), Optional.of(" "), false)).withMessage("leadingDrag must not be blank");
-        assertThatIllegalArgumentException().isThrownBy(() -> new Field("notes", ControlState.READY, FieldKind.TEXTAREA, "", "", "Notes", "", Optional.empty(),
-            FieldPresentation.STANDARD, "", "", "", false, Optional.of(image), Optional.empty(), false)).withMessage("A multiline field takes no leading image");
-        for (var presentation : List.of(FieldPresentation.STEPPER, FieldPresentation.SLIDER)) {
-            assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
-                Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", false, Optional.of(image), Optional.empty(), false))
-                .withMessage("A stepper or slider takes no leading image and no select-on-click");
-            assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
-                Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", false, Optional.empty(), Optional.empty(), true))
-                .withMessage("A stepper or slider takes no leading image and no select-on-click");
-        }
-        assertThatNullPointerException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
-            FieldPresentation.STANDARD, "", "", "", false, null, Optional.empty(), false));
-        assertThatNullPointerException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
-            FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), null, false));
+        assertThat(leading(FieldKind.SEARCH, FieldPresentation.STANDARD, Optional.of(image), "", "", Optional.empty(), false).leadingImage())
+            .as("an image without an icon, a name or a drag").contains(image);
+        assertThat(leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.empty(), "network", "Site icon", Optional.of("https://example.com/"), false)
+            .leadingDrag()).as("an icon alone takes a name and a drag").contains("https://example.com/");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.empty(), "", "",
+            Optional.of("https://example.com/"), false)).withMessage("A field's drag text needs a leading image or icon");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.empty(), "", "Site icon",
+            Optional.empty(), false)).withMessage("A field's leading name needs a leading image or icon");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.of(image), "", "",
+            Optional.of(" "), false)).withMessage("leadingDrag must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.of(image), "", " ",
+            Optional.empty(), false)).withMessage("leadingName must not be blank");
+        for (var refused : List.<Runnable>of(
+                () -> leading(FieldKind.TEXTAREA, FieldPresentation.STANDARD, Optional.of(image), "", "", Optional.empty(), false),
+                () -> leading(FieldKind.TEXTAREA, FieldPresentation.STANDARD, Optional.empty(), "network", "", Optional.empty(), false),
+                () -> leading(FieldKind.TEXTAREA, FieldPresentation.STANDARD, Optional.empty(), "", "", Optional.empty(), true)))
+            assertThatIllegalArgumentException().isThrownBy(refused::run).withMessage("A multiline field takes no leading image or icon and no select-on-click");
+        for (var presentation : List.of(FieldPresentation.STEPPER, FieldPresentation.SLIDER))
+            for (var refused : List.<Runnable>of(
+                    () -> leading(FieldKind.NUMBER, presentation, Optional.of(image), "", "", Optional.empty(), false),
+                    () -> leading(FieldKind.NUMBER, presentation, Optional.empty(), "network", "", Optional.empty(), false),
+                    () -> leading(FieldKind.NUMBER, presentation, Optional.empty(), "", "", Optional.empty(), true)))
+                assertThatIllegalArgumentException().isThrownBy(refused::run).withMessage("A stepper or slider takes no leading image or icon and no select-on-click");
+        assertThatNullPointerException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, null, "", "", Optional.empty(), false));
+        assertThatNullPointerException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.empty(), null, "", Optional.empty(), false));
+        assertThatNullPointerException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.empty(), "", null, Optional.empty(), false));
+        assertThatNullPointerException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.empty(), "", "", null, false));
     }
     /** Plan 3b: a rich face's caption is plain text unless it says it is a data value. */
     @Test void pickerFacesDefaultToAPlainCaption() {

@@ -40,9 +40,9 @@ class FakeKitTest { @Test void kitOwnsCreatedViews() throws Exception {
  @Test void aClickIntoAFieldFocusesItAndSelectsAllOnlyWhenItBringsTheFocusIn() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
   var kit=new FakeKit("sample");var ready=dev.jasper.sdk.ui.ControlState.READY;
   var address=new dev.jasper.sdk.ui.Nodes.Field("address",ready,dev.jasper.sdk.ui.Nodes.FieldKind.TEXT,"example.com","","Address","",java.util.Optional.empty(),
-   dev.jasper.sdk.ui.Nodes.FieldPresentation.STANDARD,"","","",false,java.util.Optional.empty(),java.util.Optional.empty(),true);
+   dev.jasper.sdk.ui.Nodes.FieldPresentation.STANDARD,"","","",false,java.util.Optional.empty(),"","",java.util.Optional.empty(),true);
   var tucked=new dev.jasper.sdk.ui.Nodes.Field("tucked",ready,dev.jasper.sdk.ui.Nodes.FieldKind.TEXT,"x","","Tucked","",java.util.Optional.empty(),
-   dev.jasper.sdk.ui.Nodes.FieldPresentation.STANDARD,"","","",false,java.util.Optional.empty(),java.util.Optional.empty(),true);
+   dev.jasper.sdk.ui.Nodes.FieldPresentation.STANDARD,"","","",false,java.util.Optional.empty(),"","",java.util.Optional.empty(),true);
   var hidden=new dev.jasper.sdk.ui.Nodes.Stack("hidden",new dev.jasper.sdk.ui.ControlState(false,true,false,""),dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,java.util.List.of(tucked));
   var view=(FakeKitView)kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("root",ready,dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,java.util.List.of(address,hidden))),e -> {});
   view.clickInto("address");

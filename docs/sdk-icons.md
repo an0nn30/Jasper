@@ -23,14 +23,15 @@ status.setIcon("lock");
 | Notifications | `NotificationSpec.withIcon` | `Optional.empty()` (the severity's icon) |
 | Provided session tabs | `SessionSpec` `icon` | `Optional.empty()` (Jasper's terminal icon) |
 | Content tabs | `ContentPresentation` `icon` | `null` |
-| Declarative views | `Nodes.Icon`; the `icon` of `Button`, `MenuButton`, `Choice`, `Option`, `PickerFace`, `PickerItem` and `MenuItem`; `TableRow` and `TreeItem` | `Nodes.Icon`: required (leave the node out); the `icon` components: `""`; `TableRow` and `TreeItem`: `Optional.empty()` |
+| Declarative views | `Nodes.Icon`; the `icon` of `Button`, `MenuButton`, `Choice`, `Option`, `PickerFace`, `PickerItem` and `MenuItem`; `Field`'s `leadingIcon`; `TableRow` and `TreeItem` | `Nodes.Icon`: required (leave the node out); the `icon` components and `leadingIcon`: `""`; `TableRow` and `TreeItem`: `Optional.empty()` |
 
 The one bitmap the SDK takes is a [`PixelImage`](sdk-reference.html#dev.jasper.sdk.ui.PixelImage): a PNG of at most
 65,536 bytes, such as a web page's favicon, which a content tab shows in place of its icon
 ([`ContentPresentation.withImage`](sdk-reference.html#dev.jasper.sdk.ui.ContentPresentation.withImage(PixelImage))) and a
 field before its text ([`Nodes.Field`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.Field)'s `leadingImage`). Jasper
-decodes it once and draws it scaled into the box of the icon it stands in for, in its own colours. A PNG that does not
-decode shows the content tab's icon name, or the field's glyph.
+decodes it once, without reading its metadata, and draws it scaled into the box of the icon it stands in for, in its
+own colours. A PNG that does not decode shows the content tab's icon name, or the field's `leadingIcon` (else its
+kind's glyph).
 
 Jasper checks every name it receives against the built-in names and the plugin's own registrations, including names in
 menus that have not been opened and in collapsed tree branches, and throws `IllegalArgumentException` ("Unknown icon:

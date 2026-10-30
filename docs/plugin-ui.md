@@ -323,12 +323,16 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
   a NUMBER.
 - A `readOnly` field is focusable, selectable and copyable but never edited, so it reports no `Edited`; a STEPPER or
   SLIDER is never read-only.
-- A `leadingImage`, a [`PixelImage`](sdk-reference.html#dev.jasper.sdk.ui.PixelImage) such as a web page's favicon,
-  stands before the text in place of the kind's glyph, under every look ([plugin icons](sdk-icons.md)). Dragging it
-  offers `leadingDrag`, which needs the image: as a URL when it parses as one, as text, and as the file of a `file:` URL.
-  A `selectOnClick` field selects all its text when a click brings the focus into it, as focusing it from the keyboard
-  does; once it has the focus, a click places the caret. A `TEXTAREA` takes no leading image, and a STEPPER or SLIDER
-  neither a leading image nor `selectOnClick`.
+- The leading slot, before the text, shows the field's own picture in place of the kind's glyph, in the glyph's box,
+  under every look ([plugin icons](sdk-icons.md)): its `leadingImage`, a
+  [`PixelImage`](sdk-reference.html#dev.jasper.sdk.ui.PixelImage) such as a web page's favicon, or, while it has none
+  or the image does not decode, its `leadingIcon` name, drawn in the glyph's colours. `leadingName` is the slot's
+  accessible name and tooltip. Dragging the slot offers `leadingDrag`: as a `java.net.URL` when it is an absolute URL
+  whose scheme Java has a handler for (such as `http`, `https`, `file` or `ftp`), as the local file a `file:` URL names,
+  and as text. The name and the drag text need an image or an icon.
+- A `selectOnClick` field selects all its text when a left click brings the focus into it, unless the press drags out
+  a selection of its own; while the field has the focus, a click places the caret. A `TEXTAREA`, a STEPPER and a SLIDER
+  take no leading image or icon and no `selectOnClick`.
 
 ### Secrets
 
@@ -561,8 +565,8 @@ event dispatch thread, so run the test in `SwingUtilities.invokeAndWait`. A plug
   text)` types into a field as a person would, and a read-only, hidden, disabled or busy field takes nothing;
   `setSecret(id, chars)` fills a secret and reports `SecretChanged`.
 - `focused()`, `revealed()` and `fieldSelection(id)` show what `focus`, `reveal` and `selectAll` did;
-  `clickInto(id)` clicks into a field as a person would, which a `selectOnClick` field answers by selecting all its
-  text; `setComposing(id, true)` plays an input method.
+  `clickInto(id)` clicks into a field as a person would, which a `selectOnClick` field the click brings the focus into
+  answers by selecting all its text; `setComposing(id, true)` plays an input method.
 - [`FakeKit`](sdk-reference.html#dev.jasper.sdk.testing.FakeKit)'s `views()`, `icons()` and `failures()` list its views,
   registered icons and contained handler failures. `FakePluginHost` mounts views where Jasper would: `panelView`,
   `windowView`, `contentView`, `toolbarViews`, `settingsPanelView` and `popoverViews` return them.

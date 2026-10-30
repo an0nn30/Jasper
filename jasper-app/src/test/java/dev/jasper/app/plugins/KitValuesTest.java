@@ -55,11 +55,14 @@ class KitValuesTest {
   var image=new PixelImage(png);
   for(boolean select:List.of(false,true)){
    var spec=new ViewSpec(new Field("address",READY,FieldKind.TEXT,"https://example.com/","Search or enter website name","Address","go",Optional.empty(),
-    FieldPresentation.EMBEDDED,"","revert","",false,Optional.of(image),select?Optional.of("https://example.com/"):Optional.empty(),select));
+    FieldPresentation.EMBEDDED,"","revert","",false,Optional.of(image),select?"network":"",select?"Site icon - drag to copy URL":"",
+    select?Optional.of("https://example.com/"):Optional.empty(),select));
    assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
    var field=(dev.jasper.ui.model.Nodes.Field)KitValues.toModule(spec).root();
    assertThat(field.leadingImage().orElseThrow().png()).isEqualTo(png);
    assertThat(field.leadingDrag()).isEqualTo(spec.root() instanceof Field f?f.leadingDrag():null);
+   assertThat(field.leadingIcon()).isEqualTo(select?"network":"");
+   assertThat(field.leadingName()).isEqualTo(select?"Site icon - drag to copy URL":"");
    assertThat(field.selectOnClick()).isEqualTo(select);
   }
  }

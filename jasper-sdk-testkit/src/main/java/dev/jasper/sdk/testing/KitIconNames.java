@@ -26,6 +26,7 @@ final class KitIconNames {
         switch (node) {
             case Nodes.Icon icon -> require.accept(icon.name());
             case Nodes.Button button -> optional(button.icon(), require);
+            case Nodes.Field field -> optional(field.leadingIcon(), require);
             case Nodes.MenuButton menu -> { optional(menu.icon(), require); menus(menu.items(), require); }
             case Nodes.Choice choice -> {optional(choice.icon(), require);choice.face().ifPresent(face -> optional(face.icon(),require));choice.options().forEach(option -> optional(option.icon(),require));}
             case Nodes.PickerMenu menu -> menu.items().forEach(item -> optional(item.icon(),require));

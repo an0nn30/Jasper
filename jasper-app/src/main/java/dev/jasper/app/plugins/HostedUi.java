@@ -664,19 +664,22 @@ final class HostedUi {
     private final java.util.Map<dev.jasper.app.contributions.Tab, OwnedContent> ownedContent = new java.util.IdentityHashMap<>();
     private final class OwnedContent implements dev.jasper.sdk.ui.ContentTab {
         final dev.jasper.app.contributions.Tab entry;
-        /** The image the tab last showed and its icon: a plugin sets the same image on every presentation, decoded once. */
+        /** The image the tab last showed, decoded: a plugin sets the same image on every presentation, decoded once. */
         private dev.jasper.sdk.ui.PixelImage shownImage;
-        private Optional<Icon> shownImageIcon = Optional.empty();
+        private Optional<dev.jasper.ui.icons.EncodedArtwork> shownArtwork = Optional.empty();
         OwnedContent(dev.jasper.app.contributions.Tab entry) { this.entry = entry; }
-        /** The tab shows the presentation's image in its icon's box; the icon name, checked either way, is the fallback for one that does not decode. */
+        /**
+         * The tab shows the presentation's image in its icon's box at the interface scale of the moment; the icon name,
+         * checked either way, is the fallback for one that does not decode.
+         */
         public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) {
             requireUi("content presentation"); if(entry.closed())return;
             Icon named = icon(v.icon());
-            entry.presentation(v.title(), v.detail(), v.image().flatMap(this::imageIcon).orElse(named), v.dirty(), v.location(), v.host());
+            entry.presentation(v.title(), v.detail(), v.image().flatMap(this::artwork).map(kit::image).orElse(named), v.dirty(), v.location(), v.host());
         }
-        private Optional<Icon> imageIcon(dev.jasper.sdk.ui.PixelImage image) {
-            if (!image.equals(shownImage)) { shownImage = image; shownImageIcon = kit.image(image); }
-            return shownImageIcon;
+        private Optional<dev.jasper.ui.icons.EncodedArtwork> artwork(dev.jasper.sdk.ui.PixelImage image) {
+            if (!image.equals(shownImage)) { shownImage = image; shownArtwork = kit.decode(image); }
+            return shownArtwork;
         }
         public void setCommands(List<dev.jasper.sdk.ui.ContentCommand> values) { requireUi("content commands"); entry.commands(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentCommand(v.id(), v.title(), v.shortcut(), v.enabled(), () -> containment.run(pluginId, "content command", v.run()))).toList()); }

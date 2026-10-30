@@ -114,7 +114,7 @@ public abstract class KitContractTest {
         String address = "https://example.com/";
         var spec = new ViewSpec(new Nodes.Stack("root", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
             new Nodes.Field("address", ControlState.READY, Nodes.FieldKind.TEXT, address, "Search or enter website name", "Address", "", Optional.empty(),
-                Nodes.FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), Optional.empty(), true),
+                Nodes.FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), "", "", Optional.empty(), true),
             new Nodes.Field("plain", ControlState.READY, Nodes.FieldKind.TEXT, address, "", "Plain", ""))));
         var view = kit.create(spec, events::add);
         try {
@@ -123,6 +123,30 @@ public abstract class KitContractTest {
             clickInto(view, "plain");
             var plain = fieldSelection(view, "plain");
             assertThat(plain[1]).as("no selection").isEqualTo(plain[0]);
+            assertThat(events).isEmpty();
+            assertThatIllegalArgumentException().as("a multiline field takes no select-on-click").isThrownBy(() -> new Nodes.Field("notes",
+                ControlState.READY, Nodes.FieldKind.TEXTAREA, "", "", "Notes", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", false,
+                Optional.empty(), "", "", Optional.empty(), true));
+        } finally { view.close(); stop(kit); }
+    }); }
+
+    /** Plan 4b Task 1 (SDK 0.27.0): a field's leading slot (image, icon, name and drag text) mounts and updates as given on both runtimes. */
+    @Test void aFieldsLeadingSlotMountsAndUpdatesAsGiven() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        byte[] png = new byte[32];
+        System.arraycopy(new byte[]{(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, 0, png, 0, 8);
+        java.util.function.Function<Optional<PixelImage>, ViewSpec> spec = image -> new ViewSpec(new Nodes.Field("address", ControlState.READY,
+            Nodes.FieldKind.TEXT, "https://example.com/", "Search or enter website name", "Address", "go", Optional.empty(), Nodes.FieldPresentation.STANDARD,
+            "", "", "", false, image, "network", "Site icon - drag to copy URL", Optional.of("https://example.com/"), true));
+        var loading = spec.apply(Optional.empty());
+        var view = kit.create(loading, events::add);
+        try {
+            assertThat(view.spec()).isEqualTo(loading);
+            var shown = spec.apply(Optional.of(new PixelImage(png)));
+            view.update(shown);
+            assertThat(view.spec()).isEqualTo(shown);
+            view.update(loading);
+            assertThat(view.spec()).isEqualTo(loading);
             assertThat(events).isEmpty();
         } finally { view.close(); stop(kit); }
     }); }
@@ -252,6 +276,8 @@ public abstract class KitContractTest {
         cases.put("picker-face",name -> new Nodes.Choice("rich",ControlState.READY,Nodes.ChoiceKind.PICKER,List.of(),"","Credential","pick","",Optional.empty(),Optional.of(new Nodes.PickerFace("Name","Caption",name,Nodes.Hue.GREEN,Nodes.PickerDensity.COMPACT))));
         cases.put("picker-menu",name -> new Nodes.PickerMenu("menu",ControlState.READY,"","Search",List.of(new Nodes.PickerItem("row","Row","Caption",name,Nodes.Hue.BLUE)),"row","row","Empty","Create","create","cancel"));
         cases.put("icon",KitContractTest::descriptorIcon);
+        cases.put("field-leading-icon",name -> new Nodes.Field("field",ControlState.READY,Nodes.FieldKind.TEXT,"","","Field","",Optional.empty(),
+            Nodes.FieldPresentation.STANDARD,"","","",false,Optional.empty(),name,"",Optional.empty(),false));
         cases.put("button",KitContractTest::descriptorButton);
         cases.put("menu-button",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu",name,Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu("")),""));
         cases.put("menu-item",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu","",Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu(name)),""));

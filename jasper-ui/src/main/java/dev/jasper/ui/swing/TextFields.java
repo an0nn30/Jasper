@@ -36,6 +36,9 @@ final class TextFields {
         /** The leading image last decoded, and its artwork: each image is decoded once; null artwork when it does not decode. */
         private dev.jasper.ui.model.PixelImage decodedImage;
         private dev.jasper.ui.icons.EncodedArtwork leadingArtwork;
+        /** The named glyph the leading label last showed and what it was made for: an update that changes only the text keeps it. */
+        private NamedGlyph namedKey;
+        private Icon namedIcon;
         /** A left press brought the focus into a select-on-click field: its release selects all the text. */
         private boolean selectOnRelease;
         @Override int firstLineHeight() {
@@ -120,8 +123,8 @@ final class TextFields {
             refresh();
         }
         /**
-         * Dragging the leading image, once the pointer passes the platform's drag threshold, offers the field's drag text
-         * ({@link #leadingTransfer()}); the image is the drag image.
+         * Dragging the leading slot, once the pointer passes the platform's drag threshold, offers the field's drag text
+         * ({@link #leadingTransfer()}); its image or icon is the drag image.
          */
         private void dragLeadingImage() {
             leading.setTransferHandler(new TransferHandler() {
@@ -155,23 +158,24 @@ final class TextFields {
             return image;
         }
         /**
-         * What a drag of the leading image offers: the field's drag text as a URL when it parses as one, the file a
-         * {@code file:} URL names when it exists, and the text. Null while the field shows no leading image or has no
-         * drag text.
+         * What a drag of the leading slot offers ({@link DragText}). Null while the slot shows neither the field's image
+         * nor its icon, or the field has no drag text.
          */
         java.awt.datatransfer.Transferable leadingTransfer() { return drags() ? new DragText(((Nodes.Field) node).leadingDrag().orElseThrow()) : null; }
-        /** Whether the field shows its leading image and has drag text for it. */
-        private boolean drags() { return !closed && leadingArtwork != null && ((Nodes.Field) node).leadingDrag().isPresent(); }
+        /** Whether the leading slot shows the field's own image or icon and has drag text for it. */
+        private boolean drags() { var field = (Nodes.Field) node; return !closed && ownsSlot(field) && field.leadingDrag().isPresent(); }
+        /** Whether the leading slot shows the field's own picture: its image when it decodes, else its icon. */
+        private boolean ownsSlot(Nodes.Field field) { return leadingArtwork(field) != null || !field.leadingIcon().isEmpty(); }
         /**
-         * A left press that brings the focus into a select-on-click field selects all its text when it is released, as
-         * focusing the field from the keyboard does, unless the press dragged out a selection of its own; while the field
-         * has the focus, a click places the caret.
+         * A left press that brings the focus into a select-on-click field selects all its text when it is released, unless
+         * the press dragged out a selection of its own; while the field has the focus, a click places the caret. A field
+         * that takes no input (hidden, disabled or busy) takes no click.
          */
         private void selectOnClick() {
             var clicks = new java.awt.event.MouseAdapter() {
                 @Override public void mousePressed(java.awt.event.MouseEvent event) {
-                    selectOnRelease = ((Nodes.Field) node).selectOnClick() && SwingUtilities.isLeftMouseButton(event) && !event.isPopupTrigger()
-                        && !event.isShiftDown() && !input.isFocusOwner();
+                    selectOnRelease = interactive() && ((Nodes.Field) node).selectOnClick() && SwingUtilities.isLeftMouseButton(event)
+                        && !event.isPopupTrigger() && !event.isShiftDown() && !input.isFocusOwner();
                 }
                 @Override public void mouseReleased(java.awt.event.MouseEvent event) {
                     if (!selectOnRelease) return;
@@ -184,7 +188,7 @@ final class TextFields {
         /** The field's leading image decoded, once per image; null without one, or when it does not decode. */
         private dev.jasper.ui.icons.EncodedArtwork leadingArtwork(Nodes.Field field) {
             var image = field.leadingImage().orElse(null);
-            if (image == null) return null;
+            if (image == null) { decodedImage = null; leadingArtwork = null; return null; }
             if (!image.equals(decodedImage)) {
                 decodedImage = image;
                 try {
@@ -194,6 +198,21 @@ final class TextFields {
                 } catch (IllegalArgumentException undecodable) { leadingArtwork = null; }
             }
             return leadingArtwork;
+        }
+        /** What a named glyph of the leading label was made for. */
+        private record NamedGlyph(String name, int extent, boolean panel, Object theme) {}
+        /**
+         * The named glyph in the field's glyph colours, made again only when its name, extent, panel treatment or theme
+         * changes, so an update that changes only the text neither relays out nor repaints the label.
+         */
+        private Icon namedGlyph(String name, int extent) {
+            var key = new NamedGlyph(name, extent, panelSearch, context().theme());
+            if (!key.equals(namedKey)) {
+                namedIcon = panelSearch ? context().icons().panel(name, context().theme().semantic(), SemanticColor.HUE_NEUTRAL, extent)
+                    : context().icons().icon(name, context().theme(), SemanticColor.TEXT_PLACEHOLDER, extent);
+                namedKey = key;
+            }
+            return namedIcon;
         }
         /**
          * Enter in a single-line field with a trailing action runs that action (for example adding a typed entry) and
@@ -395,23 +414,22 @@ final class TextFields {
             error.setFont(ThemePainting.font(context(), Typography.Role.CAPTION)); error.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ERROR));
             surface.error = !field.state().error().isEmpty();
             leading.setFont(ThemePainting.font(context(), Typography.Role.MONO)); leading.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PLACEHOLDER));
-            // A leading image takes the kind's glyph place and box under every look (Field.leadingImage).
+            // The leading slot (Field.leadingImage, else Field.leadingIcon) takes the kind's glyph place and box under every look.
             var artwork = leadingArtwork(field);
+            boolean own = ownsSlot(field);
             boolean glyphKind = field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH;
             // The palette's transparent query shows the rail-size glyph its reference depicts.
             int extent=columnSearch ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_GLYPH) : com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), panelSearch || surface.transparent ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
-            leading.setText(artwork == null && field.kind() == Nodes.FieldKind.PORT ? ":" : "");
-            if (artwork != null) leading.setIcon(artwork.icon(extent));
-            else if (field.kind() == Nodes.FieldKind.SEARCH || field.kind() == Nodes.FieldKind.PATH) {
-                String name=field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : "search";
-                leading.setIcon(panelSearch ? context().icons().panel(name, context().theme().semantic(), SemanticColor.HUE_NEUTRAL,extent)
-                    : context().icons().icon(name,context().theme(),SemanticColor.TEXT_PLACEHOLDER,extent));
-            } else leading.setIcon(null);
-            if (artwork != null && leading.getParent() == null) surface.add(leading, BorderLayout.WEST);
-            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT && artwork == null ? DesignMetrics.Role.PORT_PREFIX_GAP
+            leading.setText(!own && field.kind() == Nodes.FieldKind.PORT ? ":" : "");
+            String glyph = field.kind() == Nodes.FieldKind.PATH ? "folder.filled" : field.kind() == Nodes.FieldKind.SEARCH ? "search" : null;
+            leading.setIcon(artwork != null ? artwork.icon(extent) : own ? namedGlyph(field.leadingIcon(), extent) : glyph != null ? namedGlyph(glyph, extent) : null);
+            if (own && leading.getParent() == null) surface.add(leading, BorderLayout.WEST);
+            String slotName = own && !field.leadingName().isEmpty() ? field.leadingName() : null;
+            if (!java.util.Objects.equals(leading.getToolTipText(), slotName)) { leading.getAccessibleContext().setAccessibleName(slotName); leading.setToolTipText(slotName); }
+            int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT && !own ? DesignMetrics.Role.PORT_PREFIX_GAP
                 : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_ICON_GAP : settings && field.kind() == Nodes.FieldKind.SEARCH ? DesignMetrics.Role.SETTINGS_SEARCH_ICON_GAP : DesignMetrics.Role.ICON_GAP);
-            leading.setVisible(artwork != null || glyphKind && field.presentation() != Nodes.FieldPresentation.PLAIN_PATH && context().faces().fields.glyph(field.kind()));
-            leading.setBorder(new EmptyBorder(0, 0, 0, gap));
+            leading.setVisible(own || glyphKind && field.presentation() != Nodes.FieldPresentation.PLAIN_PATH && context().faces().fields.glyph(field.kind()));
+            if (!(leading.getBorder() instanceof EmptyBorder border && border.getBorderInsets().equals(new Insets(0, 0, 0, gap)))) leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
             int padding = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_PADDING : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_PADDING : field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             surface.setBorder(surface.quiet ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(ring * 2, padding, ring * 2, padding));
@@ -437,8 +455,9 @@ final class TextFields {
         }
     }
     /**
-     * A leading image's drag text: as a {@code java.net.URL} when it is an absolute URL Java can open, as the file a
-     * {@code file:} URL names when that file exists, and as text; drop targets take the first they understand.
+     * A leading slot's drag text: as a {@code java.net.URL} when it is an absolute URL whose scheme Java has a handler
+     * for, as the local file a {@code file:} URL names (read from the URL alone, without the file system), and as text;
+     * drop targets take the first they understand.
      */
     static final class DragText implements java.awt.datatransfer.Transferable {
         static final java.awt.datatransfer.DataFlavor URL = urlFlavor();
@@ -457,7 +476,7 @@ final class TextFields {
         private static java.util.List<java.io.File> file(java.net.URI uri) {
             try {
                 var path = java.nio.file.Path.of(uri);
-                return java.nio.file.Files.exists(path) ? java.util.List.of(path.toFile()) : null;
+                return path.isAbsolute() ? java.util.List.of(path.toFile()) : null;
             } catch (IllegalArgumentException | java.nio.file.FileSystemNotFoundException | SecurityException notLocal) { return null; }
         }
         private static java.awt.datatransfer.DataFlavor urlFlavor() {

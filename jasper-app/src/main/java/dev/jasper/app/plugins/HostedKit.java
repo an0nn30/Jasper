@@ -57,15 +57,21 @@ final class HostedKit implements UiKit,AutoCloseable {
     }
 
     /**
-     * A plugin's image as a content tab shows it (SDK 0.27.0): decoded now and drawn in the box a named icon fills (the
-     * installed kit's rail glyph at the interface scale), its aspect and colours kept.
+     * A plugin's image decoded (SDK 0.27.0), for a content tab to show with {@link #image(dev.jasper.ui.icons.EncodedArtwork)}.
      *
-     * @return the image's icon; empty when the PNG does not decode
+     * @return the decoded artwork; empty when the PNG does not decode
      */
-    Optional<javax.swing.Icon> image(dev.jasper.sdk.ui.PixelImage image){
-        int box=com.formdev.flatlaf.util.UIScale.scale(icons.size(FlatLafInstaller.installedKit().metrics(),dev.jasper.ui.model.Nodes.IconSize.RAIL));
-        try{return Optional.of(new dev.jasper.ui.icons.EncodedArtwork(dev.jasper.ui.icons.EncodedArtwork.Format.PNG,image.png()).icon(box));}
+    Optional<dev.jasper.ui.icons.EncodedArtwork> decode(dev.jasper.sdk.ui.PixelImage image){
+        try{var artwork=new dev.jasper.ui.icons.EncodedArtwork(dev.jasper.ui.icons.EncodedArtwork.Format.PNG,image.png());artwork.prepare();return Optional.of(artwork);}
         catch(IllegalArgumentException undecodable){return Optional.empty();}
+    }
+
+    /**
+     * Decoded artwork as a content tab shows it: drawn in the box a named icon fills now (the installed kit's rail glyph
+     * at the current interface scale), its aspect and colours kept; the same icon while the box stays the same.
+     */
+    javax.swing.Icon image(dev.jasper.ui.icons.EncodedArtwork artwork){
+        return artwork.icon(com.formdev.flatlaf.util.UIScale.scale(icons.size(FlatLafInstaller.installedKit().metrics(),dev.jasper.ui.model.Nodes.IconSize.RAIL)));
     }
 
     /** A semantic colour of one theme slot, as the kit paints it; registered specialized content follows its view's slot. */

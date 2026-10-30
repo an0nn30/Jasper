@@ -16,11 +16,12 @@ public record PixelImage(byte[] png) {
 
     /** Copies the bytes; refuses more than {@value #MAX_BYTES} of them and bytes without the PNG signature. */
     public PixelImage {
-        Objects.requireNonNull(png, "png");
-        if (png.length > MAX_BYTES) throw new IllegalArgumentException("A pixel image holds at most " + MAX_BYTES + " bytes, not " + png.length);
+        // An array's length never changes, so it is checked before the copy; the signature is checked on the copy, so
+        // bytes the caller changes meanwhile cannot slip past the check.
+        if (Objects.requireNonNull(png, "png").length > MAX_BYTES) throw new IllegalArgumentException("A pixel image holds at most " + MAX_BYTES + " bytes, not " + png.length);
+        png = png.clone();
         if (png.length < SIGNATURE.length || !Arrays.equals(png, 0, SIGNATURE.length, SIGNATURE, 0, SIGNATURE.length))
             throw new IllegalArgumentException("A pixel image must be a PNG");
-        png = png.clone();
     }
 
     /** @return a copy of the PNG file's bytes */

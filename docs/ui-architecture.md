@@ -446,11 +446,14 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   label from the host composition and TRANSPARENT drops the input fill on a surface that backs the field; a
   TRANSPARENT search field shows the rail-size glyph with `TRANSPARENT_FIELD_ICON_GAP`. A SEARCH field's label is its
   accessible name only (the glyph and hint label it visually). Read-only fields report no `Edited`. Single-line fields
-  never clip an enlarged font. A `leadingImage` (`PixelImage`, a PNG of at most 65,536 bytes) takes the kind's glyph
-  place and box under every kit, decoded once; one that does not decode leaves the glyph. Dragging it offers
-  `leadingDrag` as a `java.net.URL` when it is one Java can open, as the file of a `file:` URL that exists, and as text.
-  A `selectOnClick` field selects all its text on the release of a left press that brought the focus into it, unless
-  the press dragged out a selection.
+  never clip an enlarged font. The leading slot takes the kind's glyph place and box under every kit: the
+  `leadingImage` (`PixelImage`, a PNG of at most 65,536 bytes, decoded once with its metadata skipped), else, while it
+  has none or it does not decode, the `leadingIcon` in the glyph's colours, else the kind's glyph; its icon is made
+  again only when what it shows, its size or the theme changes. `leadingName` is the slot's accessible name and
+  tooltip. Dragging the slot offers `leadingDrag` as a `java.net.URL` when Java has a handler for its scheme, as the
+  local file a `file:` URL names (read from the URL, not the file system) and as text. A `selectOnClick` field selects
+  all its text on the release of a left press that brought the focus into it, unless the press dragged out a
+  selection.
 - Field actions: `trailingAction` (Enter, not TEXTAREA or PATH), `alternateAction` (Shift+Enter, not TEXTAREA),
   `cancelAction` (Escape) and `listId`, which drives an `ItemList` with the arrow and page keys while the field keeps
   focus. A list named by a field's `listId` reserves its `visibleRows` selectable-row height even when filtered or
@@ -670,7 +673,8 @@ refused:
   or `base` attributes, fragment-only `href` and `url(...)`, no `\` or `@` in CSS, depth at most 128; external
   resources are denied. `EncodedArtwork.checkSvg(bytes)` applies the rules without AWT, `raster(width, height)`
   draws the artwork into a new image (1 to 8192 pixels a side) and `icon(extent)` is an icon of it fitted into a square
-  box, its densities prepared outside paint.
+  box, its densities prepared outside paint, made once per extent. A PNG is read without its metadata, so no text or
+  profile chunk is inflated.
 - **Identity artwork** (`IdentityArtwork(artwork, tileHue, selectedInk)`) adds a tile hue (not NONE) and whether a
   selected tile keeps the authored ink (`AUTHORED`) or draws a foreground silhouette (`FOREGROUND`).
 - `ReceivingArtwork` gives a receiving view scoped aliases (`received<N>:art<M>`) for host-supplied artwork, reconciled

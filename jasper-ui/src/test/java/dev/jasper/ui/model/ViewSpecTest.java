@@ -42,29 +42,43 @@ class ViewSpecTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new PixelImage(png(65_537))).withMessage("A pixel image holds at most 65536 bytes, not 65537");
         assertThatIllegalArgumentException().isThrownBy(() -> new PixelImage(new byte[]{'G', 'I', 'F', '8', '9', 'a', 0, 0})).withMessage("A pixel image must be a PNG");
     }
-    /** Plan 4b Task 1: a leading image, its drag text and select-on-click, checked as the SDK checks them. */
-    @Test void leadingImagesDragTextAndSelectOnClickAreValidatedAndDefaultToNone() {
+    private static Field leading(FieldKind kind, FieldPresentation presentation, Optional<PixelImage> image, String icon, String name,
+                                 Optional<String> drag, boolean selectOnClick) {
+        return new Field("f", ControlState.READY, kind, kind == FieldKind.NUMBER ? "1" : "", "", "Field", "",
+            kind == FieldKind.NUMBER ? Optional.of(new Numeric(0, 9, 1, 0)) : Optional.empty(), presentation, "", "", "", false,
+            image, icon, name, drag, selectOnClick);
+    }
+    /** Plan 4b Task 1: a leading image, icon, name, drag text and select-on-click, checked as the SDK checks them. */
+    @Test void leadingSlotsAndSelectOnClickAreValidatedAndDefaultToNone() {
         var plain = new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "");
         assertThat(plain.leadingImage()).isEmpty();
+        assertThat(plain.leadingIcon()).isEmpty();
+        assertThat(plain.leadingName()).isEmpty();
         assertThat(plain.leadingDrag()).isEmpty();
         assertThat(plain.selectOnClick()).isFalse();
         var image = new PixelImage(png(32));
-        var address = new Field("address", ControlState.READY, FieldKind.TEXT, "", "", "Address", "", Optional.empty(), FieldPresentation.EMBEDDED,
-            "", "", "", false, Optional.of(image), Optional.of("https://example.com/"), true);
+        var address = leading(FieldKind.TEXT, FieldPresentation.EMBEDDED, Optional.of(image), "network", "Site icon - drag to copy URL",
+            Optional.of("https://example.com/"), true);
         assertThat(address.leadingImage()).contains(image);
+        assertThat(address.leadingIcon()).isEqualTo("network");
+        assertThat(address.leadingName()).isEqualTo("Site icon - drag to copy URL");
         assertThat(address.leadingDrag()).contains("https://example.com/");
         assertThat(address.selectOnClick()).isTrue();
-        assertThatIllegalArgumentException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
-            FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), Optional.of("https://example.com/"), false))
-            .withMessage("A field's drag text needs a leading image");
-        assertThatIllegalArgumentException().isThrownBy(() -> new Field("a", ControlState.READY, FieldKind.TEXT, "", "", "A", "", Optional.empty(),
-            FieldPresentation.STANDARD, "", "", "", false, Optional.of(image), Optional.of(""), false)).withMessage("leadingDrag must not be blank");
-        assertThatIllegalArgumentException().isThrownBy(() -> new Field("notes", ControlState.READY, FieldKind.TEXTAREA, "", "", "Notes", "", Optional.empty(),
-            FieldPresentation.STANDARD, "", "", "", false, Optional.of(image), Optional.empty(), false)).withMessage("A multiline field takes no leading image");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.empty(), "", "",
+            Optional.of("https://example.com/"), false)).withMessage("A field's drag text needs a leading image or icon");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.empty(), "", "Site icon",
+            Optional.empty(), false)).withMessage("A field's leading name needs a leading image or icon");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.of(image), "", "",
+            Optional.of(""), false)).withMessage("leadingDrag must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.of(image), "", " ",
+            Optional.empty(), false)).withMessage("leadingName must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXTAREA, FieldPresentation.STANDARD, Optional.empty(), "", "",
+            Optional.empty(), true)).withMessage("A multiline field takes no leading image or icon and no select-on-click");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXTAREA, FieldPresentation.STANDARD, Optional.empty(), "network", "",
+            Optional.empty(), false)).withMessage("A multiline field takes no leading image or icon and no select-on-click");
         for (var presentation : List.of(FieldPresentation.STEPPER, FieldPresentation.SLIDER))
-            assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
-                Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", false, Optional.empty(), Optional.empty(), true))
-                .withMessage("A stepper or slider takes no leading image and no select-on-click");
+            assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.NUMBER, presentation, Optional.empty(), "network", "",
+                Optional.empty(), false)).withMessage("A stepper or slider takes no leading image or icon and no select-on-click");
     }
     /** Plan 3b (spec 8.2): EXCLUSIVE shows two to four options and TABS two or more, wherever the choice sits. */
     @Test void exclusiveChoicesShowTwoToFourOptionsAndTabsTwoOrMore() {

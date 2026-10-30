@@ -15,6 +15,7 @@ final class Trees {
         switch(node) {
             case Nodes.Icon icon -> requireIcon(icon.name(),icons);
             case Nodes.Button button -> optionalIcon(button.icon(),icons);
+            case Nodes.Field field -> optionalIcon(field.leadingIcon(),icons);
             case Nodes.MenuButton menu -> {optionalIcon(menu.icon(),icons);validateMenus(menu.items(),icons);}
             case Nodes.Choice choice -> {
                 optionalIcon(choice.icon(),icons);choice.face().ifPresent(face->optionalIcon(face.icon(),icons));

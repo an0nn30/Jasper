@@ -801,6 +801,30 @@ class HostedUiTest {
             .isThrownBy(() -> page.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Example", "", "missing", false, "", "").withImage(red)));
     }
 
+    /** Plan 4b Task 1 (review R6): a content tab's image takes the icon box of the interface scale its presentation is set at. */
+    @Test void aContentTabsImageFollowsTheInterfaceScale() {
+        UUID window = terminalFixture.addWindow();
+        model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(window, tab -> { }, tab -> { }, tab -> { }, () -> { },
+            tab -> Optional.empty(), (tab, group, side) -> { }, (tab, side) -> false, tab -> false, tab -> { }, tab -> java.util.List.of(),
+            (tab, number) -> { }));
+        var page = ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), terminals.windowHandle(window), view());
+        var tab = model.tabs().inWindow(window).getFirst();
+        var shown = new dev.jasper.sdk.ui.ContentPresentation("Example", "", "file", false, "", "").withImage(png(32, java.awt.Color.RED));
+        int rail;
+        try (var icons = new dev.jasper.ui.icons.IconRegistry()) {
+            rail = icons.size(dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics(), dev.jasper.ui.model.Nodes.IconSize.RAIL);
+        }
+        page.setPresentation(shown);
+        assertThat(tab.icon().getIconWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(rail));
+        float zoom = com.formdev.flatlaf.util.UIScale.getZoomFactor();
+        try {
+            com.formdev.flatlaf.util.UIScale.setZoomFactor(zoom * 2);
+            page.setPresentation(shown);
+            assertThat(tab.icon().getIconWidth()).as("the box at the new scale").isEqualTo(com.formdev.flatlaf.util.UIScale.scale(rail))
+                .isGreaterThan(rail);
+        } finally { com.formdev.flatlaf.util.UIScale.setZoomFactor(zoom); }
+    }
+
     /** A closed content tab's status, as its presentation, changes nothing, even with an icon no longer registered. */
     @Test void aClosedContentTabsStatusChangesNothing() {
         UUID window = terminalFixture.addWindow();
