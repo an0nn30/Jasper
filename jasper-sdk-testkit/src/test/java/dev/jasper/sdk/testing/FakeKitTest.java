@@ -139,5 +139,6 @@ class FakeKitContractTest extends KitContractTest {
  protected void clickInto(dev.jasper.sdk.ui.UiView view,String id){((FakeKitView)view).clickInto(id);}
  protected java.util.List<String> suggestions(dev.jasper.sdk.ui.UiView view,String id){return ((FakeKitView)view).suggestions(id).stream().map(dev.jasper.sdk.ui.Nodes.Suggestion::title).toList();}
  protected void press(dev.jasper.sdk.ui.UiView view,String id,String key){((FakeKitView)view).press(id,key);}
+ protected void choose(dev.jasper.sdk.ui.UiView view,String id,String... path){((FakeKitView)view).choose(id,path);}
  protected void stop(dev.jasper.sdk.ui.UiKit kit){((FakeKit)kit).close();}
 }

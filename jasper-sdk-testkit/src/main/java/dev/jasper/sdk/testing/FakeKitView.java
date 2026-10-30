@@ -152,6 +152,25 @@ public final class FakeKitView implements UiView {
    default -> {if(shows)suggestionsHidden.add(fieldId);if(!field.cancelAction().isBlank())emit(new UiEvent.Action(field.cancelAction()));}
   }
  }
+ /**
+ * Simulate a person choosing an item of node {@code nodeId}'s menu, as the host's menus take the choice: a menu button's
+ * items, or a button's hold menu. {@code path} names the item by its id, or a submenu's id and then one of its
+ * children's, and so on down. An enabled item reports its action as {@link UiEvent.Action}. A disabled item, one under
+ * a disabled submenu (which does not open), a separator, a submenu itself, and every item of a node that takes no input
+ * (it or a container above it hidden, disabled or busy) report nothing.
+ * @param nodeId a menu button, or a button with a hold menu
+ * @param path item ids, from the menu down
+ * @throws IllegalArgumentException when the node is neither, or the path names no item of its menu
+ * @since 0.27.0 */
+ public void choose(String nodeId,String... path){guard();Objects.requireNonNull(path);
+  List<MenuItem> items=switch(mounted(spec.root()).get(nodeId)){case Nodes.MenuButton menu->menu.items();case Nodes.Button button->button.holdMenu();case null,default->throw new IllegalArgumentException("Not a menu button or button: "+nodeId);};
+  if(path.length==0)throw new IllegalArgumentException("No menu item named");
+  boolean reachable=true;MenuItem item=null;
+  for(String id:path){if(item!=null){reachable&=item.enabled();items=item.children();}
+   item=items.stream().filter(candidate->candidate.id().equals(id)).findFirst().orElseThrow(()->new IllegalArgumentException("No menu item "+id+" in "+nodeId));}
+  if(!reachable||!item.enabled()||item.separator()||!item.children().isEmpty()||!live(nodeId))return;
+  emit(new UiEvent.Action(item.action()));
+ }
  private Nodes.Field suggesting(String fieldId){guard();if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return field;}
  /** Whether the field's list shows: the field takes input, has suggestions or loads them, and nothing has hidden the list. */
  private boolean listShows(Nodes.Field field){return live(field.id())&&!suggestionsHidden.contains(field.id())&&(field.suggestionsLoading()||!field.suggestions().isEmpty());}

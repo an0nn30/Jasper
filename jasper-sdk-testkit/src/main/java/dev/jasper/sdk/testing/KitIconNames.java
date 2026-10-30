@@ -15,7 +15,10 @@ final class KitIconNames {
     }
     private static void menus(List<MenuItem> items, Consumer<String> require) {
         // Menu descriptors use blank for no artwork; button/choice cues use only the empty string.
-        for (var item : items) if (!item.icon().isBlank()) require.accept(item.icon());
+        for (var item : items) {
+            if (!item.icon().isBlank()) require.accept(item.icon());
+            menus(item.children(), require);
+        }
     }
     private static void tree(TreeItem item, Consumer<String> require) {
         item.icon().ifPresent(require);
@@ -25,7 +28,7 @@ final class KitIconNames {
     private static void node(Nodes.Node node, Consumer<String> require) {
         switch (node) {
             case Nodes.Icon icon -> require.accept(icon.name());
-            case Nodes.Button button -> optional(button.icon(), require);
+            case Nodes.Button button -> { optional(button.icon(), require); menus(button.holdMenu(), require); }
             case Nodes.Field field -> optional(field.leadingIcon(), require);
             case Nodes.MenuButton menu -> { optional(menu.icon(), require); menus(menu.items(), require); }
             case Nodes.Choice choice -> {optional(choice.icon(), require);choice.face().ifPresent(face -> optional(face.icon(),require));choice.options().forEach(option -> optional(option.icon(),require));}

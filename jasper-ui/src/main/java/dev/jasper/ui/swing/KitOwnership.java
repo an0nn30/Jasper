@@ -7,8 +7,8 @@ public final class KitOwnership {
     private static final String KEY = "Jasper.kit.node";
     /**
      * Client property on a row collection's or breadcrumbs' mounted component, or on a setting row's while it has a
-     * menu, holding its context menu, so a host (or a headless test) can find the items a right click built. The menu
-     * stays kit-owned.
+     * menu, holding its context menu, so a host (or a headless test) can find the items a right click built; and on a
+     * button while it has a hold menu, holding that menu. The menu stays kit-owned.
      */
     public static final String CONTEXT_MENU = "Jasper.kit.contextMenu";
     /**

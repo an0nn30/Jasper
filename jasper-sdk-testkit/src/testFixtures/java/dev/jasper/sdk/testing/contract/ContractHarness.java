@@ -206,6 +206,24 @@ public interface ContractHarness extends AutoCloseable {
      */
     String contentIcon(java.util.UUID tabId);
 
+    /**
+     * UI thread: the right-click menu a plugin's content tab shows ({@code ContentTab.showContextMenu}):
+     * {@code item:<id>} and {@code submenu:<id>} lines for the plugin's items, {@code host:<label>} lines for Jasper's
+     * pane items, {@code ---} for a separator, a submenu's children after it indented two spaces, and
+     * {@code " (disabled)"} after a disabled item; empty while it shows none.
+     */
+    List<String> contentMenu(java.util.UUID tabId);
+
+    /**
+     * UI thread: chooses from the right-click menu a plugin's content tab shows, as a person would: {@code path} is the
+     * lines {@link #contentMenu} gives, without their indent, from the menu down through submenus. True when an enabled
+     * item ran (a plugin's tells its {@code chosen} the id, Jasper's runs it), which closes the menu.
+     */
+    boolean chooseFromContentMenu(java.util.UUID tabId, List<String> path);
+
+    /** UI thread: dismisses the right-click menu a plugin's content tab shows, as Escape does; true when one showed. */
+    boolean dismissContentMenu(java.util.UUID tabId);
+
     /** UI thread: the restore state a tab gives, a content tab's or a provided session's; empty when it does not come back. */
     java.util.Optional<dev.jasper.sdk.RestoreState> restoreState(java.util.UUID tabId);
 

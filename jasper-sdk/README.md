@@ -90,7 +90,7 @@ the JDK modules a plugin may rely on.
 - `verifySdkArchitecture` reads the SDK's and the testkit's bytecode: they may reference only the JDK and
   `dev.jasper.sdk`, and their package graphs must be acyclic. It also checks the SDK's public and protected signatures:
   the only AWT and Swing types they carry are `Color` and `Dimension`, `Component` in `Appearance`, `JComponent` in
-  `CustomContent` and `KeyStroke` in `ContentCommand`.
+  `CustomContent`, `KeyStroke` in `ContentCommand` and `Point` in `ContentTab`.
 - `:jasper-sdk:check` runs Javadoc with doclint (`-Xdoclint:all`, failing on any error) and `verifySdkReference`, which
   fails when [the SDK reference](../docs/sdk-reference.html) is not what the sources of the SDK, the testkit and the
   bundled plugins' exported API packages, those plugins' `plugin.toml` files and the guide pages in

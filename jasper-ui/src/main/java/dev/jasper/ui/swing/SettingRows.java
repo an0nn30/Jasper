@@ -76,17 +76,9 @@ final class SettingRows {
         void context(Component invoker, int x, int y) {
             if (!interactive()) return;
             clearPopup();
-            for (var item : ((Nodes.SettingRow) node).contextActions()) {
-                if (item.separator()) { popup.add(new Menus.Separator(context())); continue; }
-                var entry = new Menus.Item(context());
-                entry.describe(item);
-                java.awt.event.ActionListener chosen = event -> {
-                    if (((Nodes.SettingRow) node).contextActions().contains(item)) emit(new dev.jasper.ui.model.UiEvent.Action(item.action()));
-                };
-                entry.addActionListener(chosen);
-                popupCleanup.add(() -> entry.removeActionListener(chosen));
-                popup.add(entry);
-            }
+            Menus.fill(context(), popup, ((Nodes.SettingRow) node).contextActions(), item -> {
+                if (Menus.holds(((Nodes.SettingRow) node).contextActions(), item)) emit(new dev.jasper.ui.model.UiEvent.Action(item.action()));
+            }, popupCleanup::add);
             if (popup.getComponentCount() > 0 && invoker.isShowing()) popup.show(invoker, x, y);
         }
 

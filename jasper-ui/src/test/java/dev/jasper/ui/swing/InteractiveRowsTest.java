@@ -316,6 +316,34 @@ class InteractiveRowsTest {
                 });
     }
 
+    /** Plan 4b Task 1 (SDK 0.27.0): a row menu's submenu holds its children, and a child reports its action. */
+    @Test
+    void aRowMenusSubmenuChildReportsItsAction() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var events = new ArrayList<UiEvent>();
+            var child = new dev.jasper.ui.model.MenuItem("copy-path", "Copy Path", "", "copy-path", true, false);
+            var copy = new dev.jasper.ui.model.MenuItem("copy", "Copy", "", "", true, false, Hue.NEUTRAL, "", List.of(child));
+            var spec = new ItemList("servers", ControlState.READY, ListKind.DOUBLE, List.of(item(0)), Set.of(), "open", List.of(copy),
+                SelectionMode.SINGLE, Optional.empty());
+            try (var view = new KitView(context, new ViewSpec(spec), events::add)) {
+                view.setSize(400, 240);
+                layout(view);
+                var owner = (ItemLists.ListControl) view.control("servers");
+                owner.select("item0", true);
+                events.clear();
+                owner.context("item0", owner.canvas, 0, 0);
+                var submenu = (Menus.Submenu) owner.popup.getComponent(0);
+                ((JMenuItem) submenu.getMenuComponent(0)).doClick(0);
+                assertThat(events).containsExactly(new UiEvent.Action("copy-path"));
+                owner.refresh();
+                assertThat(((Menus.Submenu) owner.popup.getComponent(0)).getMenuComponents()).as("re-described in place").hasSize(1);
+            } finally {
+                release(context);
+            }
+        });
+    }
+
     @Test
     void activationDispatchesSelectionBeforeActionAndSuppressesActionAfterRebindOrClose() {
         Edt.run(

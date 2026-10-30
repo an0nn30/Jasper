@@ -127,6 +127,29 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      */
     void split(SplitChoice choice, dev.jasper.sdk.terminal.Direction direction);
     /**
+     * Shows a right-click menu over the tab's content at {@code at}, as Jasper's own right-click menus show: {@code
+     * leading}, then the pane items Jasper offers for any item (Split, a submenu of every Split choice's Right and Down;
+     * Move Pane to Tab, a submenu of the window's other tabs; and Close Pane), then {@code trailing}, with a separator
+     * between groups; an empty group adds none. The tab is selected first, so Jasper's items act on its pane. An item's
+     * icon shows before its label without its tile, and its shortcut at its end.
+     *
+     * <p>Choosing an enabled item of the plugin's closes the menu and calls {@code chosen} with the item's id; its
+     * {@code action} is not reported. Choosing one of Jasper's items runs it, and dismissing the menu (Escape, a click
+     * elsewhere, another menu opening, the tab closing) closes it; either calls {@code chosen} with nothing. A tab that is
+     * closed, or not shown on screen, shows no menu and calls {@code chosen} with nothing before this returns.
+     * {@code chosen} is called once, on the UI thread.
+     *
+     * @param at where the menu opens, in screen coordinates (as {@code SwingUtilities.convertPointToScreen} gives them);
+     *     a point off the tab's content opens it at the nearest point on its edge
+     * @param leading the plugin's items above Jasper's pane items
+     * @param trailing the plugin's items below them
+     * @param chosen hears the id of the plugin's item chosen, or nothing
+     * @throws IllegalArgumentException when two items of the menu, in either list or any submenu, share an id, or an
+     *     icon is neither built in nor registered by the plugin
+     * @since 0.27.0
+     */
+    void showContextMenu(java.awt.Point at, List<MenuItem> leading, List<MenuItem> trailing, Consumer<java.util.Optional<String>> chosen);
+    /**
      * The window that holds the tab.
      *
      * @return the window, or the last window that held the tab once it is closed; a window that is not open, with the id

@@ -240,6 +240,12 @@ public final class Nodes {
      * treatment while it is true and reports its pressed state to assistive technology; a click reports the Action and
      * the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons take it.
      *
+     * <p>Since 0.27.0 a button can carry a {@code holdMenu}, as a browser's Back button carries its history: a press held
+     * for at least 500 ms opens the menu under the button, and its release then reports nothing, while a shorter press
+     * reports {@code action} as before. A right-click (a Control-click on macOS), Shift+F10 and the context-menu key open
+     * the menu at once. Choosing an enabled item closes the menu and reports the item's action as a
+     * {@link UiEvent.Action}.
+     *
      * @param id the node id
      * @param state the node's state; a disabled or busy button cannot be pressed
      * @param label the button's text; blank makes an icon-only button, which requires an icon and a tooltip
@@ -250,9 +256,10 @@ public final class Nodes {
      * @param presentation how the button sits in its composition
      * @param iconSeverity a severity whose colour tints the glyph; empty for the kind's colour
      * @param selected the pressed state of a toggle button; empty for a plain button
+     * @param holdMenu the items a held press opens, with unique ids; copied. Empty for a button without one
      */
     public record Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,
-                         Optional<Severity> iconSeverity, Optional<Boolean> selected) implements Node {
+                         Optional<Severity> iconSeverity, Optional<Boolean> selected, List<MenuItem> holdMenu) implements Node {
         public Button {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.button(label, icon, tooltip);
@@ -263,6 +270,12 @@ public final class Nodes {
             Objects.requireNonNull(selected);
             if (selected.isPresent() && kind != ButtonKind.GHOST && kind != ButtonKind.SECONDARY)
                 throw new IllegalArgumentException("Only ghost and secondary buttons have a pressed state");
+            holdMenu = List.copyOf(holdMenu); ModelChecks.unique(holdMenu, MenuItem::id);
+        }
+        /** A button without a hold menu. */
+        public Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,
+                      Optional<Severity> iconSeverity, Optional<Boolean> selected) {
+            this(id, state, label, icon, kind, action, tooltip, presentation, iconSeverity, selected, List.of());
         }
         /**
          * A button whose glyph takes its kind's colour (or {@code iconSeverity}'s) and that has no pressed state.

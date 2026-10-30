@@ -1308,7 +1308,43 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             // Move Pane to Tab, as ContentTab.moveToTab asks, numbered from 1 (pane flexibility spec 4).
             this::paneTargets, (tab, number) -> moveToTab(tab, number - 1),
             // A next tab, right after the shown tab (browser plan 4a).
-            tab -> attach(tab, false, null, null, true));
+            tab -> attach(tab, false, null, null, true),
+            // A plugin's right-click menu over its item (browser plan 4b).
+            this::showContentMenu);
+    }
+
+    /**
+     * How a plugin's right-click menu over an item shows ({@link #showContentMenu}): at its point on screen, kept over the
+     * menu's invoker, the item's component; false when that is not on screen, as in a headless test, which records what
+     * would show instead.
+     */
+    java.util.function.BiPredicate<JPopupMenu, Point> contentMenuPopup = (popup, onScreen) -> {
+        Component over = popup.getInvoker();
+        if (over == null || !over.isShowing()) return false;
+        Point at = new Point(onScreen);
+        SwingUtilities.convertPointFromScreen(at, over);
+        popup.show(over, Math.max(0, Math.min(at.x, over.getWidth())), Math.max(0, Math.min(at.y, over.getHeight())));
+        return true;
+    };
+
+    /**
+     * A plugin's right-click menu over {@code tab}, one of this window's items (browser plan 4b; browser spec 11): the
+     * item is selected, so the menu's pane items act on its pane, and the menu ({@link WindowChrome#contentMenu}) opens
+     * over it, closing when the item closes. An item this window does not hold, or one not on screen, shows none: the
+     * menu hears nothing at once.
+     */
+    private void showContentMenu(Tab tab, dev.jasper.app.contributions.ContentMenu menu) {
+        if (closed || !parentTabs.contains(tab)) { menu.dismissed(); return; }
+        selectTab(tab);
+        JPopupMenu popup = chrome.contentMenu(menu);
+        popup.setInvoker(tab.component());
+        var closing = tab.onClosed(() -> { popup.setVisible(false); menu.dismissed(); });
+        popup.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
+            @Override public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent event) {}
+            @Override public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent event) { closing.close(); }
+            @Override public void popupMenuCanceled(javax.swing.event.PopupMenuEvent event) {}
+        });
+        if (!contentMenuPopup.test(popup, menu.at())) { closing.close(); menu.dismissed(); }
     }
 
     /**

@@ -90,6 +90,11 @@ class FakeContractTest extends PluginContractTest {
             @Override public String contentIcon(java.util.UUID tabId) {
                 return host.contentPresentation(tabId).map(shown -> shown.image().isPresent() ? "image" : shown.icon() == null ? "-" : "icon:" + shown.icon()).orElse("-");
             }
+            @Override public List<String> contentMenu(java.util.UUID tabId) { return host.content(tabId).map(host::contentMenu).orElse(List.of()); }
+            @Override public boolean chooseFromContentMenu(java.util.UUID tabId, List<String> path) {
+                return host.content(tabId).map(tab -> host.chooseFromContentMenu(tab, path.toArray(String[]::new))).orElse(false);
+            }
+            @Override public boolean dismissContentMenu(java.util.UUID tabId) { return host.content(tabId).map(host::dismissContentMenu).orElse(false); }
             @Override public void closeTab(java.util.UUID tabId) { host.closeTab(tabId); }
             @Override public List<List<java.util.UUID>> windowTabs(java.util.UUID windowId) { return host.windowTabs(windowId); }
             @Override public List<String> scopes() { return host.scopes(); }

@@ -294,13 +294,19 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
 - An `iconSeverity` tints the button's glyph, as a favourite's warning star; a present `selected` makes a GHOST or
   SECONDARY button a toggle button, such as a search's match-case option: it shows the pressed state while true, and a
   click reports the `Action` for the owner to confirm in its next update.
+- A `holdMenu` of `MenuItem`s (SDK 0.27.0) opens under the button when a press is held for half a second, as a browser's
+  Back button holds its history; that press's release then reports nothing, while a shorter press reports the button's
+  `Action`. A right-click (Control-click on macOS), Shift+F10 and the context-menu key open it at once, and choosing an
+  item reports the item's `Action`.
 - [`MenuButton`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.MenuButton)`(label, icon, kind, action, items, tooltip)`:
   with a blank `action` the whole button opens the menu; otherwise its main part reports `Action(action)` and its arrow
   opens the menu. Each
   [`MenuItem`](sdk-reference.html#dev.jasper.sdk.ui.MenuItem)`(id, label, icon, action, enabled, separator)` reports its
   own `Action`; `withShortcut(actionId)` shows the current binding of one of the plugin's actions, or of a Jasper action
   such as `new_tab`, beside the label, in the platform's notation (symbols on macOS, words such as Ctrl+Shift+P on Linux
-  and Windows), following the user's rebinding, and nothing while it is unbound.
+  and Windows), following the user's rebinding, and nothing while it is unbound. An item with `children` (SDK 0.27.0)
+  is a submenu, in any menu: it shows an arrow and opens its children beside it, and it reports nothing itself, so its
+  `action` is blank and it shows no shortcut.
 
 ### Fields
 
@@ -578,6 +584,9 @@ event dispatch thread, so run the test in `SwingUtilities.invokeAndWait`. A plug
   answers by selecting all its text; `setComposing(id, true)` plays an input method.
 - `press(id, key)` presses `UP`, `DOWN`, `TAB`, `ENTER` or `ESCAPE` in a field as a person would, and
   `suggestions(id)` and `selectedSuggestion(id)` show what its list of suggestions shows.
+- `choose(id, path...)` chooses an item of a menu button's menu or a button's hold menu as a person would, by item ids
+  from the menu down through submenus; a disabled item, a submenu, a separator and the children of a disabled submenu
+  report nothing.
 - [`FakeKit`](sdk-reference.html#dev.jasper.sdk.testing.FakeKit)'s `views()`, `icons()` and `failures()` list its views,
   registered icons and contained handler failures. `FakePluginHost` mounts views where Jasper would: `panelView`,
   `windowView`, `contentView`, `toolbarViews`, `settingsPanelView` and `popoverViews` return them.

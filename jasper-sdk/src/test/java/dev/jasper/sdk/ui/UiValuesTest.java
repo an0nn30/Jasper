@@ -114,6 +114,60 @@ class UiValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new UiEvent.SuggestionChosen("address", "", false));
     }
 
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): an item with children is a submenu, which reports no action and shows no shortcut; it
+     * holds a copy of its children, their ids unique among them; a separator opens none; an item without children keeps
+     * every older constructor's meaning.
+     */
+    @Test void aMenuItemWithChildrenIsASubmenu() {
+        var source = new MenuItem("source", "View Source", "", "view-source", true, false);
+        var children = new ArrayList<>(List.of(source, new MenuItem("rule", "", "", "", true, true)));
+        var tools = new MenuItem("tools", "Developer Tools", "code", "", true, false, Nodes.Hue.BLUE, "", children);
+        children.clear();
+        assertThat(tools.children()).as("copied").containsExactly(source, new MenuItem("rule", "", "", "", true, true));
+        assertThatThrownBy(() -> tools.children().add(source)).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(source.children()).isEmpty();
+        assertThat(new MenuItem("open", "Open", "", "open", true, false, Nodes.Hue.NEUTRAL, "new_tab").children()).isEmpty();
+        assertThat(tools.withShortcut("").children()).as("a copy keeps its children").containsExactly(source, new MenuItem("rule", "", "", "", true, true));
+        assertThat(new MenuItem("blank", "Blank", "", " ", true, false, Nodes.Hue.NEUTRAL, "", List.of(source)).children()).as("a blank action").hasSize(1);
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "tools", true, false, Nodes.Hue.NEUTRAL, "", List.of(source)))
+            .withMessage("A submenu reports no action");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "", true, false, Nodes.Hue.NEUTRAL, "new_tab", List.of(source)))
+            .withMessage("A submenu shows no shortcut");
+        assertThatIllegalArgumentException().isThrownBy(() -> tools.withShortcut("new_tab")).withMessage("A submenu shows no shortcut");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("rule", "", "", "", true, true, Nodes.Hue.NEUTRAL, "", List.of(source)))
+            .withMessage("A separator opens no submenu");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "", true, false, Nodes.Hue.NEUTRAL, "",
+            List.of(source, new MenuItem("source", "Again", "", "again", true, false)))).withMessage("Duplicate id: source");
+        assertThatIllegalArgumentException().as("an item without children still needs an action")
+            .isThrownBy(() -> new MenuItem("open", "Open", "", "", true, false, Nodes.Hue.NEUTRAL, "", List.of())).withMessage("action must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", " ", "", "", true, false, Nodes.Hue.NEUTRAL, "", List.of(source)))
+            .withMessage("label must not be blank");
+        assertThatNullPointerException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "", true, false, Nodes.Hue.NEUTRAL, "", null));
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a button holds a copy of its hold menu, the ids unique; the older constructors make a
+     * button without one.
+     */
+    @Test void aButtonHoldsACopyOfItsHoldMenu() {
+        var entry = new MenuItem("entry-1", "Example Domain", "", "go:1", true, false);
+        var items = new ArrayList<>(List.of(entry));
+        var back = new Nodes.Button("back", ControlState.READY, "", "back", Nodes.ButtonKind.GHOST, "back", "Back", Nodes.ButtonPresentation.STANDARD,
+            Optional.empty(), Optional.empty(), items);
+        items.clear();
+        assertThat(back.holdMenu()).as("copied").containsExactly(entry);
+        assertThatThrownBy(() -> back.holdMenu().add(entry)).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(new Nodes.Button("b", ControlState.READY, "Open", "", Nodes.ButtonKind.LINK, "open", "").holdMenu()).isEmpty();
+        assertThat(new Nodes.Button("b", ControlState.READY, "", "case", Nodes.ButtonKind.GHOST, "case", "Match case", Nodes.ButtonPresentation.STANDARD,
+            Optional.empty(), Optional.of(true)).holdMenu()).isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Button("back", ControlState.READY, "", "back", Nodes.ButtonKind.GHOST, "back", "Back",
+            Nodes.ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), List.of(entry, new MenuItem("entry-1", "Again", "", "go:2", true, false))))
+            .withMessage("Duplicate id: entry-1");
+        assertThatNullPointerException().isThrownBy(() -> new Nodes.Button("back", ControlState.READY, "", "back", Nodes.ButtonKind.GHOST, "back", "Back",
+            Nodes.ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), null));
+    }
+
     /** Vim IdeaVim keys spec 4: a status item may carry an icon, a dimmed state and a menu. */
     @Test void contentStatusCarriesAnIconADimmedStateAndACopiedMenu() {
         Runnable r = () -> {};

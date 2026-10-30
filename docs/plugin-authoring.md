@@ -620,6 +620,13 @@ tab strip, the window and its menus, and the status bar; the plugin provides the
   text is empty), be `dimmed` (painted in the disabled colour, still clickable), and carry a menu of
   [`ContentStatus.MenuEntry`](sdk-reference.html#dev.jasper.sdk.ui.ContentStatus.MenuEntry) items, check items and
   separator lines, which a click opens in place of `run`.
+- `showContextMenu(at, leading, trailing, chosen)` (SDK 0.27.0) shows a right-click menu over the content at `at`, a
+  point on screen: the `leading` [`MenuItem`](sdk-reference.html#dev.jasper.sdk.ui.MenuItem)s, the pane items Jasper
+  offers for any item (Split, Move Pane to Tab and Close Pane, as a terminal's right-click menu has them), then
+  `trailing`, with a separator between groups and none for an empty group. The tab is selected first, so Jasper's items
+  act on its pane. `chosen` hears the id of the plugin's item chosen, or nothing when one of Jasper's items ran, the
+  menu was dismissed, or the tab is closed or not on screen; it hears once. Item ids must be unique across the whole
+  menu, submenus included.
 - `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new window
   (a window's only tab stays where it is) and `moveToWindow(window)` to the end of another window's strip, keeping the
   view and its state, and `window()` is the window that holds it.
@@ -1455,7 +1462,7 @@ try (var host = new FakePluginHost()) {
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
 | Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()` |
-| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
+| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentMenu(tab)` (the right-click menu `showContextMenu` shows), `chooseFromContentMenu(tab, path...)`, `dismissContentMenu(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
 
 Where the fake differs from Jasper:
 

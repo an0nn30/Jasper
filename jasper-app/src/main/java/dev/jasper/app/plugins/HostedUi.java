@@ -731,6 +731,23 @@ final class HostedUi {
             String action = right ? choice.rightAction() : choice.downAction();
             if (window != null) model.action(action).ifPresent(found -> found.invoke(new Contributions.Invocation(window, Optional.empty())));
         }
+        /**
+         * A right-click menu over the tab's content (SDK 0.27.0): the plugin's items, their ids unique over the whole menu
+         * and their icons checked as the kit checks a menu's, go to the tab's window, which adds its pane items and shows
+         * the menu; {@code chosen} runs contained, once. A closed tab shows none and hears nothing at once.
+         */
+        public void showContextMenu(java.awt.Point at, List<dev.jasper.sdk.ui.MenuItem> leading, List<dev.jasper.sdk.ui.MenuItem> trailing,
+                                    Consumer<Optional<String>> chosen) {
+            requireUi("content menu");
+            java.util.Objects.requireNonNull(at, "at");
+            java.util.Objects.requireNonNull(chosen, "chosen");
+            var before = List.copyOf(leading);
+            var after = List.copyOf(trailing);
+            uniqueMenuIds(before, after);
+            Consumer<Optional<String>> contained = value -> containment.run(pluginId, "content menu", () -> chosen.accept(value));
+            if (entry.closed()) { contained.accept(Optional.empty()); return; }
+            entry.showContextMenu(new dev.jasper.app.contributions.ContentMenu(at, menuItems(before), menuItems(after), contained));
+        }
         public WindowHandle window() {
             requireUi("content window");
             // A tab no window could take back (its move failed everywhere) names no window.
@@ -743,6 +760,24 @@ final class HostedUi {
         public Subscription onClosed(Runnable listener) { requireUi("content disposal"); return wrap(entry.onClosed(()->containment.run(pluginId,"content disposal",listener))); }
         public void close() { subscription(entry::close).close(); }
     }
+    /** Refuses a right-click menu two of whose items, in either list or any submenu, share an id, which its choice names. */
+    private static void uniqueMenuIds(List<dev.jasper.sdk.ui.MenuItem> leading, List<dev.jasper.sdk.ui.MenuItem> trailing) {
+        var seen = new java.util.HashSet<String>();
+        var pending = new java.util.ArrayDeque<dev.jasper.sdk.ui.MenuItem>(leading);
+        pending.addAll(trailing);
+        while (!pending.isEmpty()) {
+            var item = pending.pop();
+            if (!seen.add(item.id())) throw new IllegalArgumentException("Duplicate id: " + item.id());
+            pending.addAll(item.children());
+        }
+    }
+
+    /** The application's twins of a plugin's menu items: its own icons, checked, and their children's. */
+    private List<dev.jasper.app.contributions.ContentMenu.Item> menuItems(List<dev.jasper.sdk.ui.MenuItem> items) {
+        return items.stream().map(item -> new dev.jasper.app.contributions.ContentMenu.Item(item.id(), item.label(),
+            item.icon().isBlank() ? null : icon(item.icon()), item.enabled(), item.separator(), item.shortcut(), menuItems(item.children()))).toList();
+    }
+
     /** The application's twin of a plugin's restore state (workspace tabs spec 13). */
     private static dev.jasper.app.layout.TabRestore restore(dev.jasper.sdk.RestoreState state) {
         return new dev.jasper.app.layout.TabRestore(state.kind(), state.values());

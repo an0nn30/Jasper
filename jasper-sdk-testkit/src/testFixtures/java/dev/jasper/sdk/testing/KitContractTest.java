@@ -26,6 +26,11 @@ public abstract class KitContractTest {
     protected abstract List<String> suggestions(UiView view,String id);
     /** Presses {@code key} (UP, DOWN, TAB, ENTER or ESCAPE) in field {@code id} as a person would, the focus in the field. */
     protected abstract void press(UiView view,String id,String key);
+    /**
+     * Chooses, as a person would, the item {@code path} names in node {@code id}'s menu (a menu button's, or a button's
+     * hold menu): item ids from the menu down, through a submenu by its id; a disabled submenu does not open.
+     */
+    protected abstract void choose(UiView view,String id,String... path);
     protected static void edt(Runnable body) throws Exception { SwingUtilities.invokeAndWait(body); }
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
@@ -189,6 +194,36 @@ public abstract class KitContractTest {
         } finally { view.close(); stop(kit); }
     }); }
 
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a submenu's children are reachable on both runtimes, in a menu button's menu and in a
+     * button's hold menu: choosing one reports its action, while a submenu itself, a disabled child, a separator and the
+     * children of a disabled submenu report nothing.
+     */
+    @Test void aSubmenusChildrenAreReachable() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        var tools = new MenuItem("tools", "Developer Tools", "", "", true, false, Nodes.Hue.NEUTRAL, "", List.of(
+            new MenuItem("source", "View Source", "", "view-source", true, false), new MenuItem("rule", "", "", "", true, true),
+            new MenuItem("inspect", "Inspect Element", "", "inspect", false, false)));
+        var locked = new MenuItem("locked", "Locked", "", "", false, false, Nodes.Hue.NEUTRAL, "", List.of(new MenuItem("hidden", "Hidden", "", "hidden", true, false)));
+        var older = new MenuItem("older", "Older", "", "", true, false, Nodes.Hue.NEUTRAL, "", List.of(new MenuItem("entry-3", "Example Domain", "", "go:3", true, false)));
+        var spec = new ViewSpec(new Nodes.Stack("bar", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Button("back", ControlState.READY, "", "back", Nodes.ButtonKind.GHOST, "back", "Back", Nodes.ButtonPresentation.STANDARD, Optional.empty(),
+                Optional.empty(), List.of(new MenuItem("entry-1", "Jasper", "", "go:1", true, false), older)),
+            new Nodes.MenuButton("menu", ControlState.READY, "", "more", Nodes.ButtonKind.GHOST, "", List.of(new MenuItem("reload", "Reload", "", "reload", true, false), tools, locked), "Page"))));
+        var view = kit.create(spec, events::add);
+        try {
+            assertThat(view.spec()).isEqualTo(spec);
+            choose(view, "menu", "tools", "source");
+            choose(view, "back", "older", "entry-3");
+            choose(view, "back", "entry-1");
+            choose(view, "menu", "tools");
+            choose(view, "menu", "tools", "inspect");
+            choose(view, "menu", "tools", "rule");
+            choose(view, "menu", "locked", "hidden");
+            assertThat(events).containsExactly(new UiEvent.Action("view-source"), new UiEvent.Action("go:3"), new UiEvent.Action("go:1"));
+        } finally { view.close(); stop(kit); }
+    }); }
+
     @Test void windowPlainPathAndDiscreetInputRetainTheAdditiveContract() throws Exception { edt(()->{
         var path=new Nodes.Field("path",ControlState.READY,Nodes.FieldKind.PATH,"/synthetic/key","Hint","Path","browse",Optional.empty(),Nodes.FieldPresentation.PLAIN_PATH);
         assertThatThrownBy(()->new Nodes.Field("bad",ControlState.READY,Nodes.FieldKind.TEXT,"","","Bad","",Optional.empty(),Nodes.FieldPresentation.PLAIN_PATH)).isInstanceOf(IllegalArgumentException.class);
@@ -319,6 +354,11 @@ public abstract class KitContractTest {
         cases.put("button",KitContractTest::descriptorButton);
         cases.put("menu-button",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu",name,Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu("")),""));
         cases.put("menu-item",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu","",Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu(name)),""));
+        // SDK 0.27.0: a submenu's children and a button's hold menu are descriptor positions too.
+        cases.put("menu-child",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu","",Nodes.ButtonKind.GHOST,"",List.of(new MenuItem("more","More","","",true,false,
+            Nodes.Hue.NEUTRAL,"",List.of(descriptorMenu(name)))),""));
+        cases.put("hold-menu",name -> new Nodes.Button("button",ControlState.READY,"Button","",Nodes.ButtonKind.GHOST,"run","",Nodes.ButtonPresentation.STANDARD,Optional.empty(),
+            Optional.empty(),List.of(descriptorMenu(name))));
         cases.put("choice-option",name -> new Nodes.Choice("option",ControlState.READY,Nodes.ChoiceKind.DROPDOWN,List.of(new Option("one","One",name,"Default")),"one","Options",""));
         cases.put("choice",name -> new Nodes.Choice("choice",ControlState.READY,Nodes.ChoiceKind.PICKER,List.of(),"","Pick","pick",name));
         cases.put("header-overflow",name -> new Nodes.Header("header",ControlState.READY,"Header",OptionalInt.empty(),Optional.empty(),Optional.empty(),List.of(descriptorMenu(name))));

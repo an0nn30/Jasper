@@ -344,7 +344,7 @@ copy of the context, so `route(ThemeRoute)` re-routes only that view.
 
 `KitOwnership.owns(component)` says whether the kit created a component; `KitOwnership.CONTEXT_MENU`
 (`"Jasper.kit.contextMenu"`) is the client property that holds a row collection's, breadcrumbs' or setting row's
-context menu, and `KitOwnership.SUGGESTIONS` (`"Jasper.kit.suggestions"`) the one on a field's input that holds its
+context menu, or a button's hold menu, and `KitOwnership.SUGGESTIONS` (`"Jasper.kit.suggestions"`) the one on a field's input that holds its
 list of suggestions while it shows.
 
 ### Secrets
@@ -485,6 +485,14 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   accent or a status colour. `ButtonPresentation` EMBEDDED buttons are content-sized inline links and glyph buttons;
   CONTEXTUAL_EMBEDDED buttons reserve their full geometry but paint only for a selected, hovered or keyboard-active row
   or direct focus; HELP is a round help button. `MenuItem.hue` selects a menu item's category artwork hue.
+- Every kit menu fills through `Menus.fill`: an item with `children` is a `Menus.Submenu`, a `JMenu` drawn as a
+  `Menus.Item` with an arrow in place of a shortcut, whose children's popup is the menu's card (`Menus.Card`, a border
+  painting the surface under the rows) at least `MENU_MIN_WIDTH` wide; Swing's menu keys and pointer open it. A menu
+  button's outside-press check treats a submenu's popup as inside (`Menus.within`).
+- A button's `holdMenu` (`HoldMenu`, made the first time the button has one) opens under the button, placed as a menu
+  button's menu is, when a left press has been held for 500 ms by its clock (the timer re-checks until then); it
+  disarms the button so the release reports nothing. A popup trigger opens it at once, and Shift+F10 and the
+  context-menu key are bound on the button only while it has items.
 - `Text.severity` tints text and `Text.caret` draws a command line's insertion bar. Body, description and caption text
   flows (wraps, keeping line breaks, no wider than `TEXT_FLOW_COLUMNS`) in vertical stacks, form bodies, cards and
   sections. ACTIONS stacks wrap instead of squeezing their buttons. A stack's `cancelAction` answers Escape from

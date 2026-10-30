@@ -409,8 +409,7 @@ final class InteractiveRows {
             canvas.revalidate();
             sync();
             canvas.repaint();
-            for (var child : popup.getComponents()) if (child instanceof Menus.Item entry
-                    && entry.getClientProperty("Jasper.menu.item") instanceof MenuItem item) entry.describe(item);
+            Menus.describe(popup.getComponents());
             popup.restyle();
             popup.revalidate(); popup.repaint();
         }
@@ -708,26 +707,14 @@ final class InteractiveRows {
             if (!stillCurrent(id) || !selectable(indexOf(id)) || !selected.contains(id) && !ownsContextActions(id)) return;
             // A row's menu acts on that row (its action names it); it never re-reports the selection, so choosing an
             // item cannot also open or navigate to the row.
-            showMenu(contextActions(id), item -> stillCurrent(id) && contextActions(id).contains(item), invoker, x, y);
+            showMenu(contextActions(id), item -> stillCurrent(id) && Menus.holds(contextActions(id), item), invoker, x, y);
         }
 
         /** Fills and shows the popup; a chosen item reports only its action, and only while {@code current} still holds. */
         void showMenu(List<MenuItem> actions, java.util.function.Predicate<MenuItem> current, JComponent invoker, int x, int y) {
-            for (var item : actions) {
-                if (item.separator()) {
-                    popup.add(new Menus.Separator(context()));
-                    continue;
-                }
-                var entry = new Menus.Item(context());
-                entry.describe(item);
-                ActionListener listener =
-                        e -> {
-                            if (current.test(item)) emit(new UiEvent.Action(item.action()));
-                        };
-                entry.addActionListener(listener);
-                popupCleanup.add(() -> entry.removeActionListener(listener));
-                popup.add(entry);
-            }
+            Menus.fill(context(), popup, actions, item -> {
+                if (current.test(item)) emit(new UiEvent.Action(item.action()));
+            }, popupCleanup::add);
             if (popup.getComponentCount() > 0 && invoker.isShowing()) popup.show(invoker, x, y);
         }
 

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -35,11 +36,14 @@ import java.util.function.Predicate;
  *     which shows
  * @param attachNext shows a tab the registry placed in this window in a new tab right after its shown tab, or at the end
  *     of its strip when it shows none (browser plan 4a's next tab)
+ * @param contextMenu shows a plugin's right-click menu over a tab of this window, its pane items between the plugin's
+ *     (browser plan 4b), and tells the menu nothing when it cannot show it
  */
 public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach, Consumer<Tab> select,
                             Runnable toFront, Function<TabId, Optional<GroupId>> groupOf, Beside attachBeside,
                             BiPredicate<Tab, Side> splitTerminal, Predicate<Tab> mayMoveToNewTab, Consumer<Tab> moveToNewTab,
-                            Function<Tab, List<OtherTab>> tabChoices, ObjIntConsumer<Tab> moveToTab, Consumer<Tab> attachNext) {
+                            Function<Tab, List<OtherTab>> tabChoices, ObjIntConsumer<Tab> moveToTab, Consumer<Tab> attachNext,
+                            BiConsumer<Tab, ContentMenu> contextMenu) {
     /** Shows a tab in a new pane beside a pane of the window (workspace tabs spec 14's split placements). */
     @FunctionalInterface
     public interface Beside {
@@ -60,7 +64,33 @@ public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach,
         Objects.requireNonNull(attachBeside, "attachBeside"); Objects.requireNonNull(splitTerminal, "splitTerminal");
         Objects.requireNonNull(mayMoveToNewTab, "mayMoveToNewTab"); Objects.requireNonNull(moveToNewTab, "moveToNewTab");
         Objects.requireNonNull(tabChoices, "tabChoices"); Objects.requireNonNull(moveToTab, "moveToTab");
-        Objects.requireNonNull(attachNext, "attachNext");
+        Objects.requireNonNull(attachNext, "attachNext"); Objects.requireNonNull(contextMenu, "contextMenu");
+    }
+
+    /**
+     * A workspace that shows no right-click menu over its tabs: each menu hears nothing at once, as a fake window in a
+     * test does.
+     *
+     * @param id the window's id
+     * @param attach shows a tab the registry placed in this window
+     * @param detach takes a tab out of this window
+     * @param select shows a tab of this window
+     * @param toFront raises the window
+     * @param groupOf the group that holds a tab of this window
+     * @param attachBeside shows a tab the registry placed beside one of its groups
+     * @param splitTerminal opens a terminal beside a tab of this window, and answers whether it did
+     * @param mayMoveToNewTab whether Move Pane to New Tab would move a tab of this window
+     * @param moveToNewTab Move Pane to New Tab
+     * @param tabChoices the tabs Move Pane to Tab offers a tab of this window
+     * @param moveToTab Move Pane to Tab
+     * @param attachNext shows a tab the registry placed in this window right after its shown tab
+     */
+    public WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach, Consumer<Tab> select, Runnable toFront,
+                         Function<TabId, Optional<GroupId>> groupOf, Beside attachBeside, BiPredicate<Tab, Side> splitTerminal,
+                         Predicate<Tab> mayMoveToNewTab, Consumer<Tab> moveToNewTab, Function<Tab, List<OtherTab>> tabChoices,
+                         ObjIntConsumer<Tab> moveToTab, Consumer<Tab> attachNext) {
+        this(id, attach, detach, select, toFront, groupOf, attachBeside, splitTerminal, mayMoveToNewTab, moveToNewTab, tabChoices,
+            moveToTab, attachNext, (tab, menu) -> menu.dismissed());
     }
 
     /**

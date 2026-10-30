@@ -119,10 +119,11 @@ public final class Nodes {
      * keeps the kind's colour. A present {@code selected} makes it a toggle button (a search option such as match case):
      * the kit paints the pressed treatment while it is true and reports its pressed state to assistive technology; a
      * click reports the Action and the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons
-     * take it.
+     * take it. A non-empty {@code holdMenu} opens under the button after a press held for 500 ms, whose
+     * release then reports nothing, and at once on a right-click or the menu keys.
      */
     public record Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,
-                         Optional<Severity> iconSeverity, Optional<Boolean> selected) implements Node {
+                         Optional<Severity> iconSeverity, Optional<Boolean> selected, List<MenuItem> holdMenu) implements Node {
         public Button {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.button(label, icon, tooltip);
@@ -133,6 +134,12 @@ public final class Nodes {
             Objects.requireNonNull(selected);
             if (selected.isPresent() && kind != ButtonKind.GHOST && kind != ButtonKind.SECONDARY)
                 throw new IllegalArgumentException("Only ghost and secondary buttons have a pressed state");
+            holdMenu = List.copyOf(holdMenu); ModelChecks.unique(holdMenu, MenuItem::id);
+        }
+        /** A button without a hold menu. */
+        public Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,
+                      Optional<Severity> iconSeverity, Optional<Boolean> selected) {
+            this(id, state, label, icon, kind, action, tooltip, presentation, iconSeverity, selected, List.of());
         }
         /**
          * A button whose glyph takes its kind's colour (or {@code iconSeverity}'s) and that has no pressed state.

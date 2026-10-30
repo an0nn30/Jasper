@@ -81,6 +81,18 @@ class KitValuesTest {
   assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","host",false))).isEqualTo(new UiEvent.SuggestionChosen("address","host",false));
  }
  /** Plan 3b: a technical caption crosses the projection unchanged. */
+ /** Plan 4b Task 1 (SDK 0.27.0): submenus, in any menu, and a button's hold menu project without loss. */
+ @Test void submenusAndHoldMenusProjectWithoutLoss(){
+  var tools=new MenuItem("tools","Developer Tools","code","",true,false,Hue.BLUE,"",List.of(new MenuItem("source","View Source","","view-source",true,false).withShortcut("dev.x.source"),
+   new MenuItem("rule","","","",true,true),new MenuItem("inspect","Inspect","","inspect",false,false)));
+  var back=new Button("back",READY,"","back",ButtonKind.GHOST,"back","Back",ButtonPresentation.STANDARD,Optional.empty(),Optional.empty(),
+   List.of(new MenuItem("entry-1","Example Domain","","go:1",true,false),tools));
+  var spec=new ViewSpec(new Nodes.Stack("bar",READY,LayoutRole.INLINE,List.of(back,new MenuButton("menu",READY,"","more",ButtonKind.GHOST,"",List.of(tools),"Page"))));
+  assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+  var projected=(dev.jasper.ui.model.Nodes.Button)((dev.jasper.ui.model.Nodes.Stack)KitValues.toModule(spec).root()).children().getFirst();
+  assertThat(projected.holdMenu().get(1).children()).hasSize(3);
+  assertThat(projected.holdMenu().get(1).submenu()).isTrue();
+ }
  @Test void technicalPickerCaptionsProjectWithoutLoss(){
   for(boolean technical:List.of(false,true)){
    var face=new PickerFace("Mac","dustin@192.168.1.119:22","server",Hue.BLUE,PickerDensity.DEFAULT,technical);

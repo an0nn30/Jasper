@@ -31,5 +31,19 @@ class HostedKitContractTest extends KitContractTest {
  protected void press(UiView view,String id,String key){var field=input(((HostedKitView)view).component(),id+".input");
   var event=new java.awt.event.KeyEvent(field,java.awt.event.KeyEvent.KEY_PRESSED,System.currentTimeMillis(),0,KeyStroke.getKeyStroke(key).getKeyCode(),java.awt.event.KeyEvent.CHAR_UNDEFINED);
   for(var listener:field.getKeyListeners())listener.keyPressed(event);if(!event.isConsumed())SwingUtilities.processKeyBindings(event);}
+ /**
+  * As a person chooses from node {@code id}'s menu: a menu button's own popup, or a button's hold menu (its context
+  * menu), each step a row whose item has that id, through a submenu's children; a disabled submenu does not open.
+  */
+ protected void choose(UiView view,String id,String... path){var node=(JComponent)named(((HostedKitView)view).component(),id);
+  var menu=node.getComponentPopupMenu()!=null?node.getComponentPopupMenu():(JPopupMenu)node.getClientProperty(dev.jasper.ui.swing.KitOwnership.CONTEXT_MENU);
+  if(menu==null)throw new AssertionError("No menu "+id);
+  Component[] rows=menu.getComponents();JMenuItem row=null;
+  for(String step:path){
+   if(row instanceof JMenu submenu){if(!submenu.isEnabled())return;rows=submenu.getMenuComponents();}
+   row=null;for(var candidate:rows)if(candidate instanceof JMenuItem item&&item.getClientProperty("Jasper.menu.item") instanceof dev.jasper.ui.model.MenuItem shown&&shown.id().equals(step))row=item;
+   if(row==null)return;
+  }
+  if(!(row instanceof JMenu))row.doClick(0);}
  protected void stop(UiKit kit){((HostedKit)kit).close();}
 }

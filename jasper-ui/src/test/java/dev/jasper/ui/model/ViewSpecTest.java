@@ -86,6 +86,32 @@ class ViewSpecTest {
             Optional.empty(), "", "", Optional.empty(), false, suggestions, loading);
     }
     /** Plan 4b Task 1: a field's suggestions and their loading state, checked as the SDK checks them. */
+    /** Plan 4b Task 1 (SDK 0.27.0): the model mirrors the SDK's submenus and hold menus, with the same checks. */
+    @Test void submenusAndHoldMenusAreCopiedAndValidatedAsTheSdkDoes() {
+        var source = new MenuItem("source", "View Source", "", "view-source", true, false);
+        var children = new java.util.ArrayList<>(List.of(source));
+        var tools = new MenuItem("tools", "Developer Tools", "", "", true, false, Hue.NEUTRAL, "", children);
+        children.clear();
+        assertThat(tools.children()).containsExactly(source);
+        assertThat(tools.submenu()).isTrue();
+        assertThat(source.submenu()).isFalse();
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "tools", true, false, Hue.NEUTRAL, "", List.of(source)))
+            .withMessage("A submenu reports no action");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "", true, false, Hue.NEUTRAL, "new_tab", List.of(source)))
+            .withMessage("A submenu shows no shortcut");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("rule", "", "", "", true, true, Hue.NEUTRAL, "", List.of(source)))
+            .withMessage("A separator opens no submenu");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "", true, false, Hue.NEUTRAL, "", List.of(source, source)))
+            .withMessage("Duplicate id: source");
+        var items = new java.util.ArrayList<>(List.of(source, tools));
+        var back = new Button("back", ControlState.READY, "", "back", ButtonKind.GHOST, "back", "Back", ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), items);
+        items.clear();
+        assertThat(back.holdMenu()).containsExactly(source, tools);
+        assertThat(new Button("b", ControlState.READY, "Open", "", ButtonKind.LINK, "open", "").holdMenu()).isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> new Button("back", ControlState.READY, "", "back", ButtonKind.GHOST, "back", "Back",
+            ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), List.of(source, source))).withMessage("Duplicate id: source");
+    }
+
     @Test void suggestionsAreCopiedUniqueAndOnlyOnSingleLineTextFields() {
         var plain = new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "");
         assertThat(plain.suggestions()).isEmpty();
