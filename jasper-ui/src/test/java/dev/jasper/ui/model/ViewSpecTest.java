@@ -85,7 +85,6 @@ class ViewSpecTest {
             kind == FieldKind.NUMBER ? Optional.of(new Numeric(0, 9, 1, 0)) : Optional.empty(), FieldPresentation.STANDARD, "", "", "", false,
             Optional.empty(), "", "", Optional.empty(), false, suggestions, loading);
     }
-    /** Plan 4b Task 1: a field's suggestions and their loading state, checked as the SDK checks them. */
     /** Plan 4b Task 1 (SDK 0.27.0): the model mirrors the SDK's submenus and hold menus, with the same checks. */
     @Test void submenusAndHoldMenusAreCopiedAndValidatedAsTheSdkDoes() {
         var source = new MenuItem("source", "View Source", "", "view-source", true, false);
@@ -112,6 +111,7 @@ class ViewSpecTest {
             ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), List.of(source, source))).withMessage("Duplicate id: source");
     }
 
+    /** Plan 4b Task 1: a field's suggestions and their loading state, checked as the SDK checks them. */
     @Test void suggestionsAreCopiedUniqueAndOnlyOnSingleLineTextFields() {
         var plain = new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "");
         assertThat(plain.suggestions()).isEmpty();

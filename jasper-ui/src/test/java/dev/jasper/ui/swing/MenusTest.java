@@ -368,6 +368,46 @@ class MenusTest {
         });
     }
 
+    /**
+     * How many times {@code popup} is put on screen while {@code body} runs, as {@code JPopupMenu.pack()} puts an open menu
+     * whose size changed on screen again; a headless popup has no size of its own to compare.
+     */
+    static int[] shownAgain(JPopupMenu popup, Runnable body) {
+        int[] shown = {0};
+        var prior = PopupFactory.getSharedInstance();
+        PopupFactory.setSharedInstance(new PopupFactory() {
+            @Override public Popup getPopup(java.awt.Component owner, java.awt.Component contents, int x, int y) {
+                if (contents == popup) shown[0]++;
+                return prior.getPopup(owner, contents, x, y);
+            }
+        });
+        try { body.run(); } finally { PopupFactory.setSharedInstance(prior); }
+        return shown;
+    }
+
+    /**
+     * Review C3 and C6: an update re-describes a submenu's children too, and an open menu whose rows change is packed to
+     * its new size.
+     */
+    @Test void anUpdateRedescribesSubmenuChildrenAndRepacksAnOpenMenu() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, stack(page(true)), e -> {})) {
+                find(view, "menu.main", JButton.class).doClick(0);
+                var popup = find(view, "menu", JComponent.class).getComponentPopupMenu();
+                assertThat(popup.isVisible()).isTrue();
+                var child = (Menus.Item) ((Menus.Submenu) popup.getComponent(1)).getMenuComponent(0);
+                child.setFont(child.getFont().deriveFont(40f));
+                view.update(stack(page(true)));
+                assertThat(child.getFont().getSize2D()).as("the child follows the menu's type again").isNotEqualTo(40f);
+                int[] shown = shownAgain(popup, () -> view.update(stack(new MenuButton("menu", ControlState.READY, "Page", "", ButtonKind.SECONDARY, "",
+                    List.of(new MenuItem("reload", "Reload", "", "reload", true, false), tools(true), new MenuItem("print", "Print…", "", "print", true, false)), ""))));
+                assertThat(popup.getComponentCount()).isEqualTo(3);
+                assertThat(shown[0]).as("packed: shown again at its new size").isEqualTo(1);
+            } finally { release(context); }
+        });
+    }
+
     /** A press in a submenu's card is no press outside the menu, which stays open for the child's release. */
     @Test void aPressInASubmenuIsNoPressOutside() {
         Edt.run(() -> {

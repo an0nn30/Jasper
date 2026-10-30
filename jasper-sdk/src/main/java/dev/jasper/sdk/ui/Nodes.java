@@ -241,8 +241,9 @@ public final class Nodes {
      * the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons take it.
      *
      * <p>Since 0.27.0 a button can carry a {@code holdMenu}, as a browser's Back button carries its history: a press held
-     * for at least 500 ms opens the menu under the button, and its release then reports nothing, while a shorter press
-     * reports {@code action} as before. A right-click (a Control-click on macOS), Shift+F10 and the context-menu key open
+     * on the button for at least 500 ms opens the menu under it, and its release then reports nothing, while a shorter
+     * press reports {@code action} as before. A press whose pointer leaves the button, or that ends without its release
+     * (the window losing the focus), opens nothing. A right-click (a Control-click on macOS), Shift+F10 and the context-menu key open
      * the menu at once. Choosing an enabled item closes the menu and reports the item's action as a
      * {@link UiEvent.Action}.
      *
@@ -272,7 +273,20 @@ public final class Nodes {
                 throw new IllegalArgumentException("Only ghost and secondary buttons have a pressed state");
             holdMenu = List.copyOf(holdMenu); ModelChecks.unique(holdMenu, MenuItem::id);
         }
-        /** A button without a hold menu. */
+        /**
+         * A button without a hold menu.
+         *
+         * @param id the node id
+         * @param state the node's state; a disabled or busy button cannot be pressed
+         * @param label the button's text; blank makes an icon-only button, which requires an icon and a tooltip
+         * @param icon the glyph beside the label: a built-in icon name or one the plugin registered; empty for none
+         * @param kind the button's treatment
+         * @param action the action id the button reports; not blank
+         * @param tooltip the text shown on hover, and an icon-only button's accessible name; empty for none
+         * @param presentation how the button sits in its composition
+         * @param iconSeverity a severity whose colour tints the glyph; empty for the kind's colour
+         * @param selected the pressed state of a toggle button; empty for a plain button
+         */
         public Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,
                       Optional<Severity> iconSeverity, Optional<Boolean> selected) {
             this(id, state, label, icon, kind, action, tooltip, presentation, iconSeverity, selected, List.of());

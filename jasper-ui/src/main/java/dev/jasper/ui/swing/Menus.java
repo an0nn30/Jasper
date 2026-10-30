@@ -159,20 +159,8 @@ final class Menus {
             }
             popup.setInvoker(component);
             main.setSelected(true);
-            if (component.isShowing()) {
-                Container host = SwingUtilities.getRootPane(component);
-                if (host == null) host = view;
-                Rectangle anchor =
-                        SwingUtilities.convertRectangle(
-                                component.getParent(), component.getBounds(), host);
-                Point point =
-                        anchor(
-                                anchor,
-                                popup.getPreferredSize(),
-                                new Rectangle(0, 0, host.getWidth(), host.getHeight()));
-                Point local = SwingUtilities.convertPoint(host, point, component);
-                popup.show(component, local.x, local.y);
-            } else popup.setVisible(true);
+            // Off screen (a headless test) the menu still opens, unplaced, so its items can be chosen.
+            if (!showUnder(popup, component, view)) popup.setVisible(true);
             installOutside();
         }
 
@@ -259,6 +247,7 @@ final class Menus {
                             }
                         },
                         cleanup -> items.add(cleanup::run));
+                repack(popup);
             }
             int i = 0;
             for (var descriptor : prior) {
@@ -268,6 +257,7 @@ final class Menus {
                     item.setEnabled(component.isEnabled() && descriptor.enabled());
                 } else if (raw instanceof Submenu submenu) {
                     submenu.describe(descriptor);
+                    describe(submenu.getMenuComponents());
                     submenu.setEnabled(component.isEnabled() && descriptor.enabled());
                 }
             }
@@ -287,6 +277,30 @@ final class Menus {
         x = Math.max(available.x, Math.min(x, available.x + available.width - menu.width));
         y = Math.max(available.y, Math.min(y, available.y + available.height - menu.height));
         return new Point(x, y);
+    }
+
+    /**
+     * Shows {@code popup} under {@code anchor} as a menu button's menu opens: placed by {@link #anchor} in the anchor's
+     * root pane ({@code fallback} without one), so it lies below the anchor, or above it when there is no room below,
+     * aligned with its right edge when the anchor is right of the centre, and kept inside. Nothing shows while the anchor
+     * is not on screen.
+     *
+     * @return whether it showed
+     */
+    static boolean showUnder(JPopupMenu popup, JComponent anchor, Container fallback) {
+        if (!anchor.isShowing()) return false;
+        Container host = SwingUtilities.getRootPane(anchor);
+        if (host == null) host = fallback;
+        Rectangle bounds = SwingUtilities.convertRectangle(anchor.getParent(), anchor.getBounds(), host);
+        Point point = anchor(bounds, popup.getPreferredSize(), new Rectangle(0, 0, host.getWidth(), host.getHeight()));
+        Point local = SwingUtilities.convertPoint(host, point, anchor);
+        popup.show(anchor, local.x, local.y);
+        return true;
+    }
+
+    /** An open menu whose rows were rebuilt takes their size where it is; a closed one is sized when it opens. */
+    static void repack(JPopupMenu popup) {
+        if (popup.isVisible()) popup.pack();
     }
 
     /**

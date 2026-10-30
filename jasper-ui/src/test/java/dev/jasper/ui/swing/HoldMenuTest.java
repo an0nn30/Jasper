@@ -38,6 +38,12 @@ class HoldMenuTest {
 
     static Buttons.ButtonControl control(KitView view) { return (Buttons.ButtonControl) view.control("back"); }
 
+    /** As if the button were on screen: the menu shows (headless, without placing it) when it opens. */
+    static HoldMenu onScreen(HoldMenu hold) {
+        hold.show = popup -> { popup.setVisible(true); return true; };
+        return hold;
+    }
+
     /** A left press (or a press that is a popup trigger) on the button, as a person makes it. */
     static void press(Buttons.KitButton button, boolean trigger) {
         button.dispatchEvent(new MouseEvent(button, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), InputEvent.BUTTON1_DOWN_MASK, 4, 4, 1, trigger,
@@ -53,7 +59,7 @@ class HoldMenuTest {
             var context = KitFixtures.context(KitFixtures.dark(), kit);
             var events = new ArrayList<UiEvent>();
             try (var view = new KitView(context, stack(back(READY, List.of(ENTRY, OLDER))), events::add)) {
-                var hold = control(view).hold;
+                var hold = onScreen(control(view).hold);
                 long[] now = {0};
                 hold.clock = () -> now[0];
                 var button = control(view).button;
@@ -104,7 +110,7 @@ class HoldMenuTest {
             var context = KitFixtures.context();
             var events = new ArrayList<UiEvent>();
             try (var view = new KitView(context, stack(back(READY, List.of(ENTRY, OLDER))), events::add)) {
-                var hold = control(view).hold;
+                var hold = onScreen(control(view).hold);
                 var button = control(view).button;
                 button.setSize(28, 28);
                 // A Control-click on macOS: the left button, and a popup trigger.
@@ -166,17 +172,66 @@ class HoldMenuTest {
         });
     }
 
+    /**
+     * Review C1 (ruling P19): the timer opens nothing for a press that ended without a release reaching the button (a
+     * focus loss clears its pressed state), one whose pointer left the button (no longer armed), or a button not on
+     * screen, where no popup shows at all.
+     */
+    @Test void aPressThatEndedLeftTheButtonOrIsOffScreenOpensNothing() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, stack(back(READY, List.of(ENTRY))), events::add)) {
+                var hold = control(view).hold;
+                long[] now = {0};
+                hold.clock = () -> now[0];
+                var button = control(view).button;
+                button.setSize(28, 28);
+                assertThat(button.isShowing()).isFalse();
+                press(button, false);
+                now[0] = 600 * MS;
+                hold.elapsed();
+                assertThat(hold.popup.isVisible()).as("off screen: no popup at all").isFalse();
+                assertThat(button.getModel().isArmed()).as("and the press is the button's still").isTrue();
+                lift(button);
+                events.clear();
+                onScreen(hold);
+                now[0] = 0;
+                press(button, false);
+                // A focus loss ends the press as BasicButtonListener.focusLost does (Swing's own click, if any, aside).
+                button.getModel().setPressed(false);
+                button.getModel().setArmed(false);
+                now[0] = 600 * MS;
+                hold.elapsed();
+                assertThat(hold.popup.isVisible()).as("the press ended (a focus loss)").isFalse();
+                events.clear();
+                now[0] = 0;
+                press(button, false);
+                // The pointer leaving the button disarms it, as BasicButtonListener.mouseExited does.
+                button.getModel().setArmed(false);
+                now[0] = 600 * MS;
+                hold.elapsed();
+                assertThat(hold.popup.isVisible()).as("the pointer left the button").isFalse();
+                lift(button);
+                assertThat(events).as("a release off the button is no click").isEmpty();
+            } finally { release(context); }
+        });
+    }
+
     /** The menu opens while the press is held and its content changes in place as the history does. */
     @Test void anUpdateChangesTheItemsAndClosingTheViewHidesTheMenu() {
         Edt.run(() -> {
             var context = KitFixtures.context();
             var view = new KitView(context, stack(back(READY, List.of(ENTRY))), e -> {});
             try {
-                var hold = control(view).hold;
+                var hold = onScreen(control(view).hold);
                 hold.open();
                 assertThat(hold.popup.isVisible()).isTrue();
-                view.update(stack(back(READY, List.of(ENTRY, OLDER))));
+                int[] shown = MenusTest.shownAgain(hold.popup, () -> view.update(stack(back(READY, List.of(ENTRY, OLDER)))));
                 assertThat(hold.popup.getComponentCount()).isEqualTo(2);
+                assertThat(shown[0]).as("packed: shown again at its new size").isEqualTo(1);
+                shown = MenusTest.shownAgain(hold.popup, () -> view.update(stack(back(READY, List.of(ENTRY, OLDER)))));
+                assertThat(shown[0]).as("an update that changes nothing shows nothing again").isZero();
                 assertThat(SwingUtilities.isEventDispatchThread()).isTrue();
                 view.close();
                 assertThat(hold.popup.isVisible()).isFalse();

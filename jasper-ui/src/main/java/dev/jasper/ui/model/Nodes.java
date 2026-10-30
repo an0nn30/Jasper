@@ -119,7 +119,7 @@ public final class Nodes {
      * keeps the kind's colour. A present {@code selected} makes it a toggle button (a search option such as match case):
      * the kit paints the pressed treatment while it is true and reports its pressed state to assistive technology; a
      * click reports the Action and the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons
-     * take it. A non-empty {@code holdMenu} opens under the button after a press held for 500 ms, whose
+     * take it. A non-empty {@code holdMenu} opens under the button after a press held on it for 500 ms, whose
      * release then reports nothing, and at once on a right-click or the menu keys.
      */
     public record Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,

@@ -3,25 +3,25 @@ package dev.jasper.ui.swing;
 import dev.jasper.ui.model.MenuItem;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.model.UiEvent;
-import java.awt.Container;
-import java.awt.Point;
-import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.LongSupplier;
+import java.util.function.Predicate;
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
+import javax.swing.JPopupMenu;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
 /**
  * A button's hold menu (SDK 0.27.0; {@link Nodes.Button#holdMenu()}), as a browser's Back button holds its history: a
- * left press held for {@link #HOLD_NANOS} opens it under the button, and the press's release then reports nothing,
- * while a shorter press is the button's own. A popup trigger (a right-click; a Control-click on macOS) and the menu
+ * left press held on the button for {@link #HOLD_NANOS} opens it under the button, and the press's release then reports
+ * nothing, while a shorter press is the button's own. A press that ends without its release reaching the button, or
+ * whose pointer leaves the button, opens nothing, and nothing opens while the button is not on screen. A popup trigger (a right-click; a Control-click on macOS) and the menu
  * keys (Shift+F10, the context-menu key) open it at once. It shows in the menu's card, placed as a menu button's menu
  * is, and choosing an enabled item reports its action through the button's own events; a submenu's children are
  * reachable as in every kit menu. The button's {@link KitOwnership#CONTEXT_MENU} holds it while there are items. The
@@ -40,6 +40,11 @@ final class HoldMenu implements AutoCloseable {
     final Timer timer;
     /** The clock a held press is measured by, in nanoseconds; a test sets its own and runs {@link #elapsed()}. */
     LongSupplier clock = System::nanoTime;
+    /**
+     * Puts the menu on screen under the button, as a menu button's menu opens ({@link Menus#showUnder}), and says whether
+     * it did: never while the button is not on screen. A headless test, where nothing is, sets its own.
+     */
+    Predicate<JPopupMenu> show;
     private final List<Runnable> cleanup = new ArrayList<>();
     private List<MenuItem> items = List.of();
     /** When the left press now held began, by {@link #clock}; meaningful while {@link #holding}. */
@@ -56,6 +61,7 @@ final class HoldMenu implements AutoCloseable {
         popup = new Menus.Popup(owner.context());
         timer = new Timer(millis(HOLD_NANOS), event -> elapsed());
         timer.setRepeats(false);
+        show = menu -> Menus.showUnder(menu, button, owner.view);
         // After the button's own listener, which arms it: a press that opens the menu disarms it again.
         button.addMouseListener(presses);
         button.getActionMap().put(OPEN, new AbstractAction() {
@@ -73,6 +79,8 @@ final class HoldMenu implements AutoCloseable {
             keys(!items.isEmpty());
             button.putClientProperty(KitOwnership.CONTEXT_MENU, items.isEmpty() ? null : popup);
             if (items.isEmpty()) dismiss();
+            // A history that changes while its menu shows: the menu takes its new size where it is.
+            Menus.repack(popup);
         } else Menus.describe(popup.getComponents());
         if (!owner.interactive()) { holding = false; timer.stop(); dismiss(); }
         popup.revalidate();
@@ -82,8 +90,7 @@ final class HoldMenu implements AutoCloseable {
     private void pressed(MouseEvent event) {
         if (items.isEmpty() || !owner.interactive()) return;
         if (event.isPopupTrigger()) {
-            disarm();
-            open();
+            if (open()) disarm();
             return;
         }
         if (!SwingUtilities.isLeftMouseButton(event)) return;
@@ -101,12 +108,14 @@ final class HoldMenu implements AutoCloseable {
 
     /**
      * The held press's check, which the timer runs: once the press has been held for {@link #HOLD_NANOS} by
-     * {@link #clock} it disarms the button, so that the release reports nothing, and opens the menu; before that it
-     * waits for the rest.
+     * {@link #clock} it opens the menu and disarms the button, so that the release reports nothing; before that it waits
+     * for the rest. A press that has ended without its release reaching the button (a focus loss clears its pressed
+     * state), one whose pointer has left the button (it is no longer armed) and a button not on screen open nothing.
      */
     void elapsed() {
         if (!holding) return;
-        if (items.isEmpty() || !owner.interactive()) { holding = false; return; }
+        var model = button.getModel();
+        if (items.isEmpty() || !owner.interactive() || !model.isPressed() || !model.isArmed()) { holding = false; return; }
         long left = HOLD_NANOS - (clock.getAsLong() - pressedAt);
         if (left > 0) {
             timer.setInitialDelay(Math.max(1, millis(left)));
@@ -114,8 +123,7 @@ final class HoldMenu implements AutoCloseable {
             return;
         }
         holding = false;
-        disarm();
-        open();
+        if (open()) disarm();
     }
 
     /**
@@ -128,21 +136,18 @@ final class HoldMenu implements AutoCloseable {
         model.setPressed(false);
     }
 
-    /** Opens the menu under the button, as a menu button opens its own, unless it shows already or has no items. */
-    void open() {
-        if (items.isEmpty() || !owner.interactive() || popup.isVisible()) return;
+    /**
+     * Opens the menu under the button ({@link #show}) unless it shows already, has no items or the button takes no input;
+     * whether it opened now.
+     */
+    boolean open() {
+        if (items.isEmpty() || !owner.interactive() || popup.isVisible()) return false;
         holding = false;
         timer.stop();
         popup.setInvoker(button);
-        if (button.isShowing()) {
-            Container host = SwingUtilities.getRootPane(button);
-            if (host == null) host = owner.view;
-            Rectangle anchor = SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), host);
-            Point point = Menus.anchor(anchor, popup.getPreferredSize(), new Rectangle(0, 0, host.getWidth(), host.getHeight()));
-            Point local = SwingUtilities.convertPoint(host, point, button);
-            popup.show(button, local.x, local.y);
-        } else popup.setVisible(true);
+        return show.test(popup);
     }
+
 
     /** Hides the menu; whether it was showing. */
     boolean dismiss() {

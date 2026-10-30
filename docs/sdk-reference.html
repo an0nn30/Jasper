@@ -8099,8 +8099,9 @@ the kind's text colour; for example a favourite's warning star. The label keeps 
 <code>selected</code> makes it a toggle button (a search option such as match case): the kit paints the pressed
 treatment while it is true and reports its pressed state to assistive technology; a click reports the Action and
 the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons take it.</p><p>Since 0.27.0 a button can carry a <code>holdMenu</code>, as a browser's Back button carries its history: a press held
-for at least 500 ms opens the menu under the button, and its release then reports nothing, while a shorter press
-reports <code>action</code> as before. A right-click (a Control-click on macOS), Shift+F10 and the context-menu key open
+on the button for at least 500 ms opens the menu under it, and its release then reports nothing, while a shorter
+press reports <code>action</code> as before. A press whose pointer leaves the button, or that ends without its release
+(the window losing the focus), opens nothing. A right-click (a Control-click on macOS), Shift+F10 and the context-menu key open
 the menu at once. Choosing an enabled item closes the menu and reports the item's action as a
 <a href="#dev.jasper.sdk.ui.UiEvent.Action"><code>UiEvent.Action</code></a>.</div>
 <h5>Components</h5>
@@ -8131,7 +8132,7 @@ the menu at once. Choosing an enabled item closes the menu and reports the item'
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl" href="#dev.jasper.sdk.ui.Nodes.Severity">Nodes.Severity</a>&gt; iconSeverity,
         <a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Boolean.html" title="java.lang.Boolean">Boolean</a>&gt; selected)</code></pre>
 <div class="doc"><p>A button without a hold menu.</p></div>
-<dl class="tags"><dt>Parameters</dt><dd><code>id</code></dd><dd><code>state</code></dd><dd><code>label</code></dd><dd><code>icon</code></dd><dd><code>kind</code></dd><dd><code>action</code></dd><dd><code>tooltip</code></dd><dd><code>presentation</code></dd><dd><code>iconSeverity</code></dd><dd><code>selected</code></dd></dl>
+<dl class="tags"><dt>Parameters</dt><dd><code>id</code> the node id</dd><dd><code>state</code> the node's state; a disabled or busy button cannot be pressed</dd><dd><code>label</code> the button's text; blank makes an icon-only button, which requires an icon and a tooltip</dd><dd><code>icon</code> the glyph beside the label: a built-in icon name or one the plugin registered; empty for none</dd><dd><code>kind</code> the button's treatment</dd><dd><code>action</code> the action id the button reports; not blank</dd><dd><code>tooltip</code> the text shown on hover, and an icon-only button's accessible name; empty for none</dd><dd><code>presentation</code> how the button sits in its composition</dd><dd><code>iconSeverity</code> a severity whose colour tints the glyph; empty for the kind's colour</dd><dd><code>selected</code> the pressed state of a toggle button; empty for a plain button</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.Nodes.Button.Button(String,ControlState,String,String,Nodes.ButtonKind,String,String,Nodes.ButtonPresentation,Optional)">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.ui.Nodes.Button.Button(String,ControlState,String,String,Nodes.ButtonKind,String,String,Nodes.ButtonPresentation,Optional)" aria-label="Link to this member">#</a><code><b>Button</b>(

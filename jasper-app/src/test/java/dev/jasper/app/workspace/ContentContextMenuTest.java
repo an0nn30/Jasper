@@ -101,17 +101,24 @@ class ContentContextMenuTest {
         });
     }
 
+    /** Review C2: a pane item runs, then the plugin hears nothing, as the fake and the contract say. */
     @Test void emptyGroupsAddNoRuleAndAPaneItemRunsAndTellsNothing() throws Exception {
+        var shapes = new CopyOnWriteArrayList<String>();
         edt(() -> {
-            model.tabs().showContextMenu(b, menu(List.of(), List.of()));
+            model.tabs().showContextMenu(b, new ContentMenu(new Point(20, 20), List.of(), List.of(), value -> {
+                heard.add(value);
+                shapes.add(PaneDragTest.shape(owner));
+            }));
             JPopupMenu popup = shown.getFirst();
             assertThat(rows(popup.getComponents(), "")).containsExactly("Split", "  Terminal Right", "  Terminal Down",
                 "Move Pane to Tab", "  2 c", "Close Pane");
             ((JMenuItem) ((JMenu) row(popup.getComponents(), "Move Pane to Tab")).getMenuComponent(0)).doClick(0);
-            assertThat(heard).containsExactly(Optional.empty());
             assertThat(PaneDragTest.shape(owner)).as("b moved into c's tab").isEqualTo("H[c, b]");
             assertThat(owner.selectedTab()).isSameAs(b);
         });
+        edt(() -> { });
+        assertThat(heard).containsExactly(Optional.empty());
+        assertThat(shapes).as("the plugin heard after the item ran").containsExactly("H[c, b]");
     }
 
     /** The popup closing, as Swing tells its listeners when a choice, Escape or a click elsewhere hides it. */

@@ -490,9 +490,11 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   painting the surface under the rows) at least `MENU_MIN_WIDTH` wide; Swing's menu keys and pointer open it. A menu
   button's outside-press check treats a submenu's popup as inside (`Menus.within`).
 - A button's `holdMenu` (`HoldMenu`, made the first time the button has one) opens under the button, placed as a menu
-  button's menu is, when a left press has been held for 500 ms by its clock (the timer re-checks until then); it
-  disarms the button so the release reports nothing. A popup trigger opens it at once, and Shift+F10 and the
-  context-menu key are bound on the button only while it has items.
+  button's menu is (`Menus.showUnder`, which shows nothing while the button is not on screen), when a left press has
+  been held for 500 ms by its clock (the timer re-checks until then) and the button is still pressed and armed; it
+  disarms the button so the release reports nothing, and the button reports no click while the menu shows. A popup
+  trigger opens it at once, and Shift+F10 and the context-menu key are bound on the button only while it has items. An
+  open menu, a menu button's included, whose rows are rebuilt is packed to its new size (`Menus.repack`).
 - `Text.severity` tints text and `Text.caret` draws a command line's insertion bar. Body, description and caption text
   flows (wraps, keeping line breaks, no wider than `TEXT_FLOW_COLUMNS`) in vertical stacks, form bodies, cards and
   sections. ACTIONS stacks wrap instead of squeezing their buttons. A stack's `cancelAction` answers Escape from

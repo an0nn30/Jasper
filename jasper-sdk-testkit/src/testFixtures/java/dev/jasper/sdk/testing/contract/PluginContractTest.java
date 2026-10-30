@@ -370,6 +370,60 @@ public abstract class PluginContractTest {
     }
 
     /**
+     * Plan 4b Task 1 (SDK 0.27.0; review C5): closing the tab while its right-click menu shows closes the menu and tells
+     * chosen nothing, once.
+     */
+    @Test void closingATabWhileItsMenuShowsTellsChosenNothingOnce() {
+        UUID main = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        var heard = new java.util.concurrent.CopyOnWriteArrayList<Optional<String>>();
+        h.ui(() -> {
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            var page = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), owner, kitView(alpha.get()));
+            UUID id = owner.activeTab().orElseThrow().id();
+            page.showContextMenu(new java.awt.Point(40, 30), List.of(menuItem("back", "Back", true)), List.of(), heard::add);
+            assertThat(h.contentMenu(id)).isNotEmpty();
+            page.close();
+            assertThat(heard).as("closing the tab dismisses its menu").containsExactly(Optional.empty());
+            assertThat(h.contentMenu(id)).isEmpty();
+            assertThat(h.dismissContentMenu(id)).isFalse();
+            assertThat(h.chooseFromContentMenu(id, List.of("item:back"))).isFalse();
+            assertThat(heard).as("once").hasSize(1);
+        });
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0; review C4): one right-click menu shows at a time in Jasper: another plugin's menu
+     * opening dismisses the first, whose chosen hears nothing.
+     */
+    @Test void anotherPluginsRightClickMenuDismissesTheFirst() {
+        UUID main = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.beta", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), beta::set);
+        var heardAlpha = new java.util.concurrent.CopyOnWriteArrayList<Optional<String>>();
+        var heardBeta = new java.util.concurrent.CopyOnWriteArrayList<Optional<String>>();
+        h.ui(() -> {
+            var alphaOwner = alpha.get().terminals().window(main).orElseThrow();
+            var notes = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), alphaOwner, kitView(alpha.get()));
+            UUID first = alphaOwner.activeTab().orElseThrow().id();
+            var betaOwner = beta.get().terminals().window(main).orElseThrow();
+            var page = beta.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), betaOwner, kitView(beta.get()));
+            UUID second = betaOwner.activeTab().orElseThrow().id();
+            notes.showContextMenu(new java.awt.Point(40, 30), List.of(menuItem("save", "Save", true)), List.of(), heardAlpha::add);
+            page.showContextMenu(new java.awt.Point(40, 30), List.of(menuItem("back", "Back", true)), List.of(), heardBeta::add);
+            assertThat(heardAlpha).as("the first menu is dismissed").containsExactly(Optional.empty());
+            assertThat(h.contentMenu(first)).isEmpty();
+            assertThat(h.contentMenu(second)).startsWith("item:back");
+            assertThat(h.chooseFromContentMenu(second, List.of("item:back"))).isTrue();
+            assertThat(heardBeta).containsExactly(Optional.of("back"));
+            assertThat(heardAlpha).hasSize(1);
+        });
+    }
+
+    /**
      * Plan 4b Task 1 (SDK 0.27.0): a submenu's children are reachable in a content tab's right-click menu: a plugin
      * submenu's child reaches chosen with its id, while the submenu itself and a disabled child report nothing; the host's
      * Move Pane to Tab submenu moves the pane into the tab chosen, and chosen hears nothing.

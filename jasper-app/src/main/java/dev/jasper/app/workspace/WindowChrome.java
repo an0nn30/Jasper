@@ -874,9 +874,9 @@ final class WindowChrome {
      * the window's other menus use: the plugin's leading items, the pane items the terminal's right-click menu offers for
      * a pane (Split, the Split list as the Tab menu has it; Move Pane to Tab, the window's other tabs; Close Pane), then
      * its trailing items, with a rule between groups and none for an empty group. A plugin's item shows its label as plain
-     * text, its icon and its action's binding; choosing one tells the menu its id. Choosing a pane item runs it, and the
-     * menu closing without a choice (Escape, a click elsewhere, another menu) tells the menu nothing, after the item its
-     * closing came from, if any, has run.
+     * text, its icon and its action's binding; choosing one tells the menu its id. Choosing a pane item runs it and then
+     * tells the menu nothing, and so does the menu closing without a choice (Escape, a click elsewhere, another menu),
+     * after the item its closing came from, if any, has run.
      *
      * @param menu the plugin's items and who hears the choice
      * @return the popup, not yet shown
@@ -893,8 +893,9 @@ final class WindowChrome {
         JMenu moves = paneMoves(new JMenu("Move Pane to Tab"), PlainText::item);
         JMenuItem close = PlainText.item(owner.action(ActionId.CLOSE_PANE));
         for (JMenuItem paneItem : List.of(split, moves, close)) popup.add(paneItem);
-        // A pane item tells the plugin nothing: its action runs.
-        java.awt.event.ActionListener ran = event -> menu.dismissed();
+        // A pane item runs, then tells the plugin nothing: Swing tells an item's listeners last added first, so the
+        // menu hears after the item's action has run, in a later turn, as it hears when the popup closes.
+        java.awt.event.ActionListener ran = event -> SwingUtilities.invokeLater(menu::dismissed);
         for (JMenu submenu : List.of(split, moves))
             for (Component child : submenu.getMenuComponents()) if (child instanceof JMenuItem item) item.addActionListener(ran);
         close.addActionListener(ran);

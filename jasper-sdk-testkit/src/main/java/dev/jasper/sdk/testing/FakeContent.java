@@ -140,8 +140,8 @@ final class FakeContent implements ContentTab {
         if(closed){chosen.accept(Optional.empty());return;}
         FakeContentMenu.icons(before,ui.context.kit()::validateIcon);FakeContentMenu.icons(after,ui.context.kit()::validateIcon);
         select();
-        // One menu shows at a time, in any tab.
-        for(var content:List.copyOf(ui.contents))if(content.menu!=null)content.menu.dismiss();
+        // One menu shows at a time, over any plugin's tab.
+        ui.host.dismissContentMenus();
         menu=new FakeContentMenu(this,before,paneItems(),after,chosen);
     }
     /** Jasper's pane items for this tab: Split with every Split choice's Right and Down, Move Pane to Tab, Close Pane. */

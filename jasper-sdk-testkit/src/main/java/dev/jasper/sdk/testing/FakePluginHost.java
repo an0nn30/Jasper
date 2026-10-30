@@ -2194,6 +2194,12 @@ public final class FakePluginHost implements AutoCloseable {
         return true;
     }
 
+    /** Dismisses the right-click menu any plugin's content tab shows, as another menu opening does in Jasper. */
+    void dismissContentMenus() {
+        for (FakePluginContext context : contexts.values())
+            for (FakeContent content : List.copyOf(context.ui.contents)) if (content.menu != null) content.menu.dismiss();
+    }
+
     /** The open plugin content tab with this id, for the contract harness; empty for any other tab. */
     java.util.Optional<dev.jasper.sdk.ui.ContentTab> content(UUID tabId) {
         for (FakePluginContext context : contexts.values())
