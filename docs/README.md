@@ -111,8 +111,8 @@ paths, commands and counts may no longer match, and the guides above take preced
 - Verification reports: [terminal refactor](terminal-refactor-verification.md),
   [app and Buddy refactor](app-refactor-verification.md), [Editor](editor-verification.md),
   [Remote SSH](remote-7a-verification.md), [Remote SFTP](remote-7c-verification.md),
-  [Windows start-up](windows-startup-verification.md), [macOS Local Network](mac-local-network-verification.md) and
-  [new UI icons](new-ui-icons-verification.md).
+  [Windows start-up](windows-startup-verification.md), [macOS Local Network](mac-local-network-verification.md),
+  [new UI icons](new-ui-icons-verification.md) and [Browser](browser-verification.md).
 - [Terminal readiness](terminal-readiness.md): the terminal's 2026-09-12 readiness handoff.
 - [Documentation audit](documentation-audit.md): the 2026-09-21 documentation audit.
 - [Renamed from Moray](rebranding.md): why older records use the name Moray.
