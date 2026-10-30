@@ -174,12 +174,16 @@ these deviations from the plan's text:
     after the shown tab; hidden pages keep a full-resolution frame in memory (for Task 13's memory check); `NEXT_TAB`
     was inserted mid-enum.
 
-**Release blocker, unverified (F5, R48):** Chromium runs in Jasper's process with its sandbox on, and JBR adds no
-`--no-sandbox`. On Linux distributions that restrict unprivileged user namespaces (Ubuntu 23.10 and later, through
-AppArmor), with no setuid `chrome-sandbox`, Chromium's zygote host may stop on `LOG(FATAL)` "No usable sandbox!" when
-the first browser item shows, ending Jasper and its terminals. Verify it on Linux before release; the mitigations are a
-setuid `chrome-sandbox` in the Linux packages, or a no-sandbox fallback only where Chromium would otherwise abort. On
-Windows, `java.exe` does not link `cef_sandbox`, so the sandbox is likely not in effect there (unverified).
+**Chromium's sandbox is off (the user's choice, 2026-10-30, "Turn the sandbox off now").** In the first macOS GUI check,
+the dev run (`:jasper-app:run`) crashed when the first browser item showed:
+- the sandboxed GPU and network helpers could not open the Chromium framework under the JBR ("file system sandbox
+  blocked open()");
+- Chromium then stopped on `FATAL` "GPU process isn't usable", which ends Jasper and its terminals.
+
+`ChromiumOptions` now sets `no_sandbox = true`, as JetBrains configures JCEF. The trade-off is that a page exploiting a
+Chromium bug runs with the user's rights. This also removes the Linux zygote risk recorded before (R48). Turning the
+sandbox back on needs the framework readable from the sandbox, perhaps inside a packaged `Jasper.app`, and is a
+follow-up.
 
 Known gaps and follow-ups: macOS two-finger swipe (no JBR gesture API); drags that start in a page are cancelled (R33);
 links and popups at other schemes, such as `mailto:`, open nothing in pages (R36); nothing downloads (no download
