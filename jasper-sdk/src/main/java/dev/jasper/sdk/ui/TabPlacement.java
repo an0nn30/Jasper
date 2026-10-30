@@ -13,6 +13,13 @@ public enum TabPlacement {
      * tab strip and shown, the window's empty workspace taking it in its place.
      */
     NEW_TAB,
+    /**
+     * In a new tab of that window right after its shown tab, and shown; at the end of its strip when it shows none, as
+     * {@link #NEW_TAB} places it.
+     *
+     * @since 0.26.0
+     */
+    NEXT_TAB,
     /** In a new pane to the right of the focused pane of that window's shown tab. */
     SPLIT_RIGHT,
     /** In a new pane below the focused pane of that window's shown tab. */

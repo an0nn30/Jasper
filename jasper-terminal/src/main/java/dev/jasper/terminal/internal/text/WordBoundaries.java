@@ -1,6 +1,6 @@
 package dev.jasper.terminal.internal.text;
 
-/** What a double-click selects: a run of word characters, where paths and URLs count as one word. */
+/** What a double-click selects where no link is: a run of word characters, where a path counts as one word. */
 public final class WordBoundaries {
     private static final String WORD_PUNCTUATION = "_-./~:@%+=?&#";
 

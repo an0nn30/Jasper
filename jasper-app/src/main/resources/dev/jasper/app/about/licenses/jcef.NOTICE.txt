@@ -1,0 +1,5 @@
+Jasper's Browser plugin carries code adapted from JetBrains/jcef at commit 9df0879, under this license:
+dev.jasper.browser.page.PageView from java_tests/tests JBCefOsrComponent.java, dev.jasper.browser.page.ImeAdapter from
+java_tests/tests CefInputMethodAdapter.java, and the drop listener in dev.jasper.browser.page.PageBrowser from
+java/org/cef/browser/CefDropTargetListener.java.
+Source: https://github.com/JetBrains/jcef

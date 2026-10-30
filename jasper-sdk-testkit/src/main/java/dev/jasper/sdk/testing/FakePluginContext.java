@@ -125,6 +125,17 @@ public final class FakePluginContext implements PluginContext {
                     // As the application: the editor a plugin provides first, here on the caller's thread and with no window.
                     if (!host.editProvided(file, java.util.OptionalInt.empty(), Optional.empty())) host.openedInEditor.add(file);
                 }
+                @Override public void openFile(Path file) {
+                    requireOpen();
+                    Objects.requireNonNull(file, "file");
+                    // As the application: a regular file goes to the editor a plugin provides, with the active window and no
+                    // line, here on the caller's thread, else to the desktop's edit or reveal; never the provided browser.
+                    if (!Files.isRegularFile(file)) {
+                        notifications.group().error("Could not open a file", String.valueOf(file.getFileName()));
+                        return;
+                    }
+                    if (!host.edit(file, java.util.OptionalInt.empty(), host.activeWindowId())) host.openedFiles.add(file);
+                }
                 @Override public Subscription editor(dev.jasper.sdk.ui.FileEditor editor) {
                     requireOpen();
                     if (!info.capabilities().contains(dev.jasper.sdk.Capabilities.EDITOR_PROVIDE))

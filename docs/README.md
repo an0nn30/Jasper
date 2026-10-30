@@ -31,6 +31,8 @@ bundled plugins, the plugin SDK, and the libraries the application is built from
 - [Editor](editor.md): editing local and remote files in workspace panes, several views of one file, previewing
   Markdown and the `jasper editor` command. Its Vim mode has a list of [supported keys](editor-vim-reference.md) and of
   [differences from Vim](vim-divergences.md).
+- [Browser](browser.md): web pages in workspace tabs and panes, the Web menu, links and popups in a page, and where
+  the links you click in a terminal open.
 - [File Server](file-server.md): sharing a folder over HTTP, HTTPS, FTP, FTPS, SFTP and TFTP.
 - [Project Index](project-index.md): indexing projects and finding their files from the command palette.
 - [Shell History and Snippets](history-and-snippets.md): searching shell history and saving commands.
@@ -109,8 +111,8 @@ paths, commands and counts may no longer match, and the guides above take preced
 - Verification reports: [terminal refactor](terminal-refactor-verification.md),
   [app and Buddy refactor](app-refactor-verification.md), [Editor](editor-verification.md),
   [Remote SSH](remote-7a-verification.md), [Remote SFTP](remote-7c-verification.md),
-  [Windows start-up](windows-startup-verification.md), [macOS Local Network](mac-local-network-verification.md) and
-  [new UI icons](new-ui-icons-verification.md).
+  [Windows start-up](windows-startup-verification.md), [macOS Local Network](mac-local-network-verification.md),
+  [new UI icons](new-ui-icons-verification.md) and [Browser](browser-verification.md).
 - [Terminal readiness](terminal-readiness.md): the terminal's 2026-09-12 readiness handoff.
 - [Documentation audit](documentation-audit.md): the 2026-09-21 documentation audit.
 - [Renamed from Moray](rebranding.md): why older records use the name Moray.

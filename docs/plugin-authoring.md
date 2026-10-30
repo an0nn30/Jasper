@@ -1,8 +1,9 @@
 # Writing a Jasper plugin
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
-Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
-describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.25.0, task by task.
+Shell History, Snippets, the Browser and the Enterprise look are bundled plugins built only against the public plugin
+SDK this guide describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.26.0,
+task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
   exported APIs.
@@ -64,7 +65,7 @@ id = "dev.example.tool"
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.25.0, <0.26"
+sdk = ">=0.26.0, <0.27"
 description = "Runs the tool from the command palette."
 vendor = "Example"
 homepage = "https://example.dev/tool"
@@ -90,7 +91,7 @@ summary = "Run the tool"
 | `name` | string | yes | Must show something: not only spaces, zero-width or bidi characters. It titles the plugin's row, Settings page and notification groups. |
 | `version` | string | yes | One to three numbers separated by dots, without leading zeros or a pre-release tag; missing numbers are 0, so `1.0` is `1.0.0`. |
 | `entry` | string | yes | The qualified name of the [entry class](#the-entry-point-and-lifecycle), which must be in a package. |
-| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.25.0 declares `sdk = ">=0.25.0, <0.26"`. |
+| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.26.0 declares `sdk = ">=0.26.0, <0.27"`. |
 | `description` | string | no | The Overview on the plugin's details in Settings › Plugins; searched there. |
 | `vendor` | string | no | Shown in the plugin list, its details and its review sheet. |
 | `homepage` | string | no | An absolute `http` or `https` address, linked as "Plugin homepage ↗" on the plugin's details. Anything else is ignored with a warning in the log. |
@@ -326,8 +327,10 @@ private static void installUi(PluginContext context, long stepMillis) {
 
 - `menus().standard(StandardMenu.TOOLS)` is a section at the end of a built-in menu, after a separator when the menu
   already has items;
-  `menus().create(id, title)` is a top-level menu of the plugin's own; `menus().terminalContext()` is a section at the
-  end of every terminal pane's right-click menu.
+  `menus().create(id, title)` is a top-level menu of the plugin's own; `menus().createForContent(id, title)` is one
+  that a window's menu bar shows only while one of the plugin's content tabs is that window's current item (the
+  focused pane's item in its shown tab); `menus().terminalContext()` is a section at the end of every terminal pane's
+  right-click menu.
 - A [`PluginMenu`](sdk-reference.html#dev.jasper.sdk.ui.PluginMenu) takes `add(actionId)`, `addSeparator()`,
   `submenu(title)` and `clear()`. Each change replaces the section whole, so windows never show half of it.
 - [`addForWebAddress(actionId)`](sdk-reference.html#dev.jasper.sdk.ui.PluginMenu.addForWebAddress(String)), in the
@@ -557,6 +560,9 @@ window for short-lived work. Set a kit view with a Cancel button that stops the 
 at most one, across plugins: another request throws `IllegalStateException`. It closes with its window and with the
 plugin; an `OVERLAY` dialog can open over it.
 
+`windows().hasModal(owner)`, for a Jasper window or one of the plugin's content tabs, tells whether that window shows a
+modal now: a modal dialog over it, Jasper's or any plugin's, or an overlay inside it. It is false for a closed owner.
+
 ### Popovers
 
 `view.anchor(nodeId)` mints a [`UiAnchor`](sdk-reference.html#dev.jasper.sdk.ui.UiAnchor) from a mounted `Button` or
@@ -598,7 +604,8 @@ tab strip, the window and its menus, and the status bar; the plugin provides the
   returns a [`ContentTab`](sdk-reference.html#dev.jasper.sdk.ui.ContentTab).
   `openTab(spec, owner, view, placement)` takes a
   [`TabPlacement`](sdk-reference.html#dev.jasper.sdk.ui.TabPlacement): `NEW_TAB` (the three-argument form),
-  `SPLIT_RIGHT` or `SPLIT_DOWN` (a new pane beside the focused one) or `NEW_WINDOW` (a new window). Reopening a
+  `NEXT_TAB` (a new tab right after the shown one), `SPLIT_RIGHT` or `SPLIT_DOWN` (a new pane beside the focused one)
+  or `NEW_WINDOW` (a new window). Reopening a
   key the plugin has open selects that tab and returns its handle, without mounting the view passed.
 - `setPresentation(new ContentPresentation(title, detail, icon, dirty, location, host))`: the tab shows "● " before the
   title while dirty and the detail after it; its tooltip is the location, which Jasper never treats as a local path.
@@ -1091,13 +1098,17 @@ one.
   [provides the editor](#the-file-editor-role) (normally the Editor, [default editor](editor.md)), then the desktop's
   edit or open action, then revealing the file. A failure is posted in the plugin's group as "Could not open a file in
   an editor".
+- `context.platform().openFile(file)` opens a local file as a Cmd-click (Ctrl-click on Linux and Windows) on its path
+  in a terminal does, but never in the plugin that provides the web browser: the editor a plugin provides, with the
+  active window, then the desktop's edit action, then showing it in the file manager; never the desktop's open action.
+  A path that is not a regular file, and a failure, are posted in the plugin's group as "Could not open a file".
 - `context.platform().openInBrowser(uri)` opens an `http` or `https` address the user asked for, such as a link they
   clicked in the plugin's view: the plugin that [provides the web browser](#the-web-browser-role) first, as a click in
   the active window, then the system browser, as `browse` opens it.
 - `context.platform().browse(uri)` opens an `http` or `https` address in the system browser, in the background, even
   when a plugin provides the web browser; any other address throws `IllegalArgumentException` (from `openInBrowser`
   too), and a failure is posted as "Could not open a web address".
-- All three work from any thread.
+- `openInEditor`, `openInBrowser` and `browse` work from any thread; `openFile` only on the UI thread.
 
 ## The clipboard
 
@@ -1394,7 +1405,7 @@ catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
 
 | Runs on, or may be called from | What |
 | --- | --- |
-| The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, content tabs, split items, restorers, dialogs, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
+| The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, content tabs, split items, restorers, dialogs, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard; `openFile` and `hasModal`. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
 | Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; `TabNamePiece.set`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
 
 - **Slow work** goes to `context.background()`, whose tasks can run at the same time. UI-thread code does no I/O and
@@ -1436,13 +1447,13 @@ try (var host = new FakePluginHost()) {
 | --- | --- |
 | Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView` (an event a standard row handles there calls `pendingChanged()`), `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel`; `setKitDefault(id, key, value)` (a look's default, before any plugin starts) and `lookDefaultProblems(id)` |
 | The look and the terminal font | `setPresentation(presentation)` before any plugin starts, with `FakePresentations.STANDARD` (what the fake reports until told otherwise) or `CLASSIC`; `presentation()`; `setTerminalTypography(value)`, delivered by `flush()` |
-| Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `contextMenu(paneId)`, `chooseFromContextMenu(paneId, actionId)`, `status()`, `progress()`, `rail()` |
+| Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `menuBar(windowId)` (the plugin menus a window's menu bar shows), `contextMenu(paneId)`, `chooseFromContextMenu(paneId, actionId)`, `status()`, `progress()`, `rail()` |
 | Tool windows and dialogs | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel` (in the most recently active window, or `openPanel(panelId, windowId)`), `panelView`, `panelHeader`, `placePanel` (moves the tool window as a drag would, to a `PanelPlacement`; one that is not open is built there), `closePanel`; `windows()` (the open dialogs and overlays), `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
 | Terminals | `addTerminalWindow()`, `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`, `moveTab`, `closeTab`, `windowTabs(windowId)` (a window's tabs, each its items pane by pane), `focusTerminalPane`, `closeTerminalPane`, `holdPane` (a local pane that waits, `NOT_STARTED`, until its tab is shown), `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
 | Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()` |
-| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
+| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
 
 Where the fake differs from Jasper:
 

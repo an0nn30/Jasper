@@ -395,7 +395,10 @@ public final class TunnelsPanel implements AutoCloseable {
         return rows;
     }
 
-    /** The classic table's sort within the saved tunnels and within the quick forwards: the column's text, then name, then id; none keeps the order given. */
+    /**
+     * The classic table's sort within the saved tunnels and within the quick forwards: the column's text, then name; a tie,
+     * and no sort, keeps the order given, so quick forwards, which have no name, keep the order they were made.
+     */
     private List<Tunnel> ordered(List<Tunnel> tunnels) {
         if (layout != Layout.CLASSIC || tableState.sortColumn().isEmpty()) return tunnels;
         String column = tableState.sortColumn().get();
@@ -404,7 +407,7 @@ public final class TunnelsPanel implements AutoCloseable {
         Comparator<Tunnel> ends = Comparator.comparing((Tunnel tunnel) -> portOf(sortText(tunnel, column)) < 0)
             .thenComparing(tunnel -> hostOf(sortText(tunnel, column)).toLowerCase(Locale.ROOT)).thenComparingInt(tunnel -> portOf(sortText(tunnel, column))).thenComparing(text);
         Comparator<Tunnel> primary = column.equals("local") || column.equals("remote") ? ends : text;
-        Comparator<Tunnel> byName = Comparator.comparing((Tunnel tunnel) -> tunnel.name().toLowerCase(Locale.ROOT)).thenComparing(Tunnel::name).thenComparing(Tunnel::id);
+        Comparator<Tunnel> byName = Comparator.comparing((Tunnel tunnel) -> tunnel.name().toLowerCase(Locale.ROOT)).thenComparing(Tunnel::name);
         return tunnels.stream().sorted((tableState.ascending() ? primary : primary.reversed()).thenComparing(byName)).toList();
     }
 

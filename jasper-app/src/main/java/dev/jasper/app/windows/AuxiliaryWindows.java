@@ -141,6 +141,26 @@ public final class AuxiliaryWindows implements AutoCloseable {
             if (surface.ownerWindow().filter(ownerWindow::equals).isPresent()) surface.close();
     }
 
+    /**
+     * Whether one of these surfaces shows a modal over Jasper window {@code window} ({@code Windows.hasModal}; browser
+     * plan 4a): an overlay inside it, or a modal dialog it owns, directly or through the surfaces it owns.
+     */
+    public boolean hasModal(UUID window) {
+        Objects.requireNonNull(window, "window");
+        for (AuxiliarySurface surface : open) {
+            if (!surface.shown()) continue;
+            if (surface.kind() == AuxiliarySurface.Kind.OVERLAY ? surface.ownerWindow().filter(window::equals).isPresent()
+                : surface.modal() && ownedBy(surface, window)) return true;
+        }
+        return false;
+    }
+
+    private static boolean ownedBy(AuxiliarySurface surface, UUID window) {
+        for (AuxiliarySurface at = surface; at != null; at = at.ownerSurface().orElse(null))
+            if (at.ownerWindow().filter(window::equals).isPresent()) return true;
+        return false;
+    }
+
     /** Run after a close leaves no surface open; the application uses it to decide whether to exit. */
     public Runnable onAllClosed = () -> { };
     /** Run when a surface opens while none is open; the application brings Jasper back into the Dock for it. */

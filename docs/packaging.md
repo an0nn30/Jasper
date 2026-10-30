@@ -2,7 +2,7 @@
 
 Jasper ships as a native application image that bundles a trimmed JetBrains Runtime, so users need no Java: a
 `Jasper.app` and DMG on macOS, a portable ZIP and a per-user setup wizard on Windows, and `.deb` and `.rpm` packages on
-Linux. Every package carries the application, all nine bundled plugins, Jasper's own launcher with its start-up recovery
+Linux. Every package carries the application, all ten bundled plugins, Jasper's own launcher with its start-up recovery
 helper `jasper-watch`, and the native [`jasper` command](command-line.md); the Windows packages also carry the offline
 [Cygwin starter environment](#bundled-cygwin). jpackage builds only for the machine it runs on, so each package is built
 on the operating system and architecture it is for (aarch64 or x64). Installing and using a package on the desktop is
@@ -141,9 +141,9 @@ and their libraries, and on Windows `cygwin-tool.jar`, which jpackage puts on th
 
 Each bundled plugin's folder holds its jar and the libraries it bundles: Remote (`dev.jasper.remote`), Credential
 Vault (`dev.jasper.vault`), Editor (`dev.jasper.editor`), File Server (`dev.jasper.fileserver`), Project Index
-(`dev.jasper.indexer`), Shell History (`dev.jasper.history`), Snippets (`dev.jasper.snippets`), Enterprise
-(`dev.jasper.enterprise`, off by default) and Sample (`dev.jasper.sample`, on but inert until its demo settings are
-set). [Plugins](plugins.md#bundled-plugins) describes each.
+(`dev.jasper.indexer`), Shell History (`dev.jasper.history`), Snippets (`dev.jasper.snippets`), Browser
+(`dev.jasper.browser`), Enterprise (`dev.jasper.enterprise`, off by default) and Sample (`dev.jasper.sample`, on but
+inert until its demo settings are set). [Plugins](plugins.md#bundled-plugins) describes each.
 
 ### Bundled plugins stay off the classpath
 
@@ -158,9 +158,10 @@ puts them on the class path.
 
 `Jasper.cfg` carries exactly these options, and `verifyPackage` fails on any other:
 
-- the application's: `--enable-native-access=ALL-UNNAMED`, `-Dapple.awt.application.name=Jasper`, `-Xmx2048m`,
-  `-XX:+IgnoreUnrecognizedVMOptions`, and on macOS `--add-opens=java.desktop/java.awt=ALL-UNNAMED` and
-  `--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED` for workspace glass;
+- the application's: `--enable-native-access=ALL-UNNAMED`, `--enable-native-access=jcef`,
+  `-Dapple.awt.application.name=Jasper`, `-Xmx2048m`, `-XX:+IgnoreUnrecognizedVMOptions`, and on macOS
+  `--add-opens=java.desktop/java.awt=ALL-UNNAMED` and `--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED` for
+  workspace glass;
 - on macOS and Windows, the options that point the native libraries at the app's `native` folder:
   `-Dflatlaf.nativeLibraryPath=$APPDIR/native`, `-Djna.boot.library.path=$APPDIR/native`, `-Djna.nosys=true` and
   `-Dpty4j.preferred.native.folder=$APPDIR/native`;
@@ -535,7 +536,7 @@ Windows job fails while [`validation.json`](#bundled-cygwin) lacks native and in
 architecture. The publish job refuses to continue if the tag moved during the build, requires exactly the nine packages,
 the two Cygwin source archives (`amd64` and `aarch64`) and the five SDK jars (`jasper-sdk-<v>.jar`,
 `jasper-sdk-<v>-sources.jar`, `jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and
-`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.25.0), and writes `SHA256SUMS`. It
+`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.26.0), and writes `SHA256SUMS`. It
 creates a draft prerelease titled `Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds
 exactly those files, and publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which
 a rerun finishes; a published release for the tag is never overwritten.

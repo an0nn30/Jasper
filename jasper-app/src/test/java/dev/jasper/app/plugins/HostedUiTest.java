@@ -676,6 +676,41 @@ class HostedUiTest {
         assertThatCode(() -> { prompt.close(); trust.close(); prompt.setTitle("after close"); }).doesNotThrowAnyException();
     }
 
+    /**
+     * A dialog or overlay that has closed, by the plugin or by its user, no longer waits for the plugin's stop, so a plugin
+     * that opens one for each prompt keeps only the open ones.
+     */
+    @Test void aClosedDialogOrOverlayIsNoLongerKeptForThePluginsStop() throws ReflectiveOperationException {
+        var owner = terminals.windowHandle(terminalFixture.addWindow());
+        int before = keptForStop();
+        for (int round = 0; round < 3; round++) {
+            var dialog = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Alert", owner, true));
+            dialog.setContent(view());
+            dialog.show();
+            dialog.close();
+            var overlay = ui.windows().overlay(new dev.jasper.sdk.ui.OverlaySpec("Connecting", owner));
+            overlay.close();
+        }
+        assertThat(keptForStop()).as("the plugin closed them").isEqualTo(before);
+        ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Trust?", owner, false));
+        assertThat(keptForStop()).isEqualTo(before + 1);
+        assertThat(auxiliary.open()).singleElement().satisfies(surface -> assertThat(surface.requestClose()).isTrue());
+        assertThat(keptForStop()).as("its user closed it").isEqualTo(before);
+        ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Open", owner, false));
+        ui.windows().overlay(new dev.jasper.sdk.ui.OverlaySpec("Working", owner));
+        assertThat(keptForStop()).isEqualTo(before + 2);
+        ui.closeAll();
+        assertThat(auxiliary.open()).as("the stop closes the open ones").isEmpty();
+        assertThat(keptForStop()).isZero();
+    }
+
+    /** How many removals the plugin's stop would run. */
+    private int keptForStop() throws ReflectiveOperationException {
+        var closers = HostedUi.class.getDeclaredField("closers");
+        closers.setAccessible(true);
+        return ((List<?>) closers.get(ui)).size();
+    }
+
     /** Workspace plan 8b Rulings 13: a split item's two actions carry the palette's words, the label's included. */
     @Test void aSplitItemsActionsCarryThePalettesWords() {
         ui.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("dev.x.tool.notes", "Code Notes"), (window, placement) -> { });

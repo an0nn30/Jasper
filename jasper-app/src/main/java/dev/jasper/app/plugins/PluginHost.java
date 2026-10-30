@@ -115,6 +115,10 @@ final class PluginHost {
     Consumer<String> openSettings = page -> { };
     /** The clipboard every plugin's Platform writes to; the application shares it with its own copies. */
     dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
+    /** A Jasper window's native window by id, or null ({@code Windows.hasModal}); a headless host has none. */
+    java.util.function.Function<java.util.UUID, java.awt.Window> nativeWindows = window -> null;
+    /** The desktop's share of {@code Platform.openFile}, on a worker: it edits the file or shows it in the file manager. */
+    Consumer<Path> editOrReveal = file -> new dev.jasper.app.platform.ConfigEditor().editOrReveal(file);
     final Environment environment;
     final HostedTypography typography;
     /** Runs cancellation handlers and connection closes off the EDT; outlives every plugin's own executor. */

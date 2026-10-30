@@ -34,8 +34,11 @@ own packages, the libraries it bundles and the exported packages listed for it i
 constructing ordinary Swing controls, painting, and setting colours, fonts, borders, sizes, layout, alignment or icons
 on visible components. The Editor's `DocumentArea`, `VimTextArea` and `EditorTheme` are the named exceptions for its
 document surface, with operation-specific exceptions for `EditorTextView`, `EditorTextAreaUI`, `PreviewPane`,
-`PreviewKit` and `PreviewImageView`, and its `SystemClipboard` for Vim registers. Each exception requires its exact
-class and matching source file. A plugin built elsewhere is not checked at build time;
+`PreviewKit` and `PreviewImageView`, and its `SystemClipboard` for Vim registers. The Browser's `PageView` is its
+one canvas, which paints the page and builds no control, and its `Page`, the facade a browser item drives, is the one
+class that makes it. Each exception requires its exact class and matching source file. The Browser (`plugins/browser`) shows Chromium pages through the runtime's `jcef` module, which runs in process;
+only it may name an `org.cef` or `com.jetbrains.cef` type, and only in its `engine`, `page`, `links` and `dialogs`
+packages (`ChromiumBoundaryTest`). A plugin built elsewhere is not checked at build time;
 at run time the SDK has no way to mount an ordinary control, and custom content admission (below) refuses one.
 
 ## Launch
@@ -242,6 +245,9 @@ where the look draws one (`TitleInset`).
   progress overlay per Jasper window across plugins; `WindowOverlay` mounts it in the root layered pane, contains
   focus and input, and centres and bounds the content. Escape and outside clicks never close it; it closes with its
   owner and its plugin. A modal `OVERLAY` dialog may stack over it.
+- **The modal query.** `Windows.hasModal` is true while `AuxiliaryWindows.hasModal` finds a shown overlay inside the
+  window or a shown modal dialog it owns, directly or through a dialog, or while `WindowInput.showsModal` finds the
+  window's root marked by an overlay or a visible modal dialog owned by its native window, Jasper's own included.
 - **Anchors and popovers.** `UiView.anchor(id)` mints a `UiAnchor` only for a mounted, visible, enabled, not busy
   `Button` or PICKER `Choice`. Hiding, disabling, busying, removing, retyping or reparenting the control, closing its
   surface or stopping the plugin invalidates it for good; a refresh of the same control keeps it. `Windows.popover`
@@ -263,7 +269,7 @@ where the look draws one (`TitleInset`).
 
 `Windows.openTab(ContentSpec, WindowOwner, UiView, TabPlacement)` mounts a plugin's view as an item in a Jasper
 window, translated to `contributions.TabRegistry` and `Tab`. Keys are scoped to the plugin; opening a key that is open
-selects its tab and returns its handle. A missing or closed owner window uses the most recently active window, restoring the saved window first when none is open; a `TabPlacement` opens the item in a new tab of the window, a new pane beside the focused one or a new window. A foreign owner is refused. A split item (`Windows.splitItem`) joins every window's Split lists through the
+selects its tab and returns its handle. A missing or closed owner window uses the most recently active window, restoring the saved window first when none is open; a `TabPlacement` opens the item in a new tab of the window (at the end of its strip, or right after its shown tab for `NEXT_TAB`), a new pane beside the focused one or a new window. A foreign owner is refused. A split item (`Windows.splitItem`) joins every window's Split lists through the
 application's contributions model, its two actions registered as the plugin's own; `ContentTab.split`, `moveToNewTab`,
 `tabChoices` and `moveToTab` reach the item's window through the tab registry. `WindowContent` hosts terminal and
 plugin items alike in its `WorkspaceView`. Content views take the workspace theme.
@@ -411,8 +417,10 @@ path in a local terminal pane (`JasperApplication.openClickedFile`) asks the sam
 window, and so does File › Open File… (`openFileAt`), at no line; `openClickedFile` first offers a local web file to
 the web browser role (below). A clicked path is program output, and an OSC 8 link's address can
 differ from the text shown, so that fallback is the desktop's edit or reveal action, never its open action, and a
-plugin's editor should edit the file and never run it. A failed `Platform.openInEditor` is posted in the plugin's
-notification group, as is a failed `Platform.browse`, which accepts only an absolute http or https address.
+plugin's editor should edit the file and never run it. `Platform.openFile` asks the file editor the same way from the
+plugin's worker, with the active window and no line, and falls back to that edit or reveal action; it never asks the
+web browser role. A failed `Platform.openInEditor` or `Platform.openFile` is posted in the plugin's notification group,
+as is a failed `Platform.browse`, which accepts only an absolute http or https address.
 
 `Platform.browser` (needs `browser.provide`) registers a `WebBrowser` in `plugins.WebBrowsers`, one at a time, by the
 same bundled rule; it runs on the UI thread and must not block, so nothing waits for it. `PluginRuntime.openLink`

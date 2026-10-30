@@ -96,6 +96,7 @@ final class HostedContext implements PluginContext {
         this.kit = new HostedKit(id, () -> state != State.CLOSED, ui::kitThemes, ui.appearance(), host.containment, () -> host.animations.getAsBoolean(), action -> host.shortcuts.apply(action), () -> host.kit.get());
         ui.kit(kit);
         ui.bundled = () -> host.fileEditors.bundled(id);
+        ui.nativeWindows = window -> host.nativeWindows.apply(window);
         ui.terminalOpen = what -> { gate.require(Capabilities.TERMINAL_OPEN); return () -> gate.audit(Capabilities.TERMINAL_OPEN, what); };
         ui.tabTitles = () -> {
             if (!gate.has(Capabilities.TERMINAL_OBSERVE)) return false;
@@ -213,6 +214,26 @@ final class HostedContext implements PluginContext {
                         } catch (RuntimeException failure) {
                             log().log(System.Logger.Level.WARNING, "Could not open " + file + " in an editor", failure);
                             notifications.group().error("Could not open a file in an editor", String.valueOf(file.getFileName()), failure);
+                        }
+                    });
+                }
+                @Override public void openFile(Path file) {
+                    requireOpen();
+                    requireUi("Platform.openFile");
+                    Objects.requireNonNull(file, "file");
+                    // The terminal click's file rule without the browser (browser plan 4a): the provided editor, with the active
+                    // window and no line, then the desktop's edit action or its file manager; never the desktop's open action.
+                    Optional<java.util.UUID> window = host.environment.terminals().activeWindow().map(dev.jasper.app.terminals.WindowEntry::id);
+                    background().execute(() -> {
+                        try {
+                            if (!Files.isRegularFile(file)) {
+                                notifications.group().error("Could not open a file", String.valueOf(file.getFileName()));
+                                return;
+                            }
+                            host.fileEditors.openFromWorker(file, java.util.OptionalInt.empty(), () -> window, host.editOrReveal);
+                        } catch (RuntimeException failure) {
+                            log().log(System.Logger.Level.WARNING, "Could not open " + file, failure);
+                            notifications.group().error("Could not open a file", String.valueOf(file.getFileName()), failure);
                         }
                     });
                 }

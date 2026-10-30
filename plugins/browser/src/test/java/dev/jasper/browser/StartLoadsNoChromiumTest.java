@@ -1,0 +1,118 @@
+package dev.jasper.browser;
+
+import dev.jasper.sdk.PluginInfo;
+import dev.jasper.sdk.testing.FakePluginHost;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Starting and stopping the Browser costs no Chromium, and nor does opening a browser item that is not shown, or
+ * restoring a window of them: no {@code org.cef} or {@code com.jetbrains.cef} class loads until a page is first shown. A forked
+ * headless JVM runs the plugin with the SDK's fake host and logs every class it
+ * loads, because a class loaded in this JVM cannot be told apart from one another test loaded. The log goes to the
+ * fork's standard output, not a file: {@code -Xlog} splits its options at colons, which Windows paths hold. The output
+ * is read as ISO-8859-1, because the JVM writes it in the platform's encoding and only ASCII class names matter.
+ */
+class StartLoadsNoChromiumTest {
+    private static final Pattern LOADED = Pattern.compile("\\[class,load]\\s+(\\S+)");
+    @TempDir Path temp;
+
+    @Test void startingAndStoppingTheBrowserLoadsNoChromiumClass() throws Exception {
+        List<String> loaded = fork(Main.START);
+        assertThat(loaded.contains(BrowserPlugin.class.getName())).as("the log shows the plugin's own class").isTrue();
+        assertThat(chromium(loaded)).as("Chromium classes loaded").isEmpty();
+    }
+
+    @Test void openingABrowserItemThatIsNotShownLoadsNoChromiumClass() throws Exception {
+        List<String> loaded = fork(Main.OPEN);
+        assertThat(loaded).as("the log shows the item, its page and its canvas")
+            .contains("dev.jasper.browser.item.BrowserItem", "dev.jasper.browser.page.Page", "dev.jasper.browser.page.PageView");
+        assertThat(chromium(loaded)).as("Chromium classes loaded").isEmpty();
+    }
+
+    /** Spec section 19: restored items hold only their saved state until shown. */
+    @Test void restoringAWindowOfBrowserItemsLoadsNoChromiumClass() throws Exception {
+        List<String> loaded = fork(Main.RESTORE);
+        assertThat(loaded).as("the log shows the restore, the items and their pages")
+            .contains("dev.jasper.browser.restore.BrowserRestore", "dev.jasper.browser.item.BrowserItem", "dev.jasper.browser.page.Page");
+        assertThat(chromium(loaded)).as("Chromium classes loaded").isEmpty();
+    }
+
+    /** Runs {@link Main} in a forked JVM, in {@code mode}: the classes it loaded, in order. */
+    private List<String> fork(String mode) throws Exception {
+        Path output = temp.resolve(mode + "-output.txt");
+        Process fork = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+            "-Djava.awt.headless=true", "-Xlog:class+load", "-cp", System.getProperty("java.class.path"),
+            Main.class.getName(), temp.resolve(mode + "-plugins").toString(), mode)
+            .redirectErrorStream(true).redirectOutput(output.toFile()).start();
+        if (!fork.waitFor(90, TimeUnit.SECONDS)) {
+            fork.destroyForcibly().waitFor(10, TimeUnit.SECONDS);
+            List<String> lines = Files.readAllLines(output, StandardCharsets.ISO_8859_1);
+            throw new AssertionError("the forked JVM did not exit within 90 s; output so far:\n" + diagnostics(lines));
+        }
+        List<String> lines = Files.readAllLines(output, StandardCharsets.ISO_8859_1);
+        assertThat(fork.exitValue()).as("the fork's output:\n" + diagnostics(lines)).isZero();
+        return lines.stream().map(LOADED::matcher).filter(Matcher::find).map(match -> match.group(1)).toList();
+    }
+
+    private static List<String> chromium(List<String> loaded) {
+        return loaded.stream().filter(name -> name.startsWith("org.cef.") || name.startsWith("com.jetbrains.cef.")).toList();
+    }
+
+    /** The fork's output without its class-load lines, which run to thousands. */
+    private static String diagnostics(List<String> lines) {
+        return String.join("\n", lines.stream().filter(line -> !LOADED.matcher(line).find()).toList());
+    }
+
+    /**
+     * The forked JVM's entry: starts the plugin on the fake host, on the UI thread as Jasper starts plugins; in
+     * {@link #OPEN} mode runs New Browser Tab, whose item the fake host never shows; in {@link #RESTORE} mode restores a
+     * window of saved browser items, which the fake host places and never shows; stops it; and exits non-zero on any
+     * failure.
+     */
+    public static final class Main {
+        static final String START = "start", OPEN = "open", RESTORE = "restore";
+        // A window of saved items: pages, a target, Jasper's own page, and one that saved no url (the start page).
+        private static final List<java.util.Map<String, String>> SAVED = List.of(java.util.Map.of("url", "https://example.com/"),
+            java.util.Map.of("url", "https://example.org/docs?q=1#top", "target", "docs"), java.util.Map.of("url", "jasper-about:welcome"),
+            java.util.Map.of(), java.util.Map.of("url", "file:///tmp/index.html"), java.util.Map.of("url", "http://localhost:8080/"));
+
+        private Main() { }
+
+        public static void main(String[] args) throws Exception {
+            var failures = new java.util.ArrayList<String>();
+            java.awt.EventQueue.invokeAndWait(() -> {
+                try (var host = new FakePluginHost(Path.of(args[0]))) {
+                    var window = host.addTerminalWindow();
+                    host.activateTerminalWindow(window);
+                    host.start(new PluginInfo("dev.jasper.browser", "Browser", "0.1.0", Set.of("browser.provide")), Set.of(), Set.of(), new BrowserPlugin());
+                    if (args[1].equals(OPEN) && (!host.invoke("dev.jasper.browser.new_tab", window, null) || host.contentTabs().size() != 1))
+                        failures.add("New Browser Tab opened no item");
+                    if (args[1].equals(RESTORE)) {
+                        for (var values : SAVED)
+                            if (host.restoreTab("dev.jasper.browser", window, "Saved", new dev.jasper.sdk.RestoreState("dev.jasper.browser.page", values)).isEmpty())
+                                failures.add("A saved browser item did not come back: " + values);
+                        if (host.contentTabs().size() != SAVED.size()) failures.add("Restored " + host.contentTabs().size() + " items");
+                        failures.addAll(host.declinedRestores());
+                    }
+                    host.stopAll();
+                    failures.addAll(host.failures());
+                }
+            });
+            if (!failures.isEmpty()) {
+                System.err.println(String.join("\n", failures));
+                System.exit(2);
+            }
+            System.exit(0);
+        }
+    }
+}

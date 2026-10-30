@@ -85,6 +85,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `toolbar()` | The plugin toolbar section as `button:<id>`, `menu:<title>:<id>,<id>` and `view` |
 | `toolbarViews(windowId)`, `closeToolbarViews(windowId)` | Builds a window's toolbar views, as the window does when it opens; closes them, as closing the window does |
 | `menu(target)` | One menu's contributed entries (`FILE`, `EDIT`, `VIEW`, `TAB`, `TOOLS`, `SESSION`, `TRANSFER`, `context` or `top:<menuId>`) as `item:<id>`, `web-address:<id>` (an `addForWebAddress` item), `---` and `submenu:<title>` lines, children indented, sections separated by `===` |
+| `menuBar(windowId)` | The plugin menus a window's menu bar shows, as `top:<menuId>`: each `create` menu, and each `createForContent` menu while one of its plugin's content tabs is the window's current item; a menu with no item of a registered action is left out |
 | `contextMenu(paneId)`, `chooseFromContextMenu(paneId, actionId)` | The terminal context menu's model lines for a pane, as `menu("context")` lists them (empty submenus and separators included), with each `web-address:<id>` line present only while the pane's selection (`setSelection`) is one web address; runs the action of the first item listed there for it, for that pane, and only a `web-address` item gives the handler the address as `webAddress()`; false when none is listed |
 | `status()`, `progress()` | Visible status items as `id\|side\|text\|tooltip\|actionId`; visible progress states by id |
 | `rail()` | Rail buttons' action ids |
@@ -127,7 +128,7 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `queueFileChoice(list)`, `fileChoices()` | What the next `Windows.choose` returns; every choice asked for |
 | `queueFileSelection(path)`, `queuePathSelection(list)`, `duringPathSelection(action)` | What the next file, folder or save chooser returns (an empty value cancels); something to run while it is open |
 | `clipboard()` | The `FakeClipboard` every plugin's `Platform` writes to |
-| `browsed()`, `openedInEditor()` | Addresses that reached the system browser (each `browse`, and each `openInBrowser` no provided browser took); files opened in an editor that no provided editor took |
+| `browsed()`, `openedInEditor()`, `openedFiles()` | Addresses that reached the system browser (each `browse`, and each `openInBrowser` no provided browser took); files opened in an editor that no provided editor took; files `openFile` handed to the desktop's edit action or file manager because no provided editor took them |
 | `edit(file, line, windowId)`, `editorPlugin()`, `declareBundled(id)` | Opens a file as Jasper's own opens do, through the editor a plugin provides; which plugin provides it; marks a plugin as bundled before it starts, so its editor and browser replace another's |
 | `openLink(address, origin, placement, target, windowId)`, `browserPlugin()` | Opens a web link as Jasper's own routes do (a clicked terminal link is `LinkOrigin.CLICK`, an address given to `jasper` is `EXTERNAL`), through the browser a plugin provides, and answers what it answered; which plugin provides it |
 | `setCommandClient(path)` | What `CommandLine.client()` returns |
@@ -161,8 +162,8 @@ Jasper's is `<home>/plugins/<id>/data`.
 ## Differences from Jasper
 
 - The fake checks the UI thread only for kit views and appearance. Jasper also throws `IllegalStateException` when
-  registrations, `Events.subscribe`, `Services.publish`, `CommandLine.handle`, `FileSources.register` and the
-  clipboard methods are called off the UI thread.
+  registrations, `Events.subscribe`, `Services.publish`, `CommandLine.handle`, `FileSources.register`, the
+  clipboard methods, `Platform.openFile` and `Windows.hasModal` are called off the UI thread.
 - Background tasks run one at a time, when the test calls `runBackground()`; Jasper runs each task on its own virtual
   thread, so a plugin's tasks may run at the same time.
 - Settings live in memory: `settings().file()` names `<root>/<id>/<id>.toml`, but nothing is written there. A value of
@@ -185,7 +186,7 @@ Jasper's is `<home>/plugins/<id>/data`.
   only when an attached session ends.
 - `FileSource.connect` always receives the window `connectFileSource` names; Jasper passes `null` when the chooser
   belongs to no Jasper window.
-- `Platform.openInEditor` asks the provided editor on the caller's thread.
+- `Platform.openInEditor` and `openFile` ask the provided editor on the caller's thread.
 - Panels have no `<panel id>.toggle` action and no View › Tool Windows entry.
 - The fake has no active tool window: `Panels.toggle` and `PanelHost.show()` from a panel's own toggle action only
   toggle or show it, also under `FakePresentations.CLASSIC`, where Jasper activates a showing panel that is not the

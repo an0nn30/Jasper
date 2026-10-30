@@ -11,6 +11,9 @@ val verificationClasspaths = extra["verificationClasspaths"] as Map<String, org.
 // Every plugins/<name>/ module (settings.gradle.kts discovers them) is checked; a plugin that requires
 // another plugin lists that plugin's exported packages here, and nothing else may be imported.
 val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"), ":jasper-plugin-remote" to listOf("dev.jasper.vault.api", "dev.jasper.editor.api"), ":jasper-plugin-fileserver" to listOf("dev.jasper.vault.api"), ":jasper-plugin-indexer" to listOf("dev.jasper.editor.api", "dev.jasper.remote.api"))
+// Chromium is the runtime's `jcef` module; only the Browser may name its types (org.cef, com.jetbrains.cef).
+// Which of the Browser's own packages may is ChromiumBoundaryTest's rule.
+val chromiumPlugin = ":jasper-plugin-browser"
 val pluginProjects = subprojects.filter { it.projectDir.parentFile == file("plugins") }.associateBy { it.path }
 val pluginImports = pluginProjects.keys.associateWith { declaredImports[it] ?: listOf<String>() }
 val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
@@ -32,6 +35,7 @@ val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
         val checker = file("gradle/architecture/PluginPresentationCheck.java").absolutePath
         tool("java", listOf("--class-path", verificationClasspaths.getValue(":jasper-plugin-editor").asPath, checker, "--self-test", layout.buildDirectory.dir("presentation-check-fixtures").get().asFile.absolutePath))
         fun jdk(name: String) = name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.") || name.startsWith("com.sun.net.httpserver.")
+        fun chromium(name: String) = name.startsWith("org.cef.") || name.startsWith("com.jetbrains.cef.")
         val edge = Regex("^\\s*(\\S+)\\s+->\\s+(\\S+)\\s*(.*)$")
         for ((path, imports) in pluginImports) {
             val module = pluginProjects.getValue(path)
@@ -50,6 +54,7 @@ val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
                 val (from, to, where) = match.destructured
                 if (from.substringBeforeLast('.') !in own) return@forEach
                 val target = to.substringBeforeLast('.')
+                check(path == chromiumPlugin || !chromium(to)) { "$path references Chromium; only $chromiumPlugin may: $line" }
                 val allowed = jdk(to) || target in own || imports.any { target == it }
                     || (to.startsWith("dev.jasper.sdk.") && !to.startsWith("dev.jasper.sdk.testing."))
                     || (bundled.isNotEmpty() && where.isNotBlank() && !where.contains("not found"))

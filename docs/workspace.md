@@ -272,10 +272,10 @@ Menu items show their current shortcuts. Opening a menu refreshes which items ar
 
 | Menu | Items |
 |---|---|
-| File | New Tab, New Window, Open File…, Close Pane, Close Tab, Close Window, Settings, Reload Config, Quit; then, each after a separator, Jasper's **Manage Plugins…** and the plugins' items: Editor's **Open in Editor…**, **New Editor Tab**, **Split Right with Editor**, **Open in Editor Pane…** and **New Editor Window**, Credential Vault's **Open Vault...**, **Change Vault Master Password...** and **Vault Plugin Grants...**, Project Index's **Index Folder…** |
+| File | New Tab, New Window, Open File…, Close Pane, Close Tab, Close Window, Settings, Reload Config, Quit; then, each after a separator, Jasper's **Manage Plugins…** and the plugins' items: Browser's **New Browser Tab** and **New Browser Window**, Editor's **Open in Editor…**, **New Editor Tab**, **Split Right with Editor**, **Open in Editor Pane…** and **New Editor Window**, Credential Vault's **Open Vault...**, **Change Vault Master Password...** and **Vault Plugin Grants...**, Project Index's **Index Folder…** |
 | Edit | Copy, Paste, Find, Find Next, Find Previous, Clear Scrollback |
 | View | Command Palette; View Modes › Zen; Maximize Pane; Show/Hide › Toolbar (Icons and Labels, Icons Only, Hidden), Status Bar, Rail; Font Size › Increase Font Size, Decrease Font Size, Reset Font Size; Tool Windows › one toggle per tool window |
-| Tab | Split › Terminal Right, Terminal Down, then each split item's Right and Down (Editor Right, Editor Down, Open File Right…, Open File Down…); Move Pane to New Tab, Move Pane to Tab ›, Move Tab Into ›, Focus Pane Left, Focus Pane Right, Focus Pane Up, Focus Pane Down, Previous Prompt, Next Prompt; Rename Tab; Next Tab, Previous Tab, Select Tab 1 to Select Tab 9 |
+| Tab | Split › Terminal Right, Terminal Down, then each split item's Right and Down (Browser Right, Browser Down, Editor Right, Editor Down, Open File Right…, Open File Down…); Move Pane to New Tab, Move Pane to Tab ›, Move Tab Into ›, Focus Pane Left, Focus Pane Right, Focus Pane Up, Focus Pane Down, Previous Prompt, Next Prompt; Rename Tab; Next Tab, Previous Tab, Select Tab 1 to Select Tab 9 |
 | Window | [Layouts ›](#layouts) |
 | Session | Plugins' session items. Remote: Connect to SSH Host..., Toggle SSH hosts, Split with Same Host, New Host..., Import from ~/.ssh/config..., Toggle Tunnels, Start or Stop a Tunnel..., New Tunnel..., Forward a Port..., Stop All Tunnels |
 | Transfer | Plugins' transfer items. Remote: Open SFTP here, Transfers; File Server: Share Folder…, New File Server… |
@@ -283,7 +283,8 @@ Menu items show their current shortcuts. Opening a menu refreshes which items ar
 | Plugins' own menus | Any menus plugins add, in the order they start |
 | Help | Keyboard Shortcuts…; Change Memory Settings…, Edit Custom VM Options…; About Jasper |
 
-Session, Transfer, Tools and plugins' own menus appear only while a plugin has put something in them.
+Session, Transfer, Tools and plugins' own menus appear only while a plugin has put something in them. A plugin's menu
+can also show only while one of its items is the window's current item, as the Browser's Web menu does.
 
 - **Open File…** opens a file you choose in the [file chooser](#the-file-chooser), starting in the focused pane's
   folder, the same way a Cmd-click (Ctrl-click) on a file path in the terminal does; see [Terminal](terminal.md).

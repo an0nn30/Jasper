@@ -43,6 +43,6 @@ class PresentationValuesTest {
     }
 
     @Test void theVersionIsZeroTwentyOne() {
-        assertThat(JasperSdk.VERSION).isEqualTo("0.25.0");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.26.0");
     }
 }

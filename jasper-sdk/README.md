@@ -2,8 +2,8 @@
 
 The Java API Jasper plugins compile against. Jasper is a pluggable DevOps workstation, and most of what it does is
 delivered by plugins built on this SDK alone: Remote (SSH, SFTP and tunnels), Credential Vault, Editor, File Server,
-Project Index, Shell History, Snippets and the Enterprise look are bundled plugins that use the same API as any
-third-party plugin. The SDK depends only on the JDK.
+Project Index, Shell History, Snippets, Browser and the Enterprise look are bundled plugins that use the same API as
+any third-party plugin. The SDK depends only on the JDK.
 
 - [The SDK reference](../docs/sdk-reference.html) is the complete reference: every package, type and member, generated
   from the Javadoc of the SDK, the testkit and the bundled plugins' exported API packages.
@@ -54,17 +54,17 @@ Jasper and the testkit implement the other service interfaces; `FileLocation`, `
 
 ## Versioning
 
-[`JasperSdk.VERSION`](../docs/sdk-reference.html#dev.jasper.sdk.JasperSdk.VERSION) is `0.25.0`. A plugin's
+[`JasperSdk.VERSION`](../docs/sdk-reference.html#dev.jasper.sdk.JasperSdk.VERSION) is `0.26.0`. A plugin's
 `plugin.toml` names the SDK versions it runs on as comma-separated comparators (`>=`, `>`, `<=`, `<`, `=`), all of
 which must hold. 0.x carries no compatibility promise, so a plugin admits the one minor version it was built against,
 as the bundled plugins do:
 
 ```toml
-sdk = ">=0.25.0, <0.26"
+sdk = ">=0.26.0, <0.27"
 ```
 
-A plugin that uses something only a later 0.25 version has starts its range there. Every bundled plugin declares
-`sdk = ">=0.25.0, <0.26"`.
+A plugin that uses something only a later 0.26 version has starts its range there. Every bundled plugin declares
+`sdk = ">=0.26.0, <0.27"`.
 
 Jasper checks the range at launch: a plugin whose range does not contain the running SDK is skipped, and Settings ›
 Plugins shows it as Skipped with the reason "needs SDK *range*; this is SDK *version*". Install from Zip… refuses such a

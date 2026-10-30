@@ -56,6 +56,8 @@ final class FakeUi {
 
         final String target; final String title; final Menu parent; final FakeUi ui;
         final List<Object> children = new ArrayList<>();
+        /** A {@code createForContent} menu, which a window shows only while one of its plugin's content tabs is current there. */
+        boolean content;
         Menu(FakeUi ui, Menu parent, String target, String title) { this.ui = ui; this.parent = parent; this.target = target; this.title = title; }
 
         @Override public Subscription add(String actionId) {
@@ -343,8 +345,19 @@ final class FakeUi {
                 topLevelIds.add("top:" + menuId);
                 return section("top:" + menuId, title);
             }
+            @Override public PluginMenu createForContent(String menuId, String title) {
+                var menu = (Menu) create(menuId, title);
+                menu.content = true;
+                return menu;
+            }
             @Override public PluginMenu terminalContext() { return section("context", ""); }
         };
+    }
+
+    /** Whether {@code item}, a window's current item or null, is one of this plugin's open content tabs. */
+    boolean showsContent(FakeWorkspace.Tab item) {
+        for (var content : contents) if (content.tab == item && !content.closed) return true;
+        return false;
     }
 
     private Menu section(String target, String title) {
@@ -416,6 +429,10 @@ final class FakeUi {
         DialogSpec.Presentation presentation;
         /** The hue of the square a dialog asked for before its title; NONE for none. */
         dev.jasper.sdk.ui.Nodes.Hue swatch = dev.jasper.sdk.ui.Nodes.Hue.NONE;
+        /** Whether a dialog is modal; an overlay is a modal whatever this says. */
+        boolean modal;
+        /** The Jasper window it shows over, or null when it is anchored to none. */
+        UUID window;
         java.util.function.BooleanSupplier ownerLive = () -> true;
         @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
             context.requireOpen();var next=context.kit().requireOwned(content);
@@ -699,9 +716,13 @@ final class FakeUi {
                 var shown = placement == dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW ? host.workspace.addWindow()
                     : host.workspace.window(((WindowHandle) owner).id()).orElseThrow();
                 if (placement == dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW) owner = context.terminals.windowHandle(shown.id);
-                // A split placement opens a new pane right after the window's selected item; NEW_TAB opens a new tab.
+                // A split placement opens a new pane right after the window's selected item; NEW_TAB opens a new tab, and
+                // NEXT_TAB one right after the shown tab.
                 var beside = placement == dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT || placement == dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN ? shown.selected : null;
-                var entry=new FakeContent(FakeUi.this,spec,owner,component,host.workspace.addTab(shown,dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT,spec.title(),beside));
+                var placed = placement == dev.jasper.sdk.ui.TabPlacement.NEXT_TAB
+                    ? host.workspace.addNextTab(shown, dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT, spec.title())
+                    : host.workspace.addTab(shown, dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT, spec.title(), beside);
+                var entry=new FakeContent(FakeUi.this,spec,owner,component,placed);
                 contents.add(entry);entry.select();
                 return entry;
             }
@@ -772,10 +793,19 @@ final class FakeUi {
                     throw new IllegalArgumentException("An overlay needs an open Jasper window from this host");
                 if (host.overlays.containsKey(spec.owner().id())) throw new IllegalStateException("This window already has an overlay");
                 var overlay = new FakeWindow("overlay", spec.title(), null);
+                overlay.window = spec.owner().id();
                 host.overlays.put(spec.owner().id(), overlay);
                 overlay.onClosed(() -> host.overlays.remove(spec.owner().id(), overlay));
                 windows.add(overlay);
                 return overlay;
+            }
+            @Override public boolean hasModal(WindowOwner owner) {
+                context.requireOpen();
+                java.util.Objects.requireNonNull(owner, "owner");
+                UUID window = null;
+                if (owner instanceof FakeContent content) { if (contents.contains(content) && !content.closed) window = content.tab.window.id; }
+                else if (owner instanceof WindowHandle handle && context.terminals.ownsOpenWindow(handle)) window = handle.id();
+                return window != null && host.hasModal(window);
             }
             @Override public dev.jasper.sdk.ui.PluginPopover popover(dev.jasper.sdk.ui.UiAnchor value){context.requireOpen();var popup=new FakePopover(requireAnchor(value));popovers.add(popup);return popup;}
             @Override public PluginDialog dialog(DialogSpec spec) {
@@ -789,6 +819,11 @@ final class FakeUi {
                 dialog.attachedSheet = spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET;
                 dialog.presentation = spec.presentation();
                 dialog.swatch = spec.swatch();
+                dialog.modal = spec.modal();
+                // An overlay anchored in a dialog shows inside that dialog, not over its Jasper window.
+                boolean inside = parent != null && spec.presentation() == DialogSpec.Presentation.OVERLAY;
+                dialog.window = inside ? null : parent != null ? parent.window : owner instanceof WindowHandle handle ? handle.id()
+                    : owner instanceof FakeContent content ? content.tab.window.id : null;
                 dialog.ownerLive = () -> owner instanceof dev.jasper.sdk.ui.UiAnchor anchor ? anchor.isOpen() : liveChooserOwner(owner);
                 if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var registration=value.onClosed(dialog::close);dialog.onClosed(registration::close);}
                 if (owner instanceof FakeContent content) {

@@ -2,10 +2,10 @@
 
 Most of Jasper is plugins. The application provides the workspace (windows, tabs, panes and tool windows), the
 terminal, the command palette, notifications, Settings, themes and looks. SSH, SFTP and tunnels, the credential vault,
-the editor, file servers, the project index, shell history, snippets and the Enterprise look are bundled plugins,
-written against the same public SDK (`jasper-sdk`, see the [SDK reference](sdk-reference.html)) that any other plugin
-compiles against. Each of them can be turned off in Settings › Plugins, and a plugin you install or write uses the same
-calls they do.
+the editor, the web browser, file servers, the project index, shell history, snippets and the Enterprise look are
+bundled plugins, written against the same public SDK (`jasper-sdk`, see the [SDK reference](sdk-reference.html)) that
+any other plugin compiles against. Each of them can be turned off in Settings › Plugins, and a plugin you install or
+write uses the same calls they do.
 
 Bundled plugins ship inside the application, load without a review of their [capabilities](#capabilities), and can be
 disabled but not removed. Plugins reach each other only through the packages they export; see
@@ -52,10 +52,11 @@ and the action's row in Settings › Keymap shows the same text in its tooltip. 
 | Project Index | `dev.jasper.indexer` | 0.4.0 | Yes | [Project Index](project-index.md) |
 | Shell History | `dev.jasper.history` | 0.4.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
 | Snippets | `dev.jasper.snippets` | 0.4.0 | Yes | [Shell History and Snippets](history-and-snippets.md) |
+| Browser | `dev.jasper.browser` | 0.1.0 | Yes | [Browser](browser.md) |
 | Enterprise | `dev.jasper.enterprise` | 0.4.0 | No | [The Enterprise look](enterprise.md) |
 | Sample | `dev.jasper.sample` | 0.6.0 | Yes, but inert | [Plugin authoring](plugin-authoring.md) |
 
-Every bundled plugin declares `sdk = ">=0.25.0, <0.26"`. A plugin uses another plugin it lists under "Uses, when
+Every bundled plugin declares `sdk = ">=0.26.0, <0.27"`. A plugin uses another plugin it lists under "Uses, when
 present" only while that plugin is running; without it, the features that need it are missing.
 
 ### Remote
@@ -134,6 +135,17 @@ fields, or edit the file that holds them, `plugins/dev.jasper.snippets/data/snip
 - **Start with** Snippets… (Cmd+J / Ctrl+Shift+J).
 - **Capabilities** `palette.contribute`, `terminal.inject`.
 - **Exports** `dev.jasper.snippets.api`, which Shell History uses to save a command as a snippet.
+
+### Browser
+
+Web pages in workspace tabs and panes, drawn by Chromium, which comes with Jasper's runtime: a toolbar with Back,
+Forward, Reload and the address field, a Web menu whose keys win in browser tabs, links that open in a new tab or a
+split, and popups that keep a working `window.opener`. It is Jasper's web browser: links you click in a terminal and
+Jasper's own web links can open here, by default after asking "Open in Jasper?", and `jasper URL...` opens here without
+asking. Chromium starts the first time a browser page shows.
+
+- **Start with** File › New Browser Tab.
+- **Capabilities** `browser.provide`.
 
 ### Enterprise
 
@@ -275,7 +287,7 @@ badge when there is one, **Enabled** for a running plugin, and otherwise the sta
 | Active | Running |
 | Disabled | Off: "off by default", "disabled by the user", "marked for removal", "safe mode" or "safe mode uses the standard look" |
 | Needs review | Waiting for your review: "not reviewed yet" or "new capabilities: …" |
-| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.25.0", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
+| Skipped | Not started; the reason names the cause, such as "needs SDK >=0.12.0, <0.13.0; this is SDK 0.26.0", "requires dev.example.base, which is not available", "requires dev.example.base >=2.0.0; found 1.4.0", "requires dev.example.base, which failed to start", "dependency cycle" or "the Enterprise look is active" |
 | Failed | Its classes could not be loaded, or its start failed |
 | Not loaded yet | Not present when this launch began, such as a plugin installed since |
 
@@ -294,11 +306,11 @@ checks it before it asks you anything:
 - Jar names use only letters, digits, spaces and `.`, `_`, `+`, `-`; no name may appear twice.
 - At most 4096 entries, 256 jars and 512 MiB once unpacked.
 - Exactly one jar holds a valid `plugin.toml` at its root, and the plugin's SDK range includes this Jasper's SDK,
-  0.25.0.
+  0.26.0.
 
 A zip that fails is refused on the message line with the reason, for example "The zip holds no jar files", "The zip
 must hold the plugin's jars at its root or in one folder", "Not a Jasper plugin: no plugin.toml in any jar" or "Tool
-1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.25.0", and nothing is installed.
+1.0.0 needs SDK >=0.12.0, <0.13.0; this Jasper has SDK 0.26.0", and nothing is installed.
 
 A zip that passes opens the **Install *name*** sheet: the plugin's name and version, "From *vendor*", what it
 [asks to do](#capabilities) and the warning that a plugin is not sandboxed. **Install** stages the plugin in
@@ -522,7 +534,7 @@ option applies only when Jasper starts, and a Jasper started with it is never re
 with a higher version of the same id is loaded instead. An id you disabled in Settings › Plugins stays off, from
 `--plugin-dir` too ("disabled by the user"); enable it there first.
 
-Plugins for this Jasper (SDK 0.25.0) declare a range such as `sdk = ">=0.25.0, <0.26"` in `plugin.toml`, raising the
+Plugins for this Jasper (SDK 0.26.0) declare a range such as `sdk = ">=0.26.0, <0.27"` in `plugin.toml`, raising the
 floor to the SDK version that added the newest API they use ([the manifest](plugin-authoring.md#the-manifest));
 [building the in-repo plugins](plugin-authoring.md#building-the-in-repo-plugins) and
 [running a plugin in Jasper](plugin-authoring.md#running-a-plugin-in-jasper) give the build tasks and the source

@@ -1,0 +1,4 @@
+# Settings for the Browser plugin. Change them in Settings > Tools > Browser or here; changes apply to pages and links opened afterwards.
+# start_page = "jasper-about:welcome"   # what a new browser tab, window or pane opens: a web address, or Jasper's welcome page
+# open_links_from_terminal = "ask"      # where a web link you open goes: ask, builtin (Jasper's browser) or default (the system's browser)
+# open_local_web_files = "ask"          # where a local web file clicked in a terminal goes: ask, builtin (Jasper's browser) or editor (the Default editor)

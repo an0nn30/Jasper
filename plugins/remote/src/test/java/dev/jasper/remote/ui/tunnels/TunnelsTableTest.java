@@ -148,6 +148,22 @@ class TunnelsTableTest {
         });
     }
 
+    @Test void quickForwardsThatTieKeepTheOrderTheyWereMade() throws Exception {
+        edt(() -> {
+            // Quick forwards have no name, so nothing but the order given tells apart those with the same remote end.
+            List<Tunnel> quick = List.of(5000, 22, 9000, 80, 443, 3000, 8080, 2222).stream()
+                .map(port -> Tunnel.create("", MAC, TunnelKind.LOCAL, Tunnel.LOCALHOST, port, "t", 1)).toList();
+            List<String> made = quick.stream().map(tunnel -> TunnelsPanel.rowId(tunnel.id())).toList();
+            panel = new TunnelsPanel(new FakeKit("dev.jasper.remote"), actions, () -> 0, 500_000_000L, Layout.CLASSIC);
+            panel.setTunnels(List.of(), quick, Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.of("Mac"));
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "remote"));
+            assertThat(names()).containsExactlyElementsOf(made);
+            emit(panel.view(), new UiEvent.Sorted(TunnelsPanel.ROWS, "remote"));
+            assertThat(sortedOf("remote")).contains(false);
+            assertThat(names()).as("descending").containsExactlyElementsOf(made);
+        });
+    }
+
     @Test void resizeIsReportedAndApplied() throws Exception {
         edt(() -> {
             var heard = new ArrayList<dev.jasper.sdk.ui.ColumnState>();

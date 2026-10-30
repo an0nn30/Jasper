@@ -33,11 +33,13 @@ import java.util.function.Predicate;
  *     tabs, numbered from 1 in strip order
  * @param moveToTab Move Pane to Tab: a tab's pane moves to the right of the active pane of the tab numbered as given,
  *     which shows
+ * @param attachNext shows a tab the registry placed in this window in a new tab right after its shown tab, or at the end
+ *     of its strip when it shows none (browser plan 4a's next tab)
  */
 public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach, Consumer<Tab> select,
                             Runnable toFront, Function<TabId, Optional<GroupId>> groupOf, Beside attachBeside,
                             BiPredicate<Tab, Side> splitTerminal, Predicate<Tab> mayMoveToNewTab, Consumer<Tab> moveToNewTab,
-                            Function<Tab, List<OtherTab>> tabChoices, ObjIntConsumer<Tab> moveToTab) {
+                            Function<Tab, List<OtherTab>> tabChoices, ObjIntConsumer<Tab> moveToTab, Consumer<Tab> attachNext) {
     /** Shows a tab in a new pane beside a pane of the window (workspace tabs spec 14's split placements). */
     @FunctionalInterface
     public interface Beside {
@@ -58,6 +60,32 @@ public record WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach,
         Objects.requireNonNull(attachBeside, "attachBeside"); Objects.requireNonNull(splitTerminal, "splitTerminal");
         Objects.requireNonNull(mayMoveToNewTab, "mayMoveToNewTab"); Objects.requireNonNull(moveToNewTab, "moveToNewTab");
         Objects.requireNonNull(tabChoices, "tabChoices"); Objects.requireNonNull(moveToTab, "moveToTab");
+        Objects.requireNonNull(attachNext, "attachNext");
+    }
+
+    /**
+     * A workspace that attaches a next tab as it attaches any other, at the end of its strip, as a fake window in a test
+     * does.
+     *
+     * @param id the window's id
+     * @param attach shows a tab the registry placed in this window
+     * @param detach takes a tab out of this window
+     * @param select shows a tab of this window
+     * @param toFront raises the window
+     * @param groupOf the group that holds a tab of this window
+     * @param attachBeside shows a tab the registry placed beside one of its groups
+     * @param splitTerminal opens a terminal beside a tab of this window, and answers whether it did
+     * @param mayMoveToNewTab whether Move Pane to New Tab would move a tab of this window
+     * @param moveToNewTab Move Pane to New Tab
+     * @param tabChoices the tabs Move Pane to Tab offers a tab of this window
+     * @param moveToTab Move Pane to Tab
+     */
+    public WorkspaceHost(UUID id, Consumer<Tab> attach, Consumer<Tab> detach, Consumer<Tab> select, Runnable toFront,
+                         Function<TabId, Optional<GroupId>> groupOf, Beside attachBeside, BiPredicate<Tab, Side> splitTerminal,
+                         Predicate<Tab> mayMoveToNewTab, Consumer<Tab> moveToNewTab, Function<Tab, List<OtherTab>> tabChoices,
+                         ObjIntConsumer<Tab> moveToTab) {
+        this(id, attach, detach, select, toFront, groupOf, attachBeside, splitTerminal, mayMoveToNewTab, moveToNewTab, tabChoices,
+            moveToTab, attach);
     }
 
     /**

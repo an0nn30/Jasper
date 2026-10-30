@@ -111,6 +111,25 @@ class ThirdPartyNoticesTest {
         }
     }
 
+    /**
+     * Browser plan 4a: the page classes adapted from JCEF's sources name them, the off-screen handler under its Apache
+     * header and the rest under JCEF's BSD licence.
+     */
+    @Test void theBrowsersClassesAdaptedFromJcefAreListed() {
+        var byName = ThirdPartyNotices.thirdParty().stream()
+            .collect(Collectors.toMap(ThirdPartyNotices.Component::name, component -> component));
+        var handler = byName.get("JCEF off-screen handler (the Browser's page renderer)");
+        assertThat(handler).isNotNull();
+        assertThat(handler.license()).isEqualTo("Apache-2.0");
+        assertThat(ThirdPartyNotices.read(handler.text())).contains("Apache License", "Version 2.0, January 2004");
+        assertThat(ThirdPartyNotices.read(handler.notice().orElseThrow()))
+            .contains("dev.jasper.browser.page.PageRenderer", "JBCefOsrHandler.java", "9df0879", "Copyright 2000-2021 JetBrains s.r.o.");
+        var jcef = byName.get("JCEF");
+        assertThat(ThirdPartyNotices.read(jcef.notice().orElseThrow()))
+            .contains("dev.jasper.browser.page.PageView", "JBCefOsrComponent.java", "dev.jasper.browser.page.ImeAdapter",
+                "CefInputMethodAdapter.java", "CefDropTargetListener.java", "9df0879");
+    }
+
     /** The JCEF runtime's cef_server links Apache Thrift and Boost, and its jcef module carries a renamed copy of Thrift's Java runtime. */
     @Test void thriftAndBoostInTheJcefRuntimeAreListed() {
         var byName = ThirdPartyNotices.thirdParty().stream()

@@ -11,7 +11,8 @@ import tempfile
 APP = [':jasper-app:check']
 OTHER = [':jasper-app:verifyJcefToolchain', ':jasper-buddy:check', ':jasper-ui:check',
          ':jasper-terminal:check', ':jasper-sdk:check', ':jasper-sdk-testkit:check',
-         ':jasper-plugin-editor:check', ':jasper-plugin-enterprise:check', ':jasper-plugin-fileserver:check',
+         ':jasper-plugin-browser:check', ':jasper-plugin-editor:check', ':jasper-plugin-enterprise:check',
+         ':jasper-plugin-fileserver:check',
          ':jasper-plugin-history:check', ':jasper-plugin-indexer:check', ':jasper-plugin-remote:check',
          ':jasper-plugin-sample:check', ':jasper-plugin-snippets:check', ':jasper-plugin-vault:check']
 OPTIONS = ['--parallel', '--max-workers=1', '--continue', '--stacktrace', '--console=plain',

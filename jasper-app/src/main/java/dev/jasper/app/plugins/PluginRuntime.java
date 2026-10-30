@@ -392,6 +392,15 @@ public final class PluginRuntime {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         clipboard = Objects.requireNonNull(value);
     }
+    private Function<UUID, java.awt.Window> nativeWindows = window -> null;
+    /**
+     * Supplies a Jasper window's native window by id, or null, before plugin startup, so {@code Windows.hasModal} sees the
+     * dialogs and overlays Jasper shows over it.
+     */
+    public void nativeWindows(Function<UUID, java.awt.Window> windows) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        nativeWindows = Objects.requireNonNull(windows);
+    }
     private final HostedTypography typography = new HostedTypography();
 
     /** Publishes saved terminal typography before plugin startup or on configuration changes. UI thread only.
@@ -836,6 +845,7 @@ public final class PluginRuntime {
         }
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;
+        created.nativeWindows = nativeWindows;
         created.openSettings = openSettings;
         created.commandClient = commandClient;
         Set<String> loadingIds = new HashSet<>();

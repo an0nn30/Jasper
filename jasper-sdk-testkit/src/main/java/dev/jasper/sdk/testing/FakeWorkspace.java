@@ -16,7 +16,8 @@ import java.util.UUID;
  * closes, and closes when a move takes its last tab to another window. A window holds
  * tabs in strip order, and a tab holds panes, each showing one item, which the SDK calls a tab ({@code TabHandle}); a
  * window lists its items tab by tab, then pane by pane. Whatever opens without a pane, a moved item included, opens in a
- * new tab at the end of the strip; a split or a placement beside a pane opens a new pane right after it, in its tab.
+ * new tab at the end of the strip, except a next tab, right after the shown one; a split or a placement beside a pane
+ * opens a new pane right after it, in its tab.
  * Closing the selected item selects the item its tab showed before it, or, with the tab's last pane, the tab shown
  * before. A terminal item holds one terminal pane, the active pane is the terminal pane of the selected item of the
  * window activated last, focusing a pane selects its item, a pane closes with its item, an item moved to another window
@@ -135,6 +136,23 @@ final class FakeWorkspace {
     /** An item of {@code kind}, selected, in a new pane right after {@code beside}; in a new tab when it is null. */
     Tab addTab(Window window, TabHandle.Kind kind, String title, Tab beside) {
         var tab = announceTab(window, kind, title, beside);
+        select(tab);
+        return tab;
+    }
+
+    /** An item of {@code kind}, selected, in a new tab right after the window's shown tab; at the end of the strip when it shows none. */
+    Tab addNextTab(Window window, TabHandle.Kind kind, String title) {
+        Group shown = window.active();
+        int index = window.tabs.size();
+        for (int i = 0; i < window.tabs.size(); i++) if (window.tabs.get(i).group == shown) index = i + 1;
+        var tab = new Tab(window, kind, title);
+        everyTab.add(tab);
+        var group = new Group();
+        window.recent.add(group);
+        tab.group = group;
+        window.tabs.add(index, tab);
+        group.recent.add(tab);
+        host.publishApp(TerminalEvents.TAB_OPENED, new TerminalEvents.TabEvent(window.id, tab.id));
         select(tab);
         return tab;
     }

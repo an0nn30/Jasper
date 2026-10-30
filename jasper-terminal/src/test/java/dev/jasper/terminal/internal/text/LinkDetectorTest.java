@@ -58,6 +58,35 @@ class LinkDetectorTest {
     }
 
     @Test
+    void aSpanCoversTheUrlsCellsWithoutTrailingPunctuation() {
+        assertThat(LinkDetector.urlSpanAt(row("(see https://jasper.dev/a_(b)_c)."), 12))
+            .contains(new LinkDetector.UrlSpan("https://jasper.dev/a_(b)_c", 5, 30));
+    }
+
+    @Test
+    void aSpanFindsAFileUrlWithItsPosition() {
+        assertThat(LinkDetector.urlSpanAt(row("e: file:///tmp/Foo.kt:12:5 boom"), 6))
+            .contains(new LinkDetector.UrlSpan("file:///tmp/Foo.kt:12:5", 3, 25));
+    }
+
+    @Test
+    void aSpanCountsWideCharacterCells() {
+        assertThat(LinkDetector.urlSpanAt(row("\u65e5\uE000 https://a.dev"), 5))
+            .contains(new LinkDetector.UrlSpan("https://a.dev", 3, 15));
+    }
+
+    @Test
+    void aSpanEndsAfterTheContinuationCellOfAWideLastCharacter() {
+        assertThat(LinkDetector.urlSpanAt(row("see https://a.dev/\u65e5\uE000 x"), 19))
+            .contains(new LinkDetector.UrlSpan("https://a.dev/\u65e5", 4, 19));
+    }
+
+    @Test
+    void noSpanOutsideAUrl() {
+        assertThat(LinkDetector.urlSpanAt(row("see https://jasper.dev now"), 1)).isEmpty();
+    }
+
+    @Test
     void textWithoutAUrlFindsNothing() {
         assertThat(LinkDetector.urlAt(row("no links here"), 3)).isEmpty();
     }

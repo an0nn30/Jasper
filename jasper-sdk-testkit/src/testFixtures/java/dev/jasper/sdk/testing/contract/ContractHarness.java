@@ -68,6 +68,13 @@ public interface ContractHarness extends AutoCloseable {
     List<String> menu(String target);
 
     /**
+     * The plugin menus a window's menu bar shows ({@code Menus.create} and {@code Menus.createForContent}), as
+     * {@code top:<menuId>} in the order they were created: a content menu only while the window's current item is one of
+     * its plugin's content tabs, and no menu without an item of a registered action; empty for a window that is not open.
+     */
+    List<String> menuBar(java.util.UUID windowId);
+
+    /**
      * The terminal context menu's model lines for a pane: the lines {@link #menu} gives for {@code context}, empty
      * submenus and separators included, with each {@code web-address:id} line present only while the pane's selection is
      * one web address; empty for a pane that is not open.
@@ -324,6 +331,11 @@ public interface ContractHarness extends AutoCloseable {
         /** UI thread: clicks the body of the newest notification with this title; false when there is none or it expired. */
         boolean clickNotification(String title);
         List<java.nio.file.Path> openedInEditor();
+        /**
+         * Every file a plugin's {@code Platform.openFile} handed to the desktop, which edits it or shows it in the file
+         * manager: those no provided editor opened, in request order.
+         */
+        List<java.nio.file.Path> openedFiles();
         /**
          * Every web address that reached the system browser: each {@code Platform.browse}, and each
          * {@code Platform.openInBrowser} that no provided browser opened.

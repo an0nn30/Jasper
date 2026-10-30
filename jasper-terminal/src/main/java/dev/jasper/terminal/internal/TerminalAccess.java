@@ -104,7 +104,11 @@ public final class TerminalAccess implements AutoCloseable {
     public Optional<FileTarget> fileLinkAt(long absoluteRow, int column, boolean windows) {
         return queries.fileLinkAt(absoluteRow, column, windows, provenance::localPath);
     }
-    /** The word at an absolute row and column, as a stream selection. Unsupported module collaboration API. */
+    /**
+     * What a double-click at an absolute row and column selects, as a stream selection: the link there (an OSC 8 link's
+     * cells, or the plain-text URL a Cmd-click opens), followed across soft wraps, else the word. Unsupported module
+     * collaboration API.
+     */
     public Selection wordSelection(long row, int column) { return queries.wordSelection(row, column); }
     /** A logical line, bounded by {@link dev.jasper.terminal.internal.text.LogicalLine}'s extreme-line fallback, always including the clicked row. Unsupported module collaboration API. */
     public Selection lineSelection(long row) { return queries.lineSelection(row); }

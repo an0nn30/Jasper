@@ -172,6 +172,15 @@ version = "150.0.14.1233+g9df0879"
 license = "BSD-3-Clause"
 homepage = "https://github.com/JetBrains/jcef"
 text = "jcef.LICENSE.txt"
+notice = "jcef.NOTICE.txt"
+
+[[component]]
+name = "JCEF off-screen handler (the Browser's page renderer)"
+version = "150.0.14.1233+g9df0879"
+license = "Apache-2.0"
+homepage = "https://github.com/JetBrains/jcef"
+text = "apache-2.0.txt"
+notice = "jcef-osr-handler.NOTICE.txt"
 
 [[component]]
 name = "JCL over SLF4J"
