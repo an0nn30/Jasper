@@ -3,6 +3,7 @@ package dev.jasper.browser.links;
 import dev.jasper.browser.links.Isolation.OpenerPolicy;
 import dev.jasper.browser.links.Isolation.Sandbox;
 import dev.jasper.browser.page.Activation;
+import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
 import dev.jasper.browser.page.PageEvents;
@@ -12,6 +13,8 @@ import java.awt.EventQueue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -48,12 +51,17 @@ import org.cef.network.CefResponse;
  * through a message router whose page function is {@code jasperBridgeQuery}: it opens the popup, delivers messages,
  * closes the popup, shows either page's item, and tells each page when the other has gone.
  *
+ * <p>The router is the one way Jasper's page scripts reach Jasper, so it serves the {@code page} package's scripts too:
+ * a request's {@link Op op} says what it asks, and which of the page's frames may ask it. {@code favicon}, from
+ * {@code detect-favicon.js}, tells the page the icon its document names (spec section 5).
+ *
  * <p>Every frame and every script of a page can call the page function, so each request is untrusted, and the bridge
  * keeps the limits Chromium would:
  * <ul>
- *   <li>Only a page's top frame may ask, as the bridge lives there and nowhere else (spec section 5 keeps page scripts
- *   out of challenge frames). A sub-frame's request, one too long, and more than {@value #WAITING_LIMIT} waiting from
- *   one page are refused at once, on Chromium's thread.</li>
+ *   <li>Each op is taken only from the frames it names. Every op so far is taken from a page's top frame alone, as the
+ *   scripts live there and nowhere else (spec section 5 keeps page scripts out of challenge frames). A request from a
+ *   frame its op does not take, one too long, and more than {@value #WAITING_LIMIT} waiting from one page are refused at
+ *   once, on Chromium's thread.</li>
  *   <li>An {@code open} opens only what the page could open itself ({@link LinkRoute#opensFrom}), not from a document
  *   whose sandbox blocks popups, and needs and consumes the page's own {@link Activation}, which Jasper keeps from what
  *   it forwarded to the page.</li>
@@ -64,6 +72,8 @@ import org.cef.network.CefResponse;
  *   an escaped string literal, and is delivered only when its target origin is {@code "*"} or the receiving document's
  *   origin at that moment. A document sandboxed without {@code allow-same-origin} has an opaque origin: its messages
  *   come from "null", and only messages for {@code "*"} reach it.</li>
+ *   <li>A {@code favicon}'s icon is an absolute http or https address of at most {@value #ICON_LIMIT} characters,
+ *   without a user name or password; the page takes it only from the document it still shows, and only its first.</li>
  * </ul>
  *
  * <p>A link ends as Chromium's window groups do: when the popup closes, when the user sends either page elsewhere
@@ -82,6 +92,8 @@ final class OpenerBridge {
     static final int MESSAGE_LIMIT = 1 << 20;
     /** The most requests one page may have waiting for the UI thread. */
     static final int WAITING_LIMIT = 8;
+    /** The longest icon address a {@code favicon} request may name. */
+    static final int ICON_LIMIT = 8_192;
     /**
      * Why a request failed, as the page's script is told: not a request, not allowed, the other page closed, too long,
      * too many waiting.
@@ -91,6 +103,8 @@ final class OpenerBridge {
     static final String SOURCE = source();
     // The longest request a message of MESSAGE_LIMIT makes: the script escapes JSON's quotes and backslashes once more.
     private static final int REQUEST_LIMIT = 2 * MESSAGE_LIMIT + 4_096;
+    // The longest request whose op is read for a sub-frame: an op a sub-frame may send carries only a little.
+    private static final int SUB_FRAME_LIMIT = 4_096;
     // What every page that is no popup of a live link runs: window.open's stand-in.
     private static final String PAGE = SOURCE + "\n({});";
     // The name the script goes by in a page's console and stack traces.
@@ -102,6 +116,7 @@ final class OpenerBridge {
         MALFORMED_REQUEST = new Answer(MALFORMED, "Jasper does not understand this request."),
         TOO_LONG = new Answer(TOO_LARGE, "Jasper delivers messages of up to 1 MiB of JSON."),
         TOO_MANY = new Answer(BUSY, "Too many of this page's requests are waiting."),
+        NOT_WEB_ICON = new Answer(REFUSED, "Jasper shows only icons at http and https addresses."),
         NOT_PARTY = new Answer(REFUSED, "This page is not part of that link."),
         OTHER_CLOSED = new Answer(GONE, "The other page is closed.");
     private static final System.Logger LOG = System.getLogger(OpenerBridge.class.getName());
@@ -173,6 +188,44 @@ final class OpenerBridge {
         }
     }
 
+    /**
+     * What a request asks, by its {@code op}, and whether a page's sub-frames may ask it as well as its top frame. An op
+     * a sub-frame may send is read on Chromium's thread from a request of at most {@value #SUB_FRAME_LIMIT} characters.
+     */
+    enum Op {
+        /** {@code window.open}. */
+        OPEN("open", false),
+        /** {@code postMessage} to the other page of a link. */
+        POST("post", false),
+        /** Closes a link's popup. */
+        CLOSE("close", false),
+        /** Shows the other page of a link. */
+        FOCUS("focus", false),
+        /** The icon the document names. */
+        FAVICON("favicon", false);
+
+        private final String name;
+        private final boolean subFrames;
+
+        Op(String name, boolean subFrames) {
+            this.name = name;
+            this.subFrames = subFrames;
+        }
+
+        /** The op {@code request} names, or empty for none Jasper knows. */
+        static Optional<Op> of(Map<String, Object> request) {
+            Object name = request.get("op");
+            for (Op op : values()) if (op.name.equals(name)) return Optional.of(op);
+            return Optional.empty();
+        }
+
+        /** Whether a sub-frame may send {@code text}: a short request whose op a sub-frame may send. */
+        static boolean fromSubFrame(String text) {
+            return text != null && text.length() <= SUB_FRAME_LIMIT
+                && BridgeJson.object(text).flatMap(Op::of).map(op -> op.subFrames).orElse(false);
+        }
+    }
+
     /** What a main-frame response said that matters here, until its document commits. */
     private record Response(String url, OpenerPolicy policy, Sandbox sandbox) { }
 
@@ -239,9 +292,9 @@ final class OpenerBridge {
     }
 
     /**
-     * Whether a page's query may go on to the UI thread: one from a sub-frame, one too long, and one beyond the
-     * {@value #WAITING_LIMIT} the page may have waiting are answered at once. An admitted query is {@link #settled}
-     * once answered. Chromium's thread.
+     * Whether a page's query may go on to the UI thread: one from a sub-frame whose op only a top frame may send, one too
+     * long, and one beyond the {@value #WAITING_LIMIT} the page may have waiting are answered at once. An admitted query
+     * is {@link #settled} once answered. Chromium's thread.
      *
      * @param page the page that asks
      * @param mainFrame whether its main frame asks
@@ -249,7 +302,7 @@ final class OpenerBridge {
      * @return the answer that refuses it, or empty when it may go on
      */
     Optional<Answer> admit(Page page, boolean mainFrame, String text) {
-        if (!mainFrame) return Optional.of(SUB_FRAME);
+        if (!mainFrame && !Op.fromSubFrame(text)) return Optional.of(SUB_FRAME);
         if (text == null) return Optional.of(MALFORMED_REQUEST);
         if (text.length() > REQUEST_LIMIT) return Optional.of(TOO_LONG);
         boolean[] admitted = new boolean[1];
@@ -320,16 +373,17 @@ final class OpenerBridge {
      * @return the answer
      */
     Answer request(Party sender, boolean mainFrame, Sender from, String text, long nowMillis) {
-        if (!mainFrame) return SUB_FRAME;
+        if (!mainFrame && !Op.fromSubFrame(text)) return SUB_FRAME;
         if (text != null && text.length() > REQUEST_LIMIT) return TOO_LONG;
         Map<String, Object> request = BridgeJson.object(text).orElse(null);
         if (request == null) return MALFORMED_REQUEST;
-        return switch (request.get("op") instanceof String op ? op : "") {
-            case "open" -> open(sender, from, request, nowMillis);
-            case "post" -> post(sender, from, request);
-            case "close" -> close(sender, request);
-            case "focus" -> focus(sender, request, nowMillis);
-            default -> MALFORMED_REQUEST;
+        return switch (Op.of(request).orElse(null)) {
+            case OPEN -> open(sender, from, request, nowMillis);
+            case POST -> post(sender, from, request);
+            case CLOSE -> close(sender, request);
+            case FOCUS -> focus(sender, request, nowMillis);
+            case FAVICON -> favicon(sender, from, request);
+            case null -> MALFORMED_REQUEST;
         };
     }
 
@@ -544,6 +598,30 @@ final class OpenerBridge {
             return new Answer(REFUSED, "A page can bring another forward only while it shows, after a click or key press in it.");
         other.showItem();
         return DONE;
+    }
+
+    /**
+     * {@code favicon}: the icon the asking document names, as {@code detect-favicon.js} reads it from the document's
+     * links. Any script of the page could send it, so its address is only a request: an absolute http or https address
+     * of at most {@value #ICON_LIMIT} characters, without a user name or password. The page fetches it, if it still shows
+     * the document that asked and that document has named none before.
+     */
+    private Answer favicon(Party sender, Sender asker, Map<String, Object> request) {
+        if (!only(request, "url") || !(request.get("url") instanceof String url)) return MALFORMED_REQUEST;
+        Optional<URI> icon = webAddress(url);
+        if (icon.isEmpty()) return NOT_WEB_ICON;
+        if (asker.address() != null) sender.page().faviconDeclared(icon.get(), asker.address());
+        return DONE;
+    }
+
+    /** {@code url}, of at most {@value #ICON_LIMIT} characters, as an address Jasper fetches favicons from. */
+    private static Optional<URI> webAddress(String url) {
+        if (url.length() > ICON_LIMIT) return Optional.empty();
+        try {
+            return Optional.of(new URI(url)).filter(Favicons::fetches);
+        } catch (URISyntaxException notAUri) {
+            return Optional.empty();
+        }
     }
 
     /** The document {@code page}'s main frame shows, as far as the bridge has heard. The bridge's lock is held, or not needed. */

@@ -6,6 +6,8 @@
  * {@code OpenerBridge}, with its page script {@code opener-bridge.js} and {@code BridgeJson}, opens a script's
  * {@code window.open} the same way and keeps the popup's {@code window.opener} working through the client's message
  * router, within the limits {@code Isolation} reads from each main frame's response: its origin, a sandbox, and its
- * opener policy. Depends on {@code engine} and {@code page}; it loads only once a page first asks for Chromium.
+ * opener policy. The router serves the {@code page} package's scripts too, each request by its op: a document's
+ * favicon goes to its {@link dev.jasper.browser.page.Page}. Depends on {@code engine} and {@code page}; it loads only
+ * once a page first asks for Chromium.
  */
 package dev.jasper.browser.links;

@@ -5,6 +5,38 @@ public final class PageTestAccess {
     private PageTestAccess() { }
 
     /**
+     * A favicon fetcher that fetches nothing, as it is closed: for pages whose favicons a test does not fetch.
+     *
+     * @return the fetcher
+     */
+    public static Favicons noFavicons() {
+        var favicons = new Favicons(bytes -> java.util.Optional.empty(), Runnable::run);
+        favicons.close();
+        return favicons;
+    }
+
+    /**
+     * The icon the page's current document named, which the page fetches or fetched.
+     *
+     * @param page a page
+     * @return the icon's address, or empty before the document names one
+     */
+    public static java.util.Optional<java.net.URI> declaredFavicon(Page page) {
+        return page.declaredFavicon();
+    }
+
+    /**
+     * A favicon fetched for {@code document} arrives, as a fetch the page made completes. UI thread.
+     *
+     * @param page a page
+     * @param document the address it was fetched for
+     * @param image what the fetch gave
+     */
+    public static void faviconArrived(Page page, String document, java.util.Optional<dev.jasper.sdk.ui.PixelImage> image) {
+        page.faviconArrived(document, image);
+    }
+
+    /**
      * The page's main frame starts loading {@code url}, as the client's load handler tells it. UI thread.
      *
      * @param page a page

@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PageCloseTest {
     private static final URI EXAMPLE = URI.create("https://example.com");
+    private static final Favicons NO_FAVICONS = PageTestAccess.noFavicons();
     private final List<Runnable> posted = new ArrayList<>();
     private final AtomicInteger itemCloses = new AtomicInteger();
 
@@ -52,7 +53,7 @@ class PageCloseTest {
     @Test void aMainFrameLoadStartClearsTheTitle() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new AtomicInteger();
-            var page = new Page(EXAMPLE, changes::incrementAndGet);
+            var page = new Page(EXAMPLE, changes::incrementAndGet, NO_FAVICONS);
             page.titleChanged("Example Domain");
             assertThat(page.title()).isEqualTo("Example Domain");
             var started = new ArrayList<String>();
@@ -71,7 +72,7 @@ class PageCloseTest {
     }
 
     private Page page() {
-        var page = new Page(EXAMPLE, () -> { });
+        var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS);
         page.onCloseItem(itemCloses::incrementAndGet);
         return page;
     }

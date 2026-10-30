@@ -7,6 +7,7 @@ import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.ContentPresentation;
 import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.UiEvent;
 import java.net.URI;
@@ -29,6 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BrowserItemTest {
     private static final String ID = "dev.jasper.browser";
     private static final URI EXAMPLE = URI.create("https://example.com");
+    // A PNG as far as the SDK checks one: the plugin hands it on and never decodes it.
+    private static final PixelImage ICON = new PixelImage(new byte[] {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 1});
 
     @Test void anItemAsksForItsPageOnceTheFirstTimeItShowsAndNotWhenItOpens() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
@@ -115,6 +118,79 @@ class BrowserItemTest {
             assertThat(host.contentPresentation(item.tab()).title()).as("loaded without a title: its host").isEqualTo("example.org");
             PageTestAccess.titleChanged(page, "Example Org");
             assertThat(host.contentPresentation(item.tab()).title()).isEqualTo("Example Org");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Spec sections 5 and 6: the tab and the address field show the page's favicon once the page has loaded, and the
+     * globe while it loads and once a new document starts loading. The globe stays the tab's icon and the field's
+     * leading icon, for an image that does not decode.
+     */
+    @Test void theTabAndTheFieldShowTheFaviconOnceThePageHasLoadedAndTheGlobeOtherwise() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var item = items(host, page -> { }).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            Page page = item.page();
+            assertThat(host.contentPresentation(item.tab()).image()).as("no favicon yet").isEmpty();
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingImage()).isEmpty();
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingIcon()).isEqualTo(BrowserItems.GLOBE);
+            PageTestAccess.loadingChanged(page, true, false, false);
+            PageTestAccess.faviconArrived(page, "https://example.com", Optional.of(ICON));
+            assertThat(page.favicon()).contains(ICON);
+            assertThat(host.contentPresentation(item.tab()).image()).as("loading: the globe").isEmpty();
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingImage()).as("loading: the globe").isEmpty();
+            PageTestAccess.loadingChanged(page, false, false, false);
+            assertThat(host.contentPresentation(item.tab()))
+                .isEqualTo(new ContentPresentation("example.com", "", BrowserItems.GLOBE, false, "https://example.com", "").withImage(ICON));
+            Nodes.Field field = Views.field(view, BrowserToolbar.ADDRESS);
+            assertThat(field.leadingImage()).contains(ICON);
+            assertThat(field.leadingIcon()).as("the fallback").isEqualTo(BrowserItems.GLOBE);
+            PageTestAccess.loadStarted(page, "https://example.org/");
+            assertThat(page.favicon()).isEmpty();
+            assertThat(host.contentPresentation(item.tab()).image()).as("a new document").isEmpty();
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingImage()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Spec section 5: Jasper's own pages show Jasper's icon, once loaded, as other pages show their favicon. */
+    @Test void jaspersOwnPagesShowJaspersIcon() throws Exception {
+        byte[] jasper;
+        try (var in = BrowserItem.class.getResourceAsStream("jasper.png")) {
+            assertThat(in).as("the plugin's copy of Jasper's icon").isNotNull();
+            jasper = in.readAllBytes();
+        }
+        var icon = new PixelImage(jasper);
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var item = items(host, page -> { }).open(URI.create("jasper-about:welcome"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(host.contentPresentation(item.tab()).image()).contains(icon);
+            assertThat(host.contentPresentation(item.tab()).icon()).isEqualTo(BrowserItems.GLOBE);
+            var view = host.contentView(ID, TabTitle.UNTITLED).orElseThrow();
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingImage()).contains(icon);
+            PageTestAccess.loadingChanged(item.page(), true, false, false);
+            assertThat(host.contentPresentation(item.tab()).image()).as("loading: the globe").isEmpty();
+            PageTestAccess.loadingChanged(item.page(), false, false, false);
+            item.load(EXAMPLE);
+            assertThat(host.contentPresentation(item.tab()).image()).as("a web page without a favicon").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Spec section 6: the field's leading slot is the site icon, so named, and dragging it drags the page's address
+     * without its user name and password, whatever is typed in the field.
+     */
+    @Test void theSiteIconIsNamedAndDragsThePagesAddressWithoutItsUserInfo() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            items(host, page -> { }).open(URI.create("https://ada:secret@example.com/docs"), TabPlacement.NEW_TAB, Optional.empty(),
+                Optional.empty());
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            Nodes.Field field = Views.field(view, BrowserToolbar.ADDRESS);
+            assertThat(field.leadingName()).isEqualTo("Site icon - drag to copy URL");
+            assertThat(field.leadingDrag()).contains("https://example.com/docs");
+            view.type(BrowserToolbar.ADDRESS, "something else");
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingDrag()).as("typing changes nothing").contains("https://example.com/docs");
             assertThat(host.failures()).isEmpty();
         } });
     }

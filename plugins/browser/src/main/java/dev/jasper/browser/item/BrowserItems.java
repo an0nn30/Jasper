@@ -1,5 +1,6 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.sdk.RestoreState;
@@ -16,10 +17,10 @@ import java.util.function.Consumer;
 
 /**
  * The plugin's open browser items, in every window: it opens them, finds one by the OSC 8 target it was opened for,
- * and knows each window's focused one. It registers the globe every item shows. A page is made, and Chromium so asked
- * for, only when its item first shows. UI thread.
+ * and knows each window's focused one. It registers the globe every item shows, and holds the fetcher of their pages'
+ * favicons until {@link #close()}. A page is made, and Chromium so asked for, only when its item first shows. UI thread.
  */
-public final class BrowserItems {
+public final class BrowserItems implements AutoCloseable {
     /** The globe: a browser item's tab icon, and its actions' and split item's. */
     public static final String GLOBE = "dev.jasper.browser:globe";
     // The plugin icon's circle, equator and meridian, on the kit's 16-unit grid.
@@ -28,6 +29,9 @@ public final class BrowserItems {
     private final PluginContext context;
     private final Consumer<Page> start;
     private final List<BrowserItem> open = new java.util.ArrayList<>();
+    // Made with the first item; it makes its HTTP client only once a page names a favicon.
+    private Favicons favicons;
+    private boolean closed;
 
     /**
      * The items of a plugin run, whose pages {@code start} makes: the plugin's has Chromium make them, and a test's
@@ -110,6 +114,21 @@ public final class BrowserItems {
     /** Opens Settings at the Browser's page. */
     public void showSettings() {
         context.settings().show();
+    }
+
+    /** The plugin stops: the favicon fetches under way end, and no page fetches one from now on. */
+    @Override public void close() {
+        closed = true;
+        if (favicons != null) favicons.close();
+    }
+
+    /** The fetcher of the items' pages' favicons; one that fetches nothing once the plugin has stopped. */
+    Favicons favicons() {
+        if (favicons == null) {
+            favicons = new Favicons(FaviconDecoder::toPng, context.background());
+            if (closed) favicons.close();
+        }
+        return favicons;
     }
 
     PluginContext context() {

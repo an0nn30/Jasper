@@ -1,5 +1,6 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.DialogPlace;
 import dev.jasper.browser.page.NavigationButton;
 import dev.jasper.browser.page.Page;
@@ -14,11 +15,15 @@ import dev.jasper.sdk.ui.ContentTab;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.CustomContent;
 import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.sdk.ui.ViewSpec;
 import java.awt.event.HierarchyEvent;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -30,9 +35,12 @@ import javax.swing.JComponent;
 /**
  * One page in one pane: a content tab whose one view holds the toolbar above the page's canvas, a custom content of
  * kind PREVIEW. The item asks for its page, and so for Chromium, the first time its view shows, not when it opens. Its
- * tab shows the page's title (as {@link TabTitle} gives it), the globe and, as its location and status, the page's
- * address, which the address field shows too, each without a user name or password. Its content commands {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and the mouse's
- * back and forward buttons over the page go back and forward. It saves its URL and target with Jasper's workspace
+ * tab shows the page's title (as {@link TabTitle} gives it), its icon and, as its location and status, the page's
+ * address, which the address field shows too, each without a user name or password. The icon, in the tab and at the
+ * field's left, is the page's favicon once the page has loaded, Jasper's own icon on Jasper's {@code jasper-about:}
+ * pages, and the globe while the page loads and whenever it has no favicon (spec sections 5 and 6). Its content
+ * commands {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and the mouse's back and forward
+ * buttons over the page go back and forward. It saves its URL and target with Jasper's workspace
  * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
@@ -62,7 +70,7 @@ public final class BrowserItem implements AutoCloseable {
         this.target = target;
         this.url = url;
         this.waiting = waiting;
-        page = new Page(url, this::changed);
+        page = new Page(url, this::changed, items.favicons());
         page.onNavigationButton(this::navigationButton);
         page.onOpenItem(this::openItem);
         page.onCloseItem(this::close);
@@ -354,12 +362,25 @@ public final class BrowserItem implements AutoCloseable {
         String address = shown(page.address());
         title = TabTitle.of(page.title(), host(address), title, page.loading());
         String shown = address.length() <= SHOWN_ADDRESS ? address : address.substring(0, SHOWN_ADDRESS) + "…";
-        tab.setPresentation(new ContentPresentation(title, "", BrowserItems.GLOBE, false, shown, ""));
+        // The globe stays the tab's icon under an image, for one that does not decode.
+        var presentation = new ContentPresentation(title, "", BrowserItems.GLOBE, false, shown, "");
+        tab.setPresentation(icon().map(presentation::withImage).orElse(presentation));
         tab.setStatus(List.of(new ContentStatus(shown, shown, null)));
     }
 
+    /**
+     * The image the tab and the address field show for the page: none while it loads, so the globe shows; Jasper's icon
+     * on Jasper's own pages; else the page's favicon, if it has one.
+     */
+    private Optional<PixelImage> icon() {
+        if (page.loading()) return Optional.empty();
+        String address = page.address();
+        boolean jaspers = address.regionMatches(true, 0, AboutScheme.NAME + ":", 0, AboutScheme.NAME.length() + 1);
+        return jaspers ? Optional.of(JasperIcon.IMAGE) : page.favicon();
+    }
+
     private ViewSpec spec() {
-        Nodes.Node bar = toolbar.node(shown(page.address()), page.loading(), page.canGoBack(), page.canGoForward());
+        Nodes.Node bar = toolbar.node(shown(page.address()), page.loading(), page.canGoBack(), page.canGoForward(), icon());
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,
@@ -375,6 +396,20 @@ public final class BrowserItem implements AutoCloseable {
 
     private static Optional<String> host(String address) {
         return AddressInput.parse(address).map(URI::getHost);
+    }
+
+    /** Jasper's own icon, which Jasper's pages show: the plugin's copy of the application's 32-pixel PNG, read once needed. */
+    private static final class JasperIcon {
+        static final PixelImage IMAGE = read();
+
+        private static PixelImage read() {
+            try (InputStream in = BrowserItem.class.getResourceAsStream("jasper.png")) {
+                if (in == null) throw new IllegalStateException("The Browser plugin has no jasper.png");
+                return new PixelImage(in.readAllBytes());
+            } catch (IOException unreadable) {
+                throw new UncheckedIOException(unreadable);
+            }
+        }
     }
 
     /** {@code address} as the item shows it: without a user name or password. */

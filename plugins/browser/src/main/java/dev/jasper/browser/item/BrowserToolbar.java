@@ -3,16 +3,18 @@ package dev.jasper.browser.item;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.PixelImage;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 
 /**
  * A browser item's toolbar along the top of its page (spec section 6), as SDK nodes the kit draws: Back and Forward,
- * each disabled when the page cannot go there; Reload, which is Stop while the page loads; the address field; and the
- * menu button, which holds Settings. It keeps what is typed into the field: the field shows the page's address until
- * something is typed, and again once Enter loads it or Escape gives it up. Its item handles what the nodes report. UI
- * thread.
+ * each disabled when the page cannot go there; Reload, which is Stop while the page loads; the address field, with the
+ * site icon at its left; and the menu button, which holds Settings. The site icon is the page's icon, else the globe,
+ * and dragging it drags the page's address. The toolbar keeps what is typed into the field: the field shows the page's
+ * address until something is typed, and again once Enter loads it or Escape gives it up. Its item handles what the nodes
+ * report. UI thread.
  */
 final class BrowserToolbar {
     /** The toolbar's row and its nodes; a button reports its own id. */
@@ -25,24 +27,29 @@ final class BrowserToolbar {
     /** What the menu's Settings reports. */
     static final String SETTINGS = "browser.settings";
     static final String PLACEHOLDER = "Search or enter website name";
+    /** The site icon's accessible name and tooltip. */
+    static final String SITE_ICON = "Site icon - drag to copy URL";
     // What was typed since the field last showed the page's address; null while it shows it.
     private String typed;
 
     /**
      * The toolbar for a page at {@code address}.
      *
-     * @param address the page's address, which the field shows unless something was typed
+     * @param address the page's address, which the field shows unless something was typed, and which dragging the site
+     *     icon drags
      * @param loading whether the page loads
      * @param canGoBack whether the page can go back
      * @param canGoForward whether the page can go forward
+     * @param icon the site icon: the page's favicon, or empty for the globe
      * @return the toolbar's row
      */
-    Nodes.Stack node(String address, boolean loading, boolean canGoBack, boolean canGoForward) {
+    Nodes.Stack node(String address, boolean loading, boolean canGoBack, boolean canGoForward, Optional<PixelImage> icon) {
         var reload = loading
             ? new Nodes.Button(RELOAD, ControlState.READY, "", "close", Nodes.ButtonKind.GHOST, STOP, "Stop")
             : new Nodes.Button(RELOAD, ControlState.READY, "", "refresh", Nodes.ButtonKind.GHOST, RELOAD, "Reload");
         var field = new Nodes.Field(ADDRESS, ControlState.READY, Nodes.FieldKind.TEXT, typed == null ? address : typed, PLACEHOLDER,
-            "Address", ENTER, Optional.empty(), Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "");
+            "Address", ENTER, Optional.empty(), Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "", false, icon, BrowserItems.GLOBE, SITE_ICON,
+            address.isBlank() ? Optional.empty() : Optional.of(address), false);
         var menu = new Nodes.MenuButton(MENU, ControlState.READY, "", "menu", Nodes.ButtonKind.GHOST, "",
             List.of(new MenuItem(SETTINGS, "Settings", "", SETTINGS, true, false)), "Menu");
         return new Nodes.Stack(BAR, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(

@@ -40,6 +40,7 @@ public class BrowserPlugin implements Plugin {
     private PluginContext context;
     private ExecutorService worker;
     private Chromium chromium;
+    private BrowserItems items;
     private boolean running;
 
     /** Created by the runtime. */
@@ -65,6 +66,7 @@ public class BrowserPlugin implements Plugin {
             PageDialogs.prepare(engine);
             page.start(engine);
         });
+        this.items = items;
         var welcome = new WelcomePage(context.appearance());
         about.register(WelcomePage.NAME, welcome::html);
         about.registerAction(WelcomePage.SETTINGS, () -> { if (running) items.showSettings(); });
@@ -95,12 +97,13 @@ public class BrowserPlugin implements Plugin {
     }
 
     /**
-     * Jasper quits. On the UI thread {@link Chromium#close()} only starts Chromium's dispose. The second close runs on the
-     * plugin's background executor and waits for Chromium's end: Jasper's quit waits for that work within its own
-     * shutdown grace, so quitting holds briefly for Chromium and never hangs on it.
+     * Jasper quits. The items' favicon fetches end. On the UI thread {@link Chromium#close()} only starts Chromium's
+     * dispose. The second close runs on the plugin's background executor and waits for Chromium's end: Jasper's quit
+     * waits for that work within its own shutdown grace, so quitting holds briefly for Chromium and never hangs on it.
      */
     @Override public void stop() {
         running = false;
+        if (items != null) items.close();
         chromium.close();
         try {
             context.background().execute(chromium::close);

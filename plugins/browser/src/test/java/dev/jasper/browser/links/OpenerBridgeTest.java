@@ -5,7 +5,9 @@ import dev.jasper.browser.links.Isolation.Sandbox;
 import dev.jasper.browser.links.OpenerBridge.Answer;
 import dev.jasper.browser.links.OpenerBridge.Party;
 import dev.jasper.browser.page.Activation;
+import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.page.PageTestAccess;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.net.URI;
@@ -31,6 +33,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class OpenerBridgeTest {
     private static final long NOW = 1_000_000;
+    // The pages here fetch no favicon: the bridge's part ends where a page is told its document's icon.
+    private static final Favicons NO_FAVICONS = PageTestAccess.noFavicons();
     private static final String APP = "https://app.example/start", LOGIN = "https://login.example/sign-in";
     private final OpenerBridge bridge = new OpenerBridge();
 
@@ -648,6 +652,56 @@ class OpenerBridgeTest {
         });
     }
 
+    /**
+     * Plan 4b's rulings P3 and P10: {@code favicon} tells the page the icon its document names, which the page then
+     * fetches; nothing else changes.
+     */
+    @Test void aFaviconRequestFromTheTopFrameTellsThePageItsDocumentsIcon() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            Answer answer = ask(page, favicon("https://app.example/static/icon.png"));
+            assertThat(answer.ok()).as(answer.toString()).isTrue();
+            assertThat(answer.text()).isEmpty();
+            assertThat(PageTestAccess.declaredFavicon(page.page)).contains(URI.create("https://app.example/static/icon.png"));
+            assertThat(page.scripts).isEmpty();
+            assertThat(page.opened).isEmpty();
+            assertThat(bridge.links()).isZero();
+            assertThat(ask(new Document(APP), favicon("HTTP://app.example/icon.png")).ok()).as("a scheme in capitals").isTrue();
+        });
+    }
+
+    /**
+     * Any script in the page can send {@code favicon}, so it is taken only from the top frame, and its address is only a
+     * request: an absolute http or https address of at most {@value OpenerBridge#ICON_LIMIT} characters, without a user
+     * name or password.
+     */
+    @Test void aFaviconRequestIsUntrusted() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            String icon = favicon("https://app.example/icon.png");
+            assertThat(bridge.admit(page.page, false, icon)).as("a sub-frame's, on Chromium's thread")
+                .hasValueSatisfying(answer -> assertThat(answer.code()).isEqualTo(OpenerBridge.REFUSED));
+            assertThat(bridge.request(page.party(), false, APP, icon, NOW).code()).as("a sub-frame's").isEqualTo(OpenerBridge.REFUSED);
+            for (String request : List.of("{\"op\":\"favicon\"}", "{\"op\":\"favicon\",\"url\":true}",
+                    "{\"op\":\"favicon\",\"url\":\"https://app.example/icon.png\",\"size\":\"32\"}"))
+                assertThat(ask(page, request).code()).as(request).isEqualTo(OpenerBridge.MALFORMED);
+            for (String url : List.of("/favicon.ico", "icon.png", "data:image/png;base64,AAAA", "file:///tmp/icon.png",
+                    "jasper-about:icon.png", "javascript:alert(1)", "ftp://app.example/icon.png", "https://user:secret@app.example/icon.png",
+                    "https:///icon.png", "https://app.example/a b", "https://app.example/" + "a".repeat(OpenerBridge.ICON_LIMIT)))
+                assertThat(ask(page, favicon(url)).code()).as(url).isEqualTo(OpenerBridge.REFUSED);
+            assertThat(PageTestAccess.declaredFavicon(page.page)).isEmpty();
+        });
+    }
+
+    /** The page takes an icon only from the document it shows: one from the document before tells it nothing. */
+    @Test void aFaviconRequestFromADocumentThePageNoLongerShowsTellsItNothing() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            assertThat(bridge.request(page.party(), true, LOGIN, favicon("https://login.example/icon.png"), NOW).ok()).isTrue();
+            assertThat(PageTestAccess.declaredFavicon(page.page)).isEmpty();
+        });
+    }
+
     @Test void aRequestIsReadAsStrictJson() {
         assertThat(BridgeJson.object(" { \"op\" : \"post\" , \"data\" : \"a\\\"b\\\\c\\/d\\b\\f\\n\\r\\t\\u00e9\\uD83D\\uDE00\" , \"x\" : true , \"y\" : false } "))
             .hasValueSatisfying(members -> assertThat(members).containsExactly(java.util.Map.entry("op", "post"),
@@ -699,7 +753,7 @@ class OpenerBridgeTest {
 
         Document(String address) {
             this.address = address;
-            page = new Page(URI.create(address), () -> { });
+            page = new Page(URI.create(address), () -> { }, NO_FAVICONS);
             page.onOpenItem((url, placement) -> {
                 opened.add(placement + " " + url);
                 var popup = new Document(url);
@@ -818,6 +872,10 @@ class OpenerBridgeTest {
 
     private static String open(String url) {
         return "{\"op\":\"open\",\"url\":\"" + url + "\"}";
+    }
+
+    private static String favicon(String url) {
+        return "{\"op\":\"favicon\",\"url\":" + BridgeJson.quote(url) + "}";
     }
 
     private static String post(String id, String targetOrigin, String data) {

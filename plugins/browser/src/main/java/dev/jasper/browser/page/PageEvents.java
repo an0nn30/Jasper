@@ -2,6 +2,10 @@ package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
 import java.awt.EventQueue;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +29,9 @@ import org.cef.network.CefRequest;
  * on its own UI thread (on macOS, AppKit's main thread), never Swing's, so what a page shows changes on the UI thread.
  * The hover address goes straight to the canvas, which takes it from any thread. A main frame's load start also goes,
  * at once and on Chromium's thread, to the hooks the {@code links} package gave the client
- * ({@link #onMainFrameLoadStart}). A page that enters fullscreen is told at once to leave it: Jasper refuses
- * fullscreen (spec section 5).
+ * ({@link #onMainFrameLoadStart}), and the main frame then runs {@code detect-favicon.js}, which names the document's
+ * icon through the opener bridge's router for the page to fetch ({@link Page#faviconDeclared}). A page that enters
+ * fullscreen is told at once to leave it: Jasper refuses fullscreen (spec section 5).
  */
 public final class PageEvents {
     private static final Consumer<CefClient> INSTALL = PageEvents::install;
@@ -38,6 +43,10 @@ public final class PageEvents {
         + "document.exitFullscreen().catch(function () { }); } if (document.fullscreenElement) leave(); "
         + "else document.addEventListener('fullscreenchange', leave, { once: true }); })();";
     private static final String EXIT_FULLSCREEN_URL = "jasper-about:exit-fullscreen.js";
+    /** What each main frame runs as its document starts loading: it names the document's icon once it is parsed. */
+    private static final String DETECT_FAVICON = script("detect-favicon.js");
+    private static final String DETECT_FAVICON_URL = "jasper-about:detect-favicon.js";
+    private static final System.Logger LOG = System.getLogger(PageEvents.class.getName());
     // The hooks each client was given, which hear its pages' main-frame load starts on Chromium's thread.
     private static final Map<CefClient, List<BiConsumer<PageBrowser, CefFrame>>> LOAD_STARTS =
         Collections.synchronizedMap(new WeakHashMap<>());
@@ -69,6 +78,16 @@ public final class PageEvents {
         client.addDisplayHandler(new Display());
         client.addLoadHandler(new Load());
         client.addKeyboardHandler(new Keyboard());
+    }
+
+    /** The page script {@code name}, one of this package's resources. */
+    static String script(String name) {
+        try (InputStream in = PageEvents.class.getResourceAsStream(name)) {
+            if (in == null) throw new IllegalStateException("The Browser plugin has no " + name);
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8).strip();
+        } catch (IOException unreadable) {
+            throw new UncheckedIOException(unreadable);
+        }
     }
 
     /** The page {@code browser} shows; null for a browser that is not a page's. */
@@ -143,6 +162,11 @@ public final class PageEvents {
             if (browser instanceof PageBrowser shown) {
                 List<BiConsumer<PageBrowser, CefFrame>> hooks = LOAD_STARTS.get(browser.getClient());
                 if (hooks != null) for (BiConsumer<PageBrowser, CefFrame> hook : hooks) hook.accept(shown, frame);
+                try {
+                    frame.executeJavaScript(DETECT_FAVICON, DETECT_FAVICON_URL, 0);
+                } catch (RuntimeException failure) {
+                    LOG.log(System.Logger.Level.WARNING, "A page's favicon script could not run", failure);
+                }
             }
             String url = frame.getURL();
             later(browser, page -> page.loadStarted(url));

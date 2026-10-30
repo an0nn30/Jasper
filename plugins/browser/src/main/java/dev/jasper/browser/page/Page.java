@@ -2,12 +2,15 @@ package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -16,15 +19,16 @@ import org.cef.CefClient;
 import org.cef.browser.CefFrame;
 
 /**
- * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title, whether it loads
- * and where it can go, and what it is asked to do. Its Chromium browser is made only once {@link #start} asks for it,
- * the first time its item shows; until then the page holds the address it will load and asks nothing of Chromium.
- * Every method runs on the UI thread, and so does every callback it makes. This is the one class that makes a
- * {@link PageView}.
+ * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
+ * whether it loads and where it can go, and what it is asked to do. Its Chromium browser is made only once
+ * {@link #start} asks for it, the first time its item shows; until then the page holds the address it will load and
+ * asks nothing of Chromium. Every method runs on the UI thread, and so does every callback it makes. This is the one
+ * class that makes a {@link PageView}.
  */
 public final class Page implements AutoCloseable {
     private final PageView view = new PageView();
     private final Runnable changed;
+    private final Favicons favicons;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
     private final List<Runnable> closes = new CopyOnWriteArrayList<>();
@@ -40,6 +44,11 @@ public final class Page implements AutoCloseable {
     // Where the page is, as Chromium last reported it, or what it was last asked to load since.
     private String address;
     private String title = "";
+    // The favicon of the document the main frame shows; the icon that document named, null until it names one; and the
+    // fetch of that icon while it runs.
+    private Optional<PixelImage> favicon = Optional.empty();
+    private URI declaredIcon;
+    private CompletableFuture<Optional<PixelImage>> iconFetch;
     private boolean loading, canGoBack, canGoForward, started, ready, closed;
     private PageBrowser browser;
     // The address the browser was made with, which it loads by itself.
@@ -49,12 +58,14 @@ public final class Page implements AutoCloseable {
      * A page that will load {@code url}, with its canvas and no browser yet.
      *
      * @param url what it loads first
-     * @param changed told whenever its address, title, loading state or where it can go changes
+     * @param changed told whenever its address, title, favicon, loading state or where it can go changes
+     * @param favicons fetches the favicons its documents name
      */
-    public Page(URI url, Runnable changed) {
+    public Page(URI url, Runnable changed, Favicons favicons) {
         requested = Objects.requireNonNull(url, "url");
         address = url.toString();
         this.changed = Objects.requireNonNull(changed, "changed");
+        this.favicons = Objects.requireNonNull(favicons, "favicons");
         view.onNavigationButton(this::navigationButton);
     }
 
@@ -176,6 +187,46 @@ public final class Page implements AutoCloseable {
      */
     public String title() {
         return title;
+    }
+
+    /**
+     * The favicon of the document the page's main frame shows, fetched once that document named it, while the page is
+     * still where it was fetched for. A main frame's load start clears it.
+     *
+     * @return the favicon, or empty while the page has none
+     */
+    public Optional<PixelImage> favicon() {
+        return favicon;
+    }
+
+    /**
+     * The document the page's main frame showed at {@code document} names its favicon at {@code icon}, as the page's
+     * script reports through the opener bridge: the page fetches it, and the favicon is the page's if it arrives while
+     * the page is still at {@code document}, a fragment aside. Each document names one: a request after the first, one
+     * from a document the page no longer shows, and any after {@link #close()} are ignored. The bridge has checked
+     * {@code icon}, which any script in the page could have sent.
+     *
+     * @param icon the icon's address
+     * @param document the address of the document that named it
+     */
+    public void faviconDeclared(URI icon, String document) {
+        Objects.requireNonNull(icon, "icon");
+        Objects.requireNonNull(document, "document");
+        if (closed || declaredIcon != null || !samePage(document, address)) return;
+        URI page;
+        try {
+            page = new URI(document);
+        } catch (URISyntaxException notAUri) {
+            return;
+        }
+        declaredIcon = icon;
+        CompletableFuture<Optional<PixelImage>> fetch = favicons.fetch(icon, page);
+        iconFetch = fetch;
+        fetch.whenComplete((image, failure) -> EventQueue.invokeLater(() -> {
+            if (fetch != iconFetch) return; // dropped by a load start or the close
+            iconFetch = null;
+            faviconArrived(document, failure == null ? image : Optional.empty());
+        }));
     }
 
     /**
@@ -414,6 +465,7 @@ public final class Page implements AutoCloseable {
         itemCloser = () -> { };
         itemShower = () -> { };
         dialogPlace = null;
+        dropFaviconFetch();
         view.setHoverUrl("");
         PageBrowser page = browser;
         if (page != null) page.close(true);
@@ -485,15 +537,51 @@ public final class Page implements AutoCloseable {
 
     /**
      * The main frame started loading {@code url}: the page has no title until the new document gives one, whatever
-     * Chromium reports for a document without one.
+     * Chromium reports for a document without one, and no favicon until the new document names one. A favicon still
+     * being fetched for the document before is dropped.
      */
     void loadStarted(String url) {
         if (closed) return;
-        if (!title.isEmpty()) {
-            title = "";
-            changed.run();
-        }
+        dropFaviconFetch();
+        declaredIcon = null;
+        boolean cleared = !title.isEmpty() || favicon.isPresent();
+        title = "";
+        favicon = Optional.empty();
+        if (cleared) changed.run();
         for (Consumer<String> listener : loadStarts) listener.accept(url == null ? "" : url);
+    }
+
+    /** The icon the current document named, or empty before it names one. */
+    Optional<URI> declaredFavicon() {
+        return Optional.ofNullable(declaredIcon);
+    }
+
+    /** Whether the page fetches a favicon. */
+    boolean fetchingFavicon() {
+        return iconFetch != null;
+    }
+
+    /** A favicon fetched for {@code document} arrived: it is the page's, unless the page has gone elsewhere since. */
+    void faviconArrived(String document, Optional<PixelImage> image) {
+        if (closed || image.isEmpty() || !samePage(document, address)) return;
+        favicon = image;
+        changed.run();
+    }
+
+    private void dropFaviconFetch() {
+        CompletableFuture<Optional<PixelImage>> fetch = iconFetch;
+        iconFetch = null;
+        if (fetch != null) fetch.cancel(true);
+    }
+
+    /** Whether two addresses are the same page: the same but for their fragments. */
+    private static boolean samePage(String one, String other) {
+        return withoutFragment(one).equals(withoutFragment(other));
+    }
+
+    private static String withoutFragment(String address) {
+        int hash = address.indexOf('#');
+        return hash < 0 ? address : address.substring(0, hash);
     }
 
     /** The address of the link under the pointer, or empty. Any thread. */

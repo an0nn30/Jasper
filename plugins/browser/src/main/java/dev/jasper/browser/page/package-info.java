@@ -5,9 +5,12 @@
  * {@link dev.jasper.browser.page.PageRenderer} receives those frames, and {@link dev.jasper.browser.page.PageBrowser} is
  * the page's browser. {@link dev.jasper.browser.page.PageEvents} holds the client's one display, load and keyboard
  * handler, which hand each page's callbacks to its {@code Page} and refuse fullscreen, and tells the {@code links}
- * package's hook each main frame's load start on Chromium's thread. {@link dev.jasper.browser.page.DialogPlace} is where
+ * package's hook each main frame's load start on Chromium's thread; the main frame then runs
+ * {@code detect-favicon.js}, which names the document's icon through the {@code links} package's message router, and
+ * {@link dev.jasper.browser.page.Favicons} fetches it for the page. {@link dev.jasper.browser.page.DialogPlace} is where
  * the {@code dialogs} package shows a page's dialogs, as its item gives it. The canvas, renderer and browser are adapted
- * from JetBrains' JCEF test classes, as {@code notices.toml} records. {@link dev.jasper.browser.page.LastPress} and
- * {@code Page}'s methods name no Chromium type, and none of these classes loads until a browser item opens.
+ * from JetBrains' JCEF test classes, as {@code notices.toml} records. {@link dev.jasper.browser.page.LastPress},
+ * {@code Favicons} and {@code Page}'s methods name no Chromium type, and none of these classes loads until a browser
+ * item opens.
  */
 package dev.jasper.browser.page;
