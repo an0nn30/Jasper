@@ -78,4 +78,31 @@ public final class PageTestAccess {
     public static void loadingChanged(Page page, boolean loading, boolean canGoBack, boolean canGoForward) {
         page.loadingChanged(loading, canGoBack, canGoForward);
     }
+
+    /**
+     * A read of the page's history gives {@code history}, as DevTools answers it, or as a read that failed gives
+     * {@link NavigationHistory.History#EMPTY}. UI thread.
+     *
+     * @param page a page
+     * @param history what the read gave
+     */
+    public static void historyRead(Page page, NavigationHistory.History history) {
+        page.historyRead(history);
+    }
+
+    /**
+     * Has {@code page} ready, as a page whose browser exists is, while its browser stays absent: what the page asks of
+     * its browser then fails, once the page has decided to ask and told its listeners.
+     *
+     * @param page a page
+     */
+    public static void readyWithoutBrowser(Page page) {
+        try {
+            var ready = Page.class.getDeclaredField("ready");
+            ready.setAccessible(true);
+            ready.setBoolean(page, true);
+        } catch (ReflectiveOperationException unexpected) {
+            throw new AssertionError(unexpected);
+        }
+    }
 }

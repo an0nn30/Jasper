@@ -20,10 +20,10 @@ import org.cef.browser.CefFrame;
 
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
- * whether it loads and where it can go, and what it is asked to do. Its Chromium browser is made only once
- * {@link #start} asks for it, the first time its item shows; until then the page holds the address it will load and
- * asks nothing of Chromium. Every method runs on the UI thread, and so does every callback it makes. This is the one
- * class that makes a {@link PageView}.
+ * whether it loads, where it can go and its history, and what it is asked to do. Its Chromium browser is made only
+ * once {@link #start} asks for it, the first time its item shows; until then the page holds the address it will load
+ * and asks nothing of Chromium. Every method runs on the UI thread, and so does every callback it makes. This is the
+ * one class that makes a {@link PageView}.
  */
 public final class Page implements AutoCloseable {
     private final PageView view = new PageView();
@@ -49,6 +49,9 @@ public final class Page implements AutoCloseable {
     private Optional<PixelImage> favicon = Optional.empty();
     private URI declaredIcon;
     private CompletableFuture<Optional<PixelImage>> iconFetch;
+    // The history as last read; whether a read runs, and whether the history changed since that read began.
+    private NavigationHistory.History history = NavigationHistory.History.EMPTY;
+    private boolean readingHistory, historyStale;
     private boolean loading, canGoBack, canGoForward, started, ready, closed;
     private PageBrowser browser;
     // The address the browser was made with, which it loads by itself.
@@ -58,7 +61,7 @@ public final class Page implements AutoCloseable {
      * A page that will load {@code url}, with its canvas and no browser yet.
      *
      * @param url what it loads first
-     * @param changed told whenever its address, title, favicon, loading state or where it can go changes
+     * @param changed told whenever its address, title, favicon, loading state, where it can go or its history changes
      * @param favicons fetches the favicons its documents name
      */
     public Page(URI url, Runnable changed, Favicons favicons) {
@@ -132,6 +135,19 @@ public final class Page implements AutoCloseable {
         if (!ready || closed || !canGoForward) return;
         navigated();
         browser.goForward();
+    }
+
+    /**
+     * Goes to entry {@code id} of the page's history, as Back's and Forward's hold menus choose it: an entry of the
+     * history as last read ({@link #history()}) other than the current one. An entry it no longer has, the current one,
+     * and any before the page has its browser do nothing.
+     *
+     * @param id the entry's id
+     */
+    public void goToHistoryEntry(int id) {
+        if (!ready || closed || !history.jumpsTo(id)) return;
+        navigated();
+        NavigationHistory.goTo(browser, id);
     }
 
     /** Loads the page again. */
@@ -254,6 +270,16 @@ public final class Page implements AutoCloseable {
      */
     public boolean canGoForward() {
         return canGoForward;
+    }
+
+    /**
+     * The page's history, as read from Chromium after each main-frame load end, committed navigation and title change.
+     *
+     * @return the history last read; {@link NavigationHistory.History#EMPTY} before the first read and after a read
+     *     that failed
+     */
+    public NavigationHistory.History history() {
+        return history;
     }
 
     /**
@@ -408,9 +434,9 @@ public final class Page implements AutoCloseable {
 
     /**
      * Tells {@code listener} each time Jasper, not the page's document, sends the page elsewhere: {@link #load}, or a
-     * {@link #back} or {@link #forward} the page's history allows, as the user's address field, Web menu and mouse buttons
-     * do. Chromium puts such a
-     * page in a window group of its own, apart from its opener and its popups.
+     * {@link #back}, {@link #forward} or {@link #goToHistoryEntry} the page's history allows, as the user's address field,
+     * Web menu, toolbar and mouse buttons do. Chromium puts such a page in a window group of its own, apart from its
+     * opener and its popups.
      *
      * @param listener told on the UI thread, before the page goes
      * @return the registration; the page's close ends it
@@ -517,6 +543,7 @@ public final class Page implements AutoCloseable {
         address = url;
         changed.run();
         for (Consumer<String> listener : addressChanges) listener.accept(url);
+        readHistory();
     }
 
     /** The page's title changed. */
@@ -524,6 +551,38 @@ public final class Page implements AutoCloseable {
         if (closed) return;
         title = value == null ? "" : value;
         changed.run();
+        readHistory();
+    }
+
+    /** The main frame finished loading. */
+    void loadEnded() {
+        if (!closed) readHistory();
+    }
+
+    /**
+     * Reads the page's history again, as it may have changed: at once, or once the read that runs ends, so that one read
+     * runs at a time however often the page changes.
+     */
+    private void readHistory() {
+        if (!ready || closed) return;
+        if (readingHistory) {
+            historyStale = true;
+            return;
+        }
+        readingHistory = true;
+        historyStale = false;
+        NavigationHistory.read(browser).thenAccept(read -> EventQueue.invokeLater(() -> historyRead(read)));
+    }
+
+    /** A read of the page's history gave {@code read}: the page's history from now on, and again if it changed since. */
+    void historyRead(NavigationHistory.History read) {
+        readingHistory = false;
+        if (closed) return;
+        if (!read.equals(history)) {
+            history = read;
+            changed.run();
+        }
+        if (historyStale) readHistory();
     }
 
     /** The page started or stopped loading, and where it can go changed. */

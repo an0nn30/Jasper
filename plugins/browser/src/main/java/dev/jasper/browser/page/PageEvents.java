@@ -151,7 +151,7 @@ public final class PageEvents {
         }
     }
 
-    /** Whether the page loads and where it can go, and each main-frame load's start. */
+    /** Whether the page loads and where it can go, and each main-frame load's start and end. */
     private static final class Load extends CefLoadHandlerAdapter {
         @Override public void onLoadingStateChange(CefBrowser browser, boolean loading, boolean canGoBack, boolean canGoForward) {
             later(browser, page -> page.loadingChanged(loading, canGoBack, canGoForward));
@@ -170,6 +170,10 @@ public final class PageEvents {
             }
             String url = frame.getURL();
             later(browser, page -> page.loadStarted(url));
+        }
+
+        @Override public void onLoadEnd(CefBrowser browser, CefFrame frame, int httpStatusCode) {
+            if (frame != null && frame.isMain()) later(browser, Page::loadEnded);
         }
     }
 }

@@ -1,17 +1,22 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.page.NavigationHistory.Entry;
+import dev.jasper.browser.page.NavigationHistory.History;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
+import dev.jasper.sdk.testing.FakeKit;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.ContentPresentation;
+import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.UiEvent;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -150,6 +155,45 @@ class BrowserItemTest {
             assertThat(page.favicon()).isEmpty();
             assertThat(host.contentPresentation(item.tab()).image()).as("a new document").isEmpty();
             assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingImage()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Spec section 6: the item's Back and Forward hold its page's history as last read, and choosing an entry sends the
+     * page there as Jasper's own navigation (4a's R41 and R42); an entry the history no longer has does nothing.
+     */
+    @Test void backAndForwardHoldThePagesHistoryAndAChosenEntrySendsThePageThere() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var items = items(host, page -> { });
+            var item = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            Page page = item.page();
+            assertThat(Views.button(view, BrowserToolbar.BACK).holdMenu()).as("nothing read yet").isEmpty();
+            var history = new History(1, List.of(new Entry(4, "https://example.org/", "Example Org"),
+                new Entry(6, "https://example.com/", "Example Domain"), new Entry(9, "https://ada:secret@example.net/", "")));
+            PageTestAccess.loadingChanged(page, false, true, true);
+            PageTestAccess.historyRead(page, history);
+            assertThat(Views.button(view, BrowserToolbar.BACK).holdMenu()).extracting(MenuItem::label).containsExactly("Example Org");
+            assertThat(Views.button(view, BrowserToolbar.FORWARD).holdMenu()).extracting(MenuItem::label)
+                .containsExactly("https://example.net/");
+            var navigations = new AtomicInteger();
+            page.onNavigate(navigations::incrementAndGet);
+            String back = Views.button(view, BrowserToolbar.BACK).holdMenu().getFirst().id();
+            view.choose(BrowserToolbar.BACK, back);
+            assertThat(navigations).as("no browser yet").hasValue(0);
+
+            PageTestAccess.readyWithoutBrowser(page);
+            PageTestAccess.historyRead(page, new History(0, history.entries().subList(1, 3)));
+            assertThat(Views.button(view, BrowserToolbar.BACK).holdMenu()).isEmpty();
+            view.emit(new UiEvent.Action(back));
+            assertThat(navigations).as("an entry the history no longer has").hasValue(0);
+            var kit = (FakeKit) items.context().kit();
+            assertThat(kit.failures()).isEmpty();
+            view.choose(BrowserToolbar.FORWARD, Views.button(view, BrowserToolbar.FORWARD).holdMenu().getFirst().id());
+            assertThat(navigations).as("told before the page goes").hasValue(1);
+            // The page here has no browser, so going there fails once the page has told its listeners.
+            assertThat(kit.failures()).hasSize(1);
             assertThat(host.failures()).isEmpty();
         } });
     }

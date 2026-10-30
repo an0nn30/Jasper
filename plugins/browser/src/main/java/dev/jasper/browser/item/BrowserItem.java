@@ -3,6 +3,7 @@ package dev.jasper.browser.item;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.DialogPlace;
 import dev.jasper.browser.page.NavigationButton;
+import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.sdk.RestoreState;
@@ -39,8 +40,9 @@ import javax.swing.JComponent;
  * address, which the address field shows too, each without a user name or password. The icon, in the tab and at the
  * field's left, is the page's favicon once the page has loaded, Jasper's own icon on Jasper's {@code jasper-about:}
  * pages, and the globe while the page loads and whenever it has no favicon (spec sections 5 and 6). Its content
- * commands {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and the mouse's back and forward
- * buttons over the page go back and forward. It saves its URL and target with Jasper's workspace
+ * commands {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, the mouse's back and forward
+ * buttons over the page go back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry
+ * of the page's history. It saves its URL and target with Jasper's workspace
  * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
@@ -349,7 +351,8 @@ public final class BrowserItem implements AutoCloseable {
                 endWait();
                 page.focus();
             }
-            default -> { }
+            // An entry of Back's or Forward's hold menu.
+            default -> NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
         }
     }
 
@@ -380,7 +383,8 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     private ViewSpec spec() {
-        Nodes.Node bar = toolbar.node(shown(page.address()), page.loading(), page.canGoBack(), page.canGoForward(), icon());
+        Nodes.Node bar = toolbar.node(shown(page.address()), page.loading(), page.canGoBack(), page.canGoForward(), icon(),
+            page.history());
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,
