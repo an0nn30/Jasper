@@ -59,18 +59,21 @@ public final class BrowserItems {
      * Opens a saved item again, as Jasper restores its windows: at once, in a new tab of {@code window} (where Jasper
      * then puts it as it was saved), at its saved address, for its saved OSC 8 target. An item that saved no address, or
      * one the address field would not load, comes back at {@code start}; a target WebLink would refuse is dropped. Its
-     * page loads, and Chromium starts, the first time it shows. It asks the user nothing.
+     * page loads, and Chromium starts, the first time it shows; with {@code wait}, only once the user loads it. It asks
+     * the user nothing.
      *
      * @param saved the item's saved restore state
      * @param start the start page
      * @param window the window being restored
+     * @param wait whether the item waits to be loaded, as after a run that ended while Chromium ran
      * @return the item
      */
-    public BrowserItem restore(RestoreState saved, URI start, WindowOwner window) {
+    public BrowserItem restore(RestoreState saved, URI start, WindowOwner window, boolean wait) {
         Objects.requireNonNull(saved, "saved");
         Objects.requireNonNull(start, "start");
         Objects.requireNonNull(window, "window");
-        return open(BrowserRestore.url(saved).orElse(start), TabPlacement.NEW_TAB, BrowserRestore.target(saved), Optional.of(window));
+        return BrowserItem.open(this, BrowserRestore.url(saved).orElse(start), TabPlacement.NEW_TAB, BrowserRestore.target(saved),
+            Optional.of(window), wait);
     }
 
     /**

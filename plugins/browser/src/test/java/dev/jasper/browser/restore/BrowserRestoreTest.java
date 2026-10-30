@@ -160,6 +160,7 @@ class BrowserRestoreTest {
             assertThat(host.contentPresentation(item.tab()).location()).isEqualTo(EXAMPLE.toString());
             assertThat(host.restoreState(tab.get())).as("never shown, it saves the same state again").contains(saved);
             assertThat(ItemTestAccess.pageAsked(item)).as("restored, not shown").isFalse();
+            assertThat(ItemTestAccess.waiting(item)).isFalse();
             assertThat(asked).isEmpty();
             var parent = new JPanel();
             parent.addNotify();
@@ -170,6 +171,41 @@ class BrowserRestoreTest {
             } finally {
                 parent.removeNotify();
             }
+            assertThat(host.declinedRestores()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * After a run that ended while Chromium ran, every item the restorer opens waits: it comes back as saved, and
+     * showing it asks for no page until the user loads it.
+     */
+    @Test void restoredItemsWaitAfterARunThatEndedWhileChromiumRan() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var asked = new java.util.ArrayList<Page>();
+            var items = restoring(host, asked::add, true);
+            UUID window = host.addTerminalWindow();
+            RestoreState saved = BrowserRestore.state(EXAMPLE, Optional.of("docs")).orElseThrow();
+            Optional<UUID> tab = host.restoreTab(ID, window, "Docs", saved);
+            assertThat(tab).isPresent();
+            assertThat(host.restoreTab(ID, window, "Saved", saved(Map.of()))).isPresent();
+            assertThat(items.items()).hasSize(2).allSatisfy(item -> assertThat(ItemTestAccess.waiting(item)).isTrue());
+            BrowserItem item = items.items().getFirst();
+            assertThat(item.url()).isEqualTo(EXAMPLE);
+            assertThat(item.target()).contains("docs");
+            assertThat(host.restoreState(tab.get())).as("it saves what it was saved as").contains(saved);
+            var parent = new JPanel();
+            parent.addNotify();
+            try {
+                parent.add(ItemTestAccess.pageView(item));
+                assertThat(ItemTestAccess.pageAsked(item)).as("shown, waiting").isFalse();
+                assertThat(asked).isEmpty();
+                item.reload();
+                assertThat(asked).as("loaded").containsExactly(ItemTestAccess.page(item));
+            } finally {
+                parent.removeNotify();
+            }
+            assertThat(ItemTestAccess.waiting(items.items().getLast())).as("the other still waits").isTrue();
             assertThat(host.declinedRestores()).isEmpty();
             assertThat(host.failures()).isEmpty();
         } });
@@ -275,13 +311,18 @@ class BrowserRestoreTest {
      * them, with {@link #START} as the start page. UI thread.
      */
     private static BrowserItems restoring(FakePluginHost host, Consumer<Page> start) {
+        return restoring(host, start, false);
+    }
+
+    /** As {@link #restoring(FakePluginHost, Consumer)}; with {@code wait}, as after a run that ended while Chromium ran. */
+    private static BrowserItems restoring(FakePluginHost host, Consumer<Page> start, boolean wait) {
         var context = new AtomicReference<PluginContext>();
         var items = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), started -> {
             context.set(started);
             items.set(new BrowserItems(started, start));
             started.windows().restorer(BrowserRestore.KIND, request -> {
-                items.get().restore(request.state(), START, request.window());
+                items.get().restore(request.state(), START, request.window(), wait);
                 return Optional.empty();
             });
         });

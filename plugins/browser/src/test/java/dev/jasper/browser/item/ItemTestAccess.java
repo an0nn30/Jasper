@@ -28,6 +28,16 @@ public final class ItemTestAccess {
     }
 
     /**
+     * Whether the item waits to be loaded, as a restored item does after a run that ended while Chromium ran.
+     *
+     * @param item a browser item
+     * @return whether it waits
+     */
+    public static boolean waiting(BrowserItem item) {
+        return item.waiting();
+    }
+
+    /**
      * The item's page canvas, which shows the item when added to a showing parent.
      *
      * @param item a browser item

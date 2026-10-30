@@ -18,6 +18,11 @@ is a dated record of one batch the user ran.
   keys, terminal link clicks and the "Open in Jasper?" prompt, OSC 8 targets, link gestures and popups, the opener
   bridge, page dialogs, closing, restore and local web files). The user did not report the ten lines one by one.
 
+### Pending GUI checks
+
+- After Jasper ends while a page is open (for example force-quit), the next launch shows restored browser tabs waiting
+  with Load Page; Load Page loads the page; the launch after that loads them normally.
+
 ### Batch 2: memory (not run)
 
 ### Batch 3: the AOT cache (not run)

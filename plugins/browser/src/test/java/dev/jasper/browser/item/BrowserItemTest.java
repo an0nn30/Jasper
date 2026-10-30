@@ -6,7 +6,9 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.ContentPresentation;
+import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.TabPlacement;
+import dev.jasper.sdk.ui.UiEvent;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Optional;
@@ -294,6 +296,157 @@ class BrowserItemTest {
             assertThat(host.contentTabs()).isEmpty();
             assertThat(host.failures()).isEmpty();
         } });
+    }
+
+    /**
+     * After a run that ended while Chromium ran, a restored item waits: in place of its page's canvas it says why, with
+     * Load Page, and showing it asks for no page. Its toolbar shows, and its tab saves, the saved address, and its tab's
+     * focus goes to Load Page.
+     */
+    @Test void aWaitingItemSaysWhyInPlaceOfItsPageAndShowingItAsksForNoPage() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var asked = new ArrayList<Page>();
+            var item = waiting(items(host, asked::add), EXAMPLE);
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            var root = (Nodes.Split) view.spec().root();
+            assertThat(root.children()).extracting(Nodes.Node::id).containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserItem.WAITING);
+            assertThat(root.children().get(1).state().visible()).as("the page's canvas").isFalse();
+            assertThat(root.children().getLast()).isInstanceOfSatisfying(Nodes.Empty.class, placeholder -> {
+                assertThat(placeholder.state().visible()).isTrue();
+                assertThat(placeholder.title()).isEqualTo("Jasper closed while this page was open.");
+                assertThat(placeholder.actions()).singleElement().isInstanceOfSatisfying(Nodes.Button.class, button -> {
+                    assertThat(button.label()).isEqualTo("Load Page");
+                    assertThat(button.kind()).isEqualTo(Nodes.ButtonKind.PRIMARY);
+                    assertThat(button.action()).isEqualTo(BrowserItem.LOAD_PAGE);
+                    assertThat(button.state().visible()).isTrue();
+                });
+            });
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).value()).isEqualTo("https://example.com");
+            assertThat(host.restoreState(item.tab()).orElseThrow().values()).containsEntry("url", "https://example.com");
+            var parent = show(item);
+            try {
+                assertThat(item.pageView().isShowing()).isTrue();
+                assertThat(item.pageAsked()).as("shown, waiting").isFalse();
+                assertThat(asked).isEmpty();
+                item.goBack();
+                item.goForward();
+                item.stop();
+                assertThat(item.waiting()).as("Back and Forward have no history, and Stop nothing to stop").isTrue();
+            } finally {
+                parent.removeNotify();
+            }
+            item.tab().select();
+            assertThat(view.focused()).contains(BrowserItem.LOAD_PAGE);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    @Test void loadPageEndsTheWaitAndThePageShowsAndIsAskedForOnce() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var asked = new ArrayList<Page>();
+            var item = waiting(items(host, asked::add), EXAMPLE);
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            var parent = show(item);
+            try {
+                view.emit(new UiEvent.Action(BrowserItem.LOAD_PAGE));
+                assertThat(item.waiting()).isFalse();
+                assertThat(asked).containsExactly(item.page());
+                var root = (Nodes.Split) view.spec().root();
+                assertThat(root.children()).extracting(Nodes.Node::id).containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE);
+                assertThat(root.children().getLast().state().visible()).isTrue();
+                assertThat(item.page().address()).as("what it loads").isEqualTo("https://example.com");
+                parent.remove(item.pageView());
+                parent.add(item.pageView());
+                assertThat(asked).as("once").hasSize(1);
+                item.tab().select();
+                assertThat(view.focused()).as("the page has the focus now").isEmpty();
+            } finally {
+                parent.removeNotify();
+            }
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Every load the user asks for in a waiting item ends the wait: Enter in its address field, Reload and a load. */
+    @Test void enterReloadAndALoadEndTheWaitToo() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var asked = new ArrayList<Page>();
+            var items = items(host, asked::add);
+            var typed = waiting(items, EXAMPLE);
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            view.type(BrowserToolbar.ADDRESS, "example.org/typed");
+            view.emit(new UiEvent.Action(BrowserToolbar.ENTER));
+            assertThat(typed.waiting()).as("Enter").isFalse();
+            assertThat(typed.page().address()).isEqualTo("https://example.org/typed");
+            assertThat(host.restoreState(typed.tab()).orElseThrow().values()).as("what it will load")
+                .containsEntry("url", "https://example.org/typed");
+
+            var reloaded = waiting(items, URI.create("https://example.net/saved"));
+            host.contentView(ID, "example.net").orElseThrow().emit(new UiEvent.Action(BrowserToolbar.RELOAD));
+            assertThat(reloaded.waiting()).as("Reload").isFalse();
+            assertThat(reloaded.page().address()).isEqualTo("https://example.net/saved");
+
+            var menu = waiting(items, URI.create("https://example.edu/"));
+            menu.reload();
+            assertThat(menu.waiting()).as("the Web menu's Reload").isFalse();
+
+            var routed = waiting(items, URI.create("https://example.info/"));
+            URI link = URI.create("https://example.info/linked");
+            routed.load(link);
+            assertThat(routed.waiting()).as("a load").isFalse();
+            assertThat(routed.page().address()).isEqualTo(link.toString());
+            assertThat(host.restoreState(routed.tab()).orElseThrow().values()).containsEntry("url", link.toString());
+
+            assertThat(asked).as("none of them has shown").isEmpty();
+            var parent = show(routed);
+            try {
+                assertThat(asked).as("it loads the first time it shows").containsExactly(routed.page());
+            } finally {
+                parent.removeNotify();
+            }
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    @Test void eachWaitingItemWaitsUntilItIsLoadedAndAnItemOpenedOtherwiseNeverWaits() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var asked = new ArrayList<Page>();
+            var items = items(host, asked::add);
+            var first = waiting(items, EXAMPLE);
+            var second = waiting(items, URI.create("https://example.org"));
+            host.contentView(ID, "example.com").orElseThrow().emit(new UiEvent.Action(BrowserItem.LOAD_PAGE));
+            assertThat(first.waiting()).isFalse();
+            assertThat(second.waiting()).isTrue();
+            assertThat(Views.node(host.contentView(ID, "example.org").orElseThrow().spec().root(), BrowserItem.WAITING)).isNotNull();
+            var opened = items.open(URI.create("https://example.net"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            assertThat(opened.waiting()).isFalse();
+            assertThat(Views.node(host.contentView(ID, "example.net").orElseThrow().spec().root(), BrowserItem.WAITING)).isNull();
+            var parent = show(second);
+            try {
+                assertThat(asked).as("the second still waits").isEmpty();
+            } finally {
+                parent.removeNotify();
+            }
+            first.close();
+            second.close();
+            assertThat(items.items()).containsExactly(opened);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** A waiting item at {@code url}, as a restore after a run that ended while Chromium ran opens it. UI thread. */
+    private static BrowserItem waiting(BrowserItems items, URI url) {
+        var item = BrowserItem.open(items, url, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), true);
+        assertThat(item.waiting()).isTrue();
+        return item;
+    }
+
+    /** Shows {@code item}'s page canvas in a lightweight parent given a peer, until the parent's {@code removeNotify}. */
+    private static JPanel show(BrowserItem item) {
+        var parent = new JPanel();
+        parent.addNotify();
+        parent.add(item.pageView());
+        return parent;
     }
 
     /** The items of a started stand-in plugin whose pages {@code start} makes. UI thread. */

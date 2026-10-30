@@ -34,10 +34,15 @@ import javax.swing.JComponent;
  * address, which the address field shows too, each without a user name or password. Its content commands {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and the mouse's
  * back and forward buttons over the page go back and forward. It saves its URL and target with Jasper's workspace
  * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
- * UI thread.
+ * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
+ * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
+ * address field, Reload or {@link #load}. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
+    /** A waiting item's placeholder, and its Load Page button and the action it reports. */
+    static final String WAITING = "browser.waiting", LOAD_PAGE = "browser.waiting.load";
+    private static final ControlState HIDDEN = new ControlState(false, true, false, "");
     // Each item's own: reopening a content key selects the tab that has it.
     private static final String KEY = "browser:";
     // The longest address the tab's location and status show; a data: address can run to megabytes.
@@ -50,12 +55,13 @@ public final class BrowserItem implements AutoCloseable {
     private ContentTab tab;
     private URI url;
     private String title;
-    private boolean asked, closed;
+    private boolean waiting, asked, closed;
 
-    private BrowserItem(BrowserItems items, URI url, Optional<String> target) {
+    private BrowserItem(BrowserItems items, URI url, Optional<String> target, boolean waiting) {
         this.items = items;
         this.target = target;
         this.url = url;
+        this.waiting = waiting;
         page = new Page(url, this::changed);
         page.onNavigationButton(this::navigationButton);
         page.onOpenItem(this::openItem);
@@ -82,12 +88,18 @@ public final class BrowserItem implements AutoCloseable {
      */
     public static BrowserItem open(BrowserItems items, URI url, TabPlacement placement, Optional<String> target,
                                    Optional<WindowOwner> window) {
+        return open(items, url, placement, target, window, false);
+    }
+
+    /** As {@link #open(BrowserItems, URI, TabPlacement, Optional, Optional)}; with {@code waiting}, the item waits. */
+    static BrowserItem open(BrowserItems items, URI url, TabPlacement placement, Optional<String> target,
+                            Optional<WindowOwner> window, boolean waiting) {
         Objects.requireNonNull(items, "items");
         Objects.requireNonNull(url, "url");
         Objects.requireNonNull(placement, "placement");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(window, "window");
-        var item = new BrowserItem(items, url, target);
+        var item = new BrowserItem(items, url, target, waiting);
         item.attach(placement, window);
         return item;
     }
@@ -100,7 +112,7 @@ public final class BrowserItem implements AutoCloseable {
             view.close();
             throw failure;
         }
-        tab.setFocusTarget(page::focus);
+        tab.setFocusTarget(this::focusContent);
         // No key of their own: Jasper's Copy and Paste run them, on the keys the keymap gives those.
         tab.setCommands(List.of(new ContentCommand("copy", "Copy", null, true, this::copy),
             new ContentCommand("paste", "Paste", null, true, this::paste)));
@@ -140,7 +152,7 @@ public final class BrowserItem implements AutoCloseable {
 
     /**
      * Loads {@code url} in the item; the address field gives up what was typed in it. Before the item first shows, it is
-     * also what the item saves, as it is what the item will load.
+     * also what the item saves, as it is what the item will load. A waiting item stops waiting.
      *
      * @param url the address
      */
@@ -150,6 +162,7 @@ public final class BrowserItem implements AutoCloseable {
         toolbar.restore();
         page.load(url);
         if (!asked && tab != null) tab.setRestore(restore(url));
+        endWait();
     }
 
     /** Goes back in the page's history. */
@@ -162,9 +175,11 @@ public final class BrowserItem implements AutoCloseable {
         if (!closed) page.forward();
     }
 
-    /** Loads the page again. */
+    /** Loads the page again; a waiting item stops waiting and loads its address. */
     public void reload() {
-        if (!closed) page.reload();
+        if (closed) return;
+        if (waiting) endWait();
+        else page.reload();
     }
 
     /** Stops the page loading. */
@@ -200,6 +215,11 @@ public final class BrowserItem implements AutoCloseable {
         return asked;
     }
 
+    /** Whether the item waits to be loaded. */
+    boolean waiting() {
+        return waiting;
+    }
+
     /** The page's canvas. */
     JComponent pageView() {
         return page.view();
@@ -211,9 +231,26 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     private void shown() {
-        if (asked || closed) return;
+        if (asked || closed || waiting) return;
         asked = true;
         items.start(page);
+    }
+
+    /**
+     * The wait ends: the canvas takes the placeholder's place, and the page is asked for once the canvas shows, at once
+     * when it shows now.
+     */
+    private void endWait() {
+        if (!waiting || closed) return;
+        waiting = false;
+        render();
+        if (page.view().isShowing()) shown();
+    }
+
+    /** What the tab's focus goes to: Load Page while the item waits, else the page. */
+    private void focusContent() {
+        if (waiting && !closed) view.focus(LOAD_PAGE);
+        else page.focus();
     }
 
     private void closed() {
@@ -291,7 +328,7 @@ public final class BrowserItem implements AutoCloseable {
             case BrowserToolbar.RELOAD -> reload();
             case BrowserToolbar.STOP -> stop();
             case BrowserToolbar.ENTER -> toolbar.enter(page.address()).ifPresent(address -> {
-                page.load(address);
+                load(address);
                 page.focus();
             });
             case BrowserToolbar.ESCAPE -> {
@@ -300,6 +337,10 @@ public final class BrowserItem implements AutoCloseable {
                 view.selectAll(BrowserToolbar.ADDRESS);
             }
             case BrowserToolbar.SETTINGS -> items.showSettings();
+            case LOAD_PAGE -> {
+                endWait();
+                page.focus();
+            }
             default -> { }
         }
     }
@@ -318,9 +359,18 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     private ViewSpec spec() {
-        return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT, List.of(
-            toolbar.node(shown(page.address()), page.loading(), page.canGoBack(), page.canGoForward()),
-            new Nodes.Custom(PAGE, ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page"))));
+        Nodes.Node bar = toolbar.node(shown(page.address()), page.loading(), page.canGoBack(), page.canGoForward());
+        // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
+        Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
+        return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,
+            waiting ? List.of(bar, canvas, placeholder()) : List.of(bar, canvas)));
+    }
+
+    /** What a waiting item shows in place of its page: why it waits, and Load Page. */
+    private static Nodes.Empty placeholder() {
+        return new Nodes.Empty(WAITING, ControlState.READY, new Nodes.Icon(WAITING + ".icon", ControlState.READY, BrowserItems.GLOBE,
+            Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Web page"), "Jasper closed while this page was open.", "",
+            List.of(new Nodes.Button(LOAD_PAGE, ControlState.READY, "Load Page", "", Nodes.ButtonKind.PRIMARY, LOAD_PAGE, "")));
     }
 
     private static Optional<String> host(String address) {

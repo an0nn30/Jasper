@@ -58,13 +58,18 @@ Deferred minors from the final review: sub-frame popups share the page's activat
 background opener lands after the shown tab; hidden pages keep a full-resolution frame in memory (for Task 13's memory
 check); `NEXT_TAB` was inserted mid-enum.
 
-**Release blocker, unverified (F5, R48):** Chromium runs in Jasper's own process with its sandbox on (`no_sandbox =
-false`, and JBR's `JCefAppConfig` adds no `--no-sandbox`). On Linux distributions that restrict unprivileged user
-namespaces (Ubuntu 23.10 and later, 24.04 included, through AppArmor), with no setuid `chrome-sandbox`, Chromium's
-zygote host may stop on `LOG(FATAL)` "No usable sandbox!" when the first browser item shows, which would end Jasper and
-its terminals. Verify it on Linux before release. The mitigations are a setuid `chrome-sandbox` shipped in the Linux
-packages, or a no-sandbox fallback only where Chromium would otherwise abort. On Windows, `java.exe` does not link
-`cef_sandbox`, so the sandbox is likely not in effect there (unverified).
+**Chromium's sandbox is off (the user's choice, 2026-10-30, "Turn the sandbox off now").** In the first macOS GUI check
+Chromium's sandboxed GPU and network helpers could not open the Chromium framework under the JBR, and Chromium stopped on
+`FATAL` "GPU process isn't usable", which ended Jasper. `ChromiumOptions` now sets `no_sandbox = true`, as JetBrains
+configures JCEF (`bc6af7635`). The trade-off is that a page exploiting a Chromium bug runs with the user's rights. This
+also removes the Linux zygote risk (F5). Turning the sandbox back on is a follow-up.
+
+**After a crash, restored pages wait to be loaded (2026-10-30, after the first macOS GUI check).** A Chromium crash ends
+Jasper, and each relaunch's restored browser tab started Chromium again. Chromium now writes `chromium.running` in the
+plugin's data directory when it runs and deletes it when it has ended (`engine.RunMarker`); the plugin's start reads and
+deletes it, and when it was there, that launch's restored items show "Jasper closed while this page was open." with
+Load Page instead of loading. Load Page, Enter in the address field, Reload and a routed link end the wait (the
+controller's ruling); items opened any other way load as usual.
 
 The controller's rulings, one line each (there is no R3 or R4):
 - R0: work on `claude/browser-core-88616a`, not `claude/browser-core`.
@@ -125,7 +130,7 @@ The controller's rulings, one line each (there is no R3 or R4):
   shows).
 - R47: Task 12's fix round also took its review's six documentation minors.
 - R48: the final fix wave fixes F1-F4 and the same-wave minors; the Linux sandbox risk (F5) is recorded, and the sandbox
-  stays on.
+  stays on (until the user turned it off on 2026-10-30).
 - Task 2: `sdkReference` runs before `check`, as one invocation cannot run both.
 
 Other deviations from the plan's text, one line each (the plan's banner groups all of them by task):
@@ -183,9 +188,7 @@ stacking, long messages and closing the window or quitting past one; a tab opene
 Jasper, its toggle, the prompt with Settings or a native dialog open; the saved address after a failed load and the
 welcome page's address form; a drag that starts in a page; a page's own `window.close()` closing its pane; a link and New
 Browser Tab after a failed start), the memory run (`run-macos.sh memory`: RSS unused, after one page, two minutes after
-closing) and the AOT check (a trained cache holds no `org.cef` class); Windows and Linux are not run. On Linux, the
-first browser item must show, with Jasper staying up, on Ubuntu 24.04 with unprivileged user namespaces restricted and
-no setuid `chrome-sandbox` (F5).
+closing) and the AOT check (a trained cache holds no `org.cef` class); Windows and Linux are not run.
 
 **PR #3 Windows check sharding — 2026-10-29: REVIEW PENDING.** App and other module checks run on isolated Windows runners with one Gradle worker each; both must pass. Each verifies its task graph against the original Check graph and records the graphs. Local graph and failure fixtures pass; hosted Windows validation remains pending. The existing watchdog limits remain. This extends Task 10 CI execution.
 

@@ -28,6 +28,9 @@ import org.cef.CefClient;
  *
  * <p>Making, closing or asking the state of a Chromium that never started loads no Chromium class: every JCEF call is in
  * {@link ChromiumApp}, which only the start loads, so the plugin's start costs nothing until a page is first shown.
+ *
+ * <p>While it runs, from before its client reaches any page until it has ended, its {@link RunMarker} marks it in the data
+ * directory.
  */
 public final class Chromium implements AutoCloseable {
     /** Where Chromium's life stands. */
@@ -56,6 +59,7 @@ public final class Chromium implements AutoCloseable {
     private final Consumer<Throwable> startFailed;
     private final Duration startLimit;
     private final ChromiumLife<CefClient> life;
+    private final RunMarker marker;
     private final CountDownLatch ended = new CountDownLatch(1);
     private final AtomicBoolean warned = new AtomicBoolean();
     // Set by the worker before Chromium can initialize, so before any dispose or client is decided.
@@ -70,7 +74,7 @@ public final class Chromium implements AutoCloseable {
     /**
      * A Chromium that starts nothing until {@link #client()} is first called.
      *
-     * @param dataDir the plugin's data directory, which keeps Chromium's cookies, cache and log
+     * @param dataDir the plugin's data directory, which keeps Chromium's cookies, cache and log, and its run marker
      * @param worker a platform thread of the plugin's own, which runs the start; never the UI thread, which the start
      *     needs free, or a virtual thread
      * @param about the pages {@code jasper-about:} serves
@@ -88,6 +92,7 @@ public final class Chromium implements AutoCloseable {
         this.startFailed = Objects.requireNonNull(startFailed, "startFailed");
         this.startLimit = Objects.requireNonNull(startLimit, "startLimit");
         life = new ChromiumLife<>(Objects.requireNonNull(process, "process"));
+        marker = new RunMarker(dataDir);
     }
 
     /**
@@ -196,11 +201,18 @@ public final class Chromium implements AutoCloseable {
             switch (step) {
                 case Step.Start<CefClient> start -> handOver();
                 case Step.CreateClient<CefClient> create -> EventQueue.invokeLater(() -> app.createClient(this));
-                case Step.Complete<CefClient> done -> complete(done);
+                case Step.Complete<CefClient> done -> {
+                    // Chromium runs from now on: marked before the client reaches any page.
+                    marker.running();
+                    complete(done);
+                }
                 case Step.Fail<CefClient> fail -> fail.client().completeExceptionally(fail.cause());
                 case Step.Tell<CefClient> tell -> EventQueue.invokeLater(() -> startFailed.accept(tell.cause()));
                 case Step.Dispose<CefClient> dispose -> onUiThread(this::dispose);
-                case Step.End<CefClient> end -> ended.countDown();
+                case Step.End<CefClient> end -> {
+                    marker.ended();
+                    ended.countDown();
+                }
                 case Step.Await<CefClient> await -> {
                     if (EventQueue.isDispatchThread()) Thread.ofPlatform().daemon().name("jasper-browser-chromium-stop").start(this::awaitEnd);
                 }

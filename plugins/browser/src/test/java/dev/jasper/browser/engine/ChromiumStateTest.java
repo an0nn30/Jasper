@@ -1,6 +1,7 @@
 package dev.jasper.browser.engine;
 
 import java.awt.EventQueue;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Queue;
@@ -150,6 +151,66 @@ class ChromiumStateTest {
         assertThat(ran).containsExactly("display", "links", "late");
         assertThat(starts).as("giving installers starts nothing").isEmpty();
         chromium.close();
+    }
+
+    /**
+     * A Chromium that runs marks it in its data directory before its client reaches any page, and the mark goes once
+     * Chromium has ended. No client can be made here, so the made client is a stand-in null.
+     */
+    @Test void aRunningChromiumIsMarkedUntilItHasEnded() throws Exception {
+        Chromium chromium = chromium(recording, LIMIT);
+        Path marker = data.resolve("chromium.running");
+        var markedWhenReady = new CompletableFuture<Boolean>();
+        var client = chromium.client();
+        client.whenComplete((made, failure) -> markedWhenReady.complete(Files.exists(marker)));
+        assertThat(marker).as("starting").doesNotExist();
+        EventQueue.invokeAndWait(() -> chromium.clientCreated(null));
+        assertThat(chromium.state()).isEqualTo(Chromium.State.RUNNING);
+        assertThat(client).isCompleted();
+        assertThat(markedWhenReady.get(5, TimeUnit.SECONDS)).as("marked before the client's future completes").isTrue();
+        assertThat(marker).isRegularFile().isEmptyFile();
+        chromium.close();
+        assertThat(chromium.state()).isEqualTo(Chromium.State.STOPPED);
+        assertThat(marker).as("ended").doesNotExist();
+    }
+
+    @Test void aChromiumThatNeverStartsOrWhoseStartIsRefusedLeavesNoMarker() throws Exception {
+        Path marker = data.resolve("chromium.running");
+        chromium(recording, LIMIT).close();
+        assertThat(marker).as("never started").doesNotExist();
+        Chromium refused = chromium(task -> { throw new RejectedExecutionException("The worker stopped"); }, LIMIT);
+        assertThat(refused.client()).isCompletedExceptionally();
+        assertThat(refused.state()).isEqualTo(Chromium.State.FAILED);
+        assertThat(marker).as("its start failed").doesNotExist();
+        refused.close();
+        assertThat(marker).doesNotExist();
+    }
+
+    @Test void aClientMadeAfterTheStartFailedLeavesNoMarker() throws Exception {
+        Path marker = data.resolve("chromium.running");
+        Chromium slow = chromium(recording, Duration.ofMillis(50));
+        slow.client();
+        assertThat(told()).isInstanceOf(TimeoutException.class);
+        EventQueue.invokeAndWait(() -> slow.clientCreated(null));
+        assertThat(slow.state()).isEqualTo(Chromium.State.FAILED);
+        assertThat(marker).doesNotExist();
+        slow.close();
+        assertThat(marker).doesNotExist();
+    }
+
+    /** A marker that cannot be written fails neither the start nor the close. */
+    @Test void aMarkerThatCannotBeWrittenFailsNothing() throws Exception {
+        Path notADirectory = Files.createFile(data.resolve("file"));
+        Chromium chromium = new Chromium(notADirectory, recording, new AboutScheme(), cause -> tellings.incrementAndGet(), process, LIMIT);
+        var client = chromium.client();
+        EventQueue.invokeAndWait(() -> chromium.clientCreated(null));
+        assertThat(client).isCompleted();
+        assertThat(client.isCompletedExceptionally()).isFalse();
+        assertThat(chromium.state()).isEqualTo(Chromium.State.RUNNING);
+        chromium.close();
+        assertThat(chromium.state()).isEqualTo(Chromium.State.STOPPED);
+        flushUi();
+        assertThat(tellings).hasValue(0);
     }
 
     private Chromium chromium(Executor worker, Duration limit) {

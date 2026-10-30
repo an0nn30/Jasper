@@ -3,6 +3,7 @@ package dev.jasper.browser;
 import dev.jasper.browser.dialogs.PageDialogs;
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.engine.Chromium;
+import dev.jasper.browser.engine.RunMarker;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.links.PageNavigation;
@@ -18,6 +19,7 @@ import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.SplitItemSpec;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.TabPlacement;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -29,7 +31,7 @@ import java.util.concurrent.RejectedExecutionException;
  * item, the globe they show, the Web menu, Settings › Browser, the welcome page, the Browser as Jasper's web browser,
  * the terminal's Open URL in Split items and the restorer of saved browser items, and makes Chromium's engine, which
  * starts Chromium only when a browser item first shows, so starting the plugin, and restoring its items, loads no
- * Chromium class.
+ * Chromium class. After a run that ended while Chromium ran, the items it restores wait to be loaded.
  */
 public class BrowserPlugin implements Plugin {
     static final String NEW_TAB = "dev.jasper.browser.new_tab", NEW_WINDOW = "dev.jasper.browser.new_window";
@@ -45,11 +47,15 @@ public class BrowserPlugin implements Plugin {
 
     @Override public void start(PluginContext context) {
         this.context = context;
+        Path data = context.dataDirectory();
+        // Chromium runs in Jasper's process, so a fatal Chromium error ends Jasper while Chromium runs, which leaves its
+        // marker. Restored items then wait to be loaded, as loading them by themselves would start Chromium again.
+        boolean endedWhileRunning = RunMarker.clear(data);
         // Chromium starts on a platform thread of the plugin's own: its pre-initialisation needs the UI thread free, and
         // it must not hold one of the SDK's virtual threads. The executor makes no thread until a page asks for Chromium.
         worker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-browser-chromium").factory());
         var about = new AboutScheme();
-        chromium = new Chromium(context.dataDirectory(), worker, about, this::startFailed);
+        chromium = new Chromium(data, worker, about, this::startFailed);
         BrowserSettings.Declared settings = BrowserSettings.declare(context.settings());
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
         // it, as naming their types loads Chromium's classes.
@@ -79,9 +85,10 @@ public class BrowserPlugin implements Plugin {
         var role = new BrowserRole(context, items, settings, engine::state);
         context.platform().browser(role);
         WebAddressItems.register(context, role, settings);
-        // Spec section 16: a saved item comes back at once, and its page loads the first time it shows.
+        // Spec section 16: a saved item comes back at once, and its page loads the first time it shows, or, after a run
+        // that ended while Chromium ran, once the user loads it.
         context.windows().restorer(BrowserRestore.KIND, request -> {
-            items.restore(request.state(), settings.read().startAddress(), request.window());
+            items.restore(request.state(), settings.read().startAddress(), request.window(), endedWhileRunning);
             return Optional.empty();
         });
         running = true;

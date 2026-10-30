@@ -185,6 +185,15 @@ Chromium bug runs with the user's rights. This also removes the Linux zygote ris
 sandbox back on needs the framework readable from the sandbox, perhaps inside a packaged `Jasper.app`, and is a
 follow-up.
 
+- **After a crash, restored pages wait to be loaded (a post-plan fix after the first macOS GUI check):** Chromium's
+  crash ended Jasper, and each relaunch's restored browser tab started Chromium again, so the crash repeated. Chromium
+  now writes `chromium.running` in the plugin's data directory when it runs (before its client reaches any page) and
+  deletes it when it has ended (`engine.RunMarker`). The plugin's start reads and deletes it; when it was there, that
+  launch's restored items wait: in place of the page a `Nodes.Empty` says "Jasper closed while this page was open."
+  with a primary Load Page button, the page's slot stays in the view, hidden, and the tab's focus goes to Load Page.
+  The controller ruled that every load the user asks for ends the wait too: Enter in the address field, Reload, and
+  `BrowserItem.load` (a routed link for its OSC 8 target, Open in Jasper). Items opened any other way load as usual.
+
 Known gaps and follow-ups: macOS two-finger swipe (no JBR gesture API); drags that start in a page are cancelled (R33);
 links and popups at other schemes, such as `mailto:`, open nothing in pages (R36); nothing downloads (no download
 handler), so a link or response that downloads a file, and an Alt-click, which Chromium makes a download, do nothing,

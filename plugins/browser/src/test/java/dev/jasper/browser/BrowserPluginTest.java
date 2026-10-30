@@ -7,9 +7,12 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.WorkspacePalette;
 import java.awt.Color;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -17,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** The plugin's registrations and its part in Chromium's life, on the SDK's fake host; nothing here starts Chromium. */
@@ -141,11 +145,40 @@ class BrowserPluginTest {
             assertThat(host.contentPresentation(docs).location()).isEqualTo("https://example.com/docs");
             assertThat(host.contentPresentation(docs).icon()).isEqualTo(BrowserItems.GLOBE);
             assertThat(host.restoreState(docs)).contains(saved);
+            assertThat(waits(host, "example.com")).as("no run ended while Chromium ran: it loads the first time it shows").isFalse();
             assertThat(host.restoreTab(ID, window, "Data", new dev.jasper.sdk.RestoreState(BrowserRestore.KIND, Map.of()))).isPresent();
             assertThat(host.contentPresentation(host.contentTabs().getLast()).location()).as("the start page")
                 .isEqualTo("https://example.org");
             assertThat(host.contentTabs()).hasSize(2);
             assertThat(host.declinedRestores()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * A run that ended while Chromium ran left its marker in the plugin's data directory. The start deletes it, so only
+     * this launch's restored items wait; New Browser Tab, New Browser Window and the split item open items that do not.
+     */
+    @Test void afterARunThatEndedWhileChromiumRanThisLaunchsRestoredItemsWait(@TempDir Path root) throws Exception {
+        Path marker = Files.createDirectories(root.resolve(ID).resolve("data")).resolve("chromium.running");
+        Files.createFile(marker);
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost(root)) {
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            assertThat(marker).as("read once").doesNotExist();
+            for (String address : new String[] { "https://example.com/docs", "https://example.org/" })
+                assertThat(host.restoreTab(ID, window, "Saved", BrowserRestore.state(URI.create(address), Optional.empty()).orElseThrow())).isPresent();
+            assertThat(waits(host, "example.com")).isTrue();
+            assertThat(waits(host, "example.org")).isTrue();
+            assertThat(host.contentPresentation(host.contentTab(ID, "example.com").orElseThrow()).location())
+                .isEqualTo("https://example.com/docs");
+            for (String action : new String[] { BrowserPlugin.NEW_TAB, BrowserPlugin.NEW_WINDOW, BrowserPlugin.SPLIT.rightAction() }) {
+                assertThat(host.invoke(action, window, null)).as(action).isTrue();
+                assertThat(waits(host, "Web Browser")).as(action).isFalse();
+                host.contentTab(ID, "Web Browser").orElseThrow().close();
+            }
+            assertThat(waits(host, "example.org")).as("still waiting").isTrue();
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -161,6 +194,13 @@ class BrowserPluginTest {
             "--accent: #3366ff;");
         assertThat(html).doesNotContain("transition", "animation", "http:", "https:");
         assertThat(WelcomePage.render(palette, false)).contains("content=\"light\"");
+    }
+
+    /** Whether the browser item whose tab is called {@code title} shows the placeholder of an item that waits. UI thread. */
+    private static boolean waits(FakePluginHost host, String title) {
+        var root = (Nodes.Split) host.contentView(ID, title).orElseThrow().spec().root();
+        return root.children().stream().anyMatch(node -> node instanceof Nodes.Empty empty && empty.state().visible()
+            && empty.title().equals("Jasper closed while this page was open."));
     }
 
     @Test void theWelcomePageIsBuiltAgainAfterAThemeChange() throws Exception {
