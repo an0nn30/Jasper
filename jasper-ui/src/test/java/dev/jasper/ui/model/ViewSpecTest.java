@@ -80,6 +80,34 @@ class ViewSpecTest {
             assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.NUMBER, presentation, Optional.empty(), "network", "",
                 Optional.empty(), false)).withMessage("A stepper or slider takes no leading image or icon and no select-on-click");
     }
+    private static Field suggesting(FieldKind kind, List<Suggestion> suggestions, boolean loading) {
+        return new Field("f", ControlState.READY, kind, kind == FieldKind.NUMBER ? "1" : "", "", "Field", "",
+            kind == FieldKind.NUMBER ? Optional.of(new Numeric(0, 9, 1, 0)) : Optional.empty(), FieldPresentation.STANDARD, "", "", "", false,
+            Optional.empty(), "", "", Optional.empty(), false, suggestions, loading);
+    }
+    /** Plan 4b Task 1: a field's suggestions and their loading state, checked as the SDK checks them. */
+    @Test void suggestionsAreCopiedUniqueAndOnlyOnSingleLineTextFields() {
+        var plain = new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "");
+        assertThat(plain.suggestions()).isEmpty();
+        assertThat(plain.suggestionsLoading()).isFalse();
+        var search = new Suggestion("search", "Search for “jcef”", "Web Search");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Suggestion("", "Title", "")).withMessage("id must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Suggestion("id", "", "")).withMessage("title must not be blank");
+        assertThatNullPointerException().isThrownBy(() -> new Suggestion("id", "Title", null));
+        var rows = new ArrayList<>(List.of(new Suggestion("navigate", "Navigate to “https://jcef”", "URL"), search));
+        var field = suggesting(FieldKind.TEXT, rows, true);
+        rows.clear();
+        assertThat(field.suggestions()).extracting(Suggestion::id).containsExactly("navigate", "search");
+        assertThat(field.suggestionsLoading()).isTrue();
+        assertThatIllegalArgumentException().isThrownBy(() -> suggesting(FieldKind.TEXT, List.of(search, search), false)).withMessage("Duplicate id: search");
+        assertThatIllegalArgumentException().isThrownBy(() -> suggesting(FieldKind.TEXTAREA, List.of(), true)).withMessage("A multiline field takes no suggestions");
+        assertThatIllegalArgumentException().isThrownBy(() -> suggesting(FieldKind.NUMBER, List.of(search), false))
+            .withMessage("A number field's arrow keys step its value, not suggestions");
+        assertThat(suggesting(FieldKind.PATH, List.of(search), false).suggestions()).containsExactly(search);
+        var chosen = new UiEvent.SuggestionChosen("f", "search", false);
+        assertThat(chosen.id()).isEqualTo("f");
+        assertThatIllegalArgumentException().isThrownBy(() -> new UiEvent.SuggestionChosen("f", " ", true));
+    }
     /** Plan 3b (spec 8.2): EXCLUSIVE shows two to four options and TABS two or more, wherever the choice sits. */
     @Test void exclusiveChoicesShowTwoToFourOptionsAndTabsTwoOrMore() {
         for (int count = 0; count <= 6; count++) {

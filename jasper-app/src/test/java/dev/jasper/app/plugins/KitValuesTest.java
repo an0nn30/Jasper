@@ -66,6 +66,20 @@ class KitValuesTest {
    assertThat(field.selectOnClick()).isEqualTo(select);
   }
  }
+ /** Plan 4b Task 1 (SDK 0.27.0): a field's suggestions and their loading state cross the projection unchanged, and so does a chosen suggestion. */
+ @Test void suggestionsAndTheirChoiceProjectWithoutLoss(){
+  var rows=List.of(new Suggestion("navigate","Navigate to “https://jcef”","URL"),new Suggestion("search","Search for “jcef”","Web Search"),new Suggestion("host","localhost",""));
+  for(boolean loading:List.of(false,true)){
+   var spec=new ViewSpec(new Field("address",READY,FieldKind.TEXT,"jcef","Search or enter website name","Address","go",Optional.empty(),
+    FieldPresentation.EMBEDDED,"","revert","",false,Optional.empty(),"","",Optional.empty(),true,rows,loading));
+   assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+   var field=(dev.jasper.ui.model.Nodes.Field)KitValues.toModule(spec).root();
+   assertThat(field.suggestions()).extracting(dev.jasper.ui.model.Nodes.Suggestion::id).containsExactly("navigate","search","host");
+   assertThat(field.suggestionsLoading()).isEqualTo(loading);
+  }
+  assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","search",true))).isEqualTo(new UiEvent.SuggestionChosen("address","search",true));
+  assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","host",false))).isEqualTo(new UiEvent.SuggestionChosen("address","host",false));
+ }
  /** Plan 3b: a technical caption crosses the projection unchanged. */
  @Test void technicalPickerCaptionsProjectWithoutLoss(){
   for(boolean technical:List.of(false,true)){
@@ -118,7 +132,7 @@ class KitValuesTest {
   assertThat(new MenuItem("old","Old","key","open",true,false).hue()).isEqualTo(Hue.NEUTRAL);
  }
  @Test void everyEventProjectsItsOwnerItemAndPayload(){
-  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"),new dev.jasper.ui.model.UiEvent.Clicked("tree","leaf"),new dev.jasper.ui.model.UiEvent.ColumnsResized("files",Map.of("name",180)));
+  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"),new dev.jasper.ui.model.UiEvent.Clicked("tree","leaf"),new dev.jasper.ui.model.UiEvent.ColumnsResized("files",Map.of("name",180)),new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","search",true));
   assertThat(events).hasSize(UiEvent.class.getPermittedSubclasses().length);for(var event:events)assertThat(KitValues.toSdk(event).toString()).isEqualTo(event.toString());
   assertThat(Arrays.stream(SemanticColor.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.theme.SemanticColor.values()).map(Enum::name).toArray(String[]::new));
  }

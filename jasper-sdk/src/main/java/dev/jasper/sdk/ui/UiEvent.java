@@ -125,4 +125,22 @@ public sealed interface UiEvent {
             for (var e : widths.entrySet()) { ModelChecks.id(e.getKey()); if (e.getValue() <= 0) throw new IllegalArgumentException("Column width must be positive"); }
         }
     }
+    /**
+     * The user chose one of a {@link Nodes.Field}'s suggestions: Tab or Enter on the selected one, or a click on one. The
+     * field has hidden its list by then.
+     *
+     * @param fieldId the field, which is also the event's {@link #id()}
+     * @param suggestionId the chosen {@link Nodes.Suggestion}'s id, local to that field
+     * @param byTab whether Tab chose it, rather than Enter or a click
+     * @since 0.27.0
+     */
+    record SuggestionChosen(String fieldId, String suggestionId, boolean byTab) implements UiEvent {
+        public SuggestionChosen { ModelChecks.id(fieldId); ModelChecks.id(suggestionId); }
+        /**
+         * The field the suggestion belongs to.
+         *
+         * @return {@link #fieldId()}
+         */
+        @Override public String id() { return fieldId; }
+    }
 }

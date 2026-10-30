@@ -66,6 +66,7 @@ control shows.
 | `Clicked` | the owner and the row | a plain left click on a row of a list, table or tree, after its `Selected` |
 | `Sorted` | the owner and the column | a click on a table's or tree's column header; the owner orders the rows |
 | `ColumnsResized` | the owner and the widths of its columns | a header boundary drag or double-click fit that has ended; the kit already shows the widths |
+| `SuggestionChosen` | the field, the suggestion and whether Tab chose it | Tab or Enter on a field's selected suggestion, or a click on one; the list has hidden |
 
 Users drag a column boundary in any table or column tree to resize and double-click it to fit the column; the kit keeps
 the widths for the open view until the plugin changes its column ids or a column's `width`. A plugin remembers them across restarts with
@@ -333,6 +334,14 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
 - A `selectOnClick` field selects all its text when a left click brings the focus into it, unless the press drags out
   a selection of its own; while the field has the focus, a click places the caret. A `TEXTAREA`, a STEPPER and a SLIDER
   take no leading image or icon and no `selectOnClick`.
+- A field's `suggestions`, each a [`Suggestion`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.Suggestion)`(id, title,
+  detail)`, show in a list under it as the user types, the first selected, with "Loading suggestions…" after them while
+  `suggestionsLoading` is true; the field keeps the focus, so typing goes on in it. While the list shows suggestions, Up
+  and Down move the selection, and Tab and Enter report `SuggestionChosen` (with `byTab` for Tab) instead of moving the
+  focus or reporting `trailingAction`; a click on a suggestion reports it as Enter does. While the list shows at all,
+  Escape hides it and reports `cancelAction`. A chosen suggestion, Escape and the focus leaving the field hide the list
+  until the user next edits the field; an update keeps the selection while its suggestion's id is still listed, and an
+  edit selects the first again. A `TEXTAREA` and a `NUMBER` field take no suggestions.
 
 ### Secrets
 
@@ -567,6 +576,8 @@ event dispatch thread, so run the test in `SwingUtilities.invokeAndWait`. A plug
 - `focused()`, `revealed()` and `fieldSelection(id)` show what `focus`, `reveal` and `selectAll` did;
   `clickInto(id)` clicks into a field as a person would, which a `selectOnClick` field the click brings the focus into
   answers by selecting all its text; `setComposing(id, true)` plays an input method.
+- `press(id, key)` presses `UP`, `DOWN`, `TAB`, `ENTER` or `ESCAPE` in a field as a person would, and
+  `suggestions(id)` and `selectedSuggestion(id)` show what its list of suggestions shows.
 - [`FakeKit`](sdk-reference.html#dev.jasper.sdk.testing.FakeKit)'s `views()`, `icons()` and `failures()` list its views,
   registered icons and contained handler failures. `FakePluginHost` mounts views where Jasper would: `panelView`,
   `windowView`, `contentView`, `toolbarViews`, `settingsPanelView` and `popoverViews` return them.

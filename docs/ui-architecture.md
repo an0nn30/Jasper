@@ -344,7 +344,8 @@ copy of the context, so `route(ThemeRoute)` re-routes only that view.
 
 `KitOwnership.owns(component)` says whether the kit created a component; `KitOwnership.CONTEXT_MENU`
 (`"Jasper.kit.contextMenu"`) is the client property that holds a row collection's, breadcrumbs' or setting row's
-context menu.
+context menu, and `KitOwnership.SUGGESTIONS` (`"Jasper.kit.suggestions"`) the one on a field's input that holds its
+list of suggestions while it shows.
 
 ### Secrets
 
@@ -423,8 +424,9 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 `Section`, `Empty`, `ItemList`, `Header`, `Panel`, `Form`, `Split`, `Table`, `Tree`, `Breadcrumbs`, `Custom`,
 `Separator`, `Notice`, `Properties`. Every node carries a `ControlState(visible, enabled, busy, error)`; `error` is
 validation prose and `ControlState.READY` is visible, enabled, idle and without an error. No node carries pixel
-dimensions, delegates or secret values, and no domain meaning is inferred from ids or text. `UiEvent` has 10 kinds:
-`Action`, `Edited`, `Selected`, `Toggled`, `Expanded`, `Removed`, `Reordered`, `SecretChanged`, `Clicked`, `Sorted`.
+dimensions, delegates or secret values, and no domain meaning is inferred from ids or text. `UiEvent` has 12 kinds:
+`Action`, `Edited`, `Selected`, `Toggled`, `Expanded`, `Removed`, `Reordered`, `SecretChanged`, `Clicked`, `Sorted`,
+`ColumnsResized`, `SuggestionChosen`.
 
 `ViewSpec` validates the whole tree: unique node ids and `Custom` content ids; depth at most 128 and at most 100,000
 nodes; a `Notice` only in a form's sections or a VERTICAL stack; a `Separator` only in an INLINE or ACTIONS stack and
@@ -454,6 +456,16 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   local file a `file:` URL names (read from the URL, not the file system) and as text. A `selectOnClick` field selects
   all its text on the release of a left press that brought the focus into it, unless the press dragged out a
   selection.
+- Field suggestions (`FieldSuggestions`, made the first time a field has `suggestions` or `suggestionsLoading`): a
+  non-focusable popup under the field's box and as wide as it (above it when the window has no room below), in the
+  menu's card, its rows `MENU_ITEM_HEIGHT` high, at most 8 before it scrolls: each suggestion's title, shortened with an
+  ellipsis, then its detail in `TEXT_TERTIARY`; the selected row in `SELECTION_BG`; "Loading suggestions…" last while
+  more load. The first suggestion is selected; an update keeps the selected id while it is listed, and an edit selects
+  the first. A key listener on the input reads Up, Down, Tab and Enter while the list shows suggestions and Escape while
+  it shows at all, before the field's bindings, so the hidden list leaves the field's keys untouched; Tab leaves the
+  input's forward traversal keys meanwhile. A choice, Escape, a permanent focus loss and a press outside hide the list
+  until the next edit; it appears on screen only while the input has the focus, and never over another open menu. A
+  TEXTAREA and a NUMBER field take no suggestions.
 - Field actions: `trailingAction` (Enter, not TEXTAREA or PATH), `alternateAction` (Shift+Enter, not TEXTAREA),
   `cancelAction` (Escape) and `listId`, which drives an `ItemList` with the arrow and page keys while the field keeps
   focus. A list named by a field's `listId` reserves its `visibleRows` selectable-row height even when filtered or

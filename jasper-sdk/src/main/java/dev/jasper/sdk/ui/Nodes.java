@@ -348,6 +348,19 @@ public final class Nodes {
     }
 
     /**
+     * One of the suggestions a {@link Field} offers, such as an address field's "Search for “jcef”" with the detail "Web
+     * Search": a row of the list under the field, its title and then, quieter, its detail.
+     *
+     * @param id the suggestion's id, local to its field, which {@link UiEvent.SuggestionChosen} reports; not blank
+     * @param title what the row shows; not blank
+     * @param detail what the row shows after the title; blank for none
+     * @since 0.27.0
+     */
+    public record Suggestion(String id, String title, String detail) {
+        public Suggestion { ModelChecks.id(id); ModelChecks.label(title, "title"); Objects.requireNonNull(detail, "detail"); }
+    }
+
+    /**
      * How a field sits in its composition. STANDARD shows the kit label (a SEARCH field never does) over a filled input.
      * EMBEDDED leaves the visible label to the host's own arrangement (the label stays the accessible name). TRANSPARENT
      * is EMBEDDED on a host surface that is the field's backdrop: no input fill, the outline and focus ring kept.
@@ -379,6 +392,16 @@ public final class Nodes {
      * drags out a selection of its own; while the field has the focus, a click places the caret. A TEXTAREA, a STEPPER
      * and a SLIDER take no leading image or icon and no {@code selectOnClick}.
      *
+     * <p>Since 0.27.0 a field can offer {@code suggestions} as the user types, such as an address field's addresses and
+     * searches: it shows them in a list under itself, the first selected, with "Loading suggestions…" after them while
+     * {@code suggestionsLoading} is true. The field keeps the keyboard focus, so typing goes on in the field. While the
+     * list shows suggestions, Up and Down move the selection, and Tab and Enter report {@link UiEvent.SuggestionChosen}
+     * for the selected one instead of moving the focus or running {@code trailingAction}; a click on a suggestion reports
+     * it as Enter does. While the list shows at all, Escape hides it and reports {@code cancelAction}. A chosen
+     * suggestion, Escape and the focus leaving the field hide the list until the user next edits the field. An update
+     * keeps the selection while the selected suggestion's id is still listed, and an edit selects the first again. A
+     * TEXTAREA and a NUMBER field take no suggestions.
+     *
      * @param id the node id
      * @param state the node's state; a nonblank error shows under the field
      * @param kind what the field holds
@@ -399,10 +422,13 @@ public final class Nodes {
      * @param leadingName the leading slot's accessible name and tooltip, not blank; empty for none
      * @param leadingDrag the text a drag of the leading slot offers, not blank; empty when the slot is not dragged
      * @param selectOnClick whether a left click that brings the focus into the field selects all its text
+     * @param suggestions the suggestions the field offers, in the order its list shows them, their ids unique; copied
+     * @param suggestionsLoading whether more suggestions are loading, which the list shows after them
      */
     public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
                         String alternateAction, String cancelAction, String listId, boolean readOnly, Optional<PixelImage> leadingImage,
-                        String leadingIcon, String leadingName, Optional<String> leadingDrag, boolean selectOnClick) implements Node {
+                        String leadingIcon, String leadingName, Optional<String> leadingDrag, boolean selectOnClick, List<Suggestion> suggestions,
+                        boolean suggestionsLoading) implements Node {
         public Field {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -432,6 +458,17 @@ public final class Nodes {
                 throw new IllegalArgumentException("A multiline field takes no leading image or icon and no select-on-click");
             if ((presentation == FieldPresentation.STEPPER || presentation == FieldPresentation.SLIDER) && (leading || selectOnClick))
                 throw new IllegalArgumentException("A stepper or slider takes no leading image or icon and no select-on-click");
+            suggestions = List.copyOf(suggestions); ModelChecks.unique(suggestions, Suggestion::id);
+            boolean suggesting = !suggestions.isEmpty() || suggestionsLoading;
+            if (kind == FieldKind.TEXTAREA && suggesting) throw new IllegalArgumentException("A multiline field takes no suggestions");
+            if (kind == FieldKind.NUMBER && suggesting) throw new IllegalArgumentException("A number field's arrow keys step its value, not suggestions");
+        }
+        /** A field that offers no suggestions. */
+        public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
+                     String alternateAction, String cancelAction, String listId, boolean readOnly, Optional<PixelImage> leadingImage,
+                     String leadingIcon, String leadingName, Optional<String> leadingDrag, boolean selectOnClick) {
+            this(id, state, kind, value, hint, label, trailingAction, numeric, presentation, alternateAction, cancelAction, listId, readOnly, leadingImage,
+                leadingIcon, leadingName, leadingDrag, selectOnClick, List.of(), false);
         }
         /** A field with an empty leading slot, whose clicks place the caret. */
         public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,

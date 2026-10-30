@@ -43,4 +43,9 @@ public sealed interface UiEvent {
             for (var e : widths.entrySet()) { ModelChecks.id(e.getKey()); if (e.getValue() <= 0) throw new IllegalArgumentException("Column width must be positive"); }
         }
     }
+    /** A suggestion chosen by Tab ({@code byTab}), Enter or a click: id is the field, suggestionId local to it. */
+    record SuggestionChosen(String fieldId, String suggestionId, boolean byTab) implements UiEvent {
+        public SuggestionChosen { ModelChecks.id(fieldId); ModelChecks.id(suggestionId); }
+        @Override public String id() { return fieldId; }
+    }
 }

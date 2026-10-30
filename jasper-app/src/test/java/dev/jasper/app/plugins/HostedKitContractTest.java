@@ -24,5 +24,12 @@ class HostedKitContractTest extends KitContractTest {
  protected void clickInto(UiView view,String id){var field=input(((HostedKitView)view).component(),id+".input");long when=System.currentTimeMillis();
   for(int type:new int[]{java.awt.event.MouseEvent.MOUSE_PRESSED,java.awt.event.MouseEvent.MOUSE_RELEASED,java.awt.event.MouseEvent.MOUSE_CLICKED})
    field.dispatchEvent(new java.awt.event.MouseEvent(field,type,when,type==java.awt.event.MouseEvent.MOUSE_PRESSED?java.awt.event.InputEvent.BUTTON1_DOWN_MASK:0,2,2,1,false,java.awt.event.MouseEvent.BUTTON1));}
+ /** The titles of the suggestions the kit's list shows under field {@code id} (published on its input while it shows). */
+ protected java.util.List<String> suggestions(UiView view,String id){var list=(JList<?>)input(((HostedKitView)view).component(),id+".input").getClientProperty(dev.jasper.ui.swing.KitOwnership.SUGGESTIONS);
+  var titles=new java.util.ArrayList<String>();if(list!=null)for(int row=0;row<list.getModel().getSize();row++)if(list.getModel().getElementAt(row) instanceof dev.jasper.ui.model.Nodes.Suggestion suggestion)titles.add(suggestion.title());return titles;}
+ /** As a person presses a key with the focus in field {@code id}: its key listeners, then, unless one consumed the key, its key bindings. */
+ protected void press(UiView view,String id,String key){var field=input(((HostedKitView)view).component(),id+".input");
+  var event=new java.awt.event.KeyEvent(field,java.awt.event.KeyEvent.KEY_PRESSED,System.currentTimeMillis(),0,KeyStroke.getKeyStroke(key).getKeyCode(),java.awt.event.KeyEvent.CHAR_UNDEFINED);
+  for(var listener:field.getKeyListeners())listener.keyPressed(event);if(!event.isConsumed())SwingUtilities.processKeyBindings(event);}
  protected void stop(UiKit kit){((HostedKit)kit).close();}
 }

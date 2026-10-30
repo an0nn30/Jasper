@@ -52,6 +52,68 @@ class UiValuesTest {
         assertThatNullPointerException().isThrownBy(() -> new ContentPresentation("Example", "", "file", false, "", "", null));
     }
 
+    /** An address field holding {@code suggestions}, loading more when {@code loading}. */
+    static Nodes.Field address(List<Nodes.Suggestion> suggestions, boolean loading) {
+        return new Nodes.Field("address", ControlState.READY, Nodes.FieldKind.TEXT, "jcef", "Search or enter website name", "Address", "go",
+            Optional.empty(), Nodes.FieldPresentation.EMBEDDED, "", "revert", "", false, Optional.empty(), "", "", Optional.empty(), true, suggestions, loading);
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a suggestion has an id and a title, and a detail that may be blank; a field holds a
+     * copy of its suggestions, with unique ids, and has none, not loading, unless it says so; a multiline or number
+     * field takes none.
+     */
+    @Test void aFieldsSuggestionsAreCopiedUniqueAndOnlyOnSingleLineTextFields() {
+        var search = new Nodes.Suggestion("search", "Search for “jcef”", "Web Search");
+        assertThat(search.detail()).isEqualTo("Web Search");
+        assertThat(new Nodes.Suggestion("host", "localhost", "").detail()).isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Suggestion(" ", "Title", "")).withMessage("id must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Suggestion("id", " ", "")).withMessage("title must not be blank");
+        assertThatNullPointerException().isThrownBy(() -> new Nodes.Suggestion("id", "Title", null));
+
+        var plain = new Nodes.Field("name", ControlState.READY, Nodes.FieldKind.TEXT, "", "", "Name", "", Optional.empty(), Nodes.FieldPresentation.STANDARD,
+            "", "", "", false, Optional.empty(), "", "", Optional.empty(), false);
+        assertThat(plain.suggestions()).isEmpty();
+        assertThat(plain.suggestionsLoading()).isFalse();
+        assertThat(new Nodes.Field("find", ControlState.READY, Nodes.FieldKind.SEARCH, "", "", "Find", "").suggestions()).isEmpty();
+
+        var rows = new ArrayList<>(List.of(new Nodes.Suggestion("navigate", "Navigate to “https://jcef”", "URL"), search));
+        var field = address(rows, true);
+        rows.clear();
+        assertThat(field.suggestions()).as("copied").extracting(Nodes.Suggestion::id).containsExactly("navigate", "search");
+        assertThatThrownBy(() -> field.suggestions().add(search)).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(field.suggestionsLoading()).isTrue();
+        assertThat(address(List.of(), true).suggestions()).as("loading before the first suggestion arrives").isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> address(List.of(search, new Nodes.Suggestion("search", "Other", "")), false))
+            .withMessage("Duplicate id: search");
+        assertThatNullPointerException().isThrownBy(() -> address(null, false));
+
+        for (boolean loading : List.of(false, true)) {
+            var offered = loading ? List.<Nodes.Suggestion>of() : List.of(search);
+            assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Field("notes", ControlState.READY, Nodes.FieldKind.TEXTAREA, "", "", "Notes", "",
+                Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), "", "", Optional.empty(), false, offered, loading))
+                .withMessage("A multiline field takes no suggestions");
+            for (var presentation : List.of(Nodes.FieldPresentation.STANDARD, Nodes.FieldPresentation.STEPPER))
+                assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Field("count", ControlState.READY, Nodes.FieldKind.NUMBER, "1", "", "Count", "",
+                    Optional.of(new Nodes.Numeric(0, 9, 1, 0)), presentation, "", "", "", false, Optional.empty(), "", "", Optional.empty(), false, offered, loading))
+                    .withMessage("A number field's arrow keys step its value, not suggestions");
+        }
+        for (var kind : List.of(Nodes.FieldKind.SEARCH, Nodes.FieldKind.PATH, Nodes.FieldKind.PORT))
+            assertThat(new Nodes.Field("f", ControlState.READY, kind, "", "", "F", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", false,
+                Optional.empty(), "", "", Optional.empty(), false, List.of(search), false).suggestions()).as("%s", kind).containsExactly(search);
+    }
+
+    /** Plan 4b Task 1 (SDK 0.27.0): a chosen suggestion names its field, which is the event's id, and the suggestion. */
+    @Test void aChosenSuggestionNamesItsFieldAndTheSuggestion() {
+        var chosen = new UiEvent.SuggestionChosen("address", "search", true);
+        assertThat(chosen.id()).isEqualTo("address").isEqualTo(chosen.fieldId());
+        assertThat(chosen.suggestionId()).isEqualTo("search");
+        assertThat(chosen.byTab()).isTrue();
+        assertThat(chosen).isEqualTo(new UiEvent.SuggestionChosen("address", "search", true)).isNotEqualTo(new UiEvent.SuggestionChosen("address", "search", false));
+        assertThatIllegalArgumentException().isThrownBy(() -> new UiEvent.SuggestionChosen(" ", "search", false));
+        assertThatIllegalArgumentException().isThrownBy(() -> new UiEvent.SuggestionChosen("address", "", false));
+    }
+
     /** Vim IdeaVim keys spec 4: a status item may carry an icon, a dimmed state and a menu. */
     @Test void contentStatusCarriesAnIconADimmedStateAndACopiedMenu() {
         Runnable r = () -> {};

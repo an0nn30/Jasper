@@ -22,6 +22,10 @@ public abstract class KitContractTest {
     protected abstract void click(UiView view,String id);
     /** Clicks into field {@code id} as a person would, the focus elsewhere. */
     protected abstract void clickInto(UiView view,String id);
+    /** The titles of the suggestions field {@code id} shows, in order; empty while it shows none. */
+    protected abstract List<String> suggestions(UiView view,String id);
+    /** Presses {@code key} (UP, DOWN, TAB, ENTER or ESCAPE) in field {@code id} as a person would, the focus in the field. */
+    protected abstract void press(UiView view,String id,String key);
     protected static void edt(Runnable body) throws Exception { SwingUtilities.invokeAndWait(body); }
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
@@ -148,6 +152,40 @@ public abstract class KitContractTest {
             view.update(loading);
             assertThat(view.spec()).isEqualTo(loading);
             assertThat(events).isEmpty();
+        } finally { view.close(); stop(kit); }
+    }); }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a field's suggestions render with the first selected, and Tab reports it as
+     * SuggestionChosen(byTab = true); after an edit Down and Enter report the next, and Escape hides them and reports the
+     * field's cancel action, on both runtimes.
+     */
+    @Test void aFieldsSuggestionsRenderAndTabReportsTheSelectedOne() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        var navigate = new Nodes.Suggestion("navigate", "Navigate to “https://exam”", "URL");
+        var search = new Nodes.Suggestion("search", "Search for “exam”", "Web Search");
+        java.util.function.Function<List<Nodes.Suggestion>, ViewSpec> spec = rows -> new ViewSpec(new Nodes.Field("address", ControlState.READY,
+            Nodes.FieldKind.TEXT, "exam", "Search or enter website name", "Address", "go", Optional.empty(), Nodes.FieldPresentation.STANDARD,
+            "", "revert", "", false, Optional.empty(), "", "", Optional.empty(), true, rows, false));
+        var view = kit.create(spec.apply(List.of(navigate, search)), events::add);
+        try {
+            assertThat(view.spec()).isEqualTo(spec.apply(List.of(navigate, search)));
+            assertThat(suggestions(view, "address")).containsExactly(navigate.title(), search.title());
+            press(view, "address", "TAB");
+            assertThat(events).containsExactly(new UiEvent.SuggestionChosen("address", "navigate", true));
+            assertThat(suggestions(view, "address")).as("choosing hides them").isEmpty();
+            type(view, "address", "exa");
+            assertThat(suggestions(view, "address")).as("an edit shows them again").containsExactly(navigate.title(), search.title());
+            press(view, "address", "DOWN");
+            press(view, "address", "ENTER");
+            type(view, "address", "ex");
+            press(view, "address", "ESCAPE");
+            assertThat(suggestions(view, "address")).isEmpty();
+            assertThat(events).filteredOn(event -> !(event instanceof UiEvent.Edited)).containsExactly(new UiEvent.SuggestionChosen("address", "navigate", true),
+                new UiEvent.SuggestionChosen("address", "search", false), new UiEvent.Action("revert"));
+            assertThat(events).filteredOn(UiEvent.Edited.class::isInstance).last().isEqualTo(new UiEvent.Edited("address", "ex"));
+            view.update(spec.apply(List.of()));
+            assertThat(view.spec()).isEqualTo(spec.apply(List.of()));
         } finally { view.close(); stop(kit); }
     }); }
 

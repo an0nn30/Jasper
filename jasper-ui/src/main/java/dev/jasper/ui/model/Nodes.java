@@ -187,6 +187,11 @@ public final class Nodes {
         }
     }
 
+    /** One of a {@link Field}'s suggestions: a row of its list, the title and then, quieter, the detail (blank for none). */
+    public record Suggestion(String id, String title, String detail) {
+        public Suggestion { ModelChecks.id(id); ModelChecks.label(title, "title"); Objects.requireNonNull(detail, "detail"); }
+    }
+
     /**
      * How a field sits in its composition. STANDARD shows the kit label (a SEARCH field never does) over a filled input.
      * EMBEDDED leaves the visible label to the host's own arrangement (the label stays the accessible name). TRANSPARENT
@@ -210,11 +215,18 @@ public final class Nodes {
      * {@code leadingDrag} as a {@code java.net.URL} when Java has a handler for its scheme, as the local file a
      * {@code file:} URL names, and as text. The name and the drag text need an image or an icon. A {@code selectOnClick}
      * field selects all its text when a left click brings the focus into it, unless the press drags out a selection. A
-     * TEXTAREA, a STEPPER and a SLIDER take no leading image or icon and no {@code selectOnClick}.
+     * TEXTAREA, a STEPPER and a SLIDER take no leading image or icon and no {@code selectOnClick}. The kit shows the
+     * {@code suggestions} in a list under the field, the first selected, with "Loading suggestions…" after them while
+     * {@code suggestionsLoading}; the field keeps the focus. While the list shows suggestions, Up and Down move the
+     * selection and Tab and Enter report {@link UiEvent.SuggestionChosen} (a click reports it as Enter does); while it
+     * shows at all, Escape hides it and reports {@code cancelAction}. A choice, Escape and the focus leaving the field
+     * hide the list until the next edit; an update keeps a selection still listed, and an edit selects the first. A
+     * TEXTAREA and a NUMBER field take no suggestions; their ids are unique.
      */
     public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
                         String alternateAction, String cancelAction, String listId, boolean readOnly, Optional<PixelImage> leadingImage,
-                        String leadingIcon, String leadingName, Optional<String> leadingDrag, boolean selectOnClick) implements Node {
+                        String leadingIcon, String leadingName, Optional<String> leadingDrag, boolean selectOnClick, List<Suggestion> suggestions,
+                        boolean suggestionsLoading) implements Node {
         public Field {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -244,6 +256,17 @@ public final class Nodes {
                 throw new IllegalArgumentException("A multiline field takes no leading image or icon and no select-on-click");
             if ((presentation == FieldPresentation.STEPPER || presentation == FieldPresentation.SLIDER) && (leading || selectOnClick))
                 throw new IllegalArgumentException("A stepper or slider takes no leading image or icon and no select-on-click");
+            suggestions = List.copyOf(suggestions); ModelChecks.unique(suggestions, Suggestion::id);
+            boolean suggesting = !suggestions.isEmpty() || suggestionsLoading;
+            if (kind == FieldKind.TEXTAREA && suggesting) throw new IllegalArgumentException("A multiline field takes no suggestions");
+            if (kind == FieldKind.NUMBER && suggesting) throw new IllegalArgumentException("A number field's arrow keys step its value, not suggestions");
+        }
+        /** A field that offers no suggestions. */
+        public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
+                     String alternateAction, String cancelAction, String listId, boolean readOnly, Optional<PixelImage> leadingImage,
+                     String leadingIcon, String leadingName, Optional<String> leadingDrag, boolean selectOnClick) {
+            this(id, state, kind, value, hint, label, trailingAction, numeric, presentation, alternateAction, cancelAction, listId, readOnly, leadingImage,
+                leadingIcon, leadingName, leadingDrag, selectOnClick, List.of(), false);
         }
         /** A field with an empty leading slot, whose clicks place the caret. */
         public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,

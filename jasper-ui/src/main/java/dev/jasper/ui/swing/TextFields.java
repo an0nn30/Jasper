@@ -41,6 +41,8 @@ final class TextFields {
         private Icon namedIcon;
         /** A left press brought the focus into a select-on-click field: its release selects all the text. */
         private boolean selectOnRelease;
+        /** The list of the field's suggestions, made the first time the field has some or loads them; null until then. */
+        FieldSuggestions suggestions;
         @Override int firstLineHeight() {
             if (((Nodes.Field) node).kind() == Nodes.FieldKind.TEXTAREA) return ThemePainting.height(context(), DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY);
             return line.getHeight() > 0 ? line.getY() + line.getHeight() : line.getPreferredSize().height;
@@ -87,6 +89,7 @@ final class TextFields {
                 private void changed() {
                     fitFont();
                     if (applying) return;
+                    if (suggestions != null) suggestions.edited();
                     notifying = true;
                     try { emit(new UiEvent.Edited(FieldControl.this.node.id(), input.getText())); }
                     finally { notifying = false; }
@@ -434,6 +437,8 @@ final class TextFields {
             int padding = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_PADDING : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_PADDING : field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             surface.setBorder(surface.quiet ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(ring * 2, padding, ring * 2, padding));
             if (trailing != null) { trailing.parentEnabled = interactive(); trailing.refresh(); }
+            if (suggestions == null && (!field.suggestions().isEmpty() || field.suggestionsLoading())) { suggestions = new FieldSuggestions(this); own(suggestions); }
+            if (suggestions != null) suggestions.refresh();
             if (browse != null) {
                 browse.parentEnabled = parentEnabled; browse.update(browseNode(field)); browse.component.setVisible(!field.trailingAction().isBlank());
                 // The visible label stays "Browse…"; the accessible name says which field it fills.

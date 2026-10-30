@@ -31,6 +31,10 @@ public final class FakeKitView implements UiView {
  private String focused;
  private final Map<String,String> fieldText=new HashMap<>();
  private final Map<String,int[]> fieldSelections=new HashMap<>();
+ /** Per field, the suggestion the person moved the selection to while it is listed; absent for the first. */
+ private final Map<String,String> suggestionSelections=new HashMap<>();
+ /** Fields whose suggestions a choice, Escape or the focus moving on hid until the person next edits the field. */
+ private final Set<String> suggestionsHidden=new HashSet<>();
  FakeKitView(FakeKit owner, ViewSpec spec, Consumer<UiEvent> events) {this.owner=owner;this.events=Objects.requireNonNull(events);update(spec);}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  @Override public UiAnchor anchor(String id){guard();var anchor=new Attachment(id);if(!anchor.isOpen())throw new IllegalArgumentException("Unmounted or ineligible control");anchors.add(anchor);return anchor;}
@@ -53,11 +57,16 @@ public final class FakeKitView implements UiView {
   for(var content:List.copyOf(contents.values()))if(nodes.values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id()) && c.kind()==content.kind() && mounted(spec.root()).get(c.id()) instanceof Nodes.Custom previous && previous.contentId().equals(content.id()) && previous.kind()==content.kind())){dispose(content);}
   fieldText.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.Field));
   fieldSelections.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.Field));
+  suggestionSelections.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.Field));
+  suggestionsHidden.removeIf(id -> !(nodes.get(id) instanceof Nodes.Field));
   var previous=spec==null ? Map.<String,Nodes.Node>of() : mounted(spec.root());
   for(var node:nodes.values())if(node instanceof Nodes.Field field) {
    if(!(previous.get(field.id()) instanceof Nodes.Field old) || old.kind()!=field.kind() || !old.value().equals(field.value())) {
     fieldText.put(field.id(),field.value());fieldSelections.remove(field.id());
    }
+   // The host makes a field of another kind afresh; a selection whose suggestion is gone falls back to the first.
+   if(!(previous.get(field.id()) instanceof Nodes.Field old) || old.kind()!=field.kind()){suggestionsHidden.remove(field.id());suggestionSelections.remove(field.id());}
+   var chosen=suggestionSelections.get(field.id());if(chosen!=null&&field.suggestions().stream().noneMatch(suggestion -> suggestion.id().equals(chosen)))suggestionSelections.remove(field.id());
   }
   sourceSpec=source;spec=next;for(var a:List.copyOf(anchors))a.isOpen();if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
  }
@@ -73,7 +82,9 @@ public final class FakeKitView implements UiView {
  @Override public void replaceSecret(String id,char[] value){requireSecret(id);Objects.requireNonNull(value);char[] next=value.clone();clearSecret(id);secrets.put(id,next);}
  @Override public void withSecret(String id,Consumer<char[]> use){requireSecret(id);Objects.requireNonNull(use);char[] copy=secrets.getOrDefault(id,new char[0]).clone();try{use.accept(copy);}finally{Arrays.fill(copy,(char)0);}}
  @Override public void clearSecret(String id){requireSecret(id);var old=secrets.remove(id);if(old!=null)Arrays.fill(old,(char)0);}
- @Override public void focus(String id){guard();if(!mounted(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");focused=id;}
+ @Override public void focus(String id){guard();if(!mounted(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");moveFocus(id);}
+ /** The focus moves to {@code id}: a field it leaves hides its suggestions, as the host's field does when the focus leaves it for good. */
+ private void moveFocus(String id){if(focused!=null&&!focused.equals(id)&&mounted(spec.root()).get(focused) instanceof Nodes.Field)suggestionsHidden.add(focused);focused=id;}
  @Override public void selectAll(String id){guard();if(!(mounted(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");fieldSelections.put(id,new int[]{0,fieldText.get(id).length()});}
  /** The fake's logical field selection, independently recorded from focus. */
  public int[] fieldSelection(String id){guard();if(!(mounted(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return fieldSelections.getOrDefault(id,new int[]{0,0}).clone();}
@@ -91,7 +102,8 @@ public final class FakeKitView implements UiView {
  /** Requested logical focus. */
  public Optional<String> focused(){guard();return Optional.ofNullable(focused);}
  /** Deliver a typed event through containment; an edit of a read-only field, which a person cannot make, is dropped. */
- public void emit(UiEvent event){guard();if(event instanceof UiEvent.Edited edit && mounted(spec.root()).get(edit.id()) instanceof Nodes.Field field && field.readOnly())return;if(event instanceof UiEvent.Edited edit && mounted(spec.root()).get(edit.id()) instanceof Nodes.Field){fieldText.put(edit.id(),edit.text());fieldSelections.remove(edit.id());}try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
+ public void emit(UiEvent event){guard();if(event instanceof UiEvent.Edited edit && mounted(spec.root()).get(edit.id()) instanceof Nodes.Field field && field.readOnly())return;if(event instanceof UiEvent.Edited edit && mounted(spec.root()).get(edit.id()) instanceof Nodes.Field){fieldText.put(edit.id(),edit.text());fieldSelections.remove(edit.id());suggestionsHidden.remove(edit.id());suggestionSelections.remove(edit.id());}
+  if(event instanceof UiEvent.SuggestionChosen chosen && mounted(spec.root()).get(chosen.fieldId()) instanceof Nodes.Field)suggestionsHidden.add(chosen.fieldId());try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
  /** Simulate a person typing {@code text} into a field, replacing its text: it reports {@link UiEvent.Edited} as the host's field does, while a read-only field, or one that is hidden, disabled or busy (itself or a container above it), takes nothing.
  * @param fieldId field node
  * @param text the text typed */
@@ -103,7 +115,47 @@ public final class FakeKitView implements UiView {
  * (itself or a container above it) takes no click.
  * @param fieldId field node
  * @since 0.27.0 */
- public void clickInto(String fieldId){guard();if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(!live(fieldId))return;boolean entering=!fieldId.equals(focused);focused=fieldId;if(field.selectOnClick()&&entering)fieldSelections.put(fieldId,new int[]{0,fieldText.get(fieldId).length()});else fieldSelections.remove(fieldId);}
+ public void clickInto(String fieldId){guard();if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(!live(fieldId))return;boolean entering=!fieldId.equals(focused);moveFocus(fieldId);if(field.selectOnClick()&&entering)fieldSelections.put(fieldId,new int[]{0,fieldText.get(fieldId).length()});else fieldSelections.remove(fieldId);}
+ /**
+ * The suggestions field {@code fieldId} shows in its list, as the host's field shows them: its descriptor's
+ * {@code suggestions} while the field takes input (it and every container above it shown, enabled and not busy), until a
+ * chosen suggestion, Escape or the focus moving to another node hides them; the person's next edit
+ * ({@link #type(String, String)}, or an {@link UiEvent.Edited} emitted for the field) shows them again.
+ * @param fieldId field node
+ * @return the suggestions shown, in order; empty while none show
+ * @since 0.27.0 */
+ public List<Nodes.Suggestion> suggestions(String fieldId){var field=suggesting(fieldId);return listShows(field)?field.suggestions():List.of();}
+ /**
+ * The suggestion selected in field {@code fieldId}'s list: the first, until UP and DOWN ({@link #press(String, String)})
+ * move the selection; an update keeps it while its suggestion is still listed, and an edit selects the first again.
+ * @param fieldId field node
+ * @return the selected suggestion's id; empty while no suggestion shows
+ * @since 0.27.0 */
+ public Optional<String> selectedSuggestion(String fieldId){var field=suggesting(fieldId);return listShows(field)&&!field.suggestions().isEmpty()?Optional.of(field.suggestions().get(selectedSuggestionRow(field)).id()):Optional.empty();}
+ /**
+ * Simulate a person pressing {@code key} in field {@code fieldId}, which takes the focus, as the host's field takes the
+ * key. While the field shows suggestions, UP and DOWN move the selection within them, and TAB and ENTER hide them and
+ * report {@link UiEvent.SuggestionChosen} for the selected one, {@code byTab} for TAB; while its list shows at all (also
+ * while it only loads), ESCAPE hides it and reports the field's {@code cancelAction} when that is not blank. Otherwise
+ * ENTER reports the {@code trailingAction} of a single-line field other than PATH, and ESCAPE the {@code cancelAction},
+ * when not blank. A field that is hidden, disabled or busy (itself or a container above it) takes no key.
+ * @param fieldId field node
+ * @param key UP, DOWN, TAB, ENTER or ESCAPE
+ * @since 0.27.0 */
+ public void press(String fieldId,String key){var field=suggesting(fieldId);Objects.requireNonNull(key);
+  if(!List.of("UP","DOWN","TAB","ENTER","ESCAPE").contains(key))throw new IllegalArgumentException("Not a key a field takes: "+key);
+  if(!live(fieldId))return;moveFocus(fieldId);boolean shows=listShows(field),offers=shows&&!field.suggestions().isEmpty();var rows=field.suggestions();
+  switch(key){
+   case "UP","DOWN" -> {if(offers)suggestionSelections.put(fieldId,rows.get(Math.max(0,Math.min(rows.size()-1,selectedSuggestionRow(field)+(key.equals("UP")?-1:1)))).id());}
+   case "TAB","ENTER" -> {if(offers){var chosen=rows.get(selectedSuggestionRow(field)).id();suggestionsHidden.add(fieldId);emit(new UiEvent.SuggestionChosen(fieldId,chosen,key.equals("TAB")));}
+    else if(key.equals("ENTER")&&field.kind()!=Nodes.FieldKind.TEXTAREA&&field.kind()!=Nodes.FieldKind.PATH&&!field.trailingAction().isBlank())emit(new UiEvent.Action(field.trailingAction()));}
+   default -> {if(shows)suggestionsHidden.add(fieldId);if(!field.cancelAction().isBlank())emit(new UiEvent.Action(field.cancelAction()));}
+  }
+ }
+ private Nodes.Field suggesting(String fieldId){guard();if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return field;}
+ /** Whether the field's list shows: the field takes input, has suggestions or loads them, and nothing has hidden the list. */
+ private boolean listShows(Nodes.Field field){return live(field.id())&&!suggestionsHidden.contains(field.id())&&(field.suggestionsLoading()||!field.suggestions().isEmpty());}
+ private int selectedSuggestionRow(Nodes.Field field){var rows=field.suggestions();for(int row=0;row<rows.size();row++)if(rows.get(row).id().equals(suggestionSelections.get(field.id())))return row;return 0;}
  private boolean live(String id){var nodes=mounted(spec.root());for(String step:path(spec.root(),id)){var state=nodes.get(step).state();if(!state.visible()||!state.enabled()||state.busy())return false;}return true;}
  void contentFont(java.awt.Font font){for(var content:List.copyOf(contents.values()))content.component().setFont(font);}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);
@@ -114,7 +166,7 @@ public final class FakeKitView implements UiView {
  private void dispose(CustomContent content){
   // Claim removal before invoking plugin code; reentrant close may consume the remaining snapshot.
   if(contents.get(content.id())!=content)return;contents.remove(content.id());CONTENT_OWNERS.remove(content.component(),this);try{content.lifetime().close();}catch(Throwable failure){owner.failed();}}
- @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {invalidateAnchors();for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();fieldText.clear();fieldSelections.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
+ @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {invalidateAnchors();for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();fieldText.clear();fieldSelections.clear();suggestionSelections.clear();suggestionsHidden.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
     static List<Nodes.Node> children(Nodes.Node node) {
         var result = new ArrayList<Nodes.Node>();
         switch (node) {

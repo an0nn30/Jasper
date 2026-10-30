@@ -11,6 +11,12 @@ public final class KitOwnership {
      * stays kit-owned.
      */
     public static final String CONTEXT_MENU = "Jasper.kit.contextMenu";
+    /**
+     * Client property on a field's input while its list of suggestions shows, holding that list (a {@code JList} whose
+     * rows are the field's {@code Nodes.Suggestion} values, then the loading line's text while more load), so a host (or
+     * a headless test) can read what the list shows. The list stays kit-owned.
+     */
+    public static final String SUGGESTIONS = "Jasper.kit.suggestions";
     private KitOwnership() {}
     static void mark(JComponent component, String id) { component.putClientProperty(KEY, id); component.setName(id); }
     static void clear(JComponent component) { component.putClientProperty(KEY,null); component.setName(null); }
