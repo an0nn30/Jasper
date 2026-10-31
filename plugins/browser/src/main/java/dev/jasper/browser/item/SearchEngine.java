@@ -66,24 +66,20 @@ public enum SearchEngine {
 
     /**
      * The engine's name as "Search with ⟨engine⟩" says it: {@link #displayName()}, and for Custom the host of its search
-     * URL, or "Custom" when that has no fixed host.
+     * URL, or "Custom" without one.
      *
      * @param settings the settings, which hold Custom's search URL
      * @return the name, such as {@code Google} or {@code search.example.com}
      */
     public String displayName(BrowserSettings settings) {
-        if (this != CUSTOM) return displayName;
-        try {
-            String host = new URI(settings.customSearchUrl().replace(TERMS, MARK)).getHost();
-            return host == null || host.contains(MARK) ? displayName : host;
-        } catch (URISyntaxException notAUri) {
-            return displayName;
-        }
+        String template = settings.customSearchUrl();
+        if (this != CUSTOM || !template(template)) return displayName;
+        return URI.create(template.replace(TERMS, MARK)).getHost();
     }
 
     /**
-     * The search for {@code query}: the engine's search URL with the terms in it, escaped. Custom without a usable search
-     * URL, an empty one or one that is no http or https address, searches with Google.
+     * The search for {@code query}: the engine's search URL with the terms in it, escaped. Custom without a search URL
+     * searches with Google.
      *
      * @param query the terms
      * @param settings the settings, which hold the custom URLs
@@ -91,8 +87,9 @@ public enum SearchEngine {
      */
     public URI search(String query, BrowserSettings settings) {
         Objects.requireNonNull(query, "query");
-        Optional<URI> search = filled(searchUrl(settings), query);
-        return search.isPresent() ? search.get() : filled(GOOGLE.searchUrl, query).orElseThrow();
+        String template = searchUrl(settings);
+        // A custom URL is empty or a template (BrowserSettings holds no other), and any terms fill a template.
+        return filled(template.isEmpty() ? GOOGLE.searchUrl : template, query).orElseThrow();
     }
 
     /**
@@ -100,11 +97,29 @@ public enum SearchEngine {
      *
      * @param query the typed text
      * @param settings the settings, which hold the custom URLs
-     * @return the address of the OpenSearch suggestions; empty for Custom without a usable suggestion URL
+     * @return the address of the OpenSearch suggestions; empty for Custom without a suggestion URL
      */
     public Optional<URI> suggestions(String query, BrowserSettings settings) {
         Objects.requireNonNull(query, "query");
-        return filled(this == CUSTOM ? settings.customSuggestionsUrl() : suggestionUrl, query);
+        String template = this == CUSTOM ? settings.customSuggestionsUrl() : suggestionUrl;
+        return template.isEmpty() ? Optional.empty() : filled(template, query);
+    }
+
+    /**
+     * Whether {@code value} is a template, as Custom's URLs must be: an absolute http or https address, without a user
+     * name or password, with {@code %s} after its host, so that any terms fill it.
+     *
+     * @param value a URL
+     * @return whether it is one
+     */
+    public static boolean template(String value) {
+        if (!value.contains(TERMS)) return false;
+        try {
+            URI pattern = new URI(value.replace(TERMS, MARK));
+            return WebFetch.fetches(pattern) && !pattern.getHost().contains(MARK);
+        } catch (URISyntaxException notAUri) {
+            return false;
+        }
     }
 
     /**

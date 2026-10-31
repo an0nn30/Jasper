@@ -3,5 +3,5 @@
 # open_links_from_terminal = "ask"      # where a web link you open goes: ask, builtin (Jasper's browser) or default (the system's browser)
 # open_local_web_files = "ask"          # where a local web file clicked in a terminal goes: ask, builtin (Jasper's browser) or editor (the Default editor)
 # search_engine = "google"              # what the address field searches with and suggests from: google, duckduckgo, bing, kagi or custom
-# custom_search_url = ""                # with custom: a search's results address, with %s for the terms, such as "https://search.example.com/?q=%s"
-# custom_suggestions_url = ""           # with custom: an OpenSearch suggestions address, with %s for the typed text; empty shows none
+# custom_search_url = ""                # with custom: a search's http(s) results address, with %s for the terms, such as "https://search.example.com/?q=%s"
+# custom_suggestions_url = ""           # with custom: an http(s) OpenSearch suggestions address, with %s for the typed text; empty shows none

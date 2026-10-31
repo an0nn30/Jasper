@@ -22,8 +22,10 @@ import java.util.function.Consumer;
  * @param links where a web link the user opens in Jasper goes: Open Links From Terminal
  * @param localFiles where a local web file the user opens from a terminal goes: Open Local Web Files
  * @param searchEngine what the address field searches with, and where its suggestions come from: Default Search Engine
- * @param customSearchUrl the Custom engine's search URL, with {@code %s} for the terms; empty for none
- * @param customSuggestionsUrl the Custom engine's suggestion URL, with {@code %s} for the typed text; empty for none
+ * @param customSearchUrl the Custom engine's search URL, an http or https address with {@code %s} for the terms; empty
+ *     for none
+ * @param customSuggestionsUrl the Custom engine's suggestion URL, an http or https address with {@code %s} for the
+ *     typed text; empty for none
  */
 public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpening localFiles, SearchEngine searchEngine,
                               String customSearchUrl, String customSuggestionsUrl) {
@@ -32,7 +34,7 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
     static final String START_PAGE = "start_page", LINKS = "open_links_from_terminal", LOCAL_FILES = "open_local_web_files",
         SEARCH_ENGINE = "search_engine", CUSTOM_SEARCH = "custom_search_url", CUSTOM_SUGGESTIONS = "custom_suggestions_url";
     private static final String GENERAL = "General", LINK_OPENING = "Link Opening", SEARCH = "Search Engine";
-    private static final String NO_TERMS = "The URL must contain " + SearchEngine.TERMS;
+    private static final String NO_TEMPLATE = "The URL must start with https:// or http:// and contain " + SearchEngine.TERMS;
 
     /** Open Links From Terminal: where a web link the user opens in Jasper goes. */
     public enum LinkOpening {
@@ -68,7 +70,7 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
         }
     }
 
-    /** Requires every value. */
+    /** Requires every value, and each custom URL empty or a {@link SearchEngine#template template}. */
     public BrowserSettings {
         Objects.requireNonNull(startPage, "startPage");
         Objects.requireNonNull(links, "links");
@@ -76,13 +78,14 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
         Objects.requireNonNull(searchEngine, "searchEngine");
         Objects.requireNonNull(customSearchUrl, "customSearchUrl");
         Objects.requireNonNull(customSuggestionsUrl, "customSuggestionsUrl");
+        if (!template(customSearchUrl) || !template(customSuggestionsUrl)) throw new IllegalArgumentException(NO_TEMPLATE);
     }
 
     /**
      * Declares the Browser's settings, which Settings › Browser shows: Start page under General, Open Links From
      * Terminal and Open Local Web Files under Link Opening, then Default Search Engine, Custom Search URL and Custom
-     * Search Suggestions URL under Search Engine, each custom URL empty or with {@code %s} in it. UI thread, while the
-     * plugin starts.
+     * Search Suggestions URL under Search Engine, each custom URL empty or an http or https address with {@code %s} in it.
+     * UI thread, while the plugin starts.
      *
      * @param settings the plugin's settings
      * @return the declared settings, which read the current values
@@ -111,23 +114,23 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
             .description("What the address field searches with, and where the search suggestions it shows as you type come "
                 + "from: Google, DuckDuckGo, Bing, Kagi, or Custom, with the URLs below.")
             .keywords("search", "engine", "google", "duckduckgo", "bing", "kagi", "suggestions", "address bar", "omnibox"));
-        SettingKind<String> template = SettingKind.text(BrowserSettings::template, NO_TERMS);
+        SettingKind<String> template = SettingKind.text(BrowserSettings::template, NO_TEMPLATE);
         Setting<String> customSearch = settings.declare(SettingSpec.of(CUSTOM_SEARCH, template, "")
             .label("Custom Search URL").section(SEARCH)
-            .description("With Custom: the address of a search's results, with %s where the search terms go, such as "
-                + "https://search.example.com/?q=%s. Empty searches with Google.")
+            .description("With Custom: the address of a search's results, an http:// or https:// address with %s where the "
+                + "search terms go, such as https://search.example.com/?q=%s. Empty searches with Google.")
             .keywords("search", "engine", "custom", "url", "template"));
         Setting<String> customSuggestions = settings.declare(SettingSpec.of(CUSTOM_SUGGESTIONS, template, "")
             .label("Custom Search Suggestions URL").section(SEARCH)
-            .description("With Custom: where the address field's search suggestions come from, an address that answers "
-                + "OpenSearch JSON, with %s where the typed text goes. Empty shows none.")
+            .description("With Custom: where the address field's search suggestions come from, an http:// or https:// "
+                + "address that answers OpenSearch JSON, with %s where the typed text goes. Empty shows none.")
             .keywords("search", "suggestions", "custom", "url", "opensearch", "autocomplete"));
         return new Declared(startPage, links, localFiles, engine, customSearch, customSuggestions);
     }
 
-    /** A custom URL: empty, or with {@code %s} where the terms go. */
+    /** A custom URL: empty, or a {@link SearchEngine#template template}, an http or https address with {@code %s}. */
     private static boolean template(String value) {
-        return value.isEmpty() || value.contains(SearchEngine.TERMS);
+        return value.isEmpty() || SearchEngine.template(value);
     }
 
     private static Choice<LinkOpening> choice(LinkOpening value) {

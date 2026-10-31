@@ -7,6 +7,7 @@ import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The search engines of spec section 6, with its exact search and suggestion URLs and {@code %s} for the terms: what a
@@ -28,10 +29,7 @@ class SearchEngineTest {
         assertThat(SearchEngine.DUCKDUCKGO.displayName(settings(SearchEngine.CUSTOM, "https://x.example/?q=%s", ""))).isEqualTo("DuckDuckGo");
         assertThat(SearchEngine.CUSTOM.displayName(settings(SearchEngine.CUSTOM, "https://search.example.com/find?q=%s", "")))
             .isEqualTo("search.example.com");
-        assertThat(SearchEngine.CUSTOM.displayName(settings(SearchEngine.CUSTOM, "https://%s.example.com/", ""))).as("no fixed host")
-            .isEqualTo("Custom");
-        for (String template : List.of("", "https://exa mple.com/?q=%s", "%s"))
-            assertThat(SearchEngine.CUSTOM.displayName(settings(SearchEngine.CUSTOM, template, ""))).as(template).isEqualTo("Custom");
+        assertThat(SearchEngine.CUSTOM.displayName(settings(SearchEngine.CUSTOM, "", ""))).as("no search URL").isEqualTo("Custom");
     }
 
     @Test void eachEngineSearchesAtItsSearchUrl() {
@@ -54,13 +52,33 @@ class SearchEngineTest {
         assertThat(SearchEngine.CUSTOM.search("x y", twice)).as("every %s").isEqualTo(URI.create("https://example.com/?q=x+y&again=x+y"));
     }
 
-    /** Custom without a usable search URL searches with Google, the default, rather than loading nothing. */
-    @Test void customWithoutAUsableSearchUrlSearchesWithGoogle() {
-        for (String template : List.of("", "https://example.com/?q=", "%s", "ftp://example.com/?q=%s", "https://exa mple.com/?q=%s"))
-            assertThat(SearchEngine.CUSTOM.search("jcef", settings(SearchEngine.CUSTOM, template, ""))).as(template)
-                .isEqualTo(URI.create("https://google.com/search?q=jcef"));
+    /** Custom without a search URL searches with Google, the default, rather than loading nothing. */
+    @Test void customWithAnEmptySearchUrlSearchesWithGoogle() {
+        assertThat(SearchEngine.CUSTOM.search("jcef", settings(SearchEngine.CUSTOM, "", "")))
+            .isEqualTo(URI.create("https://google.com/search?q=jcef"));
         assertThat(SearchEngine.GOOGLE.search("jcef", settings(SearchEngine.GOOGLE, "https://example.com/?q=%s", "")))
             .as("a built-in engine ignores the custom URL").isEqualTo(URI.create("https://google.com/search?q=jcef"));
+    }
+
+    /**
+     * Plan 4b's P28: a custom URL is an absolute http or https address with {@code %s} in it, after its host, so any terms
+     * fill it. Anything else is no template: the settings never hold one, and a broken Custom URL never searches with
+     * Google unnoticed.
+     */
+    @Test void aTemplateIsAnAbsoluteWebAddressWithThePlaceholder() {
+        for (String template : List.of("https://search.example.com/?q=%s", "http://intranet:8080/find/%s", "HTTPS://example.com/?q=%s",
+                "https://example.com/#q=%s"))
+            assertThat(SearchEngine.template(template)).as(template).isTrue();
+        for (String template : List.of("", "https://example.com/?q=", "%s", "search.example.com/?q=%s", "ftp://example.com/?q=%s",
+                "file:///tmp/%s", "javascript:%s", "https://exa mple.com/?q=%s", "https:///?q=%s", "https://ada:secret@example.com/?q=%s",
+                "https://%s.example.com/", "https://example.com:%s/", "https://example.com/?q=%%s"))
+            assertThat(SearchEngine.template(template)).as(template).isFalse();
+        for (String template : List.of("https://example.com/?q=", "ftp://example.com/?q=%s")) {
+            assertThatThrownBy(() -> settings(SearchEngine.CUSTOM, template, "")).as(template)
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("The URL must start with https:// or http:// and contain %s");
+            assertThatThrownBy(() -> settings(SearchEngine.CUSTOM, "", template)).as(template)
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("The URL must start with https:// or http:// and contain %s");
+        }
     }
 
     @Test void eachEngineSuggestsFromItsSuggestionUrl() {
@@ -73,10 +91,8 @@ class SearchEngineTest {
         assertThat(SearchEngine.CUSTOM.suggestions("what is", custom)).contains(URI.create("https://example.com/suggest?q=what+is&n=5"));
     }
 
-    @Test void customWithoutAUsableSuggestionUrlSuggestsNothing() {
-        for (String template : List.of("", "https://example.com/suggest", "file:///tmp/%s", "https://exa mple.com/?q=%s"))
-            assertThat(SearchEngine.CUSTOM.suggestions("jcef", settings(SearchEngine.CUSTOM, "https://example.com/?q=%s", template)))
-                .as(template).isEmpty();
+    @Test void customWithoutASuggestionUrlSuggestsNothing() {
+        assertThat(SearchEngine.CUSTOM.suggestions("jcef", settings(SearchEngine.CUSTOM, "https://example.com/?q=%s", ""))).isEmpty();
     }
 
     /** Each engine's results page gives its terms, as the address field shows them; any other address gives none. */
@@ -113,8 +129,6 @@ class SearchEngineTest {
                 "file:///search?q=jcef", "jasper-about:welcome", "about:blank", "mailto:someone@example.com", "urn:isbn:0451450523",
                 "https://www.google.com/search?&&=&q", "/search?q=relative"))
             assertThat(SearchEngine.queryOf(URI.create(address), GOOGLE)).as(address).isEmpty();
-        var broken = settings(SearchEngine.CUSTOM, "https://exa mple.com/%s?%s", "");
-        assertThat(SearchEngine.queryOf(URI.create("https://example.com/x"), broken)).as("a template that is no URI").isEmpty();
         var fragment = settings(SearchEngine.CUSTOM, "https://example.com/#q=%s", "");
         assertThat(SearchEngine.queryOf(URI.create("https://example.com/#q=x"), fragment)).as("terms after a fragment").isEmpty();
     }

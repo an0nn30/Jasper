@@ -57,17 +57,20 @@ class BrowserSettingsTest {
         } });
     }
 
-    /** Spec section 17: each custom URL must contain %s, where the terms go; empty is allowed, as the default. */
-    @Test void aCustomUrlWithoutThePlaceholderIsRefused() throws Exception {
+    /**
+     * Spec section 17 and plan 4b's P28: each custom URL is an http or https address with %s where the terms go, or
+     * empty, the default; anything else is refused with one message.
+     */
+    @Test void aCustomUrlThatIsNoWebAddressWithThePlaceholderIsRefused() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting(ID, "search_engine", "custom");
             host.setSetting(ID, "custom_search_url", "https://search.example.com/?q=");
-            host.setSetting(ID, "custom_suggestions_url", "https://search.example.com/suggest");
+            host.setSetting(ID, "custom_suggestions_url", "search.example.com/suggest?q=%s");
             var declared = new AtomicReference<BrowserSettings.Declared>();
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
                 plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
-            assertThat(host.settingsReports(ID)).containsExactly("custom_search_url: The URL must contain %s",
-                "custom_suggestions_url: The URL must contain %s");
+            String refused = "The URL must start with https:// or http:// and contain %s";
+            assertThat(host.settingsReports(ID)).containsExactly("custom_search_url: " + refused, "custom_suggestions_url: " + refused);
             assertThat(declared.get().read()).isEqualTo(new BrowserSettings(BrowserSettings.WELCOME, LinkOpening.ASK, LocalFileOpening.ASK,
                 SearchEngine.CUSTOM, "", ""));
             host.setSetting(ID, "custom_search_url", "https://search.example.com/?q=%s");
@@ -75,6 +78,11 @@ class BrowserSettingsTest {
             assertThat(host.settingsReports(ID)).isEmpty();
             assertThat(declared.get().read().customSearchUrl()).isEqualTo("https://search.example.com/?q=%s");
             assertThat(declared.get().read().customSuggestionsUrl()).isEqualTo("https://search.example.com/suggest?q=%s");
+            host.setSetting(ID, "custom_search_url", "ftp://search.example.com/?q=%s");
+            host.setSetting(ID, "custom_suggestions_url", "");
+            assertThat(host.settingsReports(ID)).containsExactly("custom_search_url: " + refused);
+            assertThat(declared.get().read().customSearchUrl()).as("the default").isEmpty();
+            assertThat(declared.get().read().customSuggestionsUrl()).isEmpty();
             assertThat(host.failures()).isEmpty();
         } });
     }
