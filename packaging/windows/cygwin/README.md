@@ -22,7 +22,7 @@ What users get is in [Cygwin Bash](../../../docs/terminal.md#cygwin-bash), the l
 | `validation.json` | The native acceptance recorded for one seed, per architecture, which releases require |
 | `CygwinTool.java` | The installation helper's entry point |
 | `BundleTool.java` | The build's seed tool: `acquire`, `verify`, `stage` and `distribution` |
-| `CygwinInstallerTemplate.java` | Adds the installation custom action to the selected JBR's WiX template and stages the image for WiX |
+| `CygwinInstallerTemplate.java` | Adds the installation custom action and the per-user web browser registration to the selected JBR's WiX template, and stages the image for WiX |
 | `installer/provision-cygwin.cmd` | The portable ZIP's installation script |
 | `relay/prebuilt/` | The relay's tested programs and `provenance.json` ([relay README](relay/README.md)) |
 | `probe/` | The relay's sources and the native probes |
@@ -202,6 +202,7 @@ replace `seed.lock.json` and the files it names under `seed-support`, run the na
 | `verifyCygwinProvisioning` (`CygwinProvisionerTest`), run with `verifyCygwinLifecycle` | A fresh installation, reuse that leaves `root` as it is, a full disk, a failed Setup kept for retry, a restart and a foreign folder |
 | `verifyCygwinProbes` (`ProbeAssertionsTest`) | The probes' own rules: Setup's hidden mode, deadlines, the custom action's scheduling, missing or contradictory evidence and scratch-folder ownership |
 | `verifyCygwinProbeRuntime` | That a runtime built with the installer probe's `jlink` options has a Java executable |
+| `verifyInstallerTemplate` (`CygwinInstallerTemplateTest`) | The setup wizard's template: the custom action once, and the web browser registration's registry values and removed keys in a component of the template's one feature; on Windows, the runtime's own template too |
 
 Passing them does not establish Windows behaviour.
 
@@ -237,12 +238,14 @@ Both need an isolated test account and run with `jasper-app/build/cygwin/classes
 
 - `InstallerAcceptanceTest <app image> <new scratch folder> <JBR SDK> <cache with the signed extra hello package>`
   builds MSIs with the production template (WiX needed) and checks the first installation, package management without
-  a window, repair, upgrade and uninstallation keeping the environment.
+  a window, repair, upgrade and uninstallation keeping the environment, and the web browser registration after the
+  installation and the upgrade and its removal by the uninstallation.
 - `UserInstallAcceptanceTest prepare|seeded|record|verify <scratch> [<image> <extra cache>]` brackets real
   `installWindowsUser`, update, `uninstallWindowsUser` and reinstall runs with a snapshot of the whole root, including
   an added package, configuration, a link and a git repository.
 
-`InstallerAcceptanceTest` needs the account to have no `%LOCALAPPDATA%\Jasper\cygwin`.
+`InstallerAcceptanceTest` needs the account to have no `%LOCALAPPDATA%\Jasper\cygwin` and no Jasper web browser
+registration.
 `UserInstallAcceptanceTest prepare` needs the ready environment such a run leaves, and moves it to
 `<scratch>\preserved-msi-cygwin` so that the next `installWindowsUser` installs afresh.
 
