@@ -9,8 +9,10 @@
  * from Chromium, and {@link dev.jasper.browser.item.FaviconDecoder} turns a page's favicon into the image its tab and
  * address field show. A failed load shows {@link dev.jasper.browser.item.ErrorPage} in place of the page, as the
  * item's {@code ErrorPages} decide, whose Continue past a certificate error the plugin run's
- * {@code CertificateAllowance} remembers for every item, and
- * {@link dev.jasper.browser.item.PageHtml} gives Jasper's own pages the theme's colours. Each item saves its restore
+ * {@code CertificateAllowance} remembers for every item. View Source shows
+ * {@link dev.jasper.browser.item.SourcePage}, a page's source fetched again through the {@code http} package or as the
+ * item's {@code SourcePages} captured it, and {@link dev.jasper.browser.item.PageHtml} gives Jasper's own pages the
+ * theme's colours and their tokens. Each item saves its restore
  * state through the {@code restore} package, and {@code BrowserItems} opens saved ones again.
  */
 package dev.jasper.browser.item;

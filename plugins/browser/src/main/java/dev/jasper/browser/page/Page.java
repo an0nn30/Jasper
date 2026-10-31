@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -26,17 +27,21 @@ import org.cef.browser.CefFrame;
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
  * whether it loads, where it can go and its history, its find in page, its zoom, its failed loads and the certificates
- * it may go on past, and what it is asked to do. Its
+ * it may go on past, the HTML it shows, and what it is asked to do. Its
  * Chromium browser is made only once {@link #start} asks for it, the first time its item shows; until then the page
  * holds the address it will load and the zoom it will show at, and asks nothing of Chromium. Every method runs on the
  * UI thread, and so does every callback it makes. This is the one class that makes a {@link PageView}.
  */
 public final class Page implements AutoCloseable {
+    /** The longest {@link #source} waits for Chromium's HTML. */
+    static final long SOURCE_WAIT_SECONDS = 10;
     private final PageView view = new PageView();
     private final Runnable changed;
     private final Favicons favicons;
     private final Function<Page, CompletableFuture<NavigationHistory.History>> historyReader;
     private ObjIntConsumer<Page> historyJumper;
+    // Given the page, reads the HTML its main frame shows: Chromium's, or a test's.
+    private Function<Page, CompletableFuture<Optional<String>>> sourceReader = page -> chromiumSource(page.readyBrowser());
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
     private final List<IntConsumer> magnifies = new CopyOnWriteArrayList<>();
@@ -326,6 +331,20 @@ public final class Page implements AutoCloseable {
             iconFetch = null;
             faviconArrived(document, failure == null ? image : Optional.empty());
         }));
+    }
+
+    /**
+     * The HTML of the document the page's main frame shows now, as Chromium serializes it, the page's scripts' changes
+     * with it: what View Source shows of a page it does not fetch again. It completes on any thread, never with an
+     * exception: empty before the page has its browser, after {@link #close()}, and when Chromium gives nothing within
+     * {@value #SOURCE_WAIT_SECONDS} seconds.
+     *
+     * @return the HTML, to come
+     */
+    public CompletableFuture<Optional<String>> source() {
+        if (closed) return CompletableFuture.completedFuture(Optional.empty());
+        CompletableFuture<Optional<String>> read = sourceReader.apply(this);
+        return read == null ? CompletableFuture.completedFuture(Optional.empty()) : read;
     }
 
     /**
@@ -843,6 +862,11 @@ public final class Page implements AutoCloseable {
         historyJumper = Objects.requireNonNull(replacement, "replacement");
     }
 
+    /** Has the page read the HTML it shows with {@code replacement} from now on, as a test's. */
+    void useSourceReader(Function<Page, CompletableFuture<Optional<String>>> replacement) {
+        sourceReader = Objects.requireNonNull(replacement, "replacement");
+    }
+
     /** Has the page find with {@code replacement} from now on, as a test's recording one. */
     void useFind(PageFind replacement) {
         find = Objects.requireNonNull(replacement, "replacement");
@@ -909,6 +933,18 @@ public final class Page implements AutoCloseable {
         CompletableFuture<Optional<PixelImage>> fetch = iconFetch;
         iconFetch = null;
         if (fetch != null) fetch.cancel(true);
+    }
+
+    /** The HTML {@code browser}'s main frame shows, as Chromium's {@code getSource} gives it; none without a browser. */
+    private static CompletableFuture<Optional<String>> chromiumSource(PageBrowser browser) {
+        var source = new CompletableFuture<Optional<String>>();
+        if (browser == null) {
+            source.complete(Optional.empty());
+            return source;
+        }
+        source.completeOnTimeout(Optional.empty(), SOURCE_WAIT_SECONDS, TimeUnit.SECONDS);
+        browser.getSource(html -> source.complete(Optional.ofNullable(html)));
+        return source;
     }
 
     /** Whether two addresses are the same page: the same but for their fragments. */

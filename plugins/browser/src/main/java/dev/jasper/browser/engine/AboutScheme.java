@@ -5,13 +5,17 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -23,7 +27,9 @@ import java.util.regex.Pattern;
  * {@link AboutSchemeFactory} is Chromium's side of the scheme and loads only once Chromium starts. The scheme is local,
  * so web pages cannot link to it: Jasper's own pages, local {@code file:} pages and the address field reach an action,
  * and an action only does something in Jasper, such as opening Settings. A page or action may read the address it was
- * asked for, its query with it ({@link #parameter}); whatever it reads there, any of those may have written.
+ * asked for, its query with it ({@link #parameter}); whatever it reads there, any of those may have written. A page
+ * whose HTML takes time, as one fetched from the web does, is added with {@link #registerLater}, so that Chromium's IO
+ * thread, which asks for every page, is never held for it.
  */
 public final class AboutScheme {
     /** The scheme's name. */
@@ -33,6 +39,7 @@ public final class AboutScheme {
     private static final Answer NOT_FOUND = new Answer(404, ""), NO_CONTENT = new Answer(204, "");
     private final Map<String, Function<URI, String>> pages = new ConcurrentHashMap<>();
     private final Map<String, Consumer<URI>> actions = new ConcurrentHashMap<>();
+    private final Map<String, Later> later = new ConcurrentHashMap<>();
 
     /** An empty registry. */
     public AboutScheme() { }
@@ -63,6 +70,27 @@ public final class AboutScheme {
         Objects.requireNonNull(html, "html");
         claim(page);
         pages.put(page, html);
+    }
+
+    /**
+     * Adds {@code jasper-about:<page>}, whose HTML comes later: Chromium hands {@code html} the address it was asked for,
+     * its query with it, on its IO thread, once for each request, and {@code html} answers at once with the page to come,
+     * holding that thread no longer. The request waits for the page without holding the thread, for at most
+     * {@code wait}, and the page goes out as UTF-8. A page that fails, comes as null or has not come by then is answered
+     * 404 with an empty body; however the request ends, by the page, the wait or the request's own cancel, as when the
+     * user goes elsewhere, the page's future is cancelled, so its work ends with it.
+     *
+     * @param page the page's name: lowercase letters, digits and hyphens, starting with a letter
+     * @param wait the longest a request waits for the page
+     * @param html starts the page's HTML for the address, at once
+     * @throws IllegalArgumentException for any other name, one already taken, or a wait that is not positive
+     */
+    public synchronized void registerLater(String page, Duration wait, Function<URI, CompletableFuture<String>> html) {
+        Objects.requireNonNull(wait, "wait");
+        Objects.requireNonNull(html, "html");
+        if (wait.isNegative() || wait.isZero()) throw new IllegalArgumentException("A page's wait must be positive: " + wait);
+        claim(page);
+        later.put(page, new Later(wait, html));
     }
 
     /**
@@ -134,10 +162,11 @@ public final class AboutScheme {
     }
 
     /**
-     * What a request for an address gets: the page's HTML with 200; for an action, 204 and an empty body, the action
-     * handed to the UI thread; or 404 and an empty body for an unknown page, one with nothing to show, or an address that
-     * is no URI. Chromium writes the address as {@code jasper-about://<page>/}, the scheme being standard. Chromium's IO
-     * thread.
+     * What a request for an address gets at once: the page's HTML with 200; for an action, 204 and an empty body, the
+     * action handed to the UI thread; or 404 and an empty body for an unknown page, one with nothing to show, or an
+     * address that is no URI. A page {@link #registerLater} added is answered only by {@link #answerLater}, and is
+     * unknown here. Chromium writes the address as {@code jasper-about://<page>/}, the scheme being standard. Chromium's
+     * IO thread.
      */
     Answer answer(String address) {
         Optional<String> name = page(address);
@@ -153,10 +182,40 @@ public final class AboutScheme {
         return body == null ? NOT_FOUND : new Answer(200, body);
     }
 
+    /**
+     * What a request for an address gets, as {@link #answer} gives it, and for a page {@link #registerLater} added, once
+     * its HTML comes: 200 with it, or 404 and an empty body for a page that fails, comes as null or comes after its wait,
+     * and for an address that is no URI. Cancelling the answer cancels the page's future. Chromium's IO thread, which is
+     * held only as long as the page's {@code html} takes to answer its future; the answer completes on any thread.
+     */
+    CompletableFuture<Answer> answerLater(String address) {
+        Later page = page(address).map(later::get).orElse(null);
+        if (page == null) return CompletableFuture.completedFuture(answer(address));
+        URI uri = uri(address);
+        if (uri == null) return CompletableFuture.completedFuture(NOT_FOUND);
+        CompletableFuture<String> html;
+        try {
+            html = page.html().apply(uri);
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "A jasper-about page failed", failure);
+            return CompletableFuture.completedFuture(NOT_FOUND);
+        }
+        if (html == null) return CompletableFuture.completedFuture(NOT_FOUND);
+        var answer = new CompletableFuture<Answer>();
+        html.whenComplete((body, failure) -> {
+            if (failure != null && !(failure instanceof CancellationException))
+                LOG.log(System.Logger.Level.WARNING, "A jasper-about page failed", failure);
+            answer.complete(failure == null && body != null ? new Answer(200, body) : NOT_FOUND);
+        });
+        answer.completeOnTimeout(NOT_FOUND, page.longest().toNanos(), TimeUnit.NANOSECONDS);
+        answer.whenComplete((answered, failure) -> html.cancel(true));
+        return answer;
+    }
+
     private void claim(String name) {
         if (name == null || !PAGE.matcher(name).matches())
             throw new IllegalArgumentException("A jasper-about page's name is lowercase letters, digits and hyphens: " + name);
-        if (pages.containsKey(name) || actions.containsKey(name))
+        if (pages.containsKey(name) || actions.containsKey(name) || later.containsKey(name))
             throw new IllegalArgumentException(NAME + ":" + name + " is already registered");
     }
 
@@ -200,4 +259,7 @@ public final class AboutScheme {
      * @param html the body
      */
     record Answer(int status, String html) { }
+
+    /** A page whose HTML comes later, and the longest a request waits for it. */
+    private record Later(Duration longest, Function<URI, CompletableFuture<String>> html) { }
 }

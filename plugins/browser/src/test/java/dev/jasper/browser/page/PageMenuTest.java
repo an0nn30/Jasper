@@ -225,6 +225,22 @@ class PageMenuTest {
         });
     }
 
+    /** Spec section 10: View Source shows the page's source in its own item, at {@code jasper-about:source}. */
+    @Test void viewSourceShowsThePagesSourceInTheSameItem() throws Exception {
+        onUiThread(() -> {
+            open();
+            PageTestAccess.useSourceReader(page, read -> java.util.concurrent.CompletableFuture.completedFuture(Optional.of("<p>source</p>")));
+            show(plain());
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.view-source")).isTrue();
+            assertThat(ended).hasValue(1);
+        });
+        onUiThread(() -> {
+            assertThat(page.address()).as("once the page's HTML is read").startsWith("jasper-about:source?url=https%3A%2F%2Fexample.com&token=");
+            assertThat(items.items()).containsExactly(item);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
     /** Spec section 14: on Jasper's error page, the menu's Back and Reload are its item's, as the toolbar's are. */
     @Test void onAnErrorPageBackGoesPastTheFailedLoadAndReloadTriesItAgain() throws Exception {
         onUiThread(() -> {
@@ -399,7 +415,7 @@ class PageMenuTest {
     private static Page placed(ContentTab tab, List<String> copies) {
         var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons());
         page.setMenuPlace(new MenuPlace(tab, copies::add, () -> "Google", terms -> URI.create("https://google.com/search?q=" + terms),
-            page::canGoBack, page::back, page::reload));
+            page::canGoBack, page::back, page::reload, () -> { }));
         return page;
     }
 

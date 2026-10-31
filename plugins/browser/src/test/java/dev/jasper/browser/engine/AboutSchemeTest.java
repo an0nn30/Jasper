@@ -69,6 +69,66 @@ class AboutSchemeTest {
         assertThatThrownBy(() -> about.registerAction("Settings", () -> { })).isInstanceOf(IllegalArgumentException.class);
     }
 
+    /** P5: a page whose HTML comes later is answered once it arrives, and the thread that asked is not held for it. */
+    @Test void aLaterPageIsAnsweredOnceItsHtmlArrivesWithoutHoldingTheThreadThatAsked() throws Exception {
+        var about = new AboutScheme();
+        var html = new java.util.concurrent.CompletableFuture<String>();
+        var asked = new java.util.concurrent.atomic.AtomicReference<java.net.URI>();
+        about.registerLater("source", java.time.Duration.ofSeconds(10), address -> {
+            asked.set(address);
+            return html;
+        });
+        var answer = about.answerLater("jasper-about://source/?url=https%3A%2F%2Fexample.com");
+        assertThat(answer).as("answered later, not on this thread").isNotDone();
+        assertThat(asked.get()).isEqualTo(java.net.URI.create("jasper-about://source/?url=https%3A%2F%2Fexample.com"));
+        html.complete("<p>source</p>");
+        assertThat(answer.get(10, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(new AboutScheme.Answer(200, "<p>source</p>"));
+        assertThat(about.answer("jasper-about://source/")).as("a later page is answered only later").isEqualTo(new AboutScheme.Answer(404, ""));
+    }
+
+    @Test void aLaterPageThatFailsGivesNothingOrComesTooLateAnswers404() throws Exception {
+        var about = new AboutScheme();
+        var slow = new java.util.concurrent.CompletableFuture<String>();
+        about.registerLater("failing", java.time.Duration.ofSeconds(10),
+            address -> java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("broken")));
+        about.registerLater("empty", java.time.Duration.ofSeconds(10), address -> java.util.concurrent.CompletableFuture.completedFuture(null));
+        about.registerLater("throwing", java.time.Duration.ofSeconds(10), address -> { throw new IllegalStateException("thrown"); });
+        about.registerLater("slow", java.time.Duration.ofMillis(100), address -> slow);
+        for (String page : new String[] { "failing", "empty", "throwing", "slow" })
+            assertThat(about.answerLater("jasper-about://" + page + "/").get(10, java.util.concurrent.TimeUnit.SECONDS)).as(page)
+                .isEqualTo(new AboutScheme.Answer(404, ""));
+        assertThat(slow).as("given up on, so its work ends").isCancelled();
+        assertThat(about.answerLater("jasper-about://slow/?url=a b").get(10, java.util.concurrent.TimeUnit.SECONDS)).as("no URI")
+            .isEqualTo(new AboutScheme.Answer(404, ""));
+    }
+
+    /** A request that ends while it waits, as when the user goes elsewhere, ends its page's work. */
+    @Test void endingTheAnswerCancelsTheLaterPage() {
+        var about = new AboutScheme();
+        var html = new java.util.concurrent.CompletableFuture<String>();
+        about.registerLater("source", java.time.Duration.ofSeconds(10), address -> html);
+        about.answerLater("jasper-about:source").cancel(true);
+        assertThat(html).isCancelled();
+    }
+
+    @Test void pagesAndActionsAnswerLaterAsTheyAnswerNowAndShareTheirNamesWithLaterPages() throws Exception {
+        var about = new AboutScheme();
+        about.register("welcome", () -> "<h1>Welcome</h1>");
+        about.registerAction("settings", () -> { });
+        about.registerLater("source", java.time.Duration.ofSeconds(10), address -> java.util.concurrent.CompletableFuture.completedFuture("x"));
+        assertThat(about.answerLater("jasper-about://welcome/")).isCompletedWithValue(new AboutScheme.Answer(200, "<h1>Welcome</h1>"));
+        assertThat(about.answerLater("jasper-about://settings/")).isCompletedWithValue(new AboutScheme.Answer(204, ""));
+        assertThat(about.answerLater("jasper-about://missing/")).isCompletedWithValue(new AboutScheme.Answer(404, ""));
+        assertThatThrownBy(() -> about.registerLater("welcome", java.time.Duration.ofSeconds(1), address -> null))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("jasper-about:welcome");
+        assertThatThrownBy(() -> about.register("source", () -> "")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> about.registerAction("source", () -> { })).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> about.registerLater("Source", java.time.Duration.ofSeconds(1), address -> null))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> about.registerLater("later", java.time.Duration.ZERO, address -> null)).as("no wait")
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void aPageNameIsLowercaseLettersDigitsAndHyphensAndIsTakenOnce() {
         var about = new AboutScheme();
         about.register("new-tab2", () -> "");

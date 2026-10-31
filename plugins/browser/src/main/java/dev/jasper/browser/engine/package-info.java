@@ -1,6 +1,7 @@
 /**
- * Chromium's one life in a Jasper process: its start on first use, its settings, its {@code jasper-about:} pages, the
- * marker that it runs and its dispose. {@link dev.jasper.browser.engine.Chromium},
+ * Chromium's one life in a Jasper process: its start on first use, its settings, its {@code jasper-about:} pages, those
+ * whose HTML comes later answered without holding Chromium's IO thread, the marker that it runs and its dispose.
+ * {@link dev.jasper.browser.engine.Chromium},
  * {@link dev.jasper.browser.engine.AboutScheme}, {@link dev.jasper.browser.engine.RunMarker}, {@code StartOnce} and
  * {@code ChromiumLife}, which makes the life's decisions, load with the plugin's start and run no JCEF code until
  * Chromium starts; {@code ChromiumApp},

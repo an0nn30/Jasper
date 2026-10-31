@@ -16,7 +16,8 @@
  * {@link dev.jasper.browser.page.DialogPlace} is where the {@code dialogs} package shows a page's dialogs, as its item
  * gives it. {@code PageMenu} is the client's one context-menu handler: Jasper shows the page's right-click menu,
  * {@code PageMenuItems} for what is under the pointer, at the {@link dev.jasper.browser.page.MenuPlace} the item gives,
- * over its tab, and Chromium shows none. {@link dev.jasper.browser.page.LinkSchemes} decides which addresses a page's
+ * over its tab, and Chromium shows none; its View Source reads the page's HTML through {@code Page.source}.
+ * {@link dev.jasper.browser.page.LinkSchemes} decides which addresses a page's
  * links open, and which a page may open with Jasper's rights, for the {@code links} package and the menu.
  * {@link dev.jasper.browser.page.LoadFailure} is a main frame's failed load, as the load handler hands it to the page for
  * its item's error page, with the {@link dev.jasper.browser.page.ServerCertificate} Chromium could not verify for it,

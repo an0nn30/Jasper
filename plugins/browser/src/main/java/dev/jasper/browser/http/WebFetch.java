@@ -6,6 +6,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
@@ -94,6 +95,26 @@ public final class WebFetch implements AutoCloseable {
     public static boolean fetches(URI address) {
         String scheme = address.getScheme() == null ? "" : address.getScheme().toLowerCase(Locale.ROOT);
         return (scheme.equals("http") || scheme.equals("https")) && address.getHost() != null && address.getRawUserInfo() == null;
+    }
+
+    /**
+     * The charset an answer's {@code Content-Type} names, as its {@code charset} parameter.
+     *
+     * @param response an answer
+     * @return the charset; empty when the answer names none, or one the JDK does not know
+     */
+    public static Optional<Charset> charset(HttpResponse<?> response) {
+        for (String parameter : response.headers().firstValue("Content-Type").orElse("").split(";")) {
+            String[] pair = parameter.strip().split("=", 2);
+            if (pair.length == 2 && pair[0].strip().toLowerCase(Locale.ROOT).equals("charset")) {
+                try {
+                    return Optional.of(Charset.forName(pair[1].strip().replace("\"", "")));
+                } catch (IllegalArgumentException unknown) {
+                    return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     /**

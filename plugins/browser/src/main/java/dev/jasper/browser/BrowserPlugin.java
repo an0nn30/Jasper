@@ -6,6 +6,7 @@ import dev.jasper.browser.engine.Chromium;
 import dev.jasper.browser.engine.RunMarker;
 import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.ErrorPage;
+import dev.jasper.browser.item.SourcePage;
 import dev.jasper.browser.item.WebMenu;
 import dev.jasper.browser.links.PageNavigation;
 import dev.jasper.browser.restore.BrowserRestore;
@@ -30,7 +31,7 @@ import java.util.concurrent.RejectedExecutionException;
 /**
  * The Browser: web pages as Jasper items. Its start registers New Browser Tab, New Browser Window and the Browser split
  * item, the globe they show, the Web menu, Settings › Browser, the welcome page, the error page with its Try Again and
- * Continue actions, the Browser as Jasper's web browser,
+ * Continue actions, View Source's page, the Browser as Jasper's web browser,
  * the terminal's Open URL in Split items and the restorer of saved browser items, and makes Chromium's engine, which
  * starts Chromium only when a browser item first shows, so starting the plugin, and restoring its items, loads no
  * Chromium class. After a run that ended while Chromium ran, the items it restores wait to be loaded.
@@ -43,6 +44,7 @@ public class BrowserPlugin implements Plugin {
     private ExecutorService worker;
     private Chromium chromium;
     private BrowserItems items;
+    private SourcePage sources;
     private boolean running;
 
     /** Created by the runtime. */
@@ -77,6 +79,11 @@ public class BrowserPlugin implements Plugin {
         about.register(ErrorPage.NAME, errors::html);
         about.registerAction(ErrorPage.TRY_AGAIN, address -> { if (running) items.tryAgain(address); });
         about.registerAction(ErrorPage.PROCEED, address -> { if (running) items.proceed(address); });
+        // Spec section 10: View Source's page, fetched again or as its item captured it, and never built on Chromium's IO
+        // thread (P5).
+        var sources = new SourcePage(context.appearance(), context.background(), items::capturedSource);
+        this.sources = sources;
+        about.registerLater(SourcePage.NAME, SourcePage.WAIT, sources::html);
         // Spec section 5: New Browser Tab and New Browser Window, in the File menu and the palette, with no default key.
         context.actions().register(ActionSpec.of(NEW_TAB, "New Browser Tab").withIcon(BrowserItems.GLOBE)
                 .withKeywords(List.of("browser", "web", "page", "new", "tab")),
@@ -104,13 +111,15 @@ public class BrowserPlugin implements Plugin {
     }
 
     /**
-     * Jasper quits. The items' favicon fetches end. On the UI thread {@link Chromium#close()} only starts Chromium's
-     * dispose. The second close runs on the plugin's background executor and waits for Chromium's end: Jasper's quit
-     * waits for that work within its own shutdown grace, so quitting holds briefly for Chromium and never hangs on it.
+     * Jasper quits. The items' favicon fetches and View Source's fetches end. On the UI thread {@link Chromium#close()}
+     * only starts Chromium's dispose. The second close runs on the plugin's background executor and waits for Chromium's
+     * end: Jasper's quit waits for that work within its own shutdown grace, so quitting holds briefly for Chromium and
+     * never hangs on it.
      */
     @Override public void stop() {
         running = false;
         if (items != null) items.close();
+        if (sources != null) sources.close();
         chromium.close();
         try {
             context.background().execute(chromium::close);

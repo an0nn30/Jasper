@@ -90,6 +90,18 @@ public final class PageTestAccess {
     }
 
     /**
+     * Has {@code page} read the HTML its main frame shows with {@code reader} from now on, which is told the page: a
+     * test's, as a page without Chromium has none to read.
+     *
+     * @param page a page
+     * @param reader gives the HTML, or empty for none, as Chromium's {@code getSource} would
+     */
+    public static void useSourceReader(Page page, java.util.function.Function<Page, java.util.concurrent.CompletableFuture<
+            java.util.Optional<String>>> reader) {
+        page.useSourceReader(reader);
+    }
+
+    /**
      * The page's main frame is at {@code url}, as the client's display handler tells it when a navigation commits. UI
      * thread.
      *

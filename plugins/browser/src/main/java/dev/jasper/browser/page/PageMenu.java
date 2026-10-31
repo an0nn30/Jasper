@@ -30,8 +30,9 @@ import org.cef.handler.CefContextMenuHandlerAdapter;
  * page's item, which opens them in the tab next to its own with Jasper's rights, so only what the frame they are in
  * could open itself ({@link LinkSchemes#opensFrom}, R36); Cut, Copy, Paste and Select All as the page's Edit menu runs
  * them, on its focused frame, as Chrome's menu does; Search with ⟨engine⟩ in the next tab with the engine the settings
- * choose; Print… with Chromium's print dialog; and the copies with the plugin's clipboard. View Source and Inspect
- * Element show and do nothing yet: plan 4b's Tasks 9 and 10 give them their pages.
+ * choose; Print… with Chromium's print dialog; the copies with the plugin's clipboard; and View Source as the page's item
+ * runs it, showing the page's source in the item (spec section 10). Inspect Element shows and does nothing yet: plan
+ * 4b's Task 10 gives it DevTools.
  *
  * <p><b>Chromium's callback is never continued</b> (P37): it is always cancelled, exactly once, as the menu closes and
  * before the item chosen runs, whether one of the page's items is chosen, one of Jasper's runs or the menu is dismissed,
@@ -203,7 +204,7 @@ final class PageMenu {
             case PageMenuItems.COPY_TITLE -> {
                 if (!page.title().isEmpty()) place.clipboard().accept(page.title());
             }
-            case PageMenuItems.VIEW_SOURCE -> viewSource(page);
+            case PageMenuItems.VIEW_SOURCE -> place.viewSource().run();
             case PageMenuItems.INSPECT_ELEMENT -> inspectElement(page, pointed.at());
             default -> { }
         }
@@ -213,9 +214,6 @@ final class PageMenu {
     private static void openInNextTab(Page page, String from, Optional<String> address) {
         address.filter(url -> LinkSchemes.opensFrom(from, url)).ifPresent(url -> page.openItem(url, TabPlacement.NEXT_TAB));
     }
-
-    /** View Source: does nothing yet; plan 4b's Task 9 shows the page's source here. */
-    private static void viewSource(Page page) { }
 
     /** Inspect Element at {@code at} on the page's canvas: does nothing yet; plan 4b's Task 10 opens DevTools here. */
     private static void inspectElement(Page page, Point at) { }

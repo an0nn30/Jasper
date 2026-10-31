@@ -66,7 +66,9 @@ import javax.swing.JComponent;
  * {@link ErrorPages} decide: while it shows, the field, the tab and the restore state keep the address that failed, the
  * tab is called by the error's title, Back, Reload, Try Again and Continue act as Chrome's do, and Enter in the untouched
  * field loads the failed address as typed text would. While the page last committed is at an https address of a host
- * the user went on to past a certificate error, the toolbar says "Not secure". UI thread.
+ * the user went on to past a certificate error, the toolbar says "Not secure". View Source, from the page's right-click
+ * menu, shows the page's source in the item at {@code jasper-about:source} (spec section 10), as its {@link SourcePages}
+ * capture it; the item saves a source page without its token. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -84,6 +86,7 @@ public final class BrowserItem implements AutoCloseable {
     private final Optional<String> target;
     private final Page page;
     private final ErrorPages errors;
+    private final SourcePages sources;
     private final BrowserToolbar toolbar = new BrowserToolbar();
     private final BrowserFindBar findBar;
     private final UiView view;
@@ -117,6 +120,7 @@ public final class BrowserItem implements AutoCloseable {
         page.onAddressChange(this::committed);
         errors = new ErrorPages(page, items.certificates(), this::load);
         page.onLoadFailure(failure -> { if (!closed) errors.failed(failure); });
+        sources = new SourcePages(page, this::load);
         title = TabTitle.of("", host(url.toString()), "", false);
         findBar = new BrowserFindBar(() -> closed ? Optional.empty() : Optional.of(page.find()), this::render, this::focusFind);
         view = items.context().kit().create(spec(), this::event);
@@ -182,7 +186,7 @@ public final class BrowserItem implements AutoCloseable {
         // right-click menu, which copies with the plugin's clipboard and searches with the engine chosen as it opens.
         page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
         page.setMenuPlace(new MenuPlace(tab, items.context().platform()::copy, this::engineName, this::search, errors::canGoBack,
-            this::goBack, this::reload));
+            this::goBack, this::reload, this::viewSource));
         items.opened(this);
         present();
     }
@@ -291,6 +295,24 @@ public final class BrowserItem implements AutoCloseable {
         if (!closed) errors.proceed(token);
     }
 
+    /**
+     * View Source: the page's HTML is captured, and the item loads the page's source page ({@link SourcePages#show}).
+     */
+    void viewSource() {
+        if (!closed) sources.show();
+    }
+
+    /**
+     * The HTML the item captured for View Source under {@code token} for the page at {@code address}.
+     *
+     * @param token the token a source page's address carries
+     * @param address the page's address, without user information
+     * @return the HTML; empty when the item holds no such capture
+     */
+    Optional<String> capturedSource(String token, String address) {
+        return closed ? Optional.empty() : sources.source(token, address);
+    }
+
     /** Whether the item has asked for its page, which it does the first time it shows. */
     boolean pageAsked() {
         return asked;
@@ -348,6 +370,7 @@ public final class BrowserItem implements AutoCloseable {
     private void closed() {
         closed = true;
         endSuggestions();
+        sources.close();
         items.closed(this);
         view.close();
         page.close();
@@ -395,9 +418,12 @@ public final class BrowserItem implements AutoCloseable {
         tab.setRestore(restore(at));
     }
 
-    /** The item's restore state at {@code at}, with its own zoom, for the target it was opened for. */
+    /**
+     * The item's restore state at {@code at}, with its own zoom, for the target it was opened for: a source page without
+     * its token, which ends with the item.
+     */
     private Optional<RestoreState> restore(URI at) {
-        return BrowserRestore.state(at, target, ownZoom);
+        return BrowserRestore.state(SourcePage.saved(at), target, ownZoom);
     }
 
     /** Increase or Decrease Font Size: the page shows at {@code percent}, which the item saves as its own zoom. */

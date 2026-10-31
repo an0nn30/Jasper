@@ -27,9 +27,9 @@ import javax.swing.Timer;
  * The plugin's open browser items, in every window: it opens them, finds one by the OSC 8 target it was opened for,
  * and knows each window's focused one. It registers the globe every item shows, gives the items the settings and the
  * certificates the user went on past, shared by them all until Jasper quits, hands each error page's Try Again and
- * Continue to the item whose page it is, and holds the fetchers of their pages' favicons and their address fields' search
- * suggestions until {@link #close()}. A page is made, and Chromium so asked for, only when its item first shows. UI
- * thread.
+ * Continue to the item whose page it is, finds the item's capture a source page shows, and holds the fetchers of their
+ * pages' favicons and their address fields' search suggestions until {@link #close()}. A page is made, and Chromium so
+ * asked for, only when its item first shows. UI thread.
  */
 public final class BrowserItems implements AutoCloseable {
     /** The globe: a browser item's tab icon, and its actions' and split item's. */
@@ -170,6 +170,25 @@ public final class BrowserItems implements AutoCloseable {
     public void proceed(URI address) {
         Objects.requireNonNull(address, "address");
         AboutScheme.parameter(address.toString(), "token").ifPresent(token -> List.copyOf(open).forEach(item -> item.proceed(token)));
+    }
+
+    /**
+     * The HTML an open item captured for View Source under {@code token} for the page at {@code address}, which
+     * {@code jasper-about:source} shows (P42). The token is all a source page's address is taken for: 128 random bits
+     * that only the item that captured the HTML made, and only for that page.
+     *
+     * @param token the token the source page's address carries
+     * @param address the page's address, without user information
+     * @return the HTML; empty when no open item holds it
+     */
+    public Optional<String> capturedSource(String token, String address) {
+        Objects.requireNonNull(token, "token");
+        Objects.requireNonNull(address, "address");
+        for (BrowserItem item : open) {
+            Optional<String> source = item.capturedSource(token, address);
+            if (source.isPresent()) return source;
+        }
+        return Optional.empty();
     }
 
     /**

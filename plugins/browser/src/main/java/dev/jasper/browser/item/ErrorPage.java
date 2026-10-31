@@ -11,9 +11,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -51,11 +49,8 @@ public final class ErrorPage {
     private static final String CONTINUE = "Continue to this site (unsafe)";
     private static final String TOKEN = "token", CODE = "code", URL = "url", PROCEED_TOKEN = "proceed", SUBJECT = "subject",
         SELF_SIGNED = "self-signed";
-    private static final String ELLIPSIS = "…";
-    private static final Pattern TOKENS = Pattern.compile("[0-9a-f]{32}");
     // What Chromium names its errors; any other code the address carries is not shown.
     private static final Pattern CODES = Pattern.compile("ERR_[A-Z0-9_]{1,60}");
-    private static final SecureRandom RANDOM = new SecureRandom();
     private final Appearance appearance;
     private volatile Look look;
 
@@ -138,7 +133,7 @@ public final class ErrorPage {
      */
     static Optional<String> token(String address) {
         return AboutScheme.page(address).filter(NAME::equals).flatMap(page -> AboutScheme.parameter(address, TOKEN))
-            .filter(token -> TOKENS.matcher(token).matches());
+            .filter(PageHtml::isToken);
     }
 
     /**
@@ -234,21 +229,6 @@ public final class ErrorPage {
         }
     }
 
-    /** A random token, 32 lowercase hexadecimal digits. */
-    private static String newToken() {
-        var bytes = new byte[16];
-        RANDOM.nextBytes(bytes);
-        return HexFormat.of().formatHex(bytes);
-    }
-
-    /** {@code text} cut to {@code length} characters, the last an ellipsis, when it is longer. */
-    private static String cut(String text, int length) {
-        if (text.length() <= length) return text;
-        int end = length - 1;
-        if (Character.isHighSurrogate(text.charAt(end - 1))) end--;
-        return text.substring(0, end) + ELLIPSIS;
-    }
-
     /**
      * A load that failed in a browser item, as the item keeps it for its error page: Java's own record, read from
      * Chromium and never from an address, so its Try Again loads only what failed in the item and its Continue allows
@@ -278,8 +258,8 @@ public final class ErrorPage {
          */
         static Failure of(LoadFailure failure) {
             Optional<String> proceed = failure.certificate().isPresent() && ServerCertificate.overridable(failure.code())
-                ? Optional.of(newToken()) : Optional.empty();
-            return new Failure(failure.url(), failure.code(), newToken(), failure.certificate(), proceed);
+                ? Optional.of(PageHtml.newToken()) : Optional.empty();
+            return new Failure(failure.url(), failure.code(), PageHtml.newToken(), failure.certificate(), proceed);
         }
 
         /** The failure once Continue was used: it has no Continue any more. */
@@ -314,11 +294,11 @@ public final class ErrorPage {
     record Shown(String url, String code, String token, List<String> subjects, boolean selfSigned, Optional<String> proceed) {
         /** Rejects nulls, and keeps the address and the chain within their bounds. */
         Shown {
-            url = cut(NavigationHistory.withoutUserInfo(Objects.requireNonNull(url, "url")), MAX_URL);
+            url = PageHtml.cut(NavigationHistory.withoutUserInfo(Objects.requireNonNull(url, "url")), MAX_URL);
             Objects.requireNonNull(code, "code");
             Objects.requireNonNull(token, "token");
             var kept = new ArrayList<String>();
-            for (String subject : subjects) if (kept.size() < MAX_SUBJECTS) kept.add(cut(subject, MAX_SUBJECT));
+            for (String subject : subjects) if (kept.size() < MAX_SUBJECTS) kept.add(PageHtml.cut(subject, MAX_SUBJECT));
             subjects = List.copyOf(kept);
             Objects.requireNonNull(proceed, "proceed");
         }

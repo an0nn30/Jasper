@@ -4,11 +4,9 @@ import dev.jasper.browser.http.WebFetch;
 import dev.jasper.browser.json.StrictJson;
 import java.net.URI;
 import java.net.http.HttpResponse;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -71,7 +69,7 @@ final class SuggestionFetcher implements AutoCloseable {
 
     /** The suggestions of an answer, read in the charset its {@code Content-Type} names, else UTF-8. */
     private static List<String> answered(HttpResponse<byte[]> response) {
-        return read(new String(response.body(), charset(response.headers().firstValue("Content-Type").orElse(""))));
+        return read(new String(response.body(), WebFetch.charset(response).orElse(StandardCharsets.UTF_8)));
     }
 
     /**
@@ -85,19 +83,5 @@ final class SuggestionFetcher implements AutoCloseable {
         if (values.isEmpty() || values.get().size() < 2 || !(values.get().get(1) instanceof List<?> suggestions)) return List.of();
         return suggestions.stream().filter(String.class::isInstance).map(value -> ((String) value).strip()).filter(value -> !value.isEmpty())
             .toList();
-    }
-
-    private static Charset charset(String contentType) {
-        for (String parameter : contentType.split(";")) {
-            String[] pair = parameter.strip().split("=", 2);
-            if (pair.length == 2 && pair[0].strip().toLowerCase(Locale.ROOT).equals("charset")) {
-                try {
-                    return Charset.forName(pair[1].strip().replace("\"", ""));
-                } catch (IllegalArgumentException unknown) {
-                    return StandardCharsets.UTF_8;
-                }
-            }
-        }
-        return StandardCharsets.UTF_8;
     }
 }
