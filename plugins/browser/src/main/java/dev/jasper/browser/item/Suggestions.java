@@ -41,17 +41,18 @@ final class Suggestions {
      *   <li>then {@code stores}' rows.</li>
      * </ol>
      * When the typed text is itself a results page's address, a search for its terms comes first. A row whose id is
-     * already listed is left out.
+     * already listed is left out. Chromium's own {@code chrome:} pages are not offered (spec section 6; plan 4b's P45):
+     * {@code chrome:} text lists no row, and an engine's {@code chrome:} suggestion is left out.
      *
      * @param typed the field's text
      * @param settings the settings, which say what a results page is
      * @param engineSuggestions the engine's suggestions for the text, in its order
      * @param stores the rows of Jasper's bookmarks and history, in their order
-     * @return the rows; none for blank text
+     * @return the rows; none for blank or {@code chrome:} text
      */
     static List<Nodes.Suggestion> rank(String typed, BrowserSettings settings, List<String> engineSuggestions, List<Nodes.Suggestion> stores) {
         String text = typed.strip();
-        if (text.isEmpty()) return List.of();
+        if (!AddressInput.resolves(text)) return List.of();
         var rows = new Rows();
         Optional<URI> address = AddressInput.address(text);
         address.flatMap(typedAddress -> SearchEngine.queryOf(typedAddress, settings)).ifPresent(rows::search);
@@ -63,7 +64,7 @@ final class Suggestions {
         for (String suggestion : engineSuggestions) {
             if (engine == ENGINE_ROWS) break;
             String terms = suggestion.strip();
-            if (terms.isEmpty() || terms.equalsIgnoreCase(text)) continue;
+            if (!AddressInput.resolves(terms) || terms.equalsIgnoreCase(text)) continue;
             if (rows.add(new Nodes.Suggestion(SEARCH + terms, shown(terms), "Search Suggestion"))) engine++;
         }
         if (bareWord) address.ifPresent(rows::navigate);
@@ -77,19 +78,19 @@ final class Suggestions {
      * @param id a row's id
      * @param settings the settings, which choose the engine
      * @return the address, or the search for the terms; empty for an id that loads nothing, such as one of a
-     *     {@code chrome:} page or blank terms
+     *     {@code chrome:} page, blank terms or {@code chrome:} terms
      */
     static Optional<URI> target(String id, BrowserSettings settings) {
         if (id.startsWith(NAVIGATE)) return AddressInput.address(id.substring(NAVIGATE.length()));
         if (!id.startsWith(SEARCH)) return Optional.empty();
         String terms = id.substring(SEARCH.length()).strip();
-        return terms.isEmpty() ? Optional.empty() : Optional.of(settings.searchEngine().search(terms, settings));
+        return AddressInput.resolves(terms) ? Optional.of(settings.searchEngine().search(terms, settings)) : Optional.empty();
     }
 
     /**
      * Where to ask the engine for suggestions for {@code typed}. Plan 4b's P24: text that is an absolute local path,
      * has a {@code file:}, {@code about:} or {@code jasper-about:} scheme, or carries a user name or password is never
-     * sent, nor blank text or text over {@value #LONGEST} characters.
+     * sent, nor blank text, {@code chrome:} text (P45) or text over {@value #LONGEST} characters.
      *
      * @param typed the field's text
      * @param settings the settings, which choose the engine
@@ -97,7 +98,7 @@ final class Suggestions {
      */
     static Optional<URI> request(String typed, BrowserSettings settings) {
         String text = typed.strip();
-        if (text.isEmpty() || text.length() > LONGEST || AddressInput.localPath(text).isPresent()
+        if (!AddressInput.resolves(text) || text.length() > LONGEST || AddressInput.localPath(text).isPresent()
             || AddressInput.scheme(text).filter(LOCAL_SCHEMES::contains).isPresent() || userInfo(text)) return Optional.empty();
         return settings.searchEngine().suggestions(text, settings);
     }

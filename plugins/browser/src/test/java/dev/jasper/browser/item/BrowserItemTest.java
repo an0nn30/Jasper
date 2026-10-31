@@ -759,6 +759,31 @@ class BrowserItemTest {
         } });
     }
 
+    /**
+     * P45: a typed {@code chrome:} address lists no suggestion and asks the engine nothing, and Enter, through the
+     * field's own path, loads nothing and leaves the text in the field.
+     */
+    @Test void aChromeAddressOffersNothingAndEnterLoadsNothing() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var later = new Later();
+            var fetches = new Fetches();
+            var item = items(host, page -> { }, later, fetches).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            for (String text : List.of("chrome://version", "CHROME:settings")) {
+                view.type(BrowserToolbar.ADDRESS, text);
+                assertThat(view.suggestions(BrowserToolbar.ADDRESS)).as(text).isEmpty();
+                assertThat(Views.field(view, BrowserToolbar.ADDRESS).suggestionsLoading()).as(text).isFalse();
+                assertThat(later.waiting()).as(text).isEmpty();
+                view.press(BrowserToolbar.ADDRESS, "ENTER");
+                assertThat(item.page().address()).as(text).isEqualTo(EXAMPLE.toString());
+                assertThat(Views.field(view, BrowserToolbar.ADDRESS).value()).as("the text stays").isEqualTo(text);
+            }
+            later.end();
+            assertThat(fetches.asked).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
     /** Plan 4b's P27: Enter right after typing {@code localhost} or a host with a port navigates there. */
     @Test void enterRightAfterTypingAHostWithAPortNavigatesThere() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {

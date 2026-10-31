@@ -122,6 +122,24 @@ class SuggestionsTest {
             .as("custom without a suggestion URL").isEmpty();
     }
 
+    /**
+     * P45: Chromium's own {@code chrome:} pages are not offered (spec section 6), so {@code chrome:} text, in any case
+     * and with or without {@code //}, lists no row, loads nothing and asks the engine nothing; an engine's
+     * {@code chrome:} suggestion is left out.
+     */
+    @Test void chromeTextOffersNothing() {
+        for (String text : List.of("chrome://version", "  CHROME://settings ", "chrome:version", "Chrome:")) {
+            assertThat(Suggestions.rank(text, GOOGLE, List.of("chrome://version", "chrome browser"), List.of())).as(text).isEmpty();
+            assertThat(Suggestions.request(text, GOOGLE)).as(text).isEmpty();
+            assertThat(Suggestions.target("search:" + text, GOOGLE)).as(text).isEmpty();
+            assertThat(Suggestions.target("navigate:" + text, GOOGLE)).as(text).isEmpty();
+        }
+        assertThat(Suggestions.rank("chro", GOOGLE, List.of("chrome://flags", "CHROME:version", "chrome browser"), List.of()))
+            .extracting(Suggestion::id).as("the engine's chrome: suggestions left out")
+            .containsExactly("search:chro", "search:chrome browser", "navigate:https://chro");
+        assertThat(Suggestions.target("search:chrome browser", GOOGLE)).contains(URI.create("https://google.com/search?q=chrome+browser"));
+    }
+
     /** P24: typed local paths and passwords never reach the search engine, not even a password half typed. */
     @Test void localPathsLocalSchemesAndUserInfoAreNeverSent() {
         for (String text : java.util.List.of("", "   ", "/Users/me/secret.html", "~/notes.txt", "file:///etc/hosts", "FILE:/tmp/x",
