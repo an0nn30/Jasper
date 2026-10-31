@@ -2513,13 +2513,13 @@ public final class FakePluginHost implements AutoCloseable {
     record ProvidedBrowser(FakePluginContext context, dev.jasper.sdk.ui.WebBrowser browser) { }
     private volatile ProvidedBrowser providedBrowser;
 
-    /** Makes a plugin's browser the one web addresses open with, under the application's one-at-a-time rule. */
     /** Whether {@code pluginId} provides the browser now. */
     boolean providesBrowser(String pluginId) {
         ProvidedBrowser current = providedBrowser;
         return current != null && current.context().plugin().id().equals(pluginId);
     }
 
+    /** Makes a plugin's browser the one web addresses open with, under the application's one-at-a-time rule. */
     Subscription provideBrowser(FakePluginContext context, dev.jasper.sdk.ui.WebBrowser browser) {
         String pluginId = context.plugin().id();
         ProvidedBrowser current = providedBrowser;

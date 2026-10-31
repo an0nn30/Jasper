@@ -832,8 +832,15 @@ verifySupport.configure {
 
         // The system's default applications: a stand-in xdg-desktop-menu edits defaults.list files the way
         // make_lazy_default does (a new file moved over the old one, through a symlink to its target) and creates one.
-        // xdg-desktop-menu splits XDG_DATA_DIRS on whitespace too, so these paths have none.
+        // xdg-desktop-menu splits XDG_DATA_DIRS on whitespace too, so these paths must have none: under a build path
+        // with whitespace the case cannot be arranged, and is skipped.
         File handlers = new File(temporaryDir, 'default-handlers')
+        if (handlers.absolutePath =~ /\s/) {
+            work.deleteDir()
+            logger.lifecycle('Verified the Linux desktop entry and its MIME cache refresh; skipped the kept default applications, ' +
+                "since xdg-desktop-menu splits XDG_DATA_DIRS on the whitespace in ${handlers.absolutePath}")
+            return
+        }
         handlers.deleteDir()
         File xdgTools = new File(handlers, 'bin'), noMktemp = new File(handlers, 'no-mktemp'), badMktemp = new File(handlers, 'bad-mktemp')
         File temporary = new File(handlers, 'tmp'), etc = new File(handlers, 'etc')

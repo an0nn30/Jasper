@@ -2,6 +2,7 @@ package dev.jasper.app.platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import dev.jasper.app.testsupport.MutableClock;
@@ -133,21 +134,22 @@ class DefaultBrowserTest {
         assertThat(browser.isJasper()).isTrue();
     }
 
-    @Test void refreshChecksAtMostOncePerThirtySeconds() {
+    /** Ruling Q19: a user who changed the default and comes back to Jasper is seen at the next activation. */
+    @Test void refreshChecksAtMostOncePerFiveSeconds() {
         var clock = new MutableClock();
         var checks = new AtomicInteger();
         var browser = new DefaultBrowser(Runnable::run, clock, () -> Optional.of(checks.incrementAndGet() > 0));
         browser.refresh();
         assertThat(checks).hasValue(1);
-        clock.advance(Duration.ofSeconds(10));
+        clock.advance(Duration.ofSeconds(2));
         browser.refresh();
-        clock.advance(Duration.ofMillis(19_999));
+        clock.advance(Duration.ofMillis(2_999));
         browser.refresh();
-        assertThat(checks).as("within 30 seconds of the last check").hasValue(1);
+        assertThat(checks).as("within 5 seconds of the last check").hasValue(1);
         clock.advance(Duration.ofMillis(1));
         browser.refresh();
         browser.refresh();
-        assertThat(checks).as("30 seconds on, once").hasValue(2);
+        assertThat(checks).as("5 seconds on, once").hasValue(2);
     }
 
     @Test void aClockSetBackDoesNotStopTheChecks() {
@@ -209,7 +211,7 @@ class DefaultBrowserTest {
     }
 
     private static void next(MutableClock clock, DefaultBrowser browser) {
-        clock.advance(Duration.ofSeconds(30));
+        clock.advance(Duration.ofSeconds(5));
         browser.refresh();
     }
 
@@ -251,6 +253,33 @@ class DefaultBrowserTest {
         assertThat(offered).as("a refused check is not still running").hasValue(2);
     }
 
+    /**
+     * The final review (T1a): a worker that throws anything but {@link RejectedExecutionException} leaves no check
+     * running either, so the next one runs; what it threw is logged, and an {@link Error} still reaches the caller.
+     */
+    @Test void aWorkerThatThrowsLeavesNoCheckRunning() {
+        var clock = new MutableClock();
+        var failures = new ArrayDeque<Throwable>(List.of(new IllegalStateException("the worker broke"), new InternalError("the VM broke")));
+        var checks = new AtomicInteger();
+        var browser = new DefaultBrowser(work -> {
+            switch (failures.poll()) {
+                case null -> work.run();
+                case RuntimeException failure -> throw failure;
+                case Error failure -> throw failure;
+                default -> throw new AssertionError();
+            }
+        }, clock, () -> Optional.of(checks.incrementAndGet() > 0));
+        try (var log = dev.jasper.app.testsupport.LogRecorder.of(DefaultBrowser.class.getName())) {
+            assertThatCode(browser::refresh).doesNotThrowAnyException();
+            assertThat(log.warnings()).containsExactly("The default browser check could not be started");
+        }
+        clock.advance(Duration.ofSeconds(5));
+        assertThatThrownBy(browser::refresh).isInstanceOf(InternalError.class).hasMessage("the VM broke");
+        next(clock, browser);
+        assertThat(checks).as("neither left a check running").hasValue(1);
+        assertThat(browser.isJasper()).isTrue();
+    }
+
     @Test void aSlowCheckNeverBlocksTheCaller() throws Exception {
         var release = new CountDownLatch(1);
         var finished = new CountDownLatch(1);
@@ -272,7 +301,8 @@ class DefaultBrowserTest {
         var clock = new MutableClock();
         var queued = new ArrayDeque<Runnable>();
         var answers = new ArrayDeque<>(List.of(Optional.<Boolean>empty(), Optional.of(true), Optional.of(false)));
-        var browser = new DefaultBrowser(queued::add, clock, answers::remove);
+        // A bound the test never reaches: only the checks below answer.
+        var browser = new DefaultBrowser(queued::add, clock, answers::remove, Duration.ofHours(1));
         CompletableFuture<Boolean> first = browser.firstAnswer();
         assertThat(first).as("before any check").isNotDone();
         browser.refresh();
@@ -300,7 +330,7 @@ class DefaultBrowserTest {
     }
 
     @Test void completingTheReturnedFutureChangesNothing() {
-        var browser = new DefaultBrowser(new ArrayDeque<Runnable>()::add, new MutableClock(), () -> Optional.of(false));
+        var browser = new DefaultBrowser(new ArrayDeque<Runnable>()::add, new MutableClock(), () -> Optional.of(false), Duration.ofHours(1));
         assertThat(browser.firstAnswer().complete(true)).isTrue();
         assertThat(browser.firstAnswer()).isNotDone();
         assertThat(browser.isJasper()).isFalse();
@@ -343,11 +373,17 @@ class DefaultBrowserTest {
         var answer = new CompletableFuture<Optional<String>>();
         Thread.ofVirtual().start(() -> answer.complete(DefaultBrowser.run(List.of("/bin/sh", "-c", "sleep 30; :"), Duration.ofSeconds(2))));
         ProcessHandle sleeper = null;
+        boolean unnamed = false;
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
         while (sleeper == null && System.nanoTime() < deadline) {
-            sleeper = ProcessHandle.current().descendants().filter(process -> !before.contains(process.pid()))
-                .filter(process -> process.info().command().orElse("").endsWith("sleep")).findFirst().orElse(null);
+            List<ProcessHandle> started = ProcessHandle.current().descendants().filter(process -> !before.contains(process.pid())).toList();
+            sleeper = started.stream().filter(process -> process.info().command().orElse("").endsWith("sleep")).findFirst().orElse(null);
+            unnamed |= started.stream().anyMatch(process -> process.info().command().isEmpty());
             if (sleeper == null) Thread.sleep(10);
+        }
+        if (sleeper == null) {
+            assertThat(answer.get(10, TimeUnit.SECONDS)).isEmpty();
+            assumeTrue(!unnamed, "this system does not say which program the shell's child runs, so it cannot be found");
         }
         assertThat(sleeper).as("the shell's own child, found while the shell waits").isNotNull();
         assertThat(answer.get(10, TimeUnit.SECONDS)).isEmpty();

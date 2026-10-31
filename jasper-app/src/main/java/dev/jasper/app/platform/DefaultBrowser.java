@@ -47,8 +47,11 @@ public final class DefaultBrowser {
     private static final List<String> XDG_SETTINGS = List.of("xdg-settings", "get", "default-web-browser");
     /** How long the Linux tool may take. */
     private static final Duration TIMEOUT = Duration.ofSeconds(2);
-    /** The shortest time between two checks. */
-    private static final Duration INTERVAL = Duration.ofSeconds(30);
+    /**
+     * The shortest time between two checks: short enough that coming back to Jasper after changing the default is seen
+     * at that activation (ruling Q19), since a check takes microseconds, or well under a second for {@code xdg-settings}.
+     */
+    private static final Duration INTERVAL = Duration.ofSeconds(5);
     /** How long {@link #firstAnswer} waits for an answer before it says no. */
     private static final Duration FIRST_ANSWER_WITHIN = Duration.ofSeconds(3);
 
@@ -120,7 +123,7 @@ public final class DefaultBrowser {
     public void onChanged(Consumer<Boolean> listener) { changed = Objects.requireNonNull(listener, "listener"); }
 
     /**
-     * Checks again on the worker, unless a check is still running or the last one began less than 30 seconds ago.
+     * Checks again on the worker, unless a check is still running or the last one began less than 5 seconds ago.
      * Returns at once; any thread. Called at start-up and whenever a Jasper window activates, which is when the user
      * may have changed the setting.
      */
@@ -138,6 +141,11 @@ public final class DefaultBrowser {
         } catch (RejectedExecutionException closed) {
             finished();
             LOG.log(System.Logger.Level.DEBUG, "The default browser check was not run", closed);
+        } catch (RuntimeException | Error failure) {
+            // A check that never started must not count as running, which would hold every later one back.
+            finished();
+            if (failure instanceof Error error) throw error;
+            LOG.log(System.Logger.Level.WARNING, "The default browser check could not be started", failure);
         }
     }
 

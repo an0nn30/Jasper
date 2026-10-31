@@ -191,11 +191,11 @@ class JasperApplicationWindowsTest {
                 application.residency(true);
                 application.open(List.of(), JasperApplication.HANDOFF);
                 var first = application.windows().windows().getFirst();
-                clock.advance(Duration.ofSeconds(30));
+                clock.advance(Duration.ofSeconds(5));
                 first.events().activated().accept(true);
                 assertThat(checks).as("asked again as a window activates").hasValue(2);
                 first.events().activated().accept(true);
-                assertThat(checks).as("at most once per 30 seconds").hasValue(2);
+                assertThat(checks).as("at most once per 5 seconds").hasValue(2);
             });
         } finally {
             edt(application::quitNow);
