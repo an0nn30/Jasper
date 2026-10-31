@@ -3,13 +3,13 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Execution status (2026-10-31): Tasks 1-7 executed and reviewed, and the final review ("With fixes") and its fix
-wave; Task 7 Step 3, the user's check on macOS, is pending** (branch `claude/browser-default-browser`, worktree
-`.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `4e0ce0a14`, which has plan 4b merged; commits
-`ff4a7bfc9` to `a56f78cc4`, the docs `120cf12e3`, then the fix wave `e831f6939` to `4b3de41f8` and its docs; not
-merged or pushed; see `docs/STATUS.md`). Executed with per-task subagents and reviews; the controller's rulings are
-numbered Q1-Q19. The task reviews and the final review recorded these deviations from the plan's text, each with its
-ruling:
+**Execution status (2026-10-31): Tasks 1-7 executed and reviewed, and the final review ("With fixes"), its fix wave and
+the re-review's fix (Q22); Task 7 Step 3, the user's check on macOS, is pending** (branch
+`claude/browser-default-browser`, worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `4e0ce0a14`,
+which has plan 4b merged; commits `ff4a7bfc9` to `a56f78cc4`, the docs `120cf12e3`, then the fix wave `e831f6939` to
+`4b3de41f8` and its docs, then `513e86648`; not merged or pushed; see `docs/STATUS.md`). Executed with per-task subagents
+and reviews; the controller's rulings are numbered Q1-Q22. The task reviews and the final review recorded these
+deviations from the plan's text, each with its ruling:
 - **SDK:** the additions are `@since 0.28.0`, the minor after plan 4b's 0.27.0, and every bundled range is
   `>=0.28.0, <0.29`.
 - **Task 1:**
@@ -127,6 +127,20 @@ ruling:
   - Q19: `DefaultBrowser` re-checks at most every 5 s, not 30 s;
   - Restart Now in the restart offer opens the link the notice was posted for (the newest) once Jasper has restarted;
   - the minors T1a-c, T2a, T3a, T3c, T3e, T4a and T6d below;
+  - Q20: the two SDK Javadoc edits stay; Q21: the three gaps the wave recorded (the testkit fake, the split items, the
+    notice deciding from the address alone) are accepted;
+  - Q22, the re-review: `withAsciiHost` spliced the decoded host in unchecked, so a host whose decoded or full-width
+    mapped form held a delimiter moved part of itself into the path, query, fragment or user info
+    (`http://evil.com%2F.good.com/x` opened `evil.com`, `http://good.com%40evil.com/x` too, and `%23`, `%3F`, `／`, `＠`
+    and `＃` likewise). It now converts with `IDN.toASCII(host, USE_STD3_ASCII_RULES)` and keeps the result only when
+    `URI` reads the converted host as the host and the user info, port, path, query and fragment as they were; a host
+    with `ß`, `ς`, a zero-width non-joiner or joiner stays as it is, since IDNA2003 maps it to another domain than
+    browsers reach (`faß.de` to `fass.de`), so it goes to the system browser or the notice. Restart Now passes the
+    link without its user info, as the notice shows it, and no address when that is no web address. Recorded: on the
+    non-tail replay path (T5), a hand-typed `Jasper https://x/` launch whose link raised the notice could open twice
+    after Restart Now; `WebAddressItems.java:92` builds its `WebLink` from the raw address (within Q21's gaps).
+    `./gradlew check` after it (10m 49s): 14,572 tests, 0 failures, 0 errors, 103 skipped (jasper-app 5,255); the
+    example external plugin's `check pluginZip` passed (1 test);
   - `./gradlew check` passed after the wave (15m 45s): 14,569 tests, 0 failures, 0 errors, 103 skipped (jasper-app
     5,252, Browser 532; the 16 build folders); the example external plugin's `check pluginZip` passed (1 test);
     `sdkReference` was rerun; source hygiene is clean over 3,256 Java files.
@@ -153,7 +167,11 @@ Known gaps and follow-ups:
 - **Split items:** a selected address with an internationalized host gets no Open URL in Split Right and Down, since
   `MenuEntry.WebAddressItem.addressIn` needs a host `java.net.URI` reads (T4b's copies of the rule).
 - **Testkit:** the fake gives the browser an internationalized host as the plugin gave it, where Jasper gives it in
-  ASCII, so in the fake an `openInBrowser` of one reaches `browsed()`.
+  ASCII, so in the fake an `openInBrowser` of one reaches `browsed()` (Q21).
+- **The new notice** decides from the address alone whether the browser saw it: a direct `PluginRuntime.openLink` with
+  a target no `WebLink` holds is logged as declined (Q21).
+- **IDNA2003:** a host with `ß`, `ς` or a zero-width joiner never reaches Jasper's browser; the system browser or the
+  notice has it (Q22's cost).
 - **Launch arguments:** `[` and `]` in a path, a `\` in the authority and raw tabs are refused as "Not a web address"
   rather than encoded; on Windows a link with a raw `"` loses it, or is refused when it splits (Q13's cost); a
   `RestartCommand` replay on the non-launcher path keeps positional paths and URLs by spelling (before this plan).

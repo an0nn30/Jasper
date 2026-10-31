@@ -234,7 +234,8 @@ Each is pending.
   notice of a link from another app: the restarted Jasper opens that link in the Browser.
 - **Hosts the browser takes or cannot (Q17):** while Jasper is the default, a link from another app (for example
   `open https://bücher.de/`) with an internationalized host opens in Jasper's browser; one with `_` in its host
-  (`open http://my_service:8080/`) shows "Jasper’s browser can’t open this address" with the address and Copy Link.
+  (`open http://my_service:8080/`), and one with `ß` (`open https://faß.de/`, Q22), show "Jasper’s browser can’t open
+  this address" with the address and Copy Link.
 
 ### Plan 4c on Windows (not run)
 

@@ -425,9 +425,10 @@ as is a failed `Platform.browse`, which accepts only an absolute http or https a
 `Platform.browser` (needs `browser.provide`) registers a `WebBrowser` in `plugins.WebBrowsers`, one at a time, by the
 same bundled rule; it runs on the UI thread and must not block, so nothing waits for it. `PluginRuntime.openLink`
 (`LinkOrigin.CLICK`, with a `PluginRuntime.Placement` and an OSC 8 target) and `openExternalLink` (`EXTERNAL`) ask it on
-the UI thread with a `WebLink`, an internationalized host given in ASCII (`platform.Browser.withAsciiHost`), and hand
-the address to the system browser when no plugin provides one, the parts make no `WebLink` even so
-(`PluginRuntime.reachesBrowser`), it declines or it throws. `openLocalWebFile` asks it for a `file:` link and answers whether it took it.
+the UI thread with a `WebLink`, an internationalized host given in ASCII when it converts exactly
+(`platform.Browser.withAsciiHost`), and hand the address to the system browser when no plugin provides one, the parts
+make no `WebLink` even so (`PluginRuntime.reachesBrowser`), it declines or it throws. `openLocalWebFile` asks it for a
+`file:` link and answers whether it took it.
 A Cmd-click (Ctrl-click on Linux and Windows) on a URL in any terminal pane reaches `TerminalView.setLinkOpener`, which
 `TabHost` points at the window's `WindowContent.onOpenLink`; `TabHost` first makes the clicked pane the active one and
 passes a `LinkClick` (the `TerminalLink` and whether the pane is wider than tall). `JasperApplication.openLink` sends

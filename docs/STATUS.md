@@ -34,8 +34,8 @@ system's default web browser:
   "Web links can’t open in Jasper" offers Turn On Browser (then Restart Now, which opens the link after the restart)
   and Copy Link, and with one provided, an address it never saw because it makes no `WebLink` (a `_` in its host)
   posts "Jasper’s browser can’t open this address" with Copy Link (Q17); an internationalized host reaches the
-  browser in ASCII; an address the system hands back within 10 s of Jasper handing it there is never handed there
-  again.
+  browser in ASCII when it converts exactly (Q22); an address the system hands back within 10 s of Jasper handing it
+  there is never handed there again.
 
 SDK 0.28.0 adds `Platform.isDefaultBrowser()` and `Platform.onDefaultBrowserChanged(Consumer<Boolean>)`, with the
 testkit's `FakePluginHost.setDefaultBrowser` and `ContractHarness.defaultBrowser`; while Jasper is the default,
@@ -66,6 +66,15 @@ SDK architecture, plugin authoring, the testkit README, the regenerated SDK refe
 external plugin's `check pluginZip` passes (1 test); `verifyPackagingSupport` passes, and skips the defaults fixture,
 saying why, when its folder's path has whitespace; source hygiene is clean over 3,256 Java files.
 
+The re-review confirmed the wave but found `withAsciiHost` unsafe (Q22), fixed in `513e86648`: a host whose decoded or
+full-width-mapped form held a delimiter moved part of itself into the path, query, fragment or user info
+(`http://evil.com%2F.good.com/x` opened `evil.com`). It now converts under the STD3 rules and keeps the result only when
+the host, user info, port, path, query and fragment round-trip exactly; a host with `ß`, `ς`, a zero-width joiner or
+non-joiner stays as it is, since `java.net.IDN`'s IDNA2003 maps it to another domain (`faß.de` to `fass.de`), and goes
+to the system browser or the notice; Restart Now opens the link without its user info. `./gradlew check` after it (10m 49s): **14,572 tests, 0 failures, 0
+errors, 103 skipped** (jasper-app 5,255 with 90 skipped); the example external plugin's `check pluginZip` passes (1
+test).
+
 The controller's rulings, one line each:
 - Q1: "Web links can’t open in Jasper" posts only when no plugin provides a browser; a provided browser that declines
   (Chromium could not start) keeps its own notice, and nothing opens.
@@ -93,6 +102,11 @@ The controller's rulings, one line each:
   `WebLink`) posts "Jasper’s browser can’t open this address" with Copy Link; no SDK API change.
 - Q18: `--url` also takes one `file:` URL that names a local file, opening it as that path; still one argument.
 - Q19: `DefaultBrowser` re-checks at most every 5 s, not 30 s.
+- Q20: the two SDK Javadoc edits of the wave (`WebLink`'s address, `Platform.browser`) stay.
+- Q21: the three gaps the wave recorded are accepted: the testkit fake gives an internationalized host as given, a
+  selected one gets no split items, and the new notice decides from the address alone.
+- Q22: an internationalized host converts only under the STD3 rules and when it round-trips exactly; one IDNA2003 maps
+  to another domain (`ß`, `ς`, zero-width joiners) stays as it is; Restart Now passes the link without its user info.
 
 Known gaps and follow-ups (the banner has them all, with the deferred minors by task and how the final review triaged
 them): the check runs only at start-up and on window activation, at most every 5 s, so a change is seen at the next
