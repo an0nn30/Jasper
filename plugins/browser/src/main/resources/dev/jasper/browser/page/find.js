@@ -6,9 +6,11 @@
  * - {action: "search", search, query, matchCase, regex} finds the query, at most 1,000 characters, in the frame's
  *   visible text: as plain text, whose runs of white space match any, or as a JavaScript regular expression (RegExp,
  *   "i" added when case does not matter). The text is read a block at a time: what one block-level element holds, up
- *   to a <br>, each run of white space as one space, so a match may span inline elements and the source's line breaks.
+ *   to a <br> or another block-level element, each run of white space (space, tab, line feed, form feed, carriage
+ *   return and no-break space) as one space, so a match may span inline elements and the source's line breaks.
  *   It highlights every match in #FFFF00 with the CSS Custom Highlight API, which leaves the page's nodes and scripts
- *   alone, and answers {search, count, invalid}. A search keeps at most 10,000 matches, or those it found in 250 ms.
+ *   alone, and answers {search, count, invalid}. A search keeps at most 10,000 matches, or those it found in the text
+ *   it collected in 250 ms.
  *   Until the next search or clear, a change to the document's nodes, text or hidden, open, class or style attributes
  *   runs the search again, after 300 ms or ten times as long as the search before took, whichever is longer, and no
  *   more once a search ran out of time; it answers again when the count changes, and the current match stays current,
@@ -50,6 +52,10 @@
       acceptNode: node => node.nodeType === Node.ELEMENT_NODE && UNSEARCHED.has(node.localName)
         ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
     };
+    // White space a page's text collapses, and the no-break space, which find takes as one; the query's is read alike.
+    // What collapses: a run of two or more, or one that is not a space; a lone space stays as it is.
+    const NBSP = String.fromCharCode(160), WHITE = '[ \\t\\n\\f\\r' + NBSP + ']';
+    const COLLAPSING = new RegExp(WHITE + '{2,}|[\\t\\n\\f\\r' + NBSP + ']', 'g'), BLANKS = new RegExp(WHITE + '+', 'g');
     const WATCHED = {childList: true, subtree: true, characterData: true, attributes: true,
       attributeFilter: ['hidden', 'open', 'class', 'style']};
     const query = window.jasperBridgeQuery;
@@ -76,7 +82,7 @@
     }
 
     // The regions a collapsed aria-expanded control names, by id, with the control.
-    function collapsed() {
+    function controlled() {
       const named = new Map();
       for (const control of document.querySelectorAll('[aria-expanded="false"][aria-controls]')) {
         for (const id of control.getAttribute('aria-controls').split(/\s+/)) if (id !== '' && !named.has(id)) named.set(id, control);
@@ -84,10 +90,15 @@
       return named;
     }
 
+    // Whether element is hidden="until-found", its value read ASCII case-insensitively, as HTML reads it.
+    function untilFound(element) {
+      const value = element.getAttribute('hidden');
+      return value !== null && value.replace(/[A-Z]/g, letter => letter.toLowerCase()) === 'until-found';
+    }
+
     // Whether find opens element: a closed details, a hidden="until-found" element, or a collapsed control's region.
     function opens(element, named) {
-      return element.localName === 'details' && !element.open || element.getAttribute('hidden') === 'until-found'
-        || element.id !== '' && named.has(element.id);
+      return element.localName === 'details' && !element.open || untilFound(element) || element.id !== '' && named.has(element.id);
     }
 
     // The element, or its nearest ancestor with a box of its own: display: contents makes none.
@@ -122,46 +133,96 @@
       return counts;
     }
 
-    // The block a text's element lies in: the nearest element, itself included, whose display is no inline kind
-    // (inline, inline-block, inline-flex and so on) and not contents.
-    function blockOf(element, blocks) {
+    // The element's computed display, once per element in a pass.
+    function displayOf(element, pass) {
+      let display = pass.displays.get(element);
+      if (display === undefined) {
+        display = getComputedStyle(element).display;
+        pass.displays.set(element, display);
+      }
+      return display;
+    }
+
+    // Whether a display lays an element out as a block: no inline kind (inline, inline-block, inline-flex and so on),
+    // not contents and not none.
+    function block(display) {
+      return !display.startsWith('inline') && display !== 'contents' && display !== 'none';
+    }
+
+    // The block a text's element lies in: the nearest element, itself included, whose display is no inline kind and
+    // not contents.
+    function blockOf(element, pass) {
       const passed = [];
-      let block = null;
+      let found = null;
       for (let at = element; at !== null; at = at.parentElement) {
-        const known = blocks.get(at);
+        const known = pass.blocks.get(at);
         if (known !== undefined) {
-          block = known;
+          found = known;
           break;
         }
         passed.push(at);
-        const display = getComputedStyle(at).display;
+        const display = displayOf(at, pass);
         if (!display.startsWith('inline') && display !== 'contents') {
-          block = at;
+          found = at;
           break;
         }
       }
-      for (const each of passed) blocks.set(each, block);
-      return block;
+      for (const each of passed) pass.blocks.set(each, found);
+      return found;
     }
 
-    // Whether a character is white space a page's text collapses, or a no-break space, which find takes as one.
-    function blank(code) {
-      return code === 32 || code === 9 || code === 10 || code === 12 || code === 13 || code === 160;
+    // text with each run of white space as one space: the text, and after each run of two or more, the offset its next
+    // character takes and how many characters were dropped up to there. One native replace, which leaves lone spaces,
+    // the most of a page's white space, alone: no loop over characters.
+    function collapse(text) {
+      const points = [], dropped = [];
+      let gone = 0;
+      const collapsed = text.replace(COLLAPSING, (spaces, at) => {
+        if (spaces.length > 1) {
+          gone += spaces.length - 1;
+          points.push(at - gone + spaces.length);
+          dropped.push(gone);
+        }
+        return ' ';
+      });
+      return {collapsed, points, dropped};
     }
 
-    // Adds node's text to the run, each run of white space as one space, noting where each character came from.
-    function append(run, node) {
-      const text = node.nodeValue, index = run.nodes.push(node) - 1;
-      let added = '';
-      for (let at = 0; at < text.length; at++) {
-        const space = blank(text.charCodeAt(at));
-        if (space && run.space) continue;
-        added += space ? ' ' : text[at];
-        run.at.push(at);
-        run.which.push(index);
-        run.space = space;
+    // The index of the last of the ascending values that is at most target; -1 for none.
+    function lastAtMost(values, target) {
+      let low = 0, high = values.length - 1, found = -1;
+      while (low <= high) {
+        const middle = (low + high) >> 1;
+        if (values[middle] <= target) {
+          found = middle;
+          low = middle + 1;
+        } else {
+          high = middle - 1;
+        }
       }
-      run.text += added;
+      return found;
+    }
+
+    // Adds node's text to the run, collapsed; a space that would follow the run's own is dropped.
+    function append(run, node) {
+      let {collapsed, points, dropped} = collapse(node.nodeValue), lead = 0;
+      if (run.space && collapsed.startsWith(' ')) {
+        collapsed = collapsed.slice(1);
+        lead = 1;
+      }
+      if (collapsed === '') return;
+      run.starts.push(run.length);
+      run.segments.push({node, lead, points, dropped});
+      run.parts.push(collapsed);
+      run.length += collapsed.length;
+      run.space = collapsed.endsWith(' ');
+    }
+
+    // Where character index of the run's text came from: its node, and its offset in that node's text.
+    function locate(run, index) {
+      const at = lastAtMost(run.starts, index), segment = run.segments[at];
+      const inner = index - run.starts[at] + segment.lead, point = lastAtMost(segment.points, inner);
+      return {node: segment.node, offset: inner + (point < 0 ? 0 : segment.dropped[point])};
     }
 
     // Whether the pass is over: it holds every match it may keep, or its time is up.
@@ -170,45 +231,49 @@
       return pass.late || pass.found.length >= MATCHES;
     }
 
-    // Finds the pattern in the run's text and keeps a range for each match, across its nodes. Answers null: what follows
-    // starts a run of its own.
-    function seek(run, pass) {
+    // Finds the pattern in the run's text and keeps a range for each match, across its nodes, until the pass is over, or
+    // with anyway, whatever the time. Answers null: what follows starts a run of its own.
+    function seek(run, pass, anyway) {
       if (run === null) return null;
+      const text = run.parts.join('');
       pattern.lastIndex = 0;
       let hit;
-      while (!over(pass) && (hit = pattern.exec(run.text)) !== null) {
+      while (pass.found.length < MATCHES && (anyway || !over(pass)) && (hit = pattern.exec(text)) !== null) {
         if (hit[0] === '') {
           pattern.lastIndex++;
           continue;
         }
-        const first = hit.index, last = hit.index + hit[0].length - 1;
+        const start = locate(run, hit.index), end = locate(run, hit.index + hit[0].length - 1);
         const range = document.createRange();
-        range.setStart(run.nodes[run.which[first]], run.at[first]);
-        range.setEnd(run.nodes[run.which[last]], run.at[last] + 1);
+        range.setStart(start.node, start.offset);
+        range.setEnd(end.node, end.offset + 1);
         pass.found.push(range);
       }
       return null;
     }
 
-    // Every match in the document's visible text, in document order, read a block at a time.
+    // Every match in the document's visible text, in document order, read a block at a time. A block-level element,
+    // with text or without, and a <br> end the text before them. Once its time is up, a pass still searches the text it
+    // collected, so a page counts what the pass reached.
     function matches() {
       const started = performance.now();
-      const pass = {deadline: started + BUDGET, late: false, found: [], named: collapsed(), blocks: new Map(), counted: new Map()};
+      const pass = {deadline: started + BUDGET, late: false, found: [], named: controlled(), displays: new Map(), blocks: new Map(),
+        counted: new Map()};
       const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, FILTER);
       let run = null;
       for (let node = walker.nextNode(); node !== null && !over(pass); node = walker.nextNode()) {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          if (node.localName === 'br') run = seek(run, pass);
+          if (node.localName === 'br' || block(displayOf(node, pass))) run = seek(run, pass, false);
           continue;
         }
         const parent = node.parentElement;
         if (!node.nodeValue || parent === null || !counted(parent, pass)) continue;
-        const block = blockOf(parent, pass.blocks);
-        if (run !== null && run.block !== block) run = seek(run, pass);
-        if (run === null) run = {block, text: '', nodes: [], at: [], which: [], space: false};
+        const within = blockOf(parent, pass);
+        if (run !== null && run.block !== within) run = seek(run, pass, false);
+        if (run === null) run = {block: within, parts: [], starts: [], segments: [], length: 0, space: false};
         append(run, node);
       }
-      seek(run, pass);
+      seek(run, pass, true);
       cost = performance.now() - started;
       exhausted = pass.late;
       return pass.found;
@@ -267,15 +332,15 @@
     function reveal(range) {
       const element = range.startContainer.parentElement;
       if (element === null) return;
-      const loose = element.localName === 'details' && !element.open || element.getAttribute('hidden') === 'until-found';
+      const loose = element.localName === 'details' && !element.open || untilFound(element);
       const box = boxed(element);
       if (!loose && box !== null && box.checkVisibility({visibilityProperty: true})) return;
-      const named = collapsed(), hiders = [];
+      const named = controlled(), hiders = [];
       for (let at = element; at !== null; at = at.parentElement) if (opens(at, named)) hiders.unshift(at);
       for (const hider of hiders) {
         if (hider.localName === 'details' && !hider.open) {
           hider.open = true;
-        } else if (hider.getAttribute('hidden') === 'until-found') {
+        } else if (untilFound(hider)) {
           hider.dispatchEvent(new Event('beforematch', {bubbles: true}));
           hider.removeAttribute('hidden');
         } else if (!hider.checkVisibility({visibilityProperty: true})) {
@@ -300,7 +365,7 @@
           case 'search': {
             end();
             const text = String(command.query).slice(0, LIMIT);
-            const source = command.regex ? text : text.replace(/\s+/g, ' ').replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+            const source = command.regex ? text : text.replace(BLANKS, ' ').replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
             let compiled;
             try {
               compiled = new RegExp(source, command.matchCase ? 'g' : 'gi');

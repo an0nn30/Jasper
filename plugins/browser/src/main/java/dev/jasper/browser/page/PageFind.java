@@ -32,14 +32,14 @@ import org.cef.browser.CefFrame;
  * case does not matter), cut to {@value #MAX_QUERY} characters; it reaches a frame's script only as a JSON string. A
  * frame matches its visible text a block at a time, each run of white space as one space, so a match may span inline
  * elements and line breaks in the page's source; a plain query's runs of white space match any. It keeps at most
- * {@value #MAX_MATCHES} matches, or those it found in 250 ms, and highlights them, every match {@code #FFFF00} and the
- * current one {@code #FF9632}, with the CSS Custom Highlight API, which leaves the page's nodes and scripts alone. It
- * opens the {@code details}, {@code hidden="until-found"} elements and regions of {@code aria-expanded="false"}
- * controls that hide the current match, and searches again, and answers a new count, when its document's nodes, text
- * or some of their attributes change, less often the longer its search takes, and no more once a search ran out of
- * time. A search settles once every frame has answered or {@link #ANSWER_WAIT}
- * has passed, and its first match is then the current one; a later answer still counts. The main frame's next
- * document ends the search. Find runs in the page's own world, so the page's scripts can see the query.
+ * {@value #MAX_MATCHES} matches, or those in the text it read in 250 ms, and highlights them, every match
+ * {@code #FFFF00} and the current one {@code #FF9632}, with the CSS Custom Highlight API, which leaves the page's nodes
+ * and scripts alone. It opens the {@code details}, {@code hidden="until-found"} elements and regions of
+ * {@code aria-expanded="false"} controls that hide the current match, and searches again, and answers a new count,
+ * when its document's nodes, text or some of their attributes change, less often the longer its search takes, and no
+ * more once a search ran out of time. A search settles once every frame has answered or {@link #ANSWER_WAIT} has
+ * passed, and its first match is then the current one; a later answer still counts. The main frame's next document
+ * ends the search. Find runs in the page's own world, so the page's scripts can see the query.
  *
  * <p>Any script in a frame could send that frame's answers, so an answer is only shown: a count of 0 to
  * {@value #MAX_MATCHES}, taken for the search under way and from a frame that search reached. UI thread.
