@@ -707,6 +707,59 @@ class JasperApplicationPluginsTest {
         ApplicationPluginCleanup.await(application[0]);
     }
 
+    /** A web browser that appends whether Jasper is the default browser, as it decides each link, to {@code data/default}. */
+    private static final String DEFAULT_ASKING_BROWSER = """
+        package fix.web;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import java.nio.file.Files;
+        import java.nio.file.StandardOpenOption;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) {
+                context.platform().browser(link -> {
+                    try {
+                        Files.writeString(context.dataDirectory().resolve("default"), context.platform().isDefaultBrowser() + "\\n",
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                    return true;
+                });
+            }
+        }
+        """;
+
+    /**
+     * Browser plan 4c Task 2: a plugin's {@code Platform.isDefaultBrowser} gives the application's last answer to whether
+     * Jasper is the system's default browser, an answer that came after the plugins started included.
+     */
+    @Test void pluginsSeeTheApplicationsAnswerToWhetherJasperIsTheDefaultBrowser() throws Exception {
+        var answer = new java.util.concurrent.atomic.AtomicBoolean(false);
+        var clock = new dev.jasper.app.testsupport.MutableClock();
+        var check = new dev.jasper.app.platform.DefaultBrowser(Runnable::run, clock, () -> Optional.of(answer.get()));
+        java.util.UUID window = java.util.UUID.randomUUID();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("web-plugin");
+        PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", DEFAULT_ASKING_BROWSER), List.of());
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> { };
+            application[0].defaultBrowser(check);
+            application[0].startPlugins(null, dev, false, dirs);
+            application[0].openLink(clicked("https://example.com/a"), window);
+            answer.set(true);
+            clock.advance(java.time.Duration.ofSeconds(30));
+            check.refresh();
+            application[0].openLink(clicked("https://example.com/b"), window);
+        });
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/default")))
+            .as("no, then yes once a check answers it").containsExactly("false", "true");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
     /**
      * Browser plan 3b: {@code jasper <address>} reaches the provided browser as an external address, as a tab with no
      * target, in the window of the pane that ran the command (R9), or in none when the call names no pane.

@@ -60,6 +60,20 @@ public interface Platform {
     void openInBrowser(URI uri);
 
     /**
+     * Whether Jasper is the system's default web browser, the application the system opens {@code https} links with, as
+     * Jasper last checked. Jasper checks at start-up and when one of its windows activates, at most every 30 seconds, so
+     * the answer can lag a change the user just made; it is false until a check has answered, and a check that could not
+     * tell keeps the last answer. UI thread only; elsewhere it throws {@code IllegalStateException}. Never blocks.
+     *
+     * @return whether Jasper is the default browser
+     * @throws UnsupportedOperationException if the host predates this query
+     * @since 0.28.0
+     */
+    default boolean isDefaultBrowser() {
+        throw new UnsupportedOperationException("The default browser query is unavailable");
+    }
+
+    /**
      * Puts text on the system clipboard. UI thread only; elsewhere it throws {@code IllegalStateException}. When the
      * clipboard cannot be written, for example while another program holds it, a failure is posted in the plugin's
      * notification group, never thrown.

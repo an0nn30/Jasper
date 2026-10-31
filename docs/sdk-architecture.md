@@ -438,6 +438,9 @@ every argument is one, as external addresses in the calling pane's window, befor
 `Platform.openInBrowser` asks the role as a click in the active window, then opens the system browser on the plugin's
 worker as `Platform.browse` does. `JasperApplication.browse`, which Settings' Help button, the Licenses window and the
 plugin manager use for Jasper's own links, sends them the clicks' way with the active window.
+`Platform.isDefaultBrowser`, on the UI thread, returns what `PluginRuntime.defaultBrowser` supplies: `JasperApplication`
+points it at `platform.DefaultBrowser.isJasper()`, the answer of its last check, which runs at start-up and as a window
+activates.
 
 `LocalSpec.command` becomes `terminals.OpenSpec.Local.program`; the workspace launches it through `ShellLauncher`
 with the default profile's environment, each word passed as is, closes the pane when the program exits with status 0

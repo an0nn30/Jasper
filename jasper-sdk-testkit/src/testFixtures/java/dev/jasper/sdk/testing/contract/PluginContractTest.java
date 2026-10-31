@@ -4645,6 +4645,27 @@ public abstract class PluginContractTest {
         assertThat(h.browsed()).as("the declined address and browse reach the system browser").containsExactlyInAnyOrder(declined, direct);
     }
 
+    /**
+     * Browser plan 4c Task 2 (SDK 0.28.0): {@code isDefaultBrowser} gives the host's last answer to whether Jasper is the
+     * system's default browser, no until the host has one, and a provided browser reads it as it decides a link.
+     */
+    @Test void isDefaultBrowserFollowsTheHost() {
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        List<Boolean> asked = new CopyOnWriteArrayList<>();
+        h.ui(() -> {
+            assertThat(a.get().platform().isDefaultBrowser()).as("not until the host has an answer").isFalse();
+            a.get().platform().browser(link -> asked.add(a.get().platform().isDefaultBrowser()));
+        });
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        h.defaultBrowser(true);
+        h.ui(() -> assertThat(a.get().platform().isDefaultBrowser()).isTrue());
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        h.defaultBrowser(false);
+        h.ui(() -> assertThat(a.get().platform().isDefaultBrowser()).as("the user chose another browser").isFalse());
+        assertThat(asked).as("as each link is decided").containsExactly(false, true);
+    }
+
     @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {
         PluginContext a = started("test.a", Set.of());
         assertThat(a.commandLine().client()).as("no client yet").isEmpty();

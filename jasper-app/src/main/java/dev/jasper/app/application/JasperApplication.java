@@ -1548,6 +1548,8 @@ public final class JasperApplication {
         plugins.openSettings(page -> openSettings(null, page));
         plugins.commandClient(CommandInstall.client(System.getProperty("os.name"), System.getProperty("jpackage.app-path"),
             System.getProperty("jasper.commandClient")));
+        // Read at each call, so the answer follows the check the bootstrap injects and every later one.
+        plugins.defaultBrowser(() -> defaultBrowser.isJasper());
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),

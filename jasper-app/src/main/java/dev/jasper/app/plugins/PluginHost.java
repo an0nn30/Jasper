@@ -136,6 +136,8 @@ final class PluginHost {
     final WebBrowsers webBrowsers;
     /** The {@code jasper} command plugins see in {@code CommandLine.client()}; set before plugins start, read on any thread. */
     volatile Optional<Path> commandClient = Optional.empty();
+    /** Whether Jasper is the system's default browser, as last checked ({@code Platform.isDefaultBrowser}); never blocks. */
+    volatile java.util.function.BooleanSupplier defaultBrowser = () -> false;
     final EventBus bus;
     final ActivityHub activities;
     final ConnectionHub connections;

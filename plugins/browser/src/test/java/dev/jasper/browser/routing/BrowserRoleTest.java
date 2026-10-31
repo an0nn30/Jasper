@@ -81,6 +81,43 @@ class BrowserRoleTest {
         });
     }
 
+    /**
+     * Browser plan 4c Task 2 (spec section 9, rule 2): while Jasper is the system's default browser, a clicked web link
+     * opens with no prompt whatever Open Links From Terminal says, as Jasper answers at each link; a local file still goes
+     * by Open Local Web Files, and once Jasper is no longer the default the setting decides again.
+     */
+    @Test void asTheDefaultBrowserAClickedLinkOpensWithNoPromptEvenWithAlwaysAsk() throws Exception {
+        started = start();
+        Path page = page();
+        URI split = URI.create("https://example.com/split"), tab = URI.create("https://example.com/tab");
+        onUiThread(() -> {
+            started.host.setDefaultBrowser(true);
+            started.host.setSetting(ID, LINKS, "default");
+            assertThat(open(split, LinkPlacement.SPLIT_RIGHT, Optional.empty(), Optional.of(started.window))).as("a split under Default Browser").isTrue();
+            assertThat(open(tab, LinkPlacement.TAB, Optional.empty(), Optional.of(started.window))).as("a tab under Default Browser").isTrue();
+            started.host.setSetting(ID, LINKS, "ask");
+            assertThat(open(LINK, LinkPlacement.TAB, Optional.empty(), Optional.of(started.window))).as("Always Ask").isTrue();
+        });
+        onUiThread(() -> {
+            assertThat(started.host.windows()).as("no prompt").isEmpty();
+            assertThat(started.items.items()).extracting(BrowserItem::url).containsExactly(split, tab, LINK);
+            assertThat(started.host.browsed()).as("nothing went back to the system browser").isEmpty();
+            assertThat(open(page.toUri(), LinkPlacement.TAB, Optional.empty(), Optional.of(started.window))).isTrue();
+        });
+        onUiThread(() -> {
+            assertPrompt(form(), FILE_TEXT, "Use Default Editor");
+            press(form().cancelAction());
+            started.host.setDefaultBrowser(false);
+            assertThat(open(LINK, LinkPlacement.TAB, Optional.empty(), Optional.of(started.window))).isTrue();
+        });
+        onUiThread(() -> {
+            assertPrompt(form(), LINK_TEXT, "Use Default Browser");
+            press(form().cancelAction());
+            assertThat(started.items.items()).hasSize(3);
+            assertThat(started.host.failures()).isEmpty();
+        });
+    }
+
     @Test void anAddressFromOutsideOpensInTheNextTabWithNoPromptWhateverTheSettings() throws Exception {
         started = start();
         onUiThread(() -> {

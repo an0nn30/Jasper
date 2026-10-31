@@ -391,9 +391,13 @@ Each link goes where the first of these says:
 2. A local web file follows **Open Local Web Files**: **Always Ask** (the default) asks; **Built-in Browser** opens
    its `file:` address in a new browser tab right after the current one; **Default Editor** opens it as a Cmd-click on
    any other file does.
-3. A split click, and Open URL in Split Right and Down, open the link in a browser pane split from the clicked pane,
+3. While Jasper is the system's default web browser, every other link opens in Jasper's browser without asking,
+   whatever **Open Links From Terminal** says: in a new browser tab right after the current one, or, for a split
+   click, in a browser pane split from the clicked pane. Jasper checks this when it starts and again when you come
+   back to one of its windows, at most every 30 seconds.
+4. A split click, and Open URL in Split Right and Down, open the link in a browser pane split from the clicked pane,
    without asking. When **Open Links From Terminal** is **Default Browser**, they go to the system browser instead.
-4. Every other link follows **Open Links From Terminal**: **Always Ask** (the default) asks; **Built-in Browser**
+5. Every other link follows **Open Links From Terminal**: **Always Ask** (the default) asks; **Built-in Browser**
    opens it in a new browser tab right after the current one; **Default Browser** opens the system browser.
 
 An OSC 8 link can name a target (`target=NAME` among its parameters). When a browser page opened for that name is open,

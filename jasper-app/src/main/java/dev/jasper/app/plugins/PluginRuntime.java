@@ -795,6 +795,20 @@ public final class PluginRuntime {
         commandClient = Objects.requireNonNull(client, "client");
     }
 
+    private java.util.function.BooleanSupplier defaultBrowser = () -> false;
+
+    /**
+     * Supplies whether Jasper is the system's default browser, as last checked, which plugins read with
+     * {@code Platform.isDefaultBrowser} on the UI thread; before {@link #start}. It must answer at once.
+     *
+     * @param jasper supplies the last answer
+     * @throws IllegalStateException once the plugins have started
+     */
+    public void defaultBrowser(java.util.function.BooleanSupplier jasper) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        defaultBrowser = Objects.requireNonNull(jasper, "jasper");
+    }
+
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         start(PluginSelection.scan(options, "", Version.parse(JasperSdk.VERSION), PluginSelection.host()), pluginTables, dark);
     }
@@ -848,6 +862,7 @@ public final class PluginRuntime {
         created.nativeWindows = nativeWindows;
         created.openSettings = openSettings;
         created.commandClient = commandClient;
+        created.defaultBrowser = defaultBrowser;
         Set<String> loadingIds = new HashSet<>();
         for (PluginCandidate loading : resolution.load()) loadingIds.add(loading.id());
         List<PluginCandidate> notLoading = byId.values().stream().filter(discovered -> !loadingIds.contains(discovered.id())).toList();

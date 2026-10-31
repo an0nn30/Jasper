@@ -171,6 +171,7 @@ class FakeContractTest extends PluginContractTest {
                 return host.openLink(address, origin, placement, target, windowId);
             }
             @Override public void commandClient(java.nio.file.Path client) { host.setCommandClient(client); }
+            @Override public void defaultBrowser(boolean jasper) { host.setDefaultBrowser(jasper); }
             @Override public void close() { host.close(); }
         };
     }

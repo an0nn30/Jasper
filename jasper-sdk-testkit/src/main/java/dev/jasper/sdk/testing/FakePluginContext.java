@@ -160,6 +160,7 @@ public final class FakePluginContext implements PluginContext {
                     }
                     if (!opened) host.browsed.add(address);
                 }
+                @Override public boolean isDefaultBrowser() { requireOpen(); return host.defaultBrowser; }
                 @Override public Subscription browser(dev.jasper.sdk.ui.WebBrowser browser) {
                     requireOpen();
                     if (!info.capabilities().contains(dev.jasper.sdk.Capabilities.BROWSER_PROVIDE))

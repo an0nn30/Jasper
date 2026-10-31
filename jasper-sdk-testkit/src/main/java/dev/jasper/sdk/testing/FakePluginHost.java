@@ -2581,4 +2581,15 @@ public final class FakePluginHost implements AutoCloseable {
      * @since 0.17.1
      */
     public void setCommandClient(Path client) { commandClient = Optional.of(Objects.requireNonNull(client, "client")); }
+
+    volatile boolean defaultBrowser;
+
+    /**
+     * Sets what {@code Platform.isDefaultBrowser} reports: whether Jasper is the system's default browser, as the
+     * application's last check answered. Until then it reports false.
+     *
+     * @param jasper whether Jasper is the default browser
+     * @since 0.28.0
+     */
+    public void setDefaultBrowser(boolean jasper) { defaultBrowser = jasper; }
 }

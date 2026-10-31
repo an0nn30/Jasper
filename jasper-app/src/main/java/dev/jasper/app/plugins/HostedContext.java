@@ -256,6 +256,11 @@ final class HostedContext implements PluginContext {
                         }
                     });
                 }
+                @Override public boolean isDefaultBrowser() {
+                    requireOpen();
+                    requireUi("Platform.isDefaultBrowser");
+                    return host.defaultBrowser.getAsBoolean();
+                }
                 @Override public boolean copy(String text) {
                     requireOpen();
                     requireUi("Platform.copy");
