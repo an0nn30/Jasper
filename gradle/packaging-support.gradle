@@ -51,6 +51,67 @@ ext.linuxPackageTasks = { String osRelease ->
     ids.any { it in rpmIds } ? ['packageRpm'] : ['packageDeb', 'packageRpm']
 }
 
+// The Linux menu entry. jpackage names it <package>-<launcher>.desktop, and DefaultBrowser (dev.jasper.app.platform)
+// compares the desktop's default web browser with this name.
+ext.linuxDesktopFileName = "${linuxPackageName}-Jasper.desktop".toString()
+
+// Desktops offer the entries that take http and https links as web browsers (browser plan 4c, spec 9). The packages
+// only offer Jasper: the user makes it the default in the desktop's settings or with xdg-settings.
+ext.linuxDesktopMimeTypes = 'MimeType=x-scheme-handler/http;x-scheme-handler/https;'
+
+// The menu entry as jpackage's own template.desktop (template) writes it, with two changes: linuxDesktopMimeTypes
+// replaces the file-association line (DESKTOP_MIMES, which writes an empty MimeType= for a package without file
+// associations), and the link is the one argument after --url (`--url %u`: a desktop drops %u when the menu starts
+// Jasper without a link, and Jasper refuses anything after --url but one web address). Every other line stays
+// jpackage's. A template without exactly one of each line fails the build.
+ext.linuxDesktopEntry = { String template ->
+    List<String> lines = template.split('\n', -1) as List
+    ['Exec=APPLICATION_LAUNCHER': 'Exec=APPLICATION_LAUNCHER --url %u', 'DESKTOP_MIMES': linuxDesktopMimeTypes].each { line, replacement ->
+        if (lines.count { it == line } != 1) {
+            throw new GradleException("jpackage's template.desktop no longer has exactly one ${line} line; review the desktop entry override")
+        }
+        lines[lines.indexOf(line)] = replacement
+    }
+    lines.join('\n')
+}
+
+// Why the menu entry jpackage wrote for installRoot is not the one the packages ship, or null: it keeps jpackage's Name,
+// Icon, Categories and Terminal=false, and has the launcher with --url %u, the web MIME types, and each key only once.
+ext.linuxDesktopEntryProblem = { String entry, String installRoot, String categories ->
+    List<String> lines = (entry ?: '').readLines()
+    List<String> missing = ['[Desktop Entry]', 'Name=Jasper', "Exec=${installRoot}/bin/Jasper --url %u",
+        "Icon=${installRoot}/lib/Jasper.png", 'Terminal=false', "Categories=${categories}", linuxDesktopMimeTypes]*.toString()
+        .findAll { !(it in lines) }
+    if (missing) return "the desktop entry lacks ${missing.join(', ')}".toString()
+    List<String> repeated = lines.findAll { it.contains('=') }.collect { it.substring(0, it.indexOf('=')) }
+        .countBy { it }.findAll { it.value > 1 }.keySet() as List
+    repeated ? "the desktop entry has more than one ${repeated.join(', ')} line".toString() : null
+}
+
+// As root, xdg-desktop-menu installs a menu entry into the first writable one of these applications directories.
+ext.linuxApplicationDirectories = ['/usr/local/share/applications', '/usr/share/applications']
+
+// The maintainer-script lines that run after xdg-desktop-menu installs or removes the menu entry: update-desktop-database
+// rebuilds the MIME cache (mimeinfo.cache) of each of the directories that exists, so desktops list Jasper among the web
+// browsers after the install and no longer after the removal. xdg-desktop-menu runs it too, when it succeeds and finds
+// it; these lines run it whatever xdg-desktop-menu did. update-desktop-database (desktop-file-utils) is optional:
+// without it nothing runs. The scripts run under set -e; a failed refresh is reported and fails neither the install nor
+// the removal.
+ext.linuxDesktopDatabaseCommands = { List<String> directories ->
+    String quoted = directories.collect { String directory ->
+        if (directory.contains("'")) throw new GradleException("An applications directory with a single quote: ${directory}")
+        "'${directory}'"
+    }.join(' ')
+    'if command -v update-desktop-database >/dev/null 2>&1; then\n' +
+        "    for jasper_applications in ${quoted}; do\n" +
+        '        if [ -d "$jasper_applications" ]; then\n' +
+        '            update-desktop-database -q "$jasper_applications" ||\n' +
+        '                echo "jasper: the desktop database in $jasper_applications was not updated" >&2\n' +
+        '        fi\n' +
+        '    done\n' +
+        'fi'
+}
+
 // The Java runtime packaged Jasper ships; docs/plugin-authoring.md ("The Java runtime") lists it for plugin authors.
 // jpackage's default for a class-path application is every module, and --bind-services then also bound javac,
 // jshell, jlink and jpackage. These roots keep all of Java SE for plugins, the providers a desktop application needs

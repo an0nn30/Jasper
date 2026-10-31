@@ -948,14 +948,17 @@ if (normalizedHost().os == 'windows') {
     // unless /usr/share/applications (or /usr/local/...) and /usr/share/desktop-directories already exist, as on
     // minimal and headless systems, and the install then fails and leaves the package unconfigured. Rewrite the selected
     // JBR's own templates so the scripts create those directories and never fail the install or removal over the menu
-    // entry. Every other line stays jpackage's; a template without the expected placeholder fails the build.
+    // entry, and refresh the desktop's MIME cache after both (linuxDesktopDatabaseCommands). Every other line stays
+    // jpackage's; a template without the expected placeholder fails the build.
     String menuDirectories = 'mkdir -p /usr/share/applications /usr/share/desktop-directories'
+    String desktopDatabase = linuxDesktopDatabaseCommands(linuxApplicationDirectories)
+    String menuInstalled = 'jasper_menu_install "$@" || echo "jasper: the desktop menu entry was not registered" >&2\n' + desktopDatabase
+    String menuRemoved = 'jasper_menu_uninstall "$@" || echo "jasper: the desktop menu entry was not removed" >&2\n' + desktopDatabase
     Map<String, String> menuCommands = [
-        DESKTOP_COMMANDS_INSTALL: "jasper_menu_install () {\nDESKTOP_COMMANDS_INSTALL\n}\n${menuDirectories}\n" +
-            'jasper_menu_install "$@" || echo "jasper: the desktop menu entry was not registered" >&2',
-        DESKTOP_COMMANDS_UNINSTALL: 'jasper_menu_uninstall () {\nDESKTOP_COMMANDS_UNINSTALL\n}\n' +
-            'jasper_menu_uninstall "$@" || echo "jasper: the desktop menu entry was not removed" >&2',
+        DESKTOP_COMMANDS_INSTALL: "jasper_menu_install () {\nDESKTOP_COMMANDS_INSTALL\n}\n${menuDirectories}\n" + menuInstalled,
+        DESKTOP_COMMANDS_UNINSTALL: 'jasper_menu_uninstall () {\nDESKTOP_COMMANDS_UNINSTALL\n}\n' + menuRemoved,
     ]
+    // Writes the install-script overrides and the menu entry (linuxDesktopEntry) into resources.
     def writeInstallScripts = { File sdkHome, File resources, String type, String requirements ->
         // Resource-directory names jpackage looks for, and the placeholders each template must contain.
         Map<String, List> overrides = type == 'deb' ?
@@ -963,10 +966,13 @@ if (normalizedHost().os == 'windows') {
              'template.control': ['control', []]] :
             ['template.spec': ["${linuxPackageName}.spec", ['DESKTOP_COMMANDS_INSTALL', 'DESKTOP_COMMANDS_UNINSTALL']]]
         new ZipFile(new File(sdkHome, 'jmods/jdk.jpackage.jmod')).withCloseable { archive ->
-            overrides.each { template, override ->
+            def templateText = { String template ->
                 def entry = archive.getEntry("classes/jdk/jpackage/internal/resources/${template}")
                 if (entry == null) throw new GradleException("The JBR SDK's jpackage has no Linux ${template}")
-                List<String> lines = archive.getInputStream(entry).withCloseable { new String(it.readAllBytes(), StandardCharsets.UTF_8) }.split('\n', -1) as List
+                archive.getInputStream(entry).withCloseable { new String(it.readAllBytes(), StandardCharsets.UTF_8) }
+            }
+            overrides.each { template, override ->
+                List<String> lines = templateText(template).split('\n', -1) as List
                 override[1].each { String placeholder ->
                     if (lines.count { it == placeholder } != 1) throw new GradleException("jpackage's ${template} no longer has exactly one ${placeholder} line; review the install-script override")
                     lines[lines.indexOf(placeholder)] = menuCommands[placeholder]
@@ -982,19 +988,23 @@ if (normalizedHost().os == 'windows') {
                 }
                 new File(resources, override[0]).setText(text, 'UTF-8')
             }
+            // jpackage looks for the menu entry's override under the launcher's name.
+            new File(resources, 'Jasper.desktop').setText(linuxDesktopEntry(templateText('template.desktop')), 'UTF-8')
         }
     }
 
-    // Checks the generated maintainer scripts: jpackage's menu commands inside the wrappers, all placeholders filled.
+    // Checks the generated maintainer scripts: jpackage's menu commands inside the wrappers, each wrapper followed by the
+    // MIME cache refresh, all placeholders filled.
     def verifyInstallScripts = { String scripts, String label ->
-        [menuDirectories, 'jasper_menu_install "$@" || ', 'jasper_menu_uninstall "$@" || ',
-         "xdg-desktop-menu install ${installRoot}/lib/${linuxPackageName}-Jasper.desktop", 'xdg-desktop-menu uninstall'].each { expected ->
+        [menuDirectories, menuInstalled, menuRemoved,
+         "xdg-desktop-menu install ${installRoot}/lib/${linuxDesktopFileName}", 'xdg-desktop-menu uninstall'].each { expected ->
             if (!scripts.contains(expected)) throw new GradleException("${label} verification failed: install scripts lack '${expected}'\n${scripts}")
         }
         if (scripts.contains('DESKTOP_COMMANDS_')) throw new GradleException("${label} verification failed: install scripts keep an unfilled placeholder\n${scripts}")
     }
 
-    // Compares an unpacked package with the verified image (same bytes, no lost executable bits) and checks the menu entry.
+    // Compares an unpacked package with the verified image (same bytes, no lost executable bits) and checks the menu entry
+    // (linuxDesktopEntryProblem).
     // jpackage rewrites its own app-image metadata, lib/app/.jpackage.xml, when it builds a package.
     def verifyUnpackedPackage = { File image, File unpacked, String label ->
         File installed = new File(unpacked, installRoot.substring(1))
@@ -1007,11 +1017,10 @@ if (normalizedHost().os == 'windows') {
             }
             if (expected.canExecute() && !actual.canExecute()) throw new GradleException("${label} verification failed: ${actual} lost its executable bit")
         }
-        File desktop = new File(installed, "lib/${linuxPackageName}-Jasper.desktop")
+        File desktop = new File(installed, "lib/${linuxDesktopFileName}")
         String entry = desktop.isFile() ? desktop.getText('UTF-8') : ''
-        if (!entry.contains("${installRoot}/bin/Jasper") || !entry.contains("${installRoot}/lib/Jasper.png") || !entry.contains("Categories=${menuCategories}")) {
-            throw new GradleException("${label} verification failed: the desktop entry is missing or incomplete\n${entry}")
-        }
+        String problem = desktop.isFile() ? linuxDesktopEntryProblem(entry, installRoot, menuCategories) : 'the desktop entry is missing'
+        if (problem != null) throw new GradleException("${label} verification failed: ${problem}\n${entry}")
     }
 
     def linuxPackage = { String type, String taskName, String requirement ->

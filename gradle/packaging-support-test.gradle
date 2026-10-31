@@ -730,3 +730,100 @@ verifySupport.configure {
         logger.lifecycle('Verified the macOS URL types')
     }
 }
+
+// Browser plan 4c (spec 9): the Linux menu entry takes http and https links, so desktops offer Jasper as a web browser.
+// The fixture rewrites a copy of jpackage's template.desktop (JDK 25) and fills it as jpackage does for packageDeb and
+// packageRpm; the MIME cache refresh runs with a stand-in update-desktop-database.
+verifySupport.configure {
+    File defaultBrowser = project.file('src/main/java/dev/jasper/app/platform/DefaultBrowser.java')
+    doLast {
+        def desktopId = defaultBrowser.getText('UTF-8') =~ /DESKTOP_ID = "([^"]*)"/
+        assert desktopId.find() && desktopId.group(1) == linuxDesktopFileName : 'DefaultBrowser.DESKTOP_ID is not the package desktop entry'
+        assert linuxDesktopFileName == 'jasper-workstation-Jasper.desktop'
+
+        String template = '[Desktop Entry]\nName=APPLICATION_NAME\nComment=APPLICATION_DESCRIPTION\nExec=APPLICATION_LAUNCHER\n' +
+            'Icon=APPLICATION_ICON\nTerminal=false\nType=Application\nCategories=DEPLOY_BUNDLE_CATEGORY\nDESKTOP_MIMES\n'
+        String root = '/opt/jasper-workstation', categories = 'System;TerminalEmulator;Network;RemoteAccess;'
+        // jpackage's values for a package without file associations: DESKTOP_MIMES is an empty MimeType= line.
+        def filled = { String text ->
+            ['APPLICATION_DESCRIPTION': 'Jasper DevOps workstation', 'DEPLOY_BUNDLE_CATEGORY': categories,
+             'APPLICATION_LAUNCHER': "${root}/bin/Jasper".toString(), 'APPLICATION_ICON': "${root}/lib/Jasper.png".toString(),
+             'APPLICATION_NAME': 'Jasper', 'DESKTOP_MIMES': 'MimeType='].inject(text) { String result, key, value -> result.replace(key, value) }
+        }
+        assert linuxDesktopEntry(template) == '[Desktop Entry]\nName=APPLICATION_NAME\nComment=APPLICATION_DESCRIPTION\n' +
+            'Exec=APPLICATION_LAUNCHER --url %u\nIcon=APPLICATION_ICON\nTerminal=false\nType=Application\n' +
+            'Categories=DEPLOY_BUNDLE_CATEGORY\nMimeType=x-scheme-handler/http;x-scheme-handler/https;\n'
+        String entry = filled(linuxDesktopEntry(template))
+        assert linuxDesktopEntryProblem(entry, root, categories) == null
+        String stock = linuxDesktopEntryProblem(filled(template), root, categories)
+        assert stock != null && stock.contains("Exec=${root}/bin/Jasper --url %u") &&
+            stock.contains('MimeType=x-scheme-handler/http;x-scheme-handler/https;') : stock
+        assert linuxDesktopEntryProblem(entry.replace('Terminal=false\n', ''), root, categories).contains('Terminal=false')
+        assert linuxDesktopEntryProblem(entry.replace('Name=Jasper\n', 'Name=Other\n'), root, categories).contains('Name=Jasper')
+        assert linuxDesktopEntryProblem(entry, root, 'System;').contains('Categories=System;')
+        assert linuxDesktopEntryProblem(entry + 'MimeType=\n', root, categories).contains('MimeType')
+        assert linuxDesktopEntryProblem(entry + 'Exec=/usr/bin/other\n', root, categories).contains('Exec')
+        assert linuxDesktopEntryProblem('', root, categories) != null
+        [template.replace('DESKTOP_MIMES\n', ''), template.replace('Exec=APPLICATION_LAUNCHER\n', 'Exec="APPLICATION_LAUNCHER"\n'),
+         template + 'DESKTOP_MIMES\n', template + 'Exec=APPLICATION_LAUNCHER\n'].each { String changed ->
+            try {
+                linuxDesktopEntry(changed)
+                assert false : "rewrote a changed template.desktop:\n${changed}"
+            } catch (GradleException expected) {
+                assert expected.message.contains('template.desktop') : expected.message
+            }
+        }
+
+        assert linuxApplicationDirectories == ['/usr/local/share/applications', '/usr/share/applications']
+        String refresh = linuxDesktopDatabaseCommands(linuxApplicationDirectories)
+        assert refresh.startsWith('if command -v update-desktop-database >/dev/null 2>&1; then\n')
+        assert refresh.contains("'/usr/local/share/applications' '/usr/share/applications'")
+        try {
+            linuxDesktopDatabaseCommands(["/tmp/it's"])
+            assert false : 'quoted a directory with a single quote'
+        } catch (GradleException expected) {
+            assert expected.message.contains("/tmp/it's")
+        }
+        if (System.getProperty('os.name').startsWith('Windows')) {
+            logger.lifecycle('Verified the Linux desktop entry (the MIME cache refresh runs only where there is a POSIX shell)')
+            return
+        }
+        File work = new File(temporaryDir, 'desktop database')
+        work.deleteDir()
+        File tools = new File(work, 'bin'), noTools = new File(work, 'empty')
+        File log = new File(work, 'calls.log'), errorLog = new File(work, 'errors.log')
+        File first = new File(work, 'local applications'), missing = new File(work, 'missing'), second = new File(work, 'applications')
+        [tools, noTools, first, second].each { assert it.mkdirs() }
+        File tool = new File(tools, 'update-desktop-database')
+        def standIn = { String body ->
+            tool.setText("#!/bin/sh\nprintf '%s|' \"\$@\" >> '${log.absolutePath}'\nprintf '\\n' >> '${log.absolutePath}'\n${body}", 'UTF-8')
+            assert tool.setExecutable(true, false)
+        }
+        // Runs the lines as the maintainer scripts do, under set -e, then one more command; only shell built-ins and the
+        // stand-in are on PATH.
+        def run = { File path ->
+            log.delete()
+            def builder = new ProcessBuilder('/bin/sh', '-c',
+                'set -e\n' + linuxDesktopDatabaseCommands([first, missing, second]*.absolutePath) + '\necho finished')
+            builder.environment().put('PATH', path.absolutePath)
+            builder.redirectError(errorLog)
+            def process = builder.start()
+            process.outputStream.close()
+            String output = process.inputStream.getText('UTF-8')
+            [status: process.waitFor(), output: output, errors: errorLog.getText('UTF-8'), calls: log.isFile() ? log.readLines('UTF-8') : []]
+        }
+        standIn('exit 0\n')
+        def refreshed = run(tools)
+        assert refreshed.status == 0 && refreshed.output == 'finished\n' && refreshed.errors.isEmpty() : refreshed
+        assert refreshed.calls == ["-q|${first.absolutePath}|", "-q|${second.absolutePath}|"]*.toString() : refreshed
+        standIn('exit 3\n')
+        def failed = run(tools)
+        assert failed.status == 0 && failed.output == 'finished\n' && failed.calls.size() == 2 : failed
+        assert failed.errors.contains("jasper: the desktop database in ${first.absolutePath} was not updated") : failed
+        assert failed.errors.contains("jasper: the desktop database in ${second.absolutePath} was not updated") : failed
+        def absent = run(noTools)
+        assert absent.status == 0 && absent.output == 'finished\n' && absent.errors.isEmpty() && absent.calls.isEmpty() : absent
+        work.deleteDir()
+        logger.lifecycle('Verified the Linux desktop entry and its MIME cache refresh')
+    }
+}
