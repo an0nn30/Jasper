@@ -30,9 +30,9 @@ content-menu calls; every bundled manifest declares `sdk = ">=0.27.0, <0.28"`. D
 certificate errors with the Linux NSS note, Jasper's own requests, restore and the settings), Find and zoom in browser
 tabs in keyboard shortcuts, the new settings in configuration's plugin table, and, with slices 1a-1c, plugin UI, plugin
 authoring, plugin icons, the SDK and testkit READMEs, UI architecture and the regenerated SDK reference.
-`./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 37s): **14,459 tests, 0 failures, 0 errors, 102
-skipped** (Browser 506, jasper-app 5,175; the XML of the 16 build folders, without the example plugin's, whose one test
-Task 10's 14,460 counted); the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test,
+`./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 41s, after Task 11's fix round): **14,461 tests, 0
+failures, 0 errors, 102 skipped** (Browser 508, jasper-app 5,175; the XML of the 16 build folders, without the example
+plugin's one test, which Task 10's 14,460 counted); the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test,
 0 failures). Source hygiene is clean over 3,245 Java files. No GUI was launched and Chromium never started.
 
 The controller's rulings, one line each:
@@ -84,6 +84,7 @@ The controller's rulings, one line each:
 - P42: View Source fetches a web page fresh and otherwise shows a capture under a one-time token.
 - P43: a captured source is found by its token in any open item.
 - P44: a second Inspect Element reopens DevTools in the same item, after Chromium closes the old ones.
+- P45: `chrome:` text gets no suggestion rows, no Enter target and no suggestion request (spec section 6).
 
 Known gaps and follow-ups (the banner has them all, with the deferred minors by task): no pinch on macOS (P35) and
 Ctrl+wheel only on Linux and Windows (P32); same-host items that show at once share a zoom (P34); no Copy Image (P36)

@@ -132,7 +132,9 @@ Each is pending.
   - an HSTS-preloaded badssl host (P41);
   - a sub-resource's certificate error does not ask.
 - **View Source:**
-  - on an `http` page, a slow server (up to 10 seconds) and a `file:` page;
+  - on an `http` page, a slow server (up to 10 seconds) and a `file:` page. Jasper answers the source page later, with
+    CEF's `open` and `handleRequest=false`; if JBR's JCEF does not keep that callback, every `http` and `https` View
+    Source fails;
   - navigating away while the source page loads.
 - **Inspect Element:**
   - DevTools open below the page on the element under the pointer, on HiDPI and at a page zoom other than 100 %; the
@@ -150,6 +152,6 @@ Each is pending.
   - Jasper quits with DevTools open.
 - **A proxied network** (the user's corporate network, P22): favicons, engine suggestions and View Source's fetch.
 
-### Windows and Linux (not run)
+### Plan 4b on Windows and Linux (not run)
 
 The user has no Windows or Linux host yet. The plan's ten lines and every line above wait for each of them too.

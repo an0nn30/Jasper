@@ -6,7 +6,7 @@
 **Execution status (2026-10-31): Tasks 1-11 executed; Task 12, the user's GUI check on macOS, is pending** (branch
 `claude/browser-page-features`, worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `bcc77624d`,
 which has plan 4a merged; commits `c48158883` to `67c9d131a`, then the docs; not merged or pushed; see
-`docs/STATUS.md`). Executed with per-task subagents and reviews; the controller's rulings are numbered P1-P44, and
+`docs/STATUS.md`). Executed with per-task subagents and reviews; the controller's rulings are numbered P1-P45, and
 plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan's text, each with its ruling:
 - **SDK:** the additions are `@since 0.27.0`, and every bundled range is `>=0.27.0, <0.28`.
 - **A plan-text error (P11):** Task 9's fallback reads `CefBrowser.getSource(CefStringVisitor)`; `CefFrame.getSource`,
@@ -151,12 +151,16 @@ plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan'
   - links DevTools open in a new tab open as `NEXT_TAB` under the inspected page's scheme rule; the DevTools browser
     gets no page scripts; DevTools have Copy and Paste and no find, zoom or right-click menu.
 - **Task 11:**
+  - its review found that `chrome:` text listed "Search for “chrome://version”", which Enter chose, and asked the
+    engine about it; now `chrome:` text, in any case, gets no suggestion rows, no Enter target and no suggestion
+    request, and an engine's `chrome:` suggestion is left out, as spec section 6 offers no `chrome:` page (P45);
   - `docs/browser.md` documents every feature, with the settings in its Settings table, which configuration's plugin
     table lists; `docs/keyboard-shortcuts.md` has Find and zoom in browser tabs;
   - `docs/sdk-icons.md` (`PixelImage`), `docs/plugin-authoring.md` (`withImage`, `showContextMenu`) and
     `docs/plugin-ui.md` (the new node components, where the SDK's nodes are documented) were written with slices 1a-1c;
-  - `./gradlew check --continue` passed: 14,459 tests, 0 failures, 0 errors, 102 skipped (Browser 506; the 16 build
-    folders without the example plugin's); the example external plugin's `check pluginZip` passed (1 test).
+  - `./gradlew check --continue` passed after the fix round: 14,461 tests, 0 failures, 0 errors, 102 skipped (Browser
+    508; the 16 build folders without the example plugin's); the example external plugin's `check pluginZip` passed (1
+    test).
 
 Known gaps and follow-ups:
 - **Zoom:** no pinch on macOS (P35; a follow-up exports `com.apple.eawt.event` to the plugin); Ctrl+wheel only on

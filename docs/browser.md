@@ -86,7 +86,8 @@ The list under the address field holds, in order:
 
 So Enter right after typing loads `example.com`, `localhost:3000` or `10.0.0.1`, and searches for a single word such
 as `jcef`, whose address is further down. When the text is itself a results page's address, a search for its terms
-comes first. **Up** and **Down** move the selection, and a click on a suggestion loads it.
+comes first; a `chrome:` address lists nothing. **Up** and **Down** move the selection, and a click on a suggestion
+loads it.
 
 | Engine | `search_engine` | Searches with | Suggestions from |
 |---|---|---|---|
@@ -97,8 +98,9 @@ comes first. **Up** and **Down** move the selection, and a click on a suggestion
 | Custom | `custom` | Custom Search URL; Google's while it is empty | Custom Search Suggestions URL, which answers OpenSearch JSON; none while it is empty |
 
 `%s` stands for the search terms, or the typed text. The engine is asked about what you type, except text that is an
-absolute local path, starts with `file:`, `about:` or `jasper-about:`, holds a user name or password (`name:secret@`),
-or is longer than 1,000 characters ([Jasper's own requests](#jaspers-own-requests)).
+absolute local path, starts with `file:`, `about:`, `jasper-about:` or `chrome:`, holds a user name or password
+(`name:secret@`), or is longer than 1,000 characters ([Jasper's own requests](#jaspers-own-requests)); a suggestion of
+the engine's that is a `chrome:` address is left out.
 
 While nothing is typed, the field of a results page, of any built-in engine or of Custom while it is chosen, shows the
 search terms instead of the address; the tab, the status bar, a drag of the site icon and the saved workspace keep the
@@ -211,14 +213,14 @@ without any user name and password, and the HTML, its tags, attribute names, att
 workspace theme's syntax colours, with the `http` and `https` addresses in its attribute values as links. **Back**
 returns to the page.
 
-- For an `http` or `https` page, Jasper fetches the page again each time the source page loads
+- For an `http` or `https` page, Jasper fetches the page again each time the source page loads, after a restore too
   ([Jasper's own requests](#jaspers-own-requests)): the HTML the server sends without your cookies, which can differ
   from what you see, for example on a page you are signed in to. Only a successful answer (200) of at most 5 MB within
   10 seconds is shown.
 - For any other page, and when that fetch fails, it shows the page's HTML as Chromium held it when you chose View
-  Source. The pane keeps that HTML while it is open, for up to its last 20 View Sources. A source page restored with the
-  workspace, or one whose HTML the pane no longer keeps, says "The source of this page is no longer available.", or
-  for a web page whose fetch failed, "Jasper can’t load the source of this page."
+  Source. The pane keeps that HTML while it is open, for up to its last 20 View Sources. Without it, as after a restore
+  or once the pane keeps it no longer, another page's source page says "The source of this page is no longer
+  available.", and a web page's whose fetch failed says "Jasper can’t load the source of this page."
 - It shows at most a source's first 5,242,880 characters, and colours its first 1,000,000; past either, it says so.
 
 ## Inspect Element
