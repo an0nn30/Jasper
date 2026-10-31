@@ -23,14 +23,20 @@ final class CodeHighlighter {
     private final String[] closings = new String[SyntaxRole.values().length];
     private int state = TokenTypes.NULL;
 
-    CodeHighlighter(String language, SyntaxPalette palette) {
+    CodeHighlighter(String language, SyntaxPalette palette, MarkdownRenderer.Dialect dialect) {
         for (var role : SyntaxRole.values()) {
-            var style = palette.style(role);
-            openings[role.ordinal()] = "<font color=\"" + String.format(Locale.ROOT, "#%06x", style.color().getRGB() & 0xffffff) + "\">"
-                + (style.bold() ? "<b>" : "") + (style.italic() ? "<i>" : "");
-            closings[role.ordinal()] = (style.italic() ? "</i>" : "") + (style.bold() ? "</b>" : "") + "</font>";
+            if (dialect == MarkdownRenderer.Dialect.WEB) {
+                // The preview's stylesheet gives each class its colour, weight and style.
+                openings[role.ordinal()] = "<span class=\"tok-" + role.name().toLowerCase(Locale.ROOT).replace('_', '-') + "\">";
+                closings[role.ordinal()] = "</span>";
+            } else {
+                var style = palette.style(role);
+                openings[role.ordinal()] = "<font color=\"" + String.format(Locale.ROOT, "#%06x", style.color().getRGB() & 0xffffff) + "\">"
+                    + (style.bold() ? "<b>" : "") + (style.italic() ? "<i>" : "");
+                closings[role.ordinal()] = (style.italic() ? "</i>" : "") + (style.bold() ? "</b>" : "") + "</font>";
+            }
         }
-        String key = language.strip().split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
+        String key = firstWord(language);
         key = ALIASES.getOrDefault(key, key);
         TokenMaker found = null;
         for (var known : Languages.all()) {
@@ -42,6 +48,11 @@ final class CodeHighlighter {
         }
         maker = found;
     }
+
+    /** True for a fence the WEB dialect leaves to Mermaid: the first word of its info string is {@code mermaid}, in any case. */
+    static boolean mermaid(String info) { return info != null && firstWord(info).equals("mermaid"); }
+
+    private static String firstWord(String info) { return info.strip().split("\\s+", 2)[0].toLowerCase(Locale.ROOT); }
 
     void line(String line, MarkdownLimits.Html out) {
         if (maker == null) { MarkdownRenderer.text(out, line); return; }

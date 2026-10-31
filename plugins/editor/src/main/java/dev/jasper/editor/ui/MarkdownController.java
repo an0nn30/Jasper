@@ -198,7 +198,7 @@ final class MarkdownController implements AutoCloseable {
         job.begin();
         try {
             if (job.cancelled) throw new CancellationException();
-            result = PreviewPane.prepare(new MarkdownRenderer().render(job.source, job.style.syntax()));
+            result = PreviewPane.prepare(new MarkdownRenderer().render(job.source, job.style.syntax(), MarkdownRenderer.Dialect.SWING));
         } catch (RuntimeException error) { failure = error; }
         finally { job.end(); }
         var prepared = result; var error = failure;
