@@ -55,8 +55,9 @@ ext.linuxPackageTasks = { String osRelease ->
 // compares the desktop's default web browser with this name.
 ext.linuxDesktopFileName = "${linuxPackageName}-Jasper.desktop".toString()
 
-// Desktops offer the entries that take http and https links as web browsers (browser plan 4c, spec 9). The packages
-// only offer Jasper: the user makes it the default in the desktop's settings or with xdg-settings.
+// Desktops offer the entries that take http and https links as web browsers (browser plan 4c, spec 9). The packages set
+// no default (linuxKeepingSystemDefaults): the user makes Jasper the default in the desktop's settings or with
+// xdg-settings.
 ext.linuxDesktopMimeTypes = 'MimeType=x-scheme-handler/http;x-scheme-handler/https;'
 
 // The menu entry as jpackage's own template.desktop (template) writes it, with two changes: linuxDesktopMimeTypes
@@ -76,11 +77,13 @@ ext.linuxDesktopEntry = { String template ->
 }
 
 // Why the menu entry jpackage wrote for installRoot is not the one the packages ship, or null: it keeps jpackage's Name,
-// Icon, Categories and Terminal=false, and has the launcher with --url %u, the web MIME types, and each key only once.
+// Icon, Categories, Type=Application and Terminal=false, and has the launcher with --url %u, the web MIME types, and each
+// key only once.
 ext.linuxDesktopEntryProblem = { String entry, String installRoot, String categories ->
     List<String> lines = (entry ?: '').readLines()
     List<String> missing = ['[Desktop Entry]', 'Name=Jasper', "Exec=${installRoot}/bin/Jasper --url %u",
-        "Icon=${installRoot}/lib/Jasper.png", 'Terminal=false', "Categories=${categories}", linuxDesktopMimeTypes]*.toString()
+        "Icon=${installRoot}/lib/Jasper.png", 'Terminal=false', 'Type=Application', "Categories=${categories}",
+        linuxDesktopMimeTypes]*.toString()
         .findAll { !(it in lines) }
     if (missing) return "the desktop entry lacks ${missing.join(', ')}".toString()
     List<String> repeated = lines.findAll { it.contains('=') }.collect { it.substring(0, it.indexOf('=')) }
@@ -109,6 +112,50 @@ ext.linuxDesktopDatabaseCommands = { List<String> directories ->
         '                echo "jasper: the desktop database in $jasper_applications was not updated" >&2\n' +
         '        fi\n' +
         '    done\n' +
+        'fi'
+}
+
+// The maintainer-script lines that run command (the menu install) and leave the system's default applications as they
+// were. xdg-desktop-menu install (its make_lazy_default) adds the entry to the line of each of its MIME types in
+// <data dir>/applications/defaults.list for the first writable data directory, following a symlink to its target: after
+// the listed default, as a fallback, or as the default where none is listed. Its uninstall never takes the entry out.
+// These lines copy each of those files that exists before command (the data directories are XDG_DATA_DIRS, else
+// /usr/local/share/:/usr/share/, split as xdg-desktop-menu splits them). After command they put back the saved bytes of
+// each file that changed and delete each file that command created; a file nothing changed is not written. The scripts
+// run under set -e, and nothing here fails the install: without the copies (no mktemp, or a copy failed) command runs
+// all the same and a message says so. The copies, in TMPDIR (else /tmp), are removed afterwards.
+ext.linuxKeepingSystemDefaults = { String command ->
+    String dataDirectories = '$(echo "${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/}" | sed \'s/:/ /g\')'
+    'jasper_defaults=$(mktemp -d "${TMPDIR:-/tmp}/jasper.XXXXXX" 2>/dev/null) || jasper_defaults=\n' +
+        'if [ -z "$jasper_defaults" ]; then\n' +
+        '    echo "jasper: the system\'s default applications were not saved" >&2\n' +
+        'else\n' +
+        '    jasper_count=0\n' +
+        "    for jasper_data in ${dataDirectories}; do\n" +
+        '        jasper_count=$((jasper_count + 1))\n' +
+        '        if [ -n "$jasper_defaults" ] && [ -f "$jasper_data/applications/defaults.list" ] &&\n' +
+        '            ! cat "$jasper_data/applications/defaults.list" 2>/dev/null > "$jasper_defaults/$jasper_count"; then\n' +
+        '            echo "jasper: the system\'s default applications were not saved" >&2\n' +
+        '            rm -rf "$jasper_defaults" || :\n' +
+        '            jasper_defaults=\n' +
+        '        fi\n' +
+        '    done\n' +
+        'fi\n' +
+        command + '\n' +
+        'if [ -n "$jasper_defaults" ]; then\n' +
+        '    jasper_count=0\n' +
+        "    for jasper_data in ${dataDirectories}; do\n" +
+        '        jasper_count=$((jasper_count + 1))\n' +
+        '        jasper_list=$jasper_data/applications/defaults.list\n' +
+        '        if [ -f "$jasper_defaults/$jasper_count" ]; then\n' +
+        '            if [ "$(cksum < "$jasper_defaults/$jasper_count")" != "$(cksum 2>/dev/null < "$jasper_list")" ]; then\n' +
+        '                cat "$jasper_defaults/$jasper_count" > "$jasper_list" || echo "jasper: $jasper_list was not restored" >&2\n' +
+        '            fi\n' +
+        '        elif [ -f "$jasper_list" ]; then\n' +
+        '            rm -f "$jasper_list" || echo "jasper: $jasper_list was not restored" >&2\n' +
+        '        fi\n' +
+        '    done\n' +
+        '    rm -rf "$jasper_defaults" || :\n' +
         'fi'
 }
 

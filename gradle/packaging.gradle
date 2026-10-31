@@ -948,11 +948,13 @@ if (normalizedHost().os == 'windows') {
     // unless /usr/share/applications (or /usr/local/...) and /usr/share/desktop-directories already exist, as on
     // minimal and headless systems, and the install then fails and leaves the package unconfigured. Rewrite the selected
     // JBR's own templates so the scripts create those directories and never fail the install or removal over the menu
-    // entry, and refresh the desktop's MIME cache after both (linuxDesktopDatabaseCommands). Every other line stays
-    // jpackage's; a template without the expected placeholder fails the build.
+    // entry, keep the system's default applications as they were across the menu install (linuxKeepingSystemDefaults),
+    // and refresh the desktop's MIME cache after both (linuxDesktopDatabaseCommands). Every other line stays jpackage's;
+    // a template without the expected placeholder fails the build.
     String menuDirectories = 'mkdir -p /usr/share/applications /usr/share/desktop-directories'
     String desktopDatabase = linuxDesktopDatabaseCommands(linuxApplicationDirectories)
-    String menuInstalled = 'jasper_menu_install "$@" || echo "jasper: the desktop menu entry was not registered" >&2\n' + desktopDatabase
+    String menuInstalled = linuxKeepingSystemDefaults(
+        'jasper_menu_install "$@" || echo "jasper: the desktop menu entry was not registered" >&2') + '\n' + desktopDatabase
     String menuRemoved = 'jasper_menu_uninstall "$@" || echo "jasper: the desktop menu entry was not removed" >&2\n' + desktopDatabase
     Map<String, String> menuCommands = [
         DESKTOP_COMMANDS_INSTALL: "jasper_menu_install () {\nDESKTOP_COMMANDS_INSTALL\n}\n${menuDirectories}\n" + menuInstalled,
@@ -993,8 +995,9 @@ if (normalizedHost().os == 'windows') {
         }
     }
 
-    // Checks the generated maintainer scripts: jpackage's menu commands inside the wrappers, each wrapper followed by the
-    // MIME cache refresh, all placeholders filled.
+    // Checks the generated maintainer scripts: jpackage's menu commands inside the wrappers, the menu install between the
+    // saving and restoring of the default applications, each wrapper followed by the MIME cache refresh, all placeholders
+    // filled.
     def verifyInstallScripts = { String scripts, String label ->
         [menuDirectories, menuInstalled, menuRemoved,
          "xdg-desktop-menu install ${installRoot}/lib/${linuxDesktopFileName}", 'xdg-desktop-menu uninstall'].each { expected ->
@@ -1018,8 +1021,9 @@ if (normalizedHost().os == 'windows') {
             if (expected.canExecute() && !actual.canExecute()) throw new GradleException("${label} verification failed: ${actual} lost its executable bit")
         }
         File desktop = new File(installed, "lib/${linuxDesktopFileName}")
-        String entry = desktop.isFile() ? desktop.getText('UTF-8') : ''
-        String problem = desktop.isFile() ? linuxDesktopEntryProblem(entry, installRoot, menuCategories) : 'the desktop entry is missing'
+        if (!desktop.isFile()) throw new GradleException("${label} verification failed: the desktop entry ${desktop} is missing")
+        String entry = desktop.getText('UTF-8')
+        String problem = linuxDesktopEntryProblem(entry, installRoot, menuCategories)
         if (problem != null) throw new GradleException("${label} verification failed: ${problem}\n${entry}")
     }
 
