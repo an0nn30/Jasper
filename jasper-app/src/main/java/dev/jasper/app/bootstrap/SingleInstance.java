@@ -104,7 +104,8 @@ final class SingleInstance {
             failure.accept(HandoffSocket.tooLong(dirs.daemonSocket()));
             return new Claim.Done(1);
         }
-        LaunchRequest request = LaunchRequest.of(source, modified, options.workingDirectory(), options.paths(), options.startupFlags());
+        LaunchRequest request = LaunchRequest.of(source, modified, options.workingDirectory(), options.paths(), options.urls(),
+            options.startupFlags());
         if (!request.fits()) {
             failure.accept("Jasper cannot open that many paths at once.");
             return new Claim.Done(2);

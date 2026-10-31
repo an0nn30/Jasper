@@ -218,7 +218,7 @@ class JasperApplicationResidencyTest {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> application.trace(trace));
-            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of(DesktopTestSupport.HOME))))
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of(DesktopTestSupport.HOME), List.of())))
                 .hasRootCauseInstanceOf(java.awt.HeadlessException.class);
             assertThat(trace.windows()).as("timed as the cold start it is (plan Ruling 13)")
                 .extracting(dev.jasper.app.startup.WindowTrace::trigger).containsExactly("cold");
@@ -227,7 +227,7 @@ class JasperApplicationResidencyTest {
         }
     }
 
-    @Test void anUpdatedLaunchWithNoWindowRestartsIntoTheNewBuildWithItsPaths(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+    @Test void anUpdatedLaunchWithNoWindowRestartsIntoTheNewBuildWithItsPathsAndWebAddresses(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
         var terminated = new CountDownLatch(1);
         var spawned = new java.util.concurrent.ConcurrentLinkedQueue<List<String>>();
         JasperApplication application = application(terminated::countDown);
@@ -239,11 +239,13 @@ class JasperApplicationResidencyTest {
         });
         Path notes = dir.resolve("notes.txt");
         var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/old.jar"), 1L);
-        assertThat(handler.apply(LaunchRequest.of(Path.of("/new.jar"), 2L, dir, List.of(notes), List.of())))
+        assertThat(handler.apply(LaunchRequest.of(Path.of("/new.jar"), 2L, dir, List.of(notes),
+                List.of(java.net.URI.create("https://example.com/a")), List.of())))
             .isEqualTo(LaunchRequest.Response.UPDATED);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).as("the old build exits").isTrue();
-        assertThat(spawned).as("its replacement waits for it, then opens the launch's paths").containsExactly(
-            List.of("/opt/jasper/bin/Jasper", "--replacing", Long.toString(ProcessHandle.current().pid()), notes.toString()));
+        assertThat(spawned).as("its replacement waits for it, then opens the launch's paths and web addresses (browser plan 4c)")
+            .containsExactly(List.of("/opt/jasper/bin/Jasper", "--replacing", Long.toString(ProcessHandle.current().pid()),
+                notes.toString(), "https://example.com/a"));
     }
 
     @Test void anUpdatedLaunchFromAnotherInstallOpensAsAnOrdinaryOne() throws Exception {
@@ -256,7 +258,7 @@ class JasperApplicationResidencyTest {
                 application.spawner = spawned::add;
                 application.staleBuild(() -> false);
             });
-            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.handedOff(List.of(), List.of(), true)))
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.handedOff(List.of(), List.of(), List.of(), true)))
                 .as("this build's own jar is unchanged: the request opens a window here")
                 .hasRootCauseInstanceOf(java.awt.HeadlessException.class);
             assertThat(spawned).isEmpty();
@@ -269,7 +271,7 @@ class JasperApplicationResidencyTest {
         JasperApplication application = application(() -> { });
         try {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() ->
-                    application.handedOff(List.of(), List.of("--safe-mode", "--config"), false)))
+                    application.handedOff(List.of(), List.of(), List.of("--safe-mode", "--config"), false)))
                 .hasRootCauseInstanceOf(java.awt.HeadlessException.class);
             edt(() -> assertThat(application.notificationCenter().history()).extracting(entry -> entry.request().title())
                 .contains("Jasper is already running: quit it first to start with --safe-mode and --config"));
@@ -287,7 +289,7 @@ class JasperApplicationResidencyTest {
         edt(() -> application.residency(true));
         edt(application::quit);   // So the queued open is inert and no window is created.
         var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/same.jar"), 7L);
-        assertThat(handler.apply(LaunchRequest.of(Path.of("/same.jar"), 7L, DesktopTestSupport.HOME, List.of(), List.of())))
+        assertThat(handler.apply(LaunchRequest.of(Path.of("/same.jar"), 7L, DesktopTestSupport.HOME, List.of(), List.of(), List.of())))
             .isEqualTo(LaunchRequest.Response.OK);
         edt(() -> { });
         assertThat(application.resident()).as("a matching request does not touch residency").isTrue();

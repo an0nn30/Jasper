@@ -314,7 +314,7 @@ public final class ApplicationBootstrap {
                     steps.workspace();
                     long window = System.nanoTime();
                     // The first window takes the first directory the launch names; its other paths open in it (plan Ruling 13).
-                    application.openFirstWindow(options.paths());
+                    application.openFirstWindow(options.paths(), options.urls());
                     StartupTrace.current().phase("first window", window);
                 }));
         } catch (RuntimeException | Error failure) {
@@ -594,7 +594,7 @@ public final class ApplicationBootstrap {
 
     /** The owner's side of a handoff (workspace-tabs spec 5.3): carries the request out. EDT. */
     static BiConsumer<LaunchRequest, Boolean> handoffHandler(JasperApplication application) {
-        return (request, updated) -> application.handedOff(request.paths(), request.ignoredFlags(), updated);
+        return (request, updated) -> application.handedOff(request.paths(), request.urls(), request.ignoredFlags(), updated);
     }
 
     /**

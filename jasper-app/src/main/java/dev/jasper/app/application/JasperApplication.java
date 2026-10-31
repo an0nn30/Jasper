@@ -105,6 +105,8 @@ public final class JasperApplication {
     public static final String HANDOFF = "handoff";
     /** The trigger of a window the macOS open-file event asked for. */
     public static final String OPEN_FILE = "open-file";
+    /** The trigger of a window the macOS open-URI event asked for: an address the system handed Jasper (browser plan 4c). */
+    public static final String OPEN_URI = "open-uri";
     private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
@@ -172,6 +174,7 @@ public final class JasperApplication {
     private boolean preferencesHandlerInstalled;
     private boolean aboutHandlerInstalled;
     private boolean openFileHandlerInstalled;
+    private boolean openUriHandlerInstalled;
     private UiState uiState = UiState.inMemory();
     /** Where the windows are saved and restored from; null before {@link #startPlugins(AppDirs)}, and then nothing is. */
     private WorkspaceStore workspaceStore;
@@ -497,6 +500,15 @@ public final class JasperApplication {
                 SwingUtilities.invokeLater(() -> filesOpened(files));
             });
             openFileHandlerInstalled = true;
+        }
+        // A link opened elsewhere while Jasper is the default browser, and open -a Jasper URL (browser plan 4c). Installed
+        // before the first window too: AWT holds the event that starts a cold launch until a handler is set.
+        if (supports(Desktop.Action.APP_OPEN_URI)) {
+            Desktop.getDesktop().setOpenURIHandler(event -> {
+                java.net.URI uri = event.getURI();
+                SwingUtilities.invokeLater(() -> uriOpened(uri));
+            });
+            openUriHandlerInstalled = true;
         }
         if (supports(Desktop.Action.APP_PREFERENCES)) {
             Desktop.getDesktop().setPreferencesHandler(event -> SwingUtilities.invokeLater(() -> openSettings(null, null)));
@@ -881,7 +893,7 @@ public final class JasperApplication {
      */
     void openLink(LinkClick click, UUID window) {
         String link = click.link().url();
-        Optional<java.net.URI> address = webAddress(link);
+        Optional<java.net.URI> address = dev.jasper.app.platform.Browser.webAddress(link);
         if (address.isPresent()) {
             openWebAddress(address.get(), placement(click), click.link().target(), Optional.of(window));
             return;
@@ -929,6 +941,18 @@ public final class JasperApplication {
         return externalAddresses.open(address, window);
     }
 
+    /**
+     * Web addresses a launch, a second launch or the system handed Jasper (browser plan 4c): each opens in
+     * {@code window}, as {@link #openExternalAddress} opens it, without waiting for it; one dropped because too many wait
+     * is logged there. None while Jasper quits. EDT.
+     */
+    private void openFromOutside(List<java.net.URI> addresses, Optional<UUID> window) {
+        for (java.net.URI address : addresses) {
+            if (quitting || stopped) return;
+            openExternalAddress(address, window);
+        }
+    }
+
     /** The window holding the pane a {@code jasper} call ran in, while it is open; empty for a call from elsewhere. EDT. */
     private Optional<UUID> windowOfPane(Optional<UUID> pane) {
         return pane.flatMap(terminals::pane).flatMap(entry -> terminals.tab(entry.tabId())).map(dev.jasper.app.terminals.TabEntry::windowId);
@@ -936,34 +960,18 @@ public final class JasperApplication {
 
     /**
      * The {@code jasper} command's arguments as web addresses (browser plan 3): present only when there is at least one
-     * and every one is a web address ({@code webAddress}); a call that mixes them with paths is a path call. Any thread.
+     * and every one is a web address ({@link dev.jasper.app.platform.Browser#webAddress}); a call that mixes them with
+     * paths is a path call. Any thread.
      */
     static Optional<List<java.net.URI>> webAddresses(List<String> arguments) {
         if (arguments.isEmpty()) return Optional.empty();
         List<java.net.URI> addresses = new ArrayList<>();
         for (String argument : arguments) {
-            Optional<java.net.URI> address = webAddress(argument);
+            Optional<java.net.URI> address = dev.jasper.app.platform.Browser.webAddress(argument);
             if (address.isEmpty()) return Optional.empty();
             addresses.add(address.get());
         }
         return Optional.of(List.copyOf(addresses));
-    }
-
-    /**
-     * {@code text} as a web address (browser plan 3): an absolute URI whose scheme is {@code http} or {@code https}, in
-     * any case, with an authority, such as {@code https://example.com/a}. Anything else is empty: another scheme, an
-     * opaque URI such as {@code https:example.com}, one without an authority such as {@code http:/notes}, a Windows path,
-     * and text that does not parse. Any thread.
-     */
-    static Optional<java.net.URI> webAddress(String text) {
-        try {
-            var address = new java.net.URI(text);
-            String scheme = address.getScheme();
-            boolean web = scheme != null && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"));
-            return web && !address.isOpaque() && address.getRawAuthority() != null ? Optional.of(address) : Optional.empty();
-        } catch (java.net.URISyntaxException notAnAddress) {
-            return Optional.empty();
-        }
     }
 
     /**
@@ -1328,7 +1336,8 @@ public final class JasperApplication {
 
     /**
      * Every outside request to show Jasper ends here: a second launch's handoff, the {@code jasper} command, the macOS
-     * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3, 5.4, 6.4 and 13; full windows spec 5.2).
+     * reopen, open-file and open-URI events and the menu bar item (workspace-tabs spec 5.3, 5.4, 6.4 and 13; full windows
+     * spec 5.2).
      * The saved window is restored first when none is open, as this process last saved it, else as
      * {@code workspace.toml} has them, and the first directory the request names opens in a new tab of the first after
      * its restored ones (with nothing to restore, a new window opens there); otherwise the most recently active window
@@ -1351,22 +1360,26 @@ public final class JasperApplication {
     }
 
     /**
-     *
      * A launch's first window, timed as a cold start unless a {@code --background} launch warmed up: the saved window
      * restored as this process last saved it, else as {@code workspace.toml} has it (workspace tabs spec 13), the
      * first directory {@code paths} names opening in a new tab of the first after its restored ones; with nothing to
      * restore, a new window whose tab starts in that directory, else where a new shell starts. The rest of the paths
-     * open in it as {@link #open} opens them (plan Ruling 13). EDT.
+     * open in it as {@link #open} opens them (plan Ruling 13), and then its web addresses, once Jasper's browser is ready
+     * ({@link #openExternalAddress}; browser plan 4c), so none opens a window of its own. EDT.
      *
      * @param paths the launch's absolute paths
+     * @param urls the launch's web addresses
      * @return the window; empty while the application is quitting
      */
-    public Optional<JasperWindow> openFirstWindow(List<Path> paths) {
+    public Optional<JasperWindow> openFirstWindow(List<Path> paths, List<java.net.URI> urls) {
         boolean open = windows.lastActive().isPresent();
         OpenPlan plan = OpenPlan.of(paths, open, java.nio.file.Files::isDirectory, java.nio.file.Files::isRegularFile);
         Optional<JasperWindow> window = windows.ensureWindow(
             windowTrigger(windowsOpened, trace.millis(StartupTrace.Milestone.WARMED_UP).isPresent()), plan.windowDirectory());
-        window.ifPresent(first -> openRest(first, plan));
+        window.ifPresent(first -> {
+            openRest(first, plan);
+            openFromOutside(urls, Optional.of(first.id()));
+        });
         return window;
     }
 
@@ -1387,21 +1400,24 @@ public final class JasperApplication {
      * A second launch handed its request to this process (workspace-tabs spec 5.3). The start-up flags it could not
      * apply are named in a notice. When it ran another build ({@code updated}) and this process's own jar has changed on
      * disk since it started, a process with no window open restarts into the new build, the replacement opening
-     * {@code paths}; one with windows open opens them itself and says "Jasper was updated" with a Restart action.
-     * Otherwise, or when the restart cannot happen, the paths open as {@link #open} opens them. EDT.
+     * {@code paths} and {@code urls}; one with windows open opens them itself and says "Jasper was updated" with a
+     * Restart action. Otherwise, or when the restart cannot happen, the paths open as {@link #open} opens them, and then
+     * the web addresses in the most recently active window, once Jasper's browser is ready ({@link #openExternalAddress};
+     * browser plan 4c). EDT.
      *
-     * @param paths the launch's absolute paths; none raises
+     * @param paths the launch's absolute paths; none, with no web addresses, raises
+     * @param urls the launch's web addresses
      * @param ignoredFlags the start-up flags the launch could not apply
      * @param updated whether the launch ran another build
      */
-    public void handedOff(List<Path> paths, List<String> ignoredFlags, boolean updated) {
+    public void handedOff(List<Path> paths, List<java.net.URI> urls, List<String> ignoredFlags, boolean updated) {
         if (quitting || stopped) return;
         if (!ignoredFlags.isEmpty())
             notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.INFO, ignoredFlagsTitle(ignoredFlags)));
         boolean newBuild = updated && staleBuild.getAsBoolean();
         boolean windowsWereOpen = windowsOpen();
         if (newBuild && !windowsWereOpen) {
-            restart(RestartMode.SAME, paths);
+            restart(RestartMode.SAME, paths, urls);
             if (quitting || stopped) return;
             LOG.log(System.Logger.Level.WARNING,
                 "Jasper was updated on disk but could not relaunch as the new build; the request opens in the running build");
@@ -1411,6 +1427,7 @@ public final class JasperApplication {
                 .withContent("Restart Jasper to run the new build.")
                 .withAction(dev.jasper.app.notifications.NotificationAction.of("Restart", this::restartForUpdate)));
         open(paths, HANDOFF);
+        openFromOutside(urls, windows.lastActive().map(JasperWindow::id));
     }
 
     /** The notice for start-up flags a second launch could not apply (spec 5.2), naming them in the order given. */
@@ -1435,6 +1452,34 @@ public final class JasperApplication {
      */
     void filesOpened(List<java.io.File> files) {
         open(files.stream().map(file -> file.toPath().toAbsolutePath()).toList(), OPEN_FILE);
+    }
+
+    /**
+     * The macOS open-URI event (browser plan 4c): an address the system handed Jasper, as the default browser or for
+     * {@code open -a Jasper <url>}. The most recently active window comes forward, or the saved one is restored, as
+     * {@link #open} does; a web address ({@link dev.jasper.app.platform.Browser#isWebAddress}) then opens in it once
+     * Jasper's browser is ready ({@link #openExternalAddress}), and a {@code file:} URL opens as the open-file event
+     * opens its file. Anything else opens nothing; the log does not repeat it. EDT.
+     *
+     * @param uri what the system handed over
+     */
+    void uriOpened(java.net.URI uri) {
+        if (quitting || stopped) return;
+        if (dev.jasper.app.platform.Browser.isWebAddress(uri)) {
+            open(List.of(), OPEN_URI);
+            openFromOutside(List.of(uri), windows.lastActive().map(JasperWindow::id));
+            return;
+        }
+        if ("file".equalsIgnoreCase(uri.getScheme())) {
+            try {
+                open(List.of(Path.of(uri).toAbsolutePath()), OPEN_URI);
+                return;
+            } catch (IllegalArgumentException | java.nio.file.FileSystemNotFoundException notLocal) {
+                // Reported below: a file: URL naming another host, or one this platform cannot read.
+            }
+        }
+        LOG.log(System.Logger.Level.INFO,
+            "The system handed Jasper an address that is neither a web address nor a local file; it opens nothing");
     }
 
     /**
@@ -1857,7 +1902,7 @@ public final class JasperApplication {
          */
         void browse(java.net.URI uri) {
             Optional<UUID> window = terminals.activeWindow().map(dev.jasper.app.terminals.WindowEntry::id);
-            if (webAddress(uri.toString()).isPresent()) openWebAddress(uri, window);
+            if (dev.jasper.app.platform.Browser.isWebAddress(uri)) openWebAddress(uri, window);
             else systemBrowser.accept(uri);
         }
 
@@ -2374,26 +2419,27 @@ public final class JasperApplication {
         else shutdownActions.add(java.util.Objects.requireNonNull(action));
     }
 
-    /** As {@link #restart(RestartMode, List)}, the replacement opening nothing. */
-    public boolean restart(RestartMode mode) { return restart(mode, List.of()); }
+    /** As {@link #restart(RestartMode, List, List)}, the replacement opening nothing. */
+    public boolean restart(RestartMode mode) { return restart(mode, List.of(), List.of()); }
 
     /**
      * Quits through the normal quit path and, from the exit thread once process cleanup is over, starts a replacement
-     * that waits for this process's instance lock ({@code --replacing}) and then opens {@code paths}
-     * (workspace-tabs spec 5.3). EDT.
+     * that waits for this process's instance lock ({@code --replacing}) and then opens {@code paths} and {@code urls}
+     * (workspace-tabs spec 5.3; browser plan 4c). EDT.
      *
      * @param mode which launch flags the replacement keeps
      * @param paths absolute paths the replacement opens
+     * @param urls web addresses the replacement opens
      * @return false, and nothing happens, when this process's command line cannot be determined; otherwise
      *     true. It also returns true, with nothing changed, when a content tab's closing guard or a quit guard refuses.
      */
-    public boolean restart(RestartMode mode, List<Path> paths) {
+    public boolean restart(RestartMode mode, List<Path> paths, List<java.net.URI> urls) {
         if (quitting || stopped) return true;
         Optional<List<String>> planned = restartPlanner.apply(mode);
         if (planned.isEmpty()) return false;
         // A refusal leaves no relaunch behind: a later ordinary quit must not start a replacement.
         if (!guardsAllowQuit()) return true;
-        relaunch = RestartCommand.replacing(planned.get(), ProcessHandle.current().pid(), paths);
+        relaunch = RestartCommand.replacing(planned.get(), ProcessHandle.current().pid(), paths, urls);
         quitNow();
         return true;
     }
@@ -2681,6 +2727,7 @@ public final class JasperApplication {
         if (preferencesHandlerInstalled) { Desktop.getDesktop().setPreferencesHandler(null); preferencesHandlerInstalled = false; }
         if (aboutHandlerInstalled) { Desktop.getDesktop().setAboutHandler(null); aboutHandlerInstalled = false; }
         if (openFileHandlerInstalled) { Desktop.getDesktop().setOpenFileHandler(null); openFileHandlerInstalled = false; }
+        if (openUriHandlerInstalled) { Desktop.getDesktop().setOpenURIHandler(null); openUriHandlerInstalled = false; }
         if (reopenListener != null) { Desktop.getDesktop().removeAppEventListener(reopenListener); reopenListener = null; }
         // Cross-process locks and socket probes must not hold up Swing or the exit deadline.
         List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());

@@ -3,8 +3,10 @@ package dev.jasper.app.bootstrap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.OptionalLong;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,6 +26,7 @@ class AppArgumentsTest {
         assertThat(plain.configOverride()).isNull();
         assertThat(plain.help()).isFalse();
         assertThat(plain.paths()).isEmpty();
+        assertThat(plain.urls()).isEmpty();
         assertThat(plain.replacing()).isEmpty();
         assertThat(plain.workingDirectory()).isEqualTo(cwd);
         assertThat(plain.given()).isEmpty();
@@ -54,7 +57,53 @@ class AppArgumentsTest {
         assertThat(launch.safeMode()).isTrue();
         assertThat(launch.given()).containsExactly("notes.txt", "--safe-mode", "src/../docs", absolute);
         assertThat(parse("-psn_0_42").paths()).as("one dash is a path, not an option").containsExactly(cwd.resolve("-psn_0_42"));
-        assertThat(AppArguments.USAGE).endsWith("[<path>...]");
+        assertThat(AppArguments.USAGE).endsWith("[<path>|<url>...]");
+    }
+
+    /**
+     * Browser plan 4c, Review Focus 2: an absolute http or https argument, in any case and with an authority, is a web
+     * address and no longer resolves as a path; everything else, a {@code file:} URL included, stays a path, in order.
+     */
+    @Test void anHttpOrHttpsArgumentIsAWebAddressAndEverythingElseStaysAPath() {
+        AppArguments launch = parse("https://example.com", "notes.txt");
+        assertThat(launch.urls()).containsExactly(URI.create("https://example.com"));
+        assertThat(launch.paths()).containsExactly(cwd.resolve("notes.txt"));
+        assertThat(launch.given()).as("as main received them").containsExactly("https://example.com", "notes.txt");
+        AppArguments mixed = parse("HTTP://Example.com/a", "src", "--safe-mode", "http://localhost:8080/b?c=1#d");
+        assertThat(mixed.urls()).containsExactly(URI.create("HTTP://Example.com/a"), URI.create("http://localhost:8080/b?c=1#d"));
+        assertThat(mixed.paths()).containsExactly(cwd.resolve("src"));
+        assertThat(mixed.safeMode()).isTrue();
+        assertThat(mixed.residencyAllowed()).isFalse();
+        assertThat(parse("https://example.com").residencyAllowed()).as("web addresses are no start-up flag").isTrue();
+    }
+
+    /** Browser plan 4c, Review Focus 2: a {@code file:} URL is the file it names, which opens as any path does. */
+    @Test void aFileUrlStaysAPathToTheFileItNames() {
+        Path page = cwd.resolve("x.html");
+        AppArguments local = parse(page.toUri().toString());
+        assertThat(local.paths()).containsExactly(page);
+        assertThat(local.urls()).isEmpty();
+        AppArguments root = parse("file:///x.html");
+        assertThat(root.urls()).isEmpty();
+        assertThat(root.paths()).as("/x.html; on Windows, on the working directory's drive")
+            .containsExactly(cwd.resolve(Path.of(URI.create("file:///x.html"))).normalize());
+    }
+
+    /** Not web addresses: another scheme, an opaque one and one without an authority stay paths where a path can say so. */
+    @Test @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void otherSchemesAndAddressesWithoutAnAuthorityStayPaths() {
+        AppArguments launch = parse("ftp://example.com/f", "mailto:someone@example.com", "https:example.com", "http:/notes");
+        assertThat(launch.urls()).isEmpty();
+        assertThat(launch.paths()).hasSize(4);
+    }
+
+    @Test void aLaunchNamesAtMostThirtyTwoWebAddresses() {
+        String[] most = IntStream.rangeClosed(1, 32).mapToObj(n -> "https://example.com/" + n).toArray(String[]::new);
+        assertThat(parse(most).urls()).hasSize(32);
+        String[] more = IntStream.rangeClosed(1, 33).mapToObj(n -> "https://example.com/" + n).toArray(String[]::new);
+        rejected(more);
+        assertThatIllegalArgumentException().isThrownBy(() -> AppArguments.parse(more, cwd))
+            .withMessageStartingWith("Jasper opens at most 32 web addresses at once.");
     }
 
     @Test void replacingNamesTheProcessARestartReplacesAndStaysOutOfTheUsage() {

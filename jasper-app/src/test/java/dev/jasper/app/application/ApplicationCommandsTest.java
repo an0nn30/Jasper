@@ -146,15 +146,8 @@ class ApplicationCommandsTest {
         DesktopTestSupport.edt(application::quitNow);
     }
 
-    /** Browser plan 3, Review Focus 5: only an absolute http or https address with an authority is a web address. */
-    @Test void onlyAnAbsoluteHttpOrHttpsAddressWithAnAuthorityIsAWebAddress() {
-        assertThat(JasperApplication.webAddress("https://example.com/a?b=1")).contains(java.net.URI.create("https://example.com/a?b=1"));
-        assertThat(JasperApplication.webAddress("HTTP://Example.com")).as("the scheme in any case").contains(java.net.URI.create("HTTP://Example.com"));
-        assertThat(JasperApplication.webAddress("http://under_score:8080/")).as("a host Java reads as a registry name").isPresent();
-        for (String text : List.of("C:\\Users\\me\\notes.txt", "c:/Users/me/notes.txt", "\\\\server\\share\\notes.txt",
-                "./https://example.com", "https:example.com", "http:/notes", "ftp://files.example.com/x", "mailto:someone@example.com",
-                "file:///etc/hosts", "example.com", "https://exa mple.com", ""))
-            assertThat(JasperApplication.webAddress(text)).as(text).isEmpty();
+    /** Browser plan 3, Review Focus 5: a call is web addresses only when every argument is one; {@code BrowserTest} says which text is one. */
+    @Test void aCallIsWebAddressesOnlyWhenEveryArgumentIsOne() {
         assertThat(JasperApplication.webAddresses(List.of("https://example.com/a", "http://localhost:8080/")))
             .contains(List.of(java.net.URI.create("https://example.com/a"), java.net.URI.create("http://localhost:8080/")));
         assertThat(JasperApplication.webAddresses(List.of("https://example.com/a", "notes.txt"))).as("a mixed call").isEmpty();

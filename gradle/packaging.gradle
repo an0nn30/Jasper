@@ -35,6 +35,9 @@ def localNetworkUsage = 'Jasper connects to SSH hosts on your local network.'
 // Workspace-tabs spec 5.4: Jasper appears in Open With and takes drops on its Dock icon for text, source code and
 // folders, without claiming any of them as their default application.
 def macDocumentTypes = '[{"CFBundleTypeName":"Text","CFBundleTypeRole":"Editor","LSHandlerRank":"Alternate","LSItemContentTypes":["public.text","public.source-code"]},{"CFBundleTypeName":"Folder","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["public.folder"]}]'
+// Browser plan 4c (spec 9): Jasper is one of the web browsers the user can make the default, for http and https; the
+// open-URI handler takes what the system hands it. A project property, so packaging-support-test.gradle checks it too.
+ext.macUrlTypes = '[{"CFBundleURLName":"Web site URL","CFBundleURLSchemes":["http","https"],"CFBundleTypeRole":"Viewer"}]'
 // Windows shows it as the launcher's file description, which Task Manager lists as the process name;
 // Linux packages use it as their summary and the menu entry's comment.
 def packageDescription = 'Jasper DevOps workstation'
@@ -283,6 +286,7 @@ def packageApp = tasks.register('packageApp') {
     inputs.property('bundledNativeOptions', providers.provider { bundledNativeJvmOptions(normalizedHost().os) })
     inputs.property('localNetworkUsage', localNetworkUsage)
     inputs.property('documentTypes', macDocumentTypes)
+    inputs.property('urlTypes', macUrlTypes)
     inputs.property('version', version)
     inputs.property('host', providers.provider { normalizedHost().toString() })
     inputs.property('toolchainHome', launcher.map { it.metadata.installationPath.asFile.absolutePath })
@@ -325,6 +329,8 @@ def packageApp = tasks.register('packageApp') {
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil local network usage')
                 executeNative(['/usr/bin/plutil', '-replace', 'CFBundleDocumentTypes', '-json', macDocumentTypes,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil document types')
+                executeNative(['/usr/bin/plutil', '-replace', 'CFBundleURLTypes', '-json', macUrlTypes,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil URL types')
                 File executable = new File(image, 'Contents/MacOS/Jasper')
                 Files.write(executable.toPath(), macLauncherWithIdentity(Files.readAllBytes(executable.toPath()),
                     'dev.jasper.app', macLauncherTemplate()))
@@ -683,6 +689,8 @@ def verifyPackage = tasks.register('verifyPackage') {
             if (localNetwork != localNetworkUsage) throw new GradleException("Package verification failed: plist local network usage description is '${localNetwork}'")
             def documentTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'CFBundleDocumentTypes', 'json', '-o', '-', plist.absolutePath], 'plutil document types').stdout)
             if (documentTypes != new groovy.json.JsonSlurper().parseText(macDocumentTypes)) throw new GradleException("Package verification failed: plist document types are ${documentTypes}")
+            def urlTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'CFBundleURLTypes', 'json', '-o', '-', plist.absolutePath], 'plutil URL types').stdout)
+            if (urlTypes != new groovy.json.JsonSlurper().parseText(macUrlTypes)) throw new GradleException("Package verification failed: plist URL types are ${urlTypes}")
             String iconName = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIconFile', 'raw', '-o', '-', plist.absolutePath], 'plutil icon').stdout.trim()
             if (!iconName.endsWith('.icns')) iconName += '.icns'
             File packagedIcon = new File(image, "Contents/Resources/${iconName}")

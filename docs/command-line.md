@@ -20,7 +20,7 @@ moves Jasper home, the folder that holds `config.toml`, to `jasper-app/build/dev
 `-Pjasper.home=<dir>` names), so it runs beside an installed Jasper and is never resident.
 
 ```
-Usage: jasper [--config <path>] [--background] [--no-window] [--safe-mode] [--plugin-dir <path>] [--help] [<path>...]
+Usage: jasper [--config <path>] [--background] [--no-window] [--safe-mode] [--plugin-dir <path>] [--help] [<path>|<url>...]
 ```
 
 | Option | Effect |

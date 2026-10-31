@@ -47,11 +47,12 @@ class RestartCommandTest {
         assertThat(other).contains(List.of("/app/Jasper", "-Dx=1", "Main", "kept"));
     }
 
-    @Test void theReplacementWaitsForThisProcessAndOpensThePaths() {
+    @Test void theReplacementWaitsForThisProcessAndOpensThePathsAndWebAddresses() {
         Path notes = Path.of("/tmp/notes.txt").toAbsolutePath();
-        assertThat(RestartCommand.replacing(List.of(JASPER, "--safe-mode"), 4242, List.of(notes)))
-            .containsExactly(JASPER, "--safe-mode", "--replacing", "4242", notes.toString());
-        assertThat(RestartCommand.replacing(List.of(JASPER), 7, List.of())).containsExactly(JASPER, "--replacing", "7");
+        assertThat(RestartCommand.replacing(List.of(JASPER, "--safe-mode"), 4242, List.of(notes),
+            List.of(java.net.URI.create("https://example.com/a?b=1"))))
+            .containsExactly(JASPER, "--safe-mode", "--replacing", "4242", notes.toString(), "https://example.com/a?b=1");
+        assertThat(RestartCommand.replacing(List.of(JASPER), 7, List.of(), List.of())).containsExactly(JASPER, "--replacing", "7");
     }
 
     @DisabledOnOs(OS.WINDOWS)

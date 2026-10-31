@@ -97,10 +97,11 @@ sequenceDiagram
    owns each home: `bootstrap.SingleInstance` tries to take `residency.InstanceLock` (`daemon/instance.lock`), and
    `LaunchAction` decides what the launch does: own the home, hand off, exit, or wait for the lock. The owner binds the
    handoff endpoint and the command socket at once (`bootstrap.Instance`) and holds their requests in `EarlyRequests`
-   until `compose` hands it the application. Any other launch hands its request (`HandoffSocket.handOff`, protocol 2:
-   RAISE or OPEN_PATHS, its working directory, paths and ignored start-up flags) to the owner and exits 0 without
-   opening the log or the toolkit; on Windows it first lends the owner the foreground right, using the process id the
-   owner records in `daemon/instance.pid` when it takes the lock. A `--background` or `--no-window` launch exits at
+   until `compose` hands it the application. Any other launch hands its request (`HandoffSocket.handOff`, protocol 3:
+   RAISE or OPEN_PATHS, its working directory, paths, ignored start-up flags and web addresses; the owner still reads
+   protocol 2, which has no web addresses) to the owner and exits 0 without opening the log or the toolkit; on Windows
+   it first lends the owner the foreground right, using the process id the owner records in `daemon/instance.pid` when
+   it takes the lock. A `--background` or `--no-window` launch exits at
    once; restart's replacement (`--replacing <pid>`) waits up to 30 seconds for the lock; an owner that does not answer
    within 10 seconds is reported (`bootstrap.LaunchFailure`) and no second instance starts. A start that fails after
    taking the lock closes its endpoints and exits, so the lock goes with the process.
@@ -157,7 +158,8 @@ starts: a later launch hands off, they are ignored, and the running Jasper says 
 one is never resident. [Command line](command-line.md) describes the client.
 
 A macOS reopen (Dock click, Spotlight, `open -a`) opens or raises a window, and the macOS open-file event opens its
-files and folders as a handoff's paths. When this process's application jar has changed on disk, a reopen of a resident
+files and folders as a handoff's paths. The macOS open-URI event raises or opens a window the same way; a web address
+then opens in it as a launch's do, and a `file:` URL opens as an open-file event's file. When this process's application jar has changed on disk, a reopen of a resident
 Jasper, or a launch of another build, with no window open relaunches the process (the replacement waits for the lock and
 opens the launch's paths); with a window open, a launch of another build is carried out here and a "Jasper was updated"
 notice offers Restart.

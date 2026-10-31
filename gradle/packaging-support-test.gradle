@@ -693,3 +693,40 @@ verifySupport.configure {
         logger.lifecycle("Verified the pinned JBR installer on all ${found} JBR workflow steps")
     }
 }
+
+// Browser plan 4c (spec 9): Info.plist lists Jasper among the web browsers for http and https. On macOS the fixture
+// sets a stand-in plist's CFBundleURLTypes as packageApp does and reads it back as verifyPackage does.
+verifySupport.configure {
+    doLast {
+        def json = new groovy.json.JsonSlurper()
+        assert json.parseText(macUrlTypes) == [[CFBundleURLName: 'Web site URL', CFBundleURLSchemes: ['http', 'https'],
+            CFBundleTypeRole: 'Viewer']]
+        if (!System.getProperty('os.name').startsWith('Mac')) {
+            logger.lifecycle('Verified the macOS URL types (plutil checked only on macOS)')
+            return
+        }
+        def plutil = { List<String> arguments ->
+            def process = new ProcessBuilder(['/usr/bin/plutil'] + arguments).redirectErrorStream(true).start()
+            String output = process.inputStream.getText('UTF-8')
+            assert process.waitFor() == 0 : "plutil ${arguments} failed: ${output}".toString()
+            output
+        }
+        File plist = new File(temporaryDir, 'url-types/Info.plist')
+        delete(plist.parentFile)
+        plist.parentFile.mkdirs()
+        plist.setText('''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>dev.jasper.app</string>
+</dict>
+</plist>
+''', 'UTF-8')
+        plutil(['-replace', 'CFBundleURLTypes', '-json', macUrlTypes, plist.absolutePath])
+        assert json.parseText(plutil(['-extract', 'CFBundleURLTypes', 'json', '-o', '-', plist.absolutePath])) == json.parseText(macUrlTypes)
+        assert plutil(['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist.absolutePath]).trim() == 'dev.jasper.app'
+        delete(plist.parentFile)
+        logger.lifecycle('Verified the macOS URL types')
+    }
+}

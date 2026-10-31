@@ -7,6 +7,7 @@ import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.testsupport.LogRecorder;
 import dev.jasper.app.testsupport.PluginJars;
+import dev.jasper.app.workspace.JasperWindow;
 import dev.jasper.app.workspace.LinkClick;
 import dev.jasper.terminal.view.TerminalLink;
 import java.lang.management.ManagementFactory;
@@ -75,7 +76,7 @@ class JasperApplicationPluginsTest {
             // A stand-in frame opens a window headless, so Quit has a window to save (workspace plan 6a Task 9).
             application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
                 () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
-            application[0].openFirstWindow(List.of()).orElseThrow();
+            application[0].openFirstWindow(List.of(), List.of()).orElseThrow();
         });
         assertThat(data.resolve("started")).exists();
         edt(application[0]::quit);
@@ -693,7 +694,7 @@ class JasperApplicationPluginsTest {
             // A stand-in frame opens a window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
             application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
                 () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
-            application[0].openFirstWindow(List.of()).orElseThrow();
+            application[0].openFirstWindow(List.of(), List.of()).orElseThrow();
             active[0] = application[0].terminals().windows().getFirst().id();
             application[0].terminals().windowActivated(active[0]);
             application[0].browse(help);
@@ -792,7 +793,7 @@ class JasperApplicationPluginsTest {
             // A stand-in frame opens a window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
             application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
                 () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
-            application[0].openFirstWindow(List.of()).orElseThrow();
+            application[0].openFirstWindow(List.of(), List.of()).orElseThrow();
             calling[0] = application[0].terminals().windows().getFirst().id();
             pane[0] = application[0].terminals().windows().getFirst().selectedTab().get()
                 .flatMap(tab -> tab.terminal().get()).orElseThrow().id();
@@ -886,6 +887,140 @@ class JasperApplicationPluginsTest {
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         ApplicationPluginCleanup.await(application[0]);
+    }
+
+    /**
+     * Browser plan 4c Task 4: a launch's web addresses wait, as any from outside, for the first answer to whether Jasper
+     * is the default browser, and then open once each, as external addresses, in the launch's first window; no other
+     * window opens and none reaches the system browser.
+     */
+    @Test void aLaunchsWebAddressesWaitForTheBrowserAndOpenOnceInItsFirstWindow() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path plugin = home.resolve("web-plugin");
+        PluginJars.build(plugin, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        var system = new CopyOnWriteArrayList<String>();
+        var checks = new CopyOnWriteArrayList<Runnable>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        JasperWindow[] first = new JasperWindow[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> system.add(address.toString());
+            application[0].defaultBrowser(dev.jasper.app.platform.DefaultBrowserTestAccess.withFirstAnswerWithin(checks::add,
+                new dev.jasper.app.testsupport.MutableClock(), () -> Optional.of(false), java.time.Duration.ofHours(1)));
+            application[0].startPlugins(null, plugin, false, dirs);
+            framesHeadless(application[0]);
+            first[0] = application[0].openFirstWindow(List.of(),
+                List.of(java.net.URI.create("https://example.com/a"), java.net.URI.create("HTTP://Example.com/b"))).orElseThrow();
+        });
+        Path opened = dirs.plugins().resolve("dev.example.web/data/opened");
+        edt(() -> { });
+        assertThat(opened).as("waiting for the first answer").doesNotExist();
+        checks.getFirst().run();
+        assertThat(awaitLines(opened, 2)).containsExactly("https://example.com/a|EXTERNAL|" + first[0].id(),
+            "HTTP://Example.com/b|EXTERNAL|" + first[0].id());
+        edt(() -> { });
+        edt(() -> { });
+        assertThat(java.nio.file.Files.readAllLines(opened)).as("once each").hasSize(2);
+        edt(() -> assertThat(application[0].terminals().windows()).as("no other window").hasSize(1));
+        assertThat(system).isEmpty();
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+    }
+
+    /**
+     * Browser plan 4c Task 4, Review Focus 3: a second launch's web addresses, handed over while the owner still waits for
+     * its first answer, open once each, after its paths, in the most recently active window; a later one opens at once,
+     * and one handed over while Jasper quits opens nothing.
+     */
+    @Test void aSecondLaunchsWebAddressesOpenOnceInTheMostRecentlyActiveWindow() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path plugin = home.resolve("web-plugin");
+        PluginJars.build(plugin, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        var system = new CopyOnWriteArrayList<String>();
+        var checks = new CopyOnWriteArrayList<Runnable>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        JasperWindow[] first = new JasperWindow[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].systemBrowser = address -> system.add(address.toString());
+            application[0].defaultBrowser(dev.jasper.app.platform.DefaultBrowserTestAccess.withFirstAnswerWithin(checks::add,
+                new dev.jasper.app.testsupport.MutableClock(), () -> Optional.of(false), java.time.Duration.ofHours(1)));
+            application[0].startPlugins(null, plugin, false, dirs);
+            framesHeadless(application[0]);
+            first[0] = application[0].openFirstWindow(List.of(), List.of()).orElseThrow();
+        });
+        Path source = Path.of("/same.jar");
+        var handler = dev.jasper.app.bootstrap.BootstrapTestSupport.handoffHandler(application[0], source, 7L);
+        assertThat(handler.apply(dev.jasper.app.residency.LaunchRequest.of(source, 7L, home, List.of(home),
+            List.of(java.net.URI.create("https://example.com/a"), java.net.URI.create("https://example.com/b")), List.of())))
+            .isEqualTo(dev.jasper.app.residency.LaunchRequest.Response.OK);
+        edt(() -> { });
+        edt(() -> assertThat(first[0].content().terminalTabs()).as("its path opened at once").hasSize(2));
+        Path opened = dirs.plugins().resolve("dev.example.web/data/opened");
+        assertThat(opened).as("waiting for the first answer").doesNotExist();
+        checks.getFirst().run();
+        assertThat(awaitLines(opened, 2)).containsExactly("https://example.com/a|EXTERNAL|" + first[0].id(),
+            "https://example.com/b|EXTERNAL|" + first[0].id());
+        assertThat(handler.apply(dev.jasper.app.residency.LaunchRequest.of(source, 7L, home, List.of(),
+            List.of(java.net.URI.create("https://example.com/later")), List.of())))
+            .isEqualTo(dev.jasper.app.residency.LaunchRequest.Response.OK);
+        assertThat(awaitLines(opened, 3)).endsWith("https://example.com/later|EXTERNAL|" + first[0].id());
+        edt(() -> { });
+        assertThat(java.nio.file.Files.readAllLines(opened)).as("once each").hasSize(3);
+        assertThat(system).isEmpty();
+        edt(() -> {
+            application[0].quit();
+            application[0].handedOff(List.of(), List.of(java.net.URI.create("https://example.com/quitting")), List.of(), false);
+        });
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+        assertThat(java.nio.file.Files.readAllLines(opened)).as("nothing once Jasper quits").hasSize(3);
+        assertThat(system).isEmpty();
+    }
+
+    /**
+     * Browser plan 4c Task 4, Review Focus 2: the macOS open-URI event sends a web address to the browser as an external
+     * address in the most recently active window, and a {@code file:} URL, even one for a page the browser could show, to
+     * the editor as a file; nothing once Jasper quits.
+     */
+    @Test void theOpenUriEventSendsWebAddressesToTheBrowserAndFileUrlsToTheEditor() throws Exception {
+        Path page = java.nio.file.Files.writeString(home.resolve("index.html"), "<p>hi</p>\n");
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = startedWithBrowserAndEditor(dirs, terminated);
+        Path browsed = dirs.plugins().resolve("dev.example.both/data/browsed");
+        Path edited = dirs.plugins().resolve("dev.example.both/data/edited");
+        JasperWindow[] window = new JasperWindow[1];
+        edt(() -> {
+            framesHeadless(application);
+            window[0] = application.openFirstWindow(List.of(), List.of()).orElseThrow();
+            application.uriOpened(java.net.URI.create("https://example.com/from-the-system"));
+            application.uriOpened(page.toUri());
+        });
+        assertThat(awaitLines(browsed, 1)).containsExactly("https://example.com/from-the-system|EXTERNAL|TAB|" + window[0].id());
+        assertThat(awaitLines(edited, 1)).containsExactly("index.html|-");
+        edt(() -> { });
+        assertThat(java.nio.file.Files.readAllLines(browsed)).as("the file: URL is a file, not a page").hasSize(1);
+        edt(() -> {
+            application.quit();
+            application.uriOpened(java.net.URI.create("https://example.com/quitting"));
+            application.uriOpened(page.toUri());
+        });
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application);
+        assertThat(java.nio.file.Files.readAllLines(browsed)).hasSize(1);
+        assertThat(java.nio.file.Files.readAllLines(edited)).hasSize(1);
+    }
+
+    /** A stand-in frame, so a window opens headless, as {@code pluginsStartBeforeWindowsAndStopBeforeTermination} does. EDT. */
+    private static void framesHeadless(JasperApplication application) {
+        application.frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
+            () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
     }
 
     /**
@@ -1259,7 +1394,7 @@ class JasperApplicationPluginsTest {
             // A stand-in frame opens a window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
             application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
                 () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
-            first[0] = application[0].openFirstWindow(List.of()).orElseThrow();
+            first[0] = application[0].openFirstWindow(List.of(), List.of()).orElseThrow();
         });
         edt(() -> first[0].content().onOpenLink.accept(clicked("https://example.com/e")));
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
@@ -1292,7 +1427,7 @@ class JasperApplicationPluginsTest {
             // A stand-in frame opens a window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
             application[0].frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
                 () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
-            first[0] = application[0].openFirstWindow(List.of()).orElseThrow();
+            first[0] = application[0].openFirstWindow(List.of(), List.of()).orElseThrow();
         });
         edt(() -> {
             var opener = first[0].content().onOpenLink;
@@ -1463,7 +1598,7 @@ class JasperApplicationPluginsTest {
             // A stand-in frame opens a window headless, as pluginsStartBeforeWindowsAndStopBeforeTermination does.
             application.frames = window -> new dev.jasper.app.workspace.WindowShell(() -> { }, () -> { }, () -> { }, () -> { },
                 () -> null, component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
-            first[0] = application.openFirstWindow(List.of()).orElseThrow();
+            first[0] = application.openFirstWindow(List.of(), List.of()).orElseThrow();
         });
 
         edt(() -> first[0].content().onOpenClickedFile.accept(page, 0));
