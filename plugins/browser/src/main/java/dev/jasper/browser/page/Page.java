@@ -18,13 +18,15 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.ObjIntConsumer;
+import java.util.function.Predicate;
 import javax.swing.JComponent;
 import org.cef.CefClient;
 import org.cef.browser.CefFrame;
 
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
- * whether it loads, where it can go and its history, its find in page, its zoom, and what it is asked to do. Its
+ * whether it loads, where it can go and its history, its find in page, its zoom, its failed loads and the certificates
+ * it may go on past, and what it is asked to do. Its
  * Chromium browser is made only once {@link #start} asks for it, the first time its item shows; until then the page
  * holds the address it will load and the zoom it will show at, and asks nothing of Chromium. Every method runs on the
  * UI thread, and so does every callback it makes. This is the one class that makes a {@link PageView}.
@@ -34,7 +36,7 @@ public final class Page implements AutoCloseable {
     private final Runnable changed;
     private final Favicons favicons;
     private final Function<Page, CompletableFuture<NavigationHistory.History>> historyReader;
-    private final ObjIntConsumer<Page> historyJumper;
+    private ObjIntConsumer<Page> historyJumper;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
     private final List<IntConsumer> magnifies = new CopyOnWriteArrayList<>();
@@ -42,6 +44,12 @@ public final class Page implements AutoCloseable {
     private final List<Runnable> navigations = new CopyOnWriteArrayList<>();
     private final List<Runnable> dialogResets = new CopyOnWriteArrayList<>();
     private final List<Consumer<String>> addressChanges = new CopyOnWriteArrayList<>();
+    private final List<Consumer<LoadFailure>> loadFailures = new CopyOnWriteArrayList<>();
+    // Which certificates Chromium may go on past; read on Chromium's thread.
+    private volatile Predicate<ServerCertificate> certificates = certificate -> false;
+    // The certificate last refused for a main-frame load, and its address, until that address's failure takes it.
+    private ServerCertificate refused;
+    private String refusedUrl;
     private BiFunction<String, TabPlacement, Optional<Page>> opener = (url, placement) -> Optional.empty();
     private Runnable itemCloser = () -> { }, itemShower = () -> { };
     // Where the page's dialogs and file choosers show, and where its right-click menu shows; its item gives them.
@@ -156,6 +164,22 @@ public final class Page implements AutoCloseable {
         requested = url;
         address = url.toString();
         navigated();
+        if (ready) browser.loadURL(address);
+        changed.run();
+    }
+
+    /**
+     * Loads {@code errorPage}, one of Jasper's error pages, in place of a load that failed, as {@link #load} would, but
+     * without telling those who asked {@link #onNavigate}: the page shows what became of where it was going, and goes
+     * nowhere else.
+     *
+     * @param errorPage the error page's address
+     */
+    public void showError(URI errorPage) {
+        Objects.requireNonNull(errorPage, "errorPage");
+        if (closed) return;
+        requested = errorPage;
+        address = errorPage.toString();
         if (ready) browser.loadURL(address);
         changed.run();
     }
@@ -436,6 +460,59 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Tells {@code listener} each time a load of the page's main frame fails, as Chromium reports it, a load the user or
+     * a download stopped among them. The failure carries the certificate Jasper refused for that address, if it did
+     * ({@link #certificateRefused}).
+     *
+     * @param listener told on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onLoadFailure(Consumer<LoadFailure> listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) return () -> { };
+        loadFailures.add(listener);
+        return () -> loadFailures.remove(listener);
+    }
+
+    /**
+     * Has Chromium go on past a certificate it could not verify only when {@code allowed} says so; until then it goes on
+     * past none. It replaces the one before.
+     *
+     * @param allowed told the certificate on Chromium's thread; it must answer at once and must not throw
+     */
+    public void allowCertificates(Predicate<ServerCertificate> allowed) {
+        Objects.requireNonNull(allowed, "allowed");
+        if (!closed) certificates = allowed;
+    }
+
+    /**
+     * Whether Chromium may go on past {@code certificate}, which it could not verify for a load of the page. Any
+     * thread.
+     *
+     * @param certificate the certificate
+     * @return whether the page's item allows it; false after {@link #close()}
+     */
+    public boolean allowsCertificate(ServerCertificate certificate) {
+        Objects.requireNonNull(certificate, "certificate");
+        return !closed && certificates.test(certificate);
+    }
+
+    /**
+     * Chromium was told not to go on past {@code certificate} for the load of {@code url}: the failure of that load that
+     * follows carries it. Nothing after {@link #close()}.
+     *
+     * @param url the address whose load met it, as Chromium gave it
+     * @param certificate the certificate
+     */
+    public void certificateRefused(String url, ServerCertificate certificate) {
+        Objects.requireNonNull(url, "url");
+        Objects.requireNonNull(certificate, "certificate");
+        if (closed) return;
+        refusedUrl = url;
+        refused = certificate;
+    }
+
+    /**
      * Has {@code opener} open each link or popup of the page that goes to an item of its own, beside the page's item: the
      * page's item sets it. It replaces the one before.
      *
@@ -622,6 +699,10 @@ public final class Page implements AutoCloseable {
         navigations.clear();
         dialogResets.clear();
         addressChanges.clear();
+        loadFailures.clear();
+        refused = null;
+        refusedUrl = null;
+        certificates = certificate -> false;
         opener = (url, placement) -> Optional.empty();
         itemCloser = () -> { };
         itemShower = () -> { };
@@ -715,6 +796,22 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * A load of the main frame failed: those who asked {@link #onLoadFailure} are told, with the certificate refused for
+     * {@code url}, which this failure takes.
+     */
+    void loadFailed(String url, String code) {
+        if (closed || url == null) return;
+        Optional<ServerCertificate> certificate = Optional.empty();
+        if (refused != null && url.equals(refusedUrl)) {
+            certificate = Optional.of(refused);
+            refused = null;
+            refusedUrl = null;
+        }
+        var failure = new LoadFailure(url, code == null ? "" : code, certificate);
+        for (Consumer<LoadFailure> listener : loadFailures) listener.accept(failure);
+    }
+
+    /**
      * Reads the page's history again, as it may have changed: at once, or once the read that runs ends, so that one read
      * runs at a time however often the page changes.
      */
@@ -738,6 +835,11 @@ public final class Page implements AutoCloseable {
     /** The page's browser once it hears what it is asked; null before. */
     PageBrowser readyBrowser() {
         return ready ? browser : null;
+    }
+
+    /** Has the page go to its history's entries with {@code replacement} from now on, as a test's recording one. */
+    void useHistoryJumper(ObjIntConsumer<Page> replacement) {
+        historyJumper = Objects.requireNonNull(replacement, "replacement");
     }
 
     /** Has the page find with {@code replacement} from now on, as a test's recording one. */

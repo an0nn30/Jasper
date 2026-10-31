@@ -1,5 +1,6 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.restore.BrowserRestore;
@@ -24,9 +25,11 @@ import javax.swing.Timer;
 
 /**
  * The plugin's open browser items, in every window: it opens them, finds one by the OSC 8 target it was opened for,
- * and knows each window's focused one. It registers the globe every item shows, gives the items the settings, and holds
- * the fetchers of their pages' favicons and their address fields' search suggestions until {@link #close()}. A page is
- * made, and Chromium so asked for, only when its item first shows. UI thread.
+ * and knows each window's focused one. It registers the globe every item shows, gives the items the settings and the
+ * certificates the user went on past, shared by them all until Jasper quits, hands each error page's Try Again and
+ * Continue to the item whose page it is, and holds the fetchers of their pages' favicons and their address fields' search
+ * suggestions until {@link #close()}. A page is made, and Chromium so asked for, only when its item first shows. UI
+ * thread.
  */
 public final class BrowserItems implements AutoCloseable {
     /** The globe: a browser item's tab icon, and its actions' and split item's. */
@@ -40,6 +43,8 @@ public final class BrowserItems implements AutoCloseable {
     private final BiFunction<Duration, Runnable, Runnable> later;
     private final Function<URI, CompletableFuture<List<String>>> suggest;
     private final List<BrowserItem> open = new java.util.ArrayList<>();
+    // Spec section 14: one for the plugin's run, in memory, so it ends when Jasper quits.
+    private final CertificateAllowance certificates = new CertificateAllowance();
     // Made with the first item; it makes its HTTP client only once a page names a favicon.
     private Favicons favicons;
     // Made with the first suggestion request.
@@ -144,6 +149,30 @@ public final class BrowserItems implements AutoCloseable {
     }
 
     /**
+     * An error page's Try Again, the {@code jasper-about:error-retry} action: the item whose error page has the token the
+     * address names, while it shows that page, loads what failed there again. Any page may have written the address, so
+     * the token is all it is taken for.
+     *
+     * @param address the action's address, with the token as its {@code token} parameter
+     */
+    public void tryAgain(URI address) {
+        Objects.requireNonNull(address, "address");
+        AboutScheme.parameter(address.toString(), "token").ifPresent(token -> List.copyOf(open).forEach(item -> item.tryAgain(token)));
+    }
+
+    /**
+     * An error page's Continue to this site (unsafe), the {@code jasper-about:error-continue} action: the item whose error
+     * page has Continue's one-time token, while it shows that page, allows the host and certificate it kept for it and
+     * loads the page again. Any page may have written the address, so the token is all it is taken for.
+     *
+     * @param address the action's address, with Continue's token as its {@code token} parameter
+     */
+    public void proceed(URI address) {
+        Objects.requireNonNull(address, "address");
+        AboutScheme.parameter(address.toString(), "token").ifPresent(token -> List.copyOf(open).forEach(item -> item.proceed(token)));
+    }
+
+    /**
      * The plugin stops: the favicon and suggestion fetches under way end, and no page or field fetches one from now on.
      */
     @Override public void close() {
@@ -163,6 +192,11 @@ public final class BrowserItems implements AutoCloseable {
 
     PluginContext context() {
         return context;
+    }
+
+    /** The certificates the user went on past, which every item shares. Any thread. */
+    CertificateAllowance certificates() {
+        return certificates;
     }
 
     /** The settings as they are now. */

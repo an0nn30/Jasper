@@ -68,6 +68,28 @@ public final class PageTestAccess {
     }
 
     /**
+     * A load of the page's main frame failed, as the client's load handler tells it. UI thread.
+     *
+     * @param page a page
+     * @param url the address that failed
+     * @param code Chromium's name for the error
+     */
+    public static void loadFailed(Page page, String url, String code) {
+        page.loadFailed(url, code);
+    }
+
+    /**
+     * Has {@code page} go to its history's entries with {@code jumper} from now on, which is told the page and each
+     * entry's id: a test's recording one, as a page without Chromium goes nowhere.
+     *
+     * @param page a page
+     * @param jumper told each entry the page goes to
+     */
+    public static void useHistoryJumper(Page page, java.util.function.ObjIntConsumer<Page> jumper) {
+        page.useHistoryJumper(jumper);
+    }
+
+    /**
      * The page's main frame is at {@code url}, as the client's display handler tells it when a navigation commits. UI
      * thread.
      *

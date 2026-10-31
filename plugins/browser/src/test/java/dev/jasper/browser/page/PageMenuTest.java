@@ -225,6 +225,31 @@ class PageMenuTest {
         });
     }
 
+    /** Spec section 14: on Jasper's error page, the menu's Back and Reload are its item's, as the toolbar's are. */
+    @Test void onAnErrorPageBackGoesPastTheFailedLoadAndReloadTriesItAgain() throws Exception {
+        onUiThread(() -> {
+            open();
+            var jumps = new ArrayList<Integer>();
+            PageTestAccess.useHistoryJumper(page, (jumped, id) -> jumps.add(id));
+            PageTestAccess.loadFailed(page, "https://unknown.example/", "ERR_NAME_NOT_RESOLVED");
+            String error = page.address().replace("jasper-about:error?", "jasper-about://error/?");
+            PageTestAccess.addressChanged(page, error);
+            PageTestAccess.loadingChanged(page, false, true, false);
+            PageTestAccess.historyRead(page, new NavigationHistory.History(2, List.of(new NavigationHistory.Entry(1, PAGE, "Example"),
+                new NavigationHistory.Entry(2, "https://unknown.example/", ""), new NavigationHistory.Entry(3, error, "Server Not Found"))));
+            show(plain());
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.back")).isTrue();
+            show(plain());
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.reload")).isTrue();
+            assertThat(jumps).as("Back to the page before the failed load; Reload to the failed load again").containsExactly(1, 2);
+            PageTestAccess.historyRead(page, new NavigationHistory.History(1, List.of(new NavigationHistory.Entry(2, "https://unknown.example/", ""),
+                new NavigationHistory.Entry(3, error, "Server Not Found"))));
+            show(plain());
+            assertThat(host.contentMenu(item.tab())).as("nothing before the failed load").contains("item:page-menu.back (disabled)");
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
     @Test void dismissingTheMenuOrRunningOneOfJaspersItemsEndsChromiumsMenuOnceAndRunsNothingOfThePages() throws Exception {
         onUiThread(() -> {
             open();
@@ -373,7 +398,8 @@ class PageMenuTest {
     /** A page without an item whose menu shows over {@code tab}, copying into {@code copies}. UI thread. */
     private static Page placed(ContentTab tab, List<String> copies) {
         var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons());
-        page.setMenuPlace(new MenuPlace(tab, copies::add, () -> "Google", terms -> URI.create("https://google.com/search?q=" + terms)));
+        page.setMenuPlace(new MenuPlace(tab, copies::add, () -> "Google", terms -> URI.create("https://google.com/search?q=" + terms),
+            page::canGoBack, page::back, page::reload));
         return page;
     }
 

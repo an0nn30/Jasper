@@ -7,15 +7,18 @@ import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PixelImage;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * A browser item's toolbar along the top of its page (spec section 6), as SDK nodes the kit draws: Back and Forward,
  * each disabled when the page cannot go there and each holding the page's twelve nearest history entries that way in
  * its hold menu; Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the
  * menu button, which holds Settings. The site icon is the page's icon, else the globe, and dragging it drags the page's
- * address. The click that brings the focus into the field selects all its text. The toolbar keeps what is typed into
+ * address; while the page is one Jasper goes on to past a certificate error, "Not secure", in the warning colour, stands
+ * in its place (spec section 14). The click that brings the focus into the field selects all its text. The toolbar keeps what is typed into
  * the field and the engine's suggestions for it: the field shows the page's address, or a results page's search terms,
  * until something is typed, then that text and its {@link Suggestions}, and the page's again once a load or Escape
  * gives the text up. Its item handles what the nodes report. UI thread.
@@ -31,6 +34,8 @@ final class BrowserToolbar {
     /** What the menu's Settings reports. */
     static final String SETTINGS = "browser.settings";
     static final String PLACEHOLDER = "Search or enter website name";
+    /** What says the page is not secure, in place of the site icon. */
+    static final String NOT_SECURE = "browser.address.not-secure";
     /** The site icon's accessible name and tooltip. */
     static final String SITE_ICON = "Site icon - drag to copy URL";
     // What was typed since the field last showed the page's address; null while it shows it.
@@ -50,25 +55,36 @@ final class BrowserToolbar {
      * @param icon the site icon: the page's favicon, or empty for the globe
      * @param history the page's history, which Back's and Forward's hold menus list
      * @param settings the settings, which say what a results page is
+     * @param notSecure whether the page is one Jasper goes on to past a certificate error: "Not secure" then stands before
+     *     the field, which shows no site icon
      * @return the toolbar's row
      */
     Nodes.Stack node(String address, boolean loading, boolean canGoBack, boolean canGoForward, Optional<PixelImage> icon,
-                     NavigationHistory.History history, BrowserSettings settings) {
+                     NavigationHistory.History history, BrowserSettings settings, boolean notSecure) {
         var reload = loading
             ? new Nodes.Button(RELOAD, ControlState.READY, "", "close", Nodes.ButtonKind.GHOST, STOP, "Stop")
             : new Nodes.Button(RELOAD, ControlState.READY, "", "refresh", Nodes.ButtonKind.GHOST, RELOAD, "Reload");
         String value = typed != null ? typed
             : AddressInput.parse(address).flatMap(page -> SearchEngine.queryOf(page, settings)).orElse(address);
-        var field = new Nodes.Field(ADDRESS, ControlState.READY, Nodes.FieldKind.TEXT, value, PLACEHOLDER, "Address", ENTER, Optional.empty(),
-            Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "", false, icon, BrowserItems.GLOBE, SITE_ICON,
-            address.isBlank() ? Optional.empty() : Optional.of(address), true,
-            typed == null ? List.of() : Suggestions.rank(typed, settings, suggested, List.of()), typed != null && suggesting);
+        List<Nodes.Suggestion> rows = typed == null ? List.of() : Suggestions.rank(typed, settings, suggested, List.of());
+        // The site icon's slot is empty while "Not secure" stands in its place, so it is neither named nor dragged.
+        var field = notSecure
+            ? new Nodes.Field(ADDRESS, ControlState.READY, Nodes.FieldKind.TEXT, value, PLACEHOLDER, "Address", ENTER, Optional.empty(),
+                Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "", false, Optional.empty(), "", "", Optional.empty(), true, rows,
+                typed != null && suggesting)
+            : new Nodes.Field(ADDRESS, ControlState.READY, Nodes.FieldKind.TEXT, value, PLACEHOLDER, "Address", ENTER, Optional.empty(),
+                Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "", false, icon, BrowserItems.GLOBE, SITE_ICON,
+                address.isBlank() ? Optional.empty() : Optional.of(address), true, rows, typed != null && suggesting);
         var menu = new Nodes.MenuButton(MENU, ControlState.READY, "", "menu", Nodes.ButtonKind.GHOST, "",
             List.of(new MenuItem(SETTINGS, "Settings", "", SETTINGS, true, false)), "Menu");
-        return new Nodes.Stack(BAR, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+        var children = new ArrayList<Nodes.Node>(List.of(
             historyButton(BACK, canGoBack, "back", "Back", NavigationHistory.backMenu(history)),
-            historyButton(FORWARD, canGoForward, "forward", "Forward", NavigationHistory.forwardMenu(history)),
-            reload, field, menu));
+            historyButton(FORWARD, canGoForward, "forward", "Forward", NavigationHistory.forwardMenu(history)), reload));
+        if (notSecure) children.add(new Nodes.Text(NOT_SECURE, ControlState.READY, "Not secure", Nodes.TextRole.CAPTION,
+            Optional.of(Nodes.Severity.WARNING), OptionalInt.empty()));
+        children.add(field);
+        children.add(menu);
+        return new Nodes.Stack(BAR, ControlState.READY, Nodes.LayoutRole.INLINE, children);
     }
 
     /** The field's text changed: it shows that text from now on, and no suggestions of the engine's yet. */

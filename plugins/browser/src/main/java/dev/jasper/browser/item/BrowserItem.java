@@ -2,10 +2,12 @@ package dev.jasper.browser.item;
 
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.DialogPlace;
+import dev.jasper.browser.page.LoadFailure;
 import dev.jasper.browser.page.MenuPlace;
 import dev.jasper.browser.page.NavigationButton;
 import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.page.ServerCertificate;
 import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.RestoreState;
@@ -31,7 +33,10 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -61,7 +66,15 @@ import javax.swing.JComponent;
  * it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
- * address field, Reload or {@link #load}. UI thread.
+ * address field, Reload or {@link #load}.
+ * A main-frame load that fails, but for one a download or the user stopped, shows Jasper's {@link ErrorPage} in place
+ * of the page (spec section 14). While it shows, the field, the tab and the restore state keep the address that failed,
+ * and the tab is called by the error's title. As Chrome's: Back goes to the page before the failed load, past the entry
+ * Chromium keeps for it; Reload and Try Again load the failed address again, through that entry when Chromium kept one,
+ * else, for an http or https address only, as a new load; Enter in the untouched field loads it as typed text would; and
+ * Continue to this site (unsafe), once, allows the host with the certificate the item kept for the failure, for every
+ * item until Jasper quits, and loads it again. While the page is at an https address of a host so allowed, the toolbar
+ * says "Not secure". UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -75,6 +88,8 @@ public final class BrowserItem implements AutoCloseable {
     private static final String KEY = "browser:";
     // The longest address the tab's location and status show; a data: address can run to megabytes.
     private static final int SHOWN_ADDRESS = 2_000;
+    // The most error pages an item remembers: as many as Chromium keeps entries in a page's history.
+    private static final int ERROR_PAGES = 50;
     private final BrowserItems items;
     private final Optional<String> target;
     private final Page page;
@@ -93,6 +108,8 @@ public final class BrowserItem implements AutoCloseable {
     // Cancels the wait for the typing to pause; and the engine's answer the field waits for, or null.
     private Runnable typingPause = NOTHING;
     private CompletableFuture<List<String>> suggestion;
+    // The error pages the item showed, by their tokens, oldest first.
+    private final Map<String, ErrorPage.Failure> errors = new LinkedHashMap<>();
 
     private BrowserItem(BrowserItems items, URI url, Optional<String> target, OptionalInt zoom, boolean waiting) {
         this.items = items;
@@ -109,6 +126,10 @@ public final class BrowserItem implements AutoCloseable {
         page.onCloseItem(this::close);
         page.onShowItem(this::show);
         page.onAddressChange(this::committed);
+        page.onLoadFailure(this::failed);
+        // Chromium asks on its own thread; the allowance is the plugin's, and safe there.
+        CertificateAllowance certificates = items.certificates();
+        page.allowCertificates(certificate -> certificates.allows(certificate.host(), certificate.sha256()));
         title = TabTitle.of("", host(url.toString()), "", false);
         findBar = new BrowserFindBar(() -> closed ? Optional.empty() : Optional.of(page.find()), this::render, this::focusFind);
         view = items.context().kit().create(spec(), this::event);
@@ -173,7 +194,8 @@ public final class BrowserItem implements AutoCloseable {
         // The page's alerts, confirmations and file choosers show over this item's tab, and close with it; so does its
         // right-click menu, which copies with the plugin's clipboard and searches with the engine chosen as it opens.
         page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
-        page.setMenuPlace(new MenuPlace(tab, items.context().platform()::copy, this::engineName, this::search));
+        page.setMenuPlace(new MenuPlace(tab, items.context().platform()::copy, this::engineName, this::search, this::canGoBack,
+            this::goBack, this::reload));
         items.opened(this);
         present();
     }
@@ -221,9 +243,15 @@ public final class BrowserItem implements AutoCloseable {
         endWait();
     }
 
-    /** Goes back in the page's history. */
+    /**
+     * Goes back in the page's history: from an error page, to the entry before the failed load and each try at it, as
+     * the history was last read; nowhere when there is none.
+     */
     public void goBack() {
-        if (!closed) page.back();
+        if (closed) return;
+        Optional<ErrorPage.Failure> shown = shownError().filter(this::historyAt);
+        if (shown.isPresent()) backFromError(shown.get()).ifPresent(page::goToHistoryEntry);
+        else page.back();
     }
 
     /** Goes forward in the page's history. */
@@ -231,11 +259,11 @@ public final class BrowserItem implements AutoCloseable {
         if (!closed) page.forward();
     }
 
-    /** Loads the page again; a waiting item stops waiting and loads its address. */
+    /** Loads the page again, or on an error page what failed; a waiting item stops waiting and loads its address. */
     public void reload() {
         if (closed) return;
         if (waiting) endWait();
-        else page.reload();
+        else shownError().ifPresentOrElse(this::retry, page::reload);
     }
 
     /** Stops the page loading. */
@@ -264,6 +292,29 @@ public final class BrowserItem implements AutoCloseable {
     @Override public void close() {
         if (tab != null) tab.close();
         else view.close();
+    }
+
+    /**
+     * An error page's Try Again with {@code token}: while the item shows its error page of that token, it loads what
+     * failed there again.
+     */
+    void tryAgain(String token) {
+        if (!closed) shownError().filter(shown -> shown.token().equals(token)).ifPresent(this::retry);
+    }
+
+    /**
+     * An error page's Continue with {@code token}: while the item shows its error page whose Continue has that token, and
+     * only once, the host and certificate the item kept for it are allowed and it loads again.
+     */
+    void proceed(String token) {
+        if (closed) return;
+        Optional<ErrorPage.Failure> shown = shownError().filter(failure -> failure.proceed().filter(token::equals).isPresent());
+        if (shown.isEmpty() || shown.get().certificate().isEmpty()) return;
+        ErrorPage.Failure failure = shown.get();
+        ServerCertificate certificate = failure.certificate().get();
+        items.certificates().allow(certificate.host(), certificate.sha256());
+        errors.put(failure.token(), failure.spent());
+        retry(failure);
     }
 
     /** Whether the item has asked for its page, which it does the first time it shows. */
@@ -353,10 +404,99 @@ public final class BrowserItem implements AutoCloseable {
         }
     }
 
-    /** The page's main frame committed a navigation to {@code address}: the item saves it. */
+    /** The page's main frame committed a navigation to {@code address}: the item saves it, or what failed for its error page. */
     private void committed(String address) {
         if (closed || tab == null) return;
-        AddressInput.parse(address).ifPresent(this::save);
+        String at = ErrorPage.token(address).map(errors::get).map(ErrorPage.Failure::url).orElse(address);
+        AddressInput.parse(at).ifPresent(this::save);
+    }
+
+    /**
+     * A load of the page's main frame failed: but for one a download or the user stopped, and one of an error page, the
+     * page shows an error page for it.
+     */
+    private void failed(LoadFailure failure) {
+        boolean errorPage = AboutScheme.page(failure.url()).filter(ErrorPage.NAME::equals).isPresent();
+        if (closed || errorPage || ErrorPage.title(failure.code()).isEmpty()) return;
+        var shown = ErrorPage.Failure.of(failure);
+        errors.put(shown.token(), shown);
+        if (errors.size() > ERROR_PAGES) errors.remove(errors.keySet().iterator().next());
+        page.showError(shown.address());
+    }
+
+    /** The failure whose error page the page shows: one of this item's. */
+    private Optional<ErrorPage.Failure> shownError() {
+        return ErrorPage.token(page.address()).map(errors::get);
+    }
+
+    /** Where the page is, as the item shows and saves it: what failed while its error page shows, else the page's address. */
+    private String address() {
+        return shownError().map(ErrorPage.Failure::url).orElseGet(page::address);
+    }
+
+    /** Whether Back goes anywhere: from an error page, as {@link #goBack} goes; else as Chromium says. */
+    private boolean canGoBack() {
+        Optional<ErrorPage.Failure> shown = shownError().filter(this::historyAt);
+        return shown.isPresent() ? backFromError(shown.get()).isPresent() : page.canGoBack();
+    }
+
+    /** Whether the page's history, as last read, is at {@code shown}'s error page. */
+    private boolean historyAt(ErrorPage.Failure shown) {
+        NavigationHistory.History history = page.history();
+        return history.current() >= 0
+            && ErrorPage.token(history.entries().get(history.current()).url()).filter(shown.token()::equals).isPresent();
+    }
+
+    /** The nearest entry before the error page that is neither {@code shown}'s failed load nor an error page for it. */
+    private OptionalInt backFromError(ErrorPage.Failure shown) {
+        NavigationHistory.History history = page.history();
+        for (int at = history.current() - 1; at >= 0; at--) {
+            NavigationHistory.Entry entry = history.entries().get(at);
+            if (!ofFailure(entry.url(), shown)) return OptionalInt.of(entry.id());
+        }
+        return OptionalInt.empty();
+    }
+
+    /** Whether an entry at {@code entry} is {@code shown}'s failed load, or one of this item's error pages for that address. */
+    private boolean ofFailure(String entry, ErrorPage.Failure shown) {
+        String failed = kept(shown.url());
+        return entry.equals(failed)
+            || ErrorPage.token(entry).map(errors::get).filter(other -> kept(other.url()).equals(failed)).isPresent();
+    }
+
+    /**
+     * Loads what failed for {@code shown} again: through Chromium's own entry for the failed load, just before the error
+     * page, when the history has one, so it loads in place, as Chrome's Try Again does; else as a new load, for an http or
+     * https address only, as a page could load one itself.
+     */
+    private void retry(ErrorPage.Failure shown) {
+        if (historyAt(shown)) {
+            NavigationHistory.History history = page.history();
+            int before = history.current() - 1;
+            if (before >= 0 && history.entries().get(before).url().equals(kept(shown.url()))) {
+                page.goToHistoryEntry(history.entries().get(before).id());
+                return;
+            }
+        }
+        AddressInput.parse(shown.url()).filter(BrowserItem::web).ifPresent(this::load);
+    }
+
+    /** Whether the page is at an https address of a host the user went on to past a certificate error. */
+    private boolean notSecure() {
+        if (shownError().isPresent()) return false;
+        return AddressInput.parse(page.address()).filter(at -> "https".equalsIgnoreCase(at.getScheme())).map(URI::getHost)
+            .filter(items.certificates()::allowsAny).isPresent();
+    }
+
+    /** Whether {@code address} is an http or https one. */
+    private static boolean web(URI address) {
+        String scheme = address.getScheme() == null ? "" : address.getScheme().toLowerCase(Locale.ROOT);
+        return scheme.equals("http") || scheme.equals("https");
+    }
+
+    /** {@code url} as the page's history keeps an entry's address: without its user information, and cut. */
+    private static String kept(String url) {
+        return new NavigationHistory.Entry(0, url, "").url();
     }
 
     /** The item saves that it is at {@code at}, with its own zoom and the target it was opened for. */
@@ -416,7 +556,7 @@ public final class BrowserItem implements AutoCloseable {
     /** The page's address, title, loading state or where it can go changed. */
     private void changed() {
         if (closed) return;
-        url = AddressInput.parse(page.address()).orElse(url);
+        url = AddressInput.parse(address()).orElse(url);
         render();
         present();
     }
@@ -442,7 +582,7 @@ public final class BrowserItem implements AutoCloseable {
             case BrowserToolbar.FORWARD -> goForward();
             case BrowserToolbar.RELOAD -> reload();
             case BrowserToolbar.STOP -> stop();
-            case BrowserToolbar.ENTER -> toolbar.enter(page.address(), items.settings()).ifPresent(this::loadAndFocus);
+            case BrowserToolbar.ENTER -> toolbar.enter(address(), items.settings()).ifPresent(this::loadAndFocus);
             case BrowserToolbar.ESCAPE -> {
                 toolbar.restore();
                 endSuggestions();
@@ -506,7 +646,7 @@ public final class BrowserItem implements AutoCloseable {
 
     private void present() {
         if (closed || tab == null) return;
-        String address = shown(page.address());
+        String address = shown(address());
         title = TabTitle.of(page.title(), host(address), title, page.loading());
         String shown = address.length() <= SHOWN_ADDRESS ? address : address.substring(0, SHOWN_ADDRESS) + "…";
         // The globe stays the tab's icon under an image, for one that does not decode.
@@ -516,19 +656,19 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     /**
-     * The image the tab and the address field show for the page: none while it loads, so the globe shows; Jasper's icon
-     * on Jasper's own pages; else the page's favicon, if it has one.
+     * The image the tab and the address field show for the page: none while it loads or shows an error page, so the
+     * globe shows; Jasper's icon on Jasper's own pages; else the page's favicon, if it has one.
      */
     private Optional<PixelImage> icon() {
-        if (page.loading()) return Optional.empty();
+        if (page.loading() || shownError().isPresent()) return Optional.empty();
         String address = page.address();
         boolean jaspers = address.regionMatches(true, 0, AboutScheme.NAME + ":", 0, AboutScheme.NAME.length() + 1);
         return jaspers ? Optional.of(JasperIcon.IMAGE) : page.favicon();
     }
 
     private ViewSpec spec() {
-        Nodes.Node bar = toolbar.node(shown(page.address()), page.loading(), page.canGoBack(), page.canGoForward(), icon(),
-            page.history(), items.settings());
+        Nodes.Node bar = toolbar.node(shown(address()), page.loading(), canGoBack(), page.canGoForward(), icon(),
+            page.history(), items.settings(), notSecure());
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,

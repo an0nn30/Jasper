@@ -1,13 +1,13 @@
 package dev.jasper.browser;
 
 import dev.jasper.browser.engine.AboutScheme;
+import dev.jasper.browser.item.PageHtml;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.WorkspacePalette;
-import java.awt.Color;
-import java.util.Locale;
 
 /**
- * {@code jasper-about:welcome}, the default start page, in the workspace theme's colours: the heading "Welcome" and
+ * {@code jasper-about:welcome}, the default start page, in the workspace theme's colours ({@link PageHtml#colours}): the
+ * heading "Welcome" and
  * Quick Actions, whose Settings opens Settings › Browser through the {@code jasper-about:settings} action. The page is
  * built on the UI thread when the plugin starts and again after each theme change, so Chromium's IO thread, which asks
  * for it, only reads the last one built. A page already open shows a theme change when it loads again.
@@ -44,14 +44,7 @@ final class WelcomePage {
             <meta name="color-scheme" content="%s">
             <title>Welcome</title>
             <style>
-            :root {
-              --background: %s;
-              --card: %s;
-              --text: %s;
-              --muted: %s;
-              --border: %s;
-              --accent: %s;
-            }
+            %s
             html, body { margin: 0; background: var(--background); color: var(--text); }
             body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
             main { max-width: 640px; margin: 0 auto; padding: 72px 24px; }
@@ -76,13 +69,6 @@ final class WelcomePage {
             </main>
             </body>
             </html>
-            """.formatted(dark ? "dark" : "light", css(palette.background()), css(palette.surfaceRaised()), css(palette.text()),
-            css(palette.textMuted()), css(palette.border()), css(palette.accent()), AboutScheme.NAME + ":" + SETTINGS);
-    }
-
-    /** {@code color} as CSS, its alpha kept. */
-    private static String css(Color color) {
-        if (color.getAlpha() == 255) return String.format(Locale.ROOT, "#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
-        return String.format(Locale.ROOT, "rgba(%d, %d, %d, %.3f)", color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha() / 255.0);
+            """.formatted(dark ? "dark" : "light", PageHtml.colours(palette), AboutScheme.NAME + ":" + SETTINGS);
     }
 }

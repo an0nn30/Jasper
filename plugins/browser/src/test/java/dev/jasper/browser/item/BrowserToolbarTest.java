@@ -44,17 +44,17 @@ class BrowserToolbarTest {
 
     @Test void reloadBecomesStopWhileThePageLoads() {
         var toolbar = new BrowserToolbar();
-        Nodes.Button idle = Views.button(toolbar.node(START, false, true, false, Optional.empty(), History.EMPTY, GOOGLE), BrowserToolbar.RELOAD);
+        Nodes.Button idle = Views.button(toolbar.node(START, false, true, false, Optional.empty(), History.EMPTY, GOOGLE, false), BrowserToolbar.RELOAD);
         assertThat(idle.action()).isEqualTo(BrowserToolbar.RELOAD);
         assertThat(idle.icon()).isEqualTo("refresh");
         assertThat(idle.tooltip()).isEqualTo("Reload");
-        Nodes.Button loading = Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE), BrowserToolbar.RELOAD);
+        Nodes.Button loading = Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE, false), BrowserToolbar.RELOAD);
         assertThat(loading.action()).isEqualTo(BrowserToolbar.STOP);
         assertThat(loading.icon()).isEqualTo("close");
         assertThat(loading.tooltip()).isEqualTo("Stop");
-        assertThat(Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE), BrowserToolbar.BACK).state().enabled())
+        assertThat(Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE, false), BrowserToolbar.BACK).state().enabled())
             .as("Back can go").isTrue();
-        assertThat(Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE), BrowserToolbar.FORWARD).state().enabled()).isFalse();
+        assertThat(Views.button(toolbar.node(START, true, true, false, Optional.empty(), History.EMPTY, GOOGLE, false), BrowserToolbar.FORWARD).state().enabled()).isFalse();
     }
 
     /**
@@ -65,16 +65,16 @@ class BrowserToolbarTest {
         var toolbar = new BrowserToolbar();
         var history = new History(1, List.of(new Entry(1, "https://example.com/one", "One"), new Entry(2, START, "Here"),
             new Entry(3, "https://example.com/three", "Three"), new Entry(4, "https://example.com/four", "Four")));
-        Nodes.Stack bar = toolbar.node(START, false, true, true, Optional.empty(), history, GOOGLE);
+        Nodes.Stack bar = toolbar.node(START, false, true, true, Optional.empty(), history, GOOGLE, false);
         Nodes.Button back = Views.button(bar, BrowserToolbar.BACK), forward = Views.button(bar, BrowserToolbar.FORWARD);
         assertThat(back.holdMenu()).isEqualTo(NavigationHistory.backMenu(history)).extracting(MenuItem::label).containsExactly("One");
         assertThat(forward.holdMenu()).isEqualTo(NavigationHistory.forwardMenu(history)).extracting(MenuItem::label)
             .containsExactly("Three", "Four");
         assertThat(back.action()).isEqualTo(BrowserToolbar.BACK);
         assertThat(forward.action()).isEqualTo(BrowserToolbar.FORWARD);
-        Nodes.Stack last = toolbar.node(START, false, true, false, Optional.empty(), new History(1, history.entries().subList(0, 2)), GOOGLE);
+        Nodes.Stack last = toolbar.node(START, false, true, false, Optional.empty(), new History(1, history.entries().subList(0, 2)), GOOGLE, false);
         assertThat(Views.button(last, BrowserToolbar.FORWARD).holdMenu()).as("an empty forward list").isEmpty();
-        Nodes.Stack none = toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE);
+        Nodes.Stack none = toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false);
         assertThat(Views.button(none, BrowserToolbar.BACK).holdMenu()).isEmpty();
         assertThat(Views.button(none, BrowserToolbar.FORWARD).holdMenu()).isEmpty();
     }
@@ -83,21 +83,40 @@ class BrowserToolbarTest {
     @Test void theFieldsLeadingSlotShowsTheIconGivenElseTheGlobeAndDragsTheAddress() {
         var toolbar = new BrowserToolbar();
         var icon = new PixelImage(new byte[] {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 1});
-        Nodes.Field shown = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE), BrowserToolbar.ADDRESS);
+        Nodes.Field shown = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, false), BrowserToolbar.ADDRESS);
         assertThat(shown.leadingImage()).contains(icon);
         assertThat(shown.leadingIcon()).isEqualTo(BrowserItems.GLOBE);
         assertThat(shown.leadingName()).isEqualTo("Site icon - drag to copy URL");
         assertThat(shown.leadingDrag()).contains(START);
-        Nodes.Field none = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE), BrowserToolbar.ADDRESS);
+        Nodes.Field none = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false), BrowserToolbar.ADDRESS);
         assertThat(none.leadingImage()).isEmpty();
         assertThat(none.leadingIcon()).isEqualTo(BrowserItems.GLOBE);
         assertThat(none.leadingDrag()).contains(START);
         toolbar.edited("typed");
-        Nodes.Field typed = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE), BrowserToolbar.ADDRESS);
+        Nodes.Field typed = (Nodes.Field) Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, false), BrowserToolbar.ADDRESS);
         assertThat(typed.value()).isEqualTo("typed");
         assertThat(typed.leadingDrag()).as("the page's address, not the text").contains(START);
-        Nodes.Field blank = (Nodes.Field) Views.node(toolbar.node("", false, false, false, Optional.empty(), History.EMPTY, GOOGLE), BrowserToolbar.ADDRESS);
+        Nodes.Field blank = (Nodes.Field) Views.node(toolbar.node("", false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false), BrowserToolbar.ADDRESS);
         assertThat(blank.leadingDrag()).as("nothing to drag").isEmpty();
+    }
+
+    /** Spec section 14: "Not secure", in the warning colour, stands where the site icon goes, which then shows none. */
+    @Test void notSecureStandsInPlaceOfTheSiteIcon() {
+        var toolbar = new BrowserToolbar();
+        var icon = new PixelImage(new byte[] {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 1});
+        Nodes.Stack bar = toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, true);
+        Nodes.Text notSecure = (Nodes.Text) Views.node(bar, BrowserToolbar.NOT_SECURE);
+        assertThat(notSecure.text()).isEqualTo("Not secure");
+        assertThat(notSecure.severity()).contains(Nodes.Severity.WARNING);
+        assertThat(bar.children().indexOf(notSecure)).as("just before the field").isEqualTo(bar.children().indexOf(Views.node(bar, BrowserToolbar.ADDRESS)) - 1);
+        Nodes.Field field = (Nodes.Field) Views.node(bar, BrowserToolbar.ADDRESS);
+        assertThat(field.leadingImage()).isEmpty();
+        assertThat(field.leadingIcon()).isEmpty();
+        assertThat(field.leadingName()).isEmpty();
+        assertThat(field.leadingDrag()).isEmpty();
+        assertThat(field.value()).isEqualTo(START);
+        assertThat(Views.node(toolbar.node(START, false, false, false, Optional.of(icon), History.EMPTY, GOOGLE, false), BrowserToolbar.NOT_SECURE))
+            .as("a secure page").isNull();
     }
 
     /**
@@ -107,7 +126,7 @@ class BrowserToolbarTest {
     @Test void theFieldListsTheTypedTextsSuggestionsAndShowsAResultsPagesTerms() {
         var toolbar = new BrowserToolbar();
         String results = "https://duckduckgo.com/?q=what+is+jcef";
-        Nodes.Field idle = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE),
+        Nodes.Field idle = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false),
             BrowserToolbar.ADDRESS);
         assertThat(idle.value()).isEqualTo("what is jcef");
         assertThat(idle.leadingDrag()).contains(results);
@@ -116,18 +135,18 @@ class BrowserToolbarTest {
         assertThat(idle.suggestionsLoading()).isFalse();
         toolbar.edited("jc");
         toolbar.suggesting();
-        Nodes.Field typing = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE),
+        Nodes.Field typing = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false),
             BrowserToolbar.ADDRESS);
         assertThat(typing.value()).isEqualTo("jc");
         assertThat(typing.suggestions()).isEqualTo(Suggestions.rank("jc", GOOGLE, List.of(), List.of()));
         assertThat(typing.suggestionsLoading()).isTrue();
         toolbar.suggested(List.of("jcef"));
-        Nodes.Field answered = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE),
+        Nodes.Field answered = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false),
             BrowserToolbar.ADDRESS);
         assertThat(answered.suggestions()).isEqualTo(Suggestions.rank("jc", GOOGLE, List.of("jcef"), List.of()));
         assertThat(answered.suggestionsLoading()).isFalse();
         toolbar.restore();
-        Nodes.Field restored = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE),
+        Nodes.Field restored = (Nodes.Field) Views.node(toolbar.node(results, false, false, false, Optional.empty(), History.EMPTY, GOOGLE, false),
             BrowserToolbar.ADDRESS);
         assertThat(restored.value()).isEqualTo("what is jcef");
         assertThat(restored.suggestions()).isEmpty();

@@ -25,7 +25,8 @@ import org.cef.handler.CefContextMenuHandlerAdapter;
  * right-click, as Chrome does there. Chromium asks on its own UI thread, where what is under the pointer is read, as its
  * parameters last only for the call; the menu shows on Swing's.
  *
- * <p>Every item is Jasper's to run: Back, Forward and Reload through the page; the links' and images' through the
+ * <p>Every item is Jasper's to run: Back and Reload as the page's item runs them, which on its error page go past the
+ * failed load and try it again (spec section 14), and Forward through the page; the links' and images' through the
  * page's item, which opens them in the tab next to its own with Jasper's rights, so only what the frame they are in
  * could open itself ({@link LinkSchemes#opensFrom}, R36); Cut, Copy, Paste and Select All as the page's Edit menu runs
  * them, on its focused frame, as Chrome's menu does; Search with ⟨engine⟩ in the next tab with the engine the settings
@@ -164,8 +165,9 @@ final class PageMenu {
         MenuPlace place = found.get();
         String from = pointed.frame().orElseGet(page::address);
         try {
-            PageMenuItems items = PageMenuItems.of(new PageMenuItems.Context(page.canGoBack(), page.canGoForward(), pointed.link(),
-                pointed.image(), pointed.selection(), pointed.editable(), place.engineName().get(), from, !page.title().isEmpty()));
+            PageMenuItems items = PageMenuItems.of(new PageMenuItems.Context(place.canGoBack().getAsBoolean(), page.canGoForward(),
+                pointed.link(), pointed.image(), pointed.selection(), pointed.editable(), place.engineName().get(), from,
+                !page.title().isEmpty()));
             Point at = pointed.at();
             SwingUtilities.convertPointToScreen(at, page.view());
             place.tab().showContextMenu(at, items.leading(), items.trailing(), chosen -> {
@@ -184,9 +186,9 @@ final class PageMenu {
      */
     static void run(Page page, MenuPlace place, Pointed pointed, String from, String id) {
         switch (id) {
-            case PageMenuItems.BACK -> page.back();
+            case PageMenuItems.BACK -> place.back().run();
             case PageMenuItems.FORWARD -> page.forward();
-            case PageMenuItems.RELOAD -> page.reload();
+            case PageMenuItems.RELOAD -> place.reload().run();
             case PageMenuItems.OPEN_LINK -> openInNextTab(page, from, pointed.link());
             case PageMenuItems.COPY_LINK -> pointed.linkAsWritten().ifPresent(place.clipboard());
             case PageMenuItems.OPEN_IMAGE -> openInNextTab(page, from, pointed.image());

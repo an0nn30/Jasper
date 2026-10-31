@@ -32,6 +32,33 @@ class AboutSchemeTest {
         java.awt.EventQueue.invokeAndWait(() -> { }); // a failing action is logged, not thrown on the UI thread
     }
 
+    @Test void aPageOrActionOfTheAddressIsHandedTheAddressWithItsQuery() throws Exception {
+        var about = new AboutScheme();
+        about.register("error", address -> "<p>" + address + "</p>");
+        assertThat(about.answer("jasper-about://error/?url=https%3A%2F%2Fexample.com&code=ERR_FAILED#top"))
+            .isEqualTo(new AboutScheme.Answer(200, "<p>jasper-about://error/?url=https%3A%2F%2Fexample.com&code=ERR_FAILED#top</p>"));
+        var asked = new java.util.concurrent.CompletableFuture<java.net.URI>();
+        about.registerAction("error-retry", asked::complete);
+        assertThat(about.answer("jasper-about://error-retry/?token=abc")).isEqualTo(new AboutScheme.Answer(204, ""));
+        assertThat(asked.get(10, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(java.net.URI.create("jasper-about://error-retry/?token=abc"));
+        assertThat(about.answer("jasper-about://error/?url=a b")).as("an address that is no URI").isEqualTo(new AboutScheme.Answer(404, ""));
+    }
+
+    @Test void anAddressesParametersAreReadDecoded() {
+        String address = "jasper-about://error/?token=abc&url=https%3A%2F%2Fexample.com%2F%3Fq%3D1&subject=CN%3Da&subject=CN%3Db+c&empty=#frag";
+        assertThat(AboutScheme.parameter(address, "url")).contains("https://example.com/?q=1");
+        assertThat(AboutScheme.parameter(address, "token")).contains("abc");
+        assertThat(AboutScheme.parameters(address, "subject")).containsExactly("CN=a", "CN=b c");
+        assertThat(AboutScheme.parameter(address, "empty")).contains("");
+        assertThat(AboutScheme.parameter(address, "missing")).isEmpty();
+        assertThat(AboutScheme.parameter("jasper-about:error?token=abc", "token")).as("written without //").contains("abc");
+        assertThat(AboutScheme.parameter("jasper-about://error/#token=abc", "token")).as("a fragment is no query").isEmpty();
+        assertThat(AboutScheme.parameter("jasper-about://error/?token=%zz", "token")).as("not decodable").isEmpty();
+        assertThat(AboutScheme.page("JASPER-ABOUT://Error/?token=abc")).contains("error");
+        assertThat(AboutScheme.page("jasper-about:error-retry?token=abc")).contains("error-retry");
+        assertThat(AboutScheme.page("https://error/")).isEmpty();
+    }
+
     @Test void pagesAndActionsShareTheirNames() {
         var about = new AboutScheme();
         about.register("welcome", () -> "");

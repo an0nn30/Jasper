@@ -233,9 +233,13 @@ public final class NavigationHistory {
     /**
      * {@code url} without the user name and password of its authority: what is written between the {@code //} after its
      * scheme and the last {@code @} before the authority ends. Read as text, for an address {@link java.net.URI} refuses
-     * would still show them; one without an authority, such as a {@code data:} or {@code mailto:} address, is kept.
+     * would still show them; one without an authority, such as a {@code data:} or {@code mailto:} address, is kept. The
+     * history's entries and Jasper's error pages show addresses so (4a's R46).
+     *
+     * @param url an address, as text
+     * @return the address without its user information
      */
-    private static String withoutUserInfo(String url) {
+    public static String withoutUserInfo(String url) {
         int colon = url.indexOf(':');
         if (colon < 1 || !url.startsWith("//", colon + 1) || !scheme(url, colon)) return url;
         int start = colon + 3, end = start;

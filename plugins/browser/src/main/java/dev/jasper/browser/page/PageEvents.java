@@ -20,6 +20,7 @@ import org.cef.browser.CefFrame;
 import org.cef.handler.CefDisplayHandlerAdapter;
 import org.cef.handler.CefKeyboardHandler;
 import org.cef.handler.CefKeyboardHandlerAdapter;
+import org.cef.handler.CefLoadHandler;
 import org.cef.handler.CefLoadHandlerAdapter;
 import org.cef.network.CefRequest;
 
@@ -31,8 +32,9 @@ import org.cef.network.CefRequest;
  * at once and on Chromium's thread, to the hooks the {@code links} package gave the client
  * ({@link #onMainFrameLoadStart}), and the main frame then runs {@code detect-favicon.js}, which names the document's
  * icon through the opener bridge's router for the page to fetch ({@link Page#faviconDeclared}). Each main-frame load
- * start shows the page at its own zoom again, there and then, as Chromium keeps one zoom per host. A page that enters
- * fullscreen is told at once to leave it: Jasper refuses fullscreen (spec section 5).
+ * start shows the page at its own zoom again, there and then, as Chromium keeps one zoom per host. A main frame's failed
+ * load goes to its page with Chromium's name for the error ({@link Page#onLoadFailure}), for its item's error page. A
+ * page that enters fullscreen is told at once to leave it: Jasper refuses fullscreen (spec section 5).
  */
 public final class PageEvents {
     private static final Consumer<CefClient> INSTALL = PageEvents::install;
@@ -152,7 +154,7 @@ public final class PageEvents {
         }
     }
 
-    /** Whether the page loads and where it can go, and each main-frame load's start and end. */
+    /** Whether the page loads and where it can go, and each main-frame load's start, end and failure. */
     private static final class Load extends CefLoadHandlerAdapter {
         @Override public void onLoadingStateChange(CefBrowser browser, boolean loading, boolean canGoBack, boolean canGoForward) {
             later(browser, page -> page.loadingChanged(loading, canGoBack, canGoForward));
@@ -176,6 +178,13 @@ public final class PageEvents {
 
         @Override public void onLoadEnd(CefBrowser browser, CefFrame frame, int httpStatusCode) {
             if (frame != null && frame.isMain()) later(browser, Page::loadEnded);
+        }
+
+        @Override public void onLoadError(CefBrowser browser, CefFrame frame, CefLoadHandler.ErrorCode errorCode, String errorText,
+                                          String failedUrl) {
+            if (frame == null || !frame.isMain()) return;
+            String code = errorCode == null ? "" : errorCode.name();
+            later(browser, page -> page.loadFailed(failedUrl, code));
         }
     }
 }

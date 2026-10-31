@@ -5,17 +5,22 @@ import dev.jasper.browser.links.LinkGesture.Where;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
 import dev.jasper.browser.page.PageView;
+import dev.jasper.browser.page.ServerCertificate;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
+import java.util.Optional;
 import java.util.function.Consumer;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
+import org.cef.callback.CefCallback;
 import org.cef.handler.CefLifeSpanHandlerAdapter;
+import org.cef.handler.CefLoadHandler;
 import org.cef.handler.CefRequestHandlerAdapter;
 import org.cef.handler.CefResourceRequestHandler;
 import org.cef.misc.BoolRef;
 import org.cef.network.CefRequest;
+import org.cef.security.CefSSLInfo;
 
 /**
  * Where a page's links and popups go (spec section 8): the client's one request handler, for a link Chromium would open
@@ -26,6 +31,11 @@ import org.cef.network.CefRequest;
  * own UI thread, and each answers at once that Chromium makes nothing itself; what Jasper opens instead is posted to
  * Swing's: the link loaded in its page, or an item of its own that the page's item opens beside itself. The hover
  * address, from {@code onStatusMessage}, is the {@code page} package's display handler's.
+ *
+ * <p>The request handler also hears each certificate Chromium cannot verify for a page's load
+ * ({@code onCertificateError}): Chromium goes on past it only when the page's item allows that host with that
+ * certificate, and otherwise the page is told the certificate, which its item's error page shows with the failure that
+ * follows (spec section 14). Chromium checks certificates against the system's trust store.
  *
  * <p>JCEF keeps a client's first request handler, so this is the only one: what else a request handler is asked goes to
  * its defaults. Life span handlers are a list, which JetBrains' runtime adds its own to, so this adds one and removes
@@ -72,6 +82,14 @@ public final class PageNavigation {
                 ? bridge.responses() : null;
         }
 
+        @Override public boolean onCertificateError(CefBrowser browser, CefLoadHandler.ErrorCode error, String url, CefSSLInfo info,
+                                                    CefCallback callback) {
+            Page page = browser instanceof PageBrowser shown ? shown.owner() : null;
+            if (page == null || !goesOn(page, url, certificate(url, info), EventQueue::invokeLater)) return false;
+            callback.Continue();
+            return true;
+        }
+
         @Override public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String url, boolean userGesture) {
             if (browser instanceof PageBrowser page)
                 LinkRoute.link(url, page.view().lastPress(), userGesture, System.currentTimeMillis(), MAC_OS)
@@ -89,6 +107,30 @@ public final class PageNavigation {
                     .ifPresent(where -> EventQueue.invokeLater(() -> go(page, url, where)));
             }
             return true;
+        }
+    }
+
+    /**
+     * Whether Chromium goes on past {@code certificate}, which it could not verify for the load of {@code url} in
+     * {@code page}: only when the page allows it. Otherwise {@code ui} is handed the page's refusal, for the
+     * failure that follows, and Chromium cancels the load. Without a certificate there is nothing to allow. Chromium's
+     * thread.
+     */
+    static boolean goesOn(Page page, String url, Optional<ServerCertificate> certificate, Consumer<Runnable> ui) {
+        if (certificate.isEmpty()) return false;
+        if (page.allowsCertificate(certificate.get())) return true;
+        ServerCertificate refused = certificate.get();
+        ui.accept(() -> page.certificateRefused(url, refused));
+        return false;
+    }
+
+    /** The certificate {@code info} reports for the load of {@code url}; empty when it reports none Jasper can read. */
+    private static Optional<ServerCertificate> certificate(String url, CefSSLInfo info) {
+        try {
+            return info == null || info.certificate == null ? Optional.empty()
+                : ServerCertificate.of(url, info.certificate.getCertificatesChain());
+        } catch (RuntimeException unreadable) {
+            return Optional.empty();
         }
     }
 
