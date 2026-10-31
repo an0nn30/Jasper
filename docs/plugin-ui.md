@@ -296,8 +296,9 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
   click reports the `Action` for the owner to confirm in its next update.
 - A `holdMenu` of `MenuItem`s (SDK 0.27.0) opens under the button when a press is held on it for half a second, as a
   browser's Back button holds its history; that press's release then reports nothing, while a shorter press reports the
-  button's `Action`, and a press that leaves the button opens nothing. A right-click (Control-click on macOS), Shift+F10 and the context-menu key open it at once, and choosing an
-  item reports the item's `Action`.
+  button's `Action`, and a press that leaves the button, even to come back, opens nothing. A right-click
+  (Control-click on macOS), Shift+F10 and the context-menu key open it at once, and choosing an item reports the
+  item's `Action`.
 - [`MenuButton`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.MenuButton)`(label, icon, kind, action, items, tooltip)`:
   with a blank `action` the whole button opens the menu; otherwise its main part reports `Action(action)` and its arrow
   opens the menu. Each

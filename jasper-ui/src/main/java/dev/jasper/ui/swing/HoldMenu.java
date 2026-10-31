@@ -21,11 +21,12 @@ import javax.swing.Timer;
  * A button's hold menu (SDK 0.27.0; {@link Nodes.Button#holdMenu()}), as a browser's Back button holds its history: a
  * left press held on the button for {@link #HOLD_NANOS} opens it under the button, and the press's release then reports
  * nothing, while a shorter press is the button's own. A press that ends without its release reaching the button, or
- * whose pointer leaves the button, opens nothing, and nothing opens while the button is not on screen. A popup trigger (a right-click; a Control-click on macOS) and the menu
- * keys (Shift+F10, the context-menu key) open it at once. It shows in the menu's card, placed as a menu button's menu
- * is, and choosing an enabled item reports its action through the button's own events; a submenu's children are
- * reachable as in every kit menu. The button's {@link KitOwnership#CONTEXT_MENU} holds it while there are items. The
- * button makes it the first time it has a hold menu. EDT only.
+ * whose pointer leaves the button, even to come back, opens nothing, and nothing opens while the button is not on
+ * screen. A popup trigger (a right-click; a Control-click on macOS) and the menu keys (Shift+F10, the context-menu key)
+ * open it at once. It shows in the menu's card, placed as a menu button's menu is, and choosing an enabled item reports
+ * its action through the button's own events; a submenu's children are reachable as in every kit menu. The button's
+ * {@link KitOwnership#CONTEXT_MENU} holds it while there are items. The button makes it the first time it has a hold
+ * menu. EDT only.
  */
 final class HoldMenu implements AutoCloseable {
     /** How long a left press is held before the menu opens: 500 ms, as browsers hold their Back and Forward buttons. */
@@ -53,6 +54,8 @@ final class HoldMenu implements AutoCloseable {
     private final MouseAdapter presses = new MouseAdapter() {
         @Override public void mousePressed(MouseEvent event) { pressed(event); }
         @Override public void mouseReleased(MouseEvent event) { released(event); }
+        /** The pointer leaving the button ends the hold: coming back before it is up opens nothing. */
+        @Override public void mouseExited(MouseEvent event) { holding = false; timer.stop(); }
     };
 
     HoldMenu(Buttons.ButtonControl owner) {
@@ -147,7 +150,6 @@ final class HoldMenu implements AutoCloseable {
         popup.setInvoker(button);
         return show.test(popup);
     }
-
 
     /** Hides the menu; whether it was showing. */
     boolean dismiss() {

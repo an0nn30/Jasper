@@ -90,6 +90,32 @@ class PageViewMouseTest {
         });
     }
 
+    /** Plan 4b's W19: a turn of no notches is no turn, even with half a notch left over from the turn before. */
+    @Test void aTurnOfNoNotchesMagnifiesNothing() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var view = view(NavigationButtonTest.WINDOWS);
+            turn(view, -0.5);
+            assertThat(magnified).as("half a notch rounds away from zero").containsExactly(1);
+            assertThat(turn(view, 0).isConsumed()).isTrue();
+            assertThat(magnified).as("half a notch the other way is left, but no turn").containsExactly(1);
+        });
+    }
+
+    /**
+     * Plan 4b's W11: a canvas that magnifies nothing, as DevTools' does, hands Ctrl+wheel to its browser on Windows and
+     * Linux too, so DevTools zoom as Chromium zooms them.
+     */
+    @Test void aCanvasWithoutAMagnifierLeavesCtrlWheelToItsBrowser() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            for (String os : List.of(NavigationButtonTest.WINDOWS, NavigationButtonTest.LINUX)) {
+                var devTools = new PageView(event -> false, shown -> { }, rate -> { }, key -> { },
+                    button -> NavigationButton.of(button, NavigationButtonTest.WINDOWS, NavigationButtonTest.W_TOOLKIT));
+                devTools.useOsName(os);
+                assertThat(turn(devTools, -1).isConsumed()).as(os).isFalse();
+            }
+        });
+    }
+
     /**
      * Spec section 7 and plan 4b's P32: on macOS, where trackpad pinch is the gesture, Ctrl+wheel is the page's like any
      * wheel; Chromium itself does not zoom on it there.

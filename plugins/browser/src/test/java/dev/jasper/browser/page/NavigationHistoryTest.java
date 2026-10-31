@@ -242,13 +242,16 @@ class NavigationHistoryTest {
         });
     }
 
-    /** P1: a title change, a committed navigation and a main-frame load end each read the history again. */
+    /**
+     * P1: a title change, a committed navigation and a main-frame load end each read the history again: the last two at
+     * once, a title change a moment later (W9).
+     */
     @Test void eachChangeOfThePageReadsItsHistory() throws Exception {
         var seam = new Seam();
         Page page = onUiThread(() -> seam.page(() -> { }));
         History first = new History(0, List.of(entry(1, "One"))), second = new History(1, List.of(entry(1, "One"), entry(2, "Two")));
         onUiThread(() -> PageTestAccess.titleChanged(page, "One"));
-        assertThat(seam.reads).hasSize(1);
+        awaitReads(seam, 1);
         seam.reads.getLast().complete(first);
         assertThat(onUiThread(page::history)).isEqualTo(first);
         onUiThread(() -> PageTestAccess.addressChanged(page, "https://example.com/2"));
@@ -269,21 +272,56 @@ class NavigationHistoryTest {
         var changes = new AtomicInteger();
         Page page = onUiThread(() -> seam.page(changes::incrementAndGet));
         History first = new History(0, List.of(entry(1, "One"))), second = new History(1, List.of(entry(1, "One"), entry(2, "Two")));
-        onUiThread(() -> PageTestAccess.titleChanged(page, "One"));
+        onUiThread(() -> PageTestAccess.addressChanged(page, "https://example.com/1"));
         onUiThread(() -> {
             PageTestAccess.titleChanged(page, "Two");
             PageTestAccess.addressChanged(page, "https://example.com/2");
             page.loadEnded();
             return null;
         });
+        assertThat(changes).as("the item told of each address and title").hasValue(3);
         assertThat(seam.reads).as("one at a time").hasSize(1);
         seam.reads.getFirst().complete(first);
         assertThat(onUiThread(page::history)).isEqualTo(first);
+        assertThat(changes).as("and of the history read").hasValue(4);
         assertThat(seam.reads).as("exactly one more").hasSize(2);
         seam.reads.getLast().complete(second);
         assertThat(onUiThread(page::history)).isEqualTo(second);
-        assertThat(seam.reads).as("nothing changed since").hasSize(2);
+        assertThat(changes).hasValue(5);
+        Thread.sleep(Page.TITLE_READ_MILLIS * 2L);
+        assertThat(seam.reads).as("nothing changed since: the title's read was taken by the address's").hasSize(2);
         onUiThread(page::close);
+    }
+
+    /**
+     * W9: a page whose title changes again and again, as one that animates it does, reads its history once for the
+     * changes of a moment, a moment after the first; a committed navigation meanwhile reads it at once, for both.
+     */
+    @Test void titleChangesInQuickSuccessionReadTheHistoryOnce() throws Exception {
+        var seam = new Seam();
+        Page page = onUiThread(() -> seam.page(() -> { }));
+        for (int change = 1; change <= 5; change++) {
+            String title = "(" + change + ") Inbox";
+            onUiThread(() -> PageTestAccess.titleChanged(page, title));
+        }
+        assertThat(seam.reads).as("not at once").isEmpty();
+        awaitReads(seam, 1);
+        seam.reads.getFirst().complete(new History(0, List.of(entry(1, "(5) Inbox"))));
+        Thread.sleep(Page.TITLE_READ_MILLIS * 2L);
+        assertThat(seam.reads).as("once for them all").hasSize(1);
+        onUiThread(() -> {
+            PageTestAccess.titleChanged(page, "(6) Inbox");
+            PageTestAccess.addressChanged(page, "https://example.com/inbox");
+            return null;
+        });
+        assertThat(seam.reads).as("the navigation reads at once").hasSize(2);
+        seam.reads.getLast().complete(new History(0, List.of(entry(1, "(6) Inbox"))));
+        Thread.sleep(Page.TITLE_READ_MILLIS * 2L);
+        assertThat(seam.reads).as("and for the title too").hasSize(2);
+        onUiThread(() -> PageTestAccess.titleChanged(page, "(7) Inbox"));
+        onUiThread(page::close);
+        Thread.sleep(Page.TITLE_READ_MILLIS * 2L);
+        assertThat(seam.reads).as("nothing after the close").hasSize(2);
     }
 
     /** A read that fails leaves no history, and the next change reads again. */
@@ -291,13 +329,13 @@ class NavigationHistoryTest {
         var seam = new Seam();
         Page page = onUiThread(() -> seam.page(() -> { }));
         History first = new History(0, List.of(entry(1, "One")));
-        onUiThread(() -> PageTestAccess.titleChanged(page, "One"));
+        onUiThread(() -> PageTestAccess.addressChanged(page, "https://example.com/1"));
         seam.reads.getLast().complete(first);
         assertThat(onUiThread(page::history)).isEqualTo(first);
-        onUiThread(() -> PageTestAccess.titleChanged(page, "Two"));
+        onUiThread(() -> PageTestAccess.addressChanged(page, "https://example.com/2"));
         seam.reads.getLast().completeExceptionally(new IllegalStateException("DevTools broke"));
         assertThat(onUiThread(page::history)).isEqualTo(History.EMPTY);
-        onUiThread(() -> PageTestAccess.titleChanged(page, "Three"));
+        onUiThread(() -> PageTestAccess.addressChanged(page, "https://example.com/3"));
         assertThat(seam.reads).as("the failed read ended").hasSize(3);
         onUiThread(page::close);
     }
@@ -315,6 +353,13 @@ class NavigationHistoryTest {
             return null;
         });
         onUiThread(page::close);
+    }
+
+    /** Waits, up to 5 seconds, until the page has asked for {@code count} reads. */
+    private static void awaitReads(Seam seam, int count) throws InterruptedException {
+        long end = System.nanoTime() + 5_000_000_000L;
+        while (seam.reads.size() < count && System.nanoTime() < end) Thread.sleep(10);
+        assertThat(seam.reads).hasSize(count);
     }
 
     /** The page's history reads and jumps, for a page made with it: each read answers when the test completes it. */

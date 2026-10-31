@@ -231,15 +231,18 @@
       return pass.late || pass.found.length >= MATCHES;
     }
 
-    // Finds the pattern in the run's text and keeps a range for each match, across its nodes, until the pass is over, or
-    // with anyway, whatever the time. Answers null: what follows starts a run of its own.
-    function seek(run, pass, anyway) {
+    // Finds the pattern in the run's text and keeps a range for each match, across its nodes, until the pass holds every
+    // match it may keep. A run the pass collected is searched whole, whatever the time, so it counts the text it reached;
+    // only a pattern's empty matches, which find nothing and step one character at a time, stop at the deadline. Answers
+    // null: what follows starts a run of its own.
+    function seek(run, pass) {
       if (run === null) return null;
       const text = run.parts.join('');
       pattern.lastIndex = 0;
       let hit;
-      while (pass.found.length < MATCHES && (anyway || !over(pass)) && (hit = pattern.exec(text)) !== null) {
+      while (pass.found.length < MATCHES && (hit = pattern.exec(text)) !== null) {
         if (hit[0] === '') {
+          if (over(pass)) break;
           pattern.lastIndex++;
           continue;
         }
@@ -263,17 +266,17 @@
       let run = null;
       for (let node = walker.nextNode(); node !== null && !over(pass); node = walker.nextNode()) {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          if (node.localName === 'br' || block(displayOf(node, pass))) run = seek(run, pass, false);
+          if (node.localName === 'br' || block(displayOf(node, pass))) run = seek(run, pass);
           continue;
         }
         const parent = node.parentElement;
         if (!node.nodeValue || parent === null || !counted(parent, pass)) continue;
         const within = blockOf(parent, pass);
-        if (run !== null && run.block !== within) run = seek(run, pass, false);
+        if (run !== null && run.block !== within) run = seek(run, pass);
         if (run === null) run = {block: within, parts: [], starts: [], segments: [], length: 0, space: false};
         append(run, node);
       }
-      seek(run, pass, true);
+      seek(run, pass);
       cost = performance.now() - started;
       exhausted = pass.late;
       return pass.found;

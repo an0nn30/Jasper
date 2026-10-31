@@ -36,7 +36,59 @@ class BrowserFindBarTest {
     private static final URI EXAMPLE = URI.create("https://example.com");
     private final List<String> ran = new ArrayList<>();
     private final List<Runnable> waits = new ArrayList<>();
+    private final List<Runnable> typing = new ArrayList<>(), typingCancelled = new ArrayList<>();
+    private boolean typingHeld;
     private PageFind find;
+
+    /**
+     * Plan 4b's W10: the bar searches once typing pauses for {@link BrowserFindBar#TYPING_WAIT}, not on every keystroke;
+     * Enter, a toggle and an emptied query act at once, and closing the bar drops the search still waiting.
+     */
+    @Test void typingSearchesOnceItPauses() throws Exception {
+        onUiThread(host -> {
+            FakeKitView view = open(host);
+            command(host, "find");
+            PageTestAccess.findSelected(find, "main", search(0), "");
+            ran.clear();
+            typingHeld = true;
+            view.type(BrowserFindBar.FIND, "n");
+            view.type(BrowserFindBar.FIND, "ne");
+            view.type(BrowserFindBar.FIND, "nee");
+            assertThat(searches()).as("not on each keystroke").isEmpty();
+            assertThat(typing).hasSize(3);
+            assertThat(typingCancelled).as("each keystroke puts the search off again").containsExactly(typing.get(0), typing.get(1));
+            typing.getLast().run();
+            assertThat(searches()).containsExactly("main nee", "child nee");
+            answer(1, 1);
+            assertThat(status(view)).isEqualTo("2 matches");
+
+            ran.clear();
+            view.type(BrowserFindBar.FIND, "need");
+            view.press(BrowserFindBar.FIND, "ENTER");
+            assertThat(searches()).as("Enter searches for what is typed at once").containsExactly("main need", "child need");
+            assertThat(typingCancelled).contains(typing.getLast());
+
+            ran.clear();
+            view.type(BrowserFindBar.FIND, "needl");
+            view.emit(new UiEvent.Action(BrowserFindBar.CASE));
+            assertThat(searches()).as("a toggle searches at once").containsExactly("main needl", "child needl");
+            assertThat(typingCancelled).contains(typing.getLast());
+
+            ran.clear();
+            view.type(BrowserFindBar.FIND, "");
+            assertThat(ran).as("an emptied query clears the page at once").containsExactly("main {\"action\":\"clear\"}",
+                "child {\"action\":\"clear\"}");
+
+            view.type(BrowserFindBar.FIND, "needle");
+            Runnable waiting = typing.getLast();
+            view.press(BrowserFindBar.FIND, "ESCAPE");
+            assertThat(typingCancelled).as("closing drops it").contains(waiting);
+            ran.clear();
+            waiting.run();
+            assertThat(searches()).as("even should its timer still fire").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        });
+    }
 
     @Test void openSeedsTheQueryFromAOneLineSelection() throws Exception {
         onUiThread(host -> {
@@ -276,7 +328,22 @@ class BrowserFindBarTest {
             .open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
         find = PageTestAccess.recordingFind(List.of("main", "child"), Optional.of("main"), ran, waits);
         PageTestAccess.useFind(item.page(), find);
+        item.findBar().useLater(this::typingWait);
         return item;
+    }
+
+    /**
+     * The bar's wait after a keystroke: at once, or with {@link #typingHeld} recorded in {@link #typing} for the test to
+     * run, its cancel recorded in {@link #typingCancelled}.
+     */
+    private Runnable typingWait(java.time.Duration delay, Runnable task) {
+        assertThat(delay).isEqualTo(BrowserFindBar.TYPING_WAIT);
+        if (!typingHeld) {
+            task.run();
+            return () -> { };
+        }
+        typing.add(task);
+        return () -> typingCancelled.add(task);
     }
 
     private static void command(FakePluginHost host, String id) {

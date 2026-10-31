@@ -210,6 +210,23 @@ class SourcePageTest {
         assertThat(SourcePage.saved(URI.create("jasper-about:error?token=" + TOKEN))).isEqualTo(URI.create("jasper-about:error?token=" + TOKEN));
     }
 
+    /**
+     * Plan 4b's W7: the source page of an error page is saved as that of the address that failed, as Chrome's View Source
+     * of an error page shows the failed address's source; the error page's tokens end with the item.
+     */
+    @Test void anErrorPagesSourcePageIsSavedAsTheFailedAddresssWithoutItsTokens() {
+        String error = "jasper-about:error?token=" + TOKEN + "&code=ERR_CONNECTION_REFUSED&url=https%3A%2F%2Fexample.com%2Fa&proceed=" + TOKEN;
+        for (String inner : List.of(error, error.replace("jasper-about:error?", "jasper-about://error/?"))) {
+            URI saved = SourcePage.saved(SourcePage.address(inner, Optional.of(TOKEN)));
+            assertThat(saved).as(inner).isEqualTo(URI.create("jasper-about:source?url=https%3A%2F%2Fexample.com%2Fa"));
+            assertThat(saved.toString()).doesNotContain(TOKEN);
+        }
+        assertThat(SourcePage.saved(SourcePage.address("jasper-about:error?token=" + TOKEN, Optional.empty()))).as("no failed address")
+            .isEqualTo(URI.create("jasper-about:source"));
+        assertThat(SourcePage.saved(SourcePage.address("jasper-about:welcome", Optional.of(TOKEN)))).as("another Jasper page")
+            .isEqualTo(URI.create("jasper-about:source?url=jasper-about%3Awelcome"));
+    }
+
     /** An http(s) page's source is fetched again, without cookies, and the fresh source wins over the item's capture. */
     @Test void aWebPagesSourceIsFetchedAgainAndUsedOnA200() throws Exception {
         open((token, page) -> Optional.of("<p>captured</p>"), SourcePage.TIMEOUT);

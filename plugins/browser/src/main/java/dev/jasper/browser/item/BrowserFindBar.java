@@ -8,12 +8,16 @@ import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.swing.KeyStroke;
+import javax.swing.Timer;
 
 /**
  * A browser item's find bar (spec section 10), as SDK nodes the kit draws, modelled on the Editor's: the query field,
@@ -22,14 +26,17 @@ import javax.swing.KeyStroke;
  * Previous, Next and Close buttons. Escape anywhere in the bar closes it, and closing it clears every highlight and gives
  * the page the focus back. A regular expression is JavaScript's, as the page's {@link PageFind} runs it. Jasper's Find
  * opens the bar with a one-line selection of the page as its query, else its last query; Find Next and Find Previous
- * go to the next and previous match, and with the bar closed show it and search for its query again. Each search shows
- * its result once it settles, and later changes as they come: a frame's late answer, a changed document, and the end
- * of the search with the page's next document, after which Enter searches again. UI thread.
+ * go to the next and previous match, and with the bar closed show it and search for its query again. Typing searches
+ * once it pauses for {@link #TYPING_WAIT} (plan 4b's W10); Enter, a toggle and an emptied query act at once. Each search
+ * shows its result once it settles, and later changes as they come: a frame's late answer, a changed document, and the
+ * end of the search with the page's next document, after which Enter searches again. UI thread.
  */
 final class BrowserFindBar {
     /** The bar and its nodes; each button reports its own id. */
     static final String ROOT = "browser.find", FIND = "browser.find.query", CASE = "browser.find.case", REGEX = "browser.find.regex",
         STATUS = "browser.find.status", PREVIOUS = "browser.find.previous", NEXT = "browser.find.next", CLOSE = "browser.find.close";
+    /** How long typing in the query pauses before the bar searches for it. */
+    static final Duration TYPING_WAIT = Duration.ofMillis(100);
     private static final boolean MAC_OS = System.getProperty("os.name", "").startsWith("Mac");
     private final Supplier<Optional<PageFind>> target;
     private final Runnable changed;
@@ -43,6 +50,9 @@ final class BrowserFindBar {
     private long opened;
     private String query = "", status = "";
     private boolean matchCase, regex, visible, edited;
+    // Runs a task on the UI thread after a delay and answers what cancels it; the search typing put off, and its cancel.
+    private BiFunction<Duration, Runnable, Runnable> later = BrowserFindBar::onUiAfter;
+    private Runnable typed, cancelTyped;
 
     /**
      * A closed find bar.
@@ -84,7 +94,8 @@ final class BrowserFindBar {
         if (event instanceof UiEvent.Edited edit && edit.id().equals(FIND)) {
             query = edit.text();
             edited = true;
-            search();
+            if (query.isEmpty()) search();
+            else searchLater();
             changed.run();
             return true;
         }
@@ -143,6 +154,7 @@ final class BrowserFindBar {
         if (!visible) return;
         visible = false;
         opened++;
+        dropTyped();
         searching = null;
         watching.close();
         watching = () -> { };
@@ -211,13 +223,53 @@ final class BrowserFindBar {
             return;
         }
         if (query.isEmpty()) return;
-        if (captured.result().isEmpty()) search(); // the page's next document ended the search
+        // Typed and not yet searched for, or the page's next document ended the search.
+        if (typed != null || captured.result().isEmpty()) search();
         else status = text(forward ? captured.next() : captured.previous());
         changed.run();
     }
 
+    /** Searches for the query once typing pauses, putting off any search typing put off before. */
+    private void searchLater() {
+        dropTyped();
+        Runnable task = new Runnable() {
+            @Override public void run() {
+                if (typed != this) return; // dropped meanwhile
+                typed = null;
+                cancelTyped = null;
+                if (!visible) return;
+                search();
+                changed.run();
+            }
+        };
+        typed = task;
+        cancelTyped = Objects.requireNonNull(later.apply(TYPING_WAIT, task), "cancel");
+    }
+
+    /** The search typing put off, if one waits, will not run. */
+    private void dropTyped() {
+        Runnable cancel = cancelTyped;
+        typed = null;
+        cancelTyped = null;
+        if (cancel != null) cancel.run();
+    }
+
+    /** Has the bar wait for typing to pause with {@code replacement} from now on, as a test's recording one. */
+    void useLater(BiFunction<Duration, Runnable, Runnable> replacement) {
+        later = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Runs {@code task} on the UI thread after {@code delay}, and answers what cancels it. */
+    private static Runnable onUiAfter(Duration delay, Runnable task) {
+        var timer = new Timer((int) delay.toMillis(), event -> task.run());
+        timer.setRepeats(false);
+        timer.start();
+        return timer::stop;
+    }
+
     /** Searches the page for the query; an empty one clears the page. The status shows the result once it settles. */
     private void search() {
+        dropTyped();
         searching = null;
         if (query.isEmpty()) {
             captured.clear();

@@ -386,6 +386,11 @@ public final class BrowserItem implements AutoCloseable {
         return page.view();
     }
 
+    /** The item's find bar. */
+    BrowserFindBar findBar() {
+        return findBar;
+    }
+
     /** The item's page. */
     Page page() {
         return page;

@@ -126,6 +126,7 @@ record PageMenuItems(List<MenuItem> leading, List<MenuItem> trailing) {
         menu.addAll(items);
     }
 
+    /** An item of the menu: a content tab's menu reports its id and ignores its action, which must not be blank. */
     private static MenuItem item(String id, String label, boolean enabled) {
         return new MenuItem(id, label, "", id, enabled, false);
     }

@@ -218,6 +218,37 @@ class HoldMenuTest {
         });
     }
 
+    /**
+     * Plan 4b's W14: a press whose pointer leaves the button opens nothing, even should it come back before the hold
+     * is up, as the button, armed again, is then no longer held where it was pressed.
+     */
+    @Test void aPressThatLeavesTheButtonAndComesBackOpensNothing() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, stack(back(READY, List.of(ENTRY))), events::add)) {
+                var hold = onScreen(control(view).hold);
+                long[] now = {0};
+                hold.clock = () -> now[0];
+                var button = control(view).button;
+                button.setSize(28, 28);
+                press(button, false);
+                assertThat(hold.timer.isRunning()).isTrue();
+                now[0] = 200 * MS;
+                button.dispatchEvent(new MouseEvent(button, MouseEvent.MOUSE_EXITED, System.currentTimeMillis(), InputEvent.BUTTON1_DOWN_MASK,
+                    40, 4, 0, false));
+                assertThat(hold.timer.isRunning()).as("leaving ends the hold").isFalse();
+                now[0] = 300 * MS;
+                button.dispatchEvent(new MouseEvent(button, MouseEvent.MOUSE_ENTERED, System.currentTimeMillis(), InputEvent.BUTTON1_DOWN_MASK,
+                    4, 4, 0, false));
+                assertThat(button.getModel().isArmed()).as("Swing arms the button again").isTrue();
+                now[0] = 600 * MS;
+                hold.elapsed();
+                assertThat(hold.popup.isVisible()).as("came back within the hold").isFalse();
+            } finally { release(context); }
+        });
+    }
+
     /** The menu opens while the press is held and its content changes in place as the history does. */
     @Test void anUpdateChangesTheItemsAndClosingTheViewHidesTheMenu() {
         Edt.run(() -> {

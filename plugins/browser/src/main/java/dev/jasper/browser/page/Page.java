@@ -22,6 +22,7 @@ import java.util.function.IntConsumer;
 import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 import javax.swing.JComponent;
+import javax.swing.Timer;
 import org.cef.CefClient;
 import org.cef.browser.CefFrame;
 
@@ -37,6 +38,8 @@ import org.cef.browser.CefFrame;
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
     static final long SOURCE_WAIT_SECONDS = 10;
+    /** How long after a title change the page reads its history, once for the title changes meanwhile. */
+    static final int TITLE_READ_MILLIS = 250;
     private final PageView view = new PageView();
     private final Runnable changed;
     private final Favicons favicons;
@@ -80,6 +83,8 @@ public final class Page implements AutoCloseable {
     // The history as last read; whether a read runs, and whether the history changed since that read began.
     private NavigationHistory.History history = NavigationHistory.History.EMPTY;
     private boolean readingHistory, historyStale;
+    // Reads the history a moment after the title changed: a page that animates its title would read it on each change.
+    private final Timer titleRead = new Timer(TITLE_READ_MILLIS, event -> readHistory());
     private boolean loading, canGoBack, canGoForward, started, ready, closed;
     // The zoom the page shows at, as Chromium's level; read on Chromium's thread as each main-frame navigation commits.
     private volatile double zoomLevel;
@@ -125,6 +130,7 @@ public final class Page implements AutoCloseable {
         this.favicons = Objects.requireNonNull(favicons, "favicons");
         this.historyReader = Objects.requireNonNull(historyReader, "historyReader");
         this.historyJumper = Objects.requireNonNull(historyJumper, "historyJumper");
+        titleRead.setRepeats(false);
         view.onNavigationButton(this::navigationButton);
         view.onMagnify(this::magnified);
         // Chromium keeps one zoom per host, which another page on the same host may have changed meanwhile.
@@ -782,6 +788,7 @@ public final class Page implements AutoCloseable {
         dialogPlace = null;
         menuPlace = null;
         dropFaviconFetch();
+        titleRead.stop();
         if (find != null) find.close();
         if (devTools != null) devTools.close();
         view.setHoverUrl("");
@@ -857,12 +864,12 @@ public final class Page implements AutoCloseable {
         readHistory();
     }
 
-    /** The page's title changed. */
+    /** The page's title changed: the history, whose entries carry titles, is read a moment later (plan 4b's W9). */
     void titleChanged(String value) {
         if (closed) return;
         title = value == null ? "" : value;
         changed.run();
-        readHistory();
+        if (!titleRead.isRunning()) titleRead.start();
     }
 
     /** The main frame finished loading. */
@@ -891,6 +898,7 @@ public final class Page implements AutoCloseable {
      * runs at a time however often the page changes.
      */
     private void readHistory() {
+        titleRead.stop(); // this read covers the title changed so far
         if (closed) return;
         if (readingHistory) {
             historyStale = true;

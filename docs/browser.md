@@ -164,6 +164,7 @@ closed they open it and search again from the first match.
   counts at most 10,000 matches, and on a very large page those in the text it read within a quarter of a second.
 - While the bar is open, the count follows changes to the page, until a search runs out of time. The page's next
   document ends the search, and Enter searches again.
+- The bar searches once you pause typing for a tenth of a second; Enter and the toggles search at once.
 - A query is cut to 1,000 characters.
 - Closing the bar removes every highlight and gives the keyboard back to the page; the query stays for the next Find.
 
@@ -237,7 +238,7 @@ In the DevTools pane:
 - **Copy** and **Paste** act in DevTools, and on macOS so do Cmd+A, Cmd+X, Cmd+Z and Cmd+Shift+Z;
 - the Web menu and its keys act on the inspected page: Reload Page reloads it, Back and Forward move it through its
   history, and Open Location… goes to its address field;
-- Jasper's Find and font size actions are not offered, so their keys reach DevTools;
+- Jasper's Find and font size actions are not offered, so their keys reach DevTools, and so does Ctrl+wheel;
 - a right-click shows no menu, and DevTools' file dialogs, such as for loading a profile, open nothing;
 - a link DevTools open in a new tab, such as one in the console, opens in a new browser tab right after the page's,
   when the page could open it itself, as for [Open Link in New Tab](#the-right-click-menu).
@@ -430,7 +431,8 @@ click **Reload** or open a link in it.
 - An address too long for the saved state (4,096 characters, counted with the target and the zoom) is saved without
   its query and fragment, and when it is still too long, not at all.
 - A `data:` or `blob:` page saves no address. A `jasper-about:` page saves its address.
-- A page that shows an [error page](#error-pages) saves the address that failed.
+- A page that shows an [error page](#error-pages) saves the address that failed, and one that shows an error page's
+  [source](#view-source) saves the source page of that address.
 - An address is saved without any user name and password in it.
 - A page that saved no address, or one the address field would not load, comes back at the start page.
 

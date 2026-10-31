@@ -24,16 +24,17 @@ import java.util.concurrent.TimeUnit;
  * credentials and uses the JDK's default proxy selector, following redirects within the web schemes, for at most a
  * limit of bytes and a time limit in all. Only an http or https address with a host and without a user name or password
  * is fetched; anything else, a failure, an answer other than 200 and one over the limit give nothing. The client is made
- * on the first fetch, on the executor given, as making the first one takes tens of milliseconds, and it ends with
- * {@link #close()}, so an owner that fetches nothing holds none. Any thread.
+ * on the first fetch, on the executor given, as making the first one takes tens of milliseconds, and outside any lock,
+ * so no thread that fetches or closes waits for it; it ends with {@link #close()}, so an owner that fetches nothing holds
+ * none. Any thread.
  */
 public final class WebFetch implements AutoCloseable {
     private final Executor starts;
     private final Duration timeout;
     private final int limit;
-    // Made on the first fetch; guarded by this.
+    // Made on the first fetch; guarded by this. Closed is written under the lock too, and read without it.
     private HttpClient client;
-    private boolean closed;
+    private volatile boolean closed;
 
     /**
      * A fetcher.
@@ -62,7 +63,7 @@ public final class WebFetch implements AutoCloseable {
         Objects.requireNonNull(address, "address");
         Objects.requireNonNull(accept, "accept");
         var result = new CompletableFuture<Optional<HttpResponse<byte[]>>>();
-        if (!fetches(address) || closed()) {
+        if (!fetches(address) || closed) {
             result.complete(Optional.empty());
             return result;
         }
@@ -139,14 +140,22 @@ public final class WebFetch implements AutoCloseable {
         result.whenComplete((answer, failure) -> exchange.cancel(true));
     }
 
-    private synchronized boolean closed() {
-        return closed;
-    }
-
-    private synchronized HttpClient client() {
-        if (closed) return null;
-        if (client == null) client = HttpClient.newBuilder().connectTimeout(timeout).followRedirects(HttpClient.Redirect.NORMAL).build();
-        return client;
+    /**
+     * The client, made on the first call: outside the lock, so neither {@link #get} nor {@link #close()} waits while it
+     * is made. Of two made at once, one is kept and the other shut down. Null once closed.
+     */
+    private HttpClient client() {
+        synchronized (this) {
+            if (closed || client != null) return client;
+        }
+        HttpClient made = HttpClient.newBuilder().connectTimeout(timeout).followRedirects(HttpClient.Redirect.NORMAL).build();
+        HttpClient kept;
+        synchronized (this) {
+            if (!closed && client == null) client = made;
+            kept = client;
+        }
+        if (kept != made) made.shutdownNow();
+        return kept;
     }
 
     /** The body of an answer: read only for a 200 that does not announce more than the limit. */

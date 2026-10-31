@@ -17,7 +17,7 @@ import java.util.Objects;
  * @param icon an icon name drawn on a tile before the label; blank for none. When any item of a menu has an icon,
  *     every label starts after the icon column
  * @param action the action key choosing the item reports as {@link UiEvent.Action}; not blank unless {@code separator}
- *     or a submenu, which is blank
+ *     or a submenu, which is blank. A content tab's right-click menu ignores it and reports the item's id
  * @param enabled false shows the item disabled; it reports nothing
  * @param separator true makes the item a separator line, which shows no label, icon or shortcut, reports nothing and has
  *     no children

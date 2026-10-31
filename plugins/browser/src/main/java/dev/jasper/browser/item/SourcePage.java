@@ -203,8 +203,9 @@ public final class SourcePage implements AutoCloseable {
     }
 
     /**
-     * What an item saves of {@code address}: a source page's without its token, which ends with the item; any other as it
-     * is.
+     * What an item saves of {@code address}: a source page's without its token, which ends with the item, and an error
+     * page's source page as that of the address that failed, without the error page's tokens (plan 4b's W7); any other
+     * as it is.
      *
      * @param address where the item is
      * @return the address to save
@@ -212,7 +213,13 @@ public final class SourcePage implements AutoCloseable {
     static URI saved(URI address) {
         String written = address.toString();
         if (!source(written)) return address;
-        return page(written).map(page -> address(page, Optional.empty())).orElseGet(() -> URI.create(AboutScheme.NAME + ":" + NAME));
+        return page(written).map(SourcePage::savedPage).filter(page -> !page.isEmpty()).map(page -> address(page, Optional.empty()))
+            .orElseGet(() -> URI.create(AboutScheme.NAME + ":" + NAME));
+    }
+
+    /** The page a source page saves: an error page as the address that failed, empty for none; any other as it is. */
+    private static String savedPage(String page) {
+        return AboutScheme.page(page).filter(ErrorPage.NAME::equals).isPresent() ? ErrorPage.Shown.of(page).url() : page;
     }
 
     /**

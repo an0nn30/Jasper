@@ -7241,8 +7241,8 @@ included, so hand other plugins <a href="#dev.jasper.sdk.ui.ContentTab.window()"
 leading</code>, then the pane items Jasper offers for any item (Split, a submenu of every Split choice's Right and Down;
 Move Pane to Tab, a submenu of the window's other tabs; and Close Pane), then <code>trailing</code>, with a separator
 between groups; an empty group adds none. The tab is selected first, so Jasper's items act on its pane. An item's
-icon shows before its label without its tile, and its shortcut at its end.</p><p>Choosing an enabled item of the plugin's closes the menu and calls <code>chosen</code> with the item's id; its
-<code>action</code> is not reported. Choosing one of Jasper's items runs it, and dismissing the menu (Escape, a click
+icon shows before its label without its tile, and its shortcut at its end.</p><p>Choosing an enabled item of the plugin's closes the menu and calls <code>chosen</code> with the item's id. Its
+<code>action</code> is ignored: any non-blank one, as <a href="#dev.jasper.sdk.ui.MenuItem"><code>MenuItem</code></a> requires. Choosing one of Jasper's items runs it, and dismissing the menu (Escape, a click
 elsewhere, another menu opening, the tab closing) closes it; either calls <code>chosen</code> with nothing. A tab that is
 closed, or not shown on screen, shows no menu and calls <code>chosen</code> with nothing before this returns.
 <code>chosen</code> is called once, on the UI thread.</div>
@@ -7581,7 +7581,7 @@ blank and it shows no shortcut; a disabled one does not open.</div>
 <tr id="dev.jasper.sdk.ui.MenuItem.icon()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>icon</b></code></td><td>an icon name drawn on a tile before the label; blank for none. When any item of a menu has an icon,
     every label starts after the icon column</td></tr>
 <tr id="dev.jasper.sdk.ui.MenuItem.action()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>action</b></code></td><td>the action key choosing the item reports as <a href="#dev.jasper.sdk.ui.UiEvent.Action"><code>UiEvent.Action</code></a>; not blank unless <code>separator</code>
-    or a submenu, which is blank</td></tr>
+    or a submenu, which is blank. A content tab's right-click menu ignores it and reports the item's id</td></tr>
 <tr id="dev.jasper.sdk.ui.MenuItem.enabled()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>enabled</b></code></td><td>false shows the item disabled; it reports nothing</td></tr>
 <tr id="dev.jasper.sdk.ui.MenuItem.separator()"><td class="ct"><code><span class="kw">boolean</span></code></td><td class="cn"><code><b>separator</b></code></td><td>true makes the item a separator line, which shows no label, icon or shortcut, reports nothing and has
     no children</td></tr>
@@ -8100,10 +8100,10 @@ the kind's text colour; for example a favourite's warning star. The label keeps 
 treatment while it is true and reports its pressed state to assistive technology; a click reports the Action and
 the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons take it.</p><p>Since 0.27.0 a button can carry a <code>holdMenu</code>, as a browser's Back button carries its history: a press held
 on the button for at least 500 ms opens the menu under it, and its release then reports nothing, while a shorter
-press reports <code>action</code> as before. A press whose pointer leaves the button, or that ends without its release
-(the window losing the focus), opens nothing. A right-click (a Control-click on macOS), Shift+F10 and the context-menu key open
-the menu at once. Choosing an enabled item closes the menu and reports the item's action as a
-<a href="#dev.jasper.sdk.ui.UiEvent.Action"><code>UiEvent.Action</code></a>.</div>
+press reports <code>action</code> as before. A press whose pointer leaves the button, even to come back, or that ends
+without its release (the window losing the focus), opens nothing. A right-click (a Control-click on macOS),
+Shift+F10 and the context-menu key open the menu at once. Choosing an enabled item closes the menu and reports the
+item's action as a <a href="#dev.jasper.sdk.ui.UiEvent.Action"><code>UiEvent.Action</code></a>.</div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.Nodes.Button.id()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>id</b></code></td><td>the node id</td></tr>
@@ -8298,7 +8298,8 @@ for the selected one instead of moving the focus or running <code>trailingAction
 it as Enter does. While the list shows at all, Escape hides it and reports <code>cancelAction</code>. A chosen
 suggestion, Escape and the focus leaving the field hide the list until the user next edits the field. An update
 keeps the selection while the selected suggestion's id is still listed, and an edit selects the first again. A
-TEXTAREA and a NUMBER field take no suggestions.</div>
+TEXTAREA and a NUMBER field take no suggestions, nor does a field with a <code>listId</code>, whose Up and Down move
+that list.</div>
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.Nodes.Field.id()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a></code></td><td class="cn"><code><b>id</b></code></td><td>the node id</td></tr>

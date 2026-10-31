@@ -61,7 +61,8 @@ import javax.swing.Timer;
  * user bigger, as Chromium counts the notches. They add up, a turn gives a step once they round to a whole notch, at
  * most one step a turn, and what is left over carries to the next turn. With Shift down too, as Java reports a
  * horizontal wheel or a tilt, the wheel is the page's, which scrolls sideways. On macOS, where trackpad pinch is the
- * gesture (spec section 7), Ctrl+wheel is the page's, as in Chromium.
+ * gesture (spec section 7), Ctrl+wheel is the page's, as in Chromium; and so it is everywhere on a canvas without a
+ * magnifier, as DevTools' is, which Chromium then zooms.
  *
  * <p><b>Showing.</b> While the view does not show (its tab is hidden, or it is out of its window) its page draws one
  * frame a second; showing again restores 60. The page itself is not told it is hidden: its scripts and network work go
@@ -77,7 +78,10 @@ public final class PageView extends JComponent {
     // Which of AWT's buttons are the mouse's back and forward buttons here.
     private final IntFunction<Optional<NavigationButton>> navigationButtons;
     private volatile Consumer<NavigationButton> navigation = button -> { };
-    private volatile IntConsumer magnifier = direction -> { };
+    // Null for a canvas that magnifies nothing, as DevTools' does: its Ctrl+wheel is its browser's.
+    private volatile IntConsumer magnifier;
+    // The platform whose Ctrl+wheel rule the view follows, as os.name names it; a test gives another.
+    private volatile String osName = System.getProperty("os.name", "");
     // Made with the page's browser: it names Chromium's types, which an item that has not shown yet does not load.
     private volatile ImeAdapter ime;
     // The view's input method client from the start, so a view focused before its page attaches is an active client.
@@ -201,9 +205,6 @@ public final class PageView extends JComponent {
     void onNavigationButton(Consumer<NavigationButton> listener) {
         navigation = Objects.requireNonNull(listener, "listener");
     }
-
-    // The platform whose Ctrl+wheel rule the view follows, as os.name names it; a test gives another.
-    private volatile String osName = System.getProperty("os.name", "");
 
     /**
      * Has the view follow the Ctrl+wheel rule of the platform {@code os} names, as {@code os.name} does, for a test of
@@ -343,9 +344,10 @@ public final class PageView extends JComponent {
     @Override protected void processMouseWheelEvent(MouseWheelEvent event) {
         super.processMouseWheelEvent(event);
         if (event.isConsumed()) return;
-        if (magnifies(event.getModifiersEx(), osName)) { // Jasper's zoom, never the page's
+        IntConsumer zoom = magnifier;
+        if (zoom != null && magnifies(event.getModifiersEx(), osName)) { // Jasper's zoom, never the page's
             event.consume();
-            magnify(event.getPreciseWheelRotation());
+            magnify(zoom, event.getPreciseWheelRotation());
             return;
         }
         PageBrowser target = browser;
@@ -396,15 +398,15 @@ public final class PageView extends JComponent {
 
     /**
      * Ctrl+wheel turned {@code notches}, as Chromium counts them (its {@code zoom_scroll_remainder_}): they add to those
-     * no step took yet, which round, half away from zero, to whole notches; any whole notch gives one step its way, and
-     * the rest is kept.
+     * no step took yet, which round, half away from zero, to whole notches; any whole notch gives {@code zoom} one step
+     * its way, and the rest is kept. A turn of no notches, as a touchpad sends, is none, whatever is kept.
      */
-    private void magnify(double notches) {
-        if (!Double.isFinite(notches)) return;
+    private void magnify(IntConsumer zoom, double notches) {
+        if (!Double.isFinite(notches) || notches == 0) return;
         magnifyTurn += notches;
         double whole = Math.signum(magnifyTurn) * Math.floor(Math.abs(magnifyTurn) + 0.5);
         magnifyTurn -= whole;
-        if (whole != 0) magnifier.accept(whole < 0 ? 1 : -1);
+        if (whole != 0) zoom.accept(whole < 0 ? 1 : -1);
     }
 
     /** Whether pressing {@code keyCode} activates the page: every key but Escape and the modifiers, as in Chromium. */

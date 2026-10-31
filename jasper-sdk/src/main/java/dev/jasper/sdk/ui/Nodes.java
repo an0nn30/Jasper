@@ -242,10 +242,10 @@ public final class Nodes {
      *
      * <p>Since 0.27.0 a button can carry a {@code holdMenu}, as a browser's Back button carries its history: a press held
      * on the button for at least 500 ms opens the menu under it, and its release then reports nothing, while a shorter
-     * press reports {@code action} as before. A press whose pointer leaves the button, or that ends without its release
-     * (the window losing the focus), opens nothing. A right-click (a Control-click on macOS), Shift+F10 and the context-menu key open
-     * the menu at once. Choosing an enabled item closes the menu and reports the item's action as a
-     * {@link UiEvent.Action}.
+     * press reports {@code action} as before. A press whose pointer leaves the button, even to come back, or that ends
+     * without its release (the window losing the focus), opens nothing. A right-click (a Control-click on macOS),
+     * Shift+F10 and the context-menu key open the menu at once. Choosing an enabled item closes the menu and reports the
+     * item's action as a {@link UiEvent.Action}.
      *
      * @param id the node id
      * @param state the node's state; a disabled or busy button cannot be pressed

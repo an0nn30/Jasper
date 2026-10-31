@@ -27,8 +27,10 @@ public final class AddressInput {
      *   <li>with a scheme Jasper offers ({@code http}, {@code https}, {@code file}, {@code about} or {@code jasper-about}),
      *       the text as typed;</li>
      *   <li>an absolute local path ({@code /…}, {@code ~/…}, or {@code C:\…} on Windows), its {@code file:} URL;</li>
-     *   <li>a domain (a trailing dot allowed), an IP address, {@code localhost}, a host with a port, or a single word
-     *       without spaces (underscores allowed), with {@code https://} before it;</li>
+     *   <li>a domain (a trailing dot allowed), an IP address, {@code localhost} or a host with a port, each with or
+     *       without a path, query or fragment, or a single word (ASCII letters, digits, {@code _} and inner {@code -},
+     *       with a letter or {@code _}) alone, with a port or with a {@code /} path, with {@code https://} before it;
+     *       {@code c#} and {@code why?} are searches;</li>
      *   <li>other text, a search for it with the chosen engine.</li>
      * </ul>
      *

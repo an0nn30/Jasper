@@ -626,7 +626,7 @@ tab strip, the window and its menus, and the status bar; the plugin provides the
   `trailing`, with a separator between groups and none for an empty group. The tab is selected first, so Jasper's items
   act on its pane. `chosen` hears the id of the plugin's item chosen, or nothing when one of Jasper's items ran, the
   menu was dismissed, or the tab is closed or not on screen; it hears once. Item ids must be unique across the whole
-  menu, submenus included.
+  menu, submenus included; an item's `action` is ignored, but must not be blank.
 - `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new window
   (a window's only tab stays where it is) and `moveToWindow(window)` to the end of another window's strip, keeping the
   view and its state, and `window()` is the window that holds it.

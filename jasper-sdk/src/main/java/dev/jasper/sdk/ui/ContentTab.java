@@ -133,8 +133,8 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      * between groups; an empty group adds none. The tab is selected first, so Jasper's items act on its pane. An item's
      * icon shows before its label without its tile, and its shortcut at its end.
      *
-     * <p>Choosing an enabled item of the plugin's closes the menu and calls {@code chosen} with the item's id; its
-     * {@code action} is not reported. Choosing one of Jasper's items runs it, and dismissing the menu (Escape, a click
+     * <p>Choosing an enabled item of the plugin's closes the menu and calls {@code chosen} with the item's id. Its
+     * {@code action} is ignored: any non-blank one, as {@link MenuItem} requires. Choosing one of Jasper's items runs it, and dismissing the menu (Escape, a click
      * elsewhere, another menu opening, the tab closing) closes it; either calls {@code chosen} with nothing. A tab that is
      * closed, or not shown on screen, shows no menu and calls {@code chosen} with nothing before this returns.
      * {@code chosen} is called once, on the UI thread.

@@ -453,7 +453,7 @@ class BrowserRestoreTest {
 
     /**
      * A restored item shows at the zoom it saved and saves it again, also while it waits after a run that ended while
-     * Chromium ran; its page takes the zoom once it has a browser. A saved zoom outside 5% to 500% is ignored: the item
+     * Chromium ran; its page takes the zoom once it has a browser. A saved zoom outside 25% to 500% is ignored: the item
      * comes back at Page zoom.
      */
     @Test void aRestoredItemComesBackAtItsSavedZoomAlsoWhileItWaits() throws Exception {
