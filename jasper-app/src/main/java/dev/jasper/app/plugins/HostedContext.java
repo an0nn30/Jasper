@@ -241,8 +241,9 @@ final class HostedContext implements PluginContext {
                     requireOpen();
                     URI address = webAddress(uri);
                     // While Jasper is the system's default browser, the system would hand the address back to Jasper, so the
-                    // provided browser has it first, as openInBrowser's (browser plan 4c).
-                    if (host.defaultBrowser.getAsBoolean()) inBrowser(address);
+                    // provided browser has it first, as openInBrowser's (browser plan 4c); never the provider's own, its
+                    // hand-back (ruling Q9).
+                    if (host.defaultBrowser.getAsBoolean() && !host.webBrowsers.providedBy(id)) inBrowser(address);
                     else systemBrowser(address);
                 }
                 @Override public void openInBrowser(URI uri) {

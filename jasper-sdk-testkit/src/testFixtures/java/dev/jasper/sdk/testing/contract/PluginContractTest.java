@@ -4677,6 +4677,29 @@ public abstract class PluginContractTest {
     }
 
     /**
+     * Browser plan 4c Task 3 (SDK 0.28.0, ruling Q9): the plugin that provides the browser hands a link back with
+     * {@code browse}, so its own {@code browse} never comes back to its browser, even while Jasper is the default: it
+     * goes to the system-browser fallback.
+     */
+    @Test void theProvidersOwnBrowseNeverComesBackToItsBrowser() {
+        UUID window = h.addTerminalWindow();
+        h.activateTerminalWindow(window);
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        h.ui(() -> a.get().platform().browser(recordingBrowser(calls, true)));
+        h.defaultBrowser(true);
+        h.ui(() -> a.get().platform().browse(PAGE));
+        h.flush();
+        for (int i = 0; i < 1000 && h.browsed().isEmpty(); i++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        assertThat(h.browsed()).containsExactly(PAGE);
+        h.flush();
+        assertThat(calls).as("its browser never hears its own hand-back").isEmpty();
+    }
+
+    /**
      * Browser plan 4c Task 2 (SDK 0.28.0): {@code isDefaultBrowser} gives the host's last answer to whether Jasper is the
      * system's default browser, no until the host has one, and a provided browser reads it as it decides a link.
      */

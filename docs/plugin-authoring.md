@@ -1116,8 +1116,9 @@ one.
   the active window, then the system browser, as `browse` opens it.
 - `context.platform().browse(uri)` opens an `http` or `https` address in the system browser, in the background, even
   when a plugin provides the web browser. While Jasper is itself the system's default browser, which would hand the
-  address back, it opens as `openInBrowser` opens it. Any other address throws `IllegalArgumentException` (from
-  `openInBrowser` too), and a failure is posted as "Could not open a web address".
+  address back, it opens as `openInBrowser` opens it, unless the calling plugin provides the web browser: its own
+  `browse`, such as a link it hands back, never comes back to it, and Jasper opens nothing. Any other address throws
+  `IllegalArgumentException` (from `openInBrowser` too), and a failure is posted as "Could not open a web address".
 - `openInEditor`, `openInBrowser` and `browse` work from any thread; `openFile` only on the UI thread.
 
 ## The clipboard
@@ -1183,8 +1184,9 @@ terminal pane, with the path's line and the clicked window. The Editor takes thi
 
 `context.platform().browser(webBrowser)` (`browser.provide`) makes the plugin the web browser Jasper opens web
 addresses with: an `http` or `https` link Cmd-clicked (Ctrl-clicked on Linux and Windows) in any terminal pane, with the
-clicked window; every plugin's `openInBrowser` and Jasper's own web links (Settings' Help button, the Licenses
-window's and the plugin manager's homepages), with the active window; `jasper <address>…`, with the window of the pane
+clicked window; every plugin's `openInBrowser`, another plugin's `browse` while Jasper is the system's default browser,
+and Jasper's own web links (Settings' Help button, the Licenses window's and the plugin manager's homepages), with the
+active window; `jasper <address>…`, with the window of the pane
 it ran in ([command line](command-line.md#the-jasper-command)). A local file the user clicked in a terminal arrives too,
 as a `file:` link.
 
@@ -1203,7 +1205,7 @@ as a `file:` link.
 - A clicked link comes from program output, and an OSC 8 link's address can differ from the text shown, so treat the
   address as untrusted input and show it before acting on it.
 - `ftp` and `mailto` links always go to the system browser, and so does `Platform.browse` while Jasper is not the
-  system's default browser.
+  system's default browser, and the browser plugin's own `Platform.browse` always.
 - `context.platform().isDefaultBrowser()`, on the UI thread, tells whether Jasper is the system's default web browser,
   as Jasper last checked. Jasper checks at start-up and again from time to time, such as when one of its windows
   activates, so the answer can lag a change the user just made. It is false until a check has answered, and a check

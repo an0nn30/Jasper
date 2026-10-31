@@ -146,8 +146,9 @@ public final class FakePluginContext implements PluginContext {
                 @Override public void browse(java.net.URI uri) {
                     requireOpen();
                     java.net.URI address = webAddress(uri);
-                    // As the application: while Jasper is the default browser, the provided browser first, as openInBrowser's.
-                    if (host.defaultBrowser) inBrowser(address);
+                    // As the application: while Jasper is the default browser, the provided browser first, as openInBrowser's;
+                    // never the provider's own, its hand-back.
+                    if (host.defaultBrowser && !host.providesBrowser(info.id())) inBrowser(address);
                     else host.browsed.add(address);
                 }
                 @Override public void openInBrowser(java.net.URI uri) {

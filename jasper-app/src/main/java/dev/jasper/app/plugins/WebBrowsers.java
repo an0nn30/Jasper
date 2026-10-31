@@ -69,6 +69,17 @@ final class WebBrowsers {
     boolean provided() { return holder != null; }
 
     /**
+     * Whether {@code pluginId} provides the browser now. Any thread.
+     *
+     * @param pluginId a plugin
+     * @return true from its registration until that ends
+     */
+    boolean providedBy(String pluginId) {
+        Holder current = holder;
+        return current != null && current.pluginId().equals(pluginId);
+    }
+
+    /**
      * Asks the provided browser to open a link. UI thread.
      *
      * @param address the link's address, as {@link WebLink#address()}

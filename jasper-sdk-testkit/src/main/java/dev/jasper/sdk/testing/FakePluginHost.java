@@ -2051,9 +2051,11 @@ public final class FakePluginHost implements AutoCloseable {
     public List<Path> openedFiles() { return List.copyOf(openedFiles); }
 
     /**
-     * Every web address that reached the system browser: each {@code Platform.browse}, and each
-     * {@code Platform.openInBrowser} that no provided browser opened. While {@link #setDefaultBrowser} says Jasper is the
-     * default, a {@code Platform.browse} reaches it only when no provided browser opened it, as {@code openInBrowser}'s.
+     * Every web address handed to the system browser, or, while {@link #setDefaultBrowser} says Jasper is the default, to
+     * the system-browser fallback, where Jasper opens nothing: each {@code Platform.browse}, and each
+     * {@code Platform.openInBrowser} that no provided browser opened. While Jasper is the default, another plugin's
+     * {@code Platform.browse} is here only when no provided browser opened it, as {@code openInBrowser}'s; the providing
+     * plugin's own always is.
      *
      * @return the addresses in request order
      */
@@ -2512,6 +2514,12 @@ public final class FakePluginHost implements AutoCloseable {
     private volatile ProvidedBrowser providedBrowser;
 
     /** Makes a plugin's browser the one web addresses open with, under the application's one-at-a-time rule. */
+    /** Whether {@code pluginId} provides the browser now. */
+    boolean providesBrowser(String pluginId) {
+        ProvidedBrowser current = providedBrowser;
+        return current != null && current.context().plugin().id().equals(pluginId);
+    }
+
     Subscription provideBrowser(FakePluginContext context, dev.jasper.sdk.ui.WebBrowser browser) {
         String pluginId = context.plugin().id();
         ProvidedBrowser current = providedBrowser;
@@ -2588,7 +2596,8 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * Sets what {@code Platform.isDefaultBrowser} reports: whether Jasper is the system's default browser, as the
-     * application's last check answered; while it is, {@code Platform.browse} asks the provided browser first. Until then
+     * application's last check answered; while it is, another plugin's {@code Platform.browse} asks the provided browser
+     * first. Until then
      * it reports false. A value that differs from the current one runs
      * every {@code Platform.onDefaultBrowserChanged} handler with it at once, on the EDT, after the getter has changed,
      * as Jasper does when a check changes its answer; a handler that throws is recorded in {@link #failures()} without

@@ -1763,7 +1763,7 @@ Cmd-click on its path in a terminal does, without the web browser role, and neve
 <a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>Platform.openInBrowser(URI)</code></a> opens a link the
 user asked for, offering it to the web browser role first, while <a href="#dev.jasper.sdk.ui.Platform.browse(URI)"><code>Platform.browse(URI)</code></a> uses the system
 browser, except while Jasper is itself the system's default browser, when it opens as
-<a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>Platform.openInBrowser(URI)</code></a> does. Their failures are posted in the plugin's default notification group, never thrown.
+<a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>Platform.openInBrowser(URI)</code></a> does unless the calling plugin provides the browser role. Their failures are posted in the plugin's default notification group, never thrown.
 <a href="#dev.jasper.sdk.ui.Platform.isDefaultBrowser()"><code>Platform.isDefaultBrowser()</code></a> tells whether Jasper is the system's default web browser, as Jasper last checked,
 and <a href="#dev.jasper.sdk.ui.Platform.onDefaultBrowserChanged(Consumer)"><code>Platform.onDefaultBrowserChanged(Consumer)</code></a> hears each change of that answer.</p>
 </section>
@@ -9850,8 +9850,9 @@ are posted in the plugin's notification group, never thrown.</p></div>
 <div class="doc"><p>Opens a web address in the system browser, without asking the web browser a plugin provides
 (<a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>openInBrowser</code></a> asks that one first, with a <a href="#dev.jasper.sdk.ui.WebLink"><code>WebLink</code></a>). While Jasper is itself the system's default
 browser (<a href="#dev.jasper.sdk.ui.Platform.isDefaultBrowser()"><code>isDefaultBrowser</code></a>), the system would hand the address back to Jasper, so it opens as
-<a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>openInBrowser</code></a> opens it. Runs in the background; a failure is posted in the plugin's notification group,
-never thrown.</p></div>
+<a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>openInBrowser</code></a> opens it, unless this plugin provides the browser (<a href="#dev.jasper.sdk.ui.Platform.browser(WebBrowser)"><code>browser</code></a>): its own
+<code>browse</code>, such as a link it hands back, never comes back to it, and Jasper opens nothing. Runs in the
+background; a failure is posted in the plugin's notification group, never thrown.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>uri</code> an absolute <code>http</code> or <code>https</code> address</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalArgumentException.html">IllegalArgumentException</a> when the address is not an absolute http or https one</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.ui.Platform.openInBrowser(URI)">
@@ -9927,14 +9928,14 @@ the plugin.</p></div>
 <p class="badges"><span class="since">since 0.23.0</span></p>
 <div class="doc"><p>Makes this plugin the web browser Jasper opens web addresses with: an <code>http</code> or <code>https</code> link
 Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, with that window, its placement and its OSC 8
-<code>target=</code> name; every plugin's <a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>openInBrowser</code></a> and Jasper's own web links, such as Settings' Help,
-with the active window; and the addresses given to the <code>jasper</code> command, with the window of the pane it ran
-in, go to <code>browser</code> first, on the UI thread, as a <a href="#dev.jasper.sdk.ui.WebLink"><code>WebLink</code></a> that says who asked
+<code>target=</code> name; every plugin's <a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>openInBrowser</code></a>, another plugin's <a href="#dev.jasper.sdk.ui.Platform.browse(URI)"><code>browse</code></a> while Jasper is the
+system's default browser, and Jasper's own web links, such as Settings' Help, with the active window; and the
+addresses given to the <code>jasper</code> command, with the window of the pane it ran in, go to <code>browser</code> first, on the UI thread, as a <a href="#dev.jasper.sdk.ui.WebLink"><code>WebLink</code></a> that says who asked
 (<a href="#dev.jasper.sdk.ui.LinkOrigin"><code>LinkOrigin</code></a>). A local file the user clicked in a terminal also arrives, as a <code>file:</code> link.
 A clicked link comes from program output, and an OSC 8 link's address can differ from the text shown, so a browser
 should treat the address as untrusted input and show it before acting on it. Other
 schemes, such as <code>mailto</code>, always go to the system browser, and so does <a href="#dev.jasper.sdk.ui.Platform.browse(URI)"><code>browse</code></a> while Jasper is not
-the system's default browser. One at a time: a bundled
+the system's default browser, and this plugin's own <code>browse</code> always. One at a time: a bundled
 plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
 plugin's own included, throws. When the browser returns false or throws, and when no plugin provides one, the
 system browser opens an <code>http</code> or <code>https</code> address and the Default editor a <code>file:</code> one. While
@@ -12758,9 +12759,11 @@ those no provided editor opened.</p></div>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.browsed()">
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.browsed()" aria-label="Link to this member">#</a><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/List.html" title="java.util.List">List</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/net/URI.html" title="java.net.URI">URI</a>&gt; <b>browsed</b>()</code></pre>
-<div class="doc"><p>Every web address that reached the system browser: each <code>Platform.browse</code>, and each
-<code>Platform.openInBrowser</code> that no provided browser opened. While <a href="#dev.jasper.sdk.testing.FakePluginHost.setDefaultBrowser(boolean)"><code>setDefaultBrowser</code></a> says Jasper is the
-default, a <code>Platform.browse</code> reaches it only when no provided browser opened it, as <code>openInBrowser</code>'s.</p></div>
+<div class="doc"><p>Every web address handed to the system browser, or, while <a href="#dev.jasper.sdk.testing.FakePluginHost.setDefaultBrowser(boolean)"><code>setDefaultBrowser</code></a> says Jasper is the default, to
+the system-browser fallback, where Jasper opens nothing: each <code>Platform.browse</code>, and each
+<code>Platform.openInBrowser</code> that no provided browser opened. While Jasper is the default, another plugin's
+<code>Platform.browse</code> is here only when no provided browser opened it, as <code>openInBrowser</code>'s; the providing
+plugin's own always is.</p></div>
 <dl class="tags"><dt>Returns</dt><dd>the addresses in request order</dd></dl>
 </div>
 <div class="member" id="dev.jasper.sdk.testing.FakePluginHost.clipboard()">
@@ -12979,7 +12982,8 @@ client; until then it is empty.</p></div>
 <pre class="sig"><a class="self" href="#dev.jasper.sdk.testing.FakePluginHost.setDefaultBrowser(boolean)" aria-label="Link to this member">#</a><code><span class="kw">void</span> <b>setDefaultBrowser</b>(<span class="kw">boolean</span> jasper)</code></pre>
 <p class="badges"><span class="since">since 0.28.0</span></p>
 <div class="doc"><p>Sets what <code>Platform.isDefaultBrowser</code> reports: whether Jasper is the system's default browser, as the
-application's last check answered; while it is, <code>Platform.browse</code> asks the provided browser first. Until then
+application's last check answered; while it is, another plugin's <code>Platform.browse</code> asks the provided browser
+first. Until then
 it reports false. A value that differs from the current one runs
 every <code>Platform.onDefaultBrowserChanged</code> handler with it at once, on the EDT, after the getter has changed,
 as Jasper does when a check changes its answer; a handler that throws is recorded in <a href="#dev.jasper.sdk.testing.FakePluginHost.failures()"><code>failures()</code></a> without

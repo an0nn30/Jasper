@@ -5,6 +5,7 @@ import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.startup.StartupTrace;
+import dev.jasper.app.testsupport.LogRecorder;
 import dev.jasper.app.testsupport.PluginJars;
 import dev.jasper.app.workspace.LinkClick;
 import dev.jasper.terminal.view.TerminalLink;
@@ -847,7 +848,10 @@ class JasperApplicationPluginsTest {
         ApplicationPluginCleanup.await(application[0]);
     }
 
-    /** Browser plan 4c Task 3: at most 32 web addresses from outside wait for the plugins; the 33rd is dropped. */
+    /**
+     * Browser plan 4c Task 3: at most 32 web addresses from outside wait for the plugins; the 33rd is dropped, its call
+     * says so on its error stream and exits with 1, and the log says so without the address.
+     */
     @Test void theThirtyThirdWebAddressWaitingForThePluginsIsDropped() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
         Path dev = home.resolve("web-plugin");
@@ -861,11 +865,21 @@ class JasperApplicationPluginsTest {
             application[0].systemBrowser = address -> system.add(address.toString());
         });
         List<String> addresses = java.util.stream.IntStream.rangeClosed(1, 33).mapToObj(n -> "https://example.com/" + n).toList();
-        var first = dispatch(application[0], addresses.subList(0, 30).toArray(String[]::new));
-        var second = dispatch(application[0], addresses.subList(30, 33).toArray(String[]::new));
+        var firstErr = new StringBuffer();
+        var secondErr = new StringBuffer();
+        java.util.concurrent.CompletableFuture<Integer> first;
+        java.util.concurrent.CompletableFuture<Integer> second;
+        try (var log = LogRecorder.of(ExternalAddresses.class.getName())) {
+            first = dispatch(application[0], firstErr, addresses.subList(0, 30).toArray(String[]::new));
+            second = dispatch(application[0], secondErr, addresses.subList(30, 33).toArray(String[]::new));
+            edt(() -> { });
+            assertThat(log.warnings()).containsExactly("A web address from outside was dropped: 32 were already waiting for Jasper's browser");
+        }
         edt(() -> application[0].startPlugins(null, dev, false, dirs));
         assertThat(first.get(5, TimeUnit.SECONDS)).isZero();
-        assertThat(second.get(5, TimeUnit.SECONDS)).isZero();
+        assertThat(second.get(5, TimeUnit.SECONDS)).as("one of its addresses was dropped").isOne();
+        assertThat(firstErr).isEmpty();
+        assertThat(secondErr).hasToString("jasper: too many web addresses are waiting; https://example.com/33 was not opened\n");
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
             .containsExactlyElementsOf(addresses.subList(0, 32).stream().map(address -> address + "|EXTERNAL|-").toList());
         assertThat(system).as("the dropped address goes nowhere").isEmpty();
@@ -892,9 +906,9 @@ class JasperApplicationPluginsTest {
             application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
             application[0].desktop = address -> desktop.add(address.toString());
             application[0].clipboard = new dev.jasper.app.platform.HostClipboard(() -> copied, (delay, task) -> () -> { });
-            // Made here, so its 3 s bound on the first answer starts as late as it can: the check below answers well before.
-            application[0].defaultBrowser(new dev.jasper.app.platform.DefaultBrowser(checks::add,
-                new dev.jasper.app.testsupport.MutableClock(), () -> Optional.of(true)));
+            // A bound the test never reaches: only the held-back check below gives the first answer.
+            application[0].defaultBrowser(dev.jasper.app.platform.DefaultBrowserTestAccess.withFirstAnswerWithin(checks::add,
+                new dev.jasper.app.testsupport.MutableClock(), () -> Optional.of(true), java.time.Duration.ofHours(1)));
             application[0].startPlugins(null, null, false, dirs);
         });
         var call = dispatch(application[0], "https://example.com/sign-in");
@@ -923,9 +937,12 @@ class JasperApplicationPluginsTest {
         edt(() -> notices(application[0]).getFirst().request().actions().get(1).run().run());
         assertThat(copied.getData(java.awt.datatransfer.DataFlavor.stringFlavor)).as("the newest address")
             .isEqualTo(dev.jasper.app.settingsui.SettingsDialog.HELP_URL + "keybindings");
-        edt(() -> notices(application[0]).getFirst().request().actions().get(0).run().run());
-        dev.jasper.app.workspace.DesktopTestSupport.until(() -> application[0].notificationCenter().history().stream()
-            .anyMatch(notice -> notice.request().title().equals("Could not turn on the Browser")));
+        try (var log = LogRecorder.of(PluginRuntime.class.getName())) {
+            edt(() -> notices(application[0]).getFirst().request().actions().get(0).run().run());
+            dev.jasper.app.workspace.DesktopTestSupport.until(() -> application[0].notificationCenter().history().stream()
+                .anyMatch(notice -> notice.request().title().equals("Could not turn on the Browser")));
+            assertThat(log.warnings()).containsExactly("A plugin manager operation failed");
+        }
         assertThat(notices(application[0]).getFirst().request().content()).isEqualTo("No such plugin: dev.jasper.browser");
         assertThat(desktop).as("only the mailto link").containsExactly("mailto:someone@example.com");
         edt(application[0]::quit);
@@ -964,9 +981,9 @@ class JasperApplicationPluginsTest {
 
     /**
      * A web browser that appends {@code <address>|<origin>|<window id or ->} to {@code data/opened}, and declines
-     * {@code /declined}, and that asks {@code Platform.browse} for {@code /browsed} and {@code /declined} as it starts.
+     * {@code /declined}, and that hands {@code /own} back with {@code Platform.browse} as it starts.
      */
-    private static final String BROWSING_BROWSER = """
+    private static final String HANDING_BACK_BROWSER = """
         package fix.web;
         import dev.jasper.sdk.plugin.Plugin;
         import dev.jasper.sdk.plugin.PluginContext;
@@ -983,6 +1000,18 @@ class JasperApplicationPluginsTest {
                     } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
                     return !link.address().getPath().equals("/declined");
                 });
+                context.platform().browse(java.net.URI.create("https://example.com/own"));
+            }
+        }
+        """;
+
+    /** A plugin that asks {@code Platform.browse} for {@code /browsed} and {@code /declined} as it starts. */
+    private static final String BROWSING = """
+        package fix.browsing;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) {
                 context.platform().browse(java.net.URI.create("https://example.com/browsed"));
                 context.platform().browse(java.net.URI.create("https://example.com/declined"));
             }
@@ -990,32 +1019,121 @@ class JasperApplicationPluginsTest {
         """;
 
     /**
-     * Browser plan 4c Task 3, ruling Q2: while Jasper is the system's default browser, which would hand an address back,
-     * {@code Platform.browse} (the Browser's Use Default Browser among its callers) reaches the provided browser as a
-     * click from the active window, and an address it declines never reaches the system browser.
+     * Browser plan 4c Task 3, rulings Q2 and Q9: while Jasper is the system's default browser, which would hand an address
+     * back, another plugin's {@code Platform.browse} reaches the provided browser as a click from the active window; the
+     * provider's own {@code browse}, its hand-back, never comes back to it; and neither one the browser declines nor that
+     * hand-back reaches the system browser or posts a notice.
      */
-    @Test void whileJasperIsTheDefaultPlatformBrowseReachesTheProvidedBrowser() throws Exception {
+    @Test void whileJasperIsTheDefaultAnotherPluginsBrowseReachesTheProvidedBrowserAndItsOwnNever() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
         Path dev = home.resolve("web-plugin");
         PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
-            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", BROWSING_BROWSER), List.of());
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", HANDING_BACK_BROWSER), List.of());
+        // The other plugin is bundled: plugins beside the application jar.
+        Path code = java.nio.file.Files.createDirectories(home.resolve("app")).resolve("jasper-app.jar");
+        java.nio.file.Files.writeString(code, "");
+        PluginJars.build(home.resolve("app/plugins/dev.example.browsing"), "browsing.jar",
+            PluginJars.descriptor("dev.example.browsing", "1.0.0", "fix.browsing.Main"), Map.of("fix.browsing.Main", BROWSING), List.of());
         var desktop = new CopyOnWriteArrayList<String>();
         var check = new dev.jasper.app.platform.DefaultBrowser(Runnable::run, new dev.jasper.app.testsupport.MutableClock(), () -> Optional.of(true));
         var terminated = new CountDownLatch(1);
         JasperApplication[] application = new JasperApplication[1];
-        edt(() -> {
-            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
-            application[0].desktop = address -> desktop.add(address.toString());
-            application[0].defaultBrowser(check);
-            application[0].startPlugins(null, dev, false, dirs);
-        });
-        assertThat(awaitLines(dirs.plugins().resolve("dev.example.web/data/opened"), 2))
-            .containsExactly("https://example.com/browsed|CLICK|-", "https://example.com/declined|CLICK|-");
+        try (var log = LogRecorder.of(ExternalAddresses.class.getName())) {
+            edt(() -> {
+                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+                application[0].desktop = address -> desktop.add(address.toString());
+                application[0].defaultBrowser(check);
+                application[0].startPlugins(code, dev, false, dirs);
+            });
+            assertThat(application[0].pluginRuntime().pluginNames()).containsKeys("dev.example.web", "dev.example.browsing");
+            assertThat(awaitLines(dirs.plugins().resolve("dev.example.web/data/opened"), 2)).as("never the provider's own")
+                .containsExactly("https://example.com/browsed|CLICK|-", "https://example.com/declined|CLICK|-");
+            // The declined address and the hand-back each reach the fallback, which opens nothing.
+            awaitRecords(log, 2);
+            assertThat(log.records()).extracting(java.util.logging.LogRecord::getMessage).containsOnly(OPENS_NOTHING);
+        }
+        assertThat(notices(application[0])).isEmpty();
+        assertThat(desktop).isEmpty();
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         ApplicationPluginCleanup.await(application[0]);
         edt(() -> { });
-        assertThat(desktop).as("the declined address goes nowhere").isEmpty();
+        assertThat(desktop).as("neither one goes anywhere").isEmpty();
+    }
+
+    /**
+     * Browser plan 4c Task 3, ruling Q1: while Jasper is the system's default browser, a clicked link and a
+     * {@code jasper <url>} that the provided browser declines (as the Browser does once Chromium could not start) open
+     * nothing, post no notice, and never reach the system browser.
+     */
+    @Test void whileJasperIsTheDefaultALinkTheProvidedBrowserDeclinesOpensNothing() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("web-plugin");
+        PluginJars.build(dev, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        var desktop = new CopyOnWriteArrayList<String>();
+        var check = new dev.jasper.app.platform.DefaultBrowser(Runnable::run, new dev.jasper.app.testsupport.MutableClock(), () -> Optional.of(true));
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        java.util.UUID window = java.util.UUID.randomUUID();
+        try (var log = LogRecorder.of(ExternalAddresses.class.getName())) {
+            edt(() -> {
+                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+                application[0].desktop = address -> desktop.add(address.toString());
+                application[0].defaultBrowser(check);
+                application[0].startPlugins(null, dev, false, dirs);
+                application[0].openLink(clicked("https://example.com/declined"), window);
+            });
+            assertThat(external(application[0], "https://example.com/declined")).isZero();
+            assertThat(log.records()).extracting(java.util.logging.LogRecord::getMessage).containsExactly(OPENS_NOTHING, OPENS_NOTHING);
+        }
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened")))
+            .containsExactly("https://example.com/declined|CLICK|-", "https://example.com/declined|EXTERNAL|-");
+        assertThat(notices(application[0])).isEmpty();
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+        assertThat(desktop).isEmpty();
+    }
+
+    /**
+     * Browser plan 4c Task 3, ruling Q10: a web address that comes back from outside within 10 seconds of Jasper handing
+     * it to the system browser, as when Jasper is the default without the check seeing it, never goes back to the system:
+     * with no browser provided it posts the notice. Another address still goes to the system browser.
+     */
+    @Test void aWebAddressThatComesBackFromTheSystemBrowserIsNeverHandedToItAgain() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var desktop = new CopyOnWriteArrayList<String>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        java.util.UUID window = java.util.UUID.randomUUID();
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].desktop = address -> desktop.add(address.toString());
+            application[0].startPlugins(null, null, false, dirs);
+            application[0].openLink(clicked("https://example.com/loop"), window);
+        });
+        awaitCalls(desktop, 1);
+        // The system hands it back: Jasper is its default browser, which the check did not see.
+        assertThat(external(application[0], "https://example.com/loop")).isZero();
+        assertThat(notices(application[0])).extracting(notice -> notice.request().title()).containsExactly("Web links can’t open in Jasper");
+        assertThat(external(application[0], "https://example.com/other")).isZero();
+        awaitCalls(desktop, 2);
+        assertThat(desktop).containsExactlyInAnyOrder("https://example.com/loop", "https://example.com/other");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+        assertThat(desktop).hasSize(2);
+    }
+
+    /** What the fallback logs for an address the provided browser had and did not open while Jasper is the default. */
+    private static final String OPENS_NOTHING =
+        "Jasper's browser did not open a web address, and the system would hand it back, so nothing opens";
+
+    /** Waits up to ten seconds for {@code log} to hold {@code count} records. */
+    private static void awaitRecords(LogRecorder log, int count) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline && log.records().size() < count) Thread.sleep(10);
     }
 
     /**
@@ -1058,8 +1176,13 @@ class JasperApplicationPluginsTest {
 
     /** Dispatches {@code jasper <addresses>} from no pane; the answer comes once they have been handed on. */
     private java.util.concurrent.CompletableFuture<Integer> dispatch(JasperApplication application, String... addresses) {
+        return dispatch(application, new StringBuffer(), addresses);
+    }
+
+    /** As above, its error stream written to {@code err}. */
+    private java.util.concurrent.CompletableFuture<Integer> dispatch(JasperApplication application, StringBuffer err, String... addresses) {
         return application.commands().dispatch(new dev.jasper.app.commandline.Invocation(List.of(addresses), home, Optional.empty(),
-            text -> { }, text -> { })).toCompletableFuture();
+            text -> { }, err::append)).toCompletableFuture();
     }
 
     /** As {@link #dispatch}, waiting for the exit status. */
