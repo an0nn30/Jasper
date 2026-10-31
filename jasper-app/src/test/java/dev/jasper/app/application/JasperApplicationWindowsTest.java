@@ -186,7 +186,7 @@ class JasperApplicationWindowsTest {
         var checks = new AtomicInteger();
         try {
             edt(() -> {
-                application.defaultBrowser(new DefaultBrowser(Runnable::run, clock, () -> checks.incrementAndGet() > 0));
+                application.defaultBrowser(new DefaultBrowser(Runnable::run, clock, () -> java.util.Optional.of(checks.incrementAndGet() > 0)));
                 assertThat(checks).as("asked at start-up").hasValue(1);
                 application.residency(true);
                 application.open(List.of(), JasperApplication.HANDOFF);

@@ -219,7 +219,7 @@ public final class JasperApplication {
     /** Test seam: the desktop's browser, which {@code openInSystemBrowser} calls off the EDT. Production is {@link dev.jasper.app.platform.Browser#open}. */
     Consumer<java.net.URI> desktop = dev.jasper.app.platform.Browser::open;
     /** Whether Jasper is the system's default browser; never, until {@link #defaultBrowser(DefaultBrowser)} asks the system. */
-    private volatile DefaultBrowser defaultBrowser = new DefaultBrowser(Runnable::run, java.time.Clock.systemUTC(), () -> false);
+    private volatile DefaultBrowser defaultBrowser = new DefaultBrowser(Runnable::run, java.time.Clock.systemUTC(), () -> Optional.of(false));
     /**
      * Test seam: whether each window's detached tool windows get native windows ({@link DetachedFrame}): only where
      * windows can be made, as nothing native is made headless.
