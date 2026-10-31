@@ -33,6 +33,8 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     // Chromium's drag operations (cef_drag_operations_mask_t) and event flags (cef_event_flags_t).
     private static final int COPY = 1, LINK = 2, MOVE = 16;
     private static final int SHIFT = 1 << 1, CONTROL = 1 << 2;
+    // Chromium's tolerance for two zoom levels being the same (blink::ZoomValuesEqual).
+    private static final double SAME_ZOOM = 0.001;
     private final PageView view;
     // Set before the native browser is made, so before Chromium calls back for this browser.
     private volatile Page owner;
@@ -98,6 +100,19 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
      */
     public PageView view() {
         return view;
+    }
+
+    /**
+     * Shows the page at its own zoom again, as Chromium shows the zoom it keeps for the host of a document a navigation
+     * commits: at once on Chromium's thread, the thread its handlers are told on, so the document draws at the page's
+     * zoom from its first frame. A page already at its zoom is left alone, so a page that rewrites its address often
+     * does not set its host's zoom each time.
+     */
+    void keepZoom() {
+        Page page = owner;
+        if (page == null) return;
+        double level = page.zoomLevel();
+        if (Math.abs(getZoomLevel() - level) > SAME_ZOOM) setZoomLevel(level);
     }
 
     /** Makes {@code page} the one the client's handlers send this browser's callbacks to. Before the native browser exists. */

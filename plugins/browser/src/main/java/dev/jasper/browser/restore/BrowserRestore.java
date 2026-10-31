@@ -7,17 +7,18 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 
 /**
- * What a browser item saves with Jasper's workspace, and what it comes back from (spec section 16): its URL and the OSC 8
- * target it was opened for. It never saves form contents, credentials or cookies. {@code workspace.toml} is plain text,
- * so what comes back from it is checked as untrusted input.
+ * What a browser item saves with Jasper's workspace, and what it comes back from (spec section 16): its URL, its zoom
+ * and the OSC 8 target it was opened for. It never saves form contents, credentials or cookies. {@code workspace.toml}
+ * is plain text, so what comes back from it is checked as untrusted input.
  */
 public final class BrowserRestore {
     /** The restorer kind of a browser item. */
     public static final String KIND = "dev.jasper.browser.page";
-    private static final String URL = "url", TARGET = "target";
+    private static final String URL = "url", TARGET = "target", ZOOM = "zoom";
     // The schemes the address field loads as typed (AddressInput, which this package cannot use: the item package uses
     // this one); BrowserRestoreTest holds the two to the same set.
     private static final Set<String> SCHEMES = Set.of("http", "https", "file", "about", "jasper-about");
@@ -25,31 +26,39 @@ public final class BrowserRestore {
     private static final Set<String> UNSAVED = Set.of("data", "blob");
     // WebLink's rule for a target.
     private static final int MAX_TARGET = 256;
+    // The item package's Zoom range, which this package cannot use; BrowserRestoreTest holds the two to the same range.
+    private static final int MIN_ZOOM = 5, MAX_ZOOM = 500;
 
     private BrowserRestore() { }
 
     /**
-     * The restore state of an item at {@code url}, opened for {@code target}: the keys {@code url} and {@code target},
-     * each when present, within {@link RestoreState#MAX_CHARACTERS} counted over keys and values.
+     * The restore state of an item at {@code url}, opened for {@code target}, with a zoom of its own or none: the keys
+     * {@code url}, {@code target} and {@code zoom}, each when present, within {@link RestoreState#MAX_CHARACTERS} counted
+     * over keys and values.
      * <ul>
      *   <li>A URL is saved without its user name and password ({@link #withoutUserInfo}).</li>
-     *   <li>A URL that would pass that budget is saved without its query and fragment; when it still would, no
-     *       {@code url} is saved.</li>
+     *   <li>A URL that would pass that budget beside the target and the zoom, which always fit, is saved without its
+     *       query and fragment; when it still would, no {@code url} is saved.</li>
      *   <li>A {@code data:} or {@code blob:} page saves no {@code url}.</li>
      *   <li>Jasper's own {@code jasper-about:} pages save their URL.</li>
      *   <li>A target that is not 1 to 256 characters without a control character, as WebLink allows, is not saved.</li>
      * </ul>
-     * An item that saves no {@code url} comes back at the start page.
+     * An item that saves no {@code url} comes back at the start page, and one that saves no {@code zoom} at Page zoom.
      *
      * @param url where the item is, or what it loads first
      * @param target the OSC 8 target it was opened for, or empty
+     * @param zoom the item's own zoom, a whole percent from 5 to 500, or empty for none
      * @return the state; always present, as {@code ContentTab.setRestore} takes it
+     * @throws IllegalArgumentException for a zoom outside 5 to 500
      */
-    public static Optional<RestoreState> state(URI url, Optional<String> target) {
+    public static Optional<RestoreState> state(URI url, Optional<String> target, OptionalInt zoom) {
         Objects.requireNonNull(url, "url");
         Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(zoom, "zoom");
+        if (zoom.isPresent() && !validZoom(zoom.getAsInt())) throw new IllegalArgumentException("Not a zoom: " + zoom.getAsInt() + "%");
         var values = new HashMap<String, String>();
         target.filter(BrowserRestore::validTarget).ifPresent(name -> values.put(TARGET, name));
+        zoom.ifPresent(percent -> values.put(ZOOM, Integer.toString(percent)));
         int budget = RestoreState.MAX_CHARACTERS - URL.length()
             - values.entrySet().stream().mapToInt(entry -> entry.getKey().length() + entry.getValue().length()).sum();
         String scheme = url.getScheme() == null ? "" : url.getScheme().toLowerCase(Locale.ROOT);
@@ -110,6 +119,26 @@ public final class BrowserRestore {
      */
     public static Optional<String> target(RestoreState state) {
         return Optional.ofNullable(state.values().get(TARGET)).filter(BrowserRestore::validTarget);
+    }
+
+    /**
+     * The zoom a saved item comes back at: its saved {@code zoom}, a whole percent from 5 to 500 in decimal digits, as
+     * {@link #state} writes it.
+     *
+     * @param state a saved item's restore state
+     * @return the zoom; empty when it saved none, or one that is not such a percent, and the item comes back at Page zoom
+     */
+    public static OptionalInt zoom(RestoreState state) {
+        String saved = state.values().get(ZOOM);
+        // At most three ASCII digits: Integer.parseInt would also take a sign and other scripts' digits.
+        if (saved == null || saved.isEmpty() || saved.length() > 3 || !saved.chars().allMatch(c -> c >= '0' && c <= '9'))
+            return OptionalInt.empty();
+        int percent = Integer.parseInt(saved);
+        return validZoom(percent) ? OptionalInt.of(percent) : OptionalInt.empty();
+    }
+
+    private static boolean validZoom(int percent) {
+        return percent >= MIN_ZOOM && percent <= MAX_ZOOM;
     }
 
     private static boolean parses(String address) {

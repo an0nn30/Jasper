@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.swing.JComponent;
@@ -48,10 +49,13 @@ import javax.swing.JComponent;
  * and Enter with none shown loads what the text resolves to, each then focusing the page. Its content commands
  * {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and {@code find}, {@code find-next} and
  * {@code find-previous}, on the keys of Editor tabs, what Jasper's Find, Find Next and Find Previous run: its
- * {@link BrowserFindBar}, the view's last row. The mouse's back and forward buttons over the page go back and forward,
- * and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's history. It saves its URL and
- * target with Jasper's workspace
- * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
+ * {@link BrowserFindBar}, the view's last row. Its {@code font-bigger}, {@code font-smaller} and {@code font-reset},
+ * what Jasper's Increase, Decrease and Reset Font Size run, as in Editor tabs, zoom the page a {@link Zoom} step up or
+ * down, which the item saves as its own zoom, or back to Page zoom, which leaves it none; Ctrl+wheel over the page steps
+ * the zoom too, unsaved. The mouse's back and forward buttons over the page go back and forward, and an entry chosen from
+ * Back's or Forward's hold menu goes to that entry of the page's history. It saves its URL, its own zoom and its target
+ * with Jasper's workspace ({@link BrowserRestore}): what it loads first until it shows, then where each committed
+ * navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
  * address field, Reload or {@link #load}. UI thread.
@@ -76,19 +80,28 @@ public final class BrowserItem implements AutoCloseable {
     private final UiView view;
     private ContentTab tab;
     private URI url;
+    // Where the item's restore state says it is: what it loads first until it shows, then where its page committed.
+    private URI saved;
+    // The zoom the page shows at, in percent; and the zoom the item saves, the one the user chose, or none for Page zoom.
+    private int zoom;
+    private OptionalInt ownZoom;
     private String title;
     private boolean waiting, asked, closed;
     // Cancels the wait for the typing to pause; and the engine's answer the field waits for, or null.
     private Runnable typingPause = NOTHING;
     private CompletableFuture<List<String>> suggestion;
 
-    private BrowserItem(BrowserItems items, URI url, Optional<String> target, boolean waiting) {
+    private BrowserItem(BrowserItems items, URI url, Optional<String> target, OptionalInt zoom, boolean waiting) {
         this.items = items;
         this.target = target;
         this.url = url;
+        saved = url;
+        ownZoom = zoom;
         this.waiting = waiting;
         page = new Page(url, this::changed, items.favicons());
+        showZoom(zoom.orElseGet(() -> items.settings().pageZoom()));
         page.onNavigationButton(this::navigationButton);
+        page.onMagnify(this::magnify);
         page.onOpenItem(this::openItem);
         page.onCloseItem(this::close);
         page.onShowItem(this::show);
@@ -110,22 +123,26 @@ public final class BrowserItem implements AutoCloseable {
      * @param placement where it opens
      * @param target the OSC 8 target it is for, or empty
      * @param window the window it opens from, or empty for the most recently active one
-     * @return the item
+     * @return the item, at Page zoom
      */
     public static BrowserItem open(BrowserItems items, URI url, TabPlacement placement, Optional<String> target,
                                    Optional<WindowOwner> window) {
-        return open(items, url, placement, target, window, false);
+        return open(items, url, placement, target, window, OptionalInt.empty(), false);
     }
 
-    /** As {@link #open(BrowserItems, URI, TabPlacement, Optional, Optional)}; with {@code waiting}, the item waits. */
+    /**
+     * As {@link #open(BrowserItems, URI, TabPlacement, Optional, Optional)}, at {@code zoom}, a zoom of its own from
+     * {@link Zoom#MIN} to {@link Zoom#MAX}, or empty for Page zoom; with {@code waiting}, the item waits.
+     */
     static BrowserItem open(BrowserItems items, URI url, TabPlacement placement, Optional<String> target,
-                            Optional<WindowOwner> window, boolean waiting) {
+                            Optional<WindowOwner> window, OptionalInt zoom, boolean waiting) {
         Objects.requireNonNull(items, "items");
         Objects.requireNonNull(url, "url");
         Objects.requireNonNull(placement, "placement");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(window, "window");
-        var item = new BrowserItem(items, url, target, waiting);
+        Objects.requireNonNull(zoom, "zoom");
+        var item = new BrowserItem(items, url, target, zoom, waiting);
         item.attach(placement, window);
         return item;
     }
@@ -139,13 +156,16 @@ public final class BrowserItem implements AutoCloseable {
             throw failure;
         }
         tab.setFocusTarget(this::focusContent);
-        // Copy and Paste have no key of their own: Jasper's run them, on the keys the keymap gives those. Find's are the
-        // Editor's, which on macOS are Jasper's own.
+        // Copy, Paste and the font size commands have no key of their own: Jasper's run them, on the keys the keymap gives
+        // those, as in Editor tabs. Find's are the Editor's, which on macOS are Jasper's own.
         tab.setCommands(List.of(new ContentCommand("copy", "Copy", null, true, this::copy),
             new ContentCommand("paste", "Paste", null, true, this::paste),
             new ContentCommand("find", "Find…", BrowserFindBar.findKey(), true, findBar::open),
             new ContentCommand("find-next", "Find Next", BrowserFindBar.findAgainKey(false), true, findBar::next),
-            new ContentCommand("find-previous", "Find Previous", BrowserFindBar.findAgainKey(true), true, findBar::previous)));
+            new ContentCommand("find-previous", "Find Previous", BrowserFindBar.findAgainKey(true), true, findBar::previous),
+            new ContentCommand("font-bigger", "Increase Font Size", null, true, () -> zoomTo(Zoom.step(zoom, 1))),
+            new ContentCommand("font-smaller", "Decrease Font Size", null, true, () -> zoomTo(Zoom.step(zoom, -1))),
+            new ContentCommand("font-reset", "Reset Font Size", null, true, this::resetZoom)));
         tab.onClosed(this::closed);
         // The page's alerts, confirmations and file choosers show over this item's tab, and close with it.
         page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
@@ -192,7 +212,7 @@ public final class BrowserItem implements AutoCloseable {
         toolbar.restore();
         endSuggestions();
         page.load(url);
-        if (!asked && tab != null) tab.setRestore(restore(url));
+        if (!asked && tab != null) save(url);
         endWait();
     }
 
@@ -331,12 +351,44 @@ public final class BrowserItem implements AutoCloseable {
     /** The page's main frame committed a navigation to {@code address}: the item saves it. */
     private void committed(String address) {
         if (closed || tab == null) return;
-        AddressInput.parse(address).ifPresent(committed -> tab.setRestore(restore(committed)));
+        AddressInput.parse(address).ifPresent(this::save);
     }
 
-    /** The item's restore state at {@code at}, for the target it was opened for. */
+    /** The item saves that it is at {@code at}, with its own zoom and the target it was opened for. */
+    private void save(URI at) {
+        saved = at;
+        tab.setRestore(restore(at));
+    }
+
+    /** The item's restore state at {@code at}, with its own zoom, for the target it was opened for. */
     private Optional<RestoreState> restore(URI at) {
-        return BrowserRestore.state(at, target);
+        return BrowserRestore.state(at, target, ownZoom);
+    }
+
+    /** Increase or Decrease Font Size: the page shows at {@code percent}, which the item saves as its own zoom. */
+    private void zoomTo(int percent) {
+        if (closed) return;
+        showZoom(percent);
+        ownZoom = OptionalInt.of(percent);
+        save(saved);
+    }
+
+    /** Reset Font Size: the page shows at Page zoom, and the item saves no zoom of its own, so it comes back at Page zoom. */
+    private void resetZoom() {
+        if (closed) return;
+        showZoom(items.settings().pageZoom());
+        ownZoom = OptionalInt.empty();
+        save(saved);
+    }
+
+    /** Ctrl+wheel over the page: it shows a step bigger, 1, or smaller, -1, which the item does not save. */
+    private void magnify(int direction) {
+        if (!closed) showZoom(Zoom.step(zoom, direction));
+    }
+
+    private void showZoom(int percent) {
+        zoom = percent;
+        page.setZoomLevel(Zoom.cefLevel(percent));
     }
 
     /** The page asks to be shown, as a script's {@code focus()} of its window does: selects the tab and raises its window. */

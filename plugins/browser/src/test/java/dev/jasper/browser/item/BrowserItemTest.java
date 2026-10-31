@@ -322,6 +322,27 @@ class BrowserItemTest {
         } });
     }
 
+    /**
+     * Jasper's Increase, Decrease and Reset Font Size, on the keys the keymap gives them (Cmd+=, Cmd+- and Cmd+0 on macOS,
+     * Ctrl+Shift+=, Ctrl+Shift+- and Ctrl+Shift+0 on Windows and Linux) and from View › Font Size, run a content tab's
+     * {@code font-bigger}, {@code font-smaller} and {@code font-reset}: the item's zoom commands are the Editor's, and
+     * name no key of their own.
+     */
+    @Test void itsZoomCommandsAreTheEditorsFontSizeCommandsWithNoKeyOfTheirOwn() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var item = items(host, page -> { }).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var commands = host.contentCommands(item.tab()).stream().filter(each -> each.id().startsWith("font-")).toList();
+            assertThat(commands).extracting(dev.jasper.sdk.ui.ContentCommand::id).containsExactly("font-bigger", "font-smaller", "font-reset");
+            assertThat(commands).extracting(dev.jasper.sdk.ui.ContentCommand::title)
+                .containsExactly("Increase Font Size", "Decrease Font Size", "Reset Font Size");
+            assertThat(commands).allSatisfy(command -> {
+                assertThat(command.shortcut()).isNull();
+                assertThat(command.enabled()).isTrue();
+            });
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
     @Test void theItemsViewIsTheToolbarAboveTheCanvasAsPreviewContent() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             items(host, page -> { }).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
@@ -885,7 +906,7 @@ class BrowserItemTest {
 
     /** A waiting item at {@code url}, as a restore after a run that ended while Chromium ran opens it. UI thread. */
     private static BrowserItem waiting(BrowserItems items, URI url) {
-        var item = BrowserItem.open(items, url, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), true);
+        var item = BrowserItem.open(items, url, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), java.util.OptionalInt.empty(), true);
         assertThat(item.waiting()).isTrue();
         return item;
     }

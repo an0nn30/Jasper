@@ -128,6 +128,6 @@ class LinkDecisionTest {
     }
 
     private static BrowserSettings settings(LinkOpening links, LocalFileOpening files) {
-        return new BrowserSettings(BrowserSettings.WELCOME, links, files, SearchEngine.GOOGLE, "", "");
+        return new BrowserSettings(BrowserSettings.WELCOME, 100, links, files, SearchEngine.GOOGLE, "", "");
     }
 }

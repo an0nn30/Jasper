@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -92,8 +93,8 @@ class BrowserPluginTest {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
             host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
-            assertThat(host.declared(ID)).containsExactly("start_page", "open_links_from_terminal", "open_local_web_files", "search_engine",
-                "custom_search_url", "custom_suggestions_url");
+            assertThat(host.declared(ID)).containsExactly("start_page", "page_zoom", "open_links_from_terminal", "open_local_web_files",
+                "search_engine", "custom_search_url", "custom_suggestions_url");
             assertThat(host.browserPlugin()).as("Jasper's web browser").contains(ID);
             assertThat(host.invoke(BrowserPlugin.NEW_TAB, window, null)).isTrue();
             var tab = host.contentTabs().getLast();
@@ -138,7 +139,7 @@ class BrowserPluginTest {
             UUID window = host.addTerminalWindow();
             host.setSetting(ID, "start_page", "example.org");
             host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
-            var saved = BrowserRestore.state(URI.create("https://example.com/docs"), Optional.of("docs")).orElseThrow();
+            var saved = BrowserRestore.state(URI.create("https://example.com/docs"), Optional.of("docs"), OptionalInt.empty()).orElseThrow();
             assertThat(host.restoreTab(ID, window, "Docs", saved)).isPresent();
             var docs = host.contentTabs().getLast();
             assertThat(docs.window().id()).isEqualTo(window);
@@ -169,7 +170,8 @@ class BrowserPluginTest {
             host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
             assertThat(marker).as("read once").doesNotExist();
             for (String address : new String[] { "https://example.com/docs", "https://example.org/" })
-                assertThat(host.restoreTab(ID, window, "Saved", BrowserRestore.state(URI.create(address), Optional.empty()).orElseThrow())).isPresent();
+                assertThat(host.restoreTab(ID, window, "Saved",
+                    BrowserRestore.state(URI.create(address), Optional.empty(), OptionalInt.empty()).orElseThrow())).isPresent();
             assertThat(waits(host, "example.com")).isTrue();
             assertThat(waits(host, "example.org")).isTrue();
             assertThat(host.contentPresentation(host.contentTab(ID, "example.com").orElseThrow()).location())

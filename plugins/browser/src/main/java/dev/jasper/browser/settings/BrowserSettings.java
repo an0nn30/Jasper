@@ -2,6 +2,7 @@ package dev.jasper.browser.settings;
 
 import dev.jasper.browser.item.AddressInput;
 import dev.jasper.browser.item.SearchEngine;
+import dev.jasper.browser.item.Zoom;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.settings.Choice;
 import dev.jasper.sdk.settings.PluginSettings;
@@ -19,6 +20,8 @@ import java.util.function.Consumer;
  * Settings › Browser, as one snapshot (spec section 17).
  *
  * @param startPage what a new browser tab, window or pane loads, as typed into its address field
+ * @param pageZoom the zoom, a whole percent from 5 to 500, that a page shows at until it is zoomed, and that Reset Font
+ *     Size returns it to: Page zoom
  * @param links where a web link the user opens in Jasper goes: Open Links From Terminal
  * @param localFiles where a local web file the user opens from a terminal goes: Open Local Web Files
  * @param searchEngine what the address field searches with, and where its suggestions come from: Default Search Engine
@@ -27,12 +30,13 @@ import java.util.function.Consumer;
  * @param customSuggestionsUrl the Custom engine's suggestion URL, an http or https address with {@code %s} for the
  *     typed text; empty for none
  */
-public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpening localFiles, SearchEngine searchEngine,
-                              String customSearchUrl, String customSuggestionsUrl) {
+public record BrowserSettings(String startPage, int pageZoom, LinkOpening links, LocalFileOpening localFiles,
+                              SearchEngine searchEngine, String customSearchUrl, String customSuggestionsUrl) {
     /** Jasper's welcome page, the default start page. */
     public static final String WELCOME = "jasper-about:welcome";
-    static final String START_PAGE = "start_page", LINKS = "open_links_from_terminal", LOCAL_FILES = "open_local_web_files",
-        SEARCH_ENGINE = "search_engine", CUSTOM_SEARCH = "custom_search_url", CUSTOM_SUGGESTIONS = "custom_suggestions_url";
+    static final String START_PAGE = "start_page", PAGE_ZOOM = "page_zoom", LINKS = "open_links_from_terminal",
+        LOCAL_FILES = "open_local_web_files", SEARCH_ENGINE = "search_engine", CUSTOM_SEARCH = "custom_search_url",
+        CUSTOM_SUGGESTIONS = "custom_suggestions_url";
     private static final String GENERAL = "General", LINK_OPENING = "Link Opening", SEARCH = "Search Engine";
     private static final String NO_TEMPLATE = "The URL must start with https:// or http:// and contain " + SearchEngine.TERMS;
 
@@ -70,9 +74,13 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
         }
     }
 
-    /** Requires every value, and each custom URL empty or a {@link SearchEngine#template template}. */
+    /**
+     * Requires every value, Page zoom from {@link Zoom#MIN} to {@link Zoom#MAX}, and each custom URL empty or a
+     * {@link SearchEngine#template template}.
+     */
     public BrowserSettings {
         Objects.requireNonNull(startPage, "startPage");
+        if (pageZoom < Zoom.MIN || pageZoom > Zoom.MAX) throw new IllegalArgumentException("Not a page zoom: " + pageZoom + "%");
         Objects.requireNonNull(links, "links");
         Objects.requireNonNull(localFiles, "localFiles");
         Objects.requireNonNull(searchEngine, "searchEngine");
@@ -82,10 +90,10 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
     }
 
     /**
-     * Declares the Browser's settings, which Settings › Browser shows: Start page under General, Open Links From
-     * Terminal and Open Local Web Files under Link Opening, then Default Search Engine, Custom Search URL and Custom
-     * Search Suggestions URL under Search Engine, each custom URL empty or an http or https address with {@code %s} in it.
-     * UI thread, while the plugin starts.
+     * Declares the Browser's settings, which Settings › Browser shows: Start page and Page zoom, a percent from 5 to 500,
+     * under General, Open Links From Terminal and Open Local Web Files under Link Opening, then Default Search Engine,
+     * Custom Search URL and Custom Search Suggestions URL under Search Engine, each custom URL empty or an http or https
+     * address with {@code %s} in it. UI thread, while the plugin starts.
      *
      * @param settings the plugin's settings
      * @return the declared settings, which read the current values
@@ -96,6 +104,11 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
             .label("Start page").section(GENERAL)
             .description("What a new browser tab, window or pane opens: a web address, or jasper-about:welcome for Jasper's welcome page.")
             .keywords("home", "homepage", "new tab", "browser", "welcome"));
+        Setting<Integer> pageZoom = settings.declare(SettingSpec.of(PAGE_ZOOM, SettingKind.integer(Zoom.MIN, Zoom.MAX), 100)
+            .label("Page zoom").section(GENERAL).unit("%")
+            .description("The zoom web pages show at until you zoom them, and that Reset Font Size returns a page to. Increase "
+                + "and Decrease Font Size zoom a page in steps of 5%, and Jasper keeps that zoom with the page.")
+            .keywords("zoom", "scale", "magnify", "size", "font size", "browser"));
         Setting<LinkOpening> links = settings.declare(SettingSpec.of(LINKS, SettingKind.choice(List.of(
                 choice(LinkOpening.ASK), choice(LinkOpening.BUILT_IN), choice(LinkOpening.DEFAULT_BROWSER))), LinkOpening.ASK)
             .label("Open Links From Terminal").section(LINK_OPENING)
@@ -125,7 +138,7 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
             .description("With Custom: where the address field's search suggestions come from, an http:// or https:// "
                 + "address that answers OpenSearch JSON, with %s where the typed text goes. Empty shows none.")
             .keywords("search", "suggestions", "custom", "url", "opensearch", "autocomplete"));
-        return new Declared(startPage, links, localFiles, engine, customSearch, customSuggestions);
+        return new Declared(startPage, pageZoom, links, localFiles, engine, customSearch, customSuggestions);
     }
 
     /** A custom URL: empty, or a {@link SearchEngine#template template}, an http or https address with {@code %s}. */
@@ -153,14 +166,17 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
     /** The Browser's declared settings. */
     public static final class Declared {
         private final Setting<String> startPage;
+        private final Setting<Integer> pageZoom;
         private final Setting<LinkOpening> links;
         private final Setting<LocalFileOpening> localFiles;
         private final Setting<SearchEngine> engine;
         private final Setting<String> customSearch, customSuggestions;
 
-        private Declared(Setting<String> startPage, Setting<LinkOpening> links, Setting<LocalFileOpening> localFiles,
-                         Setting<SearchEngine> engine, Setting<String> customSearch, Setting<String> customSuggestions) {
+        private Declared(Setting<String> startPage, Setting<Integer> pageZoom, Setting<LinkOpening> links,
+                         Setting<LocalFileOpening> localFiles, Setting<SearchEngine> engine, Setting<String> customSearch,
+                         Setting<String> customSuggestions) {
             this.startPage = startPage;
+            this.pageZoom = pageZoom;
             this.links = links;
             this.localFiles = localFiles;
             this.engine = engine;
@@ -174,7 +190,8 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
          * @return the snapshot
          */
         public BrowserSettings read() {
-            return new BrowserSettings(startPage.get(), links.get(), localFiles.get(), engine.get(), customSearch.get(), customSuggestions.get());
+            return new BrowserSettings(startPage.get(), pageZoom.get(), links.get(), localFiles.get(), engine.get(), customSearch.get(),
+                customSuggestions.get());
         }
 
         /**

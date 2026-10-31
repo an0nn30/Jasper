@@ -1,5 +1,6 @@
 # Settings for the Browser plugin. Change them in Settings > Tools > Browser or here; changes apply to pages and links opened afterwards.
 # start_page = "jasper-about:welcome"   # what a new browser tab, window or pane opens: a web address, or Jasper's welcome page
+# page_zoom = 100                       # the zoom web pages show at until you zoom them, and that Reset Font Size returns to: 5 to 500 (%)
 # open_links_from_terminal = "ask"      # where a web link you open goes: ask, builtin (Jasper's browser) or default (the system's browser)
 # open_local_web_files = "ask"          # where a local web file clicked in a terminal goes: ask, builtin (Jasper's browser) or editor (the Default editor)
 # search_engine = "google"              # what the address field searches with and suggests from: google, duckduckgo, bing, kagi or custom

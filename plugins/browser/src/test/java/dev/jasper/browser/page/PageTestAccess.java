@@ -37,6 +37,16 @@ public final class PageTestAccess {
     }
 
     /**
+     * The zoom the page shows at, which its browser takes once made.
+     *
+     * @param page a page
+     * @return Chromium's zoom level
+     */
+    public static double zoomLevel(Page page) {
+        return page.zoomLevel();
+    }
+
+    /**
      * The page's main frame starts loading {@code url}, as the client's load handler tells it. UI thread.
      *
      * @param page a page

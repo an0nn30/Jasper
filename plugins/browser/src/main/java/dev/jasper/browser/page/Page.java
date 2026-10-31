@@ -5,6 +5,7 @@ import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
+import java.awt.event.HierarchyEvent;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntConsumer;
 import java.util.function.ObjIntConsumer;
 import javax.swing.JComponent;
 import org.cef.CefClient;
@@ -22,10 +24,10 @@ import org.cef.browser.CefFrame;
 
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
- * whether it loads, where it can go and its history, its find in page, and what it is asked to do. Its Chromium
- * browser is made only once {@link #start} asks for it, the first time its item shows; until then the page holds the
- * address it will load and asks nothing of Chromium. Every method runs on the UI thread, and so does every callback it
- * makes. This is the one class that makes a {@link PageView}.
+ * whether it loads, where it can go and its history, its find in page, its zoom, and what it is asked to do. Its
+ * Chromium browser is made only once {@link #start} asks for it, the first time its item shows; until then the page
+ * holds the address it will load and the zoom it will show at, and asks nothing of Chromium. Every method runs on the
+ * UI thread, and so does every callback it makes. This is the one class that makes a {@link PageView}.
  */
 public final class Page implements AutoCloseable {
     private final PageView view = new PageView();
@@ -35,6 +37,7 @@ public final class Page implements AutoCloseable {
     private final ObjIntConsumer<Page> historyJumper;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
+    private final List<IntConsumer> magnifies = new CopyOnWriteArrayList<>();
     private final List<Runnable> closes = new CopyOnWriteArrayList<>();
     private final List<Runnable> navigations = new CopyOnWriteArrayList<>();
     private final List<Runnable> dialogResets = new CopyOnWriteArrayList<>();
@@ -57,6 +60,8 @@ public final class Page implements AutoCloseable {
     private NavigationHistory.History history = NavigationHistory.History.EMPTY;
     private boolean readingHistory, historyStale;
     private boolean loading, canGoBack, canGoForward, started, ready, closed;
+    // The zoom the page shows at, as Chromium's level; read on Chromium's thread as each main-frame navigation commits.
+    private volatile double zoomLevel;
     // The page's find in page, made the first time it is asked for.
     private PageFind find;
     private PageBrowser browser;
@@ -94,6 +99,11 @@ public final class Page implements AutoCloseable {
         this.historyReader = Objects.requireNonNull(historyReader, "historyReader");
         this.historyJumper = Objects.requireNonNull(historyJumper, "historyJumper");
         view.onNavigationButton(this::navigationButton);
+        view.onMagnify(this::magnified);
+        // Chromium keeps a zoom per host, which another page on the same host may have changed meanwhile.
+        view.addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && view.isShowing()) showZoom();
+        });
     }
 
     /**
@@ -174,6 +184,22 @@ public final class Page implements AutoCloseable {
         if (closed || !history.jumpsTo(id)) return;
         navigated();
         historyJumper.accept(this, id);
+    }
+
+    /**
+     * Shows the page at {@code level}, Chromium's zoom level: 0 is 100%, and each level up is 1.2 times the size. Before
+     * the page has its browser, the level its browser takes once made. Chromium keeps one zoom per host, shared by the
+     * pages on it, and shows it as a navigation commits, so the page shows its own again then and each time its canvas
+     * shows. Nothing after {@link #close()}.
+     *
+     * @param level the zoom level
+     * @throws IllegalArgumentException for a level that is not finite
+     */
+    public void setZoomLevel(double level) {
+        if (!Double.isFinite(level)) throw new IllegalArgumentException("Not a zoom level: " + level);
+        if (closed) return;
+        zoomLevel = level;
+        showZoom();
     }
 
     /** Loads the page again. */
@@ -361,6 +387,19 @@ public final class Page implements AutoCloseable {
         Objects.requireNonNull(listener, "listener");
         navigationButtons.add(listener);
         return () -> navigationButtons.remove(listener);
+    }
+
+    /**
+     * Tells {@code listener} each step Ctrl+wheel over the page magnifies it by. The page itself never sees Ctrl+wheel,
+     * so Chromium's own Ctrl+wheel zoom never applies.
+     *
+     * @param listener told 1 for a step bigger, -1 for a step smaller, on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onMagnify(IntConsumer listener) {
+        Objects.requireNonNull(listener, "listener");
+        magnifies.add(listener);
+        return () -> magnifies.remove(listener);
     }
 
     /**
@@ -552,6 +591,7 @@ public final class Page implements AutoCloseable {
         closed = true;
         loadStarts.clear();
         navigationButtons.clear();
+        magnifies.clear();
         navigations.clear();
         dialogResets.clear();
         addressChanges.clear();
@@ -588,6 +628,17 @@ public final class Page implements AutoCloseable {
         for (Consumer<NavigationButton> listener : navigationButtons) listener.accept(button);
     }
 
+    /** Ctrl+wheel over the page magnifies it a step bigger, 1, or smaller, -1. */
+    private void magnified(int direction) {
+        if (closed) return;
+        for (IntConsumer listener : magnifies) listener.accept(direction);
+    }
+
+    /** The browser, once it hears what it is asked, shows the page at its zoom. */
+    private void showZoom() {
+        if (ready && !closed) browser.setZoomLevel(zoomLevel);
+    }
+
     /** The client is ready: makes the browser, which loads what the page was last asked to. */
     private void make(CefClient client) {
         if (closed) return;
@@ -602,6 +653,7 @@ public final class Page implements AutoCloseable {
     void created(PageBrowser created) {
         if (closed || created != browser) return;
         ready = true;
+        showZoom();
         String next = requested.toString();
         if (!next.equals(made)) browser.loadURL(next);
     }
@@ -642,6 +694,11 @@ public final class Page implements AutoCloseable {
         historyStale = false;
         historyReader.apply(this).whenComplete((read, failure) -> EventQueue.invokeLater(() ->
             historyRead(failure == null && read != null ? read : NavigationHistory.History.EMPTY)));
+    }
+
+    /** The zoom the page shows at, as Chromium's level. Any thread. */
+    double zoomLevel() {
+        return zoomLevel;
     }
 
     /** The page's browser once it hears what it is asked; null before. */
