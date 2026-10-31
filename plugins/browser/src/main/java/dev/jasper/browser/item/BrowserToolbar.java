@@ -11,11 +11,11 @@ import java.util.Optional;
 
 /**
  * A browser item's toolbar along the top of its page (spec section 6), as SDK nodes the kit draws: Back and Forward,
- * each disabled when the page cannot go there and each holding the page's history that way, nearest entry first, in its
- * hold menu; Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the menu
- * button, which holds Settings. The site icon is the page's icon, else the globe, and dragging it drags the page's
- * address. The toolbar keeps what is typed into the field: the field shows the page's address until something is typed,
- * and again once Enter loads it or Escape gives it up. Its item handles what the nodes report. UI thread.
+ * each disabled when the page cannot go there and each holding the page's twelve nearest history entries that way in
+ * its hold menu; Reload, which is Stop while the page loads; the address field, with the site icon at its left; and the
+ * menu button, which holds Settings. The site icon is the page's icon, else the globe, and dragging it drags the page's
+ * address. The toolbar keeps what is typed into the field: the field shows the page's address until something is
+ * typed, and again once Enter loads it or Escape gives it up. Its item handles what the nodes report. UI thread.
  */
 final class BrowserToolbar {
     /** The toolbar's row and its nodes; a button reports its own id. */
@@ -56,8 +56,8 @@ final class BrowserToolbar {
         var menu = new Nodes.MenuButton(MENU, ControlState.READY, "", "menu", Nodes.ButtonKind.GHOST, "",
             List.of(new MenuItem(SETTINGS, "Settings", "", SETTINGS, true, false)), "Menu");
         return new Nodes.Stack(BAR, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-            history(BACK, canGoBack, "back", "Back", NavigationHistory.backMenu(history)),
-            history(FORWARD, canGoForward, "forward", "Forward", NavigationHistory.forwardMenu(history)),
+            historyButton(BACK, canGoBack, "back", "Back", NavigationHistory.backMenu(history)),
+            historyButton(FORWARD, canGoForward, "forward", "Forward", NavigationHistory.forwardMenu(history)),
             reload, field, menu));
     }
 
@@ -85,7 +85,7 @@ final class BrowserToolbar {
     }
 
     /** Back or Forward: a press goes there, and a held one opens {@code menu}, the page's history that way. */
-    private static Nodes.Button history(String id, boolean enabled, String icon, String tooltip, List<MenuItem> menu) {
+    private static Nodes.Button historyButton(String id, boolean enabled, String icon, String tooltip, List<MenuItem> menu) {
         return new Nodes.Button(id, enabled(enabled), "", icon, Nodes.ButtonKind.GHOST, id, tooltip,
             Nodes.ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), menu);
     }

@@ -1,10 +1,9 @@
 package dev.jasper.browser.page;
 
+import dev.jasper.browser.json.StrictJson;
 import dev.jasper.sdk.ui.MenuItem;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.HexFormat;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -19,19 +18,21 @@ import org.cef.browser.CefDevToolsClient;
  * entries, so the history is read with DevTools' {@code Page.getNavigationHistory}, and a chosen entry is gone to with
  * {@code Page.navigateToHistoryEntry}, both through the page's DevTools client. The answer comes from Chromium, but the
  * page's own titles and addresses are in it, so it is read as untrusted input, within bounds: anything else, or more,
- * gives no history. Each menu lists its entries nearest first, each as its title, or as its address without a user
- * name or password when it has none; an entry has no tooltip, as a menu item has none. Only {@link #read} and
- * {@link #goTo} touch Chromium.
+ * gives no history. Each menu lists its twelve nearest entries, nearest first, each as its title, or as its address
+ * without a user name or password when it has none; an entry has no tooltip, as a menu item has none. Only
+ * {@link #read} and {@link #goTo} touch Chromium.
  */
 public final class NavigationHistory {
     /** The longest answer read, in characters: Chromium keeps 50 entries, which take a few kilobytes. */
     static final int MAX_TEXT = 1 << 20;
     /** The most entries a history has, twice Chromium's 50. */
     static final int MAX_ENTRIES = 100;
-    /** How deep the answer's arrays and objects nest at most: its entries are at the third level. */
+    /** How deep the answer's arrays and objects nest at most, the answer the first level: its entries are at the third. */
     static final int MAX_DEPTH = 8;
     /** The most characters an entry keeps of its title and of its address. */
     static final int KEPT = 2_000;
+    /** The most entries a menu lists, the nearest, as Chrome's do; a popup menu does not scroll. */
+    static final int MENU_ITEMS = 12;
     /** The most characters a menu item shows of its entry, the ellipsis that cuts a longer one included. */
     static final int LABEL = 80;
     /** What a history menu item's action is: this, then its entry's id. */
@@ -86,12 +87,12 @@ public final class NavigationHistory {
     /**
      * Reads {@code browser}'s history. Any thread.
      *
-     * @param browser a page's browser
-     * @return the history; {@link History#EMPTY} when the browser closes, DevTools fails or takes more than five seconds,
-     *     or its answer is not one, and never an exception
+     * @param browser a page's browser, or null while the page has none ready
+     * @return the history; {@link History#EMPTY} without a browser, when the browser closes, DevTools fails or takes more
+     *     than five seconds, or its answer is not one, and never an exception
      */
     static CompletableFuture<History> read(PageBrowser browser) {
-        Objects.requireNonNull(browser, "browser");
+        if (browser == null) return CompletableFuture.completedFuture(History.EMPTY);
         try {
             CefDevToolsClient client = browser.getDevToolsClient();
             if (client == null) return CompletableFuture.completedFuture(History.EMPTY);
@@ -107,11 +108,11 @@ public final class NavigationHistory {
      * Has {@code browser} go to its history's entry {@code id}, as choosing it from a hold menu does. An entry the
      * history no longer has is refused by Chromium, and nothing happens.
      *
-     * @param browser a page's browser
+     * @param browser a page's browser, or null while the page has none ready, which goes nowhere
      * @param id the entry's id
      */
     static void goTo(PageBrowser browser, int id) {
-        Objects.requireNonNull(browser, "browser");
+        if (browser == null) return;
         try {
             CefDevToolsClient client = browser.getDevToolsClient();
             // The answer says only whether Chromium went; a refusal leaves the page where it is.
@@ -132,43 +133,47 @@ public final class NavigationHistory {
      */
     static History parse(String answer) {
         if (answer == null || answer.length() > MAX_TEXT) return History.EMPTY;
+        Map<String, Object> root = StrictJson.object(answer, MAX_DEPTH).orElse(null);
+        Integer current = root == null ? null : integer(root.get("currentIndex"));
+        if (current == null || !(root.get("entries") instanceof List<?> listed) || listed.isEmpty()
+            || listed.size() > MAX_ENTRIES) return History.EMPTY;
+        var entries = new ArrayList<Entry>(listed.size());
+        for (Object each : listed) {
+            if (!(each instanceof Map<?, ?> entry) || !(entry.get("url") instanceof String url)
+                || !(entry.get("title") instanceof String title)) return History.EMPTY;
+            Integer id = integer(entry.get("id"));
+            if (id == null) return History.EMPTY;
+            entries.add(new Entry(id, url, title));
+        }
         try {
-            if (!(new Reader(answer).document() instanceof Map<?, ?> root)
-                || !(root.get("entries") instanceof List<?> listed) || listed.isEmpty() || listed.size() > MAX_ENTRIES)
-                return History.EMPTY;
-            var entries = new ArrayList<Entry>(listed.size());
-            for (Object each : listed) {
-                if (!(each instanceof Map<?, ?> entry) || !(entry.get("url") instanceof String url)
-                    || !(entry.get("title") instanceof String title)) return History.EMPTY;
-                entries.add(new Entry(integer(entry.get("id")), url, title));
-            }
-            return new History(integer(root.get("currentIndex")), entries);
-        } catch (Malformed | IllegalArgumentException notAHistory) {
+            return new History(current, entries);
+        } catch (IllegalArgumentException notAHistory) { // no current entry, or an id twice
             return History.EMPTY;
         }
     }
 
     /**
-     * Back's hold menu: the entries before the current one, nearest first.
+     * Back's hold menu: the {@link #MENU_ITEMS} nearest entries before the current one, nearest first.
      *
      * @param history the page's history
      * @return the menu's items; empty when there are none
      */
     public static List<MenuItem> backMenu(History history) {
         var items = new ArrayList<MenuItem>();
-        for (int at = history.current() - 1; at >= 0; at--) item(history.entries().get(at)).ifPresent(items::add);
+        for (int at = history.current() - 1; at >= 0 && items.size() < MENU_ITEMS; at--)
+            item(history.entries().get(at)).ifPresent(items::add);
         return List.copyOf(items);
     }
 
     /**
-     * Forward's hold menu: the entries after the current one, nearest first.
+     * Forward's hold menu: the {@link #MENU_ITEMS} nearest entries after the current one, nearest first.
      *
      * @param history the page's history
      * @return the menu's items; empty when there are none
      */
     public static List<MenuItem> forwardMenu(History history) {
         var items = new ArrayList<MenuItem>();
-        for (int at = history.current() + 1; at < history.entries().size(); at++)
+        for (int at = history.current() + 1; at < history.entries().size() && items.size() < MENU_ITEMS; at++)
             item(history.entries().get(at)).ifPresent(items::add);
         return List.copyOf(items);
     }
@@ -239,7 +244,10 @@ public final class NavigationHistory {
         return at < start ? url : url.substring(0, start) + url.substring(at + 1);
     }
 
-    /** Whether the first {@code length} characters of {@code url} are a scheme: a letter, then letters, digits and {@code +-.}. */
+    /**
+     * Whether the first {@code length} characters of {@code url} are a scheme: a letter, then letters, digits and
+     * {@code +-.}.
+     */
     private static boolean scheme(String url, int length) {
         for (int at = 0; at < length; at++) {
             char c = url.charAt(at);
@@ -249,181 +257,8 @@ public final class NavigationHistory {
         return true;
     }
 
-    /** A JSON integer that is an {@code int}. */
-    private static int integer(Object value) throws Malformed {
-        if (!(value instanceof Long number) || number < Integer.MIN_VALUE || number > Integer.MAX_VALUE)
-            throw new Malformed();
-        return number.intValue();
-    }
-
-    /** Not such an answer. Carries no stack: it only ends the reading. */
-    private static final class Malformed extends Exception {
-        Malformed() {
-            super(null, null, false, false);
-        }
-    }
-
-    /**
-     * Reads one JSON document, strictly: objects as maps (a repeated name is malformed), arrays as lists, strings,
-     * {@code true}, {@code false}, {@code null} as {@link #NULL}, integers as {@link Long} and other numbers as
-     * {@link #NUMBER}.
-     */
-    private static final class Reader {
-        static final Object NULL = new Object(), NUMBER = new Object();
-        private final String text;
-        private int at, depth;
-
-        Reader(String text) {
-            this.text = text;
-        }
-
-        Object document() throws Malformed {
-            Object value = value();
-            space();
-            if (at != text.length()) throw new Malformed();
-            return value;
-        }
-
-        private Object value() throws Malformed {
-            space();
-            if (at >= text.length()) throw new Malformed();
-            char c = text.charAt(at);
-            if (c == '{') return object();
-            if (c == '[') return array();
-            if (c == '"') return string();
-            if (c == '-' || c >= '0' && c <= '9') return number();
-            if (word("true")) return Boolean.TRUE;
-            if (word("false")) return Boolean.FALSE;
-            if (word("null")) return NULL;
-            throw new Malformed();
-        }
-
-        private Map<String, Object> object() throws Malformed {
-            enter();
-            var members = new LinkedHashMap<String, Object>();
-            space();
-            if (!take('}')) {
-                do {
-                    space();
-                    String name = string();
-                    space();
-                    expect(':');
-                    if (members.putIfAbsent(name, value()) != null) throw new Malformed();
-                    space();
-                } while (take(','));
-                expect('}');
-            }
-            depth--;
-            return members;
-        }
-
-        private List<Object> array() throws Malformed {
-            enter();
-            var values = new ArrayList<>();
-            space();
-            if (!take(']')) {
-                do {
-                    values.add(value());
-                    space();
-                } while (take(','));
-                expect(']');
-            }
-            depth--;
-            return values;
-        }
-
-        /** Takes the bracket that opens an array or object, one level deeper. */
-        private void enter() throws Malformed {
-            if (++depth > MAX_DEPTH) throw new Malformed();
-            at++;
-        }
-
-        private String string() throws Malformed {
-            expect('"');
-            var out = new StringBuilder();
-            while (true) {
-                if (at >= text.length()) throw new Malformed();
-                char c = text.charAt(at++);
-                if (c == '"') return out.toString();
-                if (c < 0x20) throw new Malformed();
-                if (c != '\\') {
-                    out.append(c);
-                    continue;
-                }
-                if (at >= text.length()) throw new Malformed();
-                char escaped = text.charAt(at++);
-                switch (escaped) {
-                    case '"', '\\', '/' -> out.append(escaped);
-                    case 'b' -> out.append('\b');
-                    case 'f' -> out.append('\f');
-                    case 'n' -> out.append('\n');
-                    case 'r' -> out.append('\r');
-                    case 't' -> out.append('\t');
-                    case 'u' -> out.append(unit());
-                    default -> throw new Malformed();
-                }
-            }
-        }
-
-        /** The four ASCII hexadecimal digits of a unicode escape, as one UTF-16 unit. */
-        private char unit() throws Malformed {
-            if (at + 4 > text.length()) throw new Malformed();
-            int unit = 0;
-            for (int digit = 0; digit < 4; digit++) {
-                char c = text.charAt(at++);
-                if (!HexFormat.isHexDigit(c)) throw new Malformed();
-                unit = unit * 16 + HexFormat.fromHexDigit(c);
-            }
-            return (char) unit;
-        }
-
-        /** A number: an integer of at most 18 digits as a {@link Long}, any other as {@link #NUMBER}. */
-        private Object number() throws Malformed {
-            int start = at;
-            take('-');
-            if (!take('0') && digits() == 0) throw new Malformed();
-            boolean integer = true;
-            if (take('.')) {
-                integer = false;
-                if (digits() == 0) throw new Malformed();
-            }
-            if (take('e') || take('E')) {
-                integer = false;
-                if (!take('+')) take('-');
-                if (digits() == 0) throw new Malformed();
-            }
-            String written = text.substring(start, at);
-            int digits = written.length() - (written.charAt(0) == '-' ? 1 : 0);
-            return integer && digits <= 18 ? Long.parseLong(written) : NUMBER;
-        }
-
-        /** Takes the decimal digits here, and says how many. */
-        private int digits() {
-            int start = at;
-            while (at < text.length() && text.charAt(at) >= '0' && text.charAt(at) <= '9') at++;
-            return at - start;
-        }
-
-        private boolean word(String word) {
-            if (!text.startsWith(word, at)) return false;
-            at += word.length();
-            return true;
-        }
-
-        private void space() {
-            while (at < text.length() && " \t\n\r".indexOf(text.charAt(at)) >= 0) at++;
-        }
-
-        private boolean take(char c) {
-            if (at < text.length() && text.charAt(at) == c) {
-                at++;
-                return true;
-            }
-            return false;
-        }
-
-        private void expect(char c) throws Malformed {
-            if (!take(c)) throw new Malformed();
-        }
+    /** {@code value} as an {@code int}: a JSON integer that fits one; else null. */
+    private static Integer integer(Object value) {
+        return value instanceof Long number && number == number.intValue() ? number.intValue() : null;
     }
 }

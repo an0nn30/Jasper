@@ -89,20 +89,4 @@ public final class PageTestAccess {
     public static void historyRead(Page page, NavigationHistory.History history) {
         page.historyRead(history);
     }
-
-    /**
-     * Has {@code page} ready, as a page whose browser exists is, while its browser stays absent: what the page asks of
-     * its browser then fails, once the page has decided to ask and told its listeners.
-     *
-     * @param page a page
-     */
-    public static void readyWithoutBrowser(Page page) {
-        try {
-            var ready = Page.class.getDeclaredField("ready");
-            ready.setAccessible(true);
-            ready.setBoolean(page, true);
-        } catch (ReflectiveOperationException unexpected) {
-            throw new AssertionError(unexpected);
-        }
-    }
 }

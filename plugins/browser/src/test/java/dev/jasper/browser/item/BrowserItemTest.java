@@ -180,20 +180,17 @@ class BrowserItemTest {
             var navigations = new AtomicInteger();
             page.onNavigate(navigations::incrementAndGet);
             String back = Views.button(view, BrowserToolbar.BACK).holdMenu().getFirst().id();
+            // The page here has no browser, so it goes nowhere once it has told its listeners.
             view.choose(BrowserToolbar.BACK, back);
-            assertThat(navigations).as("no browser yet").hasValue(0);
+            assertThat(navigations).as("told before the page goes").hasValue(1);
 
-            PageTestAccess.readyWithoutBrowser(page);
             PageTestAccess.historyRead(page, new History(0, history.entries().subList(1, 3)));
             assertThat(Views.button(view, BrowserToolbar.BACK).holdMenu()).isEmpty();
             view.emit(new UiEvent.Action(back));
-            assertThat(navigations).as("an entry the history no longer has").hasValue(0);
-            var kit = (FakeKit) items.context().kit();
-            assertThat(kit.failures()).isEmpty();
+            assertThat(navigations).as("an entry the history no longer has").hasValue(1);
             view.choose(BrowserToolbar.FORWARD, Views.button(view, BrowserToolbar.FORWARD).holdMenu().getFirst().id());
-            assertThat(navigations).as("told before the page goes").hasValue(1);
-            // The page here has no browser, so going there fails once the page has told its listeners.
-            assertThat(kit.failures()).hasSize(1);
+            assertThat(navigations).hasValue(2);
+            assertThat(((FakeKit) items.context().kit()).failures()).isEmpty();
             assertThat(host.failures()).isEmpty();
         } });
     }

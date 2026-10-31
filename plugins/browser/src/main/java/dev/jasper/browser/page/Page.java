@@ -14,6 +14,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.ObjIntConsumer;
 import javax.swing.JComponent;
 import org.cef.CefClient;
 import org.cef.browser.CefFrame;
@@ -29,6 +31,8 @@ public final class Page implements AutoCloseable {
     private final PageView view = new PageView();
     private final Runnable changed;
     private final Favicons favicons;
+    private final Function<Page, CompletableFuture<NavigationHistory.History>> historyReader;
+    private final ObjIntConsumer<Page> historyJumper;
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
     private final List<Runnable> closes = new CopyOnWriteArrayList<>();
@@ -65,10 +69,28 @@ public final class Page implements AutoCloseable {
      * @param favicons fetches the favicons its documents name
      */
     public Page(URI url, Runnable changed, Favicons favicons) {
+        // Functions of the page, not of its browser's type: making a page loads no Chromium class.
+        this(url, changed, favicons, page -> NavigationHistory.read(page.readyBrowser()),
+            (page, id) -> NavigationHistory.goTo(page.readyBrowser(), id));
+    }
+
+    /**
+     * A page that reads its history with {@code historyReader} and goes to an entry of it with {@code historyJumper}.
+     *
+     * @param url what it loads first
+     * @param changed told whenever its address, title, favicon, loading state, where it can go or its history changes
+     * @param favicons fetches the favicons its documents name
+     * @param historyReader given the page, reads its history, as {@link NavigationHistory#read} reads its browser's
+     * @param historyJumper given the page and an entry's id, goes there, as {@link NavigationHistory#goTo} does
+     */
+    Page(URI url, Runnable changed, Favicons favicons, Function<Page, CompletableFuture<NavigationHistory.History>> historyReader,
+         ObjIntConsumer<Page> historyJumper) {
         requested = Objects.requireNonNull(url, "url");
         address = url.toString();
         this.changed = Objects.requireNonNull(changed, "changed");
         this.favicons = Objects.requireNonNull(favicons, "favicons");
+        this.historyReader = Objects.requireNonNull(historyReader, "historyReader");
+        this.historyJumper = Objects.requireNonNull(historyJumper, "historyJumper");
         view.onNavigationButton(this::navigationButton);
     }
 
@@ -139,15 +161,17 @@ public final class Page implements AutoCloseable {
 
     /**
      * Goes to entry {@code id} of the page's history, as Back's and Forward's hold menus choose it: an entry of the
-     * history as last read ({@link #history()}) other than the current one. An entry it no longer has, the current one,
-     * and any before the page has its browser do nothing.
+     * history as last read ({@link #history()}) other than the current one. An entry it no longer has and the current
+     * one do nothing; a page has no history to go to before its browser is ready. Those who asked {@link #onNavigate}
+     * are told before the page goes, so they are told too when Chromium then refuses the entry, as it does one dropped
+     * from the history after the last read, and the page stays where it is.
      *
      * @param id the entry's id
      */
     public void goToHistoryEntry(int id) {
-        if (!ready || closed || !history.jumpsTo(id)) return;
+        if (closed || !history.jumpsTo(id)) return;
         navigated();
-        NavigationHistory.goTo(browser, id);
+        historyJumper.accept(this, id);
     }
 
     /** Loads the page again. */
@@ -435,8 +459,8 @@ public final class Page implements AutoCloseable {
     /**
      * Tells {@code listener} each time Jasper, not the page's document, sends the page elsewhere: {@link #load}, or a
      * {@link #back}, {@link #forward} or {@link #goToHistoryEntry} the page's history allows, as the user's address field,
-     * Web menu, toolbar and mouse buttons do. Chromium puts such a page in a window group of its own, apart from its
-     * opener and its popups.
+     * Web menu, toolbar and mouse buttons do; a history entry Chromium then refuses has told it too. Chromium puts such a
+     * page in a window group of its own, apart from its opener and its popups.
      *
      * @param listener told on the UI thread, before the page goes
      * @return the registration; the page's close ends it
@@ -564,17 +588,26 @@ public final class Page implements AutoCloseable {
      * runs at a time however often the page changes.
      */
     private void readHistory() {
-        if (!ready || closed) return;
+        if (closed) return;
         if (readingHistory) {
             historyStale = true;
             return;
         }
         readingHistory = true;
         historyStale = false;
-        NavigationHistory.read(browser).thenAccept(read -> EventQueue.invokeLater(() -> historyRead(read)));
+        historyReader.apply(this).whenComplete((read, failure) -> EventQueue.invokeLater(() ->
+            historyRead(failure == null && read != null ? read : NavigationHistory.History.EMPTY)));
     }
 
-    /** A read of the page's history gave {@code read}: the page's history from now on, and again if it changed since. */
+    /** The page's browser once it hears what it is asked; null before. */
+    PageBrowser readyBrowser() {
+        return ready ? browser : null;
+    }
+
+    /**
+     * A read of the page's history gave {@code read}, or {@link NavigationHistory.History#EMPTY} when it failed: the
+     * page's history from now on, and the page reads it again if it changed since the read began.
+     */
     void historyRead(NavigationHistory.History read) {
         readingHistory = false;
         if (closed) return;

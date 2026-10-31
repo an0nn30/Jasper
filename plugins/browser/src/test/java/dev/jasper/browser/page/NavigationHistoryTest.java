@@ -4,9 +4,14 @@ import dev.jasper.browser.page.NavigationHistory.Entry;
 import dev.jasper.browser.page.NavigationHistory.History;
 import dev.jasper.sdk.ui.MenuItem;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalInt;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
@@ -45,7 +50,7 @@ class NavigationHistoryTest {
         assertThat(NavigationHistory.parse(answer)).isEqualTo(new History(0, List.of(new Entry(1, "about:blank", ""))));
     }
 
-    /** Anything that is not such an answer gives no history, and never an exception. */
+    /** Anything that is not such an answer gives no history, and never an exception. {@code StrictJsonTest} has the grammar. */
     @Test void anythingElseGivesNoHistory() {
         String entry = "{\"id\":1,\"url\":\"https://example.com/\",\"title\":\"\"}";
         for (String text : new String[] {null, "", "   ", "[]", "{}", "null", "not json", "{\"currentIndex\":0}",
@@ -63,20 +68,10 @@ class NavigationHistoryTest {
             "{\"currentIndex\":0,\"entries\":[{\"id\":\"1\",\"url\":\"https://example.com/\",\"title\":\"\"}]}",
             "{\"currentIndex\":0,\"entries\":[{\"id\":1.5,\"url\":\"https://example.com/\",\"title\":\"\"}]}",
             "{\"currentIndex\":0,\"entries\":[{\"id\":2147483648,\"url\":\"https://example.com/\",\"title\":\"\"}]}",
-            "{\"currentIndex\":0,\"entries\":[{\"id\":01,\"url\":\"https://example.com/\",\"title\":\"\"}]}",
             "{\"currentIndex\":0,\"entries\":[{\"id\":1,\"url\":null,\"title\":\"\"}]}",
             "{\"currentIndex\":0,\"entries\":[{\"id\":1,\"url\":\"https://example.com/\"}]}",
-            "{\"currentIndex\":0,\"entries\":[{\"id\":1,\"url\":\"https://example.com/\",\"title\":\"a\nb\"}]}",
-            "{\"currentIndex\":0,\"entries\":[{\"id\":1,\"url\":\"https://example.com/\",\"title\":\"\\x\"}]}",
-            "{\"currentIndex\":0,\"entries\":[{\"id\":1,\"url\":\"https://example.com/\",\"title\":\"\\u12\"}]}",
-            "{\"currentIndex\":0,\"entries\":[{\"id\":1,\"url\":\"https://example.com/\",\"title\":\"\\u\uFF10\uFF10\uFF14\uFF11\"}]}",
             "{\"currentIndex\":0,\"entries\":[{\"id\":1,\"url\":\"https://example.com/\",\"title\":\"open",
-            "{\"currentIndex\":0,\"entries\":[" + entry + "],}",
-            "{\"currentIndex\":0,\"entries\":[" + entry + ",]}",
-            "{\"currentIndex\":0,\"entries\":[" + entry + "], \"x\":tru}",
-            "{\"currentIndex\":0,\"entries\":[" + entry + "], \"x\":-}",
-            "{\"currentIndex\":0,\"entries\":[" + entry + "], \"x\":1.}",
-            "{\"currentIndex\":0,\"entries\":[" + entry + "], \"x\":1e}"})
+            "{\"currentIndex\":0,\"entries\":[" + entry + ",]}"})
             assertThat(NavigationHistory.parse(text)).as(String.valueOf(text)).isEqualTo(History.EMPTY);
     }
 
@@ -122,6 +117,20 @@ class NavigationHistoryTest {
             .containsExactly(OptionalInt.of(2), OptionalInt.of(1));
         assertThat(NavigationHistory.forwardMenu(history)).extracting(item -> NavigationHistory.entryId(item.action()))
             .containsExactly(OptionalInt.of(4), OptionalInt.of(5));
+    }
+
+    /** P23: each menu lists the twelve nearest entries, as Chrome's do; an entry with nothing to show leaves its place. */
+    @Test void eachMenuListsTheTwelveNearestEntries() {
+        var entries = new ArrayList<Entry>();
+        for (int id = 1; id <= 30; id++) entries.add(entry(id, "Entry " + id));
+        History history = new History(15, entries);
+        assertThat(ids(NavigationHistory.backMenu(history))).isEqualTo(range(15, 4));
+        assertThat(ids(NavigationHistory.forwardMenu(history))).isEqualTo(range(17, 28));
+        entries.set(14, new Entry(15, "", ""));
+        entries.set(16, new Entry(17, "", ""));
+        History gaps = new History(15, entries);
+        assertThat(ids(NavigationHistory.backMenu(gaps))).as("twelve items, not twelve entries").isEqualTo(range(14, 3));
+        assertThat(ids(NavigationHistory.forwardMenu(gaps))).isEqualTo(range(18, 29));
     }
 
     @Test void atEitherEndThatMenuIsEmpty() {
@@ -215,24 +224,145 @@ class NavigationHistoryTest {
      * R41 and R42), as Back and Forward do. An entry the history no longer has, and the page's current one, do nothing.
      */
     @Test void aPageGoesToAnEntryOfItsHistoryAsJasperSendsItElsewhere() throws Exception {
-        SwingUtilities.invokeAndWait(() -> {
-            var page = new Page(EXAMPLE, () -> { }, PageTestAccess.noFavicons());
-            var navigations = new AtomicInteger();
-            page.onNavigate(navigations::incrementAndGet);
+        var seam = new Seam();
+        onUiThread(() -> {
+            Page page = seam.page(() -> { });
+            page.onNavigate(() -> seam.told.add("navigate"));
             page.historyRead(new History(1, List.of(entry(1, "One"), entry(2, "Two"), entry(3, "Three"))));
-            page.goToHistoryEntry(1);
-            assertThat(navigations).as("no browser yet").hasValue(0);
-            PageTestAccess.readyWithoutBrowser(page);
             page.goToHistoryEntry(2);
             page.goToHistoryEntry(9);
-            assertThat(navigations).as("where it is, and a stale entry").hasValue(0);
-            // The page here has no browser, so going there fails once the page has told its listeners.
-            assertThatThrownBy(() -> page.goToHistoryEntry(3)).isInstanceOf(NullPointerException.class);
-            assertThat(navigations).hasValue(1);
+            assertThat(seam.told).as("where it is, and a stale entry").isEmpty();
+            page.goToHistoryEntry(3);
+            assertThat(seam.told).containsExactly("navigate", "go to 3");
+            assertThat(seam.pages).containsExactly(page);
             page.close();
             page.goToHistoryEntry(1);
-            assertThat(navigations).as("nothing after the close").hasValue(1);
+            assertThat(seam.told).as("nothing after the close").hasSize(2);
+            return null;
         });
+    }
+
+    /** P1: a title change, a committed navigation and a main-frame load end each read the history again. */
+    @Test void eachChangeOfThePageReadsItsHistory() throws Exception {
+        var seam = new Seam();
+        Page page = onUiThread(() -> seam.page(() -> { }));
+        History first = new History(0, List.of(entry(1, "One"))), second = new History(1, List.of(entry(1, "One"), entry(2, "Two")));
+        onUiThread(() -> PageTestAccess.titleChanged(page, "One"));
+        assertThat(seam.reads).hasSize(1);
+        seam.reads.getLast().complete(first);
+        assertThat(onUiThread(page::history)).isEqualTo(first);
+        onUiThread(() -> PageTestAccess.addressChanged(page, "https://example.com/2"));
+        assertThat(seam.reads).hasSize(2);
+        seam.reads.getLast().complete(second);
+        assertThat(onUiThread(page::history)).isEqualTo(second);
+        onUiThread(page::loadEnded);
+        assertThat(seam.reads).hasSize(3);
+        seam.reads.getLast().complete(second);
+        assertThat(onUiThread(page::history)).isEqualTo(second);
+        assertThat(seam.pages).hasSize(3).containsOnly(page);
+        onUiThread(page::close);
+    }
+
+    /** One read runs at a time: any number of changes while it runs cause exactly one more read once it has answered. */
+    @Test void changesDuringAReadCauseOneMoreRead() throws Exception {
+        var seam = new Seam();
+        var changes = new AtomicInteger();
+        Page page = onUiThread(() -> seam.page(changes::incrementAndGet));
+        History first = new History(0, List.of(entry(1, "One"))), second = new History(1, List.of(entry(1, "One"), entry(2, "Two")));
+        onUiThread(() -> PageTestAccess.titleChanged(page, "One"));
+        onUiThread(() -> {
+            PageTestAccess.titleChanged(page, "Two");
+            PageTestAccess.addressChanged(page, "https://example.com/2");
+            page.loadEnded();
+            return null;
+        });
+        assertThat(seam.reads).as("one at a time").hasSize(1);
+        seam.reads.getFirst().complete(first);
+        assertThat(onUiThread(page::history)).isEqualTo(first);
+        assertThat(seam.reads).as("exactly one more").hasSize(2);
+        seam.reads.getLast().complete(second);
+        assertThat(onUiThread(page::history)).isEqualTo(second);
+        assertThat(seam.reads).as("nothing changed since").hasSize(2);
+        onUiThread(page::close);
+    }
+
+    /** A read that fails leaves no history, and the next change reads again. */
+    @Test void aReadThatFailsLeavesNoHistoryAndTheNextChangeReadsAgain() throws Exception {
+        var seam = new Seam();
+        Page page = onUiThread(() -> seam.page(() -> { }));
+        History first = new History(0, List.of(entry(1, "One")));
+        onUiThread(() -> PageTestAccess.titleChanged(page, "One"));
+        seam.reads.getLast().complete(first);
+        assertThat(onUiThread(page::history)).isEqualTo(first);
+        onUiThread(() -> PageTestAccess.titleChanged(page, "Two"));
+        seam.reads.getLast().completeExceptionally(new IllegalStateException("DevTools broke"));
+        assertThat(onUiThread(page::history)).isEqualTo(History.EMPTY);
+        onUiThread(() -> PageTestAccess.titleChanged(page, "Three"));
+        assertThat(seam.reads).as("the failed read ended").hasSize(3);
+        onUiThread(page::close);
+    }
+
+    /** Without its browser ready, a page has no history to read and goes nowhere. */
+    @Test void withoutABrowserThereIsNoHistoryAndNoJump() throws Exception {
+        assertThat(NavigationHistory.read(null)).isCompletedWithValue(History.EMPTY);
+        NavigationHistory.goTo(null, 3);
+        Page page = onUiThread(() -> new Page(EXAMPLE, () -> { }, PageTestAccess.noFavicons()));
+        onUiThread(() -> PageTestAccess.titleChanged(page, "Example Domain"));
+        assertThat(onUiThread(page::history)).isEqualTo(History.EMPTY);
+        onUiThread(() -> {
+            page.historyRead(new History(1, List.of(entry(1, "One"), entry(2, "Here"))));
+            page.goToHistoryEntry(1);
+            return null;
+        });
+        onUiThread(page::close);
+    }
+
+    /** The page's history reads and jumps, for a page made with it: each read answers when the test completes it. */
+    private static final class Seam {
+        final List<CompletableFuture<History>> reads = new CopyOnWriteArrayList<>();
+        final List<Page> pages = new CopyOnWriteArrayList<>();
+        final List<String> told = new CopyOnWriteArrayList<>();
+
+        Page page(Runnable changed) {
+            return new Page(EXAMPLE, changed, PageTestAccess.noFavicons(), page -> {
+                pages.add(page);
+                var read = new CompletableFuture<History>();
+                reads.add(read);
+                return read;
+            }, (page, id) -> {
+                pages.add(page);
+                told.add("go to " + id);
+            });
+        }
+    }
+
+    /** Runs {@code task} on the UI thread, after everything already posted there, such as a read's answer. */
+    private static <T> T onUiThread(Callable<T> task) throws Exception {
+        var result = new AtomicReference<T>();
+        var failure = new AtomicReference<Exception>();
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                result.set(task.call());
+            } catch (Exception thrown) {
+                failure.set(thrown);
+            }
+        });
+        if (failure.get() != null) throw failure.get();
+        return result.get();
+    }
+
+    private static void onUiThread(Runnable task) throws Exception {
+        SwingUtilities.invokeAndWait(task);
+    }
+
+    private static List<Integer> ids(List<MenuItem> menu) {
+        return menu.stream().map(item -> NavigationHistory.entryId(item.action()).orElseThrow()).toList();
+    }
+
+    /** The ids from {@code from} to {@code to}, both included, in that order. */
+    private static List<Integer> range(int from, int to) {
+        int step = from <= to ? 1 : -1;
+        return IntStream.iterate(from, id -> id != to + step, id -> id + step).boxed().toList();
     }
 
     private static Entry entry(int id, String title) {

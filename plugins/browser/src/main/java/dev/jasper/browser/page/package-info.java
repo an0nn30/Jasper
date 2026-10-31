@@ -9,9 +9,10 @@
  * {@code detect-favicon.js}, which names the document's icon through the {@code links} package's message router, and
  * {@link dev.jasper.browser.page.Favicons} fetches it for the page. {@link dev.jasper.browser.page.NavigationHistory}
  * reads a page's history through DevTools after each main-frame load end, committed navigation and title change, for
- * its item's Back and Forward hold menus, and goes to the entry chosen. {@link dev.jasper.browser.page.DialogPlace} is
- * where the {@code dialogs} package shows a page's dialogs, as its item gives it. The canvas, renderer and browser are
- * adapted from JetBrains' JCEF test classes, as {@code notices.toml} records. {@link dev.jasper.browser.page.LastPress},
+ * its item's Back and Forward hold menus, and goes to the entry chosen; the {@code json} package reads DevTools'
+ * answer. {@link dev.jasper.browser.page.DialogPlace} is where the {@code dialogs} package shows a page's dialogs, as
+ * its item gives it. The canvas, renderer and browser are adapted from JetBrains' JCEF test classes, as
+ * {@code notices.toml} records. {@link dev.jasper.browser.page.LastPress},
  * {@code Favicons} and {@code Page}'s methods name no Chromium type, and none of these classes loads until a browser
  * item opens.
  */
