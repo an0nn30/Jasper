@@ -96,7 +96,7 @@ public final class BrowserItem implements AutoCloseable {
     private final BrowserFindBar findBar;
     private final UiView view;
     private ContentTab tab;
-    // The item's DevTools item, made by its first Inspect Element; null before.
+    // The item's DevTools item while it is open; null before the first Inspect Element and once it closes.
     private DevToolsItem devTools;
     private URI url;
     // Where the item's restore state says it is: what it loads first until it shows, then where its page committed.
@@ -330,11 +330,22 @@ public final class BrowserItem implements AutoCloseable {
             devTools.show(tools);
             return;
         }
+        DevToolsItem opened;
         try {
-            devTools = DevToolsItem.open(items.context(), tab, tools, title);
+            opened = DevToolsItem.open(items.context(), tab, tools, title);
         } catch (IllegalStateException closing) { // the windows close, or Jasper quits
             items.context().log().log(System.Logger.Level.WARNING, "DevTools could not open: " + closing.getMessage(), closing);
+            return;
         }
+        if (opened.closed()) return; // DevTools Chromium could not open
+        devTools = opened;
+        // A closed DevTools item, its canvas and Chromium's browser are let go.
+        opened.tab().onClosed(() -> { if (devTools == opened) devTools = null; });
+    }
+
+    /** The item's DevTools item while it is open. */
+    Optional<DevToolsItem> devToolsItem() {
+        return Optional.ofNullable(devTools);
     }
 
     /**

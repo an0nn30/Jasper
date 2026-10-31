@@ -4,6 +4,7 @@ import dev.jasper.browser.page.LoadFailure;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.page.ServerCertificate;
+import java.awt.Point;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,9 +15,10 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Spec section 14: what the client's request handler does with a certificate error of a page's main frame. Chromium's
- * side is played by the test: the certificate it reports, and its thread, whose hand-offs to the UI thread the test
- * runs. No Chromium.
+ * Spec section 14: what the client's request handler does with a certificate error of a page's main frame; and where a
+ * link a page's DevTools open goes. Chromium's side is played by the test: the certificate it reports, the browser it
+ * calls about (made without Chromium, {@code PageTestAccess.devToolsBrowser}), and its thread, whose hand-offs to the
+ * UI thread the test runs. No Chromium.
  */
 class PageNavigationTest {
     private static final String URL = "https://self-signed.badssl.com/";
@@ -74,6 +76,31 @@ class PageNavigationTest {
             page.allowCertificates(certificate -> true);
             page.close();
             assertThat(PageNavigation.goesOn(page, URL, "ERR_CERT_AUTHORITY_INVALID", Optional.of(CERTIFICATE), task -> { })).isFalse();
+        });
+    }
+
+    /**
+     * A link or popup a page's DevTools open, as a URL clicked in their Console, goes to the page they inspect, in the tab
+     * next to its own, when that page could open it itself (4a's R36); a page's own links are not DevTools'.
+     */
+    @Test void aLinkThePagesDevToolsOpenGoesNextToThePagesTabWhenThePageCouldOpenIt() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            var opened = new ArrayList<String>();
+            page.onOpenItem((url, placement) -> {
+                opened.add(placement + " " + url);
+                return Optional.empty();
+            });
+            var handedOff = new ArrayList<Runnable>();
+            var devTools = PageTestAccess.devToolsBrowser(PageTestAccess.devTools(page, new Point()));
+            assertThat(PageNavigation.fromDevTools(devTools, "https://example.org/docs", handedOff::add)).isTrue();
+            assertThat(PageNavigation.fromDevTools(devTools, "file:///etc/hosts", handedOff::add)).isTrue();
+            assertThat(PageNavigation.fromDevTools(devTools, "jasper-about:welcome", handedOff::add)).isTrue();
+            assertThat(PageNavigation.fromDevTools(PageTestAccess.pageBrowser(page), "https://example.org/", handedOff::add))
+                .as("the page's own browser").isFalse();
+            assertThat(opened).as("on the UI thread").isEmpty();
+            handedOff.forEach(Runnable::run);
+            assertThat(opened).as("an https page opens no local address").containsExactly("NEXT_TAB https://example.org/docs");
         });
     }
 

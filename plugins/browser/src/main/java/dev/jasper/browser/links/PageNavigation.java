@@ -29,8 +29,10 @@ import org.cef.security.CefSSLInfo;
  * neither a disposition nor, for a popup, whether the user asked for it, so {@link LinkRoute} decides from the press the
  * page's {@link PageView} last forwarded and the page's activation, which a popup consumes. Chromium calls both on its
  * own UI thread, and each answers at once that Chromium makes nothing itself; what Jasper opens instead is posted to
- * Swing's: the link loaded in its page, or an item of its own that the page's item opens beside itself. The hover
- * address, from {@code onStatusMessage}, is the {@code page} package's display handler's.
+ * Swing's: the link loaded in its page, or an item of its own that the page's item opens beside itself. A link or
+ * popup of a page's DevTools browser, as a URL clicked in their Console, goes to the page they inspect, in the tab next
+ * to its own when that page could open it ({@link #fromDevTools}). The hover address, from {@code onStatusMessage}, is
+ * the {@code page} package's display handler's.
  *
  * <p>The request handler also hears each certificate Chromium cannot verify for a page's load
  * ({@code onCertificateError}): Chromium goes on past it only when the page's item allows that host with that
@@ -94,6 +96,7 @@ public final class PageNavigation {
         }
 
         @Override public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String url, boolean userGesture) {
+            if (fromDevTools(browser, url, EventQueue::invokeLater)) return true;
             if (browser instanceof PageBrowser page)
                 LinkRoute.link(url, page.view().lastPress(), userGesture, System.currentTimeMillis(), MAC_OS)
                     .ifPresent(where -> EventQueue.invokeLater(() -> go(page, url, where)));
@@ -104,6 +107,7 @@ public final class PageNavigation {
     /** Popups: Jasper opens the ones the user asked for as items, and Chromium makes none. */
     private static final class Popups extends CefLifeSpanHandlerAdapter {
         @Override public boolean onBeforePopup(CefBrowser browser, CefFrame frame, String url, String name) {
+            if (fromDevTools(browser, url, EventQueue::invokeLater)) return true;
             if (browser instanceof PageBrowser page) {
                 PageView view = page.view();
                 LinkRoute.popup(url, view.lastPress(), view.activation(), System.currentTimeMillis(), MAC_OS)
@@ -111,6 +115,18 @@ public final class PageNavigation {
             }
             return true;
         }
+    }
+
+    /**
+     * Whether {@code browser} is a page's DevTools browser, whose link or popup to {@code url} then goes to the page they
+     * inspect, handed to {@code ui}: in the tab next to the page's, when the page could open it ({@link Page#openFromDevTools}).
+     * Chromium makes nothing itself for it. Chromium's thread.
+     */
+    static boolean fromDevTools(CefBrowser browser, String url, Consumer<Runnable> ui) {
+        Page inspected = browser instanceof PageBrowser shown ? shown.inspected() : null;
+        if (inspected == null) return false;
+        if (url != null) ui.accept(() -> inspected.openFromDevTools(url));
+        return true;
     }
 
     /**

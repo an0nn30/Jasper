@@ -115,7 +115,7 @@ final class DevToolsItem implements AutoCloseable {
         before.close();
         view.registerContent(content(next));
         ending = next.onEnd(this::close);
-        tab.select();
+        if (!closed) tab.select(); // DevTools Chromium could not open have closed the item
     }
 
     /**

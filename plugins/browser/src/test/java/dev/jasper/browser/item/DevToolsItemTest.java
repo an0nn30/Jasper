@@ -124,6 +124,7 @@ class DevToolsItemTest {
             devTools.close();
             assertThat(ended).hasValue(1);
             assertThat(item.tab().isClosed()).isFalse();
+            assertThat(item.devToolsItem()).as("the page's item keeps no closed DevTools item").isEmpty();
             inspect(6, 6);
             ContentTab again = host.contentTab(ID, "DevTools — example.com").orElseThrow();
             assertThat(again).isNotSameAs(devTools);
@@ -157,6 +158,25 @@ class DevToolsItemTest {
                 assertThat(host.invoke(action, window, null)).as(action).isTrue();
             assertThat(ran).containsExactly(WebMenu.RELOAD + " " + EXAMPLE, WebMenu.BACK + " " + EXAMPLE,
                 WebMenu.OPEN_LOCATION + " " + EXAMPLE);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /**
+     * A link the DevTools open in a new tab, as a URL clicked in their Console, opens a browser item next to the page's,
+     * when the page could open it itself (4a's R36).
+     */
+    @Test void aLinkTheDevToolsOpenOpensNextToThePageWhenThePageCouldOpenIt() throws Exception {
+        onUiThread(() -> {
+            open();
+            inspect(5, 5);
+            page.openFromDevTools("file:///etc/hosts");
+            page.openFromDevTools("jasper-about:welcome");
+            assertThat(items.items()).as("an https page opens no local address").containsExactly(item);
+            page.openFromDevTools("https://example.org/docs");
+            assertThat(items.items()).hasSize(2);
+            assertThat(items.items().get(1).url()).isEqualTo(URI.create("https://example.org/docs"));
+            assertThat(host.windowTabs(window)).as("a tab of its own, next to the page's").hasSize(2);
             assertThat(host.failures()).isEmpty();
         });
     }

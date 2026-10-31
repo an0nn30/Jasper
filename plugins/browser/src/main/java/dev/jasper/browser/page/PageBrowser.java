@@ -148,6 +148,17 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     }
 
     /**
+     * The page whose DevTools this browser shows, when it is Chromium's DevTools browser: where the links the DevTools open
+     * go ({@link Page#openFromDevTools}). Any thread.
+     *
+     * @return the page, or null for a page's own browser
+     */
+    public Page inspected() {
+        DevTools tools = devTools;
+        return tools == null ? null : tools.page();
+    }
+
+    /**
      * The canvas the page is drawn on, which records the press and the key that decide whether and where its links and
      * popups open. Any thread.
      *

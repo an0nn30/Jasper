@@ -10,10 +10,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
@@ -144,30 +146,38 @@ public final class PageEvents {
      * Redo, which Chromium leaves to the browser's Edit menu there. Chromium asks only after the page declined the key,
      * so a script that takes Cmd+Z itself undoes once. So it is in a page's DevTools.
      */
-    private static final class Keyboard extends CefKeyboardHandlerAdapter {
+    static final class Keyboard extends CefKeyboardHandlerAdapter {
         @Override public boolean onKeyEvent(CefBrowser browser, CefKeyboardHandler.CefKeyEvent event) {
-            if (!(browser instanceof PageBrowser)) return false;
-            var command = EditingCommand.of(event.type == CefKeyboardHandler.CefKeyEvent.EventType.KEYEVENT_RAWKEYDOWN,
-                event.modifiers, event.windows_key_code);
-            if (command.isEmpty()) return false;
-            CefFrame frame = browser.getFocusedFrame();
-            if (frame == null) return false;
-            try {
-                switch (command.get()) {
-                    case SELECT_ALL -> frame.selectAll();
-                    case CUT -> frame.cut();
-                    case UNDO -> frame.undo();
-                    case REDO -> frame.redo();
-                }
-            } finally {
-                frame.dispose();
-            }
-            return true;
+            return edit(browser, EditingCommand.of(event.type == CefKeyboardHandler.CefKeyEvent.EventType.KEYEVENT_RAWKEYDOWN,
+                event.modifiers, event.windows_key_code), CefBrowser::getFocusedFrame);
         }
     }
 
+    /**
+     * Runs {@code command} on the frame {@code focused} gives as {@code browser}'s focused one, then releases only this
+     * handle to it, when {@code browser} is a page's or a page's DevTools browser. Chromium's thread.
+     *
+     * @return whether a command ran, which Chromium then does not
+     */
+    static boolean edit(CefBrowser browser, Optional<EditingCommand> command, Function<CefBrowser, CefFrame> focused) {
+        if (!(browser instanceof PageBrowser) || command.isEmpty()) return false;
+        CefFrame frame = focused.apply(browser);
+        if (frame == null) return false;
+        try {
+            switch (command.get()) {
+                case SELECT_ALL -> frame.selectAll();
+                case CUT -> frame.cut();
+                case UNDO -> frame.undo();
+                case REDO -> frame.redo();
+            }
+        } finally {
+            frame.dispose();
+        }
+        return true;
+    }
+
     /** Whether the page loads and where it can go, and each main-frame load's start, end and failure. */
-    private static final class Load extends CefLoadHandlerAdapter {
+    static final class Load extends CefLoadHandlerAdapter {
         @Override public void onLoadingStateChange(CefBrowser browser, boolean loading, boolean canGoBack, boolean canGoForward) {
             later(browser, page -> page.loadingChanged(loading, canGoBack, canGoForward));
         }

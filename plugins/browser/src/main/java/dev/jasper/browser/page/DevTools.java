@@ -5,6 +5,7 @@ import java.awt.Point;
 import java.awt.event.HierarchyEvent;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import javax.swing.JComponent;
@@ -16,10 +17,11 @@ import org.cef.browser.CefFrame;
  * browser, drawn on it off screen as a page's browser is drawn on the page's. Chromium makes that browser through the
  * page's ({@code PageBrowser.createDevToolsBrowser}) once the canvas is in a window and the DevTools made for the page
  * before these have closed: Chromium keeps one DevTools per page, and asked again while they are open it only shows
- * them, which would leave JCEF matching the next browser Chromium makes to the one it was asked for. The client's
- * handlers take the DevTools browser for no page's. Closing the DevTools closes that browser, and so does the page's
- * close; those who asked {@link #onEnd} are told once Chromium has closed it, or at once for DevTools Chromium never
- * made. UI thread.
+ * them, which would leave JCEF matching the next browser Chromium makes to the one it was asked for. The wait is
+ * transitive (P44): DevTools closed while they wait end only once those before them have, so DevTools after them wait for
+ * every earlier one. The client's handlers take the DevTools browser for no page's. Closing the DevTools closes that
+ * browser, and so does the page's close; those who asked {@link #onEnd} are told once Chromium has closed it, or, for
+ * DevTools Chromium was never asked for, once they are closed and the DevTools before them have ended. UI thread.
  */
 public final class DevTools implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(DevTools.class.getName());
@@ -29,8 +31,9 @@ public final class DevTools implements AutoCloseable {
     private final List<Runnable> ends = new CopyOnWriteArrayList<>();
     // The page's DevTools before these, until they have ended.
     private DevTools previous;
-    // The page's browser, which Chromium made the DevTools through, and the DevTools browser it made; null before.
-    private PageBrowser inspected, browser;
+    // The DevTools browser Chromium made, and what has Chromium close it; null before Chromium is asked and after the end.
+    private PageBrowser browser;
+    private Runnable closer;
     private boolean asked, closed, ended;
 
     /**
@@ -48,7 +51,8 @@ public final class DevTools implements AutoCloseable {
             this.previous = previous;
             previous.onEnd(() -> {
                 this.previous = null;
-                open();
+                if (closed) ended();
+                else open();
             });
         }
     }
@@ -94,12 +98,23 @@ public final class DevTools implements AutoCloseable {
         return () -> ends.remove(listener);
     }
 
-    /** Closes the DevTools: Chromium closes their browser, or for DevTools it never made, they end now. Once. */
+    /**
+     * Closes the DevTools, once: Chromium closes their browser, and they end once it has. DevTools Chromium was never asked
+     * for end now, or while they wait, once the DevTools before them have ended.
+     */
     @Override public void close() {
         if (closed) return;
         closed = true;
-        if (browser != null) inspected.closeDevTools();
-        else ended();
+        if (asked) {
+            if (closer != null) closer.run(); // else open() runs it once Chromium has been asked
+        } else if (previous == null) {
+            ended();
+        }
+    }
+
+    /** The page the DevTools inspect. */
+    Page page() {
+        return page;
     }
 
     /** The canvas, for the DevTools browser Chromium makes for these. */
@@ -112,33 +127,45 @@ public final class DevTools implements AutoCloseable {
         browser = Objects.requireNonNull(devTools, "devTools");
     }
 
-    /** Chromium has closed the DevTools browser, or never made it: those who asked {@link #onEnd} are told. Once. */
+    /**
+     * Chromium has closed the DevTools browser, or was never asked for it: those who asked {@link #onEnd} are told, and the
+     * DevTools let go of Chromium's browser. Once.
+     */
     void ended() {
         if (ended) return;
         ended = true;
         closed = true;
+        browser = null;
+        closer = null;
+        previous = null;
         List<Runnable> told = List.copyOf(ends);
         ends.clear();
         for (Runnable listener : told) listener.run();
     }
 
     /**
-     * Has Chromium make the DevTools browser, once the canvas is in a window and the page's DevTools before have ended,
-     * while the page's browser is ready. Once; DevTools Chromium could not make end.
+     * Has Chromium make the DevTools browser through the page's ({@code Page.openDevTools}), once the canvas is in a window
+     * and the page's DevTools before have ended, while the page's browser is ready. Once; DevTools Chromium could not make
+     * end.
      */
     private void open() {
         if (asked || closed || previous != null || !view.isDisplayable()) return;
-        PageBrowser target = page.readyBrowser();
-        if (target == null) return;
         asked = true;
-        inspected = target;
+        Optional<Runnable> opened;
         try {
-            target.openDevTools(this, at);
+            opened = page.openDevTools(this, at);
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "Chromium could not open a page's DevTools", failure);
-            browser = null;
             ended();
+            return;
         }
+        if (opened.isEmpty()) { // the page's browser is not ready: nothing was asked
+            asked = false;
+            if (closed) ended();
+            return;
+        }
+        closer = opened.get();
+        if (closed) closer.run(); // closed while Chromium was asked
     }
 
     /** Runs {@code command} on the DevTools' focused frame, then releases only this handle to it; nothing before Chromium made them. */

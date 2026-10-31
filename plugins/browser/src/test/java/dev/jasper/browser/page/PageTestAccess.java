@@ -158,6 +158,63 @@ public final class PageTestAccess {
     }
 
     /**
+     * A page's browser made without its constructor, which would start Chromium: it has only its own fields, its page and
+     * the page's canvas, and every Chromium call on it answers nothing, as JCEF's calls do before a native browser
+     * exists. For the client's handlers, which ask a browser whose it is.
+     *
+     * @param owner the page
+     * @return the browser
+     */
+    public static PageBrowser pageBrowser(Page owner) {
+        PageBrowser made = withoutConstructor();
+        set(made, "view", owner.view());
+        made.owner(owner);
+        return made;
+    }
+
+    /**
+     * Chromium's DevTools browser for {@code tools}, made as {@link #pageBrowser} makes a page's: no page's, drawn on the
+     * DevTools' canvas.
+     *
+     * @param tools the DevTools
+     * @return the browser
+     */
+    public static PageBrowser devToolsBrowser(DevTools tools) {
+        PageBrowser made = withoutConstructor();
+        set(made, "view", tools.canvas());
+        set(made, "devTools", tools);
+        return made;
+    }
+
+    /**
+     * A {@code PageBrowser} whose constructors never ran, only {@code Object}'s: the JDK's serialization constructor,
+     * from {@code jdk.unsupported}'s {@code sun.reflect.ReflectionFactory}, found by name so the compiler has no internal
+     * API to warn of.
+     */
+    private static PageBrowser withoutConstructor() {
+        try {
+            Class<?> factory = Class.forName("sun.reflect.ReflectionFactory");
+            Object reflection = factory.getMethod("getReflectionFactory").invoke(null);
+            var constructor = (java.lang.reflect.Constructor<?>) factory.getMethod("newConstructorForSerialization", Class.class,
+                java.lang.reflect.Constructor.class).invoke(reflection, PageBrowser.class, Object.class.getDeclaredConstructor());
+            return PageBrowser.class.cast(constructor.newInstance());
+        } catch (ReflectiveOperationException unavailable) {
+            throw new AssertionError("A page's browser could not be made without Chromium", unavailable);
+        }
+    }
+
+    /** Sets {@code made}'s field {@code name}, final ones included, as its constructor would have. */
+    private static void set(PageBrowser made, String name, Object value) {
+        try {
+            var field = PageBrowser.class.getDeclaredField(name);
+            field.setAccessible(true);
+            field.set(made, value);
+        } catch (ReflectiveOperationException unavailable) {
+            throw new AssertionError("A page's browser has no field " + name, unavailable);
+        }
+    }
+
+    /**
      * Chromium has closed the DevTools' browser, as it does once they or their page close. UI thread.
      *
      * @param tools the DevTools

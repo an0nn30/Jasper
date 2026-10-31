@@ -80,8 +80,12 @@ public final class Page implements AutoCloseable {
     private volatile double zoomLevel;
     // The page's find in page, made the first time it is asked for.
     private PageFind find;
-    // The DevTools made for the page last, or null before any.
+    // The DevTools made for the page last, until they end; null before and after.
     private DevTools devTools;
+    // Given DevTools and a point, has Chromium make their browser through the page's and answers what closes it, or empty
+    // while the page's browser is not ready: a test's, or null for Chromium's. Null by default, so that making a page
+    // loads no DevTools class.
+    private BiFunction<DevTools, Point, Optional<Runnable>> devToolsOpener;
     private PageBrowser browser;
     // The address the browser was made with, which it loads by itself.
     private String made;
@@ -584,6 +588,18 @@ public final class Page implements AutoCloseable {
         itemCloser = Objects.requireNonNull(closer, "closer");
     }
 
+    /**
+     * A link the page's DevTools open in a new tab, as a URL clicked in their Console: it opens in the tab next to the
+     * page's, as the page's right-click menu opens a link, when the page itself could open it ({@link LinkSchemes#opensFrom},
+     * 4a's R36), as what the DevTools show comes from the page. Nothing after {@link #close()}.
+     *
+     * @param url the address, as Chromium gave it
+     */
+    public void openFromDevTools(String url) {
+        Objects.requireNonNull(url, "url");
+        if (!closed && LinkSchemes.opensFrom(address, url)) openItem(url, TabPlacement.NEXT_TAB);
+    }
+
     /** The page asks to close its item, as a script's {@code window.close()} does. Nothing after {@link #close()}. */
     public void closeItem() {
         if (!closed) itemCloser.run();
@@ -883,8 +899,26 @@ public final class Page implements AutoCloseable {
     DevTools devTools(Point at) {
         DevTools made = new DevTools(this, new PageView(), at, devTools);
         devTools = made;
+        made.onEnd(() -> { if (devTools == made) devTools = null; });
         if (closed) made.close();
         return made;
+    }
+
+    /**
+     * Has Chromium make {@code tools}' browser, inspecting the element at {@code at} on the page's canvas, through the
+     * page's browser: what closes it, or empty while the page's browser is not ready or the page has closed.
+     */
+    Optional<Runnable> openDevTools(DevTools tools, Point at) {
+        if (devToolsOpener != null) return Objects.requireNonNull(devToolsOpener.apply(tools, at), "opened");
+        PageBrowser target = readyBrowser();
+        if (target == null || closed) return Optional.empty();
+        target.openDevTools(tools, at);
+        return Optional.of(target::closeDevTools);
+    }
+
+    /** Has the page ask for its DevTools' browsers with {@code replacement} from now on, as a test's recording one. */
+    void useDevToolsOpener(BiFunction<DevTools, Point, Optional<Runnable>> replacement) {
+        devToolsOpener = Objects.requireNonNull(replacement, "replacement");
     }
 
     /** Has the page go to its history's entries with {@code replacement} from now on, as a test's recording one. */
