@@ -28,7 +28,7 @@ class PageNavigationTest {
             Page page = page();
             page.allowCertificates(certificate -> certificate.equals(CERTIFICATE));
             var handedOff = new ArrayList<Runnable>();
-            assertThat(PageNavigation.goesOn(page, URL, Optional.of(CERTIFICATE), handedOff::add)).isTrue();
+            assertThat(PageNavigation.goesOn(page, URL, "ERR_CERT_AUTHORITY_INVALID", Optional.of(CERTIFICATE), handedOff::add)).isTrue();
             assertThat(handedOff).isEmpty();
         });
     }
@@ -39,14 +39,32 @@ class PageNavigationTest {
             var failures = new ArrayList<LoadFailure>();
             page.onLoadFailure(failures::add);
             var handedOff = new ArrayList<Runnable>();
-            assertThat(PageNavigation.goesOn(page, URL, Optional.of(CERTIFICATE), handedOff::add)).as("none allowed yet").isFalse();
+            assertThat(PageNavigation.goesOn(page, URL, "ERR_CERT_AUTHORITY_INVALID", Optional.of(CERTIFICATE), handedOff::add)).as("none allowed yet").isFalse();
             assertThat(handedOff).hasSize(1);
             handedOff.forEach(Runnable::run);
             PageTestAccess.loadFailed(page, URL, "ERR_CERT_AUTHORITY_INVALID");
             assertThat(failures).containsExactly(new LoadFailure(URL, "ERR_CERT_AUTHORITY_INVALID", Optional.of(CERTIFICATE)));
             handedOff.clear();
-            assertThat(PageNavigation.goesOn(page, URL, Optional.empty(), handedOff::add)).as("no certificate to allow").isFalse();
+            assertThat(PageNavigation.goesOn(page, URL, "ERR_CERT_AUTHORITY_INVALID", Optional.empty(), handedOff::add)).as("no certificate to allow").isFalse();
             assertThat(handedOff).isEmpty();
+        });
+    }
+
+    /** As Chrome: a revoked, invalid or malformed certificate has no way past it, even one allowed before. */
+    @Test void aFatalCertificateErrorGoesOnPastNoCertificateEvenAnAllowedOne() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            page.allowCertificates(certificate -> true);
+            var failures = new ArrayList<LoadFailure>();
+            page.onLoadFailure(failures::add);
+            for (String fatal : List.of("ERR_CERT_REVOKED", "ERR_CERT_INVALID", "ERR_CERT_CONTAINS_ERRORS")) {
+                var handedOff = new ArrayList<Runnable>();
+                assertThat(PageNavigation.goesOn(page, URL, fatal, Optional.of(CERTIFICATE), handedOff::add)).as(fatal).isFalse();
+                handedOff.forEach(Runnable::run);
+                PageTestAccess.loadFailed(page, URL, fatal);
+            }
+            assertThat(failures).as("each shows its certificate on the error page").allSatisfy(failure ->
+                assertThat(failure.certificate()).contains(CERTIFICATE));
         });
     }
 
@@ -55,7 +73,7 @@ class PageNavigationTest {
             Page page = page();
             page.allowCertificates(certificate -> true);
             page.close();
-            assertThat(PageNavigation.goesOn(page, URL, Optional.of(CERTIFICATE), task -> { })).isFalse();
+            assertThat(PageNavigation.goesOn(page, URL, "ERR_CERT_AUTHORITY_INVALID", Optional.of(CERTIFICATE), task -> { })).isFalse();
         });
     }
 

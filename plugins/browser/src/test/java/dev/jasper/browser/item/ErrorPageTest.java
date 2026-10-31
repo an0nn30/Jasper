@@ -91,15 +91,18 @@ class ErrorPageTest {
         assertThat(code).as("a code that is none Chromium writes is not shown").doesNotContain("<i>", "&lt;i&gt;");
     }
 
-    /** 4a's R46: an error page shows its address without a user name or password. */
+    /**
+     * 4a's R46: an error page shows its address without a user name or password. The name and password hold letters a
+     * hexadecimal token never does, so a token cannot hold them by chance.
+     */
     @Test void theAddressIsShownAndCarriedWithoutItsUserInfo() {
-        var failure = ErrorPage.Failure.of(new LoadFailure("https://ada:secret@example.com/docs", "ERR_CONNECTION_REFUSED", Optional.empty()));
-        assertThat(failure.url()).as("kept for Try Again").isEqualTo("https://ada:secret@example.com/docs");
-        assertThat(failure.address().toString()).doesNotContain("ada", "secret");
+        var failure = ErrorPage.Failure.of(new LoadFailure("https://jill:hunter@example.com/docs", "ERR_CONNECTION_REFUSED", Optional.empty()));
+        assertThat(failure.url()).as("kept for Try Again").isEqualTo("https://jill:hunter@example.com/docs");
+        assertThat(failure.address().toString()).doesNotContain("jill", "hunter");
         String html = ErrorPage.html(failure.address(), PALETTE, true);
-        assertThat(html).contains("https://example.com/docs").doesNotContain("ada", "secret");
-        String forged = render("https://ada:secret@example.com/", "ERR_FAILED", Optional.empty());
-        assertThat(forged).as("an address another page wrote").doesNotContain("ada", "secret");
+        assertThat(html).contains("https://example.com/docs").doesNotContain("jill", "hunter");
+        String forged = render("https://jill:hunter@example.com/", "ERR_FAILED", Optional.empty());
+        assertThat(forged).as("an address another page wrote").doesNotContain("jill", "hunter");
     }
 
     @Test void aCertificateErrorSaysWhyAndShowsTheChainWithContinueBehindDetails() {
@@ -123,6 +126,21 @@ class ErrorPageTest {
         assertThat(ErrorPage.reason("ERR_CERT_WEAK_KEY", false)).contains("The certificate for this website isn’t valid.");
         assertThat(ErrorPage.reason("ERR_SSL_PROTOCOL_ERROR", false)).as("no certificate's fault").isEmpty();
         assertThat(ErrorPage.reason("ERR_NAME_NOT_RESOLVED", false)).isEmpty();
+    }
+
+    /** As Chrome: a revoked, invalid or malformed certificate says why and shows its chain, with no way past it. */
+    @Test void aFatalCertificateErrorShowsItsCertificateWithoutContinue() {
+        var certificate = new ServerCertificate("revoked.badssl.com", SHA256, List.of("CN=revoked.badssl.com"), false);
+        for (String fatal : List.of("ERR_CERT_REVOKED", "ERR_CERT_INVALID", "ERR_CERT_CONTAINS_ERRORS")) {
+            var failure = ErrorPage.Failure.of(new LoadFailure("https://revoked.badssl.com/", fatal, Optional.of(certificate)));
+            assertThat(failure.proceed()).as(fatal).isEmpty();
+            String html = ErrorPage.html(failure.address(), PALETTE, true);
+            assertThat(html).as(fatal).contains("Jasper can’t verify the identity of the website “revoked.badssl.com”.",
+                "<li>CN=revoked.badssl.com</li>", ErrorPage.reason(fatal, false).orElseThrow());
+            assertThat(html).as(fatal).doesNotContain("<details>", "Continue to this site");
+        }
+        assertThat(ErrorPage.reason("ERR_CERT_REVOKED", false)).contains("The certificate for this website has been revoked.");
+        assertThat(ErrorPage.reason("ERR_CERT_CONTAINS_ERRORS", false)).contains("The certificate for this website isn’t valid.");
     }
 
     /** A certificate error Chromium gave no certificate for, such as one it never asked about, has no way past it. */

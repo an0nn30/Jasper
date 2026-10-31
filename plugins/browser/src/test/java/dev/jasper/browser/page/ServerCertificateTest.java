@@ -70,6 +70,18 @@ class ServerCertificateTest {
             .hasSize(ServerCertificate.MAX_CHAIN);
     }
 
+    /** As Chrome: a revoked, invalid or malformed certificate is fatal; any other certificate error can be gone past. */
+    @Test void onlyARevokedInvalidOrMalformedCertificateIsFatal() {
+        for (String fatal : List.of("ERR_CERT_REVOKED", "ERR_CERT_INVALID", "ERR_CERT_CONTAINS_ERRORS"))
+            assertThat(ServerCertificate.overridable(fatal)).as(fatal).isFalse();
+        for (String minor : List.of("ERR_CERT_AUTHORITY_INVALID", "ERR_CERT_DATE_INVALID", "ERR_CERT_COMMON_NAME_INVALID",
+                "ERR_CERT_WEAK_SIGNATURE_ALGORITHM", "ERR_CERTIFICATE_TRANSPARENCY_REQUIRED"))
+            assertThat(ServerCertificate.overridable(minor)).as(minor).isTrue();
+        assertThat(ServerCertificate.overridable("ERR_SSL_PROTOCOL_ERROR")).as("no certificate's error").isFalse();
+        assertThat(ServerCertificate.overridable("")).isFalse();
+        assertThat(ServerCertificate.overridable(null)).isFalse();
+    }
+
     @Test void itsPartsAreChecked() {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ServerCertificate("", SELF_SIGNED_SHA256, List.of(), true))
             .isInstanceOf(IllegalArgumentException.class);

@@ -487,14 +487,15 @@ public final class Page implements AutoCloseable {
 
     /**
      * Whether Chromium may go on past {@code certificate}, which it could not verify for a load of the page. Any
-     * thread.
+     * thread: it reads only the volatile answer {@link #allowCertificates} gave, which {@link #close()} replaces with one
+     * that allows nothing.
      *
      * @param certificate the certificate
      * @return whether the page's item allows it; false after {@link #close()}
      */
     public boolean allowsCertificate(ServerCertificate certificate) {
         Objects.requireNonNull(certificate, "certificate");
-        return !closed && certificates.test(certificate);
+        return certificates.test(certificate);
     }
 
     /**

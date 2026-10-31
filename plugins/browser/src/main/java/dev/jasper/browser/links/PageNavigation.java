@@ -85,7 +85,10 @@ public final class PageNavigation {
         @Override public boolean onCertificateError(CefBrowser browser, CefLoadHandler.ErrorCode error, String url, CefSSLInfo info,
                                                     CefCallback callback) {
             Page page = browser instanceof PageBrowser shown ? shown.owner() : null;
-            if (page == null || !goesOn(page, url, certificate(url, info), EventQueue::invokeLater)) return false;
+            String code = error == null ? "" : error.name();
+            // False, not callback.cancel(): CEF then fails the load with the certificate's own error, such as
+            // ERR_CERT_AUTHORITY_INVALID, which the error page needs to say why.
+            if (page == null || !goesOn(page, url, code, certificate(url, info), EventQueue::invokeLater)) return false;
             callback.Continue();
             return true;
         }
@@ -112,13 +115,14 @@ public final class PageNavigation {
 
     /**
      * Whether Chromium goes on past {@code certificate}, which it could not verify for the load of {@code url} in
-     * {@code page}: only when the page allows it. Otherwise {@code ui} is handed the page's refusal, for the
-     * failure that follows, and Chromium cancels the load. Without a certificate there is nothing to allow. Chromium's
-     * thread.
+     * {@code page} with the error {@code code}: only when the error is one Chrome lets the user past
+     * ({@link ServerCertificate#overridable}) and the page allows the certificate. Otherwise {@code ui} is handed the
+     * page's refusal, for the failure that follows, and Chromium cancels the load. Without a certificate there is
+     * nothing to allow. Chromium's thread.
      */
-    static boolean goesOn(Page page, String url, Optional<ServerCertificate> certificate, Consumer<Runnable> ui) {
+    static boolean goesOn(Page page, String url, String code, Optional<ServerCertificate> certificate, Consumer<Runnable> ui) {
         if (certificate.isEmpty()) return false;
-        if (page.allowsCertificate(certificate.get())) return true;
+        if (ServerCertificate.overridable(code) && page.allowsCertificate(certificate.get())) return true;
         ServerCertificate refused = certificate.get();
         ui.accept(() -> page.certificateRefused(url, refused));
         return false;

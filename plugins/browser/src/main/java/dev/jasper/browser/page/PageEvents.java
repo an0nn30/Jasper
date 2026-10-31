@@ -104,6 +104,17 @@ public final class PageEvents {
     }
 
     /**
+     * A load of {@code page} in {@code frame} failed with {@code errorCode}: a main frame's failure is handed to the UI
+     * thread through {@code ui}, for the page, by Chromium's name for the error, or empty for one it does not name; a
+     * sub-frame's, and one without a page or frame, are not. Chromium's thread.
+     */
+    static void loadError(Page page, CefFrame frame, CefLoadHandler.ErrorCode errorCode, String failedUrl, Consumer<Runnable> ui) {
+        if (page == null || frame == null || !frame.isMain()) return;
+        String code = errorCode == null ? "" : errorCode.name();
+        ui.accept(() -> page.loadFailed(failedUrl, code));
+    }
+
+    /**
      * The main frame's address and the page's title, the address of the link under the pointer, and the fullscreen a
      * page is refused.
      */
@@ -182,9 +193,7 @@ public final class PageEvents {
 
         @Override public void onLoadError(CefBrowser browser, CefFrame frame, CefLoadHandler.ErrorCode errorCode, String errorText,
                                           String failedUrl) {
-            if (frame == null || !frame.isMain()) return;
-            String code = errorCode == null ? "" : errorCode.name();
-            later(browser, page -> page.loadFailed(failedUrl, code));
+            loadError(page(browser), frame, errorCode, failedUrl, EventQueue::invokeLater);
         }
     }
 }

@@ -75,6 +75,11 @@ class BrowserItemErrorTest {
             PageTestAccess.addressChanged(page, "https://example.org/");
             assertThat(Views.field(view, BrowserToolbar.ADDRESS).value()).isEqualTo("https://example.org/");
             assertThat(host.restoreState(item.tab()).orElseThrow().values()).containsEntry("url", "https://example.org/");
+            PageTestAccess.addressChanged(page, "jasper-about://error/?token=" + "f".repeat(32) + "&code=ERR_FAILED&url=file%3A%2F%2F%2Fetc");
+            assertThat(host.restoreState(item.tab()).orElseThrow().values()).as("an error page that is none of the item's")
+                .containsEntry("url", "https://example.org/");
+            PageTestAccess.addressChanged(page, "jasper-about://error/?code=ERR_FAILED");
+            assertThat(host.restoreState(item.tab()).orElseThrow().values()).containsEntry("url", "https://example.org/");
             assertThat(host.failures()).isEmpty();
         });
     }
@@ -88,6 +93,11 @@ class BrowserItemErrorTest {
             String errorPage = page.address();
             PageTestAccess.loadFailed(page, errorPage, "ERR_FAILED");
             assertThat(page.address()).as("no error page for an error page").isEqualTo(errorPage);
+            for (String action : List.of("jasper-about://error-retry/?token=" + "a".repeat(32), "jasper-about://error-continue/?token=x",
+                    "jasper-about://settings/", "JASPER-ABOUT:welcome")) {
+                PageTestAccess.loadFailed(page, action, "ERR_FAILED");
+                assertThat(page.address()).as("a Jasper action's or page's load, which ends without a page: " + action).isEqualTo(errorPage);
+            }
             assertThat(host.failures()).isEmpty();
         });
     }
@@ -231,6 +241,41 @@ class BrowserItemErrorTest {
         });
     }
 
+    /** As Chrome: a revoked certificate shows the error page with no Continue to use. */
+    @Test void aFatalCertificateErrorCannotBeContinued() throws Exception {
+        onUiThread(() -> {
+            open();
+            page.certificateRefused(BAD_SSL, CERTIFICATE);
+            PageTestAccess.loadFailed(page, BAD_SSL, "ERR_CERT_REVOKED");
+            String error = commitErrorPage();
+            assertThat(AboutScheme.parameter(error, "proceed")).isEmpty();
+            assertThat(AboutScheme.parameters(error, "subject")).as("the chain still shows").containsExactly("CN=*.badssl.com");
+            items.proceed(URI.create("jasper-about://error-continue/?token=" + AboutScheme.parameter(error, "token").orElseThrow()));
+            assertThat(page.allowsCertificate(CERTIFICATE)).isFalse();
+            assertThat(page.address()).isEqualTo(error);
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
+    /** An item remembers its last 50 error pages, as many as Chromium keeps entries; an older one is shown as it is. */
+    @Test void anItemRemembersItsLastFiftyErrorPages() throws Exception {
+        onUiThread(() -> {
+            open();
+            var errors = new ArrayList<String>();
+            for (int at = 0; at <= 50; at++) {
+                PageTestAccess.loadFailed(page, "https://unknown" + at + ".example/", "ERR_NAME_NOT_RESOLVED");
+                errors.add(commitErrorPage());
+            }
+            PageTestAccess.addressChanged(page, errors.get(1));
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).value()).isEqualTo("https://unknown1.example/");
+            PageTestAccess.addressChanged(page, errors.get(0));
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).value()).as("the oldest, forgotten").isEqualTo(errors.get(0));
+            items.tryAgain(URI.create("jasper-about://error-retry/?token=" + AboutScheme.parameter(errors.get(0), "token").orElseThrow()));
+            assertThat(page.address()).as("its Try Again does nothing").isEqualTo(errors.get(0));
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
     @Test void aRefusedCertificateGoesWithTheFailureOfItsOwnAddressOnly() throws Exception {
         onUiThread(() -> {
             open();
@@ -255,6 +300,8 @@ class BrowserItemErrorTest {
             assertThat(notSecure()).as("the error page").isEmpty();
             PageTestAccess.historyRead(page, History.EMPTY);
             items.proceed(URI.create("jasper-about://error-continue/?token=" + AboutScheme.parameter(error, "proceed").orElseThrow()));
+            assertThat(page.address()).isEqualTo(BAD_SSL);
+            assertThat(notSecure()).as("while it loads, before it commits").isEmpty();
             PageTestAccess.addressChanged(page, BAD_SSL + "page");
             assertThat(notSecure()).hasValueSatisfying(text -> {
                 assertThat(text.text()).isEqualTo("Not secure");
@@ -264,9 +311,15 @@ class BrowserItemErrorTest {
             assertThat(field.leadingImage()).isEmpty();
             assertThat(field.leadingIcon()).isEmpty();
             assertThat(field.value()).isEqualTo(BAD_SSL + "page");
+            item.load(URI.create("https://example.org/"));
+            assertThat(notSecure()).as("the page shown until the next one commits").isPresent();
+            PageTestAccess.loadFailed(page, "https://example.org/", "ERR_ABORTED");
+            assertThat(notSecure()).as("a load that never committed").isPresent();
             PageTestAccess.addressChanged(page, "https://example.org/");
             assertThat(notSecure()).as("a secure page").isEmpty();
             assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingIcon()).isEqualTo(BrowserItems.GLOBE);
+            item.load(URI.create(BAD_SSL + "next"));
+            assertThat(notSecure()).as("a load of an allowed host that has not committed").isEmpty();
             PageTestAccess.addressChanged(page, "http://self-signed.badssl.com/");
             assertThat(notSecure()).as("no certificate at http").isEmpty();
             assertThat(host.failures()).isEmpty();

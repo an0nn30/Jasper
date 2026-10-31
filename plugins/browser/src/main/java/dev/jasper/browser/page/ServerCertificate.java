@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -29,6 +30,8 @@ public record ServerCertificate(String host, String sha256, List<String> subject
     /** The most certificates of a chain whose subjects are kept. */
     public static final int MAX_CHAIN = 10;
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
+    // The certificate errors Chrome lets no one go past: a revoked, invalid or malformed certificate.
+    private static final Set<String> FATAL = Set.of("ERR_CERT_REVOKED", "ERR_CERT_INVALID", "ERR_CERT_CONTAINS_ERRORS");
 
     /** Rejects a blank host and a fingerprint that is not 64 hexadecimal digits; keeps both in lower case. */
     public ServerCertificate {
@@ -65,6 +68,17 @@ public record ServerCertificate(String host, String sha256, List<String> subject
             if (chain[at] != null) subjects.add(chain[at].getSubjectX500Principal().getName());
         boolean selfSigned = chain.length == 1 && server.getSubjectX500Principal().equals(server.getIssuerX500Principal());
         return Optional.of(new ServerCertificate(host.get(), sha256, subjects, selfSigned));
+    }
+
+    /**
+     * Whether a certificate error can be gone past, as Chrome lets the user go past it: any certificate error but a
+     * revoked, invalid or malformed certificate's.
+     *
+     * @param code Chromium's name for the error, such as {@code ERR_CERT_AUTHORITY_INVALID}
+     * @return whether Continue may be offered and allowed for it; false for an error that is no certificate's
+     */
+    public static boolean overridable(String code) {
+        return code != null && code.startsWith("ERR_CERT") && !FATAL.contains(code);
     }
 
     private static Optional<String> host(String url) {

@@ -68,13 +68,11 @@ final class BrowserToolbar {
             : AddressInput.parse(address).flatMap(page -> SearchEngine.queryOf(page, settings)).orElse(address);
         List<Nodes.Suggestion> rows = typed == null ? List.of() : Suggestions.rank(typed, settings, suggested, List.of());
         // The site icon's slot is empty while "Not secure" stands in its place, so it is neither named nor dragged.
-        var field = notSecure
-            ? new Nodes.Field(ADDRESS, ControlState.READY, Nodes.FieldKind.TEXT, value, PLACEHOLDER, "Address", ENTER, Optional.empty(),
-                Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "", false, Optional.empty(), "", "", Optional.empty(), true, rows,
-                typed != null && suggesting)
-            : new Nodes.Field(ADDRESS, ControlState.READY, Nodes.FieldKind.TEXT, value, PLACEHOLDER, "Address", ENTER, Optional.empty(),
-                Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "", false, icon, BrowserItems.GLOBE, SITE_ICON,
-                address.isBlank() ? Optional.empty() : Optional.of(address), true, rows, typed != null && suggesting);
+        Optional<PixelImage> image = notSecure ? Optional.empty() : icon;
+        String glyph = notSecure ? "" : BrowserItems.GLOBE, name = notSecure ? "" : SITE_ICON;
+        Optional<String> drag = notSecure || address.isBlank() ? Optional.empty() : Optional.of(address);
+        var field = new Nodes.Field(ADDRESS, ControlState.READY, Nodes.FieldKind.TEXT, value, PLACEHOLDER, "Address", ENTER, Optional.empty(),
+            Nodes.FieldPresentation.EMBEDDED, "", ESCAPE, "", false, image, glyph, name, drag, true, rows, typed != null && suggesting);
         var menu = new Nodes.MenuButton(MENU, ControlState.READY, "", "menu", Nodes.ButtonKind.GHOST, "",
             List.of(new MenuItem(SETTINGS, "Settings", "", SETTINGS, true, false)), "Menu");
         var children = new ArrayList<Nodes.Node>(List.of(

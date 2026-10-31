@@ -53,7 +53,7 @@ public final class NavigationHistory {
      */
     public record Entry(int id, String url, String title) {
         public Entry {
-            url = kept(withoutUserInfo(Objects.requireNonNull(url, "url")));
+            url = entryUrl(Objects.requireNonNull(url, "url"));
             title = kept(Objects.requireNonNull(title, "title"));
         }
     }
@@ -228,6 +228,16 @@ public final class NavigationHistory {
     /** The first {@code length} characters of {@code text}, or one fewer where a character's two halves would part. */
     private static String cut(String text, int length) {
         return text.substring(0, Character.isHighSurrogate(text.charAt(length - 1)) ? length - 1 : length);
+    }
+
+    /**
+     * {@code url} as an {@link Entry} keeps it: without its user name and password, and to {@link #KEPT} characters.
+     *
+     * @param url an address, as text
+     * @return the address as an entry of the history would hold it
+     */
+    public static String entryUrl(String url) {
+        return kept(withoutUserInfo(url));
     }
 
     /**

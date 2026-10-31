@@ -25,7 +25,8 @@ import java.util.regex.Pattern;
  * for the error, a message, the address without its user name and password, Try Again, which Enter and Space press as
  * the page opens with it focused, and "Check your internet connection and try reloading the page." A certificate error
  * adds "Jasper can’t verify the identity of the website …", why, and the subjects of the certificate chain; when Jasper
- * kept the certificate, a Details link reveals Continue to this site (unsafe).
+ * kept the certificate, a Details link reveals Continue to this site (unsafe), but for a revoked, invalid or malformed
+ * certificate, which, as in Chrome, has no way past it.
  *
  * <p>The page is built from its address alone, on Chromium's IO thread, in the workspace theme's colours
  * ({@link PageHtml#colours}): the error's address and code, the item's token for the page, and for a certificate the
@@ -257,8 +258,8 @@ public final class ErrorPage {
      * @param code Chromium's name for the error
      * @param token the error page's token, 32 random hexadecimal digits
      * @param certificate the certificate Jasper refused for this load, or empty
-     * @param proceed Continue's one-time token, while it has not been used; only a certificate error with its
-     *     certificate has one
+     * @param proceed Continue's one-time token, while it has not been used; only a certificate error that can be gone
+     *     past, with its certificate, has one
      */
     record Failure(String url, String code, String token, Optional<ServerCertificate> certificate, Optional<String> proceed) {
         /** Rejects nulls. */
@@ -270,9 +271,13 @@ public final class ErrorPage {
             Objects.requireNonNull(proceed, "proceed");
         }
 
-        /** The error page for {@code failure}, with new random tokens. */
+        /**
+         * The error page for {@code failure}, with new random tokens: a Continue for a certificate error Chrome lets the
+         * user past ({@link ServerCertificate#overridable}), with its certificate; none for a revoked, invalid or
+         * malformed certificate.
+         */
         static Failure of(LoadFailure failure) {
-            Optional<String> proceed = failure.certificate().isPresent() && certificateError(failure.code())
+            Optional<String> proceed = failure.certificate().isPresent() && ServerCertificate.overridable(failure.code())
                 ? Optional.of(newToken()) : Optional.empty();
             return new Failure(failure.url(), failure.code(), newToken(), failure.certificate(), proceed);
         }
