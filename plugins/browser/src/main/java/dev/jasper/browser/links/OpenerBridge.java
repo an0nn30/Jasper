@@ -98,7 +98,7 @@ final class OpenerBridge {
     static final String QUERY = "jasperBridgeQuery", CANCEL = "jasperBridgeCancel";
     /** The most characters of JSON one message may hold: 1 MiB. */
     static final int MESSAGE_LIMIT = 1 << 20;
-    /** The most requests one page may have waiting for the UI thread. */
+    /** The most requests a page's main frame may have waiting for the UI thread, and its sub-frames together. */
     static final int WAITING_LIMIT = 8;
     /** The longest icon address a {@code favicon} request may name. */
     static final int ICON_LIMIT = 8_192;

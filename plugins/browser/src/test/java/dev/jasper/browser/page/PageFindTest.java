@@ -87,6 +87,37 @@ class PageFindTest {
         assertThat(ran).hasSize(3);
     }
 
+    /**
+     * Every frame compiles the same pattern, so the main frame, listed first, says whether it is invalid: a sub-frame's
+     * claim alone, which any script there could make, counts as no matches in that frame.
+     */
+    @Test void onlyTheMainFrameSaysThePatternIsInvalid() {
+        CompletableFuture<Result> result = find.find("needle", false, true);
+        long search = search(0);
+        find.answered("ad", search, 0, true);
+        find.answered("main", search, 2, false);
+        find.answered("chat", search, 1, false);
+        assertThat(result).isCompletedWithValue(new Result(3, 1, false));
+        find.answered("ad", search, 5, true);
+        assertThat(find.result()).as("a sub-frame's matches with its claim are none").hasValue(new Result(3, 1, false));
+
+        CompletableFuture<Result> invalid = find.find("(", false, true);
+        long next = search(ran.size() - 1);
+        find.answered("main", next, 0, true);
+        find.answered("ad", next, 4, false);
+        find.answered("chat", next, 0, true);
+        assertThat(invalid).isCompletedWithValue(new Result(0, 0, true));
+    }
+
+    /** The main frame comes first, so a search's first match is the main document's; the others follow in CEF's order. */
+    @Test void theMainFrameIsListedFirst() {
+        assertThat(PageFind.mainFirst(Optional.of("m"), List.of("a", "m", "b"))).containsExactly("m", "a", "b");
+        assertThat(PageFind.mainFirst(Optional.of("m"), List.of("m", "a"))).containsExactly("m", "a");
+        assertThat(PageFind.mainFirst(Optional.of("m"), List.of("a", "b"))).as("CEF's list lacks it").containsExactly("m", "a", "b");
+        assertThat(PageFind.mainFirst(Optional.empty(), List.of("a", "b"))).containsExactly("a", "b");
+        assertThat(PageFind.mainFirst(Optional.empty(), List.of())).isEmpty();
+    }
+
     @Test void aQueryOfMoreThanAThousandCharactersIsCutToAThousand() {
         find.find("a".repeat(1_001), false, false);
         assertThat((String) command(ran.getFirst()).get("query")).isEqualTo("a".repeat(PageFind.MAX_QUERY));

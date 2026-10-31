@@ -23,17 +23,21 @@ import org.cef.browser.CefFrame;
 /**
  * Find in page (spec section 10), behind a browser item's find bar. Chromium's own find takes no regular expressions,
  * so the search runs in page scripts: {@code find.js} runs in each of the page's frames, cross-origin ones included, at
- * most {@value #MAX_FRAMES} of them in the order Chromium lists them ({@code CefBrowser.getFrameIdentifiers}), and each
- * frame answers its count through the {@code links} package's message router (op {@code find}). The counts add up, and
- * the current match steps through the matches frame by frame in that order, round from the last to the first.
+ * most {@value #MAX_FRAMES} of them, the main frame first and the others in the order Chromium lists them
+ * ({@code CefBrowser.getFrameIdentifiers}), and each frame answers its count through the {@code links} package's
+ * message router (op {@code find}). The counts add up, and the current match steps through the matches frame by frame
+ * in that order, round from the last to the first. The query is invalid when the main frame says so.
  *
  * <p>A query is plain text or, with {@code regex}, a JavaScript regular expression ({@code RegExp}, with {@code i} when
  * case does not matter), cut to {@value #MAX_QUERY} characters; it reaches a frame's script only as a JSON string. A
- * frame matches its visible text one text node at a time, at most {@value #MAX_MATCHES} matches, and highlights them,
- * every match {@code #FFFF00} and the current one {@code #FF9632}, with the CSS Custom Highlight API, which leaves the
- * page's nodes and scripts alone. It opens the {@code details}, {@code hidden="until-found"} elements and regions of
- * {@code aria-expanded="false"} controls that hide the current match, and searches again, and answers a new count,
- * when its document's nodes or text change. A search settles once every frame has answered or {@link #ANSWER_WAIT}
+ * frame matches its visible text a block at a time, each run of white space as one space, so a match may span inline
+ * elements and line breaks in the page's source; a plain query's runs of white space match any. It keeps at most
+ * {@value #MAX_MATCHES} matches, or those it found in 250 ms, and highlights them, every match {@code #FFFF00} and the
+ * current one {@code #FF9632}, with the CSS Custom Highlight API, which leaves the page's nodes and scripts alone. It
+ * opens the {@code details}, {@code hidden="until-found"} elements and regions of {@code aria-expanded="false"}
+ * controls that hide the current match, and searches again, and answers a new count, when its document's nodes, text
+ * or some of their attributes change, less often the longer its search takes, and no more once a search ran out of
+ * time. A search settles once every frame has answered or {@link #ANSWER_WAIT}
  * has passed, and its first match is then the current one; a later answer still counts. The main frame's next
  * document ends the search. Find runs in the page's own world, so the page's scripts can see the query.
  *
@@ -95,7 +99,8 @@ public final class PageFind {
     /**
      * A find for a page with these parts: the page's has its browser's, and a test's records.
      *
-     * @param frames the identifiers of the page's frames, in Chromium's order; none before it has a browser
+     * @param frames the identifiers of the page's frames, its main frame first and the others in Chromium's order; none
+     *     before it has a browser
      * @param focusedFrame the frame that has the page's focus, else its main frame; empty before it has a browser
      * @param scripts runs a script in the frame with an identifier; nothing for a frame that has gone
      * @param later runs a task on the UI thread after a delay, and answers what cancels it
@@ -236,7 +241,8 @@ public final class PageFind {
         if (at < 0) return;
         Result before = current();
         counts[at] = isInvalid ? 0 : count;
-        invalid |= isInvalid;
+        // Every frame compiles the same pattern, so the main frame's answer, first, says whether it is invalid.
+        if (at == 0) invalid = isInvalid;
         // As the frame's script does: its current match stays, or its last one when it has fewer.
         if (at == currentFrame && currentMatch >= counts[at]) {
             currentMatch = counts[at] - 1;
@@ -394,11 +400,20 @@ public final class PageFind {
         return query.substring(0, Character.isHighSurrogate(query.charAt(MAX_QUERY - 1)) ? MAX_QUERY - 1 : MAX_QUERY);
     }
 
+    /** The main frame's identifier, when known, then the others in CEF's order. */
+    static List<String> mainFirst(Optional<String> main, List<String> all) {
+        if (main.isEmpty()) return all;
+        var listed = new ArrayList<String>(all.size() + 1);
+        listed.add(main.get());
+        for (String frame : all) if (!frame.equals(main.get())) listed.add(frame);
+        return listed;
+    }
+
     private static List<String> frames(PageBrowser browser) {
         if (browser == null) return List.of();
         try {
             List<String> listed = browser.getFrameIdentifiers();
-            return listed == null ? List.of() : new ArrayList<>(listed);
+            return mainFirst(identifier(browser.getMainFrame()), listed == null ? List.of() : listed.stream().filter(Objects::nonNull).toList());
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "A page's frames could not be listed", failure);
             return List.of();
@@ -409,16 +424,20 @@ public final class PageFind {
         if (browser == null) return Optional.empty();
         try {
             CefFrame frame = browser.getFocusedFrame();
-            if (frame == null) frame = browser.getMainFrame();
-            if (frame == null) return Optional.empty();
-            try {
-                return Optional.ofNullable(frame.getIdentifier());
-            } finally {
-                frame.dispose();
-            }
+            return identifier(frame == null ? browser.getMainFrame() : frame);
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "A page's focused frame could not be read", failure);
             return Optional.empty();
+        }
+    }
+
+    /** {@code frame}'s identifier, the handle then disposed; empty for no frame. */
+    private static Optional<String> identifier(CefFrame frame) {
+        if (frame == null) return Optional.empty();
+        try {
+            return Optional.ofNullable(frame.getIdentifier());
+        } finally {
+            frame.dispose();
         }
     }
 
