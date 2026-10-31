@@ -161,18 +161,42 @@ class ApplicationCommandsTest {
         assertThat(JasperApplication.webAddresses(List.of())).as("no arguments: a raise").isEmpty();
     }
 
-    /** Browser plan 3, Review Focus 3: before the plugins start, jasper's addresses reach the system browser, and each call answers 0. */
+    /**
+     * Browser plan 3, Review Focus 3, and plan 4c Task 3: before the plugins start, jasper's addresses wait for them;
+     * with no plugin providing a browser they then reach the system browser, and the call answers 0.
+     */
     @Test void everyArgumentAWebAddressOpensEachAndAnswersZero() throws Exception {
         JasperApplication application = application(() -> { });
         var opened = new java.util.concurrent.CopyOnWriteArrayList<String>();
         DesktopTestSupport.edt(() -> application.systemBrowser = address -> opened.add(address.toString()));
         var err = new StringBuilder();
         var addresses = application.commands().dispatch(new Invocation(List.of("https://example.com/a", "HTTP://Example.com/b"), dir,
-            Optional.of(UUID.randomUUID()), text -> { }, err::append));
-        assertThat(addresses.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
+            Optional.of(UUID.randomUUID()), text -> { }, err::append)).toCompletableFuture();
+        DesktopTestSupport.edt(() -> { });
+        assertThat(opened).as("waiting for the plugins").isEmpty();
+        assertThat(addresses).as("answered once they have been handed on").isNotDone();
+        var dirs = new dev.jasper.app.platform.AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
+        DesktopTestSupport.edt(() -> application.startPlugins(null, null, false, dirs));
+        assertThat(addresses.get(5, TimeUnit.SECONDS)).isZero();
         assertThat(opened).containsExactly("https://example.com/a", "HTTP://Example.com/b");
         assertThat(err).isEmpty();
         DesktopTestSupport.edt(application::quitNow);
+        ApplicationPluginCleanup.await(application);
+    }
+
+    /** Browser plan 4c Task 3: a call whose addresses still wait for the browser when Jasper quits fails, and nothing opens. */
+    @Test void aCallWaitingForTheBrowserFailsWithTheQuittingMessageWhenJasperQuits() throws Exception {
+        JasperApplication application = application(() -> { });
+        var opened = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        DesktopTestSupport.edt(() -> application.systemBrowser = address -> opened.add(address.toString()));
+        var answer = application.commands().dispatch(new Invocation(List.of("https://example.com/a"), dir, Optional.empty(),
+            text -> { }, text -> { })).toCompletableFuture();
+        DesktopTestSupport.edt(() -> { });
+        assertThat(answer).isNotDone();
+        DesktopTestSupport.edt(application::quitNow);
+        assertThatThrownBy(() -> answer.get(5, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+            .cause().isInstanceOf(IllegalStateException.class).hasMessage("Jasper is quitting; run the command again");
+        assertThat(opened).isEmpty();
     }
 
     /**

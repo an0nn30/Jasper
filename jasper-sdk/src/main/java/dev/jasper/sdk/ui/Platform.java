@@ -38,9 +38,11 @@ public interface Platform {
     }
 
     /**
-     * Opens a web address in the system browser, never asking the web browser a plugin provides
-     * ({@link #openInBrowser} asks that one first, with a {@link WebLink}). Runs in the background; a failure is posted
-     * in the plugin's notification group, never thrown.
+     * Opens a web address in the system browser, without asking the web browser a plugin provides
+     * ({@link #openInBrowser} asks that one first, with a {@link WebLink}). While Jasper is itself the system's default
+     * browser ({@link #isDefaultBrowser}), the system would hand the address back to Jasper, so it opens as
+     * {@link #openInBrowser} opens it. Runs in the background; a failure is posted in the plugin's notification group,
+     * never thrown.
      *
      * @param uri an absolute {@code http} or {@code https} address
      * @throws IllegalArgumentException when the address is not an absolute http or https one
@@ -159,10 +161,13 @@ public interface Platform {
      * ({@link LinkOrigin}). A local file the user clicked in a terminal also arrives, as a {@code file:} link.
      * A clicked link comes from program output, and an OSC 8 link's address can differ from the text shown, so a browser
      * should treat the address as untrusted input and show it before acting on it. Other
-     * schemes, such as {@code mailto}, and {@link #browse} always go to the system browser. One at a time: a bundled
+     * schemes, such as {@code mailto}, always go to the system browser, and so does {@link #browse} while Jasper is not
+     * the system's default browser. One at a time: a bundled
      * plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
      * plugin's own included, throws. When the browser returns false or throws, and when no plugin provides one, the
-     * system browser opens an {@code http} or {@code https} address and the Default editor a {@code file:} one. Needs
+     * system browser opens an {@code http} or {@code https} address and the Default editor a {@code file:} one. While
+     * Jasper is itself the system's default browser, which would hand an {@code http} or {@code https} address back,
+     * Jasper opens nothing instead, and says so when no plugin provides a browser. Needs
      * {@code browser.provide}. UI thread only. The registration ends with the plugin.
      *
      * @param browser opens a web address

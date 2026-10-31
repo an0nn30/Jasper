@@ -782,6 +782,33 @@ public final class PluginRuntime {
             desktop.accept(address);
     }
 
+    /**
+     * Whether a plugin provides the web browser now ({@code Platform.browser}). UI thread.
+     *
+     * @return false before the plugins start, and while no plugin provides one
+     * @throws IllegalStateException off the UI thread
+     */
+    public boolean providesBrowser() {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("The web browser is asked for on the UI thread");
+        PluginHost current = host;
+        return current != null && current.webBrowsers.provided();
+    }
+
+    private Consumer<java.net.URI> systemBrowser = dev.jasper.app.platform.Browser::open;
+
+    /**
+     * Sets how a plugin's {@code Platform.browse}, and its {@code Platform.openInBrowser} that no provided browser took,
+     * open an address in the system browser; before {@link #start}. It runs on the plugin's worker, and what it throws
+     * is posted in the plugin's notification group.
+     *
+     * @param opener opens an absolute http or https address; {@code platform.Browser.open} unless set
+     * @throws IllegalStateException once the plugins have started
+     */
+    public void systemBrowser(Consumer<java.net.URI> opener) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        systemBrowser = Objects.requireNonNull(opener, "opener");
+    }
+
     private Optional<Path> commandClient = Optional.empty();
 
     /**
@@ -799,7 +826,8 @@ public final class PluginRuntime {
 
     /**
      * Supplies whether Jasper is the system's default browser, as last checked, which plugins read with
-     * {@code Platform.isDefaultBrowser} on the UI thread; before {@link #start}. It must answer at once.
+     * {@code Platform.isDefaultBrowser} on the UI thread and {@code Platform.browse} reads on any thread; before
+     * {@link #start}. It must answer at once.
      *
      * @param jasper supplies the last answer
      * @throws IllegalStateException once the plugins have started
@@ -860,7 +888,7 @@ public final class PluginRuntime {
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
-            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass), typography);
+            systemBrowser, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass), typography);
         created.animations = animations;
         created.themes = themes;
         if (given != null) {

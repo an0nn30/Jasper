@@ -219,7 +219,17 @@ public final class JasperApplication {
     /** Test seam: the desktop's browser, which {@code openInSystemBrowser} calls off the EDT. Production is {@link dev.jasper.app.platform.Browser#open}. */
     Consumer<java.net.URI> desktop = dev.jasper.app.platform.Browser::open;
     /** Whether Jasper is the system's default browser; never, until {@link #defaultBrowser(DefaultBrowser)} asks the system. */
-    private volatile DefaultBrowser defaultBrowser = new DefaultBrowser(Runnable::run, java.time.Clock.systemUTC(), () -> Optional.of(false));
+    private volatile DefaultBrowser defaultBrowser = neverTheDefault();
+    /** The Browser plugin, which the "Web links can’t open in Jasper" notice turns on. */
+    private static final String BROWSER_PLUGIN = "dev.jasper.browser";
+    /** At most this many web addresses from outside wait for the browser; later ones are dropped. */
+    private static final int HELD_ADDRESSES = 32;
+    /** A web address from outside that waits for the browser, the window it names, and what its call waits for. */
+    private record HeldAddress(java.net.URI address, Optional<UUID> window, CompletableFuture<Void> handedOn) { }
+    /** The web addresses from outside waiting for the browser, in arrival order; none once it is ready. EDT. */
+    private final List<HeldAddress> heldAddresses = new ArrayList<>();
+    /** Whether web addresses from outside go to the browser at once: once the plugins run and the first answer came. EDT. */
+    private boolean externalAddressesReady;
     /**
      * Test seam: whether each window's detached tool windows get native windows ({@link DetachedFrame}): only where
      * windows can be made, as nothing native is made headless.
@@ -247,8 +257,8 @@ public final class JasperApplication {
     private AboutWindows aboutWindows;
     /** Where Open Log Folder points, known once plugins start. */
     private Path logFolder;
-    /** The clipboard Jasper and its plugins share. */
-    private final dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
+    /** The clipboard Jasper and its plugins share. Test seam: set before {@link #startPlugins(AppDirs)}, which hands it to the plugins. */
+    dev.jasper.app.platform.HostClipboard clipboard = dev.jasper.app.platform.HostClipboard.system();
     private dev.jasper.app.lifecycle.Subscription pluginTheme;
 
     private int configuredLongCommandSeconds() {
@@ -912,12 +922,50 @@ public final class JasperApplication {
 
     /**
      * As {@code openWebAddress}, for an address from outside Jasper ({@code jasper <address>}), which the browser hears as
-     * an external address's. EDT.
+     * an external address's (browser plan 4c). Until the plugins run and the first answer to whether Jasper is the default
+     * browser has come, it waits, in arrival order, so that one the system handed Jasper as its default browser never goes
+     * back to the system (ruling Q6); at most {@link #HELD_ADDRESSES} wait, and a later one is dropped. EDT.
+     *
+     * @return completes once the address has been handed on or dropped; fails when Jasper quits while it waits
      */
-    private void openExternalAddress(java.net.URI address, Optional<UUID> window) {
-        PluginRuntime runtime = plugins;
-        if (runtime == null) systemBrowser.accept(address);
-        else runtime.openExternalLink(address, window, systemBrowser);
+    private CompletableFuture<Void> openExternalAddress(java.net.URI address, Optional<UUID> window) {
+        if (externalAddressesReady) {
+            plugins.openExternalLink(address, window, systemBrowser);
+            return CompletableFuture.completedFuture(null);
+        }
+        if (heldAddresses.size() >= HELD_ADDRESSES) {
+            // The address may be program output: the log does not repeat it.
+            LOG.log(System.Logger.Level.WARNING, "A web address from outside was dropped: " + HELD_ADDRESSES
+                + " were already waiting for Jasper's browser");
+            return CompletableFuture.completedFuture(null);
+        }
+        var handedOn = new CompletableFuture<Void>();
+        heldAddresses.add(new HeldAddress(address, window, handedOn));
+        return handedOn;
+    }
+
+    /**
+     * The plugins run and the first answer to whether Jasper is the default browser has come: the waiting addresses from
+     * outside open in arrival order, and later ones at once. Once Jasper quits, nothing opens. EDT.
+     */
+    private void releaseExternalAddresses() {
+        if (externalAddressesReady) return;
+        externalAddressesReady = true;
+        List<HeldAddress> held = List.copyOf(heldAddresses);
+        heldAddresses.clear();
+        for (HeldAddress waiting : held) {
+            if (quitting || stopped) {
+                waiting.handedOn().completeExceptionally(new IllegalStateException("Jasper is quitting; run the command again"));
+                continue;
+            }
+            try {
+                openExternalAddress(waiting.address(), waiting.window());
+                waiting.handedOn().complete(null);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "A web address from outside could not open", failure);
+                waiting.handedOn().completeExceptionally(failure);
+            }
+        }
     }
 
     /** The window holding the pane a {@code jasper} call ran in, while it is open; empty for a call from elsewhere. EDT. */
@@ -960,9 +1008,14 @@ public final class JasperApplication {
     /**
      * The system browser's open, on a virtual thread that shutdown waits for, so a Jasper the {@code jasper} command
      * started without a window does not quit before the desktop took the address; a failure is logged without the
-     * address, which may be program output.
+     * address, which may be program output. While Jasper is the system's default browser, an http or https address never
+     * goes to the desktop, which would hand it back to Jasper (browser plan 4c): {@link #cannotOpenInJasper} has it. EDT.
      */
     private void openInSystemBrowser(java.net.URI address) {
+        if (handsBackToJasper(address)) {
+            cannotOpenInJasper(address);
+            return;
+        }
         Consumer<java.net.URI> opener = desktop;
         CompletableFuture<Void> open = CompletableFuture.runAsync(() -> {
             try {
@@ -975,6 +1028,79 @@ public final class JasperApplication {
         // Added before its removal is registered: an open that finished already is removed at once.
         browserOpens.add(open);
         open.whenComplete((ignored, failure) -> browserOpens.remove(open));
+    }
+
+    /**
+     * Whether the system browser would hand {@code address} back to Jasper: it is an http or https address, whatever its
+     * case, and Jasper is the system's default browser, as last checked. Any thread.
+     */
+    private boolean handsBackToJasper(java.net.URI address) {
+        String scheme = address.getScheme();
+        return scheme != null && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")) && defaultBrowser.isJasper();
+    }
+
+    /**
+     * How a plugin's {@code Platform.browse}, and its {@code Platform.openInBrowser} that no provided browser took, open
+     * the system browser: the desktop's, on the plugin's worker, which posts a failure in the plugin's group; while Jasper
+     * is the system's default browser, {@link #cannotOpenInJasper} on the EDT instead. Plugin worker thread.
+     */
+    private void openInSystemBrowserForPlugin(java.net.URI address) {
+        if (handsBackToJasper(address)) SwingUtilities.invokeLater(() -> cannotOpenInJasper(address));
+        else desktop.accept(address);
+    }
+
+    /**
+     * A web address that no browser of Jasper's took while Jasper is the system's default browser, which handing it to
+     * the system would bring back (browser plan 4c, rulings Q1 and Q2). With no browser provided (the Browser plugin off
+     * or not installed), "Web links can’t open in Jasper" offers Turn On Browser and Copy Link. A provided browser that
+     * declined it, as the Browser does once Chromium could not start, has had it and says why itself, so nothing opens
+     * and it is not offered again. EDT.
+     */
+    private void cannotOpenInJasper(java.net.URI address) {
+        if (quitting || stopped) return;
+        PluginRuntime runtime = plugins;
+        if (runtime != null && runtime.providesBrowser()) {
+            LOG.log(System.Logger.Level.INFO, "Jasper's browser did not open a web address, and the system would hand it back, so nothing opens");
+            return;
+        }
+        notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.WARNING, "Web links can’t open in Jasper")
+            .withContent("The Browser plugin is off. Turn it on to open web links in Jasper, or choose another default browser "
+                + "in your system settings.")
+            .withAction(dev.jasper.app.notifications.NotificationAction.of("Turn On Browser", this::turnOnBrowser))
+            .withAction(new dev.jasper.app.notifications.NotificationAction("Copy Link", () -> copyLink(address), false)));
+    }
+
+    /** Turn On Browser: the Browser plugin runs from the next launch, and the restart that starts it is offered. EDT. */
+    private void turnOnBrowser() {
+        PluginRuntime runtime = plugins;
+        if (runtime == null || quitting || stopped) return;
+        runtime.setEnabled(BROWSER_PLUGIN, true, outcome -> {
+            if (quitting || stopped) return;
+            if (!outcome.ok()) {
+                notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.ERROR, "Could not turn on the Browser")
+                    .withContent(outcome.message()));
+                return;
+            }
+            notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.INFO, "Restart Jasper to turn on the Browser")
+                .withContent("The Browser plugin starts the next time Jasper starts.")
+                .withAction(dev.jasper.app.notifications.NotificationAction.of("Restart Now", this::restartForBrowser)));
+        });
+    }
+
+    /** The Browser's restart offer's Restart Now. EDT. */
+    private void restartForBrowser() {
+        if (!restart(RestartMode.SAME))
+            notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.ERROR, "Jasper could not restart")
+                .withContent("Jasper could not work out how it was started. Quit and reopen it to turn on the Browser."));
+    }
+
+    /** Copy Link: the address on the clipboard. EDT. */
+    private void copyLink(java.net.URI address) {
+        try {
+            clipboard.copy(address.toString());
+        } catch (RuntimeException failure) {
+            notificationViews.error("Could not copy the link", failure.getMessage());
+        }
     }
 
     /** What running plugins add to a new local shell, given Jasper's own environment; nothing before they start. EDT. */
@@ -996,7 +1122,8 @@ public final class JasperApplication {
      * as a launch would;
      * a subcommand a plugin declares runs in that plugin; otherwise arguments that all name existing files or folders
      * open as a launch's paths do ({@code commandPaths}), and a call whose first argument names one while others name
-     * nothing says which ({@code missingPaths}). A raise or a path call is answered once it has run. A plugin's subcommand
+     * nothing says which ({@code missingPaths}). A raise or a path call is answered once it has run, and a call of web
+     * addresses once they have been handed on: those that wait for the browser hold its answer back. A plugin's subcommand
      * that will run (its plugin has registered its handler) first restores the windows when none is open; one
      * whose plugin does not run answers that it is unavailable and opens no window. Called on listener threads.
      */
@@ -1004,11 +1131,14 @@ public final class JasperApplication {
         return invocation -> {
             List<String> arguments = invocation.arguments();
             Optional<List<java.net.URI>> addresses = webAddresses(arguments);
-            if (addresses.isPresent())
+            if (addresses.isPresent()) {
+                // Written on the event thread before the call's first stage completes, which the second stage follows.
+                List<CompletableFuture<Void>> handedOn = new ArrayList<>();
                 return onEventThread(SwingUtilities::invokeLater, this::acceptsRequests, () -> {
                     Optional<UUID> window = windowOfPane(invocation.pane());
-                    addresses.get().forEach(address -> openExternalAddress(address, window));
-                });
+                    addresses.get().forEach(address -> handedOn.add(openExternalAddress(address, window)));
+                }).thenCompose(exit -> CompletableFuture.allOf(handedOn.toArray(CompletableFuture[]::new)).thenApply(done -> exit));
+            }
             PluginRuntime runtime = plugins;
             java.util.function.Predicate<String> subcommand = name -> runtime != null && runtime.declaresSubcommand(name);
             Optional<List<Path>> paths = commandPaths(invocation.workingDirectory(), invocation.arguments(), subcommand);
@@ -1137,9 +1267,17 @@ public final class JasperApplication {
         systemNotices.use(Objects.requireNonNull(notifier, "notifier"));
     }
 
+    /** Until {@link #defaultBrowser(DefaultBrowser)}: a check that asks nothing and has answered no. */
+    private static DefaultBrowser neverTheDefault() {
+        var never = new DefaultBrowser(Runnable::run, java.time.Clock.systemUTC(), () -> Optional.of(false));
+        never.refresh();
+        return never;
+    }
+
     /**
      * Whether Jasper is the system's default browser, asked at once and again whenever a Jasper window activates.
-     * Injected, like {@link #systemNotifier}, so tests never ask the real operating system. EDT.
+     * Injected, like {@link #systemNotifier}, so tests never ask the real operating system; before
+     * {@link #startPlugins(AppDirs)}, after which web addresses from outside wait for its first answer. EDT.
      */
     public void defaultBrowser(DefaultBrowser browser) {
         defaultBrowser = Objects.requireNonNull(browser, "browser");
@@ -1552,6 +1690,7 @@ public final class JasperApplication {
             System.getProperty("jasper.commandClient")));
         // Read at each call, so the answer follows the check the bootstrap injects and every later one.
         plugins.defaultBrowser(() -> defaultBrowser.isJasper());
+        plugins.systemBrowser(this::openInSystemBrowserForPlugin);
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
@@ -1571,6 +1710,8 @@ public final class JasperApplication {
         if (subcommandList != null) plugins.subcommandList(subcommandList);
         plugins.starting(startupSteps::plugin);
         plugins.start(selection, configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
+        // Addresses from outside wait for the first answer too, never on the EDT (browser plan 4c, ruling Q6).
+        defaultBrowser.firstAnswer().whenComplete((jasper, failure) -> SwingUtilities.invokeLater(this::releaseExternalAddresses));
         new PluginProblemNotices(notificationCenter, incidentNotices,
             () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());
         // Spec 4.6: a look the attempt record skipped says so once, and Try Again forgets the record and restarts.
@@ -2573,6 +2714,10 @@ public final class JasperApplication {
         // Armed before anything else: a plugin's stop() that blocks the EDT cannot be abandoned, and
         // await() below is never reached in that case.
         shutdown.arm(() -> plugins == null ? null : plugins.executing());
+        // Addresses from outside still waiting for the browser open nothing now, and their calls hear so.
+        for (HeldAddress waiting : heldAddresses)
+            waiting.handedOn().completeExceptionally(new IllegalStateException("Jasper is quitting; run the command again"));
+        heldAddresses.clear();
         launches.close();
         cygwin.close();
         shellProfiles.close();

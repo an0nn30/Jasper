@@ -62,6 +62,13 @@ final class WebBrowsers {
     }
 
     /**
+     * Whether a plugin provides the browser now. Any thread.
+     *
+     * @return true from its registration until that ends
+     */
+    boolean provided() { return holder != null; }
+
+    /**
      * Asks the provided browser to open a link. UI thread.
      *
      * @param address the link's address, as {@link WebLink#address()}

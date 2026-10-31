@@ -2052,7 +2052,8 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * Every web address that reached the system browser: each {@code Platform.browse}, and each
-     * {@code Platform.openInBrowser} that no provided browser opened.
+     * {@code Platform.openInBrowser} that no provided browser opened. While {@link #setDefaultBrowser} says Jasper is the
+     * default, a {@code Platform.browse} reaches it only when no provided browser opened it, as {@code openInBrowser}'s.
      *
      * @return the addresses in request order
      */
@@ -2587,7 +2588,8 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * Sets what {@code Platform.isDefaultBrowser} reports: whether Jasper is the system's default browser, as the
-     * application's last check answered. Until then it reports false. A value that differs from the current one runs
+     * application's last check answered; while it is, {@code Platform.browse} asks the provided browser first. Until then
+     * it reports false. A value that differs from the current one runs
      * every {@code Platform.onDefaultBrowserChanged} handler with it at once, on the EDT, after the getter has changed,
      * as Jasper does when a check changes its answer; a handler that throws is recorded in {@link #failures()} without
      * stopping the others.

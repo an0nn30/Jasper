@@ -435,9 +435,15 @@ an absolute `http` or `https` address the role's way with the clicked window and
 the `SPLIT` gesture as `SPLIT_RIGHT` from a wide pane and `SPLIT_DOWN` otherwise, and any other link the terminal
 opens (`ftp`, an OSC 8 `mailto`) to the system browser. `JasperApplication.commands()` sends `jasper <address>…`, when
 every argument is one, as external addresses in the calling pane's window, before the path and subcommand handling.
+`JasperApplication.openExternalAddress` holds external addresses, at most 32 in arrival order, until the plugins run
+and `DefaultBrowser.firstAnswer()` has completed.
 `Platform.openInBrowser` asks the role as a click in the active window, then opens the system browser on the plugin's
-worker as `Platform.browse` does. `JasperApplication.browse`, which Settings' Help button, the Licenses window and the
-plugin manager use for Jasper's own links, sends them the clicks' way with the active window.
+worker as `Platform.browse` does; while `PluginHost.defaultBrowser` says Jasper is the default browser, `Platform.browse`
+asks the role that way first too. `JasperApplication.browse`, which Settings' Help button, the Licenses window and the
+plugin manager use for Jasper's own links, sends them the clicks' way with the active window. While
+`DefaultBrowser.isJasper()`, no http or https address reaches the desktop, which would hand it back: the application's
+`openInSystemBrowser`, and the opener it gives `PluginRuntime.systemBrowser` for plugins, post "Web links can’t open in
+Jasper" (Turn On Browser, Copy Link) when no plugin provides a browser, and otherwise open nothing.
 `Platform.isDefaultBrowser`, on the UI thread, returns what `PluginRuntime.defaultBrowser` supplies: `JasperApplication`
 points it at `platform.DefaultBrowser.isJasper()`, the answer of its last check, which runs at start-up and as a window
 activates. `DefaultBrowser.onChanged` tells the application, on the EDT, each answer that changes the value;

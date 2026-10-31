@@ -4646,6 +4646,37 @@ public abstract class PluginContractTest {
     }
 
     /**
+     * Browser plan 4c Task 3 (SDK 0.28.0, ruling Q2): while Jasper is the system's default browser, which would hand an
+     * address back, {@code browse} asks the provided browser first, as {@code openInBrowser} does, and only an address it
+     * declines goes on to the system browser.
+     */
+    @Test void browseAsksTheProvidedBrowserFirstWhileJasperIsTheDefault() {
+        UUID window = h.addTerminalWindow();
+        h.activateTerminalWindow(window);
+        var a = new AtomicReference<PluginContext>();
+        var user = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.user"), Set.of(), Set.of(), user::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        dev.jasper.sdk.ui.WebBrowser recording = recordingBrowser(calls, true);
+        h.ui(() -> a.get().platform().browser(link ->
+            recording.open(link) && !link.address().getPath().equals("/declined")));
+        java.net.URI declined = java.net.URI.create("https://example.com/declined");
+        h.defaultBrowser(true);
+        h.ui(() -> {
+            user.get().platform().browse(PAGE);
+            user.get().platform().browse(declined);
+        });
+        h.flush();
+        // Up to 10 s, as above: the app host hops to the UI thread and then to the plugin's worker.
+        for (int i = 0; i < 1000 && (calls.size() < 2 || h.browsed().isEmpty()); i++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        assertThat(calls).containsExactly(PAGE + "|CLICK|" + window, declined + "|CLICK|" + window);
+        assertThat(h.browsed()).as("only the declined address").containsExactly(declined);
+    }
+
+    /**
      * Browser plan 4c Task 2 (SDK 0.28.0): {@code isDefaultBrowser} gives the host's last answer to whether Jasper is the
      * system's default browser, no until the host has one, and a provided browser reads it as it decides a link.
      */
