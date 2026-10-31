@@ -130,6 +130,11 @@ class ViewSpecTest {
         assertThatIllegalArgumentException().isThrownBy(() -> suggesting(FieldKind.NUMBER, List.of(search), false))
             .withMessage("A number field's arrow keys step its value, not suggestions");
         assertThat(suggesting(FieldKind.PATH, List.of(search), false).suggestions()).containsExactly(search);
+        for (boolean loading : List.of(false, true))
+            assertThatIllegalArgumentException().isThrownBy(() -> new Field("f", ControlState.READY, FieldKind.SEARCH, "", "", "Field", "", Optional.empty(),
+                    FieldPresentation.STANDARD, "", "", "results", false, Optional.empty(), "", "", Optional.empty(), false,
+                    loading ? List.of() : List.of(search), loading))
+                .withMessage("A field's arrow keys move its list or its suggestions, not both");
         var chosen = new UiEvent.SuggestionChosen("f", "search", false);
         assertThat(chosen.id()).isEqualTo("f");
         assertThatIllegalArgumentException().isThrownBy(() -> new UiEvent.SuggestionChosen("f", " ", true));

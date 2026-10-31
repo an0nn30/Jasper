@@ -427,7 +427,8 @@ public final class Nodes {
      * it as Enter does. While the list shows at all, Escape hides it and reports {@code cancelAction}. A chosen
      * suggestion, Escape and the focus leaving the field hide the list until the user next edits the field. An update
      * keeps the selection while the selected suggestion's id is still listed, and an edit selects the first again. A
-     * TEXTAREA and a NUMBER field take no suggestions.
+     * TEXTAREA and a NUMBER field take no suggestions, nor does a field with a {@code listId}, whose Up and Down move
+     * that list.
      *
      * @param id the node id
      * @param state the node's state; a nonblank error shows under the field
@@ -489,6 +490,7 @@ public final class Nodes {
             boolean suggesting = !suggestions.isEmpty() || suggestionsLoading;
             if (kind == FieldKind.TEXTAREA && suggesting) throw new IllegalArgumentException("A multiline field takes no suggestions");
             if (kind == FieldKind.NUMBER && suggesting) throw new IllegalArgumentException("A number field's arrow keys step its value, not suggestions");
+            if (!listId.isBlank() && suggesting) throw new IllegalArgumentException("A field's arrow keys move its list or its suggestions, not both");
         }
         /** A field that offers no suggestions. */
         public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,

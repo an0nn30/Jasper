@@ -12,9 +12,11 @@ public final class KitOwnership {
      */
     public static final String CONTEXT_MENU = "Jasper.kit.contextMenu";
     /**
-     * Client property on a field's input while its list of suggestions shows, holding that list (a {@code JList} whose
-     * rows are the field's {@code Nodes.Suggestion} values, then the loading line's text while more load), so a host (or
-     * a headless test) can read what the list shows. The list stays kit-owned.
+     * Client property on a field's input while it offers its list of suggestions, holding that list (a {@code JList}
+     * whose rows are the field's {@code Nodes.Suggestion} values, then the loading line's text while more load), so a
+     * host (or a headless test) can read what the list shows: while the field takes input, has suggestions or loads
+     * them, and no choice, Escape, focus loss or press outside has hidden them, whether or not the popup is on screen,
+     * which it is only while the input has the focus. The list stays kit-owned.
      */
     public static final String SUGGESTIONS = "Jasper.kit.suggestions";
     private KitOwnership() {}

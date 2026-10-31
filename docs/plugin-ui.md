@@ -347,7 +347,8 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
   focus or reporting `trailingAction`; a click on a suggestion reports it as Enter does. While the list shows at all,
   Escape hides it and reports `cancelAction`. A chosen suggestion, Escape and the focus leaving the field hide the list
   until the user next edits the field; an update keeps the selection while its suggestion's id is still listed, and an
-  edit selects the first again. A `TEXTAREA` and a `NUMBER` field take no suggestions.
+  edit selects the first again. A `TEXTAREA` and a `NUMBER` field take no suggestions, nor does a field with a
+  `listId`.
 
 ### Secrets
 

@@ -101,6 +101,15 @@ class UiValuesTest {
         for (var kind : List.of(Nodes.FieldKind.SEARCH, Nodes.FieldKind.PATH, Nodes.FieldKind.PORT))
             assertThat(new Nodes.Field("f", ControlState.READY, kind, "", "", "F", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", false,
                 Optional.empty(), "", "", Optional.empty(), false, List.of(search), false).suggestions()).as("%s", kind).containsExactly(search);
+        // Both would take Up and Down: a field drives its list or offers suggestions, not both.
+        for (boolean loading : List.of(false, true))
+            assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Field("filter", ControlState.READY, Nodes.FieldKind.SEARCH, "", "", "Filter", "",
+                    Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "results", false, Optional.empty(), "", "", Optional.empty(), false,
+                    loading ? List.of() : List.of(search), loading))
+                .withMessage("A field's arrow keys move its list or its suggestions, not both");
+        assertThat(new Nodes.Field("filter", ControlState.READY, Nodes.FieldKind.SEARCH, "", "", "Filter", "", Optional.empty(),
+            Nodes.FieldPresentation.STANDARD, "", "", "results", false, Optional.empty(), "", "", Optional.empty(), false, List.of(), false).listId())
+            .as("a list without suggestions").isEqualTo("results");
     }
 
     /** Plan 4b Task 1 (SDK 0.27.0): a chosen suggestion names its field, which is the event's id, and the suggestion. */

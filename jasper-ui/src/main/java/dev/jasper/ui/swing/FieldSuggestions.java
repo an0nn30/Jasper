@@ -4,6 +4,7 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.theme.ColorMath;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.AWTKeyStroke;
 import java.awt.BorderLayout;
@@ -51,7 +52,7 @@ import javax.swing.event.PopupMenuListener;
  * The list never takes the keyboard focus, so typing goes on in the field. While it shows suggestions, Up and Down move
  * the selection, Tab and Enter report {@link UiEvent.SuggestionChosen} for the selected one (a click on a suggestion
  * reports it as Enter does), and Tab is no focus traversal key; while it shows at all, Escape hides it and reports the
- * field's cancel action. A choice, Escape, the focus leaving the field for good and a press outside the list hide it
+ * field's cancel action. The pointer on a row only highlights it, leaving the selection (plan 4b's P16). A choice, Escape, the focus leaving the field for good and a press outside the list hide it
  * until the person next edits the field; an update keeps the selection while its suggestion is still listed, and an edit
  * selects the first again. A key listener reads the keys before the field's own bindings, so while the list is hidden
  * the field's keys are exactly its own. The field makes it the first time it has suggestions. EDT only.
@@ -73,6 +74,8 @@ final class FieldSuggestions implements AutoCloseable {
     final Popup popup = new Popup();
     /** The suggestion the person moved the selection to; null for the first. */
     private String selectedId;
+    /** The suggestion row the pointer rests on, highlighted; -1 for none. */
+    private int hovered = -1;
     /** Hidden until the person next edits the field: by a choice, Escape, the focus leaving for good or a press outside. */
     private boolean dismissed;
     /** Whether Tab is taken from the field's focus traversal keys, and the keys it had set before (null: inherited). */
@@ -104,7 +107,10 @@ final class FieldSuggestions implements AutoCloseable {
     };
     private final FocusListener focus = new FocusAdapter() {
         @Override public void focusGained(FocusEvent event) { sync(); }
-        /** A window going behind another takes the focus for a while: the list comes back with it. */
+        /**
+         * A temporary loss keeps the list, which comes back with the focus; a window that goes behind another closes the
+         * popup itself, as Swing closes any open popup then ({@code canceled}), until the next edit.
+         */
         @Override public void focusLost(FocusEvent event) { if (!event.isTemporary()) dismissed = true; sync(); }
     };
     /** The pointer on the list's rows. */
@@ -112,6 +118,7 @@ final class FieldSuggestions implements AutoCloseable {
         @Override public void mouseMoved(MouseEvent event) { point(event); }
         @Override public void mouseDragged(MouseEvent event) { point(event); }
         @Override public void mousePressed(MouseEvent event) { point(event); }
+        @Override public void mouseExited(MouseEvent event) { hover(-1); }
         @Override public void mouseReleased(MouseEvent event) {
             var field = field();
             int row = row(event.getPoint());
@@ -119,11 +126,13 @@ final class FieldSuggestions implements AutoCloseable {
             selectedId = field.suggestions().get(row).id();
             choose(field, false);
         }
-        /** The pointer selects the suggestion it rests on; the list's own press handling never selects another row. */
+        /**
+         * The pointer highlights the suggestion it rests on and leaves the selection, which the keyboard moves (P16); the
+         * list's own press handling never selects another row.
+         */
         private void point(MouseEvent event) {
             var field = field();
-            int row = row(event.getPoint());
-            if (row >= 0 && shows(field)) selectedId = field.suggestions().get(row).id();
+            hover(shows(field) ? row(event.getPoint()) : -1);
             selectList(field);
         }
     };
@@ -174,6 +183,13 @@ final class FieldSuggestions implements AutoCloseable {
         return bounds != null && bounds.contains(point) ? row : -1;
     }
 
+    /** Highlights suggestion row {@code row}, or none for -1. */
+    private void hover(int row) {
+        if (row == hovered) return;
+        hovered = row;
+        list.repaint();
+    }
+
     /** The field's descriptor changed: a selection whose suggestion is gone falls back to the first. */
     void refresh() {
         var field = field();
@@ -219,7 +235,7 @@ final class FieldSuggestions implements AutoCloseable {
         boolean shows = shows(field);
         var wanted = new ArrayList<Object>(field.suggestions());
         if (field.suggestionsLoading()) wanted.add(LOADING);
-        if (!Collections.list(rows.elements()).equals(wanted)) { rows.clear(); rows.addAll(wanted); }
+        if (!Collections.list(rows.elements()).equals(wanted)) { rows.clear(); rows.addAll(wanted); hovered = -1; }
         selectList(field);
         takeTab(shows && !field.suggestions().isEmpty());
         var published = shows ? list : null;
@@ -316,16 +332,19 @@ final class FieldSuggestions implements AutoCloseable {
 
     /**
      * A row: the suggestion's title, shortened with an ellipsis when it does not fit, then its detail, quieter; the
-     * loading line alone, quieter still. The selected suggestion's row is filled as a dropdown's highlighted option is.
+     * loading line alone, quieter still. The selected suggestion's row is filled as a dropdown's highlighted option is,
+     * and the one under the pointer, unless selected, as a hovered list row is.
      */
     final class Row extends JPanel implements ListCellRenderer<Object> {
         final JLabel title = Labels.literal(), detail = Labels.literal();
-        private boolean selected;
+        /** Whether the row being painted is the selected suggestion's, and whether it is the one under the pointer. */
+        boolean selected, hovered;
         Row() { super(new BorderLayout()); setOpaque(false); add(title, BorderLayout.CENTER); add(detail, BorderLayout.EAST); }
         @Override public Component getListCellRendererComponent(JList<?> source, Object value, int index, boolean isSelected, boolean cellHasFocus) {
             var context = owner.context();
             var suggestion = value instanceof Nodes.Suggestion shown ? shown : null;
             selected = suggestion != null && index == selectedIndex(field());
+            hovered = suggestion != null && index == FieldSuggestions.this.hovered;
             String titleText = suggestion == null ? LOADING : suggestion.title(), detailText = suggestion == null ? "" : suggestion.detail();
             title.setText(titleText); detail.setText(detailText);
             detail.setVisible(!detailText.isBlank());
@@ -339,8 +358,10 @@ final class FieldSuggestions implements AutoCloseable {
             return this;
         }
         @Override protected void paintComponent(Graphics graphics) {
-            if (!selected) return;
-            graphics.setColor(ThemePainting.color(owner.context(), SemanticColor.SELECTION_BG));
+            if (!selected && !hovered) return;
+            var context = owner.context();
+            graphics.setColor(selected ? ThemePainting.color(context, SemanticColor.SELECTION_BG)
+                : ColorMath.opacity(ThemePainting.color(context, SemanticColor.HOVER_OVERLAY), .05));
             graphics.fillRect(0, 0, getWidth(), getHeight());
         }
     }

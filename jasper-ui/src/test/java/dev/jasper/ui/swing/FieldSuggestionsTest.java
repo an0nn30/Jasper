@@ -260,7 +260,7 @@ class FieldSuggestionsTest {
                 var input = control(view).input;
                 var other = new JButton();
                 for (var listener : input.getFocusListeners()) listener.focusLost(new FocusEvent(input, FocusEvent.FOCUS_LOST, true, other));
-                assertThat(rows(view)).as("a window going behind another keeps the list").hasSize(2);
+                assertThat(rows(view)).as("a temporary focus loss keeps the list").hasSize(2);
                 for (var listener : input.getFocusListeners()) listener.focusLost(new FocusEvent(input, FocusEvent.FOCUS_LOST, false, other));
                 assertThat(shown(view)).isNull();
                 view.update(spec(List.of(NAVIGATE, SEARCH, ENGINE), false));
@@ -283,11 +283,9 @@ class FieldSuggestionsTest {
                 var pointer = control(view).suggestions.pointer;
                 var second = list.getCellBounds(1, 1); var loading = list.getCellBounds(2, 2);
                 long when = System.currentTimeMillis();
-                pointer.mouseMoved(new MouseEvent(list, MouseEvent.MOUSE_MOVED, when, 0, 4, second.y + 2, 0, false));
-                assertThat(list.getSelectedIndex()).as("the pointer selects the row it rests on").isEqualTo(1);
                 list.setSelectedIndex(2);
                 pointer.mousePressed(new MouseEvent(list, MouseEvent.MOUSE_PRESSED, when, InputEvent.BUTTON1_DOWN_MASK, 4, loading.y + 2, 1, false, MouseEvent.BUTTON1));
-                assertThat(list.getSelectedIndex()).as("a press on the loading row leaves the selection on its suggestion").isEqualTo(1);
+                assertThat(list.getSelectedIndex()).as("a press on the loading row leaves the selection on its suggestion").isZero();
                 pointer.mouseReleased(new MouseEvent(list, MouseEvent.MOUSE_RELEASED, when, 0, 4, loading.y + 2, 1, false, MouseEvent.BUTTON1));
                 assertThat(events).as("the loading row is not a suggestion").isEmpty();
                 pointer.mouseReleased(new MouseEvent(list, MouseEvent.MOUSE_RELEASED, when, 0, 4, second.y + 2, 1, false, MouseEvent.BUTTON3));
@@ -298,6 +296,56 @@ class FieldSuggestionsTest {
                 assertThat(shown(view)).isNull();
             } finally { KitViewTest.release(context); }
         });
+    }
+
+    /**
+     * Plan 4b's P16, as Chrome's, Safari's and IntelliJ's lists do: the pointer on a row highlights it and leaves the
+     * keyboard's selection, so Enter still chooses what the selection says; a press does not select either, and leaving
+     * the list takes the highlight away.
+     */
+    @Test void hoveringASuggestionHighlightsItAndLeavesTheSelection() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, spec(List.of(NAVIGATE, SEARCH, ENGINE), false), events::add)) {
+                KitFixtures.render(view, 480, 160, 1);
+                var suggestions = control(view).suggestions;
+                var popup = suggestions.popup;
+                popup.setSize(popup.getPreferredSize()); layout(popup);
+                var list = shown(view);
+                var pointer = suggestions.pointer;
+                var second = list.getCellBounds(1, 1);
+                long when = System.currentTimeMillis();
+                pointer.mouseMoved(new MouseEvent(list, MouseEvent.MOUSE_MOVED, when, 0, 4, second.y + 2, 0, false));
+                assertThat(list.getSelectedIndex()).as("the selection stays").isZero();
+                assertThat(row(list, 1).hovered).as("the row under the pointer is highlighted").isTrue();
+                assertThat(row(list, 1).selected).isFalse();
+                assertThat(row(list, 0).hovered).isFalse();
+                assertThat(row(list, 0).selected).isTrue();
+                var image = new BufferedImage(popup.getWidth(), popup.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                var g = image.createGraphics();
+                try { popup.paint(g); } finally { g.dispose(); }
+                var third = list.getCellBounds(2, 2);
+                var hoveredAt = SwingUtilities.convertPoint(list, 2, second.y + second.height / 2, popup);
+                var plainAt = SwingUtilities.convertPoint(list, 2, third.y + third.height / 2, popup);
+                assertThat(new Color(image.getRGB(hoveredAt.x, hoveredAt.y), true)).as("the highlight")
+                    .isNotEqualTo(new Color(image.getRGB(plainAt.x, plainAt.y), true))
+                    .isNotEqualTo(ThemePainting.color(context, SemanticColor.SELECTION_BG));
+                pointer.mousePressed(new MouseEvent(list, MouseEvent.MOUSE_PRESSED, when, InputEvent.BUTTON1_DOWN_MASK, 4, second.y + 2, 1, false, MouseEvent.BUTTON1));
+                pointer.mouseDragged(new MouseEvent(list, MouseEvent.MOUSE_DRAGGED, when, InputEvent.BUTTON1_DOWN_MASK, 4, third.y + 2, 1, false));
+                assertThat(list.getSelectedIndex()).as("a press and a drag leave it too").isZero();
+                assertThat(row(list, 2).hovered).isTrue();
+                pointer.mouseExited(new MouseEvent(list, MouseEvent.MOUSE_EXITED, when, 0, 4, -4, 0, false));
+                assertThat(row(list, 2).hovered).as("leaving the list").isFalse();
+                assertThat(press(control(view).input, KeyEvent.VK_ENTER)).isTrue();
+                assertThat(events).as("Enter chooses the selection, not the row hovered").containsExactly(new UiEvent.SuggestionChosen("address", "navigate", false));
+            } finally { KitViewTest.release(context); }
+        });
+    }
+
+    /** The row the list paints at {@code index}, as its renderer prepares it. */
+    static FieldSuggestions.Row row(JList<?> list, int index) {
+        @SuppressWarnings("unchecked") var rows = (JList<Object>) list;
+        return (FieldSuggestions.Row) rows.getCellRenderer().getListCellRendererComponent(rows, rows.getModel().getElementAt(index), index, false, false);
     }
 
     @Test void aFieldWithoutSuggestionsOrThatTakesNoInputShowsNoList() {
