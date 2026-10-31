@@ -3,11 +3,12 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Execution status (2026-10-31): Tasks 1-11 executed; Task 12, the user's GUI check on macOS, is pending** (branch
-`claude/browser-page-features`, worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `bcc77624d`,
-which has plan 4a merged; commits `c48158883` to `67c9d131a`, then the docs; not merged or pushed; see
-`docs/STATUS.md`). Executed with per-task subagents and reviews; the controller's rulings are numbered P1-P45, and
-plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan's text, each with its ruling:
+**Execution status (2026-10-31): Tasks 1-11 executed, then the final review's fix wave; Task 12, the user's GUI check
+on macOS, is pending** (branch `claude/browser-page-features`, worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut
+from local `main` `bcc77624d`, which has plan 4a merged; commits `c48158883` to `67c9d131a`, then the docs, then the
+fix wave from `914614edf`; not merged or pushed; see `docs/STATUS.md`). Executed with per-task subagents and reviews;
+the controller's rulings are numbered P1-P49, and plan 4a's R0-R48 bind. The task reviews recorded these deviations
+from the plan's text, each with its ruling:
 - **SDK:** the additions are `@since 0.27.0`, and every bundled range is `>=0.27.0, <0.28`.
 - **A plan-text error (P11):** Task 9's fallback reads `CefBrowser.getSource(CefStringVisitor)`; `CefFrame.getSource`,
   which the plan names, does not exist in JBR's JCEF (checked with `javap`).
@@ -21,11 +22,12 @@ plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan'
     in the kit's icon colours (P14), and `leadingName`, the slot's accessible name and tooltip, because spec section 6
     names the favicon "Site icon - drag to copy URL" (P13); the leading icon alone can be dragged;
   - a TEXTAREA, STEPPER or SLIDER takes no leading image or icon and no `selectOnClick`, and a TEXTAREA or NUMBER field
-    no suggestions (P15: the kit would have ignored them);
+    no suggestions (P15: the kit would have ignored them), nor, since the fix wave, a field with a `listId`, as both
+    would take Up and Down;
   - `selectOnClick` selects all only on the click that brings the focus into the field, and a click in a focused field
     places the caret, as Chrome's and Safari's address bars do (P12);
-  - a click chooses a suggestion, as a drawn list must take clicks, and hovering selects one, which P16 rules should
-    only highlight (left to the final fix wave);
+  - a click chooses a suggestion, as a drawn list must take clicks; hovering a row only highlights it and leaves the
+    keyboard's selection, as Chrome's, Safari's and IntelliJ's lists do (P16, done in the fix wave);
   - `showContextMenu(Point at, List<MenuItem> leading, List<MenuItem> trailing, Consumer<Optional<String>> chosen)`:
     the host's pane items go between the two lists, as spec section 11 orders them (P2); `at` is on screen, as a plugin
     holds no reference to its tab's component (P17); `chosen` hears `Optional.empty()` for a host item, a dismissal or
@@ -33,7 +35,8 @@ plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan'
     terminal's themed native popup, with exactly Split ▸, Move Pane to Tab ▸ and Close Pane;
   - a hold menu also opens at once on a right-click (Control-click on macOS), Shift+F10 and the context-menu key, as
     Chrome opens its history on a right-click (P20); a press that leaves the button before 500 ms opens nothing, as
-    leaving cancels a click (P19); a submenu has a blank action and no shortcut;
+    leaving cancels a click (P19), also when it comes back before then (the fix wave); a submenu has a blank action and
+    no shortcut;
   - `MenuItem` has no tooltip, so Task 3's history entries have none (P18);
   - testkit additions: `FakeKitView.clickInto`, `press`, `suggestions`, `selectedSuggestion` and `choose`, and
     `FakePluginHost.contentMenu`, `chooseFromContentMenu` and `dismissContentMenu`.
@@ -48,7 +51,8 @@ plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan'
     address check ignores the fragment.
 - **Task 3:**
   - the history is read after each main-frame load end, commit and title change, one read at a time, not when a press
-    begins (P1: the SDK's hold menu is a list the plugin sets in advance);
+    begins (P1: the SDK's hold menu is a list the plugin sets in advance); since the fix wave a title change reads it
+    250 ms later, once for the changes meanwhile;
   - each menu lists at most 12 entries, nearest first, as Chrome's do, since Swing popups do not scroll (P23); "Show
     Full History" comes with plan 5's history page;
   - a label is the title, or the URL without user info, cut at 80 characters (P18);
@@ -60,7 +64,10 @@ plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan'
   - the field shows a results page's terms whenever nothing is typed, not only while focused (P25: the SDK has no focus
     event; Safari shows them so); the tab, the saved URL and the drag keep the URL;
   - no suggestion request for an absolute local path, a `file:`, `about:` or `jasper-about:` address, user info (P24:
-    local paths and passwords must not reach the engine), blank text or text over 1,000 characters;
+    local paths and passwords must not reach the engine), blank text or text over 1,000 characters, nor, since the fix
+    wave, for an address with a port, a query or a fragment, or with a path loaded over `https` (P46, as Chromium's
+    `SearchProvider::IsQuerySuitableForSuggest`; text without a scheme loads over `https`, so `example.com/docs`
+    counts);
   - `localhost`, a host with a port and IP literals rank their Navigate row first, while a bare word keeps the spec's
     search-first order (P27: Chrome navigates them, and searching them sends intranet names to the engine);
   - a single word is ASCII with a letter or `_`, and `c#` and `why?` are searches;
@@ -134,7 +141,9 @@ plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan'
     is fetched fresh (no cookies, 10 s, 5 MB, a 200 only) whenever the source page loads; otherwise, and when that
     fails, it is the HTML captured with `CefBrowser.getSource` (P11) before the item navigates, kept under a 128-bit
     token, so a forged address reads no cookies or local content;
-  - the token is looked up in every open item, as the scheme handler cannot tell which browser asked (P43);
+  - the token is looked up in every open item, as the scheme handler cannot tell which browser asked (P43). That
+    premise was inaccurate: CEF's `create` receives the asking browser and frame, which the fix wave uses for P47;
+    binding a capture to the item that asks stays a follow-up;
   - `AboutScheme.registerLater` and an asynchronous resource handler keep the fetch off CEF's IO thread (P5);
   - `SourcePage.fetch` gives `CompletableFuture<Optional<String>>`, and the renderer is `html(String, String,
     WorkspacePalette, SyntaxPalette, boolean)` with `Appearance.syntaxPalette()`; per-item `SourcePages` keep 20
@@ -149,7 +158,8 @@ plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan'
   - a second Inspect Element closes and reopens DevTools at the new point in the same item, each DevTools waiting for
     every earlier one to end, as JCEF pairs pending browsers first in, first out (P44); DevTools' state resets;
   - links DevTools open in a new tab open as `NEXT_TAB` under the inspected page's scheme rule; the DevTools browser
-    gets no page scripts; DevTools have Copy and Paste and no find, zoom or right-click menu.
+    gets no page scripts; DevTools have Copy and Paste and no find, zoom or right-click menu; since the fix wave,
+    Ctrl+wheel over them is theirs on Windows and Linux.
 - **Task 11:**
   - its review found that `chrome:` text listed "Search for “chrome://version”", which Enter chose, and asked the
     engine about it; now `chrome:` text, in any case, gets no suggestion rows, no Enter target and no suggestion
@@ -161,6 +171,36 @@ plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan'
   - `./gradlew check --continue` passed after the fix round: 14,461 tests, 0 failures, 0 errors, 102 skipped (Browser
     508; the 16 build folders without the example plugin's); the example external plugin's `check pluginZip` passed (1
     test).
+- **The final review's fix wave** (`914614edf` to the docs commit; rulings P46-P49, items W1-W22):
+  - W1 (P46): no suggestion request for an address with a port, a query, a fragment or an `https` path (above);
+  - W2 (P47): `jasper-about:` answers only a main-frame request of a page's browser (`AboutSchemeFactory.handler`;
+    `PageEvents.answersAbout`, given through `Chromium.answerAboutFor`); a sub-frame's, an image's, a script's or a
+    fetch's, and any of DevTools or of no browser, get 404 and run no action; no Jasper page loads Jasper sub-resources
+    (the welcome, error and source pages checked); source pages are built at most two at once (`item.SourceBuilds`),
+    the rest waiting their turn without a thread, and one cancelled while it waits is never built; `NOT_FOUND` is
+    `AboutScheme`'s alone;
+  - W3 (P48) and W6: a link Chromium would open elsewhere (`onOpenURLFromTab`'s page branch) opens only what its frame
+    could open itself (`LinkRoute.link` takes the sender: the frame Chromium names, else `Page.committedAddress()`);
+    the page keeps its committed address, which the right-click menu and the DevTools' links ask the scheme rule from;
+    a direct `LinkSchemesTest`;
+  - W4 (P16) and W13: hover highlights (`HOVER_OVERLAY` at 5 %) and leaves the selection; the testkit's fake has no
+    pointer, so nothing changed there; `listId` with suggestions refused in both models; the focus-loss comment and
+    test; `KitOwnership.SUGGESTIONS`' Javadoc and the UI architecture's wording;
+  - W5: a favicon fetch keeps the count of the document it was declared in (`Page.document()`, bumped at each load
+    start) instead of the address, so a `pushState` or `replaceState` during the fetch keeps the icon;
+  - W7: an error page's source page saves as the failed address's; W8: a content menu ignores an item's action, which
+    must not be blank; W9: title changes coalesce into one history read 250 ms later; W10: the find bar searches once
+    typing pauses for 100 ms; W11: Ctrl+wheel reaches DevTools; W12: the testkit README's `clickInto` row; W14: leaving
+    a hold-menu button stops its timer, the fake copies its contexts, the stray blank line; W15: `WebFetch`'s `closed`
+    is volatile and its client is made outside the lock; W16: `NavigationHistoryTest` asserts its counter, the `json`
+    package-info; W17: `AddressInput.resolve`'s Javadoc; W18: `find.js` searches each collected run whole, and only
+    its empty matches stop at the deadline; W19: the zero-notch guard, the zoom-range comment, `PageView`'s field
+    order; W20: the `page` package-info re-wrapped; W21: `SourcePage`'s class doc;
+  - W22 is recorded below, not changed;
+  - `./gradlew check --continue` passed after the wave: 14,485 tests, 0 failures, 0 errors, 102 skipped (Browser 530;
+    the 16 build folders without the example plugin's); the example external plugin's `check pluginZip` passed (1
+    test); `sdkReference` was regenerated for the wave's SDK Javadoc; two new `migration.csv` rows
+    (`AboutSchemeFactoryTest`, `SourceBuildsTest`).
 
 Known gaps and follow-ups:
 - **Zoom:** no pinch on macOS (P35; a follow-up exports `com.apple.eawt.event` to the plugin); Ctrl+wheel only on
@@ -169,46 +209,40 @@ Known gaps and follow-ups:
 - **History menus:** 12 entries, no "Show Full History" until plan 5 (P23), and no per-entry icons or tooltips (P18).
 - **Find:** shadow roots and form fields are not searched; a catastrophic regular expression can hang the page's
   renderer (P31); the page's scripts see the query and can forge their frames' counts, which are only shown; a partial
-  count shows no sign of it; a sub-frame that navigates keeps its count until the next search.
+  count shows no sign of it; a sub-frame that navigates keeps its count until the next search; past the deadline, a
+  pattern's empty match ends a run's search, so a pattern that can match empty text (`a*`) keeps fewer matches there.
 - **Jasper's own requests:** favicons, suggestions and View Source's fetch go direct and send Java's User-Agent until
   plan 6's proxy setting (P22); SVG, WebP and `data:` favicons show the globe, and a page cannot change its favicon
   later.
 - **Address field:** a scheme-less `name:secret@host` typed character by character can reach the engine before the
   `@`; a click in the field closes its suggestion list until the next keystroke (Chrome keeps it).
 - **Error pages and certificates:** a successful Try Again leaves a Forward entry (P40); HSTS hosts (P41); a host with
-  an underscore gets no Continue, failing safe; a plain `mailto:` click may show "Page Can’t Be Loaded" (unverified).
-- **View Source:** a non-web page's source does not survive a restore (P42); the address field shows the token.
+  an underscore gets no Continue, failing safe; a plain `mailto:` click may show "Page Can’t Be Loaded" (unverified);
+  "Not secure" shows for any `https` page of a host the item allowed, even one whose certificate is now valid
+  (`ErrorPages.java:133-138`, W22).
+- **View Source:** a non-web page's source does not survive a restore (P42); the address field shows the token; a
+  capture's token is found in any open item, not bound to the item that asks (P43's premise was inaccurate; P47).
+- **Links:** with P48, a file dropped on a web page, should Chromium hand its navigation to `onOpenURLFromTab` as from
+  the page, opens nothing (a GUI line); a link DevTools open may arrive through the inspected page's branch, which then
+  places it by the page's last press rather than in the next tab (a GUI line).
 - **DevTools:** their state resets on each Inspect Element (P44); no context menus; their file dialogs are cancelled;
   Cmd+[ and Cmd+] (Alt+Left and Alt+Right) navigate the inspected page.
 
-Deferred minors, for the final review and its fix wave:
-- 1a: the testkit README's `clickInto` row; `HostedKit.image(EncodedArtwork)` no longer catches the >512 px refusal;
-  `TextFields` revalidates the field container on every refresh (pre-existing).
-- 1b: hovering moves the keyboard selection (P16); the temporary-focus-loss comment and test wording; a field with both
-  a `listId` and suggestions takes Up and Down for both; `KitOwnership.SUGGESTIONS`' Javadoc;
-  `HostedKitContractTest.press` bypasses the focus manager; a press inside the field closes the list.
-- 1c: a press that leaves and comes back within 500 ms still opens the hold menu, while the docs say leaving opens
-  nothing; `FakePluginHost.dismissContentMenus` iterates live values; a stray blank line.
-- 2: a `replaceState` or `pushState` during a favicon fetch drops the icon for the document; the UI thread can wait on
-  `Favicons`' monitor while the first client builds; addresses with `{}|^` show the globe; an untested BMP case;
-  `OpenerBridgeTest`'s stderr warning (4a).
-- 3: an unasserted counter in `NavigationHistoryTest`; the `json` package-info's wording.
-- 4: templates refuse underscore and IDN hosts without saying why; `AddressInput.resolve`'s Javadoc; a fetcher test
-  that cannot tell `close()` from the timeout.
-- 5: `find.js`'s final run has no deadline in its empty-match loop; a run collected at the deadline can be dropped; a
-  block inside a `display: none` ancestor ends the run; `getComputedStyle` on every visited element; ruby and math
+Deferred minors the final review's triage leaves recorded (P49); the fix wave did the rest:
+- 1a: `HostedKit.image(EncodedArtwork)` no longer catches the >512 px refusal; `TextFields` revalidates the field
+  container on every refresh (pre-existing).
+- 1b: `HostedKitContractTest.press` bypasses the focus manager; a press inside the field closes the list.
+- 2: addresses with `{}|^` show the globe; an untested BMP case; `OpenerBridgeTest`'s stderr warning (4a).
+- 4: templates refuse underscore and IDN hosts without saying why; a fetcher test that cannot tell `close()` from the
+  timeout.
+- 5: a block inside a `display: none` ancestor ends the run; `getComputedStyle` on every visited element; ruby and math
   count as blocks; collapsing dense white space is one uninterruptible replace.
-- 6: a zero-rotation Ctrl+wheel can step on a carried remainder; a stale "5% to 500%" test comment; a theoretical NaN;
-  a field's placement in `PageView`.
-- 7: a long `page/package-info.java` line; no direct `LinkSchemesTest`; `BrowserRestore`'s copy of the scheme set and
-  `AddressInput.SCHEME`.
+- 6: a theoretical NaN.
+- 7: `BrowserRestore`'s copy of the scheme set and `AddressInput.SCHEME`.
 - 8: no error page for any failed `jasper-about:` address also hides real failures of Jasper's own pages.
-- 9: a local page can ask for many source pages at once (memory); captures are bounded per item, not plugin-wide;
-  charset labels; untested branches; the class doc on the IO thread; `SourcePage.java`'s size; `NOT_FOUND` twice; a
-  1 s negative wait in a test; the raw-text set lacks `plaintext` and `noscript`.
-- 10: `PageTestAccess`'s serialization-constructor helper (JEP 500); security: the page-browser branch of
-  `onOpenURLFromTab` follows `file:` and `jasper-about:` in the same item without a gesture, to be guarded with
-  `LinkSchemes.opensFrom`.
+- 9: captures are bounded per item, not plugin-wide; charset labels; untested branches; `SourcePage.java`'s size; a 1 s
+  negative wait in a test; the raw-text set lacks `plaintext` and `noscript`.
+- 10: `PageTestAccess`'s serialization-constructor helper (JEP 500).
 
 Task 12 (the user's GUI check on macOS, with their OK): pending, the plan's ten lines plus those the task reviews added
 ([checklist](../../browser-verification.md#plan-4b-page-features)); Windows and Linux are not run; memory and

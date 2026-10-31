@@ -152,6 +152,30 @@ Each is pending.
   - Jasper quits with DevTools open.
 - **A proxied network** (the user's corporate network, P22): favicons, engine suggestions and View Source's fetch.
 
+#### Lines the final fix wave added
+
+Each is pending.
+
+- **Suggestions:** the pointer over a row highlights it and leaves the selected row; Enter then loads the selected one,
+  and a click loads the row clicked (P16).
+- **Hold menus:** a press on Back that leaves the button and comes back within half a second opens no menu.
+- **Favicons:** a site that calls `history.replaceState` or `pushState` while it loads, such as a single-page app that
+  rewrites its address, keeps its favicon.
+- **History menus:** a page that animates its title, such as a mail inbox's unread count, keeps the menus current.
+- **Find:** typing a word quickly searches once it pauses, without the count flickering; Enter right after typing finds
+  what was typed.
+- **Links (P48):**
+  - a Cmd-click (Ctrl-click) on a `file:` link of a local page opens it in the next tab, and one on an `http` page's
+    `file:` or `jasper-about:` link opens nothing;
+  - a file dropped on an `https` page that does not take drops: whether it still opens (it may now open nothing);
+  - a DevTools console link: whether it opens in the next tab, or loads in the inspected page.
+- **Jasper's pages (P47):** a local `file:` page with `<img src="jasper-about:settings">`,
+  `<iframe src="jasper-about:welcome">` or many `<img src="jasper-about:source?url=…">` opens no Settings, shows no
+  welcome page in the frame and builds no source pages; the welcome page's Settings link, an error page's Try Again
+  and Continue, and View Source still work.
+- **View Source of an error page:** after a relaunch, the source page comes back for the address that failed.
+- **DevTools zoom:** on Windows and Linux, Ctrl+wheel over the DevTools pane zooms DevTools, not the page.
+
 ### Plan 4b on Windows and Linux (not run)
 
 The user has no Windows or Linux host yet. The plan's ten lines and every line above wait for each of them too.
