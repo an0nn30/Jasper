@@ -16,6 +16,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
@@ -41,6 +42,7 @@ import org.cef.network.CefRequest;
  */
 public final class PageEvents {
     private static final Consumer<CefClient> INSTALL = PageEvents::install;
+    private static final Predicate<CefBrowser> PAGE_BROWSER = PageEvents::answersAbout;
     /**
      * What a page that entered fullscreen runs in its main frame: it leaves fullscreen. Chromium may tell Jasper before
      * the document's fullscreen element is set, so a document without one yet leaves on its next fullscreen change.
@@ -75,9 +77,21 @@ public final class PageEvents {
         LOAD_STARTS.computeIfAbsent(client, any -> new CopyOnWriteArrayList<>()).add(hook);
     }
 
-    /** Has Chromium install the handlers on its client before any page is made on it; once, however often asked. */
+    /**
+     * Has Chromium install the handlers on its client before any page is made on it, once, however often asked, and
+     * answer {@code jasper-about:} for pages' browsers only (plan 4b's P47).
+     */
     static void prepare(Chromium chromium) {
         chromium.onClient(INSTALL);
+        chromium.answerAboutFor(PAGE_BROWSER);
+    }
+
+    /**
+     * Whether {@code browser} is a page's, whose main-frame requests {@code jasper-about:} answers: not a page's
+     * DevTools', which have no page of their own, nor any other. Chromium's IO thread.
+     */
+    static boolean answersAbout(CefBrowser browser) {
+        return page(browser) != null;
     }
 
     private static void install(CefClient client) {

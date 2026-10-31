@@ -26,17 +26,19 @@ import java.util.regex.Pattern;
  * the page where it is. This registry is plain Java, so the plugin's start holds it without loading Chromium;
  * {@link AboutSchemeFactory} is Chromium's side of the scheme and loads only once Chromium starts. The scheme is local,
  * so web pages cannot link to it: Jasper's own pages, local {@code file:} pages and the address field reach an action,
- * and an action only does something in Jasper, such as opening Settings. A page or action may read the address it was
- * asked for, its query with it ({@link #parameter}); whatever it reads there, any of those may have written. A page
- * whose HTML takes time, as one fetched from the web does, is added with {@link #registerLater}, so that Chromium's IO
- * thread, which asks for every page, is never held for it.
+ * only as a page's main frame loads it (plan 4b's P47), and an action only does something in Jasper, such as opening
+ * Settings. A page or action may read the address it was asked for, its query with it ({@link #parameter}); whatever it
+ * reads there, any of those may have written. A page whose HTML takes time, as one fetched from the web does, is added
+ * with {@link #registerLater}, so that Chromium's IO thread, which asks for every page, is never held for it.
  */
 public final class AboutScheme {
     /** The scheme's name. */
     public static final String NAME = "jasper-about";
     private static final System.Logger LOG = System.getLogger(AboutScheme.class.getName());
     private static final Pattern PAGE = Pattern.compile("[a-z][a-z0-9-]*");
-    private static final Answer NOT_FOUND = new Answer(404, ""), NO_CONTENT = new Answer(204, "");
+    /** The answer to a request for nothing Jasper serves: 404 and an empty body. */
+    static final Answer NOT_FOUND = new Answer(404, "");
+    private static final Answer NO_CONTENT = new Answer(204, "");
     private final Map<String, Function<URI, String>> pages = new ConcurrentHashMap<>();
     private final Map<String, Consumer<URI>> actions = new ConcurrentHashMap<>();
     private final Map<String, Later> later = new ConcurrentHashMap<>();

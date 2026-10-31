@@ -49,9 +49,10 @@ import java.util.regex.Pattern;
  * page two or three times its size; the worst, the shortest tags up to the highlighting's end and ampersands after it,
  * some 20 characters for each highlighted one and 5 for each other, about 41 million in all: large, but bounded.
  *
- * <p>The page is built on the plugin's background executor, never on Chromium's IO thread, which only starts the fetch or
- * the look-up, nor on the UI thread, in the theme as it was last read; a page already open shows a theme change when it
- * loads again.
+ * <p>The page is built on the plugin's background executor, at most {@value #BUILDS} at once (plan 4b's P47), never on
+ * Chromium's IO thread, which only starts the fetch or the look-up, nor on the UI thread, in the theme as it was last
+ * read; a page already open shows a theme change when it loads again. Only the short page for an address without a
+ * {@code url} is made at once, on the IO thread.
  */
 public final class SourcePage implements AutoCloseable {
     /** The page's name. */
@@ -64,6 +65,8 @@ public final class SourcePage implements AutoCloseable {
     static final int LIMIT = 5 * 1024 * 1024;
     /** How many of a source's first characters are highlighted and linked. */
     static final int HIGHLIGHTED = 1_000_000;
+    /** How many pages are built at once; the others wait their turn. */
+    static final int BUILDS = 2;
     /** What the page says for a page that is no web page when the item holds no capture of it. */
     static final String UNAVAILABLE = "The source of this page is no longer available.";
     /** What the page says for a web page whose fetch failed when the item holds no capture of it. */
@@ -80,6 +83,7 @@ public final class SourcePage implements AutoCloseable {
     private final Executor starts;
     private final BiFunction<String, String, Optional<String>> captured;
     private final WebFetch web;
+    private final SourceBuilds builds;
     private volatile Look look;
 
     /**
@@ -100,13 +104,14 @@ public final class SourcePage implements AutoCloseable {
         this.starts = Objects.requireNonNull(starts, "starts");
         this.captured = Objects.requireNonNull(captured, "captured");
         web = new WebFetch(starts, timeout, LIMIT);
+        builds = new SourceBuilds(BUILDS, starts);
         rebuild();
         appearance.onChanged(variant -> rebuild());
     }
 
     /**
      * The page for {@code address}, as the class says. Chromium's IO thread, held only while the fetch or the look-up
-     * starts; cancelling the future ends the fetch.
+     * starts; cancelling the future ends the fetch, and a build still waiting its turn.
      *
      * @param address the address Chromium asked for, its query with it
      * @return the page's HTML, to come; it fails only when the plugin's executor no longer takes work
@@ -122,10 +127,21 @@ public final class SourcePage implements AutoCloseable {
             .orElseGet(() -> CompletableFuture.completedFuture(Optional.empty()));
         Optional<String> token = token(written);
         String missing = fetched.isPresent() ? NOT_LOADED : UNAVAILABLE;
-        CompletableFuture<String> result = fresh.thenCompose(source -> source.isPresent() ? CompletableFuture.completedFuture(source)
-                : held(token, page))
-            .thenApplyAsync(source -> source.map(text -> html(page, text, now.palette(), now.syntax(), now.dark()))
-                .orElseGet(() -> message(page, missing, now.palette(), now.syntax(), now.dark())), starts);
+        var result = new CompletableFuture<String>();
+        fresh.thenCompose(source -> source.isPresent() ? CompletableFuture.completedFuture(source) : held(token, page))
+            .whenComplete((source, failure) -> {
+                if (failure != null) {
+                    result.completeExceptionally(failure);
+                    return;
+                }
+                CompletableFuture<String> built = builds.build(() -> source.map(text -> html(page, text, now.palette(), now.syntax(),
+                    now.dark())).orElseGet(() -> message(page, missing, now.palette(), now.syntax(), now.dark())));
+                built.whenComplete((html, buildFailed) -> {
+                    if (buildFailed == null) result.complete(html);
+                    else result.completeExceptionally(buildFailed);
+                });
+                result.whenComplete((html, ended) -> built.cancel(true));
+            });
         result.whenComplete((html, failure) -> fresh.cancel(true));
         return result;
     }

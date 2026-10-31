@@ -17,9 +17,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * What the client's load handler hands a page when a load fails (spec section 14): a main frame's failure, by Chromium's
  * name for its error; that a main frame's load start runs the page's scripts in a page's browser only, never in its
- * DevTools'; and that the editing keys reach both. Chromium's side is played by the test: the frame it names, the
- * browsers it calls about (made without Chromium, {@link PageTestAccess#pageBrowser}), and its thread, whose hand-offs
- * to the UI thread the test runs. No Chromium.
+ * DevTools'; that the editing keys reach both; and that {@code jasper-about:} answers a page's browser only. Chromium's
+ * side is played by the test: the frame it names, the browsers it calls about (made without Chromium,
+ * {@link PageTestAccess#pageBrowser}), and its thread, whose hand-offs to the UI thread the test runs. No Chromium.
  */
 class PageEventsTest {
     private static final String FAILED = "https://unknown.example/";
@@ -81,6 +81,19 @@ class PageEventsTest {
             assertThat(PageEvents.edit(devTools, Optional.empty(), browser -> recording(ran))).as("no editing key").isFalse();
             assertThat(PageEvents.edit(devTools, Optional.of(EditingCommand.REDO), browser -> null)).as("no focused frame").isFalse();
             assertThat(ran).isEmpty();
+        });
+    }
+
+    /** Plan 4b's P47: {@code jasper-about:} answers a page's browser, never its DevTools' or a browser no page's. */
+    @Test void jasperAboutAnswersAPagesBrowserOnly() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            assertThat(PageEvents.answersAbout(PageTestAccess.pageBrowser(page))).isTrue();
+            assertThat(PageEvents.answersAbout(PageTestAccess.devToolsBrowser(PageTestAccess.devTools(page, new Point()))))
+                .as("its DevTools'").isFalse();
+            CefBrowser other = (CefBrowser) Proxy.newProxyInstance(CefBrowser.class.getClassLoader(), new Class<?>[] {CefBrowser.class},
+                (proxy, method, args) -> { throw new UnsupportedOperationException(method.getName()); });
+            assertThat(PageEvents.answersAbout(other)).as("no page's").isFalse();
         });
     }
 

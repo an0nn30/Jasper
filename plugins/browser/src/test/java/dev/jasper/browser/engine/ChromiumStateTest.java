@@ -1,6 +1,7 @@
 package dev.jasper.browser.engine;
 
 import java.awt.EventQueue;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -19,6 +20,7 @@ import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import org.cef.browser.CefBrowser;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -282,6 +284,27 @@ class ChromiumStateTest {
         assertThat(chromium.state()).isEqualTo(Chromium.State.STOPPED);
         flushUi();
         assertThat(tellings).hasValue(0);
+    }
+
+    /** Plan 4b's P47: {@code jasper-about:} answers the browsers the pages name, none before they name them. */
+    @Test void jasperAboutAnswersOnlyTheBrowsersThePagesName() {
+        Chromium chromium = chromium(recording, LIMIT);
+        CefBrowser page = browser(), devTools = browser();
+        assertThat(chromium.answersAbout(page)).as("before the pages name any").isFalse();
+        chromium.answerAboutFor(browser -> browser == page);
+        assertThat(chromium.answersAbout(page)).isTrue();
+        assertThat(chromium.answersAbout(devTools)).isFalse();
+        assertThat(starts).as("naming them starts nothing").isEmpty();
+    }
+
+    /** A browser that is only itself. */
+    private static CefBrowser browser() {
+        return (CefBrowser) Proxy.newProxyInstance(CefBrowser.class.getClassLoader(), new Class<?>[] {CefBrowser.class},
+            (proxy, method, args) -> switch (method.getName()) {
+                case "equals" -> proxy == args[0];
+                case "hashCode" -> System.identityHashCode(proxy);
+                default -> throw new UnsupportedOperationException(method.getName());
+            });
     }
 
     /** The marker file in the data directory. */

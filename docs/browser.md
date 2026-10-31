@@ -255,7 +255,8 @@ A Shift-click loads the link in the same page. A link or page that downloads a f
 Alt-click, which Chromium makes a download.
 
 Links that open a new tab or pane, and popups, open only at `http`, `https`, `file`, `about` and `jasper-about`
-addresses. A `mailto:` or `tel:` link opens nothing, however it is clicked.
+addresses. A `mailto:` or `tel:` link opens nothing, however it is clicked. A `jasper-about:` address loads only as a
+page's whole document: in a frame, or as an image, a script or a style sheet, it loads nothing.
 
 ## Popups
 
