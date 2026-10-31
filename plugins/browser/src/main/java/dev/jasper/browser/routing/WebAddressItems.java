@@ -86,7 +86,9 @@ public final class WebAddressItems {
         WebLink link;
         try {
             link = new WebLink(address.get(), LinkOrigin.CLICK, placement, Optional.empty(), Optional.of(invoked.window()));
-        } catch (IllegalArgumentException notAWebLink) { // an authority that is no host, such as http://my_host/
+        } catch (IllegalArgumentException notAWebLink) {
+            // Jasper offers the items only for an address with a host; one with an authority that is no host, such as
+            // http://my_host/, goes to browse, which says Jasper's browser can't open it while Jasper is the default.
             context.platform().browse(address.get());
             return;
         }

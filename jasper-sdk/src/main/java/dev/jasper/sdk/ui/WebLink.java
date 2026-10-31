@@ -16,7 +16,8 @@ import java.util.Optional;
  * should treat the address as untrusted input and show it before acting on it.
  *
  * @param address an absolute {@code http} or {@code https} address with a host, or an absolute {@code file:} address, as
- *     the link or the caller gave it
+ *     the link or the caller gave it, except that Jasper gives an internationalized host in ASCII ({@code xn--}), which
+ *     the link may give in Unicode or percent-encoded
  * @param origin who asked for it
  * @param placement where the link asks to open; {@link LinkPlacement#TAB} for {@link LinkOrigin#EXTERNAL}
  * @param target an OSC 8 {@code target=} name, 1 to 256 characters with no control character, so a browser can reuse

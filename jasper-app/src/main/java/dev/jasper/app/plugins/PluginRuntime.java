@@ -763,6 +763,18 @@ public final class PluginRuntime {
             dev.jasper.sdk.ui.LinkPlacement.TAB, Optional.empty(), windowId);
     }
 
+    /**
+     * Whether the web browser a plugin provides is asked when {@code address} opens: an http or https address with a
+     * host, an internationalized one given in ASCII ({@code platform.Browser.withAsciiHost}). One whose authority is no
+     * host, such as {@code http://my_service:8080/}, never reaches it (browser plan 4c, ruling Q17). Any thread.
+     *
+     * @param address an absolute http or https address
+     * @return whether the browser is asked
+     */
+    public static boolean reachesBrowser(java.net.URI address) {
+        return WebBrowsers.takes(Objects.requireNonNull(address, "address"));
+    }
+
     private static dev.jasper.sdk.ui.LinkPlacement linkPlacement(Placement placement) {
         return switch (placement) {
             case TAB -> dev.jasper.sdk.ui.LinkPlacement.TAB;

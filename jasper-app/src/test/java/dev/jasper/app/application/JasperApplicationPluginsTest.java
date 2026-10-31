@@ -1286,6 +1286,59 @@ class JasperApplicationPluginsTest {
     }
 
     /**
+     * Browser plan 4c's final review, ruling Q17: while Jasper is the system's default browser, an address with an
+     * internationalized host, in Unicode or percent-encoded, reaches the provided browser with its host in ASCII, from
+     * outside and as a click; one no {@code WebLink} takes, such as {@code http://my_host/}, never reached the browser, so
+     * "Jasper’s browser can’t open this address" shows it, without its user info, and Copy Link copies it whole. None
+     * reaches the system browser.
+     */
+    @Test void whileJasperIsTheDefaultAnIdnAddressReachesTheBrowserAndOneItCannotTakeSaysSo() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path plugin = home.resolve("web-plugin");
+        PluginJars.build(plugin, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+            + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+        var desktop = new CopyOnWriteArrayList<String>();
+        var copied = new java.awt.datatransfer.Clipboard("test");
+        var check = new dev.jasper.app.platform.DefaultBrowser(Runnable::run, new dev.jasper.app.testsupport.MutableClock(), () -> Optional.of(true));
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        java.util.UUID window = java.util.UUID.randomUUID();
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].desktop = address -> desktop.add(address.toString());
+            application[0].clipboard = new dev.jasper.app.platform.HostClipboard(() -> copied, (delay, task) -> () -> { });
+            application[0].defaultBrowser(check);
+            application[0].startPlugins(null, plugin, false, dirs);
+        });
+        assertThat(external(application[0], "https://bücher.de/a", "https://b%C3%BCcher.de/b")).isZero();
+        edt(() -> {
+            application[0].openLink(clicked("https://bücher.de/c"), window);
+            application[0].openLink(clicked("http://my_host/"), window);
+        });
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened"))).containsExactly(
+            "https://xn--bcher-kva.de/a|EXTERNAL|-", "https://xn--bcher-kva.de/b|EXTERNAL|-", "https://xn--bcher-kva.de/c|CLICK|-");
+        assertThat(notices(application[0])).singleElement().satisfies(notice -> {
+            assertThat(notice.request().group()).isEqualTo("jasper.general");
+            assertThat(notice.request().severity()).isEqualTo(dev.jasper.app.notifications.Severity.WARNING);
+            assertThat(notice.request().title()).isEqualTo("Jasper’s browser can’t open this address");
+            assertThat(notice.request().content()).isEqualTo("http://my_host/");
+            assertThat(notice.request().actions()).extracting(dev.jasper.app.notifications.NotificationAction::label)
+                .containsExactly("Copy Link");
+        });
+        assertThat(external(application[0], "http://user:secret@my_service:8080/x")).isZero();
+        edt(() -> { });
+        var notice = notices(application[0]).getFirst().request();
+        assertThat(notice.content()).as("without its user info").isEqualTo("http://my_service:8080/x");
+        edt(() -> notice.actions().getFirst().run().run());
+        assertThat(copied.getData(java.awt.datatransfer.DataFlavor.stringFlavor)).isEqualTo("http://user:secret@my_service:8080/x");
+        assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened"))).hasSize(3);
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        ApplicationPluginCleanup.await(application[0]);
+        assertThat(desktop).isEmpty();
+    }
+
+    /**
      * Browser plan 4c Task 3, ruling Q10: a web address that comes back from outside within 10 seconds of Jasper handing
      * it to the system browser, as when Jasper is the default without the check seeing it, never goes back to the system:
      * with no browser provided it posts the notice. Another address still goes to the system browser.

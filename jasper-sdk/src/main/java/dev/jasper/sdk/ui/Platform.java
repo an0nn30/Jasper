@@ -158,18 +158,19 @@ public interface Platform {
      * Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, with that window, its placement and its OSC 8
      * {@code target=} name; every plugin's {@link #openInBrowser}, another plugin's {@link #browse} while Jasper is the
      * system's default browser, and Jasper's own web links, such as Settings' Help, with the active window; and the
-     * addresses given to the {@code jasper} command, with the window of the pane it ran in, go to {@code browser} first, on the UI thread, as a {@link WebLink} that says who asked
-     * ({@link LinkOrigin}). A local file the user clicked in a terminal also arrives, as a {@code file:} link.
-     * A clicked link comes from program output, and an OSC 8 link's address can differ from the text shown, so a browser
-     * should treat the address as untrusted input and show it before acting on it. Other
-     * schemes, such as {@code mailto}, always go to the system browser, and so does {@link #browse} while Jasper is not
-     * the system's default browser, and this plugin's own {@code browse} always. One at a time: a bundled
-     * plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
-     * plugin's own included, throws. When the browser returns false or throws, and when no plugin provides one, the
-     * system browser opens an {@code http} or {@code https} address and the Default editor a {@code file:} one. While
-     * Jasper is itself the system's default browser, which would hand an {@code http} or {@code https} address back,
-     * Jasper opens nothing instead, and says so when no plugin provides a browser. Needs
-     * {@code browser.provide}. UI thread only. The registration ends with the plugin.
+     * addresses given to the {@code jasper} command, with the window of the pane it ran in, go to {@code browser} first,
+     * on the UI thread, as a {@link WebLink} that says who asked ({@link LinkOrigin}). A local file the user clicked in a
+     * terminal also arrives, as a {@code file:} link. A clicked link comes from program output, and an OSC 8 link's
+     * address can differ from the text shown, so a browser should treat the address as untrusted input and show it
+     * before acting on it. Other schemes, such as {@code mailto}, always go to the system browser, and so does
+     * {@link #browse} while Jasper is not the system's default browser, and this plugin's own {@code browse} always. One
+     * at a time: a bundled plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and
+     * any later one, this plugin's own included, throws. When the browser returns false or throws, when no plugin
+     * provides one, and for an address that makes no {@link WebLink}, the system browser opens an {@code http} or
+     * {@code https} address and the Default editor a {@code file:} one. While Jasper is itself the system's default
+     * browser, which would hand an {@code http} or {@code https} address back, Jasper opens nothing instead, and says so
+     * when no plugin provides a browser and for an address that makes no {@link WebLink}. Needs {@code browser.provide}.
+     * UI thread only. The registration ends with the plugin.
      *
      * @param browser opens a web address
      * @return the registration

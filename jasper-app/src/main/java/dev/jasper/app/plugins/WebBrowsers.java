@@ -87,9 +87,9 @@ final class WebBrowsers {
      * @param placement where the link asks to open
      * @param target the OSC 8 {@code target=} name, or empty
      * @param windowId the Jasper window the address came from; the browser gets its plugin's handle while it is open
-     * @return true when it opened the link; false when no plugin provides a browser, the parts make no {@link WebLink}
-     *     (an {@code http} address with an authority that is no host, such as {@code http://my_host/}, which the system
-     *     browser then opens), or it declined or threw
+     * @return true when it opened the link, which carries an internationalized host in ASCII
+     *     ({@link dev.jasper.app.platform.Browser#withAsciiHost}); false when no plugin provides a browser, the parts make
+     *     no {@link WebLink} even so ({@link #takes}), or it declined or threw
      */
     boolean open(URI address, LinkOrigin origin, LinkPlacement placement, Optional<String> target, Optional<UUID> windowId) {
         Objects.requireNonNull(address, "address");
@@ -102,7 +102,7 @@ final class WebBrowsers {
         Optional<WindowOwner> window = windowId.flatMap(current.windows());
         WebLink link;
         try {
-            link = new WebLink(address, origin, placement, target, window);
+            link = new WebLink(dev.jasper.app.platform.Browser.withAsciiHost(address), origin, placement, target, window);
         } catch (IllegalArgumentException notAWebLink) {
             return false;
         }
@@ -112,5 +112,23 @@ final class WebBrowsers {
             return null;
         });
         return failure == null && opened.get();
+    }
+
+    /**
+     * Whether a provided browser is asked to open {@code address}, as a click in a tab: it makes a {@link WebLink}, an
+     * internationalized host given in ASCII. One with an authority that is no host, such as {@code http://my_host/},
+     * never reaches the browser; the system browser has it. Any thread.
+     *
+     * @param address an absolute address
+     * @return whether it makes a {@link WebLink}
+     */
+    static boolean takes(URI address) {
+        try {
+            new WebLink(dev.jasper.app.platform.Browser.withAsciiHost(address), LinkOrigin.CLICK, LinkPlacement.TAB, Optional.empty(),
+                Optional.empty());
+            return true;
+        } catch (IllegalArgumentException notAWebLink) {
+            return false;
+        }
     }
 }

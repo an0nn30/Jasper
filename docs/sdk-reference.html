@@ -9930,18 +9930,19 @@ the plugin.</p></div>
 Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, with that window, its placement and its OSC 8
 <code>target=</code> name; every plugin's <a href="#dev.jasper.sdk.ui.Platform.openInBrowser(URI)"><code>openInBrowser</code></a>, another plugin's <a href="#dev.jasper.sdk.ui.Platform.browse(URI)"><code>browse</code></a> while Jasper is the
 system's default browser, and Jasper's own web links, such as Settings' Help, with the active window; and the
-addresses given to the <code>jasper</code> command, with the window of the pane it ran in, go to <code>browser</code> first, on the UI thread, as a <a href="#dev.jasper.sdk.ui.WebLink"><code>WebLink</code></a> that says who asked
-(<a href="#dev.jasper.sdk.ui.LinkOrigin"><code>LinkOrigin</code></a>). A local file the user clicked in a terminal also arrives, as a <code>file:</code> link.
-A clicked link comes from program output, and an OSC 8 link's address can differ from the text shown, so a browser
-should treat the address as untrusted input and show it before acting on it. Other
-schemes, such as <code>mailto</code>, always go to the system browser, and so does <a href="#dev.jasper.sdk.ui.Platform.browse(URI)"><code>browse</code></a> while Jasper is not
-the system's default browser, and this plugin's own <code>browse</code> always. One at a time: a bundled
-plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
-plugin's own included, throws. When the browser returns false or throws, and when no plugin provides one, the
-system browser opens an <code>http</code> or <code>https</code> address and the Default editor a <code>file:</code> one. While
-Jasper is itself the system's default browser, which would hand an <code>http</code> or <code>https</code> address back,
-Jasper opens nothing instead, and says so when no plugin provides a browser. Needs
-<code>browser.provide</code>. UI thread only. The registration ends with the plugin.</p></div>
+addresses given to the <code>jasper</code> command, with the window of the pane it ran in, go to <code>browser</code> first,
+on the UI thread, as a <a href="#dev.jasper.sdk.ui.WebLink"><code>WebLink</code></a> that says who asked (<a href="#dev.jasper.sdk.ui.LinkOrigin"><code>LinkOrigin</code></a>). A local file the user clicked in a
+terminal also arrives, as a <code>file:</code> link. A clicked link comes from program output, and an OSC 8 link's
+address can differ from the text shown, so a browser should treat the address as untrusted input and show it
+before acting on it. Other schemes, such as <code>mailto</code>, always go to the system browser, and so does
+<a href="#dev.jasper.sdk.ui.Platform.browse(URI)"><code>browse</code></a> while Jasper is not the system's default browser, and this plugin's own <code>browse</code> always. One
+at a time: a bundled plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and
+any later one, this plugin's own included, throws. When the browser returns false or throws, when no plugin
+provides one, and for an address that makes no <a href="#dev.jasper.sdk.ui.WebLink"><code>WebLink</code></a>, the system browser opens an <code>http</code> or
+<code>https</code> address and the Default editor a <code>file:</code> one. While Jasper is itself the system's default
+browser, which would hand an <code>http</code> or <code>https</code> address back, Jasper opens nothing instead, and says so
+when no plugin provides a browser and for an address that makes no <a href="#dev.jasper.sdk.ui.WebLink"><code>WebLink</code></a>. Needs <code>browser.provide</code>.
+UI thread only. The registration ends with the plugin.</p></div>
 <dl class="tags"><dt>Parameters</dt><dd><code>browser</code> opens a web address</dd><dt>Returns</dt><dd>the registration</dd><dt>Throws</dt><dd><a class="ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/IllegalStateException.html">IllegalStateException</a> when another plugin already provides the browser
     (<code>The browser is already provided by &lt;plugin id&gt;</code>), and off the UI thread</dd><dd><a href="#dev.jasper.sdk.MissingCapabilityException">MissingCapabilityException</a> without <code>browser.provide</code></dd></dl>
 </div>
@@ -11313,7 +11314,8 @@ should treat the address as untrusted input and show it before acting on it.</di
 <h5>Components</h5>
 <div class="table-wrap"><table class="components"><tbody>
 <tr id="dev.jasper.sdk.ui.WebLink.address()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/net/URI.html" title="java.net.URI">URI</a></code></td><td class="cn"><code><b>address</b></code></td><td>an absolute <code>http</code> or <code>https</code> address with a host, or an absolute <code>file:</code> address, as
-    the link or the caller gave it</td></tr>
+    the link or the caller gave it, except that Jasper gives an internationalized host in ASCII (<code>xn--</code>), which
+    the link may give in Unicode or percent-encoded</td></tr>
 <tr id="dev.jasper.sdk.ui.WebLink.origin()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.LinkOrigin">LinkOrigin</a></code></td><td class="cn"><code><b>origin</b></code></td><td>who asked for it</td></tr>
 <tr id="dev.jasper.sdk.ui.WebLink.placement()"><td class="ct"><code><a class="tl" href="#dev.jasper.sdk.ui.LinkPlacement">LinkPlacement</a></code></td><td class="cn"><code><b>placement</b></code></td><td>where the link asks to open; <a href="#dev.jasper.sdk.ui.LinkPlacement.TAB"><code>LinkPlacement.TAB</code></a> for <a href="#dev.jasper.sdk.ui.LinkOrigin.EXTERNAL"><code>LinkOrigin.EXTERNAL</code></a></td></tr>
 <tr id="dev.jasper.sdk.ui.WebLink.target()"><td class="ct"><code><a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html" title="java.util.Optional">Optional</a>&lt;<a class="tl ext" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html" title="java.lang.String">String</a>&gt;</code></td><td class="cn"><code><b>target</b></code></td><td>an OSC 8 <code>target=</code> name, 1 to 256 characters with no control character, so a browser can reuse

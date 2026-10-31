@@ -420,8 +420,9 @@ public final class JasperApplication {
         notificationCenter.reportActionFailuresTo(failure -> incidentNotices.jasperFailure("a notification action", failure));
         externalAddresses = new ExternalAddresses(notificationCenter, java.time.Clock.systemUTC(), new ExternalAddresses.Hooks(
             (address, window, notTaken) -> plugins.openExternalLink(address, window, notTaken),
-            address -> systemBrowser.accept(address), () -> plugins != null && plugins.providesBrowser(),
-            done -> setPluginEnabled(ExternalAddresses.BROWSER_PLUGIN, true, done), () -> restart(RestartMode.SAME),
+            address -> systemBrowser.accept(address), () -> plugins != null && plugins.providesBrowser(), PluginRuntime::reachesBrowser,
+            done -> setPluginEnabled(ExternalAddresses.BROWSER_PLUGIN, true, done),
+            address -> restart(RestartMode.SAME, List.of(), List.of(address)),
             text -> clipboard.copy(text), () -> quitting || stopped));
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;

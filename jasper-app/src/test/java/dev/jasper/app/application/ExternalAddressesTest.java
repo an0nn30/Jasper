@@ -23,7 +23,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Browser plan 4c Task 3: web addresses from outside, the loop breaker and the "Web links can’t open in Jasper" notice. */
+/**
+ * Browser plan 4c Task 3: web addresses from outside, the loop breaker, the "Web links can’t open in Jasper" notice, and
+ * (the final review) "Jasper’s browser can’t open this address".
+ */
 @ExtendWith(EdtTestExtension.class)
 class ExternalAddressesTest {
     private final MutableClock clock = new MutableClock();
@@ -36,7 +39,8 @@ class ExternalAddressesTest {
     private boolean provides;
     private boolean quitting;
     private boolean restarts = true;
-    private int restarted;
+    /** The addresses each restart was asked to open afterwards. */
+    private final List<URI> restarted = new CopyOnWriteArrayList<>();
     private Optional<String> turnOnProblem = Optional.empty();
     private int turnedOn;
 
@@ -47,8 +51,8 @@ class ExternalAddressesTest {
                 offered.add(address + "|" + window.map(UUID::toString).orElse("-"));
                 if (declined.contains(address)) notTaken.accept(address);
             },
-            address -> system.add(address.toString()), () -> provides,
-            done -> { turnedOn++; done.accept(turnOnProblem); }, () -> { restarted++; return restarts; },
+            address -> system.add(address.toString()), () -> provides, dev.jasper.app.plugins.PluginRuntime::reachesBrowser,
+            done -> { turnedOn++; done.accept(turnOnProblem); }, address -> { restarted.add(address); return restarts; },
             text -> { if (text.contains("refused")) throw new IllegalStateException("The clipboard is busy"); copied.add(text); },
             () -> quitting));
     }
@@ -135,6 +139,36 @@ class ExternalAddressesTest {
         assertThat(center.history()).singleElement().satisfies(entry -> assertThat(entry.count()).isEqualTo(1));
     }
 
+    /**
+     * Ruling Q17: a provided browser never saw an address no {@code WebLink} takes, such as a host with {@code _}, so
+     * nothing has said why it opens nothing: "Jasper’s browser can’t open this address" shows it without its user info
+     * and offers Copy Link, which copies it whole. One the browser saw, an internationalized host among them, and
+     * declined has said why itself.
+     */
+    @Test void anAddressTheProvidedBrowserNeverSawPostsItsOwnNotice() {
+        var addresses = addresses();
+        provides = true;
+        addresses.cannotOpen(uri("http://user:secret@my_service:8080/a?b=1#c"));
+        Notification notice = center.history().getFirst();
+        assertThat(notice.request().group()).isEqualTo(NotificationsFeature.GENERAL.id());
+        assertThat(notice.request().severity()).isEqualTo(Severity.WARNING);
+        assertThat(notice.request().title()).isEqualTo("Jasper’s browser can’t open this address");
+        assertThat(notice.request().content()).as("without its user info").isEqualTo("http://my_service:8080/a?b=1#c");
+        assertThat(notice.request().actions()).extracting(NotificationAction::label).containsExactly("Copy Link");
+        assertThat(notice.request().actions()).extracting(NotificationAction::expires).containsExactly(false);
+        action(notice, "Copy Link").run();
+        assertThat(copied).containsExactly("http://user:secret@my_service:8080/a?b=1#c");
+        try (var log = LogRecorder.of(ExternalAddresses.class.getName())) {
+            addresses.cannotOpen(uri("https://b\u00fccher.de/"));
+            addresses.cannotOpen(uri("https://b%C3%BCcher.de/"));
+            assertThat(log.records()).as("the browser had them, in ASCII, and declined").hasSize(2);
+        }
+        assertThat(center.history()).hasSize(1);
+        quitting = true;
+        addresses.cannotOpen(uri("http://my_host/"));
+        assertThat(center.history()).hasSize(1);
+    }
+
     @Test void copyLinkCopiesTheAddressOrSaysItCouldNot() {
         var addresses = addresses();
         addresses.cannotOpen(uri("https://example.com/a?b=1"));
@@ -158,7 +192,7 @@ class ExternalAddressesTest {
         assertThat(offer.actions()).extracting(NotificationAction::label).containsExactly("Restart Now");
         restarts = false;
         offer.actions().getFirst().run().run();
-        assertThat(restarted).isOne();
+        assertThat(restarted).as("the link opens after the restart").containsExactly(uri("https://example.com/a"));
         assertThat(center.history().getFirst().request().title()).isEqualTo("Jasper could not restart");
         assertThat(center.history().getFirst().request().content())
             .isEqualTo("Jasper could not work out how it was started. Quit and reopen it to turn on the Browser.");
@@ -170,6 +204,33 @@ class ExternalAddressesTest {
         assertThat(center.history().getFirst().request().severity()).isEqualTo(Severity.ERROR);
         assertThat(center.history().getFirst().request().title()).isEqualTo("Could not turn on the Browser");
         assertThat(center.history().getFirst().request().content()).isEqualTo("No such plugin: dev.jasper.browser");
+    }
+
+    /**
+     * The final review: Restart Now opens the link that raised the notice once Jasper has restarted, the newest one when
+     * the notice stands for several, as its Copy Link copies the newest.
+     */
+    @Test void restartNowOpensTheNewestLinkAfterTheRestart() {
+        var addresses = addresses();
+        addresses.cannotOpen(uri("https://example.com/first"));
+        clock.advance(Duration.ofSeconds(1));
+        addresses.cannotOpen(uri("https://example.com/newest"));
+        assertThat(center.history()).singleElement().satisfies(entry -> assertThat(entry.count()).isEqualTo(2));
+        action(center.history().getFirst(), "Turn On Browser").run();
+        action(center.history().getFirst(), "Restart Now").run();
+        assertThat(restarted).containsExactly(uri("https://example.com/newest"));
+        assertThat(center.history().getFirst().request().title()).as("it restarted").isEqualTo("Restart Jasper to turn on the Browser");
+    }
+
+    /** The final review: Turn On Browser chosen once Jasper is quitting turns nothing on and posts nothing. */
+    @Test void turnOnBrowserDoesNothingOnceJasperQuits() {
+        var addresses = addresses();
+        addresses.cannotOpen(uri("https://example.com/a"));
+        quitting = true;
+        action(center.history().getFirst(), "Turn On Browser").run();
+        assertThat(turnedOn).isZero();
+        assertThat(center.history()).singleElement().satisfies(entry ->
+            assertThat(entry.request().title()).isEqualTo("Web links can’t open in Jasper"));
     }
 
     private static Runnable action(Notification notice, String label) {

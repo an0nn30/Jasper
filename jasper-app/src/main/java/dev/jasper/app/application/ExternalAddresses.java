@@ -18,14 +18,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Web addresses from outside Jasper, such as {@code jasper <url>}, and those that cannot open while Jasper is the
  * system's default browser (browser plan 4c). They wait until {@link #ready}: the plugins run and the first answer to
  * whether Jasper is the default has come. None goes to the system browser when that would hand it back to Jasper: one
  * that comes back within {@link #COMES_BACK_WITHIN} of Jasper handing it to the system is {@link #cannotOpen}'s instead
- * (ruling Q10), and with no browser provided "Web links can’t open in Jasper" offers Turn On Browser and Copy Link. EDT,
- * except {@link #handedToSystem}, any thread.
+ * (ruling Q10): with no browser provided "Web links can’t open in Jasper" offers Turn On Browser and Copy Link, and one
+ * the provided browser never saw, "Jasper’s browser can’t open this address" Copy Link (ruling Q17). EDT, except
+ * {@link #handedToSystem}, any thread.
  */
 final class ExternalAddresses {
     private static final System.Logger LOG = System.getLogger(ExternalAddresses.class.getName());
@@ -54,18 +56,22 @@ final class ExternalAddresses {
      * @param browser {@code PluginRuntime.openExternalLink}
      * @param systemBrowser opens an address the browser did not take in the system browser
      * @param providesBrowser whether a plugin provides the web browser now
+     * @param reachesBrowser whether an http or https address reaches the provided browser: it makes a {@code WebLink}
+     *     ({@code PluginRuntime.reachesBrowser})
      * @param turnOnBrowser turns the Browser plugin on from the next launch; it hears, on the EDT, nothing, or why not
-     * @param restart restarts Jasper as it was started; false when it cannot work out how
+     * @param restart restarts Jasper as it was started, the new Jasper opening the address; false when it cannot work
+     *     out how
      * @param copy puts text on the clipboard; it throws when the clipboard refuses
      * @param quitting whether Jasper is quitting
      */
-    record Hooks(Browser browser, Consumer<URI> systemBrowser, BooleanSupplier providesBrowser,
-                 Consumer<Consumer<Optional<String>>> turnOnBrowser, BooleanSupplier restart, Consumer<String> copy,
+    record Hooks(Browser browser, Consumer<URI> systemBrowser, BooleanSupplier providesBrowser, Predicate<URI> reachesBrowser,
+                 Consumer<Consumer<Optional<String>>> turnOnBrowser, Predicate<URI> restart, Consumer<String> copy,
                  BooleanSupplier quitting) {
         Hooks {
             Objects.requireNonNull(browser, "browser");
             Objects.requireNonNull(systemBrowser, "systemBrowser");
             Objects.requireNonNull(providesBrowser, "providesBrowser");
+            Objects.requireNonNull(reachesBrowser, "reachesBrowser");
             Objects.requireNonNull(turnOnBrowser, "turnOnBrowser");
             Objects.requireNonNull(restart, "restart");
             Objects.requireNonNull(copy, "copy");
@@ -171,25 +177,38 @@ final class ExternalAddresses {
      * A web address that no browser of Jasper's took, which the system browser would hand back to Jasper (rulings Q1 and
      * Q2). With no browser provided (the Browser plugin off or not installed), "Web links can’t open in Jasper" offers
      * Turn On Browser and Copy Link. A provided browser that declined it, as the Browser does once Chromium could not
-     * start, has had it and says why itself, so nothing opens and it is not offered again. Nothing once Jasper quits.
+     * start, has had it and says why itself, so nothing opens and it is not offered again. One that never reached the
+     * provided browser, as it makes no {@code WebLink} (such as {@code http://my_service:8080/}), "Jasper’s browser can’t
+     * open this address" shows without its user info, with Copy Link (ruling Q17). Nothing once Jasper quits.
      *
      * @param address an absolute http or https address
      */
     void cannotOpen(URI address) {
         if (hooks.quitting().getAsBoolean()) return;
         if (hooks.providesBrowser().getAsBoolean()) {
-            LOG.log(System.Logger.Level.INFO, "Jasper's browser did not open a web address, and the system would hand it back, so nothing opens");
+            if (hooks.reachesBrowser().test(address)) {
+                LOG.log(System.Logger.Level.INFO, "Jasper's browser did not open a web address, and the system would hand it back, so nothing opens");
+                return;
+            }
+            center.post(notice(Severity.WARNING, "Jasper’s browser can’t open this address")
+                .withContent(withoutUserInfo(address))
+                .withAction(new NotificationAction("Copy Link", () -> copy(address), false)));
             return;
         }
         center.post(notice(Severity.WARNING, "Web links can’t open in Jasper")
             .withContent("The Browser plugin is off. Turn it on to open web links in Jasper, or choose another default browser "
                 + "in your system settings.")
-            .withAction(NotificationAction.of("Turn On Browser", this::turnOnBrowser))
+            .withAction(NotificationAction.of("Turn On Browser", () -> turnOnBrowser(address)))
             .withAction(new NotificationAction("Copy Link", () -> copy(address), false)));
     }
 
-    /** Turn On Browser: the Browser plugin runs from the next launch, and the restart that starts it is offered. */
-    private void turnOnBrowser() {
+    /**
+     * Turn On Browser: the Browser plugin runs from the next launch, and the restart that starts it is offered, which
+     * then opens {@code address}, the link the notice was posted for (the newest, when it stands for several). Nothing
+     * once Jasper quits.
+     */
+    private void turnOnBrowser(URI address) {
+        if (hooks.quitting().getAsBoolean()) return;
         hooks.turnOnBrowser().accept(problem -> {
             if (hooks.quitting().getAsBoolean()) return;
             if (problem.isPresent()) {
@@ -198,13 +217,13 @@ final class ExternalAddresses {
             }
             center.post(notice(Severity.INFO, "Restart Jasper to turn on the Browser")
                 .withContent("The Browser plugin starts the next time Jasper starts.")
-                .withAction(NotificationAction.of("Restart Now", this::restart)));
+                .withAction(NotificationAction.of("Restart Now", () -> restart(address))));
         });
     }
 
-    /** The restart offer's Restart Now. */
-    private void restart() {
-        if (!hooks.restart().getAsBoolean())
+    /** The restart offer's Restart Now: the new Jasper opens {@code address}. */
+    private void restart(URI address) {
+        if (!hooks.restart().test(address))
             center.post(notice(Severity.ERROR, "Jasper could not restart")
                 .withContent("Jasper could not work out how it was started. Quit and reopen it to turn on the Browser."));
     }
@@ -216,6 +235,18 @@ final class ExternalAddresses {
         } catch (RuntimeException failure) {
             center.post(notice(Severity.ERROR, "Could not copy the link").withContent(failure.getMessage() == null ? "" : failure.getMessage()));
         }
+    }
+
+    /** {@code address} as text without the user name and password its authority may hold. */
+    private static String withoutUserInfo(URI address) {
+        String authority = address.getRawAuthority();
+        if (authority == null || authority.indexOf('@') < 0) return address.toString();
+        var text = new StringBuilder(address.getScheme()).append("://")
+            .append(authority, authority.lastIndexOf('@') + 1, authority.length());
+        if (address.getRawPath() != null) text.append(address.getRawPath());
+        if (address.getRawQuery() != null) text.append('?').append(address.getRawQuery());
+        if (address.getRawFragment() != null) text.append('#').append(address.getRawFragment());
+        return text.toString();
     }
 
     private static NotificationRequest notice(Severity severity, String title) {
