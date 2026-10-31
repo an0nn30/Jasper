@@ -96,7 +96,7 @@ source does not survive a restore; DevTools' state resets on each Inspect Elemen
 menus and cancel their file dialogs. A deferred security minor: the page-browser branch of `onOpenURLFromTab` follows
 `file:` and `jasper-about:` without a gesture and wants `LinkSchemes.opensFrom`. Task 12 (the user's GUI check on macOS,
 with their OK): pending, the plan's ten lines and the task reviews' lines
-([checklist](browser-verification.md)); Windows and Linux are not run; benchmarks and the memory
+([checklist](browser-verification.md#plan-4b-page-features)); Windows and Linux are not run; benchmarks and the memory
 run are deferred.
 
 **Browser plan 4a: the browser core — 2026-10-28** (`claude/browser-core-88616a`, worktree

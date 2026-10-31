@@ -207,7 +207,7 @@ Deferred minors, for the final review and its fix wave:
   `LinkSchemes.opensFrom`.
 
 Task 12 (the user's GUI check on macOS, with their OK): pending, the plan's ten lines plus those the task reviews added
-([checklist](../../browser-verification.md)); Windows and Linux are not run; memory and
+([checklist](../../browser-verification.md#plan-4b-page-features)); Windows and Linux are not run; memory and
 benchmarks are deferred.
 
 **Goal:** Give plan 4a's browser item iTerm2's page features:
