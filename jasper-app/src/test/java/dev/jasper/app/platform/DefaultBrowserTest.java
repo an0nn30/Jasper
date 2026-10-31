@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -27,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -209,6 +211,31 @@ class DefaultBrowserTest {
     private static void next(MutableClock clock, DefaultBrowser browser) {
         clock.advance(Duration.ofSeconds(30));
         browser.refresh();
+    }
+
+    /**
+     * Browser 4c Task 2 (ruling Q7): the listener hears each answer that changes the value, once and in order, on the EDT;
+     * an answer equal to the last, and a check without an answer, tell it nothing.
+     */
+    @Test void theListenerHearsEachChangeOnceOnTheEventDispatchThread() throws Exception {
+        var clock = new MutableClock();
+        var answers = new ArrayDeque<>(List.of(Optional.of(false), Optional.of(true), Optional.of(true), Optional.<Boolean>empty(),
+            Optional.of(false)));
+        var browser = new DefaultBrowser(Runnable::run, clock, answers::remove);
+        var heard = new CopyOnWriteArrayList<String>();
+        browser.onChanged(jasper -> heard.add(jasper + (SwingUtilities.isEventDispatchThread() ? " on the EDT" : " elsewhere")));
+        browser.refresh();
+        for (int i = 1; i < 5; i++) next(clock, browser);
+        assertThat(answers).as("every answer asked for").isEmpty();
+        SwingUtilities.invokeAndWait(() -> { });
+        assertThat(heard).as("no to yes, then yes to no").containsExactly("true on the EDT", "false on the EDT");
+        var later = new CopyOnWriteArrayList<Boolean>();
+        browser.onChanged(later::add);
+        answers.add(Optional.of(true));
+        next(clock, browser);
+        SwingUtilities.invokeAndWait(() -> { });
+        assertThat(later).as("a later listener replaces the first").containsExactly(true);
+        assertThat(heard).hasSize(2);
     }
 
     @Test void aWorkerThatRefusesTheCheckKeepsTheAnswerAndTriesAgainLater() {

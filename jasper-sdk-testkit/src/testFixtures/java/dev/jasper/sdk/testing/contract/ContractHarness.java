@@ -410,7 +410,8 @@ public interface ContractHarness extends AutoCloseable {
         void commandClient(java.nio.file.Path client);
         /**
          * Sets whether Jasper is the system's default browser, as the application's last check answered; until then it is
-         * not.
+         * not. A value that differs from the current one runs the plugins' {@code onDefaultBrowserChanged} handlers with it,
+         * on the UI thread, by the time {@link #flush} returns.
          */
         void defaultBrowser(boolean jasper);
 }

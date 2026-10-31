@@ -138,6 +138,8 @@ final class PluginHost {
     volatile Optional<Path> commandClient = Optional.empty();
     /** Whether Jasper is the system's default browser, as last checked ({@code Platform.isDefaultBrowser}); never blocks. */
     volatile java.util.function.BooleanSupplier defaultBrowser = () -> false;
+    /** The plugins' {@code Platform.onDefaultBrowserChanged} handlers, in registration order. UI thread. */
+    private final List<Consumer<Boolean>> defaultBrowserHandlers = new ArrayList<>();
     final EventBus bus;
     final ActivityHub activities;
     final ConnectionHub connections;
@@ -168,6 +170,24 @@ final class PluginHost {
 
     private void requireUi() {
         if (!environment.onUi().getAsBoolean()) throw new IllegalStateException("Plugin lifetimes belong to the UI thread");
+    }
+
+    /**
+     * Adds a handler of a change of {@link #defaultBrowser}; closing the registration removes it, and a closed one is not
+     * run by a change already under way. UI thread.
+     */
+    dev.jasper.app.lifecycle.Subscription onDefaultBrowserChanged(Consumer<Boolean> handler) {
+        Objects.requireNonNull(handler, "handler");
+        var live = new java.util.concurrent.atomic.AtomicBoolean(true);
+        Consumer<Boolean> guarded = jasper -> { if (live.get()) handler.accept(jasper); };
+        defaultBrowserHandlers.add(guarded);
+        return new dev.jasper.app.lifecycle.Subscription(() -> { live.set(false); defaultBrowserHandlers.remove(guarded); });
+    }
+
+    /** Runs every {@link #onDefaultBrowserChanged} handler with the new answer. UI thread. */
+    void defaultBrowserChanged(boolean jasper) {
+        requireUi();
+        for (Consumer<Boolean> handler : List.copyOf(defaultBrowserHandlers)) handler.accept(jasper);
     }
 
     Outcome start(HostedPlugin hosted) {

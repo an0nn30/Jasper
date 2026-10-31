@@ -11,7 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
-/** Browser plans 4a and 4c: the application host refuses openFile, hasModal, createForContent and isDefaultBrowser off the UI thread; the testkit models no UI thread. */
+/** Browser plans 4a and 4c: the application host refuses openFile, hasModal, createForContent, isDefaultBrowser and onDefaultBrowserChanged off the UI thread; the testkit models no UI thread. */
 class HostedUiThreadTest {
     @Test void theBrowserCoreCallsOffTheUiThreadThrow() {
         try (var harness = new AppContractTest().newHarness()) {
@@ -26,6 +26,8 @@ class HostedUiThreadTest {
             assertThatIllegalStateException().isThrownBy(() -> context.get().menus().createForContent("test.off.web", "Web"))
                 .withMessageContaining("UI thread");
             assertThatIllegalStateException().as("browser plan 4c").isThrownBy(() -> context.get().platform().isDefaultBrowser())
+                .withMessageContaining("UI thread");
+            assertThatIllegalStateException().isThrownBy(() -> context.get().platform().onDefaultBrowserChanged(jasper -> { }))
                 .withMessageContaining("UI thread");
             assertThat(harness.openedFiles()).isEmpty();
         }

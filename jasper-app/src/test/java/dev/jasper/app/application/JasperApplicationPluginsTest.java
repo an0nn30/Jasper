@@ -707,7 +707,10 @@ class JasperApplicationPluginsTest {
         ApplicationPluginCleanup.await(application[0]);
     }
 
-    /** A web browser that appends whether Jasper is the default browser, as it decides each link, to {@code data/default}. */
+    /**
+     * A web browser that appends {@code link:} and whether Jasper is the default browser, as it decides each link, to
+     * {@code data/default}, and {@code changed:} and the new answer each time it changes.
+     */
     private static final String DEFAULT_ASKING_BROWSER = """
         package fix.web;
         import dev.jasper.sdk.plugin.Plugin;
@@ -717,19 +720,24 @@ class JasperApplicationPluginsTest {
         public final class Main implements Plugin {
             @Override public void start(PluginContext context) {
                 context.platform().browser(link -> {
-                    try {
-                        Files.writeString(context.dataDirectory().resolve("default"), context.platform().isDefaultBrowser() + "\\n",
-                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-                    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                    write(context, "link:" + context.platform().isDefaultBrowser());
                     return true;
                 });
+                context.platform().onDefaultBrowserChanged(jasper -> write(context, "changed:" + jasper));
+            }
+            private static void write(PluginContext context, String line) {
+                try {
+                    Files.writeString(context.dataDirectory().resolve("default"), line + "\\n",
+                        StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
             }
         }
         """;
 
     /**
      * Browser plan 4c Task 2: a plugin's {@code Platform.isDefaultBrowser} gives the application's last answer to whether
-     * Jasper is the system's default browser, an answer that came after the plugins started included.
+     * Jasper is the system's default browser, an answer that came after the plugins started included, and its
+     * {@code onDefaultBrowserChanged} handler hears that answer change (ruling Q7).
      */
     @Test void pluginsSeeTheApplicationsAnswerToWhetherJasperIsTheDefaultBrowser() throws Exception {
         var answer = new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -753,8 +761,10 @@ class JasperApplicationPluginsTest {
             check.refresh();
             application[0].openLink(clicked("https://example.com/b"), window);
         });
+        edt(() -> { });
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/default")))
-            .as("no, then yes once a check answers it").containsExactly("false", "true");
+            .as("no, then yes once a check answers it, which the change handler then hears on the EDT")
+            .containsExactly("link:false", "link:true", "changed:true");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         ApplicationPluginCleanup.await(application[0]);

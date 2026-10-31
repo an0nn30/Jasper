@@ -18,7 +18,9 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
+import javax.swing.SwingUtilities;
 
 /**
  * Whether Jasper is the system's default web browser: the application that opens {@code https} links.
@@ -32,6 +34,7 @@ import java.util.function.Supplier;
  * </ul>
  * The answer is kept from the last check that answered, so asking never waits; {@link #refresh} checks again on the
  * worker. A check that fails or takes too long gives no answer and keeps the last one; any other system answers no.
+ * {@link #onChanged} hears each answer that changes the value, on the EDT.
  */
 public final class DefaultBrowser {
     private static final System.Logger LOG = System.getLogger(DefaultBrowser.class.getName());
@@ -54,6 +57,8 @@ public final class DefaultBrowser {
     private final Supplier<Optional<Boolean>> check;
     private final CompletableFuture<Boolean> firstAnswer = new CompletableFuture<>();
     private volatile boolean jasper;
+    /** Hears each change of {@link #jasper}, on the EDT. */
+    private volatile Consumer<Boolean> changed = value -> { };
     /** When the last check was handed to the worker; null before the first. Guarded by this. */
     private Instant checked;
     /** Whether a check has been handed to the worker and has not finished. Guarded by this. */
@@ -106,6 +111,15 @@ public final class DefaultBrowser {
     public CompletableFuture<Boolean> firstAnswer() { return firstAnswer.copy(); }
 
     /**
+     * Tells {@code listener}, on the EDT, each answer that changes {@link #isJasper}, in the order the answers came; an
+     * answer equal to the last tells it nothing, and so does a check without an answer. One listener at a time: a later
+     * call replaces it. Any thread.
+     *
+     * @param listener hears the new answer
+     */
+    public void onChanged(Consumer<Boolean> listener) { changed = Objects.requireNonNull(listener, "listener"); }
+
+    /**
      * Checks again on the worker, unless a check is still running or the last one began less than 30 seconds ago.
      * Returns at once; any thread. Called at start-up and whenever a Jasper window activates, which is when the user
      * may have changed the setting.
@@ -137,8 +151,11 @@ public final class DefaultBrowser {
                 answer = Optional.empty();
             }
             answer.ifPresent(value -> {
+                // One check runs at a time, so nothing else writes the answer meanwhile.
+                boolean was = jasper;
                 jasper = value;
                 firstAnswer.complete(value);
+                if (was != value) SwingUtilities.invokeLater(() -> changed.accept(value));
             });
         } finally {
             finished();

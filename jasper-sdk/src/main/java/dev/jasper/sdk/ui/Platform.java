@@ -4,6 +4,7 @@ import dev.jasper.sdk.Subscription;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Desktop integration the application already does for its own files and links. Implemented by the
@@ -61,9 +62,10 @@ public interface Platform {
 
     /**
      * Whether Jasper is the system's default web browser, the application the system opens {@code https} links with, as
-     * Jasper last checked. Jasper checks at start-up and when one of its windows activates, at most every 30 seconds, so
-     * the answer can lag a change the user just made; it is false until a check has answered, and a check that could not
-     * tell keeps the last answer. UI thread only; elsewhere it throws {@code IllegalStateException}. Never blocks.
+     * Jasper last checked. Jasper checks at start-up and again from time to time, such as when one of its windows
+     * activates, so the answer can lag a change the user just made; it is false until a check has answered, and a check
+     * that could not tell keeps the last answer. {@link #onDefaultBrowserChanged} hears each change. UI thread only;
+     * elsewhere it throws {@code IllegalStateException}. Never blocks.
      *
      * @return whether Jasper is the default browser
      * @throws UnsupportedOperationException if the host predates this query
@@ -71,6 +73,22 @@ public interface Platform {
      */
     default boolean isDefaultBrowser() {
         throw new UnsupportedOperationException("The default browser query is unavailable");
+    }
+
+    /**
+     * Runs {@code handler} on the UI thread each time Jasper's answer to {@link #isDefaultBrowser} changes, with the new
+     * answer. A check that gives the same answer again runs nothing, and the answer of the moment is not reported when
+     * the handler registers. UI thread only; elsewhere it throws {@code IllegalStateException}. The registration ends
+     * with the plugin.
+     *
+     * @param handler hears whether Jasper is now the default browser
+     * @return the registration
+     * @throws NullPointerException when {@code handler} is null
+     * @throws UnsupportedOperationException if the host predates this registration
+     * @since 0.28.0
+     */
+    default Subscription onDefaultBrowserChanged(Consumer<Boolean> handler) {
+        throw new UnsupportedOperationException("Hearing default browser changes is unavailable");
     }
 
     /**

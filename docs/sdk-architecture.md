@@ -440,7 +440,9 @@ worker as `Platform.browse` does. `JasperApplication.browse`, which Settings' He
 plugin manager use for Jasper's own links, sends them the clicks' way with the active window.
 `Platform.isDefaultBrowser`, on the UI thread, returns what `PluginRuntime.defaultBrowser` supplies: `JasperApplication`
 points it at `platform.DefaultBrowser.isJasper()`, the answer of its last check, which runs at start-up and as a window
-activates.
+activates. `DefaultBrowser.onChanged` tells the application, on the EDT, each answer that changes the value;
+`PluginRuntime.defaultBrowserChanged` passes it to every `Platform.onDefaultBrowserChanged` handler, contained, and the
+registrations close with their plugin.
 
 `LocalSpec.command` becomes `terminals.OpenSpec.Local.program`; the workspace launches it through `ShellLauncher`
 with the default profile's environment, each word passed as is, closes the pane when the program exits with status 0

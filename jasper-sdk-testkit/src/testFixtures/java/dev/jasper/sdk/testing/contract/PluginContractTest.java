@@ -4666,6 +4666,38 @@ public abstract class PluginContractTest {
         assertThat(asked).as("as each link is decided").containsExactly(false, true);
     }
 
+    /**
+     * Browser plan 4c Task 2 (SDK 0.28.0, ruling Q7): {@code onDefaultBrowserChanged} handlers hear each change of the
+     * host's answer, on the UI thread and with {@code isDefaultBrowser} already giving it; an answer that changes nothing
+     * runs none, and a registration hears nothing once it is closed or its plugin has stopped.
+     */
+    @Test void onDefaultBrowserChangedHearsEachChangeUntilItsRegistrationEnds() {
+        PluginContext a = started("test.a", Set.of());
+        PluginContext b = started("test.b", Set.of());
+        List<String> heard = new CopyOnWriteArrayList<>();
+        var registration = new AtomicReference<Subscription>();
+        h.ui(() -> {
+            registration.set(a.platform().onDefaultBrowserChanged(jasper -> heard.add("a:" + jasper + ":" + a.platform().isDefaultBrowser()
+                + (javax.swing.SwingUtilities.isEventDispatchThread() ? "" : ":off the UI thread"))));
+            b.platform().onDefaultBrowserChanged(jasper -> heard.add("b:" + jasper));
+            assertThatThrownBy(() -> a.platform().onDefaultBrowserChanged(null)).isInstanceOf(NullPointerException.class);
+        });
+        h.defaultBrowser(false);
+        h.flush();
+        assertThat(heard).as("an answer that changes nothing").isEmpty();
+        h.defaultBrowser(true);
+        h.flush();
+        assertThat(heard).containsExactly("a:true:true", "b:true");
+        h.ui(() -> registration.get().close());
+        h.defaultBrowser(false);
+        h.flush();
+        assertThat(heard).as("a closed registration hears nothing").containsExactly("a:true:true", "b:true", "b:false");
+        h.stopAll();
+        h.defaultBrowser(true);
+        h.flush();
+        assertThat(heard).as("nor a stopped plugin's").hasSize(3);
+    }
+
     @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {
         PluginContext a = started("test.a", Set.of());
         assertThat(a.commandLine().client()).as("no client yet").isEmpty();

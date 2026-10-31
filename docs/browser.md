@@ -416,10 +416,10 @@ dialog, such as Settings, the prompt cannot show, and the link opens in the syst
 Default editor) that once.
 
 **Open URL in Split Right** and **Open URL in Split Down** are in a terminal's right-click menu while the pane's
-selection is one `http` or `https` address and Open Links From Terminal is not Default Browser. They open the selected
-address in a browser pane to the right of the pane or below it, without asking. Select the address by dragging: a
-double-click selects only part of it. They are also listed in the command palette and Settings › Keymap, where they
-have no address and do nothing.
+selection is one `http` or `https` address and either Open Links From Terminal is not Default Browser or Jasper is the
+system's default web browser. They open the selected address in a browser pane to the right of the pane or below it,
+without asking. Select the address by dragging: a double-click selects only part of it. They are also listed in the
+command palette and Settings › Keymap, where they have no address and do nothing.
 
 ## Restore
 

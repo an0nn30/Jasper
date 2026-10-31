@@ -2583,13 +2583,46 @@ public final class FakePluginHost implements AutoCloseable {
     public void setCommandClient(Path client) { commandClient = Optional.of(Objects.requireNonNull(client, "client")); }
 
     volatile boolean defaultBrowser;
+    private final List<Entry> defaultBrowserHandlers = new CopyOnWriteArrayList<>();
 
     /**
      * Sets what {@code Platform.isDefaultBrowser} reports: whether Jasper is the system's default browser, as the
-     * application's last check answered. Until then it reports false.
+     * application's last check answered. Until then it reports false. A value that differs from the current one runs
+     * every {@code Platform.onDefaultBrowserChanged} handler with it at once, on the EDT, after the getter has changed,
+     * as Jasper does when a check changes its answer; a handler that throws is recorded in {@link #failures()} without
+     * stopping the others.
      *
      * @param jasper whether Jasper is the default browser
      * @since 0.28.0
      */
-    public void setDefaultBrowser(boolean jasper) { defaultBrowser = jasper; }
+    public void setDefaultBrowser(boolean jasper) {
+        Runnable publish = () -> {
+            if (defaultBrowser == jasper) return;
+            defaultBrowser = jasper;
+            for (var entry : List.copyOf(defaultBrowserHandlers)) {
+                if (entry.closed().get()) continue;
+                try { entry.handler().accept(jasper); }
+                catch (RuntimeException | LinkageError failure) { recordFailure(entry.pluginId() + " default browser change: " + failure); }
+            }
+        };
+        if (javax.swing.SwingUtilities.isEventDispatchThread()) publish.run();
+        else {
+            try { javax.swing.SwingUtilities.invokeAndWait(publish); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+            catch (java.lang.reflect.InvocationTargetException failure) {
+                if (failure.getCause() instanceof Error error) throw error;
+                if (failure.getCause() instanceof RuntimeException runtime) throw runtime;
+                throw new IllegalStateException(failure.getCause());
+            }
+        }
+    }
+
+    Subscription subscribeDefaultBrowser(String pluginId, Consumer<Boolean> handler) {
+        if (!javax.swing.SwingUtilities.isEventDispatchThread())
+            throw new IllegalStateException("Default browser change registration requires the UI thread");
+        Objects.requireNonNull(handler, "handler");
+        var entry = new Entry(pluginId, value -> handler.accept((Boolean) value), new AtomicBoolean());
+        defaultBrowserHandlers.add(entry);
+        return () -> { entry.closed().set(true); defaultBrowserHandlers.remove(entry); };
+    }
 }

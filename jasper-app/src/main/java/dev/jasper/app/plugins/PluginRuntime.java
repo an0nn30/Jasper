@@ -809,6 +809,18 @@ public final class PluginRuntime {
         defaultBrowser = Objects.requireNonNull(jasper, "jasper");
     }
 
+    /**
+     * Tells the plugins that a check changed the answer {@link #defaultBrowser} supplies: each
+     * {@code Platform.onDefaultBrowserChanged} handler runs with it. Before the plugins start it tells nobody. UI thread.
+     *
+     * @param jasper the new answer
+     * @throws IllegalStateException off the UI thread
+     */
+    public void defaultBrowserChanged(boolean jasper) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Default browser changes are told on the UI thread");
+        if (host != null) host.defaultBrowserChanged(jasper);
+    }
+
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         start(PluginSelection.scan(options, "", Version.parse(JasperSdk.VERSION), PluginSelection.host()), pluginTables, dark);
     }

@@ -261,6 +261,16 @@ final class HostedContext implements PluginContext {
                     requireUi("Platform.isDefaultBrowser");
                     return host.defaultBrowser.getAsBoolean();
                 }
+                @Override public Subscription onDefaultBrowserChanged(Consumer<Boolean> handler) {
+                    requireOpen();
+                    requireUi("Platform.onDefaultBrowserChanged");
+                    Objects.requireNonNull(handler, "handler");
+                    dev.jasper.app.lifecycle.Subscription registration = host.onDefaultBrowserChanged(jasper -> {
+                        if (state != State.CLOSED) host.containment.run(id, "default browser change", () -> handler.accept(jasper));
+                    });
+                    // As the browser's: HostedUi.closeAll closes it when the plugin stops or fails to start.
+                    return ui.tracked(registration::close);
+                }
                 @Override public boolean copy(String text) {
                     requireOpen();
                     requireUi("Platform.copy");

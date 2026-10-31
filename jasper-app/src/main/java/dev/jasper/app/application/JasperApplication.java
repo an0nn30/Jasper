@@ -1143,6 +1143,8 @@ public final class JasperApplication {
      */
     public void defaultBrowser(DefaultBrowser browser) {
         defaultBrowser = Objects.requireNonNull(browser, "browser");
+        // The plugins hear each change of its answer; one this application no longer asks is not passed on.
+        browser.onChanged(jasper -> { if (defaultBrowser == browser && plugins != null) plugins.defaultBrowserChanged(jasper); });
         browser.refresh();
     }
 

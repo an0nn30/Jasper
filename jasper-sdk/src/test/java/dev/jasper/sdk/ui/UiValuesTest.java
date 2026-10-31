@@ -374,10 +374,16 @@ class UiValuesTest {
             TabPlacement.SPLIT_DOWN, TabPlacement.NEW_WINDOW);
     }
 
-    /** Browser plan 4c Task 2 (SDK 0.28.0): whether Jasper is the default browser is a default that an older host refuses. */
-    @Test void theDefaultBrowserQueryIsADefaultThatAnOlderHostRefuses() throws Exception {
+    /**
+     * Browser plan 4c Task 2 (SDK 0.28.0): whether Jasper is the default browser, and hearing it change, are defaults that
+     * an older host refuses.
+     */
+    @Test void theDefaultBrowserQueryAndItsChangesAreDefaultsThatAnOlderHostRefuses() throws Exception {
         assertThat(Platform.class.getMethod("isDefaultBrowser").isDefault()).isTrue();
+        assertThat(Platform.class.getMethod("onDefaultBrowserChanged", java.util.function.Consumer.class).isDefault()).isTrue();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> older(Platform.class).isDefaultBrowser());
+        assertThatExceptionOfType(UnsupportedOperationException.class)
+            .isThrownBy(() -> older(Platform.class).onDefaultBrowserChanged(jasper -> { }));
     }
 
     /** A host that implements only the abstract members of {@code type}, as one built for an older SDK does. */
