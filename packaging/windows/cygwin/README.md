@@ -22,7 +22,7 @@ What users get is in [Cygwin Bash](../../../docs/terminal.md#cygwin-bash), the l
 | `validation.json` | The native acceptance recorded for one seed, per architecture, which releases require |
 | `CygwinTool.java` | The installation helper's entry point |
 | `BundleTool.java` | The build's seed tool: `acquire`, `verify`, `stage` and `distribution` |
-| `CygwinInstallerTemplate.java` | Adds the installation custom action and the per-user web browser registration to the selected JBR's WiX template, and stages the image for WiX |
+| `CygwinInstallerTemplate.java` | Adds the installation custom action and the per-user web browser registration (the `JasperURL` ProgId, whose command is `"[INSTALLDIR]Jasper.exe" --url "%1"`) to the selected JBR's WiX template, and stages the image for WiX |
 | `installer/provision-cygwin.cmd` | The portable ZIP's installation script |
 | `relay/prebuilt/` | The relay's tested programs and `provenance.json` ([relay README](relay/README.md)) |
 | `probe/` | The relay's sources and the native probes |

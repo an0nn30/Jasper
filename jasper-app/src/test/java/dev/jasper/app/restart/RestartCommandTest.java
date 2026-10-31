@@ -35,6 +35,17 @@ class RestartCommandTest {
             .as("a config file may be named like a path; the paths after it are the launch's").contains(List.of(JASPER, "--config", "notes.txt"));
     }
 
+    /** Browser plan 4c, ruling Q13: {@code --url} admits nothing after its address, so a replacement never repeats it. */
+    @Test void aLinkLaunchIsNotRepeated() {
+        assertThat(plan(SAME, "--url", "https://example.com/")).contains(List.of(JASPER));
+        assertThat(plan(SAME, "--url")).contains(List.of(JASPER));
+        var other = RestartCommand.plan(Optional.of("/app/Jasper"), Optional.of(new String[]{"-Dx=1", "Main", "--url",
+            "https://example.com/"}), List.of("missing"), NORMAL);
+        assertThat(other).as("dropped by its spelling, with its address").contains(List.of("/app/Jasper", "-Dx=1", "Main"));
+        assertThat(RestartCommand.plan(Optional.of("/app/Jasper"), Optional.of(new String[]{"Main", "--url"}), List.of("missing"), NORMAL))
+            .contains(List.of("/app/Jasper", "Main"));
+    }
+
     @Test void aJavaCommandLineIsReplayedWholeWithItsOwnArgumentsRewrittenAfterIt() {
         var java = RestartCommand.plan(Optional.of("/jbr/bin/java"), Optional.of(new String[]{"-Xmx1g", "-classpath", "/lib/*",
             "dev.jasper.app.Main", "notes.txt", "--safe-mode"}), List.of("notes.txt", "--safe-mode"), NORMAL);

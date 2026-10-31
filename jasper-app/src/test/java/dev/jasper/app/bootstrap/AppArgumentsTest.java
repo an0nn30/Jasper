@@ -145,6 +145,44 @@ class AppArgumentsTest {
         assertThat(parse("https.txt", "http-notes").paths()).containsExactly(cwd.resolve("https.txt"), cwd.resolve("http-notes"));
     }
 
+    /**
+     * Browser plan 4c, ruling Q13: {@code --url} is the launch a registered command makes. It opens the one web address
+     * after it, encoded as any other, and without one it is a plain launch (an empty {@code %u}); it is no start-up flag.
+     */
+    @Test void urlOpensTheOneWebAddressAfterIt() {
+        AppArguments link = parse("--url", "https://example.com/");
+        assertThat(link.urls()).containsExactly(URI.create("https://example.com/"));
+        assertThat(link.paths()).isEmpty();
+        assertThat(link.residencyAllowed()).isTrue();
+        assertThat(link.given()).as("as main received them").containsExactly("--url", "https://example.com/");
+        assertThat(parse("--url", "HTTP://Example.com/say \"hi\"").urls()).extracting(URI::toString)
+            .containsExactly("HTTP://Example.com/say%20%22hi%22");
+        AppArguments plain = parse("--url");
+        assertThat(plain.urls()).isEmpty();
+        assertThat(plain.paths()).isEmpty();
+        assertThat(plain.startupFlags()).isEmpty();
+        assertThat(plain.help() || plain.background() || plain.noWindow() || plain.replacing().isPresent()).isFalse();
+        assertThat(plain.given()).containsExactly("--url");
+    }
+
+    /**
+     * Ruling Q13: a link that breaks out of the quotes in {@code "Jasper.exe" --url "%1"} must add nothing Jasper reads.
+     * Anything after {@code --url} but one web address, and {@code --url} anywhere but first, refuses the whole launch.
+     */
+    @Test void urlRefusesAnythingButOneWebAddressAfterIt() {
+        for (String[] args : new String[][]{{"--url", "https://x/", "--plugin-dir", "y"}, {"--url", "https://x/", "extra"},
+                {"--url", "--plugin-dir", "y"}, {"--url", "https://x/", "https://y/"}, {"--url", "https://x/", "--safe-mode"}})
+            assertThatIllegalArgumentException().as(java.util.Arrays.toString(args)).isThrownBy(() -> AppArguments.parse(args, cwd))
+                .withMessageStartingWith("--url takes one web address and nothing after it.\n").withMessageContaining("Usage:");
+        for (String text : new String[]{"notes.txt", "file:///x", "--plugin-dir", "--help", "", "ftp://example.com/", "https://exa mple.com/"})
+            assertThatIllegalArgumentException().as(text).isThrownBy(() -> AppArguments.parse(new String[]{"--url", text}, cwd))
+                .withMessageStartingWith("Not a web address: " + text + "\n").withMessageContaining("Usage:");
+        for (String[] args : new String[][]{{"--safe-mode", "--url", "https://x/"}, {"--plugin-dir", "y", "--url", "https://x/"},
+                {"notes.txt", "--url"}, {"https://x/", "--url", "https://y/"}, {"--help", "--url"}})
+            assertThatIllegalArgumentException().as(java.util.Arrays.toString(args)).isThrownBy(() -> AppArguments.parse(args, cwd))
+                .withMessageStartingWith("--url must be the first argument.\n").withMessageContaining("Usage:");
+    }
+
     @Test void aLaunchNamesAtMostThirtyTwoWebAddresses() {
         String[] most = IntStream.rangeClosed(1, 32).mapToObj(n -> "https://example.com/" + n).toArray(String[]::new);
         assertThat(parse(most).urls()).hasSize(32);

@@ -19,7 +19,8 @@ import java.util.stream.Stream;
  * is given ({@link #webAddress}; browser plan 4c), at most {@link LaunchRequest#MAX_URLS}; otherwise it is a path to
  * open (workspace-tabs spec 5.4): a {@code file:} URL names its file ({@link FileUrls#localFile}), and anything else
  * resolves against the working directory. An http or https argument that is no web address, and a {@code file:} URL
- * that names no local file, are refused.
+ * that names no local file, are refused. {@code --url}, the launch a registered command makes, is a form of its own
+ * ({@link #link}).
  *
  * @param configOverride {@code --config}, or null
  * @param help {@code --help}
@@ -73,6 +74,7 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
     }
 
     static AppArguments parse(String[] args, Path workingDirectory) {
+        if (args.length > 0 && args[0].equals("--url")) return link(args, workingDirectory);
         Path override = null;
         Path pluginDir = null;
         boolean help = false, background = false, safeMode = false, noWindow = false;
@@ -110,6 +112,7 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
                     if (replacing.isPresent()) throw invalid("Duplicate --replacing option.");
                     replacing = OptionalLong.of(processId(args, ++i));
                 }
+                case "--url" -> throw invalid("--url must be the first argument.");
                 default -> {
                     if (args[i].startsWith("--")) throw invalid("Unknown argument.");
                     if (!webScheme(args[i])) paths.add(positional(args[i], workingDirectory));
@@ -122,6 +125,23 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
         if (noWindow && background) throw invalid("--no-window and --background cannot be combined.");
         return new AppArguments(override, help, background, safeMode, pluginDir, false, noWindow, replacing,
             workingDirectory, paths.build().toList(), urls.build().toList(), List.of(args));
+    }
+
+    /**
+     * The launch a registered command makes, such as Windows' {@code "Jasper.exe" --url "%1"} (browser plan 4c, ruling
+     * Q13): {@code --url} first, then at most one web address, read as {@link #webAddress} reads one, and nothing after
+     * it; without one it is a plain launch. A link that breaks out of its quotes therefore adds no option or path: the
+     * whole launch is refused.
+     */
+    private static AppArguments link(String[] args, Path workingDirectory) {
+        if (args.length > 2) throw invalid("--url takes one web address and nothing after it.");
+        List<URI> urls = List.of();
+        if (args.length == 2) {
+            if (!webScheme(args[1])) throw invalid("Not a web address: " + args[1]);
+            urls = List.of(webAddress(args[1]));
+        }
+        return new AppArguments(null, false, false, false, null, false, false, OptionalLong.empty(), workingDirectory,
+            List.of(), urls, List.of(args));
     }
 
     private static Path path(String[] args, int index, String option, String what, Path workingDirectory) {

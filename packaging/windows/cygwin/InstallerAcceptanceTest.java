@@ -78,8 +78,9 @@ public final class InstallerAcceptanceTest {
     // The production template's per-user web browser registration, read back as Windows reads it.
     private static boolean browserRegistered(Path installed) {
         return "Software\\Jasper\\Capabilities".equals(userValue("Software\\RegisteredApplications", "Jasper"))
+            && "JasperURL".equals(userValue("Software\\Jasper\\Capabilities\\URLAssociations", "http"))
             && "JasperURL".equals(userValue("Software\\Jasper\\Capabilities\\URLAssociations", "https"))
-            && ("\"" + installed.resolve("Jasper.exe") + "\" \"%1\"").equals(userValue("Software\\Classes\\JasperURL\\shell\\open\\command", ""));
+            && ("\"" + installed.resolve("Jasper.exe") + "\" --url \"%1\"").equals(userValue("Software\\Classes\\JasperURL\\shell\\open\\command", ""));
     }
     private static boolean browserUnregistered() {
         return userValue("Software\\RegisteredApplications", "Jasper") == null

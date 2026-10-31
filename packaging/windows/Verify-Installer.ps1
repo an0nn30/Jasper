@@ -70,7 +70,7 @@ try {
         '1|Software\Classes\JasperURL|-|',
         '1|Software\Classes\JasperURL||Jasper URL',
         '1|Software\Classes\JasperURL\DefaultIcon||"[INSTALLDIR]Jasper.exe",0',
-        '1|Software\Classes\JasperURL\shell\open\command||"[INSTALLDIR]Jasper.exe" "%1"'
+        '1|Software\Classes\JasperURL\shell\open\command||"[INSTALLDIR]Jasper.exe" --url "%1"'
     )
     $rows = @(Read-Column 'SELECT `Root`, `Key`, `Name`, `Value` FROM `Registry` WHERE `Component_` = ''JasperWebBrowser''' 4)
     if ($rows.Count -ne $registration.Count -or @($registration | Where-Object { $rows -cnotcontains $_ }).Count -ne 0) {

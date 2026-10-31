@@ -39,7 +39,7 @@ public final class CygwinInstallerTemplateTest {
         "HKCU|Software\\Jasper\\Capabilities\\URLAssociations|https|JasperURL",
         "HKCU|Software\\Classes\\JasperURL||Jasper URL",
         "HKCU|Software\\Classes\\JasperURL\\DefaultIcon||\"[INSTALLDIR]Jasper.exe\",0",
-        "HKCU|Software\\Classes\\JasperURL\\shell\\open\\command||\"[INSTALLDIR]Jasper.exe\" \"%1\"");
+        "HKCU|Software\\Classes\\JasperURL\\shell\\open\\command||\"[INSTALLDIR]Jasper.exe\" --url \"%1\"");
     // The keys Jasper owns, deleted with everything below them; RegisteredApplications only loses its Jasper value.
     private static final Set<String> REMOVED_KEYS = Set.of("HKCU|Software\\Jasper\\Capabilities", "HKCU|Software\\Classes\\JasperURL");
     private static int checks, fixtures;
@@ -85,7 +85,8 @@ public final class CygwinInstallerTemplateTest {
         require(components.size() == 1, "one web browser component: " + components.size());
         Element component = components.get(0), parent = (Element) component.getParentNode();
         require(parent.getLocalName().equals("DirectoryRef") && parent.getAttribute("Id").equals("INSTALLDIR"), "the component in INSTALLDIR");
-        require(component.getAttribute("Guid").matches("\\{[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}\\}"), "a fixed component GUID");
+        // Like packageInstaller's upgradeUuid, the GUID stays the same in every release.
+        require(component.getAttribute("Guid").equals("{6F685105-E30D-4CAF-9091-ED60DF8D5D62}"), "the component's GUID: " + component.getAttribute("Guid"));
         // Every installed component is removed on uninstall, unless it is permanent or never installed.
         require(!component.hasAttribute("Permanent") && !component.hasAttribute("NeverOverwrite")
             && elements(component, "Condition").isEmpty(), "a component installed every time and removed on uninstall");
