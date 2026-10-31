@@ -34,6 +34,7 @@ import dev.jasper.app.persistence.ToolWindowState;
 import dev.jasper.app.persistence.ToolWindows;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.AppDirs;
+import dev.jasper.app.platform.DefaultBrowser;
 import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.platform.SystemFonts;
 import dev.jasper.app.platform.SystemNotifier;
@@ -217,6 +218,8 @@ public final class JasperApplication {
     Consumer<java.net.URI> systemBrowser = this::openInSystemBrowser;
     /** Test seam: the desktop's browser, which {@code openInSystemBrowser} calls off the EDT. Production is {@link dev.jasper.app.platform.Browser#open}. */
     Consumer<java.net.URI> desktop = dev.jasper.app.platform.Browser::open;
+    /** Whether Jasper is the system's default browser; never, until {@link #defaultBrowser(DefaultBrowser)} asks the system. */
+    private volatile DefaultBrowser defaultBrowser = new DefaultBrowser(Runnable::run, java.time.Clock.systemUTC(), () -> false);
     /**
      * Test seam: whether each window's detached tool windows get native windows ({@link DetachedFrame}): only where
      * windows can be made, as nothing native is made headless.
@@ -1132,6 +1135,15 @@ public final class JasperApplication {
      */
     public void systemNotifier(SystemNotifier notifier) {
         systemNotices.use(Objects.requireNonNull(notifier, "notifier"));
+    }
+
+    /**
+     * Whether Jasper is the system's default browser, asked at once and again whenever a Jasper window activates.
+     * Injected, like {@link #systemNotifier}, so tests never ask the real operating system. EDT.
+     */
+    public void defaultBrowser(DefaultBrowser browser) {
+        defaultBrowser = Objects.requireNonNull(browser, "browser");
+        browser.refresh();
     }
 
     /**
@@ -2173,9 +2185,13 @@ public final class JasperApplication {
         updateBuddyActions();
     }
 
-    /** Coming back to a Jasper window is attention: the buddy wakes and waves. */
+    /**
+     * Coming back to a Jasper window is attention: the buddy wakes and waves. The user may have chosen another default
+     * browser meanwhile, so that is checked again.
+     */
     void windowActivated(JasperWindow window) {
         activatedSinceOpen = true;
+        defaultBrowser.refresh();
         // Coming back to any window shows the cards that waited, there.
         notificationViews.activated(window.content());
         systemNotices.focused();

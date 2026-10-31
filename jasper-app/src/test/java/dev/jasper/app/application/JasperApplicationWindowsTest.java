@@ -7,14 +7,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.layout.ParentTabs;
+import dev.jasper.app.platform.DefaultBrowser;
+import dev.jasper.app.testsupport.MutableClock;
 import dev.jasper.app.workspace.DesktopTestSupport;
 import dev.jasper.app.workspace.JasperWindow;
 import dev.jasper.app.workspace.WindowShell;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
@@ -169,6 +173,29 @@ class JasperApplicationWindowsTest {
                 assertThat(frames).as("the window used last comes forward").containsExactly("front w0");
                 assertThat(first.content().terminalTabs()).as("the folder opens there").hasSize(2);
                 assertThat(second.content().terminalTabs()).as("and not in the window opened last").hasSize(1);
+            });
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    /** Browser 4c: whether Jasper is the default browser is asked once it is given, and again as a window activates. */
+    @Test void aWindowThatActivatesChecksTheDefaultBrowserAgain() throws Exception {
+        JasperApplication application = application(() -> { });
+        var clock = new MutableClock();
+        var checks = new AtomicInteger();
+        try {
+            edt(() -> {
+                application.defaultBrowser(new DefaultBrowser(Runnable::run, clock, () -> checks.incrementAndGet() > 0));
+                assertThat(checks).as("asked at start-up").hasValue(1);
+                application.residency(true);
+                application.open(List.of(), JasperApplication.HANDOFF);
+                var first = application.windows().windows().getFirst();
+                clock.advance(Duration.ofSeconds(30));
+                first.events().activated().accept(true);
+                assertThat(checks).as("asked again as a window activates").hasValue(2);
+                first.events().activated().accept(true);
+                assertThat(checks).as("at most once per 30 seconds").hasValue(2);
             });
         } finally {
             edt(application::quitNow);

@@ -410,12 +410,14 @@ bootstrap injects the real notifier, as it does the resident indicator, so tests
   most 2 s), keeps at most 8 processes waiting for a click and kills one when its notification is read; tests inject
   the process starter.
 
-`gradle/mac-native.gradle` compiles the one bridge library from `MacNotifications.m` and `MacDock.m` with the JBR JNI
-headers and Apple's command line tools on macOS. `check` runs one headless harness per source: `testMacNotifications`
-(permission granted/denied/error, deferred delivery, literal Unicode, identifiers, withdrawal, the click callback and
-its binding through a fake JVM, foreground presentation, non-bundle guard) and `testMacDock` (the activation policy on
-a fake NSApp, the main-thread helper called on the main thread, where it runs inline; the hop from another thread is
-not covered, the power-off flag on a private notification center, non-bundle guard). `MacNotificationsTest` loads the
+`gradle/mac-native.gradle` compiles the one bridge library from `MacNotifications.m`, `MacDock.m` and
+`MacLaunchServices.m` with the JBR JNI headers and Apple's command line tools on macOS. `check` runs one headless
+harness per source: `testMacNotifications` (permission granted/denied/error, deferred delivery, literal Unicode,
+identifiers, withdrawal, the click callback and its binding through a fake JVM, foreground presentation, non-bundle
+guard), `testMacDock` (the activation policy on a fake NSApp, the main-thread helper called on the main thread, where it
+runs inline; the hop from another thread is not covered, the power-off flag on a private notification center, non-bundle
+guard) and `testMacLaunchServices` (the bundle identifier of the application a fake workspace opens `https` links with,
+which `platform.DefaultBrowser` compares with `dev.jasper.app`). `MacNotificationsTest` loads the
 real library and fails if `bind()` cannot resolve `clicked(String)`. Other platforms skip native compilation. Native
 packaging signs the dylib before signing Jasper and `verifyPackage` checks it and its exported natives. Gradle and IDE
 runs send no macOS notifications because they lack Jasper's bundle identity. Test a packaged app by hand: run
