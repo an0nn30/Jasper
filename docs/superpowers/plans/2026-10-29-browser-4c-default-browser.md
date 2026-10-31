@@ -3,6 +3,156 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Execution status (2026-10-31): Tasks 1-6 executed and reviewed, and Task 7's docs and check; Task 7 Step 3, the
+user's check on macOS, is pending, and so is the final review** (branch `claude/browser-default-browser`, worktree
+`.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `4e0ce0a14`, which has plan 4b merged; commits
+`ff4a7bfc9` to `a56f78cc4`, then the docs; not merged or pushed; see `docs/STATUS.md`). Executed with per-task
+subagents and reviews; the controller's rulings are numbered Q1-Q15. The task reviews recorded these deviations from
+the plan's text, each with its ruling:
+- **SDK:** the additions are `@since 0.28.0`, the minor after plan 4b's 0.27.0, and every bundled range is
+  `>=0.28.0, <0.29`.
+- **Task 1:**
+  - the bridge is JNI, as every bridge symbol `verifyPackage` checks is:
+    `Java_dev_jasper_app_platform_MacLaunchServices_defaultBrowserBundleId(JNIEnv*, jclass, jstring)` returns a
+    `jstring`, instead of the plan's C function `MacLaunchServices_defaultBrowserBundleId(const char* scheme)`; that
+    adds three files the plan does not list, following `MacDock` and the one-harness-per-source rule of
+    `gradle/mac-native.gradle`: `platform/MacLaunchServices.java` (the native method's owner), `MacLaunchServices.m`
+    and its harness `MacLaunchServicesTest.m` (`testMacLaunchServices`, in `check` on macOS);
+  - `WindowsUserPath` is unchanged: its `read(key, name)` already reads any `HKCU` string;
+  - a second public constructor takes a stand-in check, so the app's tests never ask the operating system;
+  - the check is three-state (Q4): one that fails or times out keeps the last answer, and only one that answers changes
+    it, since a passing "no" would send links to the system, which hands them back;
+  - Windows reads `UserChoiceLatest`'s `ProgId`, then its `ProgId` subkey's, then `UserChoice`'s, the first found
+    deciding (Q5: recent Windows 11 builds record the choice there; the layout is unverified);
+  - `firstAnswer()` completes with the first answer, or with false 3 s after construction (Q6), so a URL from a cold
+    launch is decided on an answer and nothing waits for ever;
+  - a check still running is not started again, a timed-out `xdg-settings` is ended with its descendants while the
+    shell lives, and an exit 0 with blank output answers no;
+  - the bootstrap injects the real check after `systemNotifier` and before `startPlugins`, and `windowActivated` (the
+    `WindowManager.Hooks.activated` hook) refreshes it;
+  - `run()` copies `WslDistributions.run`, which `platform` may not depend on (accepted).
+- **Task 2:**
+  - `Platform.onDefaultBrowserChanged(Consumer<Boolean>)` (Q7), beyond the plan: spec section 9 shows Open URL in Split
+    Right and Down whenever the URL would open in Jasper's browser, so `WebAddressItems` follows the setting and the
+    answer, and the plumbing runs `DefaultBrowser.onChanged` → `PluginRuntime.defaultBrowserChanged` → the handlers;
+  - the SDK Javadoc names no interval ("from time to time, such as when one of its windows activates"), so only
+    `docs/browser.md` gives 30 s;
+  - the fake runs the handlers at once from `setDefaultBrowser`, which `ContractHarness.defaultBrowser` drives on both
+    hosts.
+- **Task 3:**
+  - the notice posts only when no plugin provides a browser (Q1): a provided browser that declines while Jasper is the
+    default, as the Browser does once Chromium could not start, has said why itself, and handing back would loop;
+  - `openInSystemBrowser` never calls `Desktop.browse` for http(s) while Jasper is the default and never offers a
+    declined link again (Q2);
+  - `Platform.browse` changed for plugins (its Javadoc, the fake, a contract case): while Jasper is the default another
+    plugin's `browse` goes to the provided browser first, and the provider's own, its hand-back (Use Default Browser
+    included), never goes back to it and takes the system path, which then opens nothing (Q9: the plan's "this also
+    covers `Platform.browse`" would otherwise loop);
+  - a loop breaker in `ExternalAddresses` (Q10): an http(s) address from outside within 10 s of Jasper handing the same
+    address (`URI.normalize()`) to the system browser is never handed there again, for what the check cannot see (Linux
+    without `xdg-settings`, a lagging check);
+  - a `jasper <url>` call is answered only once its addresses are handed on (Q8), so a `--no-window` Jasper cannot quit
+    while one waits for the first answer; a dropped address writes "jasper: too many web addresses are waiting; <url>
+    was not opened" and the call exits 1; quitting fails a waiting call with "Jasper is quitting; run the command
+    again";
+  - the restart offer is a notice whose Restart Now calls `restart(SAME)`, following `restartForUpdate`, not
+    `RestartFlow`, which is the Plugins page's banner (U9);
+  - the hold, the notice, Turn On Browser, Copy Link and the restart offer live in the new
+    `application.ExternalAddresses` (U7: `JasperApplication`'s size), and the clipboard is a test seam;
+  - "the Browser plugin is off" means no plugin provides a browser, so a Browser that failed to load gets that text,
+    and Turn On Browser then offers the restart.
+- **Task 4:**
+  - a request without URLs stays protocol 2, and only one with URLs is protocol 3 (Q11; the plan said protocol 3 for
+    all): a newer build's second launch against an older running Jasper keeps restarting into the new build;
+  - accepted as built (Q12): a `file:` launch argument opens its file (`platform.FileUrls`, RFC 8089's forms), more
+    than 32 URLs is an argument error (exit 2), an open-URI or URL-only handoff raises or restores a window first (the
+    `open-uri` trigger, `docs/diagnostics.md`), and the web-address rule moved into `platform.Browser`, which
+    `bootstrap` and `residency` may use;
+  - an http(s) argument is never a path: what `java.net.URI` refuses after the host is percent-encoded as browsers do,
+    and one still no web address is refused ("Not a web address"), as is a `file:` URL naming no local file ("Not a
+    local file"), since either would otherwise be a lost path or "Invalid path" on Windows;
+  - `macUrlTypes` is a project property, so `packaging-support-test.gradle` checks it.
+- **Task 5:**
+  - the registered command is `"[INSTALLDIR]Jasper.exe" --url "%1"`, not `"[INSTALLDIR]Jasper.exe" "%1"` (Q13): a
+    link with a quote could break out and add `--plugin-dir` or `--config` (the CVE-2018-1000006 class); `--url` must
+    come first and take at most one http(s) address, or the whole launch is refused (exit 2) before the instance lock;
+  - the component is `JasperWebBrowser` in `DirectoryRef INSTALLDIR` with a fixed GUID, which the test pins, no `Win64`
+    and `ForceDeleteOnUninstall` on the two keys Jasper owns, so WiX 3 and jpackage's WiX 4 conversion both take it;
+  - `InstallerAcceptanceTest` checks the registration after install and upgrade and its removal (beyond the file
+    list), and `packageInstaller` takes the template as an input;
+  - `RestartCommand` drops `--url` and its address, which admits nothing after it.
+- **Task 6:**
+  - the override is `Jasper.desktop`, the launcher's name, which jpackage looks for, written from jpackage's own
+    `template.desktop` with its `Exec` and `DESKTOP_MIMES` lines changed; the command is `Exec=… --url %u` (Q13);
+  - the maintainer scripts save the system `defaults.list` files before `xdg-desktop-menu install` and put back each
+    that changed (Q14, option B): its lazy default would otherwise make Jasper a fallback or the default, and its
+    uninstall never takes it out;
+  - Categories stay jpackage's (Q15): adding `WebBrowser` without `Network` would fail `desktop-file-validate`;
+  - `update-desktop-database` runs on both applications folders, outside jpackage's single-package guard;
+    `check-install.sh` checks the entry, the MIME cache and `defaults.list` (beyond the file list);
+  - `linuxDesktopFileName` ties `DefaultBrowser`'s desktop id to `linuxPackageName` in the fixture.
+- **Task 7:**
+  - the guides: `docs/browser.md` (Making Jasper your default browser, for each platform, and When the Browser is off;
+    the addresses from outside in the link rules; the introduction's and Chromium's lines while Jasper is the
+    default), `docs/command-line.md` (`<url>...`, `file:` URLs, the five new argument errors, `jasper URL...`'s exit
+    status and the dropped-address message, restart and handoff), `docs/packaging.md` (macOS web links, the registry
+    keys and `Verify-Installer.ps1`'s rows, `verifyInstallerTemplate`, the desktop entry, the MIME cache refresh, the
+    kept `defaults.list`, `check-install.sh`) and `docs/app-architecture.md` (protocols 2 and 3); beyond the file list,
+    `docs/terminal.md`, whose link rules and split items Tasks 2 and 3 had made inaccurate, and the index's Browser
+    line;
+  - `docs/browser.md`'s rule 4 now says that under Default Browser only a split click goes to the system browser, the
+    two items being hidden then; its prompt fallback ("opens in the system browser … that once") and rule 5 stay as
+    they were: a web link reaches them only while Jasper is not the default, which rule 3 decides first;
+  - `./gradlew check` passed after the docs (10m 43s): 14,562 tests, 0 failures, 0 errors, 103 skipped (jasper-app
+    5,245, Browser 532; the 16 build folders without the example plugin's); the example external plugin's
+    `check pluginZip` passed (1 test); `sdkReference` was up to date; source hygiene is clean over 3,256 Java files.
+
+Not run:
+- **Windows** (no host): `packageInstaller`, `Verify-Installer.ps1`, `InstallerAcceptanceTest`, WiX's ICE validation of
+  the real MSI, and the real-registry cases (`theRealRegistryIsReadInTheSameOrder`, `aMissingRegistryKeyAnswersNo`).
+- **Linux** (no host; CI blocked by the Actions budget): `packageDeb`, `packageRpm`, `check-install.sh`, and real
+  xdg-utils, dash and `xdg-settings`.
+- **macOS:** the real open-URI event (`uriOpened` is tested directly), Launch Services' answer for an installed
+  `Jasper.app`, and the choice of default browser.
+- Benchmarks and the memory run: deferred.
+
+Known gaps and follow-ups:
+- **The check:** it lags a change by up to 30 s and runs only at start-up and on window activation; before its first
+  answer Jasper counts itself not the default, and URLs from outside wait up to 3 s for it.
+- **Loops:** the 10 s rule compares `URI.normalize()`, so an address the system rewrites (a trailing slash) is not
+  caught; a deliberate repeat within 10 s while Jasper is not the default and no browser runs posts the notice (Q10's
+  cost); Use Default Browser opens nothing while Jasper is the default (Q9's cost).
+- **Notices:** with the Browser off and Jasper the default, the notice of a `--no-window` Jasper that `jasper <url>`
+  started waits for a window that may never open.
+- **Launch arguments:** `[` and `]` in a path, a `\` in the authority and raw tabs are refused as "Not a web address"
+  rather than encoded; on Windows a link with a raw `"` loses it, or is refused when it splits (Q13's cost); a
+  `RestartCommand` replay on the non-launcher path keeps positional paths and URLs by spelling (before this plan).
+- **Linux:** GIO's first-handler fallback can pick Jasper where no default web browser is set; a user's own
+  `~/.config/mimeapps.list` choice of Jasper dangles after removal; when the copies cannot be made, `xdg-desktop-menu`'s
+  lazy default stays; KDE may need `WebBrowser` in Categories (Q15).
+- **Unverified:** macOS listing Jasper with only `CFBundleURLTypes`, the cold-launch open-URI event, whether AWT drops
+  a URL its parser refuses before `uriOpened`; Windows' `UserChoiceLatest` layout (Q5), ICE33 on the
+  `HKCU\Software\Classes` keys, and what Windows does with a choice of Jasper after uninstall.
+
+Deferred minors for the final review's triage:
+- 1: the in-flight guard stays set if `worker.execute` throws anything but `RejectedExecutionException`
+  (`DefaultBrowser.java:124`); two `firstAnswer` tests use the real 3 s bound; the grandchild test fails rather than
+  skips when `process.info().command()` is empty.
+- 2: `plugin-authoring.md` and the testkit README name only `onTerminalTypographyChanged` as needing the EDT in the
+  fake; the contract case lacks a throwing or self-closing handler; rule 2's split placement is not asserted
+  (`BrowserRoleTest`); the injection-order claim is untested (`JasperApplication`).
+- 3: Turn On Browser does not check quitting before acting (`ExternalAddresses.java:192`); the 10 s memory has a time
+  limit but no count cap and uses the wall clock; misplaced Javadoc in `FakePluginHost`; the Q9 test does not pin two
+  fallback records; `Platform.java` and `plugin-authoring.md` not reflowed.
+- 4: `AppArguments`' import order; the web-address rule's copies in `MenuEntry` and `HostedContext` (L7).
+- 6: an empty `cksum` result counts as unchanged (fail-open); no `trap` between save and restore; a dangling-symlink
+  `defaults.list`; the fixture fails under a build path with whitespace; no fixture cases for an unset, spaced or
+  empty `XDG_DATA_DIRS` entry.
+
+Task 7 Step 3 (the user's check on macOS, with their OK): pending, the plan's six lines plus those the task reviews
+added ([checklist](../../browser-verification.md#plan-4c-registering-jasper-as-the-default-browser)); Windows and
+Linux are not run; benchmarks are deferred.
+
 **Goal:** Let the user make Jasper the system's default web browser on macOS, Windows and Linux, as iTerm2 allows.
 - **URLs handed over from outside** open in Jasper's browser with no prompt: by the system, by `open -a Jasper <url>`,
   by `jasper <url>`, or as launch arguments.

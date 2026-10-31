@@ -97,14 +97,15 @@ sequenceDiagram
    owns each home: `bootstrap.SingleInstance` tries to take `residency.InstanceLock` (`daemon/instance.lock`), and
    `LaunchAction` decides what the launch does: own the home, hand off, exit, or wait for the lock. The owner binds the
    handoff endpoint and the command socket at once (`bootstrap.Instance`) and holds their requests in `EarlyRequests`
-   until `compose` hands it the application. Any other launch hands its request (`HandoffSocket.handOff`, protocol 3:
-   RAISE or OPEN_PATHS, its working directory, paths, ignored start-up flags and web addresses; the owner still reads
-   protocol 2, which has no web addresses) to the owner and exits 0 without opening the log or the toolkit; on Windows
-   it first lends the owner the foreground right, using the process id the owner records in `daemon/instance.pid` when
-   it takes the lock. A `--background` or `--no-window` launch exits at
-   once; restart's replacement (`--replacing <pid>`) waits up to 30 seconds for the lock; an owner that does not answer
-   within 10 seconds is reported (`bootstrap.LaunchFailure`) and no second instance starts. A start that fails after
-   taking the lock closes its endpoints and exits, so the lock goes with the process.
+   until `compose` hands it the application. Any other launch hands its request (`HandoffSocket.handOff`, protocol 2:
+   RAISE or OPEN_PATHS, its working directory, paths and ignored start-up flags; protocol 3, which adds web addresses,
+   only for a request that has some, so a running Jasper of the build before still takes the others; the owner reads
+   both) to the owner and exits 0 without opening the log or the toolkit; on Windows it first lends the owner the
+   foreground right, using the process id the owner records in `daemon/instance.pid` when it takes the lock. A
+   `--background` or `--no-window` launch exits at once; restart's replacement (`--replacing <pid>`) waits up to 30
+   seconds for the lock; an owner that does not answer within 10 seconds is reported (`bootstrap.LaunchFailure`) and no
+   second instance starts. A start that fails after taking the lock closes its endpoints and exits, so the lock goes
+   with the process.
 3. The pre-pass runs on the bootstrap thread: it opens the log (`AppLog`), carries out pending plugin removals and
    installs (`JasperApplication.preparePlugins`, `PluginRuntime.maintain`) and builds the `PluginSelection`, which
    discovers plugins once, reads `plugins.toml` and the look attempt record, resolves the plugin set and elects at most

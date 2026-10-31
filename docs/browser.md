@@ -5,7 +5,8 @@ draws them with Chromium, which comes with Jasper's runtime, so nothing else nee
 browser Jasper opens links with: a link you click in a terminal can open here, after asking you first
 ([Links from terminals and Jasper](#links-from-terminals-and-jasper)). It is on by default and can be turned off on the
 Plugins page ([Plugins](plugins.md#browser)); without it, links open in the system browser and local files in the
-Default editor.
+Default editor, and while Jasper is itself the system's [default browser](#making-jasper-your-default-browser), web
+links open nothing.
 
 ## Opening pages
 
@@ -14,7 +15,8 @@ Default editor.
 - The **Split** submenus list **Browser Right** and **Browser Down**, which open the start page in a new pane beside the
   focused one. The command palette calls them **Split Right with Browser** and **Split Down with Browser**; they have no
   default shortcut.
-- Links you click in a terminal, Jasper's own web links and `jasper URL...` can open here, as
+- Links you click in a terminal, Jasper's own web links, `jasper URL...`, a launch's web addresses and, while Jasper is
+  your [default browser](#making-jasper-your-default-browser), links from other apps can open here, as
   [below](#links-from-terminals-and-jasper).
 
 The start page is `jasper-about:welcome` by default: Jasper's welcome page, in the workspace theme's colours, whose
@@ -32,8 +34,9 @@ without any user name and password in it.
 - Chromium starts the first time a browser page shows, not when Jasper starts, and runs until Jasper quits. When it
   cannot start, Jasper posts "The browser could not start" with the reason, such as "Chromium did not start within 90
   seconds", and the plugin's log has it too. From then on the links Jasper hands the Browser open in the system browser
-  (a local web file in the Default editor), and New Browser Tab, New Browser Window and the Browser split item post the
-  notification again instead of opening a page.
+  (a local web file in the Default editor; while Jasper is itself the system's default browser, a web link opens
+  nothing), and New Browser Tab, New Browser Window and the Browser split item post the notification again instead of
+  opening a page.
 - All pages share one Chromium profile, kept across runs: cookies, session cookies included, the cache and other site
   data ([Files](#files)).
 
@@ -380,23 +383,31 @@ These links come to the Browser:
 - a local web file you Cmd-click in a terminal: HTML, XML, SVG, CSS, JavaScript, PDF, PNG, JPEG, GIF, WebP or HEIC;
 - Jasper's own web links, such as Settings' Help button and the homepages in About › Licenses… and Settings › Plugins,
   and the links plugins open, such as the Editor's Markdown preview links;
-- the addresses of `jasper URL...` ([Command line](command-line.md#the-jasper-command)).
+- the addresses from outside Jasper: those of `jasper URL...` ([Command line](command-line.md#the-jasper-command)), a
+  launch's web addresses ([launch options](command-line.md#launching-jasper-with-options)), `open -a Jasper URL` on
+  macOS, and the links other apps open while Jasper is your
+  [default browser](#making-jasper-your-default-browser).
 
 `ftp` and `mailto` links in a terminal go to the system's handler, as without the Browser.
 
 Each link goes where the first of these says:
 
-1. An address from `jasper URL...` opens in a new browser tab, without asking, right after the shown tab of the window
-   of the pane `jasper` ran in, else of the most recently active window, opening one when none is open.
+1. An address from outside Jasper opens in a new browser tab, without asking, right after the shown tab of a window:
+   for `jasper URL...`, the window of the pane `jasper` ran in, else the most recently active window, opening one when
+   none is open; for those of the launch that starts Jasper, its first window; for one the system or a second launch
+   hands over, the most recently active window, which comes to the front, Jasper's windows being restored first when
+   none is open. Until Jasper's plugins have started and Jasper has checked whether it is the default browser (at most
+   3 seconds), these addresses wait, in order; at most 32 wait, and a later one opens nothing.
 2. A local web file follows **Open Local Web Files**: **Always Ask** (the default) asks; **Built-in Browser** opens
    its `file:` address in a new browser tab right after the current one; **Default Editor** opens it as a Cmd-click on
    any other file does.
-3. While Jasper is the system's default web browser, every other link opens in Jasper's browser without asking,
-   whatever **Open Links From Terminal** says: in a new browser tab right after the current one, or, for a split
-   click, in a browser pane split from the clicked pane. Jasper checks this when it starts and again when you come
-   back to one of its windows, at most every 30 seconds.
+3. While Jasper is the system's [default web browser](#making-jasper-your-default-browser), every other link opens in
+   Jasper's browser without asking, whatever **Open Links From Terminal** says: in a new browser tab right after the
+   current one, or, for a split click, in a browser pane split from the clicked pane. Jasper checks this when it starts
+   and again when you come back to one of its windows, at most every 30 seconds.
 4. A split click, and Open URL in Split Right and Down, open the link in a browser pane split from the clicked pane,
-   without asking. When **Open Links From Terminal** is **Default Browser**, they go to the system browser instead.
+   without asking. When **Open Links From Terminal** is **Default Browser**, a split click goes to the system browser
+   instead, and the two items are not in the menu.
 5. Every other link follows **Open Links From Terminal**: **Always Ask** (the default) asks; **Built-in Browser**
    opens it in a new browser tab right after the current one; **Default Browser** opens the system browser.
 
@@ -420,6 +431,69 @@ selection is one `http` or `https` address and either Open Links From Terminal i
 system's default web browser. They open the selected address in a browser pane to the right of the pane or below it,
 without asking. Select the address by dragging: a double-click selects only part of it. They are also listed in the
 command palette and Settings › Keymap, where they have no address and do nothing.
+
+## Making Jasper your default browser
+
+Jasper can be the system's default web browser, the app that opens the `http` and `https` links of every other app.
+While it is, the links other apps open come to Jasper's browser as addresses from outside, without asking (rule 1
+above), and the links you click in a terminal and Jasper's own links open there without asking too (rule 3).
+
+Jasper never hands a web link to the system browser while it is the default, since the system would hand it back: a
+web link that no browser of Jasper's opens then opens nothing ([When the Browser is off](#when-the-browser-is-off)). An
+address the system hands Jasper within 10 seconds of Jasper handing it to the system, as when Jasper is the default but
+cannot tell, is never handed to the system again: Jasper's browser opens it, or it opens nothing.
+
+### On macOS
+
+Install `Jasper.app`, whose `Info.plist` names the `http` and `https` schemes
+([macOS web links](packaging.md#macos-web-links)), and choose Jasper in System Settings › Desktop & Dock › Default web
+browser; choose another browser there to stop. Jasper asks Launch Services which app opens `https` links; a Jasper run
+from a source checkout cannot ask, and never counts itself the default.
+
+### On Windows
+
+The [setup wizard](packaging.md#windows-setup-wizard) registers Jasper, for your account only, as a web browser for
+`http` and `https` links, so Settings › Apps › Default apps lists it; choose Jasper there for `HTTP` and `HTTPS`.
+Windows then starts Jasper as `Jasper.exe --url "<link>"` ([`--url`](command-line.md#launching-jasper-with-options)).
+A link with a double quote in it reaches Jasper without the quote, or, when the quote splits it into several
+arguments, opens nothing. An upgrade keeps the registration and uninstalling removes it. The portable ZIP and the
+[user installation from source](packaging.md#user-installation-without-a-compiler) register nothing, so Windows does
+not offer them. Jasper counts itself the default while your choice for `https` links is Jasper's (`JasperURL`).
+
+### On Linux
+
+The menu entry of the `.deb` and `.rpm` [packages](packaging.md#linux-packages) takes `http` and `https` links
+(`x-scheme-handler/http` and `x-scheme-handler/https`), so desktops that list web browsers by the links they take, such
+as GNOME, offer Jasper in their default applications settings. Choose it there, or run:
+
+```sh
+xdg-settings set default-web-browser jasper-workstation-Jasper.desktop
+```
+
+The desktop then starts Jasper with the link after `--url`. Jasper counts itself the default while
+`xdg-settings get default-web-browser` names `jasper-workstation-Jasper.desktop`; without `xdg-settings` (xdg-utils),
+it never does.
+
+The packages make no app the default: installing leaves the system's default applications (each `defaults.list`) as
+they were. Where neither you nor the system has chosen a default web browser, apps that ask GIO, as GNOME's do, open a
+link with the first app that takes it, which can be Jasper. Removing the package leaves your own choice
+(`~/.config/mimeapps.list`) as it is: one that named Jasper then names an app that is gone.
+
+### When the Browser is off
+
+While Jasper is the default and no plugin provides a web browser, as when the Browser plugin is off or does not run, a
+web link opens nothing: one from another app, a terminal, Jasper's own links or `jasper URL...`. Jasper posts
+"Web links can’t open in Jasper", "The Browser plugin is off. Turn it on to open web links in Jasper, or choose another
+default browser in your system settings.", with:
+
+- **Turn On Browser**, which turns the Browser on from the next launch, as Settings › Plugins does, and posts "Restart
+  Jasper to turn on the Browser" with **Restart Now**, which restarts Jasper as it was started. When Jasper cannot work
+  out how it was started, "Jasper could not restart" says to quit and reopen it; when the Browser cannot be turned on,
+  "Could not turn on the Browser" says why.
+- **Copy Link**, which copies the link's address.
+
+`ftp` and `mailto` links still go to the system's handler. While the Browser runs but Chromium could not start, a web
+link opens nothing either; "The browser could not start" has said why.
 
 ## Restore
 

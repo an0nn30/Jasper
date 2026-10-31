@@ -31,8 +31,9 @@ Usage: jasper [--config <path>] [--background] [--no-window] [--safe-mode] [--pl
 | `--background` | Starts with no window, to stay resident; the login item starts Jasper this way. It exits without a window when a Jasper already runs, or when it would not be resident: `system.run_in_background` is off (it then removes the login item), or the launch has `--config`, `--safe-mode` or `--plugin-dir` or runs in another home. Otherwise it becomes resident and prepares its first window without showing it. On macOS a packaged app started this way shows no Dock icon until a window opens. |
 | `--no-window` | Starts with no window, to serve the `jasper` command; the command starts Jasper this way when nothing answers it. It exits without a window when a Jasper already runs, or when it cannot serve the command socket. A Jasper that becomes resident stays; any other quits once its calls have ended and no Jasper window is open, or after 30 seconds without a call. Cannot be combined with `--background`. |
 | `--help` | Prints the usage line to standard output and exits with status 0, without reading configuration or opening a window. |
-| `--url [<url>]` | The launch Jasper's web browser registration makes (`"Jasper.exe" --url "%1"` on Windows). Only as the first argument, followed by at most one `http` or `https` address, which opens as a web address given without it does; anything else after it, or `--url` anywhere else, refuses the whole launch. Without an address it is a plain launch. The usage leaves it out. |
-| `<path>...` | Files and folders to open in the most recently active window: each file in the [Editor](editor.md#opening-files), or revealed when no editor plugin runs, and each folder as a terminal tab. A relative path resolves against the working directory; a path that names nothing is skipped. |
+| `--url [<url>]` | The launch Jasper's web browser registration makes (`"Jasper.exe" --url "%1"` on Windows, `Jasper --url %u` on Linux; [Browser](browser.md#making-jasper-your-default-browser)). Only as the first argument, followed by at most one `http` or `https` address, which opens as a web address given without it does; anything else after it, or `--url` anywhere else, refuses the whole launch. Without an address it is a plain launch. The usage leaves it out. |
+| `<path>...` | Files and folders to open in the most recently active window: each file in the [Editor](editor.md#opening-files), or revealed when no editor plugin runs, and each folder as a terminal tab. A relative path resolves against the working directory; a path that names nothing is skipped. A `file:` URL, such as `file:///Users/me/notes.txt` or `file://localhost/Users/me/notes.txt`, is the path of the local file it names, without its query and fragment. |
+| `<url>...` | `http` and `https` addresses, in any case, such as `https://example.com`, at most 32: each opens in a new browser tab, once Jasper's plugins have started, in the first window, or, when Jasper already runs, in its most recently active window ([Browser](browser.md#links-from-terminals-and-jasper)). As browsers do, Jasper percent-encodes the characters an address cannot hold after its host, such as a space, `"` or `\|`. |
 
 Each option may appear once. A value follows its option as the next argument; `--config=<path>` is an unknown
 argument.
@@ -41,13 +42,15 @@ argument.
 
 One Jasper process runs per Jasper home; it holds the home's instance lock (`daemon/instance.lock`) for as long as it
 runs, resident or not. A launch while it runs hands its request to it and exits with status 0: the running Jasper
-brings its most recently active window to the front, restoring its window first when none is open, and opens the files and folders
-the launch named. On macOS a Dock click, Finder's Open With and a drop on the Dock icon reach the running Jasper
-without a second process ([macOS Open With](packaging.md#macos-open-with)). `--config`, `--safe-mode` and
-`--plugin-dir` apply only to a Jasper that starts: a second launch hands off without them, and the running Jasper posts
-"Jasper is already running: quit it first to start with <options>". A `--background` or `--no-window` launch exits
-instead. A Jasper in another home (`JASPER_HOME` or the `jasper.home` Java property) runs beside the default home's and
-is never resident. See [background residency](configuration.md#background-residency) for when Jasper stays resident.
+brings its most recently active window to the front, restoring its window first when none is open, and opens the files,
+folders and web addresses the launch named. On macOS a Dock click, Finder's Open With, a drop on the Dock icon and a
+web link macOS hands Jasper reach the running Jasper without a second process
+([macOS Open With](packaging.md#macos-open-with), [macOS web links](packaging.md#macos-web-links)). `--config`,
+`--safe-mode` and `--plugin-dir` apply only to a Jasper that starts: a second launch hands off without them, and the
+running Jasper posts "Jasper is already running: quit it first to start with <options>". A `--background` or
+`--no-window` launch exits instead. A Jasper in another home (`JASPER_HOME` or the `jasper.home` Java property) runs
+beside the default home's and is never resident. See [background residency](configuration.md#background-residency) for
+when Jasper stays resident.
 
 A launch that can neither hand off nor start prints why to standard error, shows it in a dialog when there is a
 display, and exits with status 1, without starting a second Jasper:
@@ -60,12 +63,12 @@ display, and exits with status 1, without starting a second Jasper:
 | `Jasper cannot open that many paths and web addresses at once.` | The request would exceed 1 MiB; the status is 2. |
 
 When Jasper restarts itself, for example with **Restart Now** on the Plugins page, the new process gets the same
-options except `--background`, `--no-window` and the paths, with `--replacing <pid>` (which the usage leaves out): it
-waits up to 30 seconds for the old process to exit, then takes the home, or reports the old one as not responding.
-**Restart Normally** also drops `--safe-mode`. When the installed app has been replaced by another build, a Dock click
-while a resident Jasper has no window open, or a launch of the new build while the running Jasper has none, restarts
-Jasper as the new build, which opens the launch's files and folders. With a window open, the running Jasper opens them
-itself and posts "Jasper was updated" with **Restart**.
+options except `--background`, `--no-window`, `--url` and the paths and web addresses, with `--replacing <pid>` (which
+the usage leaves out): it waits up to 30 seconds for the old process to exit, then takes the home, or reports the old
+one as not responding. **Restart Normally** also drops `--safe-mode`. When the installed app has been replaced by
+another build, a Dock click while a resident Jasper has no window open, or a launch of the new build while the running
+Jasper has none, restarts Jasper as the new build, which opens the launch's files, folders and web addresses. With a
+window open, the running Jasper opens them itself and posts "Jasper was updated" with **Restart**.
 
 ### Argument errors
 
@@ -81,6 +84,11 @@ reading configuration or opening a window:
 | `--plugin-dir requires a directory path.` | The same for `--plugin-dir` |
 | `--config requires a valid path.`, `--plugin-dir requires a valid path.` | A value the operating system cannot use as a path |
 | `--no-window and --background cannot be combined.` | Both options given |
+| `Not a web address: <argument>` | An argument whose scheme is `http` or `https` that is no web address once encoded, such as `https:example.com`, `http:/notes` or one with a space in its host; also the argument after `--url` when it is not an `http` or `https` address |
+| `Not a local file: <argument>` | A `file:` URL that names no local file, such as `file:x.html`, or, except on Windows, where it names a share, one that names another host |
+| `Jasper opens at most 32 web addresses at once.` | More than 32 `http` and `https` arguments |
+| `--url must be the first argument.` | `--url` after another argument |
+| `--url takes one web address and nothing after it.` | More than one argument after `--url` |
 
 ## The jasper command
 
@@ -103,7 +111,7 @@ With a COMMAND, runs it in the running Jasper. Jasper is started first when it i
 |---|---|
 | `jasper` | Brings the most recently active window to the front, restoring Jasper's windows first when none is open and starting Jasper first when none is running, and exits with status 0. A new window it opens does not start in the caller's working directory. |
 | `jasper PATH...` | Opens each file in the [default editor](editor.md#default-editor), or reveals it in the file manager when no editor plugin runs or the default editor is **System default app**, and each folder as a terminal tab, in the most recently active window, starting Jasper first when none is running. A relative PATH resolves against the caller's working directory, and every PATH must name an existing file or folder. A subcommand of the same name wins, so `jasper ./editor` opens a file named `editor`. |
-| `jasper URL...` | When every argument is an absolute `http` or `https` address, such as `jasper https://example.com`, opens each, without asking first, in the web browser a plugin provides, from the window of the pane `jasper` ran in, else in your default browser. With the bundled [Browser](browser.md#links-from-terminals-and-jasper) on, each opens in a new browser tab right after that window's shown tab, or the most recently active window's. It exits with status 0. Addresses given before Jasper's plugins start wait for them. A call that mixes addresses and paths is a `PATH...` call. |
+| `jasper URL...` | When every argument is an absolute `http` or `https` address, such as `jasper https://example.com`, opens each, without asking first, in the web browser a plugin provides, from the window of the pane `jasper` ran in, else in your default browser; while Jasper is itself your default browser, it then opens nothing ([Browser](browser.md#when-the-browser-is-off)). With the bundled [Browser](browser.md#links-from-terminals-and-jasper) on, each opens in a new browser tab right after that window's shown tab, or the most recently active window's. Addresses given before Jasper's plugins start wait for them, and so does the call. It exits with status 0 once every address has been handed on, and with 1 when one was dropped because 32 were already waiting. A call that mixes addresses and paths is a `PATH...` call. |
 | `jasper --help` | Prints the usage and the subcommands of the plugins that were running when Jasper last started, read from `daemon/subcommands` in Jasper home, without contacting Jasper. Before that file exists it prints "Start Jasper once to list the plugin commands." |
 | `jasper --<option> ...` | Any first argument starting with `--`, other than `--help`, starts Jasper with all the arguments (at most 64; with more it exits with status 1 and starts nothing), detached, in the caller's working directory and environment, so relative paths resolve there. Every [launcher option](#launching-jasper-with-options) works, including those the usage leaves out; while Jasper runs, the launch hands off and the running Jasper says that it keeps its own options. It exits with status 0 once it has started the launcher and does not wait, so a Jasper that rejects its arguments shows nothing. |
 | `jasper COMMAND [ARGUMENTS...]` | Runs a plugin's subcommand in the running Jasper, which first restores its window when no window is open and the subcommand's plugin runs. Its output reaches the caller's standard output and error as it is written, and `jasper` exits with the subcommand's exit code. Ctrl+C, or any other end of the `jasper` process, cancels the call. |
@@ -199,7 +207,8 @@ otherwise it quits once the call has ended and no Jasper window is open, or afte
 | `jasper: can't reach Jasper at <socket>` | 1 | macOS and Linux: the connection failed for a reason other than nothing listening, such as permissions. On Windows every failed connection starts Jasper instead. |
 | `jasper: Jasper refused the connection` | 1 | The socket's token did not match, or could not be read within a second. |
 | `jasper: Jasper was updated; quit it completely and try again` | 1 | The running Jasper speaks another protocol version. |
-| `jasper: Jasper is quitting; run the command again` | 1 | The call arrived while Jasper was quitting. |
+| `jasper: too many web addresses are waiting; <url> was not opened` | 1 | 32 web addresses from outside Jasper were already waiting for its plugins; the call's other addresses still open. |
+| `jasper: Jasper is quitting; run the command again` | 1 | The call arrived while Jasper was quitting, or Jasper began quitting while the call's web addresses waited for its plugins. |
 | `jasper: Jasper quit before the command finished` | 1 | The connection closed before an exit code arrived. |
 | `jasper: Jasper's command socket path is too long (<path>); set JASPER_HOME to a shorter folder` | 1 | The socket path exceeds 100 bytes; Jasper serves no command socket there either. |
 | `jasper: Jasper's home folder path is too long` | 1 | Jasper home's path exceeds what the command handles. |

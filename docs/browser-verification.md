@@ -179,3 +179,88 @@ Each is pending.
 ### Plan 4b on Windows and Linux (not run)
 
 The user has no Windows or Linux host yet. The plan's ten lines and every line above wait for each of them too.
+
+## Plan 4c: registering Jasper as the default browser
+
+### Batch 1: the user's check on macOS (pending)
+
+- **How to run it:** with the user's OK, from `claude/browser-default-browser` (worktree
+  `.claude/worktrees/browser-4b-4c-e6deab`), on JBR 25.0.4.1 b635.75 with JCEF: `./gradlew :jasper-app:packageApp`
+  (headless; no `-Pjasper.aot`), then install the built `jasper-app/build/packaging/image/Jasper.app`. The check changes
+  the user's default browser, so the user makes the change and changes it back.
+- Each line is recorded pass or fail. Every line is pending.
+
+#### The plan's checklist
+
+1. **Choosing Jasper:** System Settings › Desktop & Dock › Default web browser lists Jasper, and Jasper can be chosen
+   there. Pending.
+2. **A link from another app** (Mail, Notes, Slack) opens in a new browser tab of Jasper's most recently active window.
+   Pending.
+3. **`open -a Jasper https://example.com`** opens a tab. Pending.
+4. **A terminal Cmd-click** on an `https` link opens without asking, with Open Links From Terminal at Always Ask.
+   Pending.
+5. **The Browser off:** with the Browser plugin turned off and Jasper relaunched, a link from another app shows "Web
+   links can’t open in Jasper"; Turn On Browser and then Restart Now bring the Browser back, and the next link opens
+   in it. Pending.
+6. **Choosing the previous default browser again:** after coming back to a Jasper window (more than 30 seconds after
+   the last check), a terminal Cmd-click asks "Open in Jasper?" again. Pending.
+
+#### Lines the task reviews added
+
+Each is pending.
+
+- **Listing (Task 4):** whether macOS lists Jasper as a web browser with only `CFBundleURLTypes`, no document types
+  for HTML.
+- **A cold launch by a link (Task 4):** with Jasper quit, a link from another app starts Jasper and opens once, in the
+  first or restored window, with no extra window: the event that starts the launch reaches the open-URI handler.
+- **No window open (Q12):** with a resident Jasper and no window, a link from another app restores a window and opens
+  there; the log has a `Window (open-uri)` line.
+- **An address a URI parser refuses (Task 4):** a link with a raw space (for example from `open -a Jasper` with a
+  quoted `https://example.com/a b`): whether AWT hands it to Jasper at all.
+- **While Jasper starts (Q6):** a link from another app while Jasper is still starting waits and opens once the
+  Browser has started.
+- **The split items (Q7):** with Open Links From Terminal at Default Browser while Jasper is the default, a terminal's
+  right-click menu on a selected address has Open URL in Split Right and Down, which open a browser pane, and a
+  Cmd+Shift-click opens a split; after choosing another default browser and coming back to a Jasper window, the items
+  go.
+- **Copy Link** in "Web links can’t open in Jasper" puts the address on the clipboard.
+- **`jasper URL...` with the Browser off (Task 3):** `jasper https://example.com` from a Jasper terminal posts the
+  notice and the command exits 0; with no Jasper running, whether the notice of the `--no-window` Jasper it starts is
+  seen at all.
+- **`ftp` and `mailto`** links in a terminal still open the system's handler while Jasper is the default.
+- **No loop (Q2, Q10):** with the Browser off, each link from another app posts one notice, and nothing opens over and
+  over: no other browser, no new Jasper window, no Jasper process starting again in Activity Monitor.
+
+### Plan 4c on Windows (not run)
+
+The user has no Windows host yet. Each line is not run.
+
+- `packageInstaller` builds the setup wizard; `Verify-Installer.ps1` accepts the MSI's web browser registration;
+  `InstallerAcceptanceTest` passes; light's ICE validation passes (ICE33 may warn about the `HKCU\Software\Classes`
+  keys).
+- After the setup, Settings › Apps › Default apps lists Jasper; choosing it for `HTTP` and `HTTPS` makes it the
+  default, and Jasper counts itself the default (the `UserChoiceLatest` layout, Q5): a terminal Ctrl-click opens
+  without asking.
+- A link from another app opens in Jasper through `Jasper.exe --url "%1"`, with Jasper running (a handoff) and quit (a
+  first launch).
+- A link with a double quote in it: it opens without the quote, or nothing opens when the quote splits it.
+- An upgrade keeps the registration; the uninstall removes `RegisteredApplications\Jasper`,
+  `Software\Jasper\Capabilities` and `Software\Classes\JasperURL`; what Windows does with its own choice of Jasper
+  afterwards.
+- The portable ZIP and `installWindowsUser` are not offered as browsers.
+- The plan's lines 2 to 6, on Windows.
+
+### Plan 4c on Linux (not run)
+
+The user has no Linux host yet; CI's `linux-packages` job has not run (the Actions budget). Each line is not run.
+
+- `packageDeb`, `packageRpm` and `check-install.sh`, with real xdg-utils and dash.
+- After a package install, GNOME's default applications settings list Jasper as a web browser; KDE's (Q15: whether it
+  needs `WebBrowser` in Categories).
+- `xdg-settings set default-web-browser jasper-workstation-Jasper.desktop` makes Jasper the default, Jasper counts
+  itself the default, and a link from another app opens in Jasper.
+- The install leaves every system `defaults.list` byte for byte as it was.
+- Removing the package leaves no `mimeinfo.cache` line naming Jasper.
+- Without `xdg-settings`, with Jasper the default through `~/.config/mimeapps.list` (Q10): a terminal click that Jasper
+  hands to the system comes back and opens in Jasper's browser, once.
+- The plan's lines 2 to 6, on Linux.
