@@ -53,14 +53,15 @@ import javax.swing.Timer;
  * Chromium.
  *
  * <p><b>Mouse.</b> An event the window consumes before the view hears it, as the pane drag's press, does not reach the
- * page. Each press the page gets is its {@link #lastPress()} and activates it. The mouse's back and forward buttons, on
- * Windows and Linux, never reach the page: releasing one tells the view's {@link #onNavigationButton listener}. Nor,
- * there, does Ctrl+wheel, which touchpad pinch sends on Windows, so Chromium's own Ctrl+wheel zoom never applies: it
- * tells the view's {@link #onMagnify magnifier} a step, away from the user bigger, as Chromium counts the notches. They
- * add up, a turn gives a step once they round to a whole notch, at most one step a turn, and what is left over carries
- * to the next turn. With Shift down too, as Java reports a horizontal wheel or a tilt, the wheel is the page's, which
- * scrolls sideways. On macOS, where trackpad pinch is the gesture (spec section 7), Ctrl+wheel is the page's, as in
- * Chromium.
+ * page. Each press the page gets is its {@link #lastPress()} and activates it. On macOS a Control-click reaches the page
+ * as it is, and Chromium asks for the page's right-click menu for it as for a right-click ({@code PageMenu}), as Chrome
+ * does there. The mouse's back and forward buttons, on Windows and Linux, never reach the page: releasing one tells the
+ * view's {@link #onNavigationButton listener}. Nor, there, does Ctrl+wheel, which touchpad pinch sends on Windows, so
+ * Chromium's own Ctrl+wheel zoom never applies: it tells the view's {@link #onMagnify magnifier} a step, away from the
+ * user bigger, as Chromium counts the notches. They add up, a turn gives a step once they round to a whole notch, at
+ * most one step a turn, and what is left over carries to the next turn. With Shift down too, as Java reports a
+ * horizontal wheel or a tilt, the wheel is the page's, which scrolls sideways. On macOS, where trackpad pinch is the
+ * gesture (spec section 7), Ctrl+wheel is the page's, as in Chromium.
  *
  * <p><b>Showing.</b> While the view does not show (its tab is hidden, or it is out of its window) its page draws one
  * frame a second; showing again restores 60. The page itself is not told it is hidden: its scripts and network work go

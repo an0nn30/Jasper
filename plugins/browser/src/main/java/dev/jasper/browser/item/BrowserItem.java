@@ -2,10 +2,12 @@ package dev.jasper.browser.item;
 
 import dev.jasper.browser.engine.AboutScheme;
 import dev.jasper.browser.page.DialogPlace;
+import dev.jasper.browser.page.MenuPlace;
 import dev.jasper.browser.page.NavigationButton;
 import dev.jasper.browser.page.NavigationHistory;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.restore.BrowserRestore;
+import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.RestoreState;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.ui.ContentCommand;
@@ -168,8 +170,10 @@ public final class BrowserItem implements AutoCloseable {
             new ContentCommand("font-smaller", "Decrease Font Size", null, true, () -> zoomTo(Zoom.step(zoom, -1))),
             new ContentCommand("font-reset", "Reset Font Size", null, true, this::resetZoom)));
         tab.onClosed(this::closed);
-        // The page's alerts, confirmations and file choosers show over this item's tab, and close with it.
+        // The page's alerts, confirmations and file choosers show over this item's tab, and close with it; so does its
+        // right-click menu, which copies with the plugin's clipboard and searches with the engine chosen as it opens.
         page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
+        page.setMenuPlace(new MenuPlace(tab, items.context().platform()::copy, this::engineName, this::search));
         items.opened(this);
         present();
     }
@@ -390,6 +394,18 @@ public final class BrowserItem implements AutoCloseable {
     private void showZoom(int percent) {
         zoom = percent;
         page.setZoomLevel(Zoom.cefLevel(percent));
+    }
+
+    /** The chosen search engine's name, as the page's right-click menu says it in Search with (P26). */
+    private String engineName() {
+        BrowserSettings now = items.settings();
+        return now.searchEngine().displayName(now);
+    }
+
+    /** A search for {@code terms} with the chosen search engine. */
+    private URI search(String terms) {
+        BrowserSettings now = items.settings();
+        return now.searchEngine().search(terms, now);
     }
 
     /** The page asks to be shown, as a script's {@code focus()} of its window does: selects the tab and raises its window. */

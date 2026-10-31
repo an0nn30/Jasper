@@ -14,8 +14,10 @@
  * each of the page's frames, highlights the matches and answers its count through the {@code links} package's message
  * router, and the {@code json} package writes the query into the script.
  * {@link dev.jasper.browser.page.DialogPlace} is where the {@code dialogs} package shows a page's dialogs, as its item
- * gives it. The canvas, renderer and browser are adapted from JetBrains' JCEF test classes, as
- * {@code notices.toml} records. {@link dev.jasper.browser.page.LastPress},
+ * gives it. {@code PageMenu} is the client's one context-menu handler: Jasper shows the page's right-click menu,
+ * {@code PageMenuItems} for what is under the pointer, at the {@link dev.jasper.browser.page.MenuPlace} the item gives,
+ * over its tab, and Chromium shows none. The canvas, renderer and browser are adapted from JetBrains' JCEF test classes,
+ * as {@code notices.toml} records. {@link dev.jasper.browser.page.LastPress},
  * {@code Favicons} and {@code Page}'s methods name no Chromium type, and none of these classes loads until a browser
  * item opens.
  */

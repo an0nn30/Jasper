@@ -44,8 +44,9 @@ public final class Page implements AutoCloseable {
     private final List<Consumer<String>> addressChanges = new CopyOnWriteArrayList<>();
     private BiFunction<String, TabPlacement, Optional<Page>> opener = (url, placement) -> Optional.empty();
     private Runnable itemCloser = () -> { }, itemShower = () -> { };
-    // Where the page's dialogs and file choosers show; its item gives it.
+    // Where the page's dialogs and file choosers show, and where its right-click menu shows; its item gives them.
     private DialogPlace dialogPlace;
+    private MenuPlace menuPlace;
     // What the page loads once its browser can: first its start, then the last address asked for before that.
     private URI requested;
     // Where the page is, as Chromium last reported it, or what it was last asked to load since.
@@ -117,8 +118,9 @@ public final class Page implements AutoCloseable {
 
     /**
      * Makes the page's browser: asks {@code chromium} for its client, starting Chromium when no page has yet, and makes
-     * the browser once the client is ready, which then loads what the page was last asked to. The client's display, load
-     * and keyboard handlers are installed before any page is made on it. Once; nothing after {@link #close()}.
+     * the browser once the client is ready, which then loads what the page was last asked to. The client's display, load,
+     * keyboard and context-menu handlers are installed before any page is made on it. Once; nothing after
+     * {@link #close()}.
      *
      * @param chromium the plugin's Chromium
      */
@@ -127,6 +129,7 @@ public final class Page implements AutoCloseable {
         if (started || closed) return;
         started = true;
         PageEvents.prepare(chromium);
+        PageMenu.prepare(chromium);
         // A ready client completes on the UI thread; a failure can complete anywhere, and the plugin tells it once.
         chromium.client().whenComplete((client, failure) -> {
             if (failure == null) EventQueue.invokeLater(() -> make(client));
@@ -213,26 +216,29 @@ public final class Page implements AutoCloseable {
         if (ready && !closed) browser.stopLoad();
     }
 
+    /** Cuts the selection of the page's focused frame, as its Edit menu's Cut would. */
+    public void cut() {
+        onFocusedFrame(CefFrame::cut);
+    }
+
     /** Copies the selection of the page's focused frame, as its Edit menu's Copy would. */
     public void copy() {
-        CefFrame frame = focusedFrame();
-        if (frame == null) return;
-        try {
-            frame.copy();
-        } finally {
-            frame.dispose();
-        }
+        onFocusedFrame(CefFrame::copy);
     }
 
     /** Pastes the clipboard into the page's focused frame, as its Edit menu's Paste would. */
     public void paste() {
-        CefFrame frame = focusedFrame();
-        if (frame == null) return;
-        try {
-            frame.paste();
-        } finally {
-            frame.dispose();
-        }
+        onFocusedFrame(CefFrame::paste);
+    }
+
+    /** Selects all of the page's focused frame, as its Edit menu's Select All would. */
+    public void selectAll() {
+        onFocusedFrame(CefFrame::selectAll);
+    }
+
+    /** Opens Chromium's print dialog for the page. */
+    public void print() {
+        if (ready && !closed) browser.print();
     }
 
     /** Gives the page the keyboard focus. */
@@ -521,6 +527,26 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Has the page's right-click menu show at {@code place}: the page's item gives it once it has its tab. It replaces the
+     * one before.
+     *
+     * @param place over the item's tab, with the plugin's clipboard and the chosen search engine
+     */
+    public void setMenuPlace(MenuPlace place) {
+        Objects.requireNonNull(place, "place");
+        if (!closed) menuPlace = place;
+    }
+
+    /**
+     * Where the page's right-click menu shows.
+     *
+     * @return the place its item gave, or empty before that and after {@link #close()}
+     */
+    public Optional<MenuPlace> menuPlace() {
+        return closed ? Optional.empty() : Optional.ofNullable(menuPlace);
+    }
+
+    /**
      * Tells {@code listener} each time Chromium cancels the page's dialogs, as it does when a new document replaces the
      * page's: a dialog shown or waiting to show for the page is then no longer asked.
      *
@@ -600,6 +626,7 @@ public final class Page implements AutoCloseable {
         itemCloser = () -> { };
         itemShower = () -> { };
         dialogPlace = null;
+        menuPlace = null;
         dropFaviconFetch();
         if (find != null) find.close();
         view.setHoverUrl("");
@@ -611,11 +638,17 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * The frame that has the page's focus, or none before the page has its browser or after its close; the caller
-     * disposes it, which releases only this handle to the frame.
+     * Runs {@code command} on the frame that has the page's focus, then releases only this handle to the frame; nothing
+     * before the page has its browser or after its close.
      */
-    private CefFrame focusedFrame() {
-        return ready && !closed ? browser.getFocusedFrame() : null;
+    private void onFocusedFrame(Consumer<CefFrame> command) {
+        CefFrame frame = ready && !closed ? browser.getFocusedFrame() : null;
+        if (frame == null) return;
+        try {
+            command.accept(frame);
+        } finally {
+            frame.dispose();
+        }
     }
 
     /** Jasper sends the page elsewhere. */
