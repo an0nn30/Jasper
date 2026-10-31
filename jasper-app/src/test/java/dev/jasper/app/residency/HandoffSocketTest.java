@@ -27,7 +27,7 @@ class HandoffSocketTest {
     }
 
     /** A plain launch of build {@code /app.jar} at {@code modified}, run in this test's folder. */
-    private LaunchRequest launch(long modified) { return LaunchRequest.of(Path.of("/app.jar"), modified, dir, List.of(), List.of()); }
+    private LaunchRequest launch(long modified) { return LaunchRequest.of(Path.of("/app.jar"), modified, dir, List.of(), List.of(), List.of()); }
 
     private LaunchRequest.Response handOff(LaunchRequest request) { return HandoffSocket.handOff(socket(), token(), request); }
 
@@ -60,7 +60,8 @@ class HandoffSocketTest {
 
     @Test void aPathsRequestArrivesWhole() throws Exception {
         var seen = new ConcurrentLinkedQueue<LaunchRequest>();
-        var request = LaunchRequest.of(Path.of("/app.jar"), 7L, dir, List.of(dir.resolve("notes ü.txt"), dir), List.of("--safe-mode"));
+        var request = LaunchRequest.of(Path.of("/app.jar"), 7L, dir, List.of(dir.resolve("notes ü.txt"), dir),
+            List.of(java.net.URI.create("https://example.com/a?b=1")), List.of("--safe-mode"));
         try (HandoffSocket endpoint = bind(received -> { seen.add(received); return LaunchRequest.Response.OK; })) {
             assertThat(handOff(request)).isEqualTo(LaunchRequest.Response.OK);
             assertThat(seen).containsExactly(request.withToken(Files.readString(token()).strip()));
@@ -87,13 +88,13 @@ class HandoffSocketTest {
     @Test void theOwnersAnswerIsUpdatedForAnotherBuildAndProtocolWhenItDidNotTakeTheRequest() {
         var seen = new ConcurrentLinkedQueue<String>();
         var answer = HandoffSocket.answering((request, updated) -> seen.add(request.intent() + " " + updated), Path.of("/app.jar"), 7L);
-        assertThat(answer.apply(LaunchRequest.of(Path.of("/app.jar"), 7L, dir, List.of(dir), List.of())))
+        assertThat(answer.apply(LaunchRequest.of(Path.of("/app.jar"), 7L, dir, List.of(dir), List.of(), List.of())))
             .isEqualTo(LaunchRequest.Response.OK);
-        assertThat(answer.apply(LaunchRequest.of(Path.of("/new.jar"), 9L, dir, List.of(), List.of("--safe-mode"))))
+        assertThat(answer.apply(LaunchRequest.of(Path.of("/new.jar"), 9L, dir, List.of(), List.of(), List.of("--safe-mode"))))
             .isEqualTo(LaunchRequest.Response.UPDATED);
         assertThat(seen).containsExactly("OPEN_PATHS false", "RAISE true");
         var declined = HandoffSocket.answering((request, updated) -> false, Path.of("/app.jar"), 7L);
-        assertThat(declined.apply(LaunchRequest.of(Path.of("/new.jar"), 9L, dir, List.of(), List.of())))
+        assertThat(declined.apply(LaunchRequest.of(Path.of("/new.jar"), 9L, dir, List.of(), List.of(), List.of())))
             .as("an owner that did not take the request has not answered (spec 5.3)").isEqualTo(LaunchRequest.Response.PROTOCOL);
     }
 
@@ -106,7 +107,7 @@ class HandoffSocketTest {
             paths.add(path);
             encoded += java.util.Base64.getEncoder().encodeToString(path.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)).length() + 1;
         }
-        var request = LaunchRequest.of(Path.of("/app.jar"), 7L, dir, paths, List.of());
+        var request = LaunchRequest.of(Path.of("/app.jar"), 7L, dir, paths, List.of(), List.of());
         assertThat(request.encode().length()).isBetween(LaunchRequest.MAX_LINE_BYTES - 64 * 1024, LaunchRequest.MAX_LINE_BYTES);
         assertThat(request.fits()).isTrue();
         var seen = new ConcurrentLinkedQueue<LaunchRequest>();
@@ -132,7 +133,7 @@ class HandoffSocketTest {
     @Test void anUnknownCodeLocationHandsOffInsteadOfCrashingTheLauncher() throws Exception {
         var seen = new ConcurrentLinkedQueue<LaunchRequest>();
         try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {
-            assertThat(handOff(LaunchRequest.of(null, 0L, dir, List.of(), List.of()))).isEqualTo(LaunchRequest.Response.OK);
+            assertThat(handOff(LaunchRequest.of(null, 0L, dir, List.of(), List.of(), List.of()))).isEqualTo(LaunchRequest.Response.OK);
             assertThat(seen).singleElement().extracting(LaunchRequest::codeLocation).isEqualTo(Path.of(""));
         }
     }

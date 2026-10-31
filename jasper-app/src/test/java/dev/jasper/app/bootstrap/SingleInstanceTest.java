@@ -123,6 +123,34 @@ class SingleInstanceTest {
         assertThat(failures).isEmpty();
     }
 
+    /**
+     * Browser plan 4c, Review Focus 3: a second launch that names web addresses while the owner is starting is answered
+     * on receipt; its one request carries them, in order, beside its paths, and runs once the owner is ready. A launch of
+     * web addresses alone reaches a ready owner as OPEN_PATHS.
+     */
+    @Test void aSecondLaunchsWebAddressesArriveOnceWithItsPaths() throws Exception {
+        Instance instance = owner();
+        Files.writeString(home.resolve("notes.txt"), "");
+        assertThat(claim(SingleInstance.Timing.STANDARD, "https://example.com/a", "notes.txt", "HTTP://Example.com/b"))
+            .as("answered before the owner is ready").isEqualTo(new SingleInstance.Claim.Done(0));
+        var seen = new ConcurrentLinkedQueue<LaunchRequest>();
+        instance.serve((request, updated) -> seen.add(request), () -> true, Runnable::run, NO_CALLS);
+        until(() -> !instance.holding());
+        assertThat(seen).singleElement().satisfies(request -> {
+            assertThat(request.intent()).isEqualTo(LaunchRequest.Intent.OPEN_PATHS);
+            assertThat(request.urls()).containsExactly(java.net.URI.create("https://example.com/a"), java.net.URI.create("HTTP://Example.com/b"));
+            assertThat(request.paths()).containsExactly(home.resolve("notes.txt"));
+        });
+        seen.clear();
+        assertThat(claim(SingleInstance.Timing.STANDARD, "https://example.com/c")).isEqualTo(new SingleInstance.Claim.Done(0));
+        assertThat(seen).singleElement().satisfies(request -> {
+            assertThat(request.intent()).isEqualTo(LaunchRequest.Intent.OPEN_PATHS);
+            assertThat(request.urls()).containsExactly(java.net.URI.create("https://example.com/c"));
+            assertThat(request.paths()).isEmpty();
+        });
+        assertThat(failures).isEmpty();
+    }
+
     @Test void aCallWaitsForTheOwnerAndIsAnsweredWhenItHasRun() throws Exception {
         Instance instance = owner();
         String token = Files.readString(CommandListener.tokenFile(dirs().commandSocket())).strip();
@@ -260,7 +288,7 @@ class SingleInstanceTest {
         owner();
         String[] many = IntStream.range(0, 20_000).mapToObj(i -> "a-long-file-name-number-" + i + ".txt").toArray(String[]::new);
         assertThat(claim(SingleInstance.Timing.STANDARD, many)).isEqualTo(new SingleInstance.Claim.Done(2));
-        assertThat(failures).containsExactly("Jasper cannot open that many paths at once.");
+        assertThat(failures).containsExactly("Jasper cannot open that many paths and web addresses at once.");
     }
 
     @Test void aHomeThatCannotBeLockedEndsTheLaunchWithTheReason() throws Exception {

@@ -10,6 +10,7 @@ import dev.jasper.app.launch.ShellIntegrationScripts;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.AppLog;
 import dev.jasper.app.platform.ApplicationIcon;
+import dev.jasper.app.platform.DefaultBrowser;
 import dev.jasper.app.platform.LoginItem;
 import dev.jasper.app.platform.MacDock;
 import dev.jasper.app.platform.ResidentTray;
@@ -313,7 +314,7 @@ public final class ApplicationBootstrap {
                     steps.workspace();
                     long window = System.nanoTime();
                     // The first window takes the first directory the launch names; its other paths open in it (plan Ruling 13).
-                    application.openFirstWindow(options.paths());
+                    application.openFirstWindow(options.paths(), options.urls());
                     StartupTrace.current().phase("first window", window);
                 }));
         } catch (RuntimeException | Error failure) {
@@ -385,6 +386,9 @@ public final class ApplicationBootstrap {
                 });
             }
             application.systemNotifier(SystemNotifier.forThisPlatform(System.getProperty("os.name"), dirs, tray));
+            // Whether Jasper is the default browser: asked now, before the plugins start, each time on a thread of its own.
+            application.defaultBrowser(new DefaultBrowser(work -> Thread.ofVirtual().name("jasper-default-browser").start(work),
+                java.time.Clock.systemUTC()));
             // A packaged macOS Jasper keeps running on Quit and leaves the Dock while it has no window.
             if (MacDock.available())
                 application.backgroundOnQuit(new DockControl(dockShow(MacDock::show, ApplicationIcon::installTaskbarIcon),
@@ -590,7 +594,7 @@ public final class ApplicationBootstrap {
 
     /** The owner's side of a handoff (workspace-tabs spec 5.3): carries the request out. EDT. */
     static BiConsumer<LaunchRequest, Boolean> handoffHandler(JasperApplication application) {
-        return (request, updated) -> application.handedOff(request.paths(), request.ignoredFlags(), updated);
+        return (request, updated) -> application.handedOff(request.paths(), request.urls(), request.ignoredFlags(), updated);
     }
 
     /**

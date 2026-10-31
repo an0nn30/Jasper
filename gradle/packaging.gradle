@@ -35,6 +35,9 @@ def localNetworkUsage = 'Jasper connects to SSH hosts on your local network.'
 // Workspace-tabs spec 5.4: Jasper appears in Open With and takes drops on its Dock icon for text, source code and
 // folders, without claiming any of them as their default application.
 def macDocumentTypes = '[{"CFBundleTypeName":"Text","CFBundleTypeRole":"Editor","LSHandlerRank":"Alternate","LSItemContentTypes":["public.text","public.source-code"]},{"CFBundleTypeName":"Folder","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["public.folder"]}]'
+// Browser plan 4c (spec 9): Jasper is one of the web browsers the user can make the default, for http and https; the
+// open-URI handler takes what the system hands it. A project property, so packaging-support-test.gradle checks it too.
+ext.macUrlTypes = '[{"CFBundleURLName":"Web site URL","CFBundleURLSchemes":["http","https"],"CFBundleTypeRole":"Viewer"}]'
 // Windows shows it as the launcher's file description, which Task Manager lists as the process name;
 // Linux packages use it as their summary and the menu entry's comment.
 def packageDescription = 'Jasper DevOps workstation'
@@ -283,6 +286,7 @@ def packageApp = tasks.register('packageApp') {
     inputs.property('bundledNativeOptions', providers.provider { bundledNativeJvmOptions(normalizedHost().os) })
     inputs.property('localNetworkUsage', localNetworkUsage)
     inputs.property('documentTypes', macDocumentTypes)
+    inputs.property('urlTypes', macUrlTypes)
     inputs.property('version', version)
     inputs.property('host', providers.provider { normalizedHost().toString() })
     inputs.property('toolchainHome', launcher.map { it.metadata.installationPath.asFile.absolutePath })
@@ -325,6 +329,8 @@ def packageApp = tasks.register('packageApp') {
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil local network usage')
                 executeNative(['/usr/bin/plutil', '-replace', 'CFBundleDocumentTypes', '-json', macDocumentTypes,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil document types')
+                executeNative(['/usr/bin/plutil', '-replace', 'CFBundleURLTypes', '-json', macUrlTypes,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil URL types')
                 File executable = new File(image, 'Contents/MacOS/Jasper')
                 Files.write(executable.toPath(), macLauncherWithIdentity(Files.readAllBytes(executable.toPath()),
                     'dev.jasper.app', macLauncherTemplate()))
@@ -650,13 +656,15 @@ def verifyPackage = tasks.register('verifyPackage') {
         }
         if (context.host.os == 'macos') {
             // Jasper's own signed bridges, staged and restored byte for byte by packageApp: the macOS bridge
-            // (notifications and the Dock presence), workspace glass blur and system appearance observation.
+            // (notifications, the Dock presence and the default browser), workspace glass blur and system appearance
+            // observation.
             String expectedBridgeArchitecture = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
             [
                 [label: 'native', name: 'libjasper-macos.dylib', symbols: ['Java_dev_jasper_app_platform_MacNotifications_bind',
                     'Java_dev_jasper_app_platform_MacNotifications_post', 'Java_dev_jasper_app_platform_MacNotifications_remove',
                     'Java_dev_jasper_app_platform_MacNotifications_removeAll', 'Java_dev_jasper_app_platform_MacDock_setRegular',
-                    'Java_dev_jasper_app_platform_MacDock_watchPowerOff', 'Java_dev_jasper_app_platform_MacDock_poweringOffNow']],
+                    'Java_dev_jasper_app_platform_MacDock_watchPowerOff', 'Java_dev_jasper_app_platform_MacDock_poweringOffNow',
+                    'Java_dev_jasper_app_platform_MacLaunchServices_defaultBrowserBundleId']],
                 [label: 'glass', name: 'libjasper-glass.dylib', symbols: ['Java_dev_jasper_app_platform_MacGlass_setEffect']],
                 [label: 'appearance', name: 'libjasper-appearance.dylib', symbols: ['Java_dev_jasper_app_platform_MacAppearance_watch',
                     'Java_dev_jasper_app_platform_MacAppearance_unwatch']],
@@ -681,6 +689,8 @@ def verifyPackage = tasks.register('verifyPackage') {
             if (localNetwork != localNetworkUsage) throw new GradleException("Package verification failed: plist local network usage description is '${localNetwork}'")
             def documentTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'CFBundleDocumentTypes', 'json', '-o', '-', plist.absolutePath], 'plutil document types').stdout)
             if (documentTypes != new groovy.json.JsonSlurper().parseText(macDocumentTypes)) throw new GradleException("Package verification failed: plist document types are ${documentTypes}")
+            def urlTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'CFBundleURLTypes', 'json', '-o', '-', plist.absolutePath], 'plutil URL types').stdout)
+            if (urlTypes != new groovy.json.JsonSlurper().parseText(macUrlTypes)) throw new GradleException("Package verification failed: plist URL types are ${urlTypes}")
             String iconName = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIconFile', 'raw', '-o', '-', plist.absolutePath], 'plutil icon').stdout.trim()
             if (!iconName.endsWith('.icns')) iconName += '.icns'
             File packagedIcon = new File(image, "Contents/Resources/${iconName}")
@@ -843,12 +853,15 @@ if (normalizedHost().os == 'windows') {
     // Stable across releases: changing this would install a second product instead of upgrading.
     def upgradeUuid = 'c035e743-82bf-4ca6-aacf-5512d9831a09'
     def installerVerifier = rootProject.file('packaging/windows/Verify-Installer.ps1')
+    // Not in the image: the WiX template patch, with the web browser registration.
+    def installerTemplate = rootProject.file('packaging/windows/cygwin/CygwinInstallerTemplate.java')
     tasks.register('packageInstaller') {
         group = 'distribution'
         description = 'Creates and verifies a per-user Windows setup wizard (requires WiX on PATH).'
         dependsOn(verifyPackage, 'compileCygwinBundle')
         inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.file(installerVerifier).withPathSensitivity(PathSensitivity.RELATIVE)
+        inputs.file(installerTemplate).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.property('version', version)
         inputs.property('upgradeUuid', upgradeUuid)
         outputs.file(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-windows-${normalizedHost().architecture}-setup.exe") })
@@ -935,14 +948,19 @@ if (normalizedHost().os == 'windows') {
     // unless /usr/share/applications (or /usr/local/...) and /usr/share/desktop-directories already exist, as on
     // minimal and headless systems, and the install then fails and leaves the package unconfigured. Rewrite the selected
     // JBR's own templates so the scripts create those directories and never fail the install or removal over the menu
-    // entry. Every other line stays jpackage's; a template without the expected placeholder fails the build.
+    // entry, keep the system's default applications as they were across the menu install (linuxKeepingSystemDefaults),
+    // and refresh the desktop's MIME cache after both (linuxDesktopDatabaseCommands). Every other line stays jpackage's;
+    // a template without the expected placeholder fails the build.
     String menuDirectories = 'mkdir -p /usr/share/applications /usr/share/desktop-directories'
+    String desktopDatabase = linuxDesktopDatabaseCommands(linuxApplicationDirectories)
+    String menuInstalled = linuxKeepingSystemDefaults(
+        'jasper_menu_install "$@" || echo "jasper: the desktop menu entry was not registered" >&2') + '\n' + desktopDatabase
+    String menuRemoved = 'jasper_menu_uninstall "$@" || echo "jasper: the desktop menu entry was not removed" >&2\n' + desktopDatabase
     Map<String, String> menuCommands = [
-        DESKTOP_COMMANDS_INSTALL: "jasper_menu_install () {\nDESKTOP_COMMANDS_INSTALL\n}\n${menuDirectories}\n" +
-            'jasper_menu_install "$@" || echo "jasper: the desktop menu entry was not registered" >&2',
-        DESKTOP_COMMANDS_UNINSTALL: 'jasper_menu_uninstall () {\nDESKTOP_COMMANDS_UNINSTALL\n}\n' +
-            'jasper_menu_uninstall "$@" || echo "jasper: the desktop menu entry was not removed" >&2',
+        DESKTOP_COMMANDS_INSTALL: "jasper_menu_install () {\nDESKTOP_COMMANDS_INSTALL\n}\n${menuDirectories}\n" + menuInstalled,
+        DESKTOP_COMMANDS_UNINSTALL: 'jasper_menu_uninstall () {\nDESKTOP_COMMANDS_UNINSTALL\n}\n' + menuRemoved,
     ]
+    // Writes the install-script overrides and the menu entry (linuxDesktopEntry) into resources.
     def writeInstallScripts = { File sdkHome, File resources, String type, String requirements ->
         // Resource-directory names jpackage looks for, and the placeholders each template must contain.
         Map<String, List> overrides = type == 'deb' ?
@@ -950,10 +968,13 @@ if (normalizedHost().os == 'windows') {
              'template.control': ['control', []]] :
             ['template.spec': ["${linuxPackageName}.spec", ['DESKTOP_COMMANDS_INSTALL', 'DESKTOP_COMMANDS_UNINSTALL']]]
         new ZipFile(new File(sdkHome, 'jmods/jdk.jpackage.jmod')).withCloseable { archive ->
-            overrides.each { template, override ->
+            def templateText = { String template ->
                 def entry = archive.getEntry("classes/jdk/jpackage/internal/resources/${template}")
                 if (entry == null) throw new GradleException("The JBR SDK's jpackage has no Linux ${template}")
-                List<String> lines = archive.getInputStream(entry).withCloseable { new String(it.readAllBytes(), StandardCharsets.UTF_8) }.split('\n', -1) as List
+                archive.getInputStream(entry).withCloseable { new String(it.readAllBytes(), StandardCharsets.UTF_8) }
+            }
+            overrides.each { template, override ->
+                List<String> lines = templateText(template).split('\n', -1) as List
                 override[1].each { String placeholder ->
                     if (lines.count { it == placeholder } != 1) throw new GradleException("jpackage's ${template} no longer has exactly one ${placeholder} line; review the install-script override")
                     lines[lines.indexOf(placeholder)] = menuCommands[placeholder]
@@ -969,19 +990,24 @@ if (normalizedHost().os == 'windows') {
                 }
                 new File(resources, override[0]).setText(text, 'UTF-8')
             }
+            // jpackage looks for the menu entry's override under the launcher's name.
+            new File(resources, 'Jasper.desktop').setText(linuxDesktopEntry(templateText('template.desktop')), 'UTF-8')
         }
     }
 
-    // Checks the generated maintainer scripts: jpackage's menu commands inside the wrappers, all placeholders filled.
+    // Checks the generated maintainer scripts: jpackage's menu commands inside the wrappers, the menu install between the
+    // saving and restoring of the default applications, each wrapper followed by the MIME cache refresh, all placeholders
+    // filled.
     def verifyInstallScripts = { String scripts, String label ->
-        [menuDirectories, 'jasper_menu_install "$@" || ', 'jasper_menu_uninstall "$@" || ',
-         "xdg-desktop-menu install ${installRoot}/lib/${linuxPackageName}-Jasper.desktop", 'xdg-desktop-menu uninstall'].each { expected ->
+        [menuDirectories, menuInstalled, menuRemoved,
+         "xdg-desktop-menu install ${installRoot}/lib/${linuxDesktopFileName}", 'xdg-desktop-menu uninstall'].each { expected ->
             if (!scripts.contains(expected)) throw new GradleException("${label} verification failed: install scripts lack '${expected}'\n${scripts}")
         }
         if (scripts.contains('DESKTOP_COMMANDS_')) throw new GradleException("${label} verification failed: install scripts keep an unfilled placeholder\n${scripts}")
     }
 
-    // Compares an unpacked package with the verified image (same bytes, no lost executable bits) and checks the menu entry.
+    // Compares an unpacked package with the verified image (same bytes, no lost executable bits) and checks the menu entry
+    // (linuxDesktopEntryProblem).
     // jpackage rewrites its own app-image metadata, lib/app/.jpackage.xml, when it builds a package.
     def verifyUnpackedPackage = { File image, File unpacked, String label ->
         File installed = new File(unpacked, installRoot.substring(1))
@@ -994,11 +1020,11 @@ if (normalizedHost().os == 'windows') {
             }
             if (expected.canExecute() && !actual.canExecute()) throw new GradleException("${label} verification failed: ${actual} lost its executable bit")
         }
-        File desktop = new File(installed, "lib/${linuxPackageName}-Jasper.desktop")
-        String entry = desktop.isFile() ? desktop.getText('UTF-8') : ''
-        if (!entry.contains("${installRoot}/bin/Jasper") || !entry.contains("${installRoot}/lib/Jasper.png") || !entry.contains("Categories=${menuCategories}")) {
-            throw new GradleException("${label} verification failed: the desktop entry is missing or incomplete\n${entry}")
-        }
+        File desktop = new File(installed, "lib/${linuxDesktopFileName}")
+        if (!desktop.isFile()) throw new GradleException("${label} verification failed: the desktop entry ${desktop} is missing")
+        String entry = desktop.getText('UTF-8')
+        String problem = linuxDesktopEntryProblem(entry, installRoot, menuCategories)
+        if (problem != null) throw new GradleException("${label} verification failed: ${problem}\n${entry}")
     }
 
     def linuxPackage = { String type, String taskName, String requirement ->

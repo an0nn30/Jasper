@@ -143,12 +143,22 @@ public final class FakePluginContext implements PluginContext {
                     Objects.requireNonNull(editor, "editor");
                     return host.provideEditor(FakePluginContext.this, editor);
                 }
-                @Override public void browse(java.net.URI uri) { requireOpen(); host.browsed.add(webAddress(uri)); }
+                @Override public void browse(java.net.URI uri) {
+                    requireOpen();
+                    java.net.URI address = webAddress(uri);
+                    // As the application: while Jasper is the default browser, the provided browser first, as openInBrowser's;
+                    // never the provider's own, its hand-back.
+                    if (host.defaultBrowser && !host.providesBrowser(info.id())) inBrowser(address);
+                    else host.browsed.add(address);
+                }
                 @Override public void openInBrowser(java.net.URI uri) {
                     requireOpen();
                     java.net.URI address = webAddress(uri);
                     if (address.getRawAuthority() == null || address.getRawAuthority().isEmpty())
                         throw new IllegalArgumentException("Only an http or https address with a host opens in a browser: " + uri);
+                    inBrowser(address);
+                }
+                private void inBrowser(java.net.URI address) {
                     // As the application: the browser a plugin provides first, as a click in a tab of the active window; here on the
                     // caller's thread. An address no WebLink takes, such as http://my_host/, goes to the system browser, as there.
                     boolean opened;
@@ -159,6 +169,11 @@ public final class FakePluginContext implements PluginContext {
                         opened = false;
                     }
                     if (!opened) host.browsed.add(address);
+                }
+                @Override public boolean isDefaultBrowser() { requireOpen(); return host.defaultBrowser; }
+                @Override public Subscription onDefaultBrowserChanged(Consumer<Boolean> handler) {
+                    requireOpen();
+                    var subscription = host.subscribeDefaultBrowser(info.id(), handler); own(subscription); return subscription;
                 }
                 @Override public Subscription browser(dev.jasper.sdk.ui.WebBrowser browser) {
                     requireOpen();

@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets, the Browser and the Enterprise look are bundled plugins built only against the public plugin
-SDK this guide describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.27.0,
+SDK this guide describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.28.0,
 task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
@@ -65,7 +65,7 @@ id = "dev.example.tool"
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.27.0, <0.28"
+sdk = ">=0.28.0, <0.29"
 description = "Runs the tool from the command palette."
 vendor = "Example"
 homepage = "https://example.dev/tool"
@@ -91,7 +91,7 @@ summary = "Run the tool"
 | `name` | string | yes | Must show something: not only spaces, zero-width or bidi characters. It titles the plugin's row, Settings page and notification groups. |
 | `version` | string | yes | One to three numbers separated by dots, without leading zeros or a pre-release tag; missing numbers are 0, so `1.0` is `1.0.0`. |
 | `entry` | string | yes | The qualified name of the [entry class](#the-entry-point-and-lifecycle), which must be in a package. |
-| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.27.0 declares `sdk = ">=0.27.0, <0.28"`. |
+| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.28.0 declares `sdk = ">=0.28.0, <0.29"`. |
 | `description` | string | no | The Overview on the plugin's details in Settings › Plugins; searched there. |
 | `vendor` | string | no | Shown in the plugin list, its details and its review sheet. |
 | `homepage` | string | no | An absolute `http` or `https` address, linked as "Plugin homepage ↗" on the plugin's details. Anything else is ignored with a warning in the log. |
@@ -1115,8 +1115,10 @@ one.
   clicked in the plugin's view: the plugin that [provides the web browser](#the-web-browser-role) first, as a click in
   the active window, then the system browser, as `browse` opens it.
 - `context.platform().browse(uri)` opens an `http` or `https` address in the system browser, in the background, even
-  when a plugin provides the web browser; any other address throws `IllegalArgumentException` (from `openInBrowser`
-  too), and a failure is posted as "Could not open a web address".
+  when a plugin provides the web browser. While Jasper is itself the system's default browser, which would hand the
+  address back, it opens as `openInBrowser` opens it, unless the calling plugin provides the web browser: its own
+  `browse`, such as a link it hands back, never comes back to it, and Jasper opens nothing. Any other address throws
+  `IllegalArgumentException` (from `openInBrowser` too), and a failure is posted as "Could not open a web address".
 - `openInEditor`, `openInBrowser` and `browse` work from any thread; `openFile` only on the UI thread.
 
 ## The clipboard
@@ -1182,14 +1184,16 @@ terminal pane, with the path's line and the clicked window. The Editor takes thi
 
 `context.platform().browser(webBrowser)` (`browser.provide`) makes the plugin the web browser Jasper opens web
 addresses with: an `http` or `https` link Cmd-clicked (Ctrl-clicked on Linux and Windows) in any terminal pane, with the
-clicked window; every plugin's `openInBrowser` and Jasper's own web links (Settings' Help button, the Licenses
-window's and the plugin manager's homepages), with the active window; `jasper <address>…`, with the window of the pane
-it ran in ([command line](command-line.md#the-jasper-command)). A local file the user clicked in a terminal arrives too,
-as a `file:` link.
+clicked window; every plugin's `openInBrowser`, another plugin's `browse` while Jasper is the system's default browser,
+and Jasper's own web links (Settings' Help button, the Licenses window's and the plugin manager's homepages), with the
+active window; `jasper <address>…`, with the window of the pane it ran in
+([command line](command-line.md#the-jasper-command)). A local file the user clicked in a terminal arrives too, as a
+`file:` link.
 
 - [`WebBrowser`](sdk-reference.html#dev.jasper.sdk.ui.WebBrowser)`.open(link)` runs on the UI thread, must not block,
   and returns whether it opened the link. `false`, or a handler that throws, hands an `http` or `https` address to the
-  system browser and a `file:` link to the [default editor](editor.md#default-editor).
+  system browser and a `file:` link to the [default editor](editor.md#default-editor). While Jasper is itself the
+  system's default browser, which would hand the address back, Jasper opens nothing instead.
 - A [`WebLink`](sdk-reference.html#dev.jasper.sdk.ui.WebLink) holds the `address`; the `origin`,
   [`LinkOrigin`](sdk-reference.html#dev.jasper.sdk.ui.LinkOrigin)`.CLICK` when the user clicked the link and
   `EXTERNAL` when the address came from outside Jasper, through `jasper <address>`; the `placement`,
@@ -1200,7 +1204,13 @@ as a `file:` link.
 - An `EXTERNAL` link asks for a `TAB` and has no target; a `file:` link is a `CLICK` in a `TAB`.
 - A clicked link comes from program output, and an OSC 8 link's address can differ from the text shown, so treat the
   address as untrusted input and show it before acting on it.
-- `ftp` and `mailto` links, and `Platform.browse`, always go to the system browser.
+- `ftp` and `mailto` links always go to the system browser, and so does `Platform.browse` while Jasper is not the
+  system's default browser, and the browser plugin's own `Platform.browse` always.
+- `context.platform().isDefaultBrowser()`, on the UI thread, tells whether Jasper is the system's default web browser,
+  as Jasper last checked. Jasper checks at start-up and again from time to time, such as when one of its windows
+  activates, so the answer can lag a change the user just made. It is false until a check has answered, and a check
+  that could not tell keeps the last answer. `context.platform().onDefaultBrowserChanged(handler)` runs the handler on
+  the UI thread with each new answer; the registration ends with the plugin.
 - One plugin at a time: a bundled plugin's registration replaces one that is not bundled; otherwise a later
   registration throws `IllegalStateException` ("The browser is already provided by *id*"). The role ends with the
   plugin.
@@ -1414,7 +1424,7 @@ catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
 
 | Runs on, or may be called from | What |
 | --- | --- |
-| The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, content tabs, split items, restorers, dialogs, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard; `openFile` and `hasModal`. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
+| The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, content tabs, split items, restorers, dialogs, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard; `openFile`, `isDefaultBrowser`, `onDefaultBrowserChanged` and `hasModal`. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
 | Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; `TabNamePiece.set`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `appearance().presentation()`, `terminalTypography()`, `variant()` and `workspaceVariant()`; `log()`; `Subscription.close()`. |
 
 - **Slow work** goes to `context.background()`, whose tasks can run at the same time. UI-thread code does no I/O and
@@ -1462,13 +1472,14 @@ try (var host = new FakePluginHost()) {
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
 | Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()` |
-| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentMenu(tab)` (the right-click menu `showContextMenu` shows), `chooseFromContentMenu(tab, path...)`, `dismissContentMenu(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
+| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentMenu(tab)` (the right-click menu `showContextMenu` shows), `chooseFromContentMenu(tab, path...)`, `dismissContentMenu(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `setDefaultBrowser(jasper)` (what `Platform.isDefaultBrowser()` returns; a change runs the `onDefaultBrowserChanged` handlers), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
 
 Where the fake differs from Jasper:
 
 - Background tasks run one at a time on the caller, at `runBackground()`; Jasper runs each on its own thread.
-- Apart from the kit and `Appearance`'s UI-thread methods, the fake does not enforce the UI thread, so Jasper's
-  `IllegalStateException` off it is not reproduced. The kit and `onTerminalTypographyChanged` need the event dispatch
+- Apart from the kit, `Appearance`'s UI-thread methods and `Platform.onDefaultBrowserChanged`, the fake does not
+  enforce the UI thread, so Jasper's `IllegalStateException` off it is not reproduced; `Platform.isDefaultBrowser`
+  answers on any thread. The kit, `onTerminalTypographyChanged` and `onDefaultBrowserChanged` need the event dispatch
   thread; `Appearance`'s other UI-thread methods also accept the thread that made the host.
 - It does not check that a service API is in an exported package, and an absent optional provider's API is still on
   the test classpath, so the `NoClassDefFoundError` path cannot be tested there.

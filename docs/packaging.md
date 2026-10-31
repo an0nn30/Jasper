@@ -189,7 +189,8 @@ without the cache and then without the user's options ([start-up recovery](diagn
 - **Native libraries** (macOS, Windows): each is byte-identical to its jar entry and (macOS) validly signed, and a
   headless probe with the image's runtime, options and class path loads them from `native/` and extracts nothing.
 - **macOS**: the three bridges (architecture, signature, exported JNI symbols); `Info.plist` identifier
-  `dev.jasper.app`, version, Local Network text and [document types](#macos-open-with); the icon file and catalog;
+  `dev.jasper.app`, version, Local Network text, [document types](#macos-open-with) and
+  [URL types](#macos-web-links); the icon file and catalog;
   the launcher's app-specific UUID; Chromium's framework and `jcef Helper` apps in
   `Contents/runtime/Contents/Frameworks/cef_server.app`, the renderer helper signed by JetBrains (team `2ZEFAR8TH3`);
   `codesign --verify --deep --strict` of the runtime bundle and of the app; a trained cache accepted by
@@ -322,6 +323,14 @@ opens in the [default editor](editor.md#default-editor), or is revealed in the f
 the default editor is **System default app**, and each folder as a terminal tab, in the most recently active window
 ([one Jasper per home](command-line.md#one-jasper-per-home)). `verifyPackage` checks the key.
 
+### macOS web links
+
+`packageApp` also declares `CFBundleURLTypes`: the `http` and `https` schemes, as "Web site URL" with the role Viewer,
+so that macOS offers Jasper as a default web browser ([Browser](browser.md#making-jasper-your-default-browser)). macOS
+hands Jasper a link, or the address of `open -a Jasper <url>`, as an open-URI event, to the running Jasper when there is
+one; a web address opens in a browser tab of the most recently active window, and a `file:` URL opens its file as the
+open-file event does. `verifyPackage` checks the key.
+
 ## Windows
 
 ### Portable ZIP
@@ -359,13 +368,29 @@ JCEF (the `MODULES` line of its `release` file names `jcef`) of the target archi
 | `-JavaHome`, `-WixPath` | Name the SDK and the WiX folder instead of finding them |
 
 The setup wizard installs the [Cygwin environment](#bundled-cygwin) too. `packageInstaller` writes the selected JBR's
-own WiX template (`main.wxs`) with one added custom action, `JasperProvisionCygwin`, and passes it to jpackage with
-`--resource-dir`: after the files are installed, on every installation, repair and upgrade (not on removal), and in
-silent installations too, Windows Installer runs `runtime\bin\java.exe … CygwinTool ensure --seed app\cygwin-seed` as
-the installing user, and a failure fails the installation. A JBR whose template has another shape fails the build with
+own WiX template (`main.wxs`) with one added custom action, `JasperProvisionCygwin`, and the web browser registration
+below, and passes it to jpackage with `--resource-dir`: after the files are installed, on every installation, repair
+and upgrade (not on removal), and in silent installations too, Windows Installer runs
+`runtime\bin\java.exe … CygwinTool ensure --seed app\cygwin-seed` as the installing user, and a failure fails the
+installation. A JBR whose template has another shape fails the build with
 "Unsupported JBR main.wxs; review the selected JBR template". WiX 3 cannot handle paths of 260 characters or more, so
 the task first copies the image into a new `jpi…` folder in `%TEMP%`, and fails with "WiX 3 requires a shorter TEMP
 directory for: *path*" when a copied path still reaches that length.
+
+The setup registers Jasper as a web browser for the installing user, in the component `JasperWebBrowser` of the
+template's one feature ([Browser](browser.md#making-jasper-your-default-browser)), all under `HKEY_CURRENT_USER`:
+
+| Key | Values |
+|---|---|
+| `Software\RegisteredApplications` | `Jasper` = `Software\Jasper\Capabilities` |
+| `Software\Jasper\Capabilities` | `ApplicationName` = `Jasper`, `ApplicationDescription` = `Jasper's built-in web browser` |
+| `Software\Jasper\Capabilities\URLAssociations` | `http` and `https` = `JasperURL` |
+| `Software\Classes\JasperURL` | (Default) = `Jasper URL` |
+| `Software\Classes\JasperURL\DefaultIcon` | (Default) = `"[INSTALLDIR]Jasper.exe",0` |
+| `Software\Classes\JasperURL\shell\open\command` | (Default) = `"[INSTALLDIR]Jasper.exe" --url "%1"` ([`--url`](command-line.md#launching-jasper-with-options)) |
+
+The uninstall, and so an upgrade before it writes the new version's, removes the `Jasper` value and deletes the
+`Capabilities` and `JasperURL` keys. The portable ZIP and `installWindowsUser` register nothing.
 
 The package's architecture is that of the selected JBR SDK, which must match the host's. On Windows on Arm, build the
 ARM64 package: an x64 Jasper there runs entirely under Windows' x64 emulation, including the code the JVM compiles as
@@ -383,8 +408,9 @@ before upgrading or uninstalling. Installing the wizard leaves a separately extr
 Before it publishes the setup, the task inspects the MSI it embeds with `packaging\windows\Verify-Installer.ps1`,
 without installing it: product name `Jasper`, version and upgrade code, no `ALLUSERS` (per-user), the x64 Windows
 Installer platform (jpackage's template declares x64 for an ARM64 payload too; `verifyPackage` checks the binaries'
-own architecture), the folder and shortcut dialogs, at least two shortcuts, and the upgrade rows and removal action.
-The task never installs or opens Jasper.
+own architecture), the folder and shortcut dialogs, at least two shortcuts, the upgrade rows and removal action, and
+exactly the web browser registration's `Registry` rows, the two key deletions included, in a feature component that is
+not permanent. The task never installs or opens Jasper.
 
 ### User installation without a compiler
 
@@ -451,9 +477,10 @@ describes what users get. On a Windows host, `stagePackage` and `stageWindowsUse
 
 A missing or mismatched file fails the build. Apart from `refreshCygwinSeed`, nothing here needs Python, GnuPG,
 PowerShell, a native compiler or a separately installed Cygwin. `check` runs the portable Cygwin checks on every host:
-`verifyCygwinManifest`, `verifyCygwinLifecycle`, `verifyCygwinProvisioning`, `verifyCygwinProbes` and
-`verifyCygwinProbeRuntime`. The [Cygwin README](../packaging/windows/cygwin/README.md) describes the helper, the seed
-and its refresh, the relay, the native probes and the acceptance harnesses.
+`verifyCygwinManifest`, `verifyCygwinLifecycle`, `verifyCygwinProvisioning`, `verifyCygwinProbes`,
+`verifyCygwinProbeRuntime` and `verifyInstallerTemplate`, which checks the setup wizard's template: the custom action
+and the web browser registration. The [Cygwin README](../packaging/windows/cygwin/README.md) describes the helper, the
+seed and its refresh, the relay, the native probes and the acceptance harnesses.
 
 ## Linux packages
 
@@ -477,15 +504,19 @@ sudo apt-get install fakeroot rpm cpio binutils g++
 Both packages are named `jasper-workstation` and install the image to `/opt/jasper-workstation`, with the launcher at `/opt/jasper-workstation/bin/Jasper`
 and a desktop menu entry (`/opt/jasper-workstation/lib/jasper-workstation-Jasper.desktop`, categories
 `System;TerminalEmulator;Network;RemoteAccess;`, icon `/opt/jasper-workstation/lib/Jasper.png`) registered through
-`xdg-desktop-menu`. The package description, which is also the menu entry's comment, is "Jasper DevOps workstation" and
-the home page `https://github.com/an0nn30/Jasper`. DEB builds require `fakeroot`, `dpkg-deb` and a Debian-family host
+`xdg-desktop-menu`. The package tasks write the entry from the selected JBR's own `template.desktop`, changing two
+lines: `Exec=/opt/jasper-workstation/bin/Jasper --url %u` and `MimeType=x-scheme-handler/http;x-scheme-handler/https;`,
+so that desktops offer Jasper as a web browser ([Browser](browser.md#making-jasper-your-default-browser)). The package
+description, which is also the menu entry's comment, is "Jasper DevOps workstation" and the home page
+`https://github.com/an0nn30/Jasper`. DEB builds require `fakeroot`, `dpkg-deb` and a Debian-family host
 whose package database resolves the runtime's mandatory shared libraries to Debian packages. The `.rpm` requires,
 by soname, every shared library the image needs but does not bundle (for example `libX11.so.6()(64bit)`), which every
 RPM distribution resolves: jpackage's own
 RPM lookup asks the build machine's RPM database, which is empty on a Debian-family host. Before publishing either package,
 the task checks its name, version and architecture, unpacks it without installing it, compares every file with the
 verified image byte for byte (jpackage rewrites only `lib/app/.jpackage.xml`), checks the executable bits and the
-desktop entry, and checks the install scripts.
+desktop entry (jpackage's name, icon, categories, `Type=Application` and `Terminal=false`, the `Exec` and `MimeType`
+lines above, and each key once), and checks the install scripts.
 jpackage appends the package name beneath `--install-dir /opt` to form the installation root.
 
 jpackage's install scripts register the menu entry under `set -e`, and `xdg-desktop-menu` fails unless
@@ -495,6 +526,17 @@ package tasks therefore generate the `postinst` and `prerm` (`.deb`) and `jasper
 selected JBR's own templates: the menu commands run inside a function, the install creates both folders first, and a
 menu failure only prints "jasper: the desktop menu entry was not registered" (or "…removed"). Every other line is
 jpackage's, and a JBR whose templates lack the expected placeholder fails the build.
+
+After registering or removing the menu entry, the scripts run `update-desktop-database -q` on each of
+`/usr/local/share/applications` and `/usr/share/applications` that exists, when the tool is installed, so that the MIME
+cache (`mimeinfo.cache`) lists Jasper for web links after the install and no longer after the removal; a failure only
+prints "jasper: the desktop database in *folder* was not updated". `xdg-desktop-menu install` also adds the entry to
+its MIME types' lines in the first writable data folder's `applications/defaults.list`, after the default listed there
+or, where none is, as the default, and its uninstall never takes it out. The install therefore copies each
+`applications/defaults.list` of the data folders (`XDG_DATA_DIRS`, else `/usr/local/share` and `/usr/share`) before
+the menu install, then writes back each that changed and deletes each that it created, so that the packages make Jasper
+no default. When the copies cannot be made, it prints "jasper: the system's default applications were not saved" and
+the menu install's change stays.
 
 With the default `system.run_in_background`, the first eligible installed launch registers the current user's
 `$XDG_CONFIG_HOME/autostart/dev.jasper.background.desktop` (normally under `~/.config`) to run Jasper with
@@ -536,7 +578,7 @@ Windows job fails while [`validation.json`](#bundled-cygwin) lacks native and in
 architecture. The publish job refuses to continue if the tag moved during the build, requires exactly the nine packages,
 the two Cygwin source archives (`amd64` and `aarch64`) and the five SDK jars (`jasper-sdk-<v>.jar`,
 `jasper-sdk-<v>-sources.jar`, `jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and
-`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.27.0), and writes `SHA256SUMS`. It
+`jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is `JasperSdk.VERSION`, now 0.28.0), and writes `SHA256SUMS`. It
 creates a draft prerelease titled `Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds
 exactly those files, and publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which
 a rerun finishes; a published release for the tag is never overwritten.
@@ -553,9 +595,11 @@ direct dependencies, and uploads them as the artifacts `jasper-linux-x64` and
 `debian:12`, `ubuntu:24.04`, `fedora:latest` and `opensuse/tumbleweed` containers of both architectures with
 [`packaging/linux/check-install.sh`](../packaging/linux/check-install.sh), which checks that the launcher,
 `jasper-watch` and the `jasper` command are executable, that `jasper --help` and the bundled `java -version` run,
-that every shared library resolves, and that the menu entry exists, then removes the package and checks that the
-program and the menu entry are gone. When distro `jasper-libs` is already installed, its package identity must survive
-both installation and removal; the Fedora equipped-runtime check installs it first. It never opens a window.
+that every shared library resolves, that the menu entry exists and takes `http` and `https` links with `--url %u`,
+that the MIME cache lists it when `update-desktop-database` is installed, and that no system `defaults.list` names it
+and one the script seeded is unchanged, then removes the package and checks that the program, the menu entry and its
+MIME cache lines are gone. When distro `jasper-libs` is already installed, its package identity must survive both
+installation and removal; the Fedora equipped-runtime check installs it first. It never opens a window.
 
 **ci** ([`ci.yml`](../.github/workflows/ci.yml)) runs `./gradlew check --parallel --continue` on `macos-latest`,
 `ubuntu-24.04` and `windows-latest` with the JCEF build of JBR 25 and Python 3.12, for pushes to `main` and pull requests, unless every

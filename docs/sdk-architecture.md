@@ -425,9 +425,10 @@ as is a failed `Platform.browse`, which accepts only an absolute http or https a
 `Platform.browser` (needs `browser.provide`) registers a `WebBrowser` in `plugins.WebBrowsers`, one at a time, by the
 same bundled rule; it runs on the UI thread and must not block, so nothing waits for it. `PluginRuntime.openLink`
 (`LinkOrigin.CLICK`, with a `PluginRuntime.Placement` and an OSC 8 target) and `openExternalLink` (`EXTERNAL`) ask it on
-the UI thread with a `WebLink`, and hand the address to the system browser when no plugin provides one, the parts make
-no `WebLink`, it declines or it throws; before the plugins start, the system browser opens it. `openLocalWebFile` asks
-it for a `file:` link and answers whether it took it.
+the UI thread with a `WebLink`, an internationalized host given in ASCII when it converts exactly
+(`platform.Browser.withAsciiHost`), and hand the address to the system browser when no plugin provides one, the parts
+make no `WebLink` even so (`PluginRuntime.reachesBrowser`), it declines or it throws. `openLocalWebFile` asks it for a
+`file:` link and answers whether it took it.
 A Cmd-click (Ctrl-click on Linux and Windows) on a URL in any terminal pane reaches `TerminalView.setLinkOpener`, which
 `TabHost` points at the window's `WindowContent.onOpenLink`; `TabHost` first makes the clicked pane the active one and
 passes a `LinkClick` (the `TerminalLink` and whether the pane is wider than tall). `JasperApplication.openLink` sends
@@ -435,9 +436,25 @@ an absolute `http` or `https` address the role's way with the clicked window and
 the `SPLIT` gesture as `SPLIT_RIGHT` from a wide pane and `SPLIT_DOWN` otherwise, and any other link the terminal
 opens (`ftp`, an OSC 8 `mailto`) to the system browser. `JasperApplication.commands()` sends `jasper <address>…`, when
 every argument is one, as external addresses in the calling pane's window, before the path and subcommand handling.
+`ExternalAddresses` holds external addresses, at most 32 in arrival order, until the plugins run and
+`DefaultBrowser.firstAnswer()` has completed; a `jasper` call is answered once its addresses have been handed on.
 `Platform.openInBrowser` asks the role as a click in the active window, then opens the system browser on the plugin's
-worker as `Platform.browse` does. `JasperApplication.browse`, which Settings' Help button, the Licenses window and the
-plugin manager use for Jasper's own links, sends them the clicks' way with the active window.
+worker as `Platform.browse` does; while `PluginHost.defaultBrowser` says Jasper is the default browser, another plugin's
+`Platform.browse` asks the role that way first too, and the provider's own (`WebBrowsers.providedBy`) never does.
+`JasperApplication.browse`, which Settings' Help button, the Licenses window and the plugin manager use for Jasper's own
+links, sends them the clicks' way with the active window. While
+`DefaultBrowser.isJasper()`, no http or https address reaches the desktop, which would hand it back: the application's
+`openInSystemBrowser`, and the opener it gives `PluginRuntime.systemBrowser` for plugins, hand it to
+`ExternalAddresses.cannotOpen`, which posts "Web links can’t open in Jasper" (Turn On Browser, Copy Link) when no plugin
+provides a browser, "Jasper’s browser can’t open this address" (Copy Link) for an address that never reached the
+provided browser, and otherwise opens nothing. An address either one hands to the desktop that comes back from outside
+within 10 seconds never goes to the desktop again: `ExternalAddresses` gives it to `cannotOpen` when the browser does not
+take it.
+`Platform.isDefaultBrowser`, on the UI thread, returns what `PluginRuntime.defaultBrowser` supplies: `JasperApplication`
+points it at `platform.DefaultBrowser.isJasper()`, the answer of its last check, which runs at start-up and as a window
+activates. `DefaultBrowser.onChanged` tells the application, on the EDT, each answer that changes the value;
+`PluginRuntime.defaultBrowserChanged` passes it to every `Platform.onDefaultBrowserChanged` handler, contained, and the
+registrations close with their plugin.
 
 `LocalSpec.command` becomes `terminals.OpenSpec.Local.program`; the workspace launches it through `ShellLauncher`
 with the default profile's environment, each word passed as is, closes the pane when the program exits with status 0

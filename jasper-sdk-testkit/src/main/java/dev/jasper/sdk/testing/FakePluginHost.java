@@ -2051,8 +2051,11 @@ public final class FakePluginHost implements AutoCloseable {
     public List<Path> openedFiles() { return List.copyOf(openedFiles); }
 
     /**
-     * Every web address that reached the system browser: each {@code Platform.browse}, and each
-     * {@code Platform.openInBrowser} that no provided browser opened.
+     * Every web address handed to the system browser, or, while {@link #setDefaultBrowser} says Jasper is the default, to
+     * the system-browser fallback, where Jasper opens nothing: each {@code Platform.browse}, and each
+     * {@code Platform.openInBrowser} that no provided browser opened. While Jasper is the default, another plugin's
+     * {@code Platform.browse} is here only when no provided browser opened it, as {@code openInBrowser}'s; the providing
+     * plugin's own always is.
      *
      * @return the addresses in request order
      */
@@ -2510,6 +2513,12 @@ public final class FakePluginHost implements AutoCloseable {
     record ProvidedBrowser(FakePluginContext context, dev.jasper.sdk.ui.WebBrowser browser) { }
     private volatile ProvidedBrowser providedBrowser;
 
+    /** Whether {@code pluginId} provides the browser now. */
+    boolean providesBrowser(String pluginId) {
+        ProvidedBrowser current = providedBrowser;
+        return current != null && current.context().plugin().id().equals(pluginId);
+    }
+
     /** Makes a plugin's browser the one web addresses open with, under the application's one-at-a-time rule. */
     Subscription provideBrowser(FakePluginContext context, dev.jasper.sdk.ui.WebBrowser browser) {
         String pluginId = context.plugin().id();
@@ -2581,4 +2590,50 @@ public final class FakePluginHost implements AutoCloseable {
      * @since 0.17.1
      */
     public void setCommandClient(Path client) { commandClient = Optional.of(Objects.requireNonNull(client, "client")); }
+
+    volatile boolean defaultBrowser;
+    private final List<Entry> defaultBrowserHandlers = new CopyOnWriteArrayList<>();
+
+    /**
+     * Sets what {@code Platform.isDefaultBrowser} reports: whether Jasper is the system's default browser, as the
+     * application's last check answered; while it is, another plugin's {@code Platform.browse} asks the provided browser
+     * first. Until then
+     * it reports false. A value that differs from the current one runs
+     * every {@code Platform.onDefaultBrowserChanged} handler with it at once, on the EDT, after the getter has changed,
+     * as Jasper does when a check changes its answer; a handler that throws is recorded in {@link #failures()} without
+     * stopping the others.
+     *
+     * @param jasper whether Jasper is the default browser
+     * @since 0.28.0
+     */
+    public void setDefaultBrowser(boolean jasper) {
+        Runnable publish = () -> {
+            if (defaultBrowser == jasper) return;
+            defaultBrowser = jasper;
+            for (var entry : List.copyOf(defaultBrowserHandlers)) {
+                if (entry.closed().get()) continue;
+                try { entry.handler().accept(jasper); }
+                catch (RuntimeException | LinkageError failure) { recordFailure(entry.pluginId() + " default browser change: " + failure); }
+            }
+        };
+        if (javax.swing.SwingUtilities.isEventDispatchThread()) publish.run();
+        else {
+            try { javax.swing.SwingUtilities.invokeAndWait(publish); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+            catch (java.lang.reflect.InvocationTargetException failure) {
+                if (failure.getCause() instanceof Error error) throw error;
+                if (failure.getCause() instanceof RuntimeException runtime) throw runtime;
+                throw new IllegalStateException(failure.getCause());
+            }
+        }
+    }
+
+    Subscription subscribeDefaultBrowser(String pluginId, Consumer<Boolean> handler) {
+        if (!javax.swing.SwingUtilities.isEventDispatchThread())
+            throw new IllegalStateException("Default browser change registration requires the UI thread");
+        Objects.requireNonNull(handler, "handler");
+        var entry = new Entry(pluginId, value -> handler.accept((Boolean) value), new AtomicBoolean());
+        defaultBrowserHandlers.add(entry);
+        return () -> { entry.closed().set(true); defaultBrowserHandlers.remove(entry); };
+    }
 }

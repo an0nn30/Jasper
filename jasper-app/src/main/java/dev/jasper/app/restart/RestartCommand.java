@@ -14,9 +14,9 @@ public final class RestartCommand {
      * Plans the replacement from a command and its arguments as the operating system reports them. When they end with
      * {@code launch}, the arguments Jasper's {@code main} received, those are replayed: {@code --config} and
      * {@code --plugin-dir} with their values, and {@code --safe-mode} when {@code mode} keeps it; {@code --background},
-     * {@code --no-window}, an earlier {@code --replacing} and the launch's paths are dropped. Otherwise (a platform that
-     * reports something else) the flags are dropped by their spelling alone, since nothing there tells a path from a JVM
-     * option.
+     * {@code --no-window}, an earlier {@code --replacing}, {@code --url} with its address (it admits nothing after it)
+     * and the launch's paths and web addresses are dropped. Otherwise (a platform that reports something else) the flags
+     * are dropped by their spelling alone, since nothing there tells a path from a JVM option.
      *
      * @param command the executable, when known
      * @param arguments everything after it, when known; for a Java launch that includes JVM options and the main class
@@ -52,6 +52,9 @@ public final class RestartCommand {
                     if (i + 1 < arguments.size()) kept.add(arguments.get(++i));
                 }
                 case "--replacing" -> i++;
+                case "--url" -> {
+                    if (i + 1 < arguments.size() && !arguments.get(i + 1).startsWith("--")) i++;
+                }
                 case "--background", "--no-window", "--help" -> { }
                 case "--safe-mode" -> {
                     if (mode == RestartMode.SAME) kept.add(argument);
@@ -78,18 +81,20 @@ public final class RestartCommand {
 
     /**
      * A planned command line as the replacement for process {@code pid} (workspace-tabs spec 5.3): it waits for that
-     * process's instance lock, then opens {@code paths}.
+     * process's instance lock, then opens {@code paths} and {@code urls}.
      *
      * @param planned a planned command line
      * @param pid the process it replaces
      * @param paths absolute paths the replacement opens
+     * @param urls web addresses the replacement opens (browser plan 4c)
      * @return the command line to start
      */
-    public static List<String> replacing(List<String> planned, long pid, List<Path> paths) {
+    public static List<String> replacing(List<String> planned, long pid, List<Path> paths, List<java.net.URI> urls) {
         List<String> line = new ArrayList<>(planned);
         line.add("--replacing");
         line.add(Long.toString(pid));
         for (Path path : paths) line.add(path.toString());
+        for (java.net.URI url : urls) line.add(url.toString());
         return List.copyOf(line);
     }
 

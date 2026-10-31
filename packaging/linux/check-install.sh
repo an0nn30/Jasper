@@ -24,6 +24,15 @@ check_distro_jasper() {
 if [ -e /usr/share/desktop-directories ]; then
     echo "This image already has /usr/share/desktop-directories; the headless install path is not exercised"
 fi
+# xdg-desktop-menu adds a menu entry to the lines of its MIME types in an applications directory's defaults.list; the
+# install scripts keep those files as they were. Give each applications directory the image already has one to keep.
+seeded=''
+for applications in /usr/local/share/applications /usr/share/applications; do
+    if [ -d "$applications" ] && [ ! -e "$applications/defaults.list" ]; then
+        printf '[Default Applications]\nx-scheme-handler/http=other.desktop\n' > "$applications/defaults.list"
+        seeded="$seeded $applications/defaults.list"
+    fi
+done
 
 case "$package" in
     *.deb)
@@ -146,6 +155,29 @@ if ! grep -qs "$root/bin/Jasper" /usr/local/share/applications/*.desktop /usr/sh
     echo "No desktop menu entry for Jasper under /usr/local/share/applications or /usr/share/applications" >&2
     exit 1
 fi
+# The entry takes http and https links, so desktops offer Jasper as a web browser, and the install refreshes the MIME
+# cache when update-desktop-database is installed.
+entry=$identity-Jasper.desktop
+caches="/usr/local/share/applications/mimeinfo.cache /usr/share/applications/mimeinfo.cache"
+if ! grep -qsx 'MimeType=x-scheme-handler/http;x-scheme-handler/https;' /usr/local/share/applications/$entry /usr/share/applications/$entry \
+    || ! grep -qsxF "Exec=$root/bin/Jasper --url %u" /usr/local/share/applications/$entry /usr/share/applications/$entry; then
+    echo "Jasper's desktop menu entry does not take http and https links" >&2
+    exit 1
+fi
+if command -v update-desktop-database >/dev/null && ! grep -qs "^x-scheme-handler/https=.*$entry;" $caches; then
+    echo "The desktop MIME cache does not list Jasper for https links" >&2
+    exit 1
+fi
+if grep -qsF "$entry" /usr/local/share/applications/defaults.list /usr/share/applications/defaults.list; then
+    echo "Installing the package added Jasper to the system's default applications" >&2
+    exit 1
+fi
+for list in $seeded; do
+    if ! grep -qx 'x-scheme-handler/http=other.desktop' "$list"; then
+        echo "Installing the package changed $list" >&2
+        exit 1
+    fi
+done
 
 remove
 check_distro_jasper
@@ -155,6 +187,10 @@ if [ -e "$root/bin/Jasper" ]; then
 fi
 if grep -qs "$root/bin/Jasper" /usr/local/share/applications/*.desktop /usr/share/applications/*.desktop; then
     echo "Removing the package left its desktop menu entry behind" >&2
+    exit 1
+fi
+if grep -qsF "$entry" $caches; then
+    echo "Removing the package left Jasper in the desktop MIME cache" >&2
     exit 1
 fi
 echo "Installed, checked and removed $package"

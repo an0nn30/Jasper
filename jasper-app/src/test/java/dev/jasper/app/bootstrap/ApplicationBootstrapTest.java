@@ -81,6 +81,19 @@ class ApplicationBootstrapTest {
         assertThat(dirs().instanceLock()).as("both end before the lock").doesNotExist();
     }
 
+    /** Browser plan 4c, ruling Q13: a link that broke out of a registered command's quotes starts and loads nothing. */
+    @Test void aRefusedLinkLaunchExitsBeforeTheLockAndStartsNothing() {
+        var error = new ByteArrayOutputStream();
+        for (String[] args : new String[][]{{"--url", "https://x/", "--plugin-dir", "y"}, {"--url", "notes.txt"},
+                {"--safe-mode", "--url", "https://x/"}})
+            assertThat(ApplicationBootstrap.start(args, System.out, new PrintStream(error), dirs(),
+                (service, options) -> { throw new AssertionError("Unexpected startup"); })).as(java.util.Arrays.toString(args)).isEqualTo(2);
+        assertThat(error.toString()).contains("--url takes one web address or file: URL and nothing after it.",
+            "Not a web address or file: URL: notes.txt",
+            "--url must be the first argument.");
+        assertThat(dirs().instanceLock()).doesNotExist();
+    }
+
     /** Spec 5.2: a second launch in an owned home hands its request to the owner before reading anything. */
     @Test void aSecondLaunchInAnOwnedHomeHandsOffAndALoginLaunchExits() throws Exception {
         Files.writeString(directory.resolve("config.toml"), "");

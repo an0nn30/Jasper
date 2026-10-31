@@ -763,6 +763,18 @@ public final class PluginRuntime {
             dev.jasper.sdk.ui.LinkPlacement.TAB, Optional.empty(), windowId);
     }
 
+    /**
+     * Whether the web browser a plugin provides is asked when {@code address} opens: an http or https address with a
+     * host, an internationalized one given in ASCII ({@code platform.Browser.withAsciiHost}). One whose authority is no
+     * host, such as {@code http://my_service:8080/}, never reaches it (browser plan 4c, ruling Q17). Any thread.
+     *
+     * @param address an absolute http or https address
+     * @return whether the browser is asked
+     */
+    public static boolean reachesBrowser(java.net.URI address) {
+        return WebBrowsers.takes(Objects.requireNonNull(address, "address"));
+    }
+
     private static dev.jasper.sdk.ui.LinkPlacement linkPlacement(Placement placement) {
         return switch (placement) {
             case TAB -> dev.jasper.sdk.ui.LinkPlacement.TAB;
@@ -782,6 +794,33 @@ public final class PluginRuntime {
             desktop.accept(address);
     }
 
+    /**
+     * Whether a plugin provides the web browser now ({@code Platform.browser}). UI thread.
+     *
+     * @return false before the plugins start, and while no plugin provides one
+     * @throws IllegalStateException off the UI thread
+     */
+    public boolean providesBrowser() {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("The web browser is asked for on the UI thread");
+        PluginHost current = host;
+        return current != null && current.webBrowsers.provided();
+    }
+
+    private Consumer<java.net.URI> systemBrowser = dev.jasper.app.platform.Browser::open;
+
+    /**
+     * Sets how a plugin's {@code Platform.browse}, and its {@code Platform.openInBrowser} that no provided browser took,
+     * open an address in the system browser; before {@link #start}. It runs on the plugin's worker, and what it throws
+     * is posted in the plugin's notification group.
+     *
+     * @param opener opens an absolute http or https address; {@code platform.Browser.open} unless set
+     * @throws IllegalStateException once the plugins have started
+     */
+    public void systemBrowser(Consumer<java.net.URI> opener) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        systemBrowser = Objects.requireNonNull(opener, "opener");
+    }
+
     private Optional<Path> commandClient = Optional.empty();
 
     /**
@@ -793,6 +832,33 @@ public final class PluginRuntime {
     public void commandClient(Optional<Path> client) {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         commandClient = Objects.requireNonNull(client, "client");
+    }
+
+    private java.util.function.BooleanSupplier defaultBrowser = () -> false;
+
+    /**
+     * Supplies whether Jasper is the system's default browser, as last checked, which plugins read with
+     * {@code Platform.isDefaultBrowser} on the UI thread and {@code Platform.browse} reads on any thread; before
+     * {@link #start}. It must answer at once.
+     *
+     * @param jasper supplies the last answer
+     * @throws IllegalStateException once the plugins have started
+     */
+    public void defaultBrowser(java.util.function.BooleanSupplier jasper) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        defaultBrowser = Objects.requireNonNull(jasper, "jasper");
+    }
+
+    /**
+     * Tells the plugins that a check changed the answer {@link #defaultBrowser} supplies: each
+     * {@code Platform.onDefaultBrowserChanged} handler runs with it. Before the plugins start it tells nobody. UI thread.
+     *
+     * @param jasper the new answer
+     * @throws IllegalStateException off the UI thread
+     */
+    public void defaultBrowserChanged(boolean jasper) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Default browser changes are told on the UI thread");
+        if (host != null) host.defaultBrowserChanged(jasper);
     }
 
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
@@ -834,7 +900,7 @@ public final class PluginRuntime {
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
-            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass), typography);
+            systemBrowser, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass), typography);
         created.animations = animations;
         created.themes = themes;
         if (given != null) {
@@ -848,6 +914,7 @@ public final class PluginRuntime {
         created.nativeWindows = nativeWindows;
         created.openSettings = openSettings;
         created.commandClient = commandClient;
+        created.defaultBrowser = defaultBrowser;
         Set<String> loadingIds = new HashSet<>();
         for (PluginCandidate loading : resolution.load()) loadingIds.add(loading.id());
         List<PluginCandidate> notLoading = byId.values().stream().filter(discovered -> !loadingIds.contains(discovered.id())).toList();

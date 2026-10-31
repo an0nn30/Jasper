@@ -51,6 +51,114 @@ ext.linuxPackageTasks = { String osRelease ->
     ids.any { it in rpmIds } ? ['packageRpm'] : ['packageDeb', 'packageRpm']
 }
 
+// The Linux menu entry. jpackage names it <package>-<launcher>.desktop, and DefaultBrowser (dev.jasper.app.platform)
+// compares the desktop's default web browser with this name.
+ext.linuxDesktopFileName = "${linuxPackageName}-Jasper.desktop".toString()
+
+// Desktops offer the entries that take http and https links as web browsers (browser plan 4c, spec 9). The packages set
+// no default (linuxKeepingSystemDefaults): the user makes Jasper the default in the desktop's settings or with
+// xdg-settings.
+ext.linuxDesktopMimeTypes = 'MimeType=x-scheme-handler/http;x-scheme-handler/https;'
+
+// The menu entry as jpackage's own template.desktop (template) writes it, with two changes: linuxDesktopMimeTypes
+// replaces the file-association line (DESKTOP_MIMES, which writes an empty MimeType= for a package without file
+// associations), and the link is the one argument after --url (`--url %u`: a desktop drops %u when the menu starts
+// Jasper without a link, and Jasper refuses anything after --url but one web address). Every other line stays
+// jpackage's. A template without exactly one of each line fails the build.
+ext.linuxDesktopEntry = { String template ->
+    List<String> lines = template.split('\n', -1) as List
+    ['Exec=APPLICATION_LAUNCHER': 'Exec=APPLICATION_LAUNCHER --url %u', 'DESKTOP_MIMES': linuxDesktopMimeTypes].each { line, replacement ->
+        if (lines.count { it == line } != 1) {
+            throw new GradleException("jpackage's template.desktop no longer has exactly one ${line} line; review the desktop entry override")
+        }
+        lines[lines.indexOf(line)] = replacement
+    }
+    lines.join('\n')
+}
+
+// Why the menu entry jpackage wrote for installRoot is not the one the packages ship, or null: it keeps jpackage's Name,
+// Icon, Categories, Type=Application and Terminal=false, and has the launcher with --url %u, the web MIME types, and each
+// key only once.
+ext.linuxDesktopEntryProblem = { String entry, String installRoot, String categories ->
+    List<String> lines = (entry ?: '').readLines()
+    List<String> missing = ['[Desktop Entry]', 'Name=Jasper', "Exec=${installRoot}/bin/Jasper --url %u",
+        "Icon=${installRoot}/lib/Jasper.png", 'Terminal=false', 'Type=Application', "Categories=${categories}",
+        linuxDesktopMimeTypes]*.toString()
+        .findAll { !(it in lines) }
+    if (missing) return "the desktop entry lacks ${missing.join(', ')}".toString()
+    List<String> repeated = lines.findAll { it.contains('=') }.collect { it.substring(0, it.indexOf('=')) }
+        .countBy { it }.findAll { it.value > 1 }.keySet() as List
+    repeated ? "the desktop entry has more than one ${repeated.join(', ')} line".toString() : null
+}
+
+// As root, xdg-desktop-menu installs a menu entry into the first writable one of these applications directories.
+ext.linuxApplicationDirectories = ['/usr/local/share/applications', '/usr/share/applications']
+
+// The maintainer-script lines that run after xdg-desktop-menu installs or removes the menu entry: update-desktop-database
+// rebuilds the MIME cache (mimeinfo.cache) of each of the directories that exists, so desktops list Jasper among the web
+// browsers after the install and no longer after the removal. xdg-desktop-menu runs it too, when it succeeds and finds
+// it; these lines run it whatever xdg-desktop-menu did. update-desktop-database (desktop-file-utils) is optional:
+// without it nothing runs. The scripts run under set -e; a failed refresh is reported and fails neither the install nor
+// the removal.
+ext.linuxDesktopDatabaseCommands = { List<String> directories ->
+    String quoted = directories.collect { String directory ->
+        if (directory.contains("'")) throw new GradleException("An applications directory with a single quote: ${directory}")
+        "'${directory}'"
+    }.join(' ')
+    'if command -v update-desktop-database >/dev/null 2>&1; then\n' +
+        "    for jasper_applications in ${quoted}; do\n" +
+        '        if [ -d "$jasper_applications" ]; then\n' +
+        '            update-desktop-database -q "$jasper_applications" ||\n' +
+        '                echo "jasper: the desktop database in $jasper_applications was not updated" >&2\n' +
+        '        fi\n' +
+        '    done\n' +
+        'fi'
+}
+
+// The maintainer-script lines that run command (the menu install) and leave the system's default applications as they
+// were. xdg-desktop-menu install (its make_lazy_default) adds the entry to the line of each of its MIME types in
+// <data dir>/applications/defaults.list for the first writable data directory, following a symlink to its target: after
+// the listed default, as a fallback, or as the default where none is listed. Its uninstall never takes the entry out.
+// These lines copy each of those files that exists before command (the data directories are XDG_DATA_DIRS, else
+// /usr/local/share/:/usr/share/, split as xdg-desktop-menu splits them). After command they put back the saved bytes of
+// each file that changed and delete each file that command created; a file nothing changed is not written. The scripts
+// run under set -e, and nothing here fails the install: without the copies (no mktemp, or a copy failed) command runs
+// all the same and a message says so. The copies, in TMPDIR (else /tmp), are removed afterwards.
+ext.linuxKeepingSystemDefaults = { String command ->
+    String dataDirectories = '$(echo "${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/}" | sed \'s/:/ /g\')'
+    'jasper_defaults=$(mktemp -d "${TMPDIR:-/tmp}/jasper.XXXXXX" 2>/dev/null) || jasper_defaults=\n' +
+        'if [ -z "$jasper_defaults" ]; then\n' +
+        '    echo "jasper: the system\'s default applications were not saved" >&2\n' +
+        'else\n' +
+        '    jasper_count=0\n' +
+        "    for jasper_data in ${dataDirectories}; do\n" +
+        '        jasper_count=$((jasper_count + 1))\n' +
+        '        if [ -n "$jasper_defaults" ] && [ -f "$jasper_data/applications/defaults.list" ] &&\n' +
+        '            ! cat "$jasper_data/applications/defaults.list" 2>/dev/null > "$jasper_defaults/$jasper_count"; then\n' +
+        '            echo "jasper: the system\'s default applications were not saved" >&2\n' +
+        '            rm -rf "$jasper_defaults" || :\n' +
+        '            jasper_defaults=\n' +
+        '        fi\n' +
+        '    done\n' +
+        'fi\n' +
+        command + '\n' +
+        'if [ -n "$jasper_defaults" ]; then\n' +
+        '    jasper_count=0\n' +
+        "    for jasper_data in ${dataDirectories}; do\n" +
+        '        jasper_count=$((jasper_count + 1))\n' +
+        '        jasper_list=$jasper_data/applications/defaults.list\n' +
+        '        if [ -f "$jasper_defaults/$jasper_count" ]; then\n' +
+        '            if [ "$(cksum < "$jasper_defaults/$jasper_count")" != "$(cksum 2>/dev/null < "$jasper_list")" ]; then\n' +
+        '                cat "$jasper_defaults/$jasper_count" > "$jasper_list" || echo "jasper: $jasper_list was not restored" >&2\n' +
+        '            fi\n' +
+        '        elif [ -f "$jasper_list" ]; then\n' +
+        '            rm -f "$jasper_list" || echo "jasper: $jasper_list was not restored" >&2\n' +
+        '        fi\n' +
+        '    done\n' +
+        '    rm -rf "$jasper_defaults" || :\n' +
+        'fi'
+}
+
 // The Java runtime packaged Jasper ships; docs/plugin-authoring.md ("The Java runtime") lists it for plugin authors.
 // jpackage's default for a class-path application is every module, and --bind-services then also bound javac,
 // jshell, jlink and jpackage. These roots keep all of Java SE for plugins, the providers a desktop application needs

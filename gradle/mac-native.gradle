@@ -1,6 +1,6 @@
-// Jasper's in-process macOS bridge, one signed library: notifications under Jasper's bundle identity and icon, and the
-// Dock presence of a resident Jasper. Only native macOS packaging/check needs Apple's command line tools; other hosts
-// skip it.
+// Jasper's in-process macOS bridge, one signed library: notifications under Jasper's bundle identity and icon, the
+// Dock presence of a resident Jasper, and which application opens web links. Only native macOS packaging/check needs
+// Apple's command line tools; other hosts skip it.
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.jvm.toolchain.JavaToolchainService
 
@@ -9,7 +9,7 @@ if (!System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('mac')) r
 def toolchains = extensions.getByType(JavaToolchainService)
 def javaExtension = extensions.getByType(JavaPluginExtension)
 def sdkHome = toolchains.launcherFor(javaExtension.toolchain).map { it.metadata.installationPath }
-def sources = files('src/main/native/MacNotifications.m', 'src/main/native/MacDock.m')
+def sources = files('src/main/native/MacNotifications.m', 'src/main/native/MacDock.m', 'src/main/native/MacLaunchServices.m')
 def nativeDirectory = layout.buildDirectory.dir('native')
 def library = nativeDirectory.map { it.file('libjasper-macos.dylib') }
 def compilerArguments = {
@@ -45,7 +45,7 @@ tasks.named('test', Test) {
 }
 
 // One headless harness per bridge source: fakes stand in for the notification center, NSApp and NSWorkspace.
-def nativeTests = [Notifications: 'MacNotificationsTest.m', Dock: 'MacDockTest.m'].collect { suite, harness ->
+def nativeTests = [Notifications: 'MacNotificationsTest.m', Dock: 'MacDockTest.m', LaunchServices: 'MacLaunchServicesTest.m'].collect { suite, harness ->
     def harnessSource = file("src/test/native/${harness}")
     def bridgeSource = file("src/main/native/Mac${suite}.m")
     def executable = nativeDirectory.map { it.file("mac-${suite.toLowerCase(Locale.ROOT)}-tests") }

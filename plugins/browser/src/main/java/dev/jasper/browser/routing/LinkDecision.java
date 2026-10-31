@@ -9,8 +9,10 @@ import java.util.Objects;
 
 /**
  * Where a link Jasper hands the Browser goes (spec section 9). An address from outside Jasper opens with no prompt. A
- * local file goes by Open Local Web Files. A split click opens with no prompt, which iTerm2 calls implied consent,
- * unless Open Links From Terminal sends links to the default browser. Any other link goes by Open Links From Terminal.
+ * local file goes by Open Local Web Files. While Jasper is the system's default browser, any other link opens with no
+ * prompt (rule 2): the system browser it would go back to is Jasper. Otherwise a split click opens with no prompt,
+ * which iTerm2 calls implied consent, unless Open Links From Terminal sends links to the default browser, and any other
+ * link goes by Open Links From Terminal.
  */
 final class LinkDecision {
     /** What the Browser does with a link. */
@@ -30,9 +32,10 @@ final class LinkDecision {
      *
      * @param link the link Jasper hands the Browser
      * @param settings the Browser's settings now
+     * @param jasperIsDefault whether Jasper is the system's default browser now
      * @return what the Browser does with it
      */
-    static Decision decide(WebLink link, BrowserSettings settings) {
+    static Decision decide(WebLink link, BrowserSettings settings, boolean jasperIsDefault) {
         Objects.requireNonNull(link, "link");
         Objects.requireNonNull(settings, "settings");
         if (link.origin() == LinkOrigin.EXTERNAL) return Decision.OPEN;
@@ -41,6 +44,7 @@ final class LinkDecision {
             case BUILT_IN -> Decision.OPEN;
             case DEFAULT_EDITOR -> Decision.HAND_BACK;
         };
+        if (jasperIsDefault) return Decision.OPEN;
         if (link.placement() != LinkPlacement.TAB) return settings.links() == LinkOpening.DEFAULT_BROWSER ? Decision.HAND_BACK : Decision.OPEN;
         return switch (settings.links()) {
             case ASK -> Decision.ASK;

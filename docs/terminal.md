@@ -291,8 +291,10 @@ A left press with Cmd+Option held (Ctrl+Alt on Linux and Windows) starts a
 Cmd-click (macOS) or Ctrl-click (Linux, Windows) opens what is under the pointer:
 
 1. An OSC 8 link whose target is `http`, `https`, `ftp` or `mailto` opens with the desktop's handler, normally your
-   browser; when a plugin provides Jasper's web browser, an `http` or `https` link opens there first. A link with any
-   other target opens nothing as a web link, whatever its text says.
+   browser; when a plugin provides Jasper's web browser, an `http` or `https` link opens there first, and while Jasper
+   is itself the system's default browser, it never goes to the desktop's handler
+   ([Browser](browser.md#when-the-browser-is-off)). A link with any other target opens nothing as a web link, whatever
+   its text says.
 2. A URL written as text, starting `http://`, `https://` or `ftp://`, opens the same way. It can wrap across rows; it
    ends at whitespace or at `<`, `>`, `"`, `'` or a backtick, and loses trailing `.,;:!?)]}'"`.
 3. Otherwise a file opens: an OSC 8 `file:` link, a `file://` URL written as text (which can end in `:LINE` or
@@ -325,7 +327,9 @@ to that server; a WSL pane's own `\\wsl.localhost` share works.
 
 The bundled [Browser](browser.md) provides Jasper's web browser. While it is on, an `http` or `https` link you click
 opens as its **Open Links From Terminal** setting says, and a local web file as its **Open Local Web Files** says; both
-ask "Open in Jasper?" by default ([Links from terminals and Jasper](browser.md#links-from-terminals-and-jasper)).
+ask "Open in Jasper?" by default ([Links from terminals and Jasper](browser.md#links-from-terminals-and-jasper)). While
+Jasper is the system's [default browser](browser.md#making-jasper-your-default-browser), an `http` or `https` link
+opens there without asking.
 When an OSC 8 link that names a target (`target=NAME` among its parameters) opens in the Browser, it loads in the
 browser page opened for that name, in whatever window it is; the first such link opens that page.
 
@@ -335,10 +339,11 @@ Ctrl-click then goes to the program; Ctrl+Shift-click opens the link.
 A Cmd+Shift-click (Ctrl+Shift-click on Linux and Windows, while no program asks for mouse reports) on an `http` or
 `https` link asks for it in a split of the clicked pane: to the right of a pane wider than it is tall, otherwise below
 it. While the Browser is on, the link opens there in a browser pane without asking, unless Open Links From Terminal is
-Default Browser, which sends it to the system browser; with the Browser off, it opens as a Cmd-click does. When the
-selection is one `http` or `https` address and Open Links From Terminal is not Default Browser, the pane's right-click
-menu has the Browser's **Open URL in Split Right** and **Open URL in Split Down**, which open it the same way to the
-right of the pane or below it. Select the address by dragging: a double-click selects only part of it.
+Default Browser while Jasper is not the system's default browser, which sends it to the system browser; with the
+Browser off, it opens as a Cmd-click does. When the selection is one `http` or `https` address and either Open Links
+From Terminal is not Default Browser or Jasper is the system's default browser, the pane's right-click menu has the
+Browser's **Open URL in Split Right** and **Open URL in Split Down**, which open it the same way to the right of the
+pane or below it. Select the address by dragging: a double-click selects only part of it.
 
 ## Find
 

@@ -20,11 +20,11 @@ import java.util.Optional;
 
 /**
  * Open URL in Split Right and Open URL in Split Down (spec section 9, iTerm2's Vertical and Horizontal Split Pane): the
- * terminal's right-click menu shows them while the right-clicked pane's selection is one web address, and only while
- * Open Links From Terminal lets a split click open in Jasper's browser, so they come and go with that setting. Each
- * opens the selected address as a split click from the pane it was chosen in, through the Browser's role, with no
- * prompt; the address the role gives back goes to the system browser. Invoked any other way, as from the palette, an
- * action has no address and does nothing. UI thread.
+ * terminal's right-click menu shows them while the right-clicked pane's selection is one web address, and only while a
+ * split click would open in Jasper's browser: Open Links From Terminal lets it, or Jasper is the system's default
+ * browser (rule 2). They come and go as either changes. Each opens the selected address as a split click from the pane
+ * it was chosen in, through the Browser's role, with no prompt; the address the role gives back goes to the system
+ * browser. Invoked any other way, as from the palette, an action has no address and does nothing. UI thread.
  */
 public final class WebAddressItems {
     static final String SPLIT_RIGHT = "dev.jasper.browser.open_url_split_right", SPLIT_DOWN = "dev.jasper.browser.open_url_split_down";
@@ -40,8 +40,8 @@ public final class WebAddressItems {
     }
 
     /**
-     * Registers the two actions and their section of the terminal's right-click menu, which holds them while
-     * {@code settings} lets links open in Jasper's browser.
+     * Registers the two actions and their section of the terminal's right-click menu, which holds them while a split
+     * click would open in Jasper's browser: {@code settings} lets it, or Jasper is the system's default browser.
      *
      * @param context the plugin's context, while it starts; the globe is registered already
      * @param browser opens each address: the Browser's role
@@ -56,13 +56,17 @@ public final class WebAddressItems {
             invoked -> items.open(invoked, LinkPlacement.SPLIT_RIGHT));
         context.actions().register(ActionSpec.of(SPLIT_DOWN, "Open URL in Split Down").withIcon(BrowserItems.GLOBE).withKeywords(keywords),
             invoked -> items.open(invoked, LinkPlacement.SPLIT_DOWN));
-        items.follow(settings.read().links());
-        settings.onLinksChanged(items::follow);
+        items.follow(settings.read().links(), context.platform().isDefaultBrowser());
+        settings.onLinksChanged(links -> items.follow(links, context.platform().isDefaultBrowser()));
+        context.platform().onDefaultBrowserChanged(jasper -> items.follow(settings.read().links(), jasper));
     }
 
-    /** Adds the items while links may open in Jasper's browser, and takes them out while they go to the default browser. */
-    private void follow(LinkOpening links) {
-        boolean wanted = links != LinkOpening.DEFAULT_BROWSER;
+    /**
+     * Adds the items while a split click would open in Jasper's browser, and takes them out while links go to the system
+     * browser, which is not Jasper.
+     */
+    private void follow(LinkOpening links, boolean jasperIsDefault) {
+        boolean wanted = links != LinkOpening.DEFAULT_BROWSER || jasperIsDefault;
         if (wanted == !shown.isEmpty()) return;
         if (wanted) shown = List.of(menu.addForWebAddress(SPLIT_RIGHT), menu.addForWebAddress(SPLIT_DOWN));
         else {
@@ -82,7 +86,9 @@ public final class WebAddressItems {
         WebLink link;
         try {
             link = new WebLink(address.get(), LinkOrigin.CLICK, placement, Optional.empty(), Optional.of(invoked.window()));
-        } catch (IllegalArgumentException notAWebLink) { // an authority that is no host, such as http://my_host/
+        } catch (IllegalArgumentException notAWebLink) {
+            // Jasper offers the items only for an address with a host; one with an authority that is no host, such as
+            // http://my_host/, goes to browse, which says Jasper's browser can't open it while Jasper is the default.
             context.platform().browse(address.get());
             return;
         }

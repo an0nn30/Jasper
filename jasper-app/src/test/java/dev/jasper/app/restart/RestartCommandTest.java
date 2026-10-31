@@ -35,6 +35,17 @@ class RestartCommandTest {
             .as("a config file may be named like a path; the paths after it are the launch's").contains(List.of(JASPER, "--config", "notes.txt"));
     }
 
+    /** Browser plan 4c, ruling Q13: {@code --url} admits nothing after its address, so a replacement never repeats it. */
+    @Test void aLinkLaunchIsNotRepeated() {
+        assertThat(plan(SAME, "--url", "https://example.com/")).contains(List.of(JASPER));
+        assertThat(plan(SAME, "--url")).contains(List.of(JASPER));
+        var other = RestartCommand.plan(Optional.of("/app/Jasper"), Optional.of(new String[]{"-Dx=1", "Main", "--url",
+            "https://example.com/"}), List.of("missing"), NORMAL);
+        assertThat(other).as("dropped by its spelling, with its address").contains(List.of("/app/Jasper", "-Dx=1", "Main"));
+        assertThat(RestartCommand.plan(Optional.of("/app/Jasper"), Optional.of(new String[]{"Main", "--url"}), List.of("missing"), NORMAL))
+            .contains(List.of("/app/Jasper", "Main"));
+    }
+
     @Test void aJavaCommandLineIsReplayedWholeWithItsOwnArgumentsRewrittenAfterIt() {
         var java = RestartCommand.plan(Optional.of("/jbr/bin/java"), Optional.of(new String[]{"-Xmx1g", "-classpath", "/lib/*",
             "dev.jasper.app.Main", "notes.txt", "--safe-mode"}), List.of("notes.txt", "--safe-mode"), NORMAL);
@@ -47,11 +58,12 @@ class RestartCommandTest {
         assertThat(other).contains(List.of("/app/Jasper", "-Dx=1", "Main", "kept"));
     }
 
-    @Test void theReplacementWaitsForThisProcessAndOpensThePaths() {
+    @Test void theReplacementWaitsForThisProcessAndOpensThePathsAndWebAddresses() {
         Path notes = Path.of("/tmp/notes.txt").toAbsolutePath();
-        assertThat(RestartCommand.replacing(List.of(JASPER, "--safe-mode"), 4242, List.of(notes)))
-            .containsExactly(JASPER, "--safe-mode", "--replacing", "4242", notes.toString());
-        assertThat(RestartCommand.replacing(List.of(JASPER), 7, List.of())).containsExactly(JASPER, "--replacing", "7");
+        assertThat(RestartCommand.replacing(List.of(JASPER, "--safe-mode"), 4242, List.of(notes),
+            List.of(java.net.URI.create("https://example.com/a?b=1"))))
+            .containsExactly(JASPER, "--safe-mode", "--replacing", "4242", notes.toString(), "https://example.com/a?b=1");
+        assertThat(RestartCommand.replacing(List.of(JASPER), 7, List.of(), List.of())).containsExactly(JASPER, "--replacing", "7");
     }
 
     @DisabledOnOs(OS.WINDOWS)

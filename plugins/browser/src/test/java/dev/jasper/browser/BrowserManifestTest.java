@@ -15,7 +15,7 @@ class BrowserManifestTest {
         assertThat(string("name")).isEqualTo("Browser");
         assertThat(string("version")).isEqualTo("0.1.0");
         assertThat(string("entry")).isEqualTo(BrowserPlugin.class.getName());
-        assertThat(string("sdk")).isEqualTo(">=0.27.0, <0.28");
+        assertThat(string("sdk")).isEqualTo(">=0.28.0, <0.29");
         assertThat(raw("enabled_by_default")).isEqualTo("true");
         assertThat(string("icon")).isEqualTo("icons/browser.svg");
     }

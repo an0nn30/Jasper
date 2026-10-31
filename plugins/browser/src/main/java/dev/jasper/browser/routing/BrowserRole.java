@@ -23,7 +23,8 @@ import java.util.function.Supplier;
 
 /**
  * The Browser as Jasper's web browser (spec section 9), which the plugin registers with {@code Platform.browser}. Each
- * link Jasper hands it goes where {@link LinkDecision} says. One it opens becomes a browser item: a tab click in the
+ * link Jasper hands it goes where {@link LinkDecision} says, from the settings and whether Jasper is the system's
+ * default browser, as Jasper answers when the link comes. One it opens becomes a browser item: a tab click in the
  * next tab of the link's window, a split click in that split; and a link whose OSC 8 target names an open item loads
  * there instead, in whatever window it is, without bringing it forward. One it hands back goes to the system browser,
  * or a local file to the Default editor. One that asks shows the "Open in Jasper?" prompt in the link's window once
@@ -55,7 +56,7 @@ public final class BrowserRole implements WebBrowser {
     @Override public boolean open(WebLink link) {
         Objects.requireNonNull(link, "link");
         if (!showsPages()) return false;
-        return switch (LinkDecision.decide(link, settings.read())) {
+        return switch (LinkDecision.decide(link, settings.read(), context.platform().isDefaultBrowser())) {
             case OPEN -> show(link);
             case ASK -> ask(link);
             case HAND_BACK -> false;

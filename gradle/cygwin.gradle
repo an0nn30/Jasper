@@ -130,6 +130,15 @@ tasks.register('verifyCygwinManifest', JavaExec) {
     mainClass = 'BundleManifestTest'
 }
 tasks.named('check') { dependsOn('verifyCygwinManifest') }
+tasks.register('verifyInstallerTemplate', JavaExec) {
+    group = 'verification'
+    description = 'Checks the setup wizard template patch: the Cygwin action and the per-user web browser registration.'
+    dependsOn(compileBundle)
+    classpath = files(bundleClasses)
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mainClass = 'CygwinInstallerTemplateTest'
+}
+tasks.named('check') { dependsOn('verifyInstallerTemplate') }
 
 def seedLock = rootProject.file('packaging/windows/cygwin/seed.lock.json')
 def retainedSeed = providers.gradleProperty('jasper.cygwinSnapshot').map { file(it) }

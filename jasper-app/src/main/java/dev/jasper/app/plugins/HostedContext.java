@@ -239,13 +239,22 @@ final class HostedContext implements PluginContext {
                 }
                 @Override public void browse(URI uri) {
                     requireOpen();
-                    systemBrowser(webAddress(uri));
+                    URI address = webAddress(uri);
+                    // While Jasper is the system's default browser, the system would hand the address back to Jasper, so the
+                    // provided browser has it first, as openInBrowser's (browser plan 4c); never the provider's own, its
+                    // hand-back (ruling Q9).
+                    if (host.defaultBrowser.getAsBoolean() && !host.webBrowsers.providedBy(id)) inBrowser(address);
+                    else systemBrowser(address);
                 }
                 @Override public void openInBrowser(URI uri) {
                     requireOpen();
                     URI address = webAddress(uri);
                     if (address.getRawAuthority() == null || address.getRawAuthority().isEmpty())
                         throw new IllegalArgumentException("Only an http or https address with a host opens in a browser: " + uri);
+                    inBrowser(address);
+                }
+                /** The provided browser, as a click in a tab of the active window, on the UI thread; then the system browser. */
+                private void inBrowser(URI address) {
                     host.environment.ui().accept(() -> {
                         Optional<java.util.UUID> window = host.environment.terminals().activeWindow().map(dev.jasper.app.terminals.WindowEntry::id);
                         if (host.webBrowsers.open(address, dev.jasper.sdk.ui.LinkOrigin.CLICK, dev.jasper.sdk.ui.LinkPlacement.TAB,
@@ -255,6 +264,21 @@ final class HostedContext implements PluginContext {
                             log().log(System.Logger.Level.WARNING, "Could not open a web address: the plugin stopped first");
                         }
                     });
+                }
+                @Override public boolean isDefaultBrowser() {
+                    requireOpen();
+                    requireUi("Platform.isDefaultBrowser");
+                    return host.defaultBrowser.getAsBoolean();
+                }
+                @Override public Subscription onDefaultBrowserChanged(Consumer<Boolean> handler) {
+                    requireOpen();
+                    requireUi("Platform.onDefaultBrowserChanged");
+                    Objects.requireNonNull(handler, "handler");
+                    dev.jasper.app.lifecycle.Subscription registration = host.onDefaultBrowserChanged(jasper -> {
+                        if (state != State.CLOSED) host.containment.run(id, "default browser change", () -> handler.accept(jasper));
+                    });
+                    // As the browser's: HostedUi.closeAll closes it when the plugin stops or fails to start.
+                    return ui.tracked(registration::close);
                 }
                 @Override public boolean copy(String text) {
                     requireOpen();

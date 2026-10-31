@@ -69,7 +69,7 @@ class JasperApplicationWorkspaceTest {
         CountDownLatch terminated = new CountDownLatch(1);
         JasperApplication first = application(terminated::countDown);
         edt(() -> {
-            JasperWindow main = first.openFirstWindow(List.of()).orElseThrow();
+            JasperWindow main = first.openFirstWindow(List.of(), List.of()).orElseThrow();
             main.content().newTab(home);
             main.content().split(Side.RIGHT);
             first.quitNow();
@@ -81,7 +81,7 @@ class JasperApplicationWorkspaceTest {
         JasperApplication second = application(() -> { });
         try {
             edt(() -> {
-                JasperWindow main = second.openFirstWindow(List.of()).orElseThrow();
+                JasperWindow main = second.openFirstWindow(List.of(), List.of()).orElseThrow();
                 assertThat(main.content().terminalTabs()).hasSize(3);
                 assertThat(main.content().windowLayout().parentTabs()).as("its tabs").hasSize(2);
                 assertThat(second.windows().windows()).as("one window comes back").containsExactly(main);
@@ -97,7 +97,7 @@ class JasperApplicationWorkspaceTest {
         try {
             edt(() -> {
                 application.residency(true);
-                JasperWindow main = application.openFirstWindow(List.of()).orElseThrow();
+                JasperWindow main = application.openFirstWindow(List.of(), List.of()).orElseThrow();
                 main.content().newTab(home);
                 application.toBackground();
                 assertThat(application.windows().isEmpty()).isTrue();
@@ -116,7 +116,7 @@ class JasperApplicationWorkspaceTest {
     @Test void quitAfterClosingOneWindowRestoresTheOneActiveAtQuit() throws Exception {
         JasperApplication first = application(() -> { });
         edt(() -> {
-            JasperWindow a = first.openFirstWindow(List.of()).orElseThrow();
+            JasperWindow a = first.openFirstWindow(List.of(), List.of()).orElseThrow();
             JasperWindow b = first.windows().openWindow(home).orElseThrow();
             b.requestClose();
             a.content().newTab(home);
@@ -127,7 +127,7 @@ class JasperApplicationWorkspaceTest {
         JasperApplication second = application(() -> { });
         try {
             edt(() -> {
-                JasperWindow main = second.openFirstWindow(List.of()).orElseThrow();
+                JasperWindow main = second.openFirstWindow(List.of(), List.of()).orElseThrow();
                 assertThat(main.content().terminalTabs()).as("window A with its two tabs").hasSize(2);
                 assertThat(second.windows().windows()).containsExactly(main);
             });
@@ -142,7 +142,7 @@ class JasperApplicationWorkspaceTest {
         try {
             edt(() -> {
                 application.residency(true);
-                JasperWindow main = application.openFirstWindow(List.of()).orElseThrow();
+                JasperWindow main = application.openFirstWindow(List.of(), List.of()).orElseThrow();
                 main.content().newTab(home);
                 main.requestClose();
                 assertThat(application.windows().isEmpty()).isTrue();
@@ -170,7 +170,7 @@ class JasperApplicationWorkspaceTest {
                     component -> javax.swing.SwingUtilities.isDescendingFrom(component, window.content()));
                 held[0].workspace(file());
                 held[0].residency(true);
-                JasperWindow main = held[0].openFirstWindow(List.of()).orElseThrow();
+                JasperWindow main = held[0].openFirstWindow(List.of(), List.of()).orElseThrow();
                 main.content().newTab(home);
                 main.content().toolWindows().setRailVisible(false);
                 main.requestClose();
@@ -198,7 +198,7 @@ class JasperApplicationWorkspaceTest {
         Path first = Files.createDirectories(home.resolve("first")), second = Files.createDirectories(home.resolve("second"));
         JasperApplication saving = application(() -> { });
         edt(() -> {
-            saving.openFirstWindow(List.of()).orElseThrow();
+            saving.openFirstWindow(List.of(), List.of()).orElseThrow();
             saving.quitNow();
         });
         launch();
@@ -206,7 +206,7 @@ class JasperApplicationWorkspaceTest {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
-                JasperWindow main = application.openFirstWindow(List.of(first, second)).orElseThrow();
+                JasperWindow main = application.openFirstWindow(List.of(first, second), List.of()).orElseThrow();
                 var tabs = main.content().terminalTabs();
                 assertThat(tabs).as("the restored terminal, then one per directory").hasSize(3);
                 assertThat(tabs.get(1).pane().directory()).isEqualTo(first);
@@ -223,7 +223,7 @@ class JasperApplicationWorkspaceTest {
         Files.writeString(file(), "version = 2\n[window]\nrole = ");
         JasperApplication application = application(() -> { });
         try {
-            edt(() -> assertThat(application.openFirstWindow(List.of()).orElseThrow().content().terminalTabs()).hasSize(1));
+            edt(() -> assertThat(application.openFirstWindow(List.of(), List.of()).orElseThrow().content().terminalTabs()).hasSize(1));
             // The notice comes on the next turn, once the main window is open (workspace plan 6a Rulings 13).
             edt(() -> {
                 assertThat(application.notificationCenter().history()).anySatisfy(notice -> {
@@ -248,7 +248,7 @@ class JasperApplicationWorkspaceTest {
         JasperApplication application = application(() -> { });
         try {
             edt(() -> {
-                JasperWindow main = application.openFirstWindow(List.of()).orElseThrow();
+                JasperWindow main = application.openFirstWindow(List.of(), List.of()).orElseThrow();
                 var item = application.contributions().tabs().tab(note).orElseThrow();
                 assertThat(item.kind()).isEqualTo(dev.jasper.app.contributions.Tab.Kind.PLACEHOLDER);
                 assertThat(item.title()).isEqualTo("todo.md");
@@ -277,7 +277,7 @@ class JasperApplicationWorkspaceTest {
                 new dev.jasper.app.workspace.LayoutStore(dirs.layouts(), Runnable::run).saveAsDefault(layout);
                 application.startPlugins(dirs);
                 assertThat(application.layoutStore()).isNotNull();
-                application.openFirstWindow(List.of()).orElseThrow();
+                application.openFirstWindow(List.of(), List.of()).orElseThrow();
                 JasperWindow opened = application.windows().openWindow(null).orElseThrow();
                 assertThat(opened.content().terminalTabs()).hasSize(2);
             });
@@ -428,7 +428,7 @@ class JasperApplicationWorkspaceTest {
         });
         try {
             JasperWindow[] main = new JasperWindow[1];
-            edt(() -> main[0] = application.openFirstWindow(List.of()).orElseThrow());
+            edt(() -> main[0] = application.openFirstWindow(List.of(), List.of()).orElseThrow());
             launch();
             assertThat(frames[0]).as("the main window's frame").isEqualTo(1);
             var err = new StringBuilder();
@@ -463,7 +463,7 @@ class JasperApplicationWorkspaceTest {
     @Test void aMainWindowRestoredWithoutATerminalStillMarksTheFirstPaint() throws Exception {
         JasperApplication saving = application(() -> { });
         edt(() -> {
-            JasperWindow main = saving.openFirstWindow(List.of()).orElseThrow();
+            JasperWindow main = saving.openFirstWindow(List.of(), List.of()).orElseThrow();
             main.content().closeTab(main.content().currentTerminal());
             saving.quitNow();
         });
@@ -476,7 +476,7 @@ class JasperApplicationWorkspaceTest {
             JasperWindow[] main = new JasperWindow[1];
             edt(() -> {
                 application.trace(trace);
-                main[0] = application.openFirstWindow(List.of()).orElseThrow();
+                main[0] = application.openFirstWindow(List.of(), List.of()).orElseThrow();
                 assertThat(main[0].content().showsNoTerminal()).isTrue();
                 assertThat(trace.millis(StartupTrace.Milestone.FIRST_PAINT)).isEmpty();
             });
@@ -535,7 +535,7 @@ class JasperApplicationWorkspaceTest {
         }));
         try {
             edt(() -> {
-                application.openFirstWindow(List.of()).orElseThrow();
+                application.openFirstWindow(List.of(), List.of()).orElseThrow();
                 application.quitNow();
             });
             launch();
@@ -571,7 +571,7 @@ class JasperApplicationWorkspaceTest {
         JasperApplication application = held[0];
         try {
             edt(() -> {
-                JasperWindow window = application.openFirstWindow(List.of()).orElseThrow();
+                JasperWindow window = application.openFirstWindow(List.of(), List.of()).orElseThrow();
                 assertThat(application.layoutStore().saveAsDefault(application.windows().layoutOf(window).orElseThrow()))
                     .isEqualTo(dev.jasper.app.workspace.LayoutStore.Saved.SAVED);
                 application.quitNow();
@@ -602,7 +602,7 @@ class JasperApplicationWorkspaceTest {
         // A saved window to restore: its first window opens no default layout.
         CountDownLatch terminated = new CountDownLatch(1);
         JasperApplication first = application(terminated::countDown);
-        edt(() -> first.openFirstWindow(List.of()).orElseThrow());
+        edt(() -> first.openFirstWindow(List.of(), List.of()).orElseThrow());
         launch();
         quit(first);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
@@ -622,7 +622,7 @@ class JasperApplicationWorkspaceTest {
         });
         JasperApplication application = held[0];
         try {
-            edt(() -> application.openFirstWindow(List.of()).orElseThrow());
+            edt(() -> application.openFirstWindow(List.of(), List.of()).orElseThrow());
             launch();
             edt(() -> { });
             assertThat(reads[0]).as("not read before start-up settles").isZero();

@@ -146,33 +146,50 @@ class ApplicationCommandsTest {
         DesktopTestSupport.edt(application::quitNow);
     }
 
-    /** Browser plan 3, Review Focus 5: only an absolute http or https address with an authority is a web address. */
-    @Test void onlyAnAbsoluteHttpOrHttpsAddressWithAnAuthorityIsAWebAddress() {
-        assertThat(JasperApplication.webAddress("https://example.com/a?b=1")).contains(java.net.URI.create("https://example.com/a?b=1"));
-        assertThat(JasperApplication.webAddress("HTTP://Example.com")).as("the scheme in any case").contains(java.net.URI.create("HTTP://Example.com"));
-        assertThat(JasperApplication.webAddress("http://under_score:8080/")).as("a host Java reads as a registry name").isPresent();
-        for (String text : List.of("C:\\Users\\me\\notes.txt", "c:/Users/me/notes.txt", "\\\\server\\share\\notes.txt",
-                "./https://example.com", "https:example.com", "http:/notes", "ftp://files.example.com/x", "mailto:someone@example.com",
-                "file:///etc/hosts", "example.com", "https://exa mple.com", ""))
-            assertThat(JasperApplication.webAddress(text)).as(text).isEmpty();
+    /** Browser plan 3, Review Focus 5: a call is web addresses only when every argument is one; {@code BrowserTest} says which text is one. */
+    @Test void aCallIsWebAddressesOnlyWhenEveryArgumentIsOne() {
         assertThat(JasperApplication.webAddresses(List.of("https://example.com/a", "http://localhost:8080/")))
             .contains(List.of(java.net.URI.create("https://example.com/a"), java.net.URI.create("http://localhost:8080/")));
         assertThat(JasperApplication.webAddresses(List.of("https://example.com/a", "notes.txt"))).as("a mixed call").isEmpty();
         assertThat(JasperApplication.webAddresses(List.of())).as("no arguments: a raise").isEmpty();
     }
 
-    /** Browser plan 3, Review Focus 3: before the plugins start, jasper's addresses reach the system browser, and each call answers 0. */
+    /**
+     * Browser plan 3, Review Focus 3, and plan 4c Task 3: before the plugins start, jasper's addresses wait for them;
+     * with no plugin providing a browser they then reach the system browser, and the call answers 0.
+     */
     @Test void everyArgumentAWebAddressOpensEachAndAnswersZero() throws Exception {
         JasperApplication application = application(() -> { });
         var opened = new java.util.concurrent.CopyOnWriteArrayList<String>();
         DesktopTestSupport.edt(() -> application.systemBrowser = address -> opened.add(address.toString()));
         var err = new StringBuilder();
         var addresses = application.commands().dispatch(new Invocation(List.of("https://example.com/a", "HTTP://Example.com/b"), dir,
-            Optional.of(UUID.randomUUID()), text -> { }, err::append));
-        assertThat(addresses.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
+            Optional.of(UUID.randomUUID()), text -> { }, err::append)).toCompletableFuture();
+        DesktopTestSupport.edt(() -> { });
+        assertThat(opened).as("waiting for the plugins").isEmpty();
+        assertThat(addresses).as("answered once they have been handed on").isNotDone();
+        var dirs = new dev.jasper.app.platform.AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
+        DesktopTestSupport.edt(() -> application.startPlugins(null, null, false, dirs));
+        assertThat(addresses.get(5, TimeUnit.SECONDS)).isZero();
         assertThat(opened).containsExactly("https://example.com/a", "HTTP://Example.com/b");
         assertThat(err).isEmpty();
         DesktopTestSupport.edt(application::quitNow);
+        ApplicationPluginCleanup.await(application);
+    }
+
+    /** Browser plan 4c Task 3: a call whose addresses still wait for the browser when Jasper quits fails, and nothing opens. */
+    @Test void aCallWaitingForTheBrowserFailsWithTheQuittingMessageWhenJasperQuits() throws Exception {
+        JasperApplication application = application(() -> { });
+        var opened = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        DesktopTestSupport.edt(() -> application.systemBrowser = address -> opened.add(address.toString()));
+        var answer = application.commands().dispatch(new Invocation(List.of("https://example.com/a"), dir, Optional.empty(),
+            text -> { }, text -> { })).toCompletableFuture();
+        DesktopTestSupport.edt(() -> { });
+        assertThat(answer).isNotDone();
+        DesktopTestSupport.edt(application::quitNow);
+        assertThatThrownBy(() -> answer.get(5, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+            .cause().isInstanceOf(IllegalStateException.class).hasMessage("Jasper is quitting; run the command again");
+        assertThat(opened).isEmpty();
     }
 
     /**

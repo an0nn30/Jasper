@@ -26,8 +26,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Open URL in Split Right and Open URL in Split Down (spec section 9): the terminal's right-click menu shows them while
- * a web address is selected, only while Open Links From Terminal lets links open in Jasper's browser, and each opens
- * the selected address as a split click from the pane it was chosen in.
+ * a web address is selected, only while a split click would open in Jasper's browser (Open Links From Terminal lets it,
+ * or Jasper is the system's default browser), and each opens the selected address as a split click from the pane it was
+ * chosen in.
  */
 class WebAddressItemsTest {
     private static final String ID = "dev.jasper.browser", LINKS = "open_links_from_terminal";
@@ -56,6 +57,33 @@ class WebAddressItemsTest {
             assertThat(host.menu("context")).as("absent from the start").isEmpty();
             host.setSetting(ID, LINKS, "ask");
             assertThat(host.menu("context")).containsExactlyElementsOf(SHOWN);
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Browser plan 4c (ruling Q7, spec section 9): under Default Browser the items are there while Jasper is the system's
+     * default browser, since a split click then opens in Jasper's browser, and they come and go as that answer changes.
+     */
+    @Test void underDefaultBrowserTheItemsFollowWhetherJasperIsTheDefaultBrowser() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            host.setSetting(ID, LINKS, "default");
+            host.setDefaultBrowser(true);
+            host.start(INFO, Set.of(), Set.of(), new BrowserPlugin());
+            assertThat(host.menu("context")).as("Jasper is the default from the start").containsExactlyElementsOf(SHOWN);
+            host.setDefaultBrowser(false);
+            assertThat(host.menu("context")).as("another browser became the default").isEmpty();
+            host.setDefaultBrowser(true);
+            assertThat(host.menu("context")).as("Jasper again, once").containsExactlyElementsOf(SHOWN);
+            host.setSetting(ID, LINKS, "ask");
+            host.setDefaultBrowser(false);
+            assertThat(host.menu("context")).as("Always Ask shows them either way").containsExactlyElementsOf(SHOWN);
+            host.setSetting(ID, LINKS, "default");
+            assertThat(host.menu("context")).isEmpty();
+            host.setSetting(ID, LINKS, "builtin");
+            host.setDefaultBrowser(true);
+            host.setSetting(ID, LINKS, "default");
+            assertThat(host.menu("context")).as("Default Browser while Jasper is the default").containsExactlyElementsOf(SHOWN);
             assertThat(host.failures()).isEmpty();
         } });
     }

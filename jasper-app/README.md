@@ -81,6 +81,7 @@ Starting points by change:
 | Windows, tabs and panes | `workspace/WindowManager`, `workspace/WindowContent`, `workspace/WorkspaceView`, `layout/Layout`, `contributions/TabRegistry` |
 | What `workspace.toml` keeps | `persistence/WorkspaceFile`, `workspace/WorkspaceStore`, `WindowManager.snapshot` |
 | A second launch, `jasper <path>...` or a macOS open-file event | `bootstrap/SingleInstance`, `residency/LaunchRequest`, `JasperApplication.open`, `application/OpenPlan` |
+| A web address from outside: a launch argument, a second launch or the macOS open-URI event | `bootstrap/AppArguments`, `residency/LaunchRequest`, `JasperApplication.uriOpened`, `application/ExternalAddresses` |
 | A core setting | `config/CoreSettings`, `config/ConfigSnapshot`, `settingsui/CorePages`, `workspace/WorkspaceConfiguration` |
 | A notification or incident | `notifications/NotificationCenter`, `application/NotificationsFeature`, `application/IncidentNotices` |
 | Buddy notices | `notifications/CommandNotifier`, `workspace/WorkspaceActivity`, `notifications/ActivityNotifier` |

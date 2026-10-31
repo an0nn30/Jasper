@@ -693,3 +693,223 @@ verifySupport.configure {
         logger.lifecycle("Verified the pinned JBR installer on all ${found} JBR workflow steps")
     }
 }
+
+// Browser plan 4c (spec 9): Info.plist lists Jasper among the web browsers for http and https. On macOS the fixture
+// sets a stand-in plist's CFBundleURLTypes as packageApp does and reads it back as verifyPackage does.
+verifySupport.configure {
+    doLast {
+        def json = new groovy.json.JsonSlurper()
+        assert json.parseText(macUrlTypes) == [[CFBundleURLName: 'Web site URL', CFBundleURLSchemes: ['http', 'https'],
+            CFBundleTypeRole: 'Viewer']]
+        if (!System.getProperty('os.name').startsWith('Mac')) {
+            logger.lifecycle('Verified the macOS URL types (plutil checked only on macOS)')
+            return
+        }
+        def plutil = { List<String> arguments ->
+            def process = new ProcessBuilder(['/usr/bin/plutil'] + arguments).redirectErrorStream(true).start()
+            String output = process.inputStream.getText('UTF-8')
+            assert process.waitFor() == 0 : "plutil ${arguments} failed: ${output}".toString()
+            output
+        }
+        File plist = new File(temporaryDir, 'url-types/Info.plist')
+        delete(plist.parentFile)
+        plist.parentFile.mkdirs()
+        plist.setText('''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>dev.jasper.app</string>
+</dict>
+</plist>
+''', 'UTF-8')
+        plutil(['-replace', 'CFBundleURLTypes', '-json', macUrlTypes, plist.absolutePath])
+        assert json.parseText(plutil(['-extract', 'CFBundleURLTypes', 'json', '-o', '-', plist.absolutePath])) == json.parseText(macUrlTypes)
+        assert plutil(['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist.absolutePath]).trim() == 'dev.jasper.app'
+        delete(plist.parentFile)
+        logger.lifecycle('Verified the macOS URL types')
+    }
+}
+
+// Browser plan 4c (spec 9): the Linux menu entry takes http and https links, so desktops offer Jasper as a web browser.
+// The fixture rewrites a copy of jpackage's template.desktop (JDK 25) and fills it as jpackage does for packageDeb and
+// packageRpm; the MIME cache refresh runs with a stand-in update-desktop-database.
+verifySupport.configure {
+    File defaultBrowser = project.file('src/main/java/dev/jasper/app/platform/DefaultBrowser.java')
+    doLast {
+        def desktopId = defaultBrowser.getText('UTF-8') =~ /DESKTOP_ID = "([^"]*)"/
+        assert desktopId.find() && desktopId.group(1) == linuxDesktopFileName : 'DefaultBrowser.DESKTOP_ID is not the package desktop entry'
+        assert linuxDesktopFileName == 'jasper-workstation-Jasper.desktop'
+
+        String template = '[Desktop Entry]\nName=APPLICATION_NAME\nComment=APPLICATION_DESCRIPTION\nExec=APPLICATION_LAUNCHER\n' +
+            'Icon=APPLICATION_ICON\nTerminal=false\nType=Application\nCategories=DEPLOY_BUNDLE_CATEGORY\nDESKTOP_MIMES\n'
+        String root = '/opt/jasper-workstation', categories = 'System;TerminalEmulator;Network;RemoteAccess;'
+        // jpackage's values for a package without file associations: DESKTOP_MIMES is an empty MimeType= line.
+        def filled = { String text ->
+            ['APPLICATION_DESCRIPTION': 'Jasper DevOps workstation', 'DEPLOY_BUNDLE_CATEGORY': categories,
+             'APPLICATION_LAUNCHER': "${root}/bin/Jasper".toString(), 'APPLICATION_ICON': "${root}/lib/Jasper.png".toString(),
+             'APPLICATION_NAME': 'Jasper', 'DESKTOP_MIMES': 'MimeType='].inject(text) { String result, key, value -> result.replace(key, value) }
+        }
+        assert linuxDesktopEntry(template) == '[Desktop Entry]\nName=APPLICATION_NAME\nComment=APPLICATION_DESCRIPTION\n' +
+            'Exec=APPLICATION_LAUNCHER --url %u\nIcon=APPLICATION_ICON\nTerminal=false\nType=Application\n' +
+            'Categories=DEPLOY_BUNDLE_CATEGORY\nMimeType=x-scheme-handler/http;x-scheme-handler/https;\n'
+        String entry = filled(linuxDesktopEntry(template))
+        assert linuxDesktopEntryProblem(entry, root, categories) == null
+        String stock = linuxDesktopEntryProblem(filled(template), root, categories)
+        assert stock != null && stock.contains("Exec=${root}/bin/Jasper --url %u") &&
+            stock.contains('MimeType=x-scheme-handler/http;x-scheme-handler/https;') : stock
+        assert linuxDesktopEntryProblem(entry.replace('Terminal=false\n', ''), root, categories).contains('Terminal=false')
+        assert linuxDesktopEntryProblem(entry.replace('Type=Application\n', 'Type=Link\n'), root, categories).contains('Type=Application')
+        assert linuxDesktopEntryProblem(entry.replace('Name=Jasper\n', 'Name=Other\n'), root, categories).contains('Name=Jasper')
+        assert linuxDesktopEntryProblem(entry, root, 'System;').contains('Categories=System;')
+        assert linuxDesktopEntryProblem(entry + 'MimeType=\n', root, categories).contains('MimeType')
+        assert linuxDesktopEntryProblem(entry + 'Exec=/usr/bin/other\n', root, categories).contains('Exec')
+        assert linuxDesktopEntryProblem('', root, categories) != null
+        [template.replace('DESKTOP_MIMES\n', ''), template.replace('Exec=APPLICATION_LAUNCHER\n', 'Exec="APPLICATION_LAUNCHER"\n'),
+         template + 'DESKTOP_MIMES\n', template + 'Exec=APPLICATION_LAUNCHER\n'].each { String changed ->
+            try {
+                linuxDesktopEntry(changed)
+                assert false : "rewrote a changed template.desktop:\n${changed}"
+            } catch (GradleException expected) {
+                assert expected.message.contains('template.desktop') : expected.message
+            }
+        }
+
+        assert linuxApplicationDirectories == ['/usr/local/share/applications', '/usr/share/applications']
+        String refresh = linuxDesktopDatabaseCommands(linuxApplicationDirectories)
+        assert refresh.startsWith('if command -v update-desktop-database >/dev/null 2>&1; then\n')
+        assert refresh.contains("'/usr/local/share/applications' '/usr/share/applications'")
+        try {
+            linuxDesktopDatabaseCommands(["/tmp/it's"])
+            assert false : 'quoted a directory with a single quote'
+        } catch (GradleException expected) {
+            assert expected.message.contains("/tmp/it's")
+        }
+        if (System.getProperty('os.name').startsWith('Windows')) {
+            logger.lifecycle('Verified the Linux desktop entry (the maintainer-script lines run only where there is a POSIX shell)')
+            return
+        }
+        File work = new File(temporaryDir, 'desktop database')
+        work.deleteDir()
+        File tools = new File(work, 'bin'), noTools = new File(work, 'empty')
+        File log = new File(work, 'calls.log'), outputLog = new File(work, 'output.log'), errorLog = new File(work, 'errors.log')
+        File first = new File(work, 'local applications'), missing = new File(work, 'missing'), second = new File(work, 'applications')
+        [tools, noTools, first, second].each { assert it.mkdirs() }
+        def standIn = { File directory, String name, String body ->
+            File script = new File(directory, name)
+            script.setText("#!/bin/sh\nprintf '%s|' '${name}' \"\$@\" >> '${log.absolutePath}'\nprintf '\\n' >> '${log.absolutePath}'\n${body}", 'UTF-8')
+            assert script.setExecutable(true, false)
+        }
+        // Runs lines as the maintainer scripts do, under set -e, then one more command, with environment (PATH among it).
+        def shell = { String lines, Map<String, String> environment ->
+            log.delete()
+            def builder = new ProcessBuilder('/bin/sh', '-c', 'set -e\n' + lines + '\necho finished')
+            builder.environment().putAll(environment)
+            builder.redirectOutput(outputLog).redirectError(errorLog)
+            def process = builder.start()
+            process.outputStream.close()
+            if (!process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                assert false : "the maintainer-script lines did not finish within 30 s:\n${lines}"
+            }
+            [status: process.exitValue(), output: outputLog.getText('UTF-8'), errors: errorLog.getText('UTF-8'),
+             calls: log.isFile() ? log.readLines('UTF-8') : []]
+        }
+        // The refresh: only shell built-ins and the stand-in are on PATH.
+        def refreshIn = { File path -> shell(linuxDesktopDatabaseCommands([first, missing, second]*.absolutePath), [PATH: path.absolutePath]) }
+        standIn(tools, 'update-desktop-database', 'exit 0\n')
+        def refreshed = refreshIn(tools)
+        assert refreshed.status == 0 && refreshed.output == 'finished\n' && refreshed.errors.isEmpty() : refreshed
+        assert refreshed.calls == ["update-desktop-database|-q|${first.absolutePath}|",
+            "update-desktop-database|-q|${second.absolutePath}|"]*.toString() : refreshed
+        standIn(tools, 'update-desktop-database', 'exit 3\n')
+        def failed = refreshIn(tools)
+        assert failed.status == 0 && failed.output == 'finished\n' && failed.calls.size() == 2 : failed
+        assert failed.errors.contains("jasper: the desktop database in ${first.absolutePath} was not updated") : failed
+        assert failed.errors.contains("jasper: the desktop database in ${second.absolutePath} was not updated") : failed
+        def absent = refreshIn(noTools)
+        assert absent.status == 0 && absent.output == 'finished\n' && absent.errors.isEmpty() && absent.calls.isEmpty() : absent
+
+        // The system's default applications: a stand-in xdg-desktop-menu edits defaults.list files the way
+        // make_lazy_default does (a new file moved over the old one, through a symlink to its target) and creates one.
+        // xdg-desktop-menu splits XDG_DATA_DIRS on whitespace too, so these paths must have none: under a build path
+        // with whitespace the case cannot be arranged, and is skipped.
+        File handlers = new File(temporaryDir, 'default-handlers')
+        if (handlers.absolutePath =~ /\s/) {
+            work.deleteDir()
+            logger.lifecycle('Verified the Linux desktop entry and its MIME cache refresh; skipped the kept default applications, ' +
+                "since xdg-desktop-menu splits XDG_DATA_DIRS on the whitespace in ${handlers.absolutePath}")
+            return
+        }
+        handlers.deleteDir()
+        File xdgTools = new File(handlers, 'bin'), noMktemp = new File(handlers, 'no-mktemp'), badMktemp = new File(handlers, 'bad-mktemp')
+        File temporary = new File(handlers, 'tmp'), etc = new File(handlers, 'etc')
+        File edited = new File(handlers, 'local/applications'), linked = new File(handlers, 'share/applications')
+        File created = new File(handlers, 'other/applications'), untouched = new File(handlers, 'kept/applications')
+        String listed = '[Default Applications]\nx-scheme-handler/http=other.desktop\ntext/plain=editor.desktop\n'
+        String added = 'x-scheme-handler/http=other.desktop;jasper-workstation-Jasper.desktop\nx-scheme-handler/https=jasper-workstation-Jasper.desktop\n'
+        long old = 1_000_000_000_000L
+        def arrange = {
+            [edited, linked, created, untouched, etc, temporary].each { it.deleteDir(); assert it.mkdirs() }
+            new File(edited, 'defaults.list').setText(listed, 'UTF-8')
+            new File(etc, 'defaults.list').setText('[Default Applications]\n', 'UTF-8')
+            java.nio.file.Files.createSymbolicLink(new File(linked, 'defaults.list').toPath(), new File(etc, 'defaults.list').toPath())
+            new File(untouched, 'defaults.list').setText(listed, 'UTF-8')
+            [new File(edited, 'defaults.list'), new File(etc, 'defaults.list'), new File(untouched, 'defaults.list')].each {
+                assert it.setLastModified(old)
+            }
+        }
+        def lazyDefault = { String status ->
+            standIn(xdgTools, 'xdg-desktop-menu', [edited, etc].collect { File directory ->
+                "printf '%s\\n${added.replace('\n', '\\n')}' \"\$(cat '${directory}/defaults.list')\" > '${directory}/defaults.list.new'\n" +
+                    "mv '${directory}/defaults.list.new' '${directory}/defaults.list'\n"
+            }.join('') + "printf '${added.replace('\n', '\\n')}' > '${created}/defaults.list'\nexit ${status}\n")
+        }
+        def install = { File before ->
+            shell(linuxKeepingSystemDefaults('xdg-desktop-menu install /opt/x.desktop || echo "jasper: not registered" >&2'),
+                [PATH: "${before}:${xdgTools}:/usr/bin:/bin".toString(), TMPDIR: temporary.absolutePath,
+                 XDG_DATA_DIRS: [edited, linked, created, untouched].collect { it.parentFile.absolutePath }.join(':') + '/'])
+        }
+        def asBefore = { Map result ->
+            assert new File(edited, 'defaults.list').getText('UTF-8') == listed : result
+            assert java.nio.file.Files.isSymbolicLink(new File(linked, 'defaults.list').toPath()) : result
+            assert new File(etc, 'defaults.list').getText('UTF-8') == '[Default Applications]\n' : result
+            assert !new File(created, 'defaults.list').exists() : result
+            assert new File(untouched, 'defaults.list').lastModified() == old : result
+            assert temporary.list().length == 0 : "the copies were left behind: ${temporary.list()}"
+        }
+        [xdgTools, noMktemp, badMktemp].each { assert it.mkdirs() }
+        lazyDefault('0')
+        arrange()
+        def kept = install(noTools)
+        assert kept.status == 0 && kept.output == 'finished\n' && kept.errors.isEmpty() : kept
+        assert kept.calls == ['xdg-desktop-menu|install|/opt/x.desktop|'] : kept
+        asBefore(kept)
+        lazyDefault('1')
+        arrange()
+        def refused = install(noTools)
+        assert refused.status == 0 && refused.output == 'finished\n' && refused.errors.contains('jasper: not registered') : refused
+        asBefore(refused)
+        standIn(xdgTools, 'xdg-desktop-menu', 'exit 0\n')
+        arrange()
+        def unchanged = install(noTools)
+        assert unchanged.status == 0 && unchanged.output == 'finished\n' && unchanged.errors.isEmpty() : unchanged
+        asBefore(unchanged)
+        assert new File(edited, 'defaults.list').lastModified() == old && new File(etc, 'defaults.list').lastModified() == old
+        // Without copies (no mktemp, or a copy that fails), xdg-desktop-menu still runs and a message says so.
+        lazyDefault('0')
+        standIn(noMktemp, 'mktemp', 'exit 1\n')
+        standIn(badMktemp, 'mktemp', "printf '%s\\n' '${temporary}/gone/copies'\n")
+        [noMktemp, badMktemp].each { File broken ->
+            arrange()
+            def unsaved = install(broken)
+            assert unsaved.status == 0 && unsaved.output == 'finished\n' : unsaved
+            assert unsaved.errors.contains("jasper: the system's default applications were not saved") : unsaved
+            assert unsaved.calls.contains('xdg-desktop-menu|install|/opt/x.desktop|') : unsaved
+            assert temporary.list().length == 0 : unsaved
+        }
+        work.deleteDir()
+        handlers.deleteDir()
+        logger.lifecycle('Verified the Linux desktop entry, its MIME cache refresh and the kept default applications')
+    }
+}

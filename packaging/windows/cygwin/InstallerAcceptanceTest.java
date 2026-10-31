@@ -1,3 +1,5 @@
+import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.WinReg;
 import dev.jasper.app.cygwin.*;
 import java.nio.file.*;
 import java.time.Duration;
@@ -11,6 +13,7 @@ public final class InstallerAcceptanceTest {
         if (Files.exists(scratch)) throw new IllegalArgumentException("Acceptance scratch must be new");
         var layout = CygwinLayout.system();
         if (Files.exists(layout.base())) throw new IllegalArgumentException("Fresh MSI acceptance requires an absent Cygwin environment");
+        if (!browserUnregistered()) throw new IllegalArgumentException("Fresh MSI acceptance requires an account where Jasper is not registered as a web browser");
         Files.createDirectories(scratch);
         String name = "JasperSeedAcceptance-" + UUID.randomUUID().toString().substring(0, 8);
         String upgrade = UUID.randomUUID().toString();
@@ -23,6 +26,7 @@ public final class InstallerAcceptanceTest {
         try {
             msi(msi, installed, scratch, "install", "/i");
             require(CygwinState.inspect(layout).phase() == CygwinState.Phase.READY, "fresh MSI provisioning"); checks++;
+            require(browserRegistered(installed), "web browser registration"); checks++;
             addTool(layout, image.resolve("app/cygwin-seed/cache"), Path.of(args[3]));
             require(Files.isRegularFile(layout.root().resolve("bin/hello.exe")), "additional package installed"); checks++;
             Path sentinel = layout.root().resolve("home/acceptance-user-data"); Files.createDirectories(sentinel.getParent());
@@ -34,13 +38,15 @@ public final class InstallerAcceptanceTest {
             Path next = build(shortImage, scratch, sdk, resources, name, upgrade, "1.0.1");
             msi(next, installed, scratch, "upgrade", "/i"); msi = next;
             require(Files.readString(sentinel).equals("preserve user data\n") && BundleManifest.digest(database).equals(before), "upgrade preservation"); checks++;
+            require(browserRegistered(installed), "upgrade keeps the web browser registration"); checks++;
             msi(msi, installed, scratch, "uninstall", "/x"); msi = null;
             require(Files.exists(sentinel) && BundleManifest.digest(database).equals(before), "uninstall preservation"); checks++;
             require(!Files.exists(installed.resolve("app/cygwin-tool.jar")), "MSI removed application"); checks++;
+            require(browserUnregistered(), "uninstall removes the web browser registration"); checks++;
             // Reject an incomplete seed before Setup runs, preserving the ready environment.
             var bad = new CygwinProvisioner().ensure(layout, scratch.resolve("missing-seed"));
             require(!bad.success() && BundleManifest.digest(database).equals(before), "missing seed fails closed"); checks++;
-            Files.writeString(scratch.resolve("acceptance.txt"), "PASS: " + checks + " checks; fresh MSI, repair, upgrade, uninstall, preservation, missing seed\n"
+            Files.writeString(scratch.resolve("acceptance.txt"), "PASS: " + checks + " checks; fresh MSI, repair, upgrade, uninstall, preservation, browser registration, missing seed\n"
                 + "seed=" + BundleManifest.digest(image.resolve("app/cygwin-seed/seed.lock.json")) + "\narch=" + System.getProperty("os.arch") + "\n");
             System.out.println(Files.readString(scratch.resolve("acceptance.txt")));
         } finally {
@@ -68,6 +74,22 @@ public final class InstallerAcceptanceTest {
         });
         var result = CygwinLayout.read(operation.resolve("result.json"));
         require(Boolean.FALSE.equals(result.get("failed")), "package-management supervisor: " + result);
+    }
+    // The production template's per-user web browser registration, read back as Windows reads it.
+    private static boolean browserRegistered(Path installed) {
+        return "Software\\Jasper\\Capabilities".equals(userValue("Software\\RegisteredApplications", "Jasper"))
+            && "JasperURL".equals(userValue("Software\\Jasper\\Capabilities\\URLAssociations", "http"))
+            && "JasperURL".equals(userValue("Software\\Jasper\\Capabilities\\URLAssociations", "https"))
+            && ("\"" + installed.resolve("Jasper.exe") + "\" --url \"%1\"").equals(userValue("Software\\Classes\\JasperURL\\shell\\open\\command", ""));
+    }
+    private static boolean browserUnregistered() {
+        return userValue("Software\\RegisteredApplications", "Jasper") == null
+            && !Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, "Software\\Jasper\\Capabilities")
+            && !Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, "Software\\Classes\\JasperURL");
+    }
+    private static String userValue(String key, String name) {
+        return Advapi32Util.registryValueExists(WinReg.HKEY_CURRENT_USER, key, name)
+            ? Advapi32Util.registryGetStringValue(WinReg.HKEY_CURRENT_USER, key, name) : null;
     }
     private static Path build(Path image, Path root, Path sdk, Path resources, String name, String upgrade, String version) throws Exception {
         Path output = root.resolve("msi-" + version); Files.createDirectory(output);

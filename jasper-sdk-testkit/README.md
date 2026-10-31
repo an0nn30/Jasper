@@ -53,7 +53,8 @@ The thread that calls the host plays the UI thread. Nothing happens behind the t
   `SwingUtilities.invokeAndWait`. `Appearance`'s colour, palette and opacity calls and its `onChanged` and
   `onWorkspaceChanged` subscriptions accept the thread that made the host or the event dispatch thread,
   `onTerminalTypographyChanged` only the event dispatch thread, and its variants, presentation and terminal
-  typography answer any thread.
+  typography answer any thread. `Platform.onDefaultBrowserChanged` needs the event dispatch thread too, and
+  `Platform.isDefaultBrowser` answers any thread.
 
 ## FakePluginHost
 
@@ -129,10 +130,11 @@ Jasper's is `<home>/plugins/<id>/data`.
 | `queueFileChoice(list)`, `fileChoices()` | What the next `Windows.choose` returns; every choice asked for |
 | `queueFileSelection(path)`, `queuePathSelection(list)`, `duringPathSelection(action)` | What the next file, folder or save chooser returns (an empty value cancels); something to run while it is open |
 | `clipboard()` | The `FakeClipboard` every plugin's `Platform` writes to |
-| `browsed()`, `openedInEditor()`, `openedFiles()` | Addresses that reached the system browser (each `browse`, and each `openInBrowser` no provided browser took); files opened in an editor that no provided editor took; files `openFile` handed to the desktop's edit action or file manager because no provided editor took them |
+| `browsed()`, `openedInEditor()`, `openedFiles()` | Addresses handed to the system browser, or to its fallback while `setDefaultBrowser(true)` (each `browse`, and each `openInBrowser` no provided browser took; while `setDefaultBrowser(true)`, another plugin's `browse` only when no provided browser took it, and the providing plugin's own always); files opened in an editor that no provided editor took; files `openFile` handed to the desktop's edit action or file manager because no provided editor took them |
 | `edit(file, line, windowId)`, `editorPlugin()`, `declareBundled(id)` | Opens a file as Jasper's own opens do, through the editor a plugin provides; which plugin provides it; marks a plugin as bundled before it starts, so its editor and browser replace another's |
 | `openLink(address, origin, placement, target, windowId)`, `browserPlugin()` | Opens a web link as Jasper's own routes do (a clicked terminal link is `LinkOrigin.CLICK`, an address given to `jasper` is `EXTERNAL`), through the browser a plugin provides, and answers what it answered; which plugin provides it |
 | `setCommandClient(path)` | What `CommandLine.client()` returns |
+| `setDefaultBrowser(jasper)` | What `Platform.isDefaultBrowser()` returns, false until set, and whether another plugin's `browse` asks the provided browser first; a change runs the `onDefaultBrowserChanged` handlers at once, on the EDT |
 | `declareSubcommand(pluginId, name, summary)`, `call(name, arguments, workingDirectory[, paneId])` | Declares a subcommand as `[[subcommands]]` would, before the plugin starts; calls it as `jasper <name> …` would and returns a `FakeCommandCall` |
 
 ### Settings and appearance

@@ -4645,6 +4645,113 @@ public abstract class PluginContractTest {
         assertThat(h.browsed()).as("the declined address and browse reach the system browser").containsExactlyInAnyOrder(declined, direct);
     }
 
+    /**
+     * Browser plan 4c Task 3 (SDK 0.28.0, ruling Q2): while Jasper is the system's default browser, which would hand an
+     * address back, {@code browse} asks the provided browser first, as {@code openInBrowser} does, and only an address it
+     * declines goes on to the system browser.
+     */
+    @Test void browseAsksTheProvidedBrowserFirstWhileJasperIsTheDefault() {
+        UUID window = h.addTerminalWindow();
+        h.activateTerminalWindow(window);
+        var a = new AtomicReference<PluginContext>();
+        var user = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        h.start(info("test.user"), Set.of(), Set.of(), user::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        dev.jasper.sdk.ui.WebBrowser recording = recordingBrowser(calls, true);
+        h.ui(() -> a.get().platform().browser(link ->
+            recording.open(link) && !link.address().getPath().equals("/declined")));
+        java.net.URI declined = java.net.URI.create("https://example.com/declined");
+        h.defaultBrowser(true);
+        h.ui(() -> {
+            user.get().platform().browse(PAGE);
+            user.get().platform().browse(declined);
+        });
+        h.flush();
+        // Up to 10 s, as above: the app host hops to the UI thread and then to the plugin's worker.
+        for (int i = 0; i < 1000 && (calls.size() < 2 || h.browsed().isEmpty()); i++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        assertThat(calls).containsExactly(PAGE + "|CLICK|" + window, declined + "|CLICK|" + window);
+        assertThat(h.browsed()).as("only the declined address").containsExactly(declined);
+    }
+
+    /**
+     * Browser plan 4c Task 3 (SDK 0.28.0, ruling Q9): the plugin that provides the browser hands a link back with
+     * {@code browse}, so its own {@code browse} never comes back to its browser, even while Jasper is the default: it
+     * goes to the system-browser fallback.
+     */
+    @Test void theProvidersOwnBrowseNeverComesBackToItsBrowser() {
+        UUID window = h.addTerminalWindow();
+        h.activateTerminalWindow(window);
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        List<String> calls = new CopyOnWriteArrayList<>();
+        h.ui(() -> a.get().platform().browser(recordingBrowser(calls, true)));
+        h.defaultBrowser(true);
+        h.ui(() -> a.get().platform().browse(PAGE));
+        h.flush();
+        for (int i = 0; i < 1000 && h.browsed().isEmpty(); i++) {
+            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        assertThat(h.browsed()).containsExactly(PAGE);
+        h.flush();
+        assertThat(calls).as("its browser never hears its own hand-back").isEmpty();
+    }
+
+    /**
+     * Browser plan 4c Task 2 (SDK 0.28.0): {@code isDefaultBrowser} gives the host's last answer to whether Jasper is the
+     * system's default browser, no until the host has one, and a provided browser reads it as it decides a link.
+     */
+    @Test void isDefaultBrowserFollowsTheHost() {
+        var a = new AtomicReference<PluginContext>();
+        h.start(info("test.a", Capabilities.BROWSER_PROVIDE), Set.of(), Set.of(), a::set);
+        List<Boolean> asked = new CopyOnWriteArrayList<>();
+        h.ui(() -> {
+            assertThat(a.get().platform().isDefaultBrowser()).as("not until the host has an answer").isFalse();
+            a.get().platform().browser(link -> asked.add(a.get().platform().isDefaultBrowser()));
+        });
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        h.defaultBrowser(true);
+        h.ui(() -> assertThat(a.get().platform().isDefaultBrowser()).isTrue());
+        assertThat(openLinkInATab(PAGE, dev.jasper.sdk.ui.LinkOrigin.CLICK, Optional.empty())).isTrue();
+        h.defaultBrowser(false);
+        h.ui(() -> assertThat(a.get().platform().isDefaultBrowser()).as("the user chose another browser").isFalse());
+        assertThat(asked).as("as each link is decided").containsExactly(false, true);
+    }
+
+    /**
+     * Browser plan 4c Task 2 (SDK 0.28.0, ruling Q7): {@code onDefaultBrowserChanged} handlers hear each change of the
+     * host's answer, on the UI thread and with {@code isDefaultBrowser} already giving it; an answer that changes nothing
+     * runs none, and a registration hears nothing once it is closed or its plugin has stopped.
+     */
+    @Test void onDefaultBrowserChangedHearsEachChangeUntilItsRegistrationEnds() {
+        PluginContext a = started("test.a", Set.of());
+        PluginContext b = started("test.b", Set.of());
+        List<String> heard = new CopyOnWriteArrayList<>();
+        var registration = new AtomicReference<Subscription>();
+        h.ui(() -> {
+            registration.set(a.platform().onDefaultBrowserChanged(jasper -> heard.add("a:" + jasper + ":" + a.platform().isDefaultBrowser()
+                + (javax.swing.SwingUtilities.isEventDispatchThread() ? "" : ":off the UI thread"))));
+            b.platform().onDefaultBrowserChanged(jasper -> heard.add("b:" + jasper));
+            assertThatThrownBy(() -> a.platform().onDefaultBrowserChanged(null)).isInstanceOf(NullPointerException.class);
+        });
+        h.defaultBrowser(false);
+        h.flush();
+        assertThat(heard).as("an answer that changes nothing").isEmpty();
+        h.defaultBrowser(true);
+        h.flush();
+        assertThat(heard).containsExactly("a:true:true", "b:true");
+        h.ui(() -> registration.get().close());
+        h.defaultBrowser(false);
+        h.flush();
+        assertThat(heard).as("a closed registration hears nothing").containsExactly("a:true:true", "b:true", "b:false");
+        h.stopAll();
+        h.defaultBrowser(true);
+        h.flush();
+        assertThat(heard).as("nor a stopped plugin's").hasSize(3);
+    }
+
     @Test void theCommandLineNamesTheClientOnceTheHostKnowsIt() {
         PluginContext a = started("test.a", Set.of());
         assertThat(a.commandLine().client()).as("no client yet").isEmpty();

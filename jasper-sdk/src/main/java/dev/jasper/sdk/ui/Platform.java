@@ -4,6 +4,7 @@ import dev.jasper.sdk.Subscription;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Desktop integration the application already does for its own files and links. Implemented by the
@@ -37,9 +38,12 @@ public interface Platform {
     }
 
     /**
-     * Opens a web address in the system browser, never asking the web browser a plugin provides
-     * ({@link #openInBrowser} asks that one first, with a {@link WebLink}). Runs in the background; a failure is posted
-     * in the plugin's notification group, never thrown.
+     * Opens a web address in the system browser, without asking the web browser a plugin provides
+     * ({@link #openInBrowser} asks that one first, with a {@link WebLink}). While Jasper is itself the system's default
+     * browser ({@link #isDefaultBrowser}), the system would hand the address back to Jasper, so it opens as
+     * {@link #openInBrowser} opens it, unless this plugin provides the browser ({@link #browser}): its own
+     * {@code browse}, such as a link it hands back, never comes back to it, and Jasper opens nothing. Runs in the
+     * background; a failure is posted in the plugin's notification group, never thrown.
      *
      * @param uri an absolute {@code http} or {@code https} address
      * @throws IllegalArgumentException when the address is not an absolute http or https one
@@ -58,6 +62,37 @@ public interface Platform {
      * @since 0.23.0
      */
     void openInBrowser(URI uri);
+
+    /**
+     * Whether Jasper is the system's default web browser, the application the system opens {@code https} links with, as
+     * Jasper last checked. Jasper checks at start-up and again from time to time, such as when one of its windows
+     * activates, so the answer can lag a change the user just made; it is false until a check has answered, and a check
+     * that could not tell keeps the last answer. {@link #onDefaultBrowserChanged} hears each change. UI thread only;
+     * elsewhere it throws {@code IllegalStateException}. Never blocks.
+     *
+     * @return whether Jasper is the default browser
+     * @throws UnsupportedOperationException if the host predates this query
+     * @since 0.28.0
+     */
+    default boolean isDefaultBrowser() {
+        throw new UnsupportedOperationException("The default browser query is unavailable");
+    }
+
+    /**
+     * Runs {@code handler} on the UI thread each time Jasper's answer to {@link #isDefaultBrowser} changes, with the new
+     * answer. A check that gives the same answer again runs nothing, and the answer of the moment is not reported when
+     * the handler registers. UI thread only; elsewhere it throws {@code IllegalStateException}. The registration ends
+     * with the plugin.
+     *
+     * @param handler hears whether Jasper is now the default browser
+     * @return the registration
+     * @throws NullPointerException when {@code handler} is null
+     * @throws UnsupportedOperationException if the host predates this registration
+     * @since 0.28.0
+     */
+    default Subscription onDefaultBrowserChanged(Consumer<Boolean> handler) {
+        throw new UnsupportedOperationException("Hearing default browser changes is unavailable");
+    }
 
     /**
      * Puts text on the system clipboard. UI thread only; elsewhere it throws {@code IllegalStateException}. When the
@@ -121,17 +156,21 @@ public interface Platform {
     /**
      * Makes this plugin the web browser Jasper opens web addresses with: an {@code http} or {@code https} link
      * Cmd-clicked (Ctrl-clicked on Linux and Windows) in a terminal pane, with that window, its placement and its OSC 8
-     * {@code target=} name; every plugin's {@link #openInBrowser} and Jasper's own web links, such as Settings' Help,
-     * with the active window; and the addresses given to the {@code jasper} command, with the window of the pane it ran
-     * in, go to {@code browser} first, on the UI thread, as a {@link WebLink} that says who asked
-     * ({@link LinkOrigin}). A local file the user clicked in a terminal also arrives, as a {@code file:} link.
-     * A clicked link comes from program output, and an OSC 8 link's address can differ from the text shown, so a browser
-     * should treat the address as untrusted input and show it before acting on it. Other
-     * schemes, such as {@code mailto}, and {@link #browse} always go to the system browser. One at a time: a bundled
-     * plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and any later one, this
-     * plugin's own included, throws. When the browser returns false or throws, and when no plugin provides one, the
-     * system browser opens an {@code http} or {@code https} address and the Default editor a {@code file:} one. Needs
-     * {@code browser.provide}. UI thread only. The registration ends with the plugin.
+     * {@code target=} name; every plugin's {@link #openInBrowser}, another plugin's {@link #browse} while Jasper is the
+     * system's default browser, and Jasper's own web links, such as Settings' Help, with the active window; and the
+     * addresses given to the {@code jasper} command, with the window of the pane it ran in, go to {@code browser} first,
+     * on the UI thread, as a {@link WebLink} that says who asked ({@link LinkOrigin}). A local file the user clicked in a
+     * terminal also arrives, as a {@code file:} link. A clicked link comes from program output, and an OSC 8 link's
+     * address can differ from the text shown, so a browser should treat the address as untrusted input and show it
+     * before acting on it. Other schemes, such as {@code mailto}, always go to the system browser, and so does
+     * {@link #browse} while Jasper is not the system's default browser, and this plugin's own {@code browse} always. One
+     * at a time: a bundled plugin's registration replaces a plugin's that is not bundled; otherwise the first stays and
+     * any later one, this plugin's own included, throws. When the browser returns false or throws, when no plugin
+     * provides one, and for an address that makes no {@link WebLink}, the system browser opens an {@code http} or
+     * {@code https} address and the Default editor a {@code file:} one. While Jasper is itself the system's default
+     * browser, which would hand an {@code http} or {@code https} address back, Jasper opens nothing instead, and says so
+     * when no plugin provides a browser and for an address that makes no {@link WebLink}. Needs {@code browser.provide}.
+     * UI thread only. The registration ends with the plugin.
      *
      * @param browser opens a web address
      * @return the registration
