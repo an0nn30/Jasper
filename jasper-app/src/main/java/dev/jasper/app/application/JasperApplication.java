@@ -422,7 +422,7 @@ public final class JasperApplication {
             (address, window, notTaken) -> plugins.openExternalLink(address, window, notTaken),
             address -> systemBrowser.accept(address), () -> plugins != null && plugins.providesBrowser(), PluginRuntime::reachesBrowser,
             done -> setPluginEnabled(ExternalAddresses.BROWSER_PLUGIN, true, done),
-            address -> restart(RestartMode.SAME, List.of(), List.of(address)),
+            addresses -> restart(RestartMode.SAME, List.of(), addresses),
             text -> clipboard.copy(text), () -> quitting || stopped));
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;

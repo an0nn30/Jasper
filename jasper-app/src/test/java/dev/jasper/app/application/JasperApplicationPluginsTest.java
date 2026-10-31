@@ -1310,9 +1310,9 @@ class JasperApplicationPluginsTest {
             application[0].defaultBrowser(check);
             application[0].startPlugins(null, plugin, false, dirs);
         });
-        assertThat(external(application[0], "https://bücher.de/a", "https://b%C3%BCcher.de/b")).isZero();
+        assertThat(external(application[0], "https://b\u00fccher.de/a", "https://b%C3%BCcher.de/b")).isZero();
         edt(() -> {
-            application[0].openLink(clicked("https://bücher.de/c"), window);
+            application[0].openLink(clicked("https://b\u00fccher.de/c"), window);
             application[0].openLink(clicked("http://my_host/"), window);
         });
         assertThat(java.nio.file.Files.readAllLines(dirs.plugins().resolve("dev.example.web/data/opened"))).containsExactly(

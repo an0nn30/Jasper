@@ -5,10 +5,12 @@ import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.notifications.NotificationRequest;
 import dev.jasper.app.notifications.Severity;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -59,13 +61,13 @@ final class ExternalAddresses {
      * @param reachesBrowser whether an http or https address reaches the provided browser: it makes a {@code WebLink}
      *     ({@code PluginRuntime.reachesBrowser})
      * @param turnOnBrowser turns the Browser plugin on from the next launch; it hears, on the EDT, nothing, or why not
-     * @param restart restarts Jasper as it was started, the new Jasper opening the address; false when it cannot work
+     * @param restart restarts Jasper as it was started, the new Jasper opening the addresses; false when it cannot work
      *     out how
      * @param copy puts text on the clipboard; it throws when the clipboard refuses
      * @param quitting whether Jasper is quitting
      */
     record Hooks(Browser browser, Consumer<URI> systemBrowser, BooleanSupplier providesBrowser, Predicate<URI> reachesBrowser,
-                 Consumer<Consumer<Optional<String>>> turnOnBrowser, Predicate<URI> restart, Consumer<String> copy,
+                 Consumer<Consumer<Optional<String>>> turnOnBrowser, Predicate<List<URI>> restart, Consumer<String> copy,
                  BooleanSupplier quitting) {
         Hooks {
             Objects.requireNonNull(browser, "browser");
@@ -221,9 +223,20 @@ final class ExternalAddresses {
         });
     }
 
-    /** The restart offer's Restart Now: the new Jasper opens {@code address}. */
+    /**
+     * The restart offer's Restart Now: the new Jasper opens {@code address} without its user info, as the notice shows
+     * it, so no password reaches its command line (ruling Q22); nothing when that is no web address, which its launch
+     * would refuse.
+     */
     private void restart(URI address) {
-        if (!hooks.restart().test(address))
+        List<URI> opens;
+        try {
+            URI shown = new URI(withoutUserInfo(address));
+            opens = dev.jasper.app.platform.Browser.isWebAddress(shown) ? List.of(shown) : List.of();
+        } catch (URISyntaxException noAddress) {
+            opens = List.of();
+        }
+        if (!hooks.restart().test(opens))
             center.post(notice(Severity.ERROR, "Jasper could not restart")
                 .withContent("Jasper could not work out how it was started. Quit and reopen it to turn on the Browser."));
     }

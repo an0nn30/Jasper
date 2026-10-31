@@ -12,6 +12,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
+import java.util.Objects;
 import java.util.Optional;
 import javax.swing.SwingUtilities;
 
@@ -20,6 +21,12 @@ import javax.swing.SwingUtilities;
  * desktop's browser for plugins that ask through the SDK.
  */
 public final class Browser {
+    /**
+     * What IDNA2003, which {@link IDN} follows, maps to another domain than browsers reach (UTS 46 nontransitional):
+     * {@code \u00df} and {@code \u03c2}, and the zero-width non-joiner and joiner it drops.
+     */
+    private static final String IDNA2003_MAPS_ELSEWHERE = "\u00df\u03c2\u200c\u200d";
+
     private Browser() { }
 
     /**
@@ -53,12 +60,17 @@ public final class Browser {
     }
 
     /**
-     * {@code address} with an internationalized host in its ASCII form (browser plan 4c, ruling Q17): {@link URI} reads
-     * such a host, in Unicode, {@code https://b\u00fccher.de/}, or percent-encoded, {@code https://b%C3%BCcher.de/}, as
-     * no host, and its ASCII form, {@code https://xn--bcher-kva.de/} ({@link IDN#toASCII} on the decoded host), as one.
-     * The user info, port, path, query and fragment stay as they were. Any other address comes back as it is: one that
-     * has a host or is no web address ({@link #isWebAddress}), and one whose host has no ASCII form that {@code URI}
-     * reads as a host, such as {@code http://my_service:8080/}. Any thread.
+     * {@code address} with an internationalized host in its ASCII form (browser plan 4c, rulings Q17 and Q22): {@link URI}
+     * reads such a host, in Unicode, {@code https://b\u00fccher.de/}, or percent-encoded, {@code https://b%C3%BCcher.de/},
+     * as no host, and its ASCII form, {@code https://xn--bcher-kva.de/}, as one. The host is decoded and converted with
+     * {@link IDN#toASCII(String, int)} under the STD3 rules, so only letters, digits, hyphens and dots come out, and the
+     * result is kept only when it round-trips exactly: {@code URI} reads the converted host as the host, and the user
+     * info, port, path, query and fragment as they were. A host whose decoded or mapped form holds a delimiter, such as
+     * {@code http://evil.com%2F.good.com/} or a full-width {@code \uFF0F}, which would move part of it into the path,
+     * therefore stays as it is. So does one with {@code \u00df}, {@code \u03c2} or a zero-width joiner or non-joiner:
+     * {@code IDN} follows IDNA2003, which maps them to another domain than browsers reach ({@code fa\u00df.de} to
+     * {@code fass.de}). Any other address comes back as it is too: one that has a host or is no web address
+     * ({@link #isWebAddress}), and one whose host has no ASCII form, such as {@code http://my_service:8080/}. Any thread.
      *
      * @param address any URI
      * @return the address with its host in ASCII, or {@code address}
@@ -67,19 +79,31 @@ public final class Browser {
         if (!isWebAddress(address) || address.getHost() != null) return address;
         String authority = address.getRawAuthority();
         int at = authority.lastIndexOf('@');
+        String userInfo = at < 0 ? null : authority.substring(0, at);
         String hostAndPort = authority.substring(at + 1);
         int colon = hostAndPort.lastIndexOf(':');
-        boolean port = colon >= 0 && hostAndPort.substring(colon + 1).chars().allMatch(c -> c >= '0' && c <= '9');
-        String host = port ? hostAndPort.substring(0, colon) : hostAndPort;
+        boolean hasPort = colon >= 0 && hostAndPort.substring(colon + 1).chars().allMatch(c -> c >= '0' && c <= '9');
+        String host = hasPort ? hostAndPort.substring(0, colon) : hostAndPort;
+        String port = hasPort ? hostAndPort.substring(colon + 1) : "";
         if (host.isEmpty() || host.startsWith("[")) return address;
         try {
-            var rebuilt = new StringBuilder(address.getScheme()).append("://").append(authority, 0, at + 1)
-                .append(IDN.toASCII(decoded(host))).append(port ? hostAndPort.substring(colon) : "");
+            String unicode = decoded(host);
+            if (unicode.chars().anyMatch(c -> IDNA2003_MAPS_ELSEWHERE.indexOf(c) >= 0)) return address;
+            String ascii = IDN.toASCII(unicode, IDN.USE_STD3_ASCII_RULES);
+            var rebuilt = new StringBuilder(address.getScheme()).append("://");
+            if (userInfo != null) rebuilt.append(userInfo).append('@');
+            rebuilt.append(ascii);
+            if (hasPort) rebuilt.append(':').append(port);
             if (address.getRawPath() != null) rebuilt.append(address.getRawPath());
             if (address.getRawQuery() != null) rebuilt.append('?').append(address.getRawQuery());
             if (address.getRawFragment() != null) rebuilt.append('#').append(address.getRawFragment());
-            var ascii = new URI(rebuilt.toString());
-            return ascii.getHost() != null ? ascii : address;
+            var converted = new URI(rebuilt.toString());
+            boolean exact = ascii.equals(converted.getHost()) && Objects.equals(userInfo, converted.getRawUserInfo())
+                && converted.getPort() == (port.isEmpty() ? -1 : Integer.parseInt(port))
+                && Objects.equals(address.getRawPath(), converted.getRawPath())
+                && Objects.equals(address.getRawQuery(), converted.getRawQuery())
+                && Objects.equals(address.getRawFragment(), converted.getRawFragment());
+            return exact ? converted : address;
         } catch (CharacterCodingException | IllegalArgumentException | URISyntaxException noAsciiHost) {
             return address;
         }

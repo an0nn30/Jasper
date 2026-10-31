@@ -39,8 +39,8 @@ class ExternalAddressesTest {
     private boolean provides;
     private boolean quitting;
     private boolean restarts = true;
-    /** The addresses each restart was asked to open afterwards. */
-    private final List<URI> restarted = new CopyOnWriteArrayList<>();
+    /** What each restart was asked to open afterwards. */
+    private final List<List<URI>> restarted = new CopyOnWriteArrayList<>();
     private Optional<String> turnOnProblem = Optional.empty();
     private int turnedOn;
 
@@ -52,7 +52,7 @@ class ExternalAddressesTest {
                 if (declined.contains(address)) notTaken.accept(address);
             },
             address -> system.add(address.toString()), () -> provides, dev.jasper.app.plugins.PluginRuntime::reachesBrowser,
-            done -> { turnedOn++; done.accept(turnOnProblem); }, address -> { restarted.add(address); return restarts; },
+            done -> { turnedOn++; done.accept(turnOnProblem); }, opens -> { restarted.add(opens); return restarts; },
             text -> { if (text.contains("refused")) throw new IllegalStateException("The clipboard is busy"); copied.add(text); },
             () -> quitting));
     }
@@ -192,7 +192,7 @@ class ExternalAddressesTest {
         assertThat(offer.actions()).extracting(NotificationAction::label).containsExactly("Restart Now");
         restarts = false;
         offer.actions().getFirst().run().run();
-        assertThat(restarted).as("the link opens after the restart").containsExactly(uri("https://example.com/a"));
+        assertThat(restarted).as("the link opens after the restart").containsExactly(List.of(uri("https://example.com/a")));
         assertThat(center.history().getFirst().request().title()).isEqualTo("Jasper could not restart");
         assertThat(center.history().getFirst().request().content())
             .isEqualTo("Jasper could not work out how it was started. Quit and reopen it to turn on the Browser.");
@@ -218,8 +218,25 @@ class ExternalAddressesTest {
         assertThat(center.history()).singleElement().satisfies(entry -> assertThat(entry.count()).isEqualTo(2));
         action(center.history().getFirst(), "Turn On Browser").run();
         action(center.history().getFirst(), "Restart Now").run();
-        assertThat(restarted).containsExactly(uri("https://example.com/newest"));
+        assertThat(restarted).containsExactly(List.of(uri("https://example.com/newest")));
         assertThat(center.history().getFirst().request().title()).as("it restarted").isEqualTo("Restart Jasper to turn on the Browser");
+    }
+
+    /**
+     * Ruling Q22 (H3): the restart opens the link without its user info, as the notice shows it, so no password reaches
+     * the new Jasper's command line; one that is no web address without it restarts opening nothing, which the new
+     * Jasper's launch would otherwise refuse.
+     */
+    @Test void restartNowOpensTheLinkWithoutItsUserInfo() {
+        var addresses = addresses();
+        addresses.cannotOpen(uri("https://user:secret@example.com/a?b=1#c"));
+        action(center.history().getFirst(), "Turn On Browser").run();
+        action(center.history().getFirst(), "Restart Now").run();
+        addresses.cannotOpen(uri("http://user@/x"));
+        action(center.history().stream().filter(entry -> entry.request().title().equals("Web links can’t open in Jasper"))
+            .findFirst().orElseThrow(), "Turn On Browser").run();
+        action(center.history().getFirst(), "Restart Now").run();
+        assertThat(restarted).containsExactly(List.of(uri("https://example.com/a?b=1#c")), List.of());
     }
 
     /** The final review: Turn On Browser chosen once Jasper is quitting turns nothing on and posts nothing. */
