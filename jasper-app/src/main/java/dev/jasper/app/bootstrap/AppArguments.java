@@ -1,22 +1,25 @@
 package dev.jasper.app.bootstrap;
 
 import dev.jasper.app.platform.Browser;
+import dev.jasper.app.platform.FileUrls;
 import dev.jasper.app.residency.LaunchRequest;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.HexFormat;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.stream.Stream;
 
 /**
  * Startup options parsed before any desktop initialization. An argument that does not start with {@code --} is a web
- * address to open when it is an absolute {@code http} or {@code https} URL ({@link Browser#webAddress}; browser plan
- * 4c), at most {@link LaunchRequest#MAX_URLS}; otherwise it is a path to open (workspace-tabs spec 5.4): a
- * {@code file:} URL names its file, and anything else resolves against the working directory.
+ * address to open when its scheme is {@code http} or {@code https}, in any case, read as a browser reads an address it
+ * is given ({@link #webAddress}; browser plan 4c), at most {@link LaunchRequest#MAX_URLS}; otherwise it is a path to
+ * open (workspace-tabs spec 5.4): a {@code file:} URL names its file ({@link FileUrls#localFile}), and anything else
+ * resolves against the working directory. An http or https argument that is no web address, and a {@code file:} URL
+ * that names no local file, are refused.
  *
  * @param configOverride {@code --config}, or null
  * @param help {@code --help}
@@ -36,6 +39,9 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
                     List<Path> paths, List<URI> urls, List<String> given) {
     static final String USAGE = "Usage: jasper [--config <path>] [--background] [--no-window] [--safe-mode] "
         + "[--plugin-dir <path>] [--help] [<path>|<url>...]";
+    /** What browsers percent-encode in an address they are given, after its host, that {@link URI} refuses. */
+    private static final String ENCODED = " \"<>\\^`{|}";
+    private static final HexFormat HEX = HexFormat.of().withUpperCase();
 
     AppArguments {
         Objects.requireNonNull(replacing, "replacing");
@@ -106,11 +112,10 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
                 }
                 default -> {
                     if (args[i].startsWith("--")) throw invalid("Unknown argument.");
-                    Optional<URI> address = Browser.webAddress(args[i]);
-                    if (address.isEmpty()) paths.add(positional(args[i], workingDirectory));
+                    if (!webScheme(args[i])) paths.add(positional(args[i], workingDirectory));
                     else if (++addresses > LaunchRequest.MAX_URLS)
                         throw invalid("Jasper opens at most " + LaunchRequest.MAX_URLS + " web addresses at once.");
-                    else urls.add(address.get());
+                    else urls.add(webAddress(args[i]));
                 }
             }
         }
@@ -129,23 +134,71 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
     /** A path to open, as the launch names it (spec 5.4): a {@code file:} URL's file, else the text as a path. */
     private static Path positional(String text, Path workingDirectory) {
         if (text.isBlank()) throw invalid("A path cannot be blank.");
-        Optional<Path> file = fileUrl(text);
-        try { return workingDirectory.resolve(file.orElseGet(() -> Path.of(text))).toAbsolutePath().normalize(); }
+        Path named;
+        try { named = isFileUrl(text) ? localFile(text) : Path.of(text); }
         catch (InvalidPathException ignored) { throw invalid("Invalid path: " + text); }
+        return workingDirectory.resolve(named).toAbsolutePath().normalize();
     }
+
+    private static boolean isFileUrl(String text) { return text.regionMatches(true, 0, "file:", 0, 5); }
 
     /**
      * The local file a {@code file:} URL names, such as {@code file:///Users/me/x.html}, which a desktop entry may pass
-     * (browser plan 4c, Review Focus 2); empty for any other text, or a {@code file:} URL this platform cannot read as a
-     * local path (one naming another host on macOS and Linux), which then stays the text it is.
+     * (browser plan 4c, Review Focus 2).
+     *
+     * @throws IllegalArgumentException for one that names no local file: an opaque one, one that does not parse, and one
+     *     naming another host, except on Windows, where that is the share it names
      */
-    private static Optional<Path> fileUrl(String text) {
-        if (!text.regionMatches(true, 0, "file:", 0, 5)) return Optional.empty();
+    private static Path localFile(String text) {
         try {
-            return Optional.of(Path.of(new URI(text)));
-        } catch (URISyntaxException | IllegalArgumentException | java.nio.file.FileSystemNotFoundException notLocal) {
-            return Optional.empty();
+            var file = FileUrls.localFile(new URI(text));
+            if (file.isPresent()) return file.get();
+        } catch (URISyntaxException notAUrl) {
+            // Refused below.
         }
+        throw invalid("Not a local file: " + text);
+    }
+
+    /** Whether {@code text}'s scheme is http or https, in any case: it is then a web address or refused, never a path. */
+    private static boolean webScheme(String text) {
+        return text.regionMatches(true, 0, "http:", 0, 5) || text.regionMatches(true, 0, "https:", 0, 6);
+    }
+
+    /**
+     * {@code text}, whose scheme is http or https, as a web address, read as a browser reads an address it is given:
+     * after the host, each character {@link URI} refuses and browsers percent-encode (a space and
+     * {@code " < > \ ^ ` { | }}) is encoded, and so is a {@code %} that starts no escape; everything else, escapes
+     * included, stays as it is.
+     *
+     * @throws IllegalArgumentException when that is still no web address ({@link Browser#isWebAddress}): a space in the
+     *     host, no {@code //host}, nothing after the scheme
+     */
+    private static URI webAddress(String text) {
+        try {
+            URI address = new URI(encodedAsBrowsersDo(text));
+            if (Browser.isWebAddress(address)) return address;
+        } catch (URISyntaxException notOne) {
+            // Refused below.
+        }
+        throw invalid("Not a web address: " + text);
+    }
+
+    /** {@code text} with what follows its scheme and {@code //host} percent-encoded as {@link #webAddress} says. */
+    private static String encodedAsBrowsersDo(String text) {
+        int start = text.indexOf(':') + 1;
+        if (text.startsWith("//", start)) {
+            start += 2;
+            while (start < text.length() && "/?#".indexOf(text.charAt(start)) < 0) start++;
+        }
+        var encoded = new StringBuilder(text.length() + 16).append(text, 0, start);
+        for (int i = start; i < text.length(); i++) {
+            char c = text.charAt(i);
+            boolean escape = c == '%' && i + 2 < text.length() && HexFormat.isHexDigit(text.charAt(i + 1))
+                && HexFormat.isHexDigit(text.charAt(i + 2));
+            if ((c == '%' && !escape) || ENCODED.indexOf(c) >= 0) encoded.append('%').append(HEX.toHexDigits((byte) c));
+            else encoded.append(c);
+        }
+        return encoded.toString();
     }
 
     private static long processId(String[] args, int index) {

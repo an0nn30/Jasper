@@ -1458,8 +1458,9 @@ public final class JasperApplication {
      * The macOS open-URI event (browser plan 4c): an address the system handed Jasper, as the default browser or for
      * {@code open -a Jasper <url>}. The most recently active window comes forward, or the saved one is restored, as
      * {@link #open} does; a web address ({@link dev.jasper.app.platform.Browser#isWebAddress}) then opens in it once
-     * Jasper's browser is ready ({@link #openExternalAddress}), and a {@code file:} URL opens as the open-file event
-     * opens its file. Anything else opens nothing; the log does not repeat it. EDT.
+     * Jasper's browser is ready ({@link #openExternalAddress}), and a {@code file:} URL opens the local file it names
+     * ({@link dev.jasper.app.platform.FileUrls#localFile}) as the open-file event opens its file. Anything else, a
+     * {@code file:} URL that names no local file included, opens nothing, and the log says so without repeating it. EDT.
      *
      * @param uri what the system handed over
      */
@@ -1471,15 +1472,14 @@ public final class JasperApplication {
             return;
         }
         if ("file".equalsIgnoreCase(uri.getScheme())) {
-            try {
-                open(List.of(Path.of(uri).toAbsolutePath()), OPEN_URI);
-                return;
-            } catch (IllegalArgumentException | java.nio.file.FileSystemNotFoundException notLocal) {
-                // Reported below: a file: URL naming another host, or one this platform cannot read.
-            }
+            Optional<Path> file = dev.jasper.app.platform.FileUrls.localFile(uri);
+            if (file.isPresent()) open(List.of(file.get().toAbsolutePath()), OPEN_URI);
+            else LOG.log(System.Logger.Level.INFO,
+                "The system handed Jasper a file: URL that names no local file; it opens nothing");
+            return;
         }
         LOG.log(System.Logger.Level.INFO,
-            "The system handed Jasper an address that is neither a web address nor a local file; it opens nothing");
+            "The system handed Jasper an address that is neither a web address nor a file: URL; it opens nothing");
     }
 
     /**

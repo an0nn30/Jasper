@@ -986,7 +986,8 @@ class JasperApplicationPluginsTest {
     /**
      * Browser plan 4c Task 4, Review Focus 2: the macOS open-URI event sends a web address to the browser as an external
      * address in the most recently active window, and a {@code file:} URL, even one for a page the browser could show, to
-     * the editor as a file; nothing once Jasper quits.
+     * the editor as a file, in every form RFC 8089 gives it ({@code localhost}, a query, a fragment). One naming another
+     * host opens nothing, and the log says why; nothing opens once Jasper quits.
      */
     @Test void theOpenUriEventSendsWebAddressesToTheBrowserAndFileUrlsToTheEditor() throws Exception {
         Path page = java.nio.file.Files.writeString(home.resolve("index.html"), "<p>hi</p>\n");
@@ -996,16 +997,25 @@ class JasperApplicationPluginsTest {
         Path browsed = dirs.plugins().resolve("dev.example.both/data/browsed");
         Path edited = dirs.plugins().resolve("dev.example.both/data/edited");
         JasperWindow[] window = new JasperWindow[1];
-        edt(() -> {
-            framesHeadless(application);
-            window[0] = application.openFirstWindow(List.of(), List.of()).orElseThrow();
-            application.uriOpened(java.net.URI.create("https://example.com/from-the-system"));
-            application.uriOpened(page.toUri());
-        });
-        assertThat(awaitLines(browsed, 1)).containsExactly("https://example.com/from-the-system|EXTERNAL|TAB|" + window[0].id());
-        assertThat(awaitLines(edited, 1)).containsExactly("index.html|-");
-        edt(() -> { });
-        assertThat(java.nio.file.Files.readAllLines(browsed)).as("the file: URL is a file, not a page").hasSize(1);
+        try (var log = LogRecorder.of(JasperApplication.class.getName())) {
+            edt(() -> {
+                framesHeadless(application);
+                window[0] = application.openFirstWindow(List.of(), List.of()).orElseThrow();
+                application.uriOpened(java.net.URI.create("https://example.com/from-the-system"));
+                application.uriOpened(page.toUri());
+                application.uriOpened(java.net.URI.create("file://localhost" + page.toUri().getRawPath() + "?a=1#top"));
+                application.uriOpened(java.net.URI.create("file://server/share/index.html"));
+                application.uriOpened(java.net.URI.create("mailto:someone@example.com"));
+            });
+            assertThat(awaitLines(browsed, 1)).containsExactly("https://example.com/from-the-system|EXTERNAL|TAB|" + window[0].id());
+            assertThat(awaitLines(edited, 2)).containsExactly("index.html|-", "index.html|-");
+            edt(() -> { });
+            assertThat(java.nio.file.Files.readAllLines(browsed)).as("a file: URL is a file, not a page").hasSize(1);
+            assertThat(log.records()).extracting(java.util.logging.LogRecord::getMessage)
+                .filteredOn(message -> message.startsWith("The system handed Jasper")).containsExactly(
+                "The system handed Jasper a file: URL that names no local file; it opens nothing",
+                "The system handed Jasper an address that is neither a web address nor a file: URL; it opens nothing");
+        }
         edt(() -> {
             application.quit();
             application.uriOpened(java.net.URI.create("https://example.com/quitting"));
@@ -1014,7 +1024,51 @@ class JasperApplicationPluginsTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         ApplicationPluginCleanup.await(application);
         assertThat(java.nio.file.Files.readAllLines(browsed)).hasSize(1);
-        assertThat(java.nio.file.Files.readAllLines(edited)).hasSize(1);
+        assertThat(java.nio.file.Files.readAllLines(edited)).hasSize(2);
+    }
+
+    /**
+     * Browser plan 4c Task 4, ruling Q12: with no window open, a web address from the system, and one a second launch
+     * hands over alone, first restore a window, as every outside request does, timed under its own trigger, and then
+     * open in it; no other window opens and nothing reaches the system browser.
+     */
+    @Test void withNoWindowOpenAWebAddressFromOutsideRestoresAWindowAndOpensInIt() throws Exception {
+        for (String trigger : List.of(JasperApplication.OPEN_URI, JasperApplication.HANDOFF)) {
+            Path root = home.resolve(trigger);
+            AppDirs dirs = new AppDirs(root, root.resolve("config.toml"), root.resolve("logs"));
+            Path plugin = root.resolve("web-plugin");
+            PluginJars.build(plugin, "web.jar", PluginJars.descriptor("dev.example.web", "1.0.0", "fix.web.Main")
+                + "capabilities = [\"browser.provide\"]\n", Map.of("fix.web.Main", WEB_BROWSER), List.of());
+            var system = new CopyOnWriteArrayList<String>();
+            var terminated = new CountDownLatch(1);
+            var trace = StartupTrace.detached();
+            JasperApplication[] application = new JasperApplication[1];
+            edt(() -> {
+                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+                application[0].trace(trace);
+                application[0].systemBrowser = address -> system.add(address.toString());
+                application[0].startPlugins(null, plugin, false, dirs);
+                framesHeadless(application[0]);
+            });
+            java.net.URI address = java.net.URI.create("https://example.com/" + trigger);
+            edt(() -> {
+                assertThat(application[0].terminals().windows()).as("no window is open").isEmpty();
+                if (trigger.equals(JasperApplication.OPEN_URI)) application[0].uriOpened(address);
+                else application[0].handedOff(List.of(), List.of(address), List.of(), false);
+            });
+            List<String> opened = awaitLines(dirs.plugins().resolve("dev.example.web/data/opened"), 1);
+            java.util.UUID[] window = new java.util.UUID[1];
+            edt(() -> {
+                assertThat(application[0].terminals().windows()).as(trigger).hasSize(1);
+                window[0] = application[0].terminals().windows().getFirst().id();
+            });
+            assertThat(opened).as(trigger).containsExactly(address + "|EXTERNAL|" + window[0]);
+            assertThat(trace.windows()).as(trigger).extracting(dev.jasper.app.startup.WindowTrace::trigger).containsExactly(trigger);
+            assertThat(system).isEmpty();
+            edt(application[0]::quit);
+            assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+            ApplicationPluginCleanup.await(application[0]);
+        }
     }
 
     /** A stand-in frame, so a window opens headless, as {@code pluginsStartBeforeWindowsAndStopBeforeTermination} does. EDT. */

@@ -158,11 +158,11 @@ starts: a later launch hands off, they are ignored, and the running Jasper says 
 one is never resident. [Command line](command-line.md) describes the client.
 
 A macOS reopen (Dock click, Spotlight, `open -a`) opens or raises a window, and the macOS open-file event opens its
-files and folders as a handoff's paths. The macOS open-URI event raises or opens a window the same way; a web address
-then opens in it as a launch's do, and a `file:` URL opens as an open-file event's file. When this process's application jar has changed on disk, a reopen of a resident
-Jasper, or a launch of another build, with no window open relaunches the process (the replacement waits for the lock and
-opens the launch's paths); with a window open, a launch of another build is carried out here and a "Jasper was updated"
-notice offers Restart.
+files and folders as a handoff's paths. The macOS open-URI event raises or opens a window the same way; then a web
+address opens in it as a launch's web addresses do, and a `file:` URL opens its file as the open-file event does. When
+this process's application jar has changed on disk, a reopen of a resident Jasper, or a launch of another build, with no
+window open relaunches the process (the replacement waits for the lock and opens the launch's paths and web addresses);
+with a window open, a launch of another build is carried out here and a "Jasper was updated" notice offers Restart.
 
 ## Windows and the saved workspace
 

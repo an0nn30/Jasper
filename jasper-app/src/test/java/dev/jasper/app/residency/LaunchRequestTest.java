@@ -39,12 +39,33 @@ class LaunchRequestTest {
         var raise = LaunchRequest.of(Path.of("/app.jar").toAbsolutePath(), 7L, home, List.of(), List.of(), List.of());
         assertThat(raise.intent()).isEqualTo(LaunchRequest.Intent.RAISE);
         assertThat(raise.token()).as("filled in when it is sent").isEmpty();
-        assertThat(raise.encode()).endsWith("\traise\t" + b64(home.toString()) + "\t\t\t\n");
+        assertThat(raise.encode()).endsWith("\traise\t" + b64(home.toString()) + "\t\t\n");
         assertThat(LaunchRequest.decode(raise.withToken("t").encode())).isEqualTo(raise.withToken("t"));
         var open = LaunchRequest.of(null, 0L, home, List.of(home.resolve("a.txt")), List.of(), List.of("--plugin-dir"));
         assertThat(open.intent()).isEqualTo(LaunchRequest.Intent.OPEN_PATHS);
         assertThat(open.codeLocation()).as("an unknown code location").isEqualTo(Path.of(""));
         assertThat(LaunchRequest.decode(open.withToken("t").encode())).isEqualTo(open.withToken("t"));
+    }
+
+    /**
+     * Browser plan 4c, ruling Q11: a request without web addresses is a protocol-2 line, which a running Jasper of the
+     * build before still takes, so a newer build's launch keeps restarting it into that build; only a request with web
+     * addresses is protocol 3.
+     */
+    @Test void aRequestWithoutWebAddressesIsAProtocolTwoLineAndOneWithThemProtocolThree() {
+        var raise = LaunchRequest.of(Path.of("/app.jar").toAbsolutePath(), 7L, home, List.of(), List.of(), List.of("--safe-mode"));
+        var paths = LaunchRequest.of(null, 0L, home, List.of(home.resolve("a.txt"), home), List.of(), List.of());
+        for (LaunchRequest request : List.of(raise, paths)) {
+            String line = request.withToken("t").encode();
+            assertThat(line).as("protocol 2, nine fields").startsWith("jasper\t2\tt\t");
+            assertThat(line.chars().filter(c -> c == '\t').count()).isEqualTo(8);
+            assertThat(LaunchRequest.decode(line)).isEqualTo(request.withToken("t"));
+        }
+        var web = LaunchRequest.of(null, 0L, home, List.of(), List.of(URI.create("https://example.com/a")), List.of());
+        String line = web.withToken("t").encode();
+        assertThat(line).startsWith("jasper\t3\tt\t");
+        assertThat(line.chars().filter(c -> c == '\t').count()).isEqualTo(9);
+        assertThat(LaunchRequest.decode(line)).isEqualTo(web.withToken("t"));
     }
 
     /** Browser plan 4c: web addresses alone are OPEN_PATHS too, and round-trip, in order, beside paths. */

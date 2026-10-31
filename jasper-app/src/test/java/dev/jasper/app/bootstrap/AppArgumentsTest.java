@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class AppArgumentsTest {
+    private static final boolean WINDOWS = System.getProperty("os.name").startsWith("Windows");
     @TempDir Path cwd;
 
     private AppArguments parse(String... args) { return AppArguments.parse(args, cwd); }
@@ -77,11 +78,16 @@ class AppArgumentsTest {
         assertThat(parse("https://example.com").residencyAllowed()).as("web addresses are no start-up flag").isTrue();
     }
 
-    /** Browser plan 4c, Review Focus 2: a {@code file:} URL is the file it names, which opens as any path does. */
+    /**
+     * Browser plan 4c, Review Focus 2: a {@code file:} URL is the file it names, which opens as any path does, in every
+     * form RFC 8089 gives it: with no authority, an empty one or {@code localhost}, and with a query or a fragment.
+     */
     @Test void aFileUrlStaysAPathToTheFileItNames() {
         Path page = cwd.resolve("x.html");
-        AppArguments local = parse(page.toUri().toString());
-        assertThat(local.paths()).containsExactly(page);
+        String raw = page.toUri().getRawPath();
+        AppArguments local = parse(page.toUri().toString(), "file:" + raw, "file://localhost" + raw, "FILE://LocalHost" + raw,
+            page.toUri() + "?a=1#top", "file://localhost" + raw + "#top");
+        assertThat(local.paths()).containsExactly(page, page, page, page, page, page);
         assertThat(local.urls()).isEmpty();
         AppArguments root = parse("file:///x.html");
         assertThat(root.urls()).isEmpty();
@@ -89,12 +95,54 @@ class AppArgumentsTest {
             .containsExactly(cwd.resolve(Path.of(URI.create("file:///x.html"))).normalize());
     }
 
-    /** Not web addresses: another scheme, an opaque one and one without an authority stay paths where a path can say so. */
-    @Test @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
-    void otherSchemesAndAddressesWithoutAnAuthorityStayPaths() {
-        AppArguments launch = parse("ftp://example.com/f", "mailto:someone@example.com", "https:example.com", "http:/notes");
-        assertThat(launch.urls()).isEmpty();
-        assertThat(launch.paths()).hasSize(4);
+    /**
+     * A {@code file:} URL that names no local file is refused, saying so: one naming another host (on Windows that is the
+     * share it names, as Windows reads it), an opaque one and one that does not parse.
+     */
+    @Test void aFileUrlThatNamesNoLocalFileIsRefused() {
+        for (String text : new String[]{"file:x.html", "file:", "file://localhost", "file:///a b.html"})
+            assertThatIllegalArgumentException().as(text).isThrownBy(() -> AppArguments.parse(new String[]{text}, cwd))
+                .withMessageStartingWith("Not a local file: " + text + "\n").withMessageContaining("Usage:");
+        if (WINDOWS) assertThat(parse("file://server/share/x.html").paths()).containsExactly(Path.of("\\\\server\\share\\x.html"));
+        else assertThatIllegalArgumentException().isThrownBy(() -> AppArguments.parse(new String[]{"file://server/share/x.html"}, cwd))
+            .withMessageStartingWith("Not a local file: file://server/share/x.html\n");
+    }
+
+    /**
+     * Browser plan 4c: a web address with characters browsers percent-encode (a space, {@code " < > \ ^ ` { | }}, and
+     * a {@code %} that starts no escape) after its host is encoded as they encode them, and opens; its other characters
+     * and its escapes stay as they are.
+     */
+    @Test void aWebAddressWithCharactersBrowsersEncodeOpensEncodedAsTheyDo() {
+        AppArguments launch = parse("https://example.com/a b", "https://example.com/say \"hi\"", "https://example.com/a|b",
+            "https://example.com/{x}?q={y}#{z}", "https://example.com/100%", "https://example.com/%zz%4", "https://example.com/%41%2f",
+            "http://localhost:8080/<a>^`\\", "HTTPS://Example.com/search?q=a b&r=ü");
+        assertThat(launch.urls()).extracting(URI::toString).containsExactly("https://example.com/a%20b",
+            "https://example.com/say%20%22hi%22", "https://example.com/a%7Cb", "https://example.com/%7Bx%7D?q=%7By%7D#%7Bz%7D",
+            "https://example.com/100%25", "https://example.com/%25zz%254", "https://example.com/%41%2f",
+            "http://localhost:8080/%3Ca%3E%5E%60%5C", "HTTPS://Example.com/search?q=a%20b&r=ü");
+        assertThat(launch.paths()).isEmpty();
+    }
+
+    /**
+     * Browser plan 4c: an argument whose scheme is http or https is never a path, on any platform. One that is still no
+     * web address once encoded as browsers do (a space in its host, no {@code //host}, nothing after the scheme) is
+     * refused, saying so.
+     */
+    @Test void anHttpOrHttpsArgumentThatIsNoWebAddressIsRefusedNotAPath() {
+        for (String text : new String[]{"https://exa mple.com/", "https:example.com", "http:/notes", "HTTP:", "https://", "http://a\tb/"})
+            assertThatIllegalArgumentException().as(text).isThrownBy(() -> AppArguments.parse(new String[]{text}, cwd))
+                .withMessageStartingWith("Not a web address: " + text + "\n").withMessageContaining("Usage:");
+    }
+
+    /** Another scheme stays a path where a path can say so; Windows has no such path and says that. */
+    @Test void otherSchemesStayPaths() {
+        for (String text : new String[]{"ftp://example.com/f", "mailto:someone@example.com"}) {
+            if (WINDOWS) assertThatIllegalArgumentException().as(text).isThrownBy(() -> AppArguments.parse(new String[]{text}, cwd))
+                .withMessageStartingWith("Invalid path: " + text + "\n");
+            else assertThat(parse(text).paths()).as(text).containsExactly(cwd.resolve(text).normalize());
+        }
+        assertThat(parse("https.txt", "http-notes").paths()).containsExactly(cwd.resolve("https.txt"), cwd.resolve("http-notes"));
     }
 
     @Test void aLaunchNamesAtMostThirtyTwoWebAddresses() {

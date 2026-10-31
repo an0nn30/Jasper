@@ -288,7 +288,7 @@ class SingleInstanceTest {
         owner();
         String[] many = IntStream.range(0, 20_000).mapToObj(i -> "a-long-file-name-number-" + i + ".txt").toArray(String[]::new);
         assertThat(claim(SingleInstance.Timing.STANDARD, many)).isEqualTo(new SingleInstance.Claim.Done(2));
-        assertThat(failures).containsExactly("Jasper cannot open that many paths at once.");
+        assertThat(failures).containsExactly("Jasper cannot open that many paths and web addresses at once.");
     }
 
     @Test void aHomeThatCannotBeLockedEndsTheLaunchWithTheReason() throws Exception {

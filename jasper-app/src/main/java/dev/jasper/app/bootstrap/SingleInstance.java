@@ -107,7 +107,7 @@ final class SingleInstance {
         LaunchRequest request = LaunchRequest.of(source, modified, options.workingDirectory(), options.paths(), options.urls(),
             options.startupFlags());
         if (!request.fits()) {
-            failure.accept("Jasper cannot open that many paths at once.");
+            failure.accept("Jasper cannot open that many paths and web addresses at once.");
             return new Claim.Done(2);
         }
         long deadline = System.nanoTime() + timing.handoff().toNanos();

@@ -16,8 +16,9 @@ import java.util.stream.Stream;
 /**
  * One line of the handoff protocol (workspace-tabs spec 5.3): what a second launch asks the home's owner to do.
  * Protocol 3 carries the launch's intent, its working directory, its paths (absolute: resolved against that directory),
- * the start-up flags it could not apply and its web addresses (browser plan 4c). A protocol-2 line, which a launch of
- * the build before sends, is the same without the web addresses, and still decodes.
+ * the start-up flags it could not apply and its web addresses (browser plan 4c). Protocol 2 is the same without the web
+ * addresses: a request that has none is sent as protocol 2, so a running Jasper of the build before still takes it
+ * (ruling Q11), and both decode.
  *
  * @param token the token beside the owner's socket; empty until the request is sent
  * @param codeLocation the launch's jar or classes directory; empty when unknown
@@ -40,7 +41,7 @@ public record LaunchRequest(String token, Path codeLocation, long codeLocationMo
     private static final String MAGIC = "jasper";
     private static final int PROTOCOL = 3;
     private static final int FIELDS = 10;
-    /** The protocol before web addresses, which a launch of the build before sends; its line has no last field. */
+    /** The protocol before web addresses, which a request without them still uses; its line has no last field. */
     private static final int PROTOCOL_WITHOUT_URLS = 2;
 
     /**
@@ -118,13 +119,15 @@ public record LaunchRequest(String token, Path codeLocation, long codeLocationMo
     }
 
     /**
-     * One newline-terminated line of ten tab-separated fields, the web addresses last. Text is base64, so a tab or
-     * newline in a path survives; each list is its items' base64, comma-separated.
+     * One newline-terminated line of tab-separated fields: protocol 3's ten, the web addresses last, or protocol 2's
+     * nine when there are none. Text is base64, so a tab or newline in a path survives; each list is its items' base64,
+     * comma-separated.
      */
     String encode() {
-        return String.join("\t", MAGIC, Integer.toString(PROTOCOL), token, text(codeLocation.toString()),
-            Long.toString(codeLocationModified), intent.name().toLowerCase(Locale.ROOT), text(workingDirectory.toString()),
-            list(paths.stream().map(Path::toString)), list(ignoredFlags.stream()), list(urls.stream().map(URI::toString))) + "\n";
+        String line = String.join("\t", MAGIC, Integer.toString(urls.isEmpty() ? PROTOCOL_WITHOUT_URLS : PROTOCOL), token,
+            text(codeLocation.toString()), Long.toString(codeLocationModified), intent.name().toLowerCase(Locale.ROOT),
+            text(workingDirectory.toString()), list(paths.stream().map(Path::toString)), list(ignoredFlags.stream()));
+        return (urls.isEmpty() ? line : line + "\t" + list(urls.stream().map(URI::toString))) + "\n";
     }
 
     /** Null for anything this build cannot act on, including another protocol than 3 and 2. Never throws. */

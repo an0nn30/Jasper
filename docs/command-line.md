@@ -56,7 +56,7 @@ display, and exits with status 1, without starting a second Jasper:
 | `Jasper is already running but not responding. Quit it (process <pid>) and try again.` | The running Jasper did not take the request within 10 seconds. The process id is the one it recorded in `daemon/instance.pid`, left out when there is none. |
 | `Jasper could not lock its home folder (<path>): <reason>` | The instance lock could not be created or taken. |
 | `Jasper's home folder path is too long for its socket: <path>` | The handoff socket's path exceeds 100 bytes, so the running Jasper could not serve it either; set `JASPER_HOME` to a shorter folder. |
-| `Jasper cannot open that many paths at once.` | The request would exceed 1 MiB; the status is 2. |
+| `Jasper cannot open that many paths and web addresses at once.` | The request would exceed 1 MiB; the status is 2. |
 
 When Jasper restarts itself, for example with **Restart Now** on the Plugins page, the new process gets the same
 options except `--background`, `--no-window` and the paths, with `--replacing <pid>` (which the usage leaves out): it
