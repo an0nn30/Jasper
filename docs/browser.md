@@ -99,8 +99,9 @@ loads it.
 
 `%s` stands for the search terms, or the typed text. The engine is asked about what you type, except text that is an
 absolute local path, starts with `file:`, `about:`, `jasper-about:` or `chrome:`, holds a user name or password
-(`name:secret@`), or is longer than 1,000 characters ([Jasper's own requests](#jaspers-own-requests)); a suggestion of
-the engine's that is a `chrome:` address is left out.
+(`name:secret@`), names an address with a port, a query or a fragment, or with a path it loads over `https`
+(`devbox:8080`, `example.com?id=7`, `example.com/docs`), or is longer than 1,000 characters
+([Jasper's own requests](#jaspers-own-requests)); a suggestion of the engine's that is a `chrome:` address is left out.
 
 While nothing is typed, the field of a results page, of any built-in engine or of Custom while it is chosen, shows the
 search terms instead of the address; the tab, the status bar, a drag of the site icon and the saved workspace keep the

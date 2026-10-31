@@ -90,7 +90,9 @@ final class Suggestions {
     /**
      * Where to ask the engine for suggestions for {@code typed}. Plan 4b's P24: text that is an absolute local path,
      * has a {@code file:}, {@code about:} or {@code jasper-about:} scheme, or carries a user name or password is never
-     * sent, nor blank text, {@code chrome:} text (P45) or text over {@value #LONGEST} characters.
+     * sent, nor blank text, {@code chrome:} text (P45) or text over {@value #LONGEST} characters. P46, as Chromium's
+     * {@code SearchProvider::IsQuerySuitableForSuggest} reads it: nor is text that names an address with a port, a
+     * query or a fragment, or with a path it loads over https.
      *
      * @param typed the field's text
      * @param settings the settings, which choose the engine
@@ -99,8 +101,31 @@ final class Suggestions {
     static Optional<URI> request(String typed, BrowserSettings settings) {
         String text = typed.strip();
         if (!AddressInput.resolves(text) || text.length() > LONGEST || AddressInput.localPath(text).isPresent()
-            || AddressInput.scheme(text).filter(LOCAL_SCHEMES::contains).isPresent() || userInfo(text)) return Optional.empty();
+            || AddressInput.scheme(text).filter(LOCAL_SCHEMES::contains).isPresent() || userInfo(text)
+            || AddressInput.address(text).filter(Suggestions::privateAddress).isPresent()) return Optional.empty();
         return settings.searchEngine().suggestions(text, settings);
+    }
+
+    /**
+     * Whether {@code address} holds more than the server's name the network sees anyway: a user name, a port, a query or
+     * a fragment, or a path on an https address (text without a scheme loads over https).
+     */
+    private static boolean privateAddress(URI address) {
+        String authority = address.getRawAuthority();
+        return authority != null && (authority.indexOf('@') >= 0 || port(authority))
+            || filled(address.getRawQuery()) || filled(address.getRawFragment())
+            || "https".equalsIgnoreCase(address.getScheme()) && (address.isOpaque() || filled(address.getRawPath()));
+    }
+
+    /** Whether {@code authority} names a port: a colon after its host, an IPv6 address's brackets aside, and digits. */
+    private static boolean port(String authority) {
+        String host = authority.substring(authority.lastIndexOf('@') + 1);
+        int colon = host.indexOf(':', host.startsWith("[") ? Math.max(host.indexOf(']'), 0) : 0);
+        return colon >= 0 && colon < host.length() - 1;
+    }
+
+    private static boolean filled(String part) {
+        return part != null && !part.isEmpty();
     }
 
     /**

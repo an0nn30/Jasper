@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * The address field's suggestions in spec section 6's order: the typed address, the web search, the engine's
  * suggestions, single-word hosts, then the stores; what each loads; and which typed text asks the engine at all (plan
- * 4b's P24).
+ * 4b's P24 and P46).
  */
 class SuggestionsTest {
     private static final BrowserSettings GOOGLE = SearchEngineTest.settings(SearchEngine.GOOGLE, "", "");
@@ -112,12 +112,10 @@ class SuggestionsTest {
     @Test void theEngineIsAskedAboutOrdinaryText() {
         assertThat(Suggestions.request(" what is ", GOOGLE))
             .contains(URI.create("https://suggestqueries.google.com/complete/search?client=firefox&q=what+is"));
-        assertThat(Suggestions.request("example.com/docs", GOOGLE)).isPresent();
-        assertThat(Suggestions.request("https://example.com/@me", GOOGLE)).isPresent();
-        assertThat(Suggestions.request("https://example.com:8080/a:b", GOOGLE)).as("a port").isPresent();
-        assertThat(Suggestions.request("https://example.com:", GOOGLE)).as("a port being typed").isPresent();
-        assertThat(Suggestions.request("http://[::1]:8080/", GOOGLE)).as("an IPv6 host").isPresent();
-        assertThat(Suggestions.request("python: lists", GOOGLE)).as("a colon without scheme://").isPresent();
+        for (String text : List.of("example.com", "https://example.com", "devbox", "localhost", "[::1]", "10.0.0.1",
+                "http://example.com/docs", "c#", "why?", "what is a?b", "c# #tips", "python: lists"))
+            assertThat(Suggestions.request(text, GOOGLE)).as(text).isPresent();
+        assertThat(Suggestions.request("https://example.com:", GOOGLE)).as("a port not yet typed").isPresent();
         assertThat(Suggestions.request("what is", SearchEngineTest.settings(SearchEngine.CUSTOM, "https://example.com/?q=%s", "")))
             .as("custom without a suggestion URL").isEmpty();
     }
@@ -138,6 +136,20 @@ class SuggestionsTest {
             .extracting(Suggestion::id).as("the engine's chrome: suggestions left out")
             .containsExactly("search:chro", "search:chrome browser", "navigate:https://chro");
         assertThat(Suggestions.target("search:chrome browser", GOOGLE)).contains(URI.create("https://google.com/search?q=chrome+browser"));
+    }
+
+    /**
+     * P46, as Chromium's {@code SearchProvider::IsQuerySuitableForSuggest} reads it: an address with a user name, a
+     * port, a query or a fragment, or with a path Jasper loads over https, never reaches the search engine, so neither
+     * a pasted address's secrets nor an intranet host with its port do.
+     */
+    @Test void addressesWithAPortAQueryAFragmentOrAnHttpsPathAreNeverSent() {
+        for (String text : List.of("https://example.com:8080/a:b", "http://[::1]:8080/", "foo:8080", "my_host:8080", "localhost:3000",
+                "10.0.0.1:8443/x", "[::1]:8080", "https://my_host:8080", "example.com?token=abc", "http://example.com/?q=x",
+                "https://www.google.com/search?q=what+is+jcef", "http://example.com/#secret", "example.com#frag",
+                "https://example.com/@me", "https://example.com/", "https://example.com/reset/a1b2c3", "example.com/docs",
+                "devbox/app", "localhost/status", "https:example.com/private", "HTTPS://EXAMPLE.COM/A"))
+            assertThat(Suggestions.request(text, GOOGLE)).as(text).isEmpty();
     }
 
     /** P24: typed local paths and passwords never reach the search engine, not even a password half typed. */
