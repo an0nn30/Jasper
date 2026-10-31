@@ -12,7 +12,8 @@ val verifyThirdPartyNotices = tasks.register("verifyThirdPartyNotices") {
     description = "Checks that every shipped third-party jar has a license entry and that every named license file exists."
     val index = noticesApp.file("src/main/resources/dev/jasper/app/about/licenses/notices.toml")
     inputs.file(index)
-    inputs.files(rootProject.fileTree("plugins") { include("*/src/main/resources/plugin.toml", "*/src/main/resources/**/*.ttf", "*/src/main/resources/**/*.otf") })
+    inputs.files(rootProject.fileTree("plugins") { include("*/src/main/resources/plugin.toml", "*/src/main/resources/**/*.ttf", "*/src/main/resources/**/*.otf",
+        "*/src/main/resources/**/third_party/**") })
     val modules = listOf(noticesApp) + rootProject.subprojects.filter { it.path.startsWith(":jasper-plugin-") }
     inputs.files(modules.map { verificationClasspaths.getValue(it.path) })
     doLast {
@@ -46,16 +47,19 @@ val verifyThirdPartyNotices = tasks.register("verifyThirdPartyNotices") {
             }
         }
         listed.groupingBy { it }.eachCount().filterValues { it > 1 }.keys.forEach { problems.add("$it is listed twice") }
-        // Font files ship inside plugin jars, not as Maven modules: each must be listed in a component's files (spec 14.1).
-        val fonts = rootProject.subprojects.filter { it.path.startsWith(":jasper-plugin-") }.flatMap { plugin ->
+        // Font files (spec 14.1) and the files under a third_party folder ship inside plugin jars, not as Maven modules:
+        // each must be listed in a component's files.
+        val bundledFiles = rootProject.subprojects.filter { it.path.startsWith(":jasper-plugin-") }.flatMap { plugin ->
             val pluginResources = plugin.file("src/main/resources")
             val descriptor = pluginResources.resolve("plugin.toml")
             val id = if (descriptor.isFile) Regex("(?m)^id\\s*=\\s*\"([^\"]+)\"").find(descriptor.readText())?.groupValues?.get(1) else null
-            if (id == null) emptyList<String>() else pluginResources.walkTopDown().filter { it.isFile && (it.extension == "ttf" || it.extension == "otf") }
-                .map { "$id/" + it.relativeTo(pluginResources).invariantSeparatorsPath }.toList()
+            if (id == null) emptyList<String>() else pluginResources.walkTopDown().filter { it.isFile }
+                .map { it.relativeTo(pluginResources).invariantSeparatorsPath }
+                .filter { it.endsWith(".ttf") || it.endsWith(".otf") || "third_party" in it.split('/').dropLast(1) }
+                .map { "$id/$it" }.toList()
         }.toSortedSet()
-        (fonts - listedFiles.toSet()).forEach { problems.add("$it ships but no component in notices.toml lists it in files") }
-        (listedFiles.toSet() - fonts).forEach { problems.add("$it is listed in notices.toml files but no bundled plugin ships it") }
+        (bundledFiles - listedFiles.toSet()).forEach { problems.add("$it ships but no component in notices.toml lists it in files") }
+        (listedFiles.toSet() - bundledFiles).forEach { problems.add("$it is listed in notices.toml files but no bundled plugin ships it") }
         (shipped - listed.toSet()).forEach { problems.add("$it ships but no component in notices.toml lists it") }
         (listed.toSet() - shipped).forEach { problems.add("$it is listed in notices.toml but no longer ships") }
         check(problems.isEmpty()) { "Third-party notices are incomplete:\n" + problems.joinToString("\n") }

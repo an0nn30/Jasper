@@ -24,10 +24,23 @@ class ThirdPartyNoticesTest {
         var component = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().equals("CommonMark Java")).findFirst().orElseThrow();
         assertThat(component.modules()).containsExactlyInAnyOrder("org.commonmark:commonmark:0.30.0",
             "org.commonmark:commonmark-ext-gfm-tables:0.30.0", "org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0",
-            "org.commonmark:commonmark-ext-task-list-items:0.30.0");
+            "org.commonmark:commonmark-ext-task-list-items:0.30.0", "org.commonmark:commonmark-ext-gfm-alerts:0.30.0",
+            "org.commonmark:commonmark-ext-footnotes:0.30.0", "org.commonmark:commonmark-ext-autolink:0.30.0");
         assertThat(component.licenseName()).isEqualTo("BSD 2-Clause License");
         assertThat(ThirdPartyNotices.read(component.text())).contains("Copyright (c) 2015, Atlassian Pty Ltd",
             "Redistribution and use in source and binary forms", "THIS SOFTWARE IS PROVIDED");
+    }
+
+    /** Browser plan 9: CommonMark's autolink extension brings autolink-java, at the version its POM names. */
+    @Test void autolinkJavaIsListedWithItsMitLicense() {
+        var autolink = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().equals("autolink-java")).findFirst().orElseThrow();
+        assertThat(autolink.title()).isEqualTo("autolink-java 0.12.0");
+        assertThat(autolink.license()).isEqualTo("MIT");
+        assertThat(autolink.homepage()).isEqualTo("https://github.com/robinst/autolink-java");
+        assertThat(autolink.modules()).containsExactly("org.nibor.autolink:autolink:0.12.0");
+        assertThat(autolink.notice()).isEmpty();
+        assertThat(ThirdPartyNotices.read(autolink.text())).contains("Robin Stocker",
+            "Permission is hereby granted, free of charge", "THE SOFTWARE IS PROVIDED \"AS IS\"");
     }
 
     @Test void jasperComesFirstThenTheRestByNameIgnoringCase() {
