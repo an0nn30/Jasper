@@ -291,4 +291,137 @@ class MenusTest {
             release(base);
         });
     }
+
+    static final MenuItem SOURCE = new MenuItem("source", "View Source", "", "view-source", true, false);
+    static final MenuItem INSPECT = new MenuItem("inspect", "Inspect Element", "", "inspect", false, false);
+    static MenuItem tools(boolean enabled) {
+        return new MenuItem("tools", "Developer Tools", "", "", enabled, false, Hue.NEUTRAL, "", List.of(SOURCE, new MenuItem("rule", "", "", "", true, true), INSPECT));
+    }
+    static MenuButton page(boolean enabled) {
+        return new MenuButton("menu", ControlState.READY, "Page", "", ButtonKind.SECONDARY, "",
+            List.of(new MenuItem("reload", "Reload", "", "reload", true, false), tools(enabled)), "");
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): an item with children is a submenu row, which holds its children in its own popup;
+     * choosing a child reports its action and closes the menu, a disabled child reports nothing, and a disabled submenu
+     * shows disabled; an update re-describes it.
+     */
+    @Test void aSubmenuHoldsItsChildrenAndChoosingOneReportsItsAction() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, stack(page(true)), events::add)) {
+                find(view, "menu.main", JButton.class).doClick(0);
+                var popup = find(view, "menu", JComponent.class).getComponentPopupMenu();
+                assertThat(popup.getComponent(1)).isInstanceOf(Menus.Submenu.class);
+                var tools = (Menus.Submenu) popup.getComponent(1);
+                assertThat(tools.getText()).isEqualTo("Developer Tools");
+                assertThat(tools.getMenuComponents()).hasSize(3);
+                assertThat(tools.getMenuComponent(1)).isInstanceOf(Menus.Separator.class);
+                ((JMenuItem) tools.getMenuComponent(2)).doClick(0);
+                assertThat(events).as("a disabled child").isEmpty();
+                ((JMenuItem) tools.getMenuComponent(0)).doClick(0);
+                assertThat(events).containsExactly(new UiEvent.Action("view-source"));
+                assertThat(popup.isVisible()).as("choosing closes the menu").isFalse();
+                tools.doClick(0);
+                assertThat(events).as("a submenu reports nothing itself").hasSize(1);
+                view.update(stack(page(false)));
+                assertThat(((Menus.Submenu) popup.getComponent(1)).isEnabled()).as("a disabled submenu").isFalse();
+            } finally { release(context); }
+        });
+    }
+
+    /**
+     * A submenu's children show in the menu's card under the default and Enterprise kits: the menu surface behind its
+     * rows, at least a menu's minimum width, the padding of a menu; its row draws the arrow at its end, and a highlighted
+     * row the accent fill.
+     */
+    @Test void aSubmenusCardIsAMenusAndItsRowDrawsAnArrow() {
+        for (var kit : List.of(dev.jasper.ui.kit.Kit.DEFAULT, KitFixtures.enterprise())) Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.dark(), kit);
+            try {
+                var row = new Menus.Submenu(context);
+                row.describe(tools(true));
+                Menus.fill(context, row, tools(true).children(), item -> { }, cleanup -> { });
+                var card = row.getPopupMenu();
+                var size = card.getPreferredSize();
+                assertThat(size.width).as("under %s", kit.id()).isGreaterThanOrEqualTo(ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.MENU_MIN_WIDTH));
+                assertThat(card.getInsets().top).isEqualTo(ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.MENU_PADDING));
+                card.setSize(size);
+                FormsTest.layout(card);
+                var image = new java.awt.image.BufferedImage(size.width, size.height, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var g = image.createGraphics();
+                try { card.paint(g); } finally { g.dispose(); }
+                assertThat(new java.awt.Color(image.getRGB(size.width / 2, size.height - 2), true)).as("the menu's surface")
+                    .isEqualTo(ThemePainting.color(context, dev.jasper.ui.theme.SemanticColor.SURFACE_MENU));
+                row.setSize(row.getPreferredSize());
+                var plain = ButtonsTest.paint(row);
+                int d = row.arrow(), x = row.getWidth() - row.getInsets().right - d;
+                boolean inked = false;
+                for (int px = x; px <= x + d; px++) for (int py = 0; py < row.getHeight(); py++) inked |= (plain.getRGB(px, py) >>> 24) != 0;
+                assertThat(inked).as("the arrow").isTrue();
+                row.setSelected(true);
+                var highlighted = ButtonsTest.paint(row);
+                assertThat(new java.awt.Color(highlighted.getRGB(1, 1))).isEqualTo(ThemePainting.color(context, dev.jasper.ui.theme.SemanticColor.ACCENT));
+            } finally { release(context); }
+        });
+    }
+
+    /**
+     * How many times {@code popup} is put on screen while {@code body} runs, as {@code JPopupMenu.pack()} puts an open menu
+     * whose size changed on screen again; a headless popup has no size of its own to compare.
+     */
+    static int[] shownAgain(JPopupMenu popup, Runnable body) {
+        int[] shown = {0};
+        var prior = PopupFactory.getSharedInstance();
+        PopupFactory.setSharedInstance(new PopupFactory() {
+            @Override public Popup getPopup(java.awt.Component owner, java.awt.Component contents, int x, int y) {
+                if (contents == popup) shown[0]++;
+                return prior.getPopup(owner, contents, x, y);
+            }
+        });
+        try { body.run(); } finally { PopupFactory.setSharedInstance(prior); }
+        return shown;
+    }
+
+    /**
+     * Review C3 and C6: an update re-describes a submenu's children too, and an open menu whose rows change is packed to
+     * its new size.
+     */
+    @Test void anUpdateRedescribesSubmenuChildrenAndRepacksAnOpenMenu() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, stack(page(true)), e -> {})) {
+                find(view, "menu.main", JButton.class).doClick(0);
+                var popup = find(view, "menu", JComponent.class).getComponentPopupMenu();
+                assertThat(popup.isVisible()).isTrue();
+                var child = (Menus.Item) ((Menus.Submenu) popup.getComponent(1)).getMenuComponent(0);
+                child.setFont(child.getFont().deriveFont(40f));
+                view.update(stack(page(true)));
+                assertThat(child.getFont().getSize2D()).as("the child follows the menu's type again").isNotEqualTo(40f);
+                int[] shown = shownAgain(popup, () -> view.update(stack(new MenuButton("menu", ControlState.READY, "Page", "", ButtonKind.SECONDARY, "",
+                    List.of(new MenuItem("reload", "Reload", "", "reload", true, false), tools(true), new MenuItem("print", "Print…", "", "print", true, false)), ""))));
+                assertThat(popup.getComponentCount()).isEqualTo(3);
+                assertThat(shown[0]).as("packed: shown again at its new size").isEqualTo(1);
+            } finally { release(context); }
+        });
+    }
+
+    /** A press in a submenu's card is no press outside the menu, which stays open for the child's release. */
+    @Test void aPressInASubmenuIsNoPressOutside() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, stack(page(true)), e -> {})) {
+                find(view, "menu.main", JButton.class).doClick(0);
+                var popup = find(view, "menu", JComponent.class).getComponentPopupMenu();
+                var child = (JMenuItem) ((Menus.Submenu) popup.getComponent(1)).getMenuComponent(0);
+                assertThat(Menus.within(child, popup)).isTrue();
+                assertThat(Menus.within(new JButton("Outside"), popup)).isFalse();
+                var press = new java.awt.event.MouseEvent(child, java.awt.event.MouseEvent.MOUSE_PRESSED, 0, 0, 1, 1, 1, false);
+                for (var listener : java.awt.Toolkit.getDefaultToolkit().getAWTEventListeners(java.awt.AWTEvent.MOUSE_EVENT_MASK)) listener.eventDispatched(press);
+                assertThat(popup.isVisible()).isTrue();
+            } finally { release(context); }
+        });
+    }
 }

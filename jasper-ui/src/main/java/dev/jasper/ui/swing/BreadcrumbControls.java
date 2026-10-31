@@ -4,7 +4,6 @@ import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.Crumb;
-import dev.jasper.ui.model.MenuItem;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.theme.SemanticColor;
@@ -221,19 +220,11 @@ final class BreadcrumbControls {
             clearPopup();
             var crumb = value().crumbs().stream().filter(candidate -> candidate.id().equals(crumbId)).findFirst();
             if (crumb.isEmpty()) return;
-            for (MenuItem item : crumb.get().contextActions()) {
-                if (item.separator()) { popup.add(new Menus.Separator(context())); continue; }
-                var entry = new Menus.Item(context());
-                entry.describe(item);
-                // A crumb's menu acts on that crumb without navigating to it, so it reports only the item's action.
-                ActionListener chosen = event -> {
-                    if (value().crumbs().stream().anyMatch(candidate -> candidate.id().equals(crumbId) && candidate.contextActions().contains(item)))
-                        emit(new UiEvent.Action(item.action()));
-                };
-                entry.addActionListener(chosen);
-                popupCleanup.add(() -> entry.removeActionListener(chosen));
-                popup.add(entry);
-            }
+            // A crumb's menu acts on that crumb without navigating to it, so it reports only the item's action.
+            Menus.fill(context(), popup, crumb.get().contextActions(), item -> {
+                if (value().crumbs().stream().anyMatch(candidate -> candidate.id().equals(crumbId) && Menus.holds(candidate.contextActions(), item)))
+                    emit(new UiEvent.Action(item.action()));
+            }, popupCleanup::add);
             if (popup.getComponentCount() > 0 && invoker.isShowing()) popup.show(invoker, x, y);
         }
 

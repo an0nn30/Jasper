@@ -33,6 +33,8 @@ final class FakeContent implements ContentTab {
     Runnable focus=()->{};
     final List<Consumer<Boolean>> activated=new ArrayList<>();
     final List<Runnable> disposed=new ArrayList<>();
+    /** The right-click menu the tab shows; null while it shows none. */
+    FakeContentMenu menu;
     FakeContent(FakeUi ui,ContentSpec spec,WindowOwner owner,JComponent component,FakeWorkspace.Tab tab){
         this.ui=ui;this.key=spec.key();this.owner=owner;this.component=component;this.tab=tab;
         presentation=new ContentPresentation(spec.title(),"",null,false,"","");
@@ -104,9 +106,13 @@ final class FakeContent implements ContentTab {
         Objects.requireNonNull(choice,"choice");Objects.requireNonNull(direction,"direction");
         // Unguarded, so a closed content tab's split does nothing, as every other method of a closed handle does.
         if(!ui.splitChoices().contains(choice))throw new IllegalArgumentException("Not one of Jasper's split choices: "+choice.label());
-        boolean terminal=choice.equals(SplitChoice.TERMINAL);
         // Rulings 19: a local shell needs terminal.open, refused first, whatever the tab's state, as Terminals refuses.
-        if(terminal)ui.context.terminals.require(dev.jasper.sdk.Capabilities.TERMINAL_OPEN);
+        if(choice.equals(SplitChoice.TERMINAL))ui.context.terminals.require(dev.jasper.sdk.Capabilities.TERMINAL_OPEN);
+        splitBeside(choice,direction);
+    }
+    /** A Split entry beside this content, as the application runs it: Jasper's own, from a menu, asks no capability. */
+    void splitBeside(SplitChoice choice,dev.jasper.sdk.terminal.Direction direction){
+        boolean terminal=choice.equals(SplitChoice.TERMINAL);
         // A closed tab, or one waiting on a close decision, splits nothing, as it moves nowhere.
         if(!splittable())return;
         select();
@@ -123,10 +129,44 @@ final class FakeContent implements ContentTab {
         ui.host.workspace.move(tab, window);
         owner=ui.context.terminals.windowHandle(window.id); select();
     }
+    /**
+     * SDK 0.27.0: the menu shows over the tab, selected first, with Jasper's pane items as they stand now between the
+     * plugin's; another menu opening dismisses it. A closed tab shows none and hears nothing at once.
+     */
+    public void showContextMenu(java.awt.Point at,List<MenuItem> leading,List<MenuItem> trailing,Consumer<Optional<String>> chosen){
+        Objects.requireNonNull(at,"at");Objects.requireNonNull(chosen,"chosen");
+        var before=List.copyOf(leading);var after=List.copyOf(trailing);
+        FakeContentMenu.uniqueIds(before,after);
+        if(closed){chosen.accept(Optional.empty());return;}
+        FakeContentMenu.icons(before,ui.context.kit()::validateIcon);FakeContentMenu.icons(after,ui.context.kit()::validateIcon);
+        select();
+        // One menu shows at a time, over any plugin's tab.
+        ui.host.dismissContentMenus();
+        menu=new FakeContentMenu(this,before,paneItems(),after,chosen);
+    }
+    /** Jasper's pane items for this tab: Split with every Split choice's Right and Down, Move Pane to Tab, Close Pane. */
+    private List<FakeContentMenu.Host> paneItems(){
+        var split=new ArrayList<FakeContentMenu.Host>();
+        for(var choice:ui.splitChoices()){
+            split.add(new FakeContentMenu.Host(choice.rightLabel(),true,()->splitBeside(choice,dev.jasper.sdk.terminal.Direction.RIGHT),List.of()));
+            split.add(new FakeContentMenu.Host(choice.downLabel(),true,()->splitBeside(choice,dev.jasper.sdk.terminal.Direction.DOWN),List.of()));
+        }
+        var moves=new ArrayList<FakeContentMenu.Host>();
+        if(movable()){
+            var strip=ui.host.workspace.strip(tab.window);
+            for(int i=0;i<strip.size();i++){
+                if(strip.get(i)==tab.group)continue;
+                int number=i+1;
+                moves.add(new FakeContentMenu.Host(number+" "+capped(strip.get(i).recent.getFirst().title),true,()->moveToTab(number),List.of()));
+            }
+        }
+        return List.of(new FakeContentMenu.Host("Split",true,null,List.copyOf(split)),new FakeContentMenu.Host("Move Pane to Tab",!moves.isEmpty(),null,List.copyOf(moves)),
+            new FakeContentMenu.Host("Close Pane",true,this::requestClose,List.of()));
+    }
     public WindowHandle window(){return ui.context.terminals.windowHandle(tab.window.id);}
     public boolean isActive(){return active;} public boolean isClosed(){return closed;}
     public CompletableFuture<Boolean> requestClose(){return ui.closeContent(List.of(this),true);}
     public Subscription onActive(Consumer<Boolean> value){activated.add(value);return ()->activated.remove(value);}
     public Subscription onClosed(Runnable value){disposed.add(value);return ()->disposed.remove(value);}
-    public void close(){if(closed)return;active(false);closed=true;ui.contents.remove(this);ui.host.workspace.close(tab);for(var listener:List.copyOf(disposed))listener.run();disposed.clear();activated.clear();}
+    public void close(){if(closed)return;if(menu!=null)menu.dismiss();active(false);closed=true;ui.contents.remove(this);ui.host.workspace.close(tab);for(var listener:List.copyOf(disposed))listener.run();disposed.clear();activated.clear();}
 }

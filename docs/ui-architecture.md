@@ -344,7 +344,8 @@ copy of the context, so `route(ThemeRoute)` re-routes only that view.
 
 `KitOwnership.owns(component)` says whether the kit created a component; `KitOwnership.CONTEXT_MENU`
 (`"Jasper.kit.contextMenu"`) is the client property that holds a row collection's, breadcrumbs' or setting row's
-context menu.
+context menu, or a button's hold menu, and `KitOwnership.SUGGESTIONS` (`"Jasper.kit.suggestions"`) the one on a field's input that holds its
+list of suggestions while the field offers it, whether or not the popup is on screen.
 
 ### Secrets
 
@@ -423,8 +424,9 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 `Section`, `Empty`, `ItemList`, `Header`, `Panel`, `Form`, `Split`, `Table`, `Tree`, `Breadcrumbs`, `Custom`,
 `Separator`, `Notice`, `Properties`. Every node carries a `ControlState(visible, enabled, busy, error)`; `error` is
 validation prose and `ControlState.READY` is visible, enabled, idle and without an error. No node carries pixel
-dimensions, delegates or secret values, and no domain meaning is inferred from ids or text. `UiEvent` has 10 kinds:
-`Action`, `Edited`, `Selected`, `Toggled`, `Expanded`, `Removed`, `Reordered`, `SecretChanged`, `Clicked`, `Sorted`.
+dimensions, delegates or secret values, and no domain meaning is inferred from ids or text. `UiEvent` has 12 kinds:
+`Action`, `Edited`, `Selected`, `Toggled`, `Expanded`, `Removed`, `Reordered`, `SecretChanged`, `Clicked`, `Sorted`,
+`ColumnsResized`, `SuggestionChosen`.
 
 `ViewSpec` validates the whole tree: unique node ids and `Custom` content ids; depth at most 128 and at most 100,000
 nodes; a `Notice` only in a form's sections or a VERTICAL stack; a `Separator` only in an INLINE or ACTIONS stack and
@@ -446,7 +448,25 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   label from the host composition and TRANSPARENT drops the input fill on a surface that backs the field; a
   TRANSPARENT search field shows the rail-size glyph with `TRANSPARENT_FIELD_ICON_GAP`. A SEARCH field's label is its
   accessible name only (the glyph and hint label it visually). Read-only fields report no `Edited`. Single-line fields
-  never clip an enlarged font.
+  never clip an enlarged font. The leading slot takes the kind's glyph place and box under every kit: the
+  `leadingImage` (`PixelImage`, a PNG of at most 65,536 bytes, decoded once with its metadata skipped), else, while it
+  has none or it does not decode, the `leadingIcon` in the glyph's colours, else the kind's glyph; its icon is made
+  again only when what it shows, its size or the theme changes. `leadingName` is the slot's accessible name and
+  tooltip. Dragging the slot offers `leadingDrag` as a `java.net.URL` when Java has a handler for its scheme, as the
+  local file a `file:` URL names (read from the URL, not the file system) and as text. A `selectOnClick` field selects
+  all its text on the release of a left press that brought the focus into it, unless the press dragged out a
+  selection.
+- Field suggestions (`FieldSuggestions`, made the first time a field has `suggestions` or `suggestionsLoading`): a
+  non-focusable popup under the field's box and as wide as it (above it when the window has no room below), in the
+  menu's card, its rows `MENU_ITEM_HEIGHT` high, at most 8 before it scrolls: each suggestion's title, shortened with an
+  ellipsis, then its detail in `TEXT_TERTIARY`; the selected row in `SELECTION_BG`, and the row under the pointer,
+  unless selected, in `HOVER_OVERLAY` at 5%; "Loading suggestions…" last while more load. The first suggestion is
+  selected; the pointer never moves the selection, an update keeps the selected id while it is listed, and an edit
+  selects the first. A key listener on the input reads Up, Down, Tab and Enter while the list shows suggestions and Escape while
+  it shows at all, before the field's bindings, so the hidden list leaves the field's keys untouched; Tab leaves the
+  input's forward traversal keys meanwhile. A choice, Escape, a permanent focus loss and a press outside hide the list
+  until the next edit; it appears on screen only while the input has the focus, and never over another open menu. A
+  TEXTAREA, a NUMBER field and a field with a `listId` take no suggestions.
 - Field actions: `trailingAction` (Enter, not TEXTAREA or PATH), `alternateAction` (Shift+Enter, not TEXTAREA),
   `cancelAction` (Escape) and `listId`, which drives an `ItemList` with the arrow and page keys while the field keeps
   focus. A list named by a field's `listId` reserves its `visibleRows` selectable-row height even when filtered or
@@ -466,6 +486,17 @@ the title; and a field's `listId` naming an `ItemList` in the same view.
   accent or a status colour. `ButtonPresentation` EMBEDDED buttons are content-sized inline links and glyph buttons;
   CONTEXTUAL_EMBEDDED buttons reserve their full geometry but paint only for a selected, hovered or keyboard-active row
   or direct focus; HELP is a round help button. `MenuItem.hue` selects a menu item's category artwork hue.
+- Every kit menu fills through `Menus.fill`: an item with `children` is a `Menus.Submenu`, a `JMenu` drawn as a
+  `Menus.Item` with an arrow in place of a shortcut, whose children's popup is the menu's card (`Menus.Card`, a border
+  painting the surface under the rows) at least `MENU_MIN_WIDTH` wide; Swing's menu keys and pointer open it. A menu
+  button's outside-press check treats a submenu's popup as inside (`Menus.within`).
+- A button's `holdMenu` (`HoldMenu`, made the first time the button has one) opens under the button, placed as a menu
+  button's menu is (`Menus.showUnder`, which shows nothing while the button is not on screen), when a left press has
+  been held for 500 ms by its clock (the timer re-checks until then) and the button is still pressed and armed; the
+  pointer leaving the button stops the timer. It disarms the button so the release reports nothing, and the button
+  reports no click while the menu shows. A popup
+  trigger opens it at once, and Shift+F10 and the context-menu key are bound on the button only while it has items. An
+  open menu, a menu button's included, whose rows are rebuilt is packed to its new size (`Menus.repack`).
 - `Text.severity` tints text and `Text.caret` draws a command line's insertion bar. Body, description and caption text
   flows (wraps, keeping line breaks, no wider than `TEXT_FLOW_COLUMNS`) in vertical stacks, form bodies, cards and
   sections. ACTIONS stacks wrap instead of squeezing their buttons. A stack's `cancelAction` answers Escape from
@@ -664,8 +695,10 @@ refused:
   and 4,194,304 pixels in all. An SVG must have an `svg` root and passes the receiving rules: no doctype or external
   entities, no processing instructions, no `script`, `foreignObject`, `animate`, `animateTransform` or `set`, no `on*`
   or `base` attributes, fragment-only `href` and `url(...)`, no `\` or `@` in CSS, depth at most 128; external
-  resources are denied. `EncodedArtwork.checkSvg(bytes)` applies the rules without AWT and `raster(width, height)`
-  draws the artwork into a new image (1 to 8192 pixels a side).
+  resources are denied. `EncodedArtwork.checkSvg(bytes)` applies the rules without AWT, `raster(width, height)`
+  draws the artwork into a new image (1 to 8192 pixels a side) and `icon(extent)` is an icon of it fitted into a square
+  box, its densities prepared outside paint, made once per extent. A PNG is read without its metadata, so no text or
+  profile chunk is inflated.
 - **Identity artwork** (`IdentityArtwork(artwork, tileHue, selectedInk)`) adds a tile hue (not NONE) and whether a
   selected tile keeps the authored ink (`AUTHORED`) or draws a foreground silhouette (`FOREGROUND`).
 - `ReceivingArtwork` gives a receiving view scoped aliases (`received<N>:art<M>`) for host-supplied artwork, reconciled

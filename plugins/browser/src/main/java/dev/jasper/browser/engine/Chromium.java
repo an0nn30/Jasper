@@ -19,7 +19,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import org.cef.CefClient;
+import org.cef.browser.CefBrowser;
 
 /**
  * Chromium's one life in a plugin run: in process and off screen, started when a page first asks for it and disposed
@@ -71,6 +73,8 @@ public final class Chromium implements AutoCloseable {
     private final List<Consumer<CefClient>> waiting = new ArrayList<>();
     private boolean installed;
     private CefClient installedOn;
+    // Given as a page first asks for Chromium, before any page's browser is made; until then jasper-about: answers nothing.
+    private volatile Predicate<CefBrowser> pageBrowsers;
 
     /**
      * A Chromium that starts nothing until {@link #client()} is first called.
@@ -136,6 +140,23 @@ public final class Chromium implements AutoCloseable {
     }
 
     /**
+     * Has {@code jasper-about:} answer only main-frame requests of the browsers {@code pageBrowser} takes for a page's
+     * (plan 4b's P47); every other request, and any before this is given, is answered 404 and runs no action. Give it as
+     * a page first asks for Chromium, with the client's installers; the last one given counts.
+     *
+     * @param pageBrowser whether a browser is a page's; asked on Chromium's IO thread, where it must return at once
+     */
+    public void answerAboutFor(Predicate<CefBrowser> pageBrowser) {
+        pageBrowsers = Objects.requireNonNull(pageBrowser, "pageBrowser");
+    }
+
+    /** Whether {@code jasper-about:} answers {@code browser}'s main-frame requests, as {@link #answerAboutFor} says. Any thread. */
+    boolean answersAbout(CefBrowser browser) {
+        Predicate<CefBrowser> pageBrowser = pageBrowsers;
+        return pageBrowser != null && pageBrowser.test(browser);
+    }
+
+    /**
      * Where Chromium's life stands.
      *
      * @return the state
@@ -191,7 +212,7 @@ public final class Chromium implements AutoCloseable {
         if (!enter()) return;
         ChromiumApp started;
         try {
-            started = ChromiumApp.start(dataDir, about, this::terminated);
+            started = ChromiumApp.start(dataDir, about, this::answersAbout, this::terminated);
         } catch (Throwable failure) { // JCEF reports a runtime without Chromium's libraries as an Error.
             threw(failure);
             return;

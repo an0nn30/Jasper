@@ -2,45 +2,100 @@ package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
+import java.awt.Point;
+import java.awt.event.HierarchyEvent;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.IntConsumer;
+import java.util.function.ObjIntConsumer;
+import java.util.function.Predicate;
 import javax.swing.JComponent;
+import javax.swing.Timer;
 import org.cef.CefClient;
 import org.cef.browser.CefFrame;
 
 /**
- * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title, whether it loads
- * and where it can go, and what it is asked to do. Its Chromium browser is made only once {@link #start} asks for it,
- * the first time its item shows; until then the page holds the address it will load and asks nothing of Chromium.
- * Every method runs on the UI thread, and so does every callback it makes. This is the one class that makes a
- * {@link PageView}.
+ * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
+ * whether it loads, where it can go and its history, its find in page, its zoom, its failed loads and the certificates
+ * it may go on past, the HTML it shows, its {@link DevTools}, and what it is asked to do. Its
+ * Chromium browser is made only once {@link #start} asks for it, the first time its item shows; until then the page
+ * holds the address it will load and the zoom it will show at, and asks nothing of Chromium. Every method runs on the
+ * UI thread, and so does every callback it makes. This is the one class that makes a {@link PageView}: the page's, and
+ * each of its DevTools'.
  */
 public final class Page implements AutoCloseable {
+    /** The longest {@link #source} waits for Chromium's HTML. */
+    static final long SOURCE_WAIT_SECONDS = 10;
+    /** How long after a title change the page reads its history, once for the title changes meanwhile. */
+    static final int TITLE_READ_MILLIS = 250;
     private final PageView view = new PageView();
     private final Runnable changed;
+    private final Favicons favicons;
+    private final Function<Page, CompletableFuture<NavigationHistory.History>> historyReader;
+    private ObjIntConsumer<Page> historyJumper;
+    // Given the page, reads the HTML its main frame shows: Chromium's, or a test's.
+    private Function<Page, CompletableFuture<Optional<String>>> sourceReader = page -> chromiumSource(page.readyBrowser());
     private final List<Consumer<String>> loadStarts = new CopyOnWriteArrayList<>();
     private final List<Consumer<NavigationButton>> navigationButtons = new CopyOnWriteArrayList<>();
+    private final List<IntConsumer> magnifies = new CopyOnWriteArrayList<>();
     private final List<Runnable> closes = new CopyOnWriteArrayList<>();
     private final List<Runnable> navigations = new CopyOnWriteArrayList<>();
     private final List<Runnable> dialogResets = new CopyOnWriteArrayList<>();
     private final List<Consumer<String>> addressChanges = new CopyOnWriteArrayList<>();
+    private final List<Consumer<LoadFailure>> loadFailures = new CopyOnWriteArrayList<>();
+    // Which certificates Chromium may go on past; read on Chromium's thread.
+    private volatile Predicate<ServerCertificate> certificates = certificate -> false;
+    // The certificate last refused for a main-frame load, and its address, until that address's failure takes it.
+    private ServerCertificate refused;
+    private String refusedUrl;
     private BiFunction<String, TabPlacement, Optional<Page>> opener = (url, placement) -> Optional.empty();
     private Runnable itemCloser = () -> { }, itemShower = () -> { };
-    // Where the page's dialogs and file choosers show; its item gives it.
+    // Where the page's dialogs and file choosers show, and where its right-click menu shows; its item gives them.
     private DialogPlace dialogPlace;
+    private MenuPlace menuPlace;
     // What the page loads once its browser can: first its start, then the last address asked for before that.
     private URI requested;
     // Where the page is, as Chromium last reported it, or what it was last asked to load since.
     private String address;
+    // The document the main frame shows, as Chromium last reported a navigation there committed; empty before the
+    // first. Read on Chromium's thread.
+    private volatile String committed = "";
     private String title = "";
+    // The favicon of the document the main frame shows; the icon that document named, null until it names one; and the
+    // fetch of that icon while it runs. The document is counted by the main frame's load starts, as a script's pushState
+    // changes the address and not the document.
+    private Optional<PixelImage> favicon = Optional.empty();
+    private long document;
+    private URI declaredIcon;
+    private CompletableFuture<Optional<PixelImage>> iconFetch;
+    // The history as last read; whether a read runs, and whether the history changed since that read began.
+    private NavigationHistory.History history = NavigationHistory.History.EMPTY;
+    private boolean readingHistory, historyStale;
+    // Reads the history a moment after the title changed: a page that animates its title would read it on each change.
+    private final Timer titleRead = new Timer(TITLE_READ_MILLIS, event -> readHistory());
     private boolean loading, canGoBack, canGoForward, started, ready, closed;
+    // The zoom the page shows at, as Chromium's level; read on Chromium's thread as each main-frame navigation commits.
+    private volatile double zoomLevel;
+    // The page's find in page, made the first time it is asked for.
+    private PageFind find;
+    // The DevTools made for the page last, until they end; null before and after.
+    private DevTools devTools;
+    // Given DevTools and a point, has Chromium make their browser through the page's and answers what closes it, or empty
+    // while the page's browser is not ready: a test's, or null for Chromium's. Null by default, so that making a page
+    // loads no DevTools class.
+    private BiFunction<DevTools, Point, Optional<Runnable>> devToolsOpener;
     private PageBrowser browser;
     // The address the browser was made with, which it loads by itself.
     private String made;
@@ -49,13 +104,39 @@ public final class Page implements AutoCloseable {
      * A page that will load {@code url}, with its canvas and no browser yet.
      *
      * @param url what it loads first
-     * @param changed told whenever its address, title, loading state or where it can go changes
+     * @param changed told whenever its address, title, favicon, loading state, where it can go or its history changes
+     * @param favicons fetches the favicons its documents name
      */
-    public Page(URI url, Runnable changed) {
+    public Page(URI url, Runnable changed, Favicons favicons) {
+        // Functions of the page, not of its browser's type: making a page loads no Chromium class.
+        this(url, changed, favicons, page -> NavigationHistory.read(page.readyBrowser()),
+            (page, id) -> NavigationHistory.goTo(page.readyBrowser(), id));
+    }
+
+    /**
+     * A page that reads its history with {@code historyReader} and goes to an entry of it with {@code historyJumper}.
+     *
+     * @param url what it loads first
+     * @param changed told whenever its address, title, favicon, loading state, where it can go or its history changes
+     * @param favicons fetches the favicons its documents name
+     * @param historyReader given the page, reads its history, as {@link NavigationHistory#read} reads its browser's
+     * @param historyJumper given the page and an entry's id, goes there, as {@link NavigationHistory#goTo} does
+     */
+    Page(URI url, Runnable changed, Favicons favicons, Function<Page, CompletableFuture<NavigationHistory.History>> historyReader,
+         ObjIntConsumer<Page> historyJumper) {
         requested = Objects.requireNonNull(url, "url");
         address = url.toString();
         this.changed = Objects.requireNonNull(changed, "changed");
+        this.favicons = Objects.requireNonNull(favicons, "favicons");
+        this.historyReader = Objects.requireNonNull(historyReader, "historyReader");
+        this.historyJumper = Objects.requireNonNull(historyJumper, "historyJumper");
+        titleRead.setRepeats(false);
         view.onNavigationButton(this::navigationButton);
+        view.onMagnify(this::magnified);
+        // Chromium keeps one zoom per host, which another page on the same host may have changed meanwhile.
+        view.addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && view.isShowing()) showZoom();
+        });
     }
 
     /**
@@ -69,8 +150,9 @@ public final class Page implements AutoCloseable {
 
     /**
      * Makes the page's browser: asks {@code chromium} for its client, starting Chromium when no page has yet, and makes
-     * the browser once the client is ready, which then loads what the page was last asked to. The client's display, load
-     * and keyboard handlers are installed before any page is made on it. Once; nothing after {@link #close()}.
+     * the browser once the client is ready, which then loads what the page was last asked to. The client's display, load,
+     * keyboard and context-menu handlers are installed before any page is made on it. Once; nothing after
+     * {@link #close()}.
      *
      * @param chromium the plugin's Chromium
      */
@@ -79,6 +161,7 @@ public final class Page implements AutoCloseable {
         if (started || closed) return;
         started = true;
         PageEvents.prepare(chromium);
+        PageMenu.prepare(chromium);
         // A ready client completes on the UI thread; a failure can complete anywhere, and the plugin tells it once.
         chromium.client().whenComplete((client, failure) -> {
             if (failure == null) EventQueue.invokeLater(() -> make(client));
@@ -109,6 +192,22 @@ public final class Page implements AutoCloseable {
         changed.run();
     }
 
+    /**
+     * Loads {@code errorPage}, one of Jasper's error pages, in place of a load that failed, as {@link #load} would, but
+     * without telling those who asked {@link #onNavigate}: the page shows what became of where it was going, and goes
+     * nowhere else.
+     *
+     * @param errorPage the error page's address
+     */
+    public void showError(URI errorPage) {
+        Objects.requireNonNull(errorPage, "errorPage");
+        if (closed) return;
+        requested = errorPage;
+        address = errorPage.toString();
+        if (ready) browser.loadURL(address);
+        changed.run();
+    }
+
     /** Goes back in the page's history, when it can: a page with nothing before this entry does nothing. */
     public void back() {
         if (!ready || closed || !canGoBack) return;
@@ -123,6 +222,38 @@ public final class Page implements AutoCloseable {
         browser.goForward();
     }
 
+    /**
+     * Goes to entry {@code id} of the page's history, as Back's and Forward's hold menus choose it: an entry of the
+     * history as last read ({@link #history()}) other than the current one. An entry it no longer has and the current
+     * one do nothing; a page has no history to go to before its browser is ready. Those who asked {@link #onNavigate}
+     * are told before the page goes, so they are told too when Chromium then refuses the entry, as it does one dropped
+     * from the history after the last read, and the page stays where it is.
+     *
+     * @param id the entry's id
+     */
+    public void goToHistoryEntry(int id) {
+        if (closed || !history.jumpsTo(id)) return;
+        navigated();
+        historyJumper.accept(this, id);
+    }
+
+    /**
+     * Shows the page at {@code level}, Chromium's zoom level: 0 is 100%, and each level up is 1.2 times the size. Before
+     * the page has its browser, the level its browser takes once made. Chromium keeps one zoom per host, shared by every
+     * page on it, and shows it as a new document loads, so the page shows its own again as each main-frame load starts
+     * and each time its canvas shows. Two pages on one host that show at once share one zoom, the one set last: JCEF
+     * gives no zoom of a page's own. Nothing after {@link #close()}.
+     *
+     * @param level the zoom level
+     * @throws IllegalArgumentException for a level that is not finite
+     */
+    public void setZoomLevel(double level) {
+        if (!Double.isFinite(level)) throw new IllegalArgumentException("Not a zoom level: " + level);
+        if (closed) return;
+        zoomLevel = level;
+        showZoom();
+    }
+
     /** Loads the page again. */
     public void reload() {
         if (ready && !closed) browser.reload();
@@ -133,26 +264,29 @@ public final class Page implements AutoCloseable {
         if (ready && !closed) browser.stopLoad();
     }
 
+    /** Cuts the selection of the page's focused frame, as its Edit menu's Cut would. */
+    public void cut() {
+        onFocusedFrame(CefFrame::cut);
+    }
+
     /** Copies the selection of the page's focused frame, as its Edit menu's Copy would. */
     public void copy() {
-        CefFrame frame = focusedFrame();
-        if (frame == null) return;
-        try {
-            frame.copy();
-        } finally {
-            frame.dispose();
-        }
+        onFocusedFrame(CefFrame::copy);
     }
 
     /** Pastes the clipboard into the page's focused frame, as its Edit menu's Paste would. */
     public void paste() {
-        CefFrame frame = focusedFrame();
-        if (frame == null) return;
-        try {
-            frame.paste();
-        } finally {
-            frame.dispose();
-        }
+        onFocusedFrame(CefFrame::paste);
+    }
+
+    /** Selects all of the page's focused frame, as its Edit menu's Select All would. */
+    public void selectAll() {
+        onFocusedFrame(CefFrame::selectAll);
+    }
+
+    /** Opens Chromium's print dialog for the page. */
+    public void print() {
+        if (ready && !closed) browser.print();
     }
 
     /** Gives the page the keyboard focus. */
@@ -170,12 +304,135 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * The address of the document the page's main frame shows, as Chromium last reported a navigation there committed:
+     * what the page itself may open from, which decides what Jasper opens for it with its own rights
+     * ({@link LinkSchemes#opensFrom}). Unlike {@link #address()}, never where the page was only asked to go. Any thread.
+     *
+     * @return the address, as Chromium writes it; empty before the first navigation commits
+     */
+    public String committedAddress() {
+        return committed;
+    }
+
+    /**
      * The page's title.
      *
      * @return the title, or empty while the page has none
      */
     public String title() {
         return title;
+    }
+
+    /**
+     * The favicon of the document the page's main frame shows, fetched once that document named it, while the page is
+     * still where it was fetched for. A main frame's load start clears it.
+     *
+     * @return the favicon, or empty while the page has none
+     */
+    public Optional<PixelImage> favicon() {
+        return favicon;
+    }
+
+    /**
+     * The document the page's main frame showed at {@code document} names its favicon at {@code icon}, as the page's
+     * script reports through the opener bridge: the page fetches it, and the favicon is the page's if it arrives while
+     * the page still shows that document, whatever its scripts' {@code pushState} made of its address since (plan 4b's
+     * W5). Each document names one: a request after the first, one from an address the page is no longer at, a
+     * fragment aside, and any after {@link #close()} are ignored. The bridge has checked {@code icon}, which any script
+     * in the page could have sent.
+     *
+     * @param icon the icon's address
+     * @param document the address of the document that named it
+     */
+    public void faviconDeclared(URI icon, String document) {
+        Objects.requireNonNull(icon, "icon");
+        Objects.requireNonNull(document, "document");
+        if (closed || declaredIcon != null || !samePage(document, address)) return;
+        URI page;
+        try {
+            page = new URI(document);
+        } catch (URISyntaxException notAUri) {
+            return;
+        }
+        declaredIcon = icon;
+        long declaredIn = this.document;
+        CompletableFuture<Optional<PixelImage>> fetch = favicons.fetch(icon, page);
+        iconFetch = fetch;
+        fetch.whenComplete((image, failure) -> EventQueue.invokeLater(() -> {
+            if (fetch != iconFetch) return; // dropped by a load start or the close
+            iconFetch = null;
+            faviconArrived(declaredIn, failure == null ? image : Optional.empty());
+        }));
+    }
+
+    /**
+     * The HTML of the document the page's main frame shows now, as Chromium serializes it, the page's scripts' changes
+     * with it: what View Source shows of a page it does not fetch again. It completes on any thread, never with an
+     * exception: empty before the page has its browser, after {@link #close()}, and when Chromium gives nothing within
+     * {@value #SOURCE_WAIT_SECONDS} seconds.
+     *
+     * @return the HTML, to come
+     */
+    public CompletableFuture<Optional<String>> source() {
+        if (closed) return CompletableFuture.completedFuture(Optional.empty());
+        CompletableFuture<Optional<String>> read = sourceReader.apply(this);
+        return read == null ? CompletableFuture.completedFuture(Optional.empty()) : read;
+    }
+
+    /**
+     * Chromium's DevTools for the page, inspecting the element at {@code at} on its canvas, as Inspect Element asks (spec
+     * section 10): new DevTools, with a canvas of their own, whose browser Chromium makes once that canvas is in a window
+     * and the DevTools made for the page before have closed, which their item closes as it shows these. None before the
+     * page's browser is ready, and none after {@link #close()}.
+     *
+     * @param at the point, on the page's canvas
+     * @return the DevTools, or empty
+     */
+    public Optional<DevTools> inspect(Point at) {
+        Objects.requireNonNull(at, "at");
+        return ready && !closed ? Optional.of(devTools(at)) : Optional.empty();
+    }
+
+    /**
+     * The page's find in page, which searches the frames of its browser once it has one: none before.
+     *
+     * @return the find, made the first time it is asked for
+     */
+    public PageFind find() {
+        if (find == null) {
+            find = PageFind.of(this);
+            if (closed) find.close();
+        }
+        return find;
+    }
+
+    /**
+     * A frame of the page answers a search of its find, as {@code find.js} reports through the opener bridge, which has
+     * checked the answer's shape and bounds; the find takes it only for its search under way and from a frame it
+     * reached. Nothing before the page's find is made, or after {@link #close()}.
+     *
+     * @param frame the identifier of the frame that answered, as Chromium names it
+     * @param search the search the answer is for
+     * @param count the frame's matches
+     * @param invalid whether the frame found the query no regular expression
+     */
+    public void findAnswered(String frame, long search, int count, boolean invalid) {
+        Objects.requireNonNull(frame, "frame");
+        if (!closed && find != null) find.answered(frame, search, count, invalid);
+    }
+
+    /**
+     * A frame of the page answers its find's request for the selection, as {@code find.js} reports through the opener
+     * bridge; the find takes it only for its request under way and from the frame it asked.
+     *
+     * @param frame the identifier of the frame that answered
+     * @param search the request the answer is for
+     * @param selection the frame's selected text
+     */
+    public void findSelected(String frame, long search, String selection) {
+        Objects.requireNonNull(frame, "frame");
+        Objects.requireNonNull(selection, "selection");
+        if (!closed && find != null) find.selected(frame, search, selection);
     }
 
     /**
@@ -206,6 +463,16 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * The page's history, as read from Chromium after each main-frame load end, committed navigation and title change.
+     *
+     * @return the history last read; {@link NavigationHistory.History#EMPTY} before the first read and after a read
+     *     that failed
+     */
+    public NavigationHistory.History history() {
+        return history;
+    }
+
+    /**
      * Tells {@code listener} each time the mouse's back or forward button is released over the page, on Windows and
      * Linux. The page itself never sees those buttons.
      *
@@ -216,6 +483,19 @@ public final class Page implements AutoCloseable {
         Objects.requireNonNull(listener, "listener");
         navigationButtons.add(listener);
         return () -> navigationButtons.remove(listener);
+    }
+
+    /**
+     * Tells {@code listener} each step Ctrl+wheel over the page magnifies it by, on Windows and Linux. There the page
+     * itself never sees Ctrl+wheel, so Chromium's own Ctrl+wheel zoom never applies; on macOS it is the page's.
+     *
+     * @param listener told 1 for a step bigger, -1 for a step smaller, on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onMagnify(IntConsumer listener) {
+        Objects.requireNonNull(listener, "listener");
+        magnifies.add(listener);
+        return () -> magnifies.remove(listener);
     }
 
     /**
@@ -242,6 +522,60 @@ public final class Page implements AutoCloseable {
         if (closed) return () -> { };
         addressChanges.add(listener);
         return () -> addressChanges.remove(listener);
+    }
+
+    /**
+     * Tells {@code listener} each time a load of the page's main frame fails, as Chromium reports it, a load the user or
+     * a download stopped among them. The failure carries the certificate Jasper refused for that address, if it did
+     * ({@link #certificateRefused}).
+     *
+     * @param listener told on the UI thread
+     * @return the registration; the page's close ends it
+     */
+    public Subscription onLoadFailure(Consumer<LoadFailure> listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (closed) return () -> { };
+        loadFailures.add(listener);
+        return () -> loadFailures.remove(listener);
+    }
+
+    /**
+     * Has Chromium go on past a certificate it could not verify only when {@code allowed} says so; until then it goes on
+     * past none. It replaces the one before.
+     *
+     * @param allowed told the certificate on Chromium's thread; it must answer at once and must not throw
+     */
+    public void allowCertificates(Predicate<ServerCertificate> allowed) {
+        Objects.requireNonNull(allowed, "allowed");
+        if (!closed) certificates = allowed;
+    }
+
+    /**
+     * Whether Chromium may go on past {@code certificate}, which it could not verify for a load of the page. Any
+     * thread: it reads only the volatile answer {@link #allowCertificates} gave, which {@link #close()} replaces with one
+     * that allows nothing.
+     *
+     * @param certificate the certificate
+     * @return whether the page's item allows it; false after {@link #close()}
+     */
+    public boolean allowsCertificate(ServerCertificate certificate) {
+        Objects.requireNonNull(certificate, "certificate");
+        return certificates.test(certificate);
+    }
+
+    /**
+     * Chromium was told not to go on past {@code certificate} for the load of {@code url}: the failure of that load that
+     * follows carries it. Nothing after {@link #close()}.
+     *
+     * @param url the address whose load met it, as Chromium gave it
+     * @param certificate the certificate
+     */
+    public void certificateRefused(String url, ServerCertificate certificate) {
+        Objects.requireNonNull(url, "url");
+        Objects.requireNonNull(certificate, "certificate");
+        if (closed) return;
+        refusedUrl = url;
+        refused = certificate;
     }
 
     /**
@@ -276,6 +610,19 @@ public final class Page implements AutoCloseable {
      */
     public void onCloseItem(Runnable closer) {
         itemCloser = Objects.requireNonNull(closer, "closer");
+    }
+
+    /**
+     * A link the page's DevTools open in a new tab, as a URL clicked in their Console: it opens in the tab next to the
+     * page's, as the page's right-click menu opens a link, when the document the page shows could open it
+     * ({@link #committedAddress()}, {@link LinkSchemes#opensFrom}, 4a's R36), as what the DevTools show comes from the
+     * page. Nothing after {@link #close()}.
+     *
+     * @param url the address, as Chromium gave it
+     */
+    public void openFromDevTools(String url) {
+        Objects.requireNonNull(url, "url");
+        if (!closed && LinkSchemes.opensFrom(committed, url)) openItem(url, TabPlacement.NEXT_TAB);
     }
 
     /** The page asks to close its item, as a script's {@code window.close()} does. Nothing after {@link #close()}. */
@@ -336,6 +683,26 @@ public final class Page implements AutoCloseable {
     }
 
     /**
+     * Has the page's right-click menu show at {@code place}: the page's item gives it once it has its tab. It replaces the
+     * one before.
+     *
+     * @param place over the item's tab, with the plugin's clipboard and the chosen search engine
+     */
+    public void setMenuPlace(MenuPlace place) {
+        Objects.requireNonNull(place, "place");
+        if (!closed) menuPlace = place;
+    }
+
+    /**
+     * Where the page's right-click menu shows.
+     *
+     * @return the place its item gave, or empty before that and after {@link #close()}
+     */
+    public Optional<MenuPlace> menuPlace() {
+        return closed ? Optional.empty() : Optional.ofNullable(menuPlace);
+    }
+
+    /**
      * Tells {@code listener} each time Chromium cancels the page's dialogs, as it does when a new document replaces the
      * page's: a dialog shown or waiting to show for the page is then no longer asked.
      *
@@ -357,8 +724,8 @@ public final class Page implements AutoCloseable {
 
     /**
      * Tells {@code listener} each time Jasper, not the page's document, sends the page elsewhere: {@link #load}, or a
-     * {@link #back} or {@link #forward} the page's history allows, as the user's address field, Web menu and mouse buttons
-     * do. Chromium puts such a
+     * {@link #back}, {@link #forward} or {@link #goToHistoryEntry} the page's history allows, as the user's address field,
+     * Web menu, toolbar and mouse buttons do; a history entry Chromium then refuses has told it too. Chromium puts such a
      * page in a window group of its own, apart from its opener and its popups.
      *
      * @param listener told on the UI thread, before the page goes
@@ -407,13 +774,23 @@ public final class Page implements AutoCloseable {
         closed = true;
         loadStarts.clear();
         navigationButtons.clear();
+        magnifies.clear();
         navigations.clear();
         dialogResets.clear();
         addressChanges.clear();
+        loadFailures.clear();
+        refused = null;
+        refusedUrl = null;
+        certificates = certificate -> false;
         opener = (url, placement) -> Optional.empty();
         itemCloser = () -> { };
         itemShower = () -> { };
         dialogPlace = null;
+        menuPlace = null;
+        dropFaviconFetch();
+        titleRead.stop();
+        if (find != null) find.close();
+        if (devTools != null) devTools.close();
         view.setHoverUrl("");
         PageBrowser page = browser;
         if (page != null) page.close(true);
@@ -423,11 +800,17 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * The frame that has the page's focus, or none before the page has its browser or after its close; the caller
-     * disposes it, which releases only this handle to the frame.
+     * Runs {@code command} on the frame that has the page's focus, then releases only this handle to the frame; nothing
+     * before the page has its browser or after its close.
      */
-    private CefFrame focusedFrame() {
-        return ready && !closed ? browser.getFocusedFrame() : null;
+    private void onFocusedFrame(Consumer<CefFrame> command) {
+        CefFrame frame = ready && !closed ? browser.getFocusedFrame() : null;
+        if (frame == null) return;
+        try {
+            command.accept(frame);
+        } finally {
+            frame.dispose();
+        }
     }
 
     /** Jasper sends the page elsewhere. */
@@ -439,6 +822,17 @@ public final class Page implements AutoCloseable {
     private void navigationButton(NavigationButton button) {
         if (closed) return;
         for (Consumer<NavigationButton> listener : navigationButtons) listener.accept(button);
+    }
+
+    /** Ctrl+wheel over the page magnifies it a step bigger, 1, or smaller, -1. */
+    private void magnified(int direction) {
+        if (closed) return;
+        for (IntConsumer listener : magnifies) listener.accept(direction);
+    }
+
+    /** The browser, once it hears what it is asked, shows the page at its zoom. */
+    private void showZoom() {
+        if (ready && !closed) browser.setZoomLevel(zoomLevel);
     }
 
     /** The client is ready: makes the browser, which loads what the page was last asked to. */
@@ -455,23 +849,133 @@ public final class Page implements AutoCloseable {
     void created(PageBrowser created) {
         if (closed || created != browser) return;
         ready = true;
+        showZoom();
         String next = requested.toString();
         if (!next.equals(made)) browser.loadURL(next);
     }
 
-    /** The main frame's address changed. */
+    /** The main frame's address changed: a navigation there committed. */
     void addressChanged(String url) {
         if (closed || url == null) return;
         address = url;
+        committed = url;
         changed.run();
         for (Consumer<String> listener : addressChanges) listener.accept(url);
+        readHistory();
     }
 
-    /** The page's title changed. */
+    /** The page's title changed: the history, whose entries carry titles, is read a moment later (plan 4b's W9). */
     void titleChanged(String value) {
         if (closed) return;
         title = value == null ? "" : value;
         changed.run();
+        if (!titleRead.isRunning()) titleRead.start();
+    }
+
+    /** The main frame finished loading. */
+    void loadEnded() {
+        if (!closed) readHistory();
+    }
+
+    /**
+     * A load of the main frame failed: those who asked {@link #onLoadFailure} are told, with the certificate refused for
+     * {@code url}, which this failure takes.
+     */
+    void loadFailed(String url, String code) {
+        if (closed || url == null) return;
+        Optional<ServerCertificate> certificate = Optional.empty();
+        if (refused != null && url.equals(refusedUrl)) {
+            certificate = Optional.of(refused);
+            refused = null;
+            refusedUrl = null;
+        }
+        var failure = new LoadFailure(url, code == null ? "" : code, certificate);
+        for (Consumer<LoadFailure> listener : loadFailures) listener.accept(failure);
+    }
+
+    /**
+     * Reads the page's history again, as it may have changed: at once, or once the read that runs ends, so that one read
+     * runs at a time however often the page changes.
+     */
+    private void readHistory() {
+        titleRead.stop(); // this read covers the title changed so far
+        if (closed) return;
+        if (readingHistory) {
+            historyStale = true;
+            return;
+        }
+        readingHistory = true;
+        historyStale = false;
+        historyReader.apply(this).whenComplete((read, failure) -> EventQueue.invokeLater(() ->
+            historyRead(failure == null && read != null ? read : NavigationHistory.History.EMPTY)));
+    }
+
+    /** The zoom the page shows at, as Chromium's level. Any thread. */
+    double zoomLevel() {
+        return zoomLevel;
+    }
+
+    /** The page's browser once it hears what it is asked; null before. */
+    PageBrowser readyBrowser() {
+        return ready ? browser : null;
+    }
+
+    /**
+     * New DevTools for the page at {@code at}, on a new canvas, waiting for those made before; whether Chromium can make
+     * their browser is theirs to find out ({@link #inspect} makes them only for a ready page).
+     */
+    DevTools devTools(Point at) {
+        DevTools made = new DevTools(this, new PageView(), at, devTools);
+        devTools = made;
+        made.onEnd(() -> { if (devTools == made) devTools = null; });
+        if (closed) made.close();
+        return made;
+    }
+
+    /**
+     * Has Chromium make {@code tools}' browser, inspecting the element at {@code at} on the page's canvas, through the
+     * page's browser: what closes it, or empty while the page's browser is not ready or the page has closed.
+     */
+    Optional<Runnable> openDevTools(DevTools tools, Point at) {
+        if (devToolsOpener != null) return Objects.requireNonNull(devToolsOpener.apply(tools, at), "opened");
+        PageBrowser target = readyBrowser();
+        if (target == null || closed) return Optional.empty();
+        target.openDevTools(tools, at);
+        return Optional.of(target::closeDevTools);
+    }
+
+    /** Has the page ask for its DevTools' browsers with {@code replacement} from now on, as a test's recording one. */
+    void useDevToolsOpener(BiFunction<DevTools, Point, Optional<Runnable>> replacement) {
+        devToolsOpener = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page go to its history's entries with {@code replacement} from now on, as a test's recording one. */
+    void useHistoryJumper(ObjIntConsumer<Page> replacement) {
+        historyJumper = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page read the HTML it shows with {@code replacement} from now on, as a test's. */
+    void useSourceReader(Function<Page, CompletableFuture<Optional<String>>> replacement) {
+        sourceReader = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /** Has the page find with {@code replacement} from now on, as a test's recording one. */
+    void useFind(PageFind replacement) {
+        find = Objects.requireNonNull(replacement, "replacement");
+    }
+
+    /**
+     * A read of the page's history gave {@code read}, or {@link NavigationHistory.History#EMPTY} when it failed: the
+     * page's history from now on, and the page reads it again if it changed since the read began.
+     */
+    void historyRead(NavigationHistory.History read) {
+        readingHistory = false;
+        if (closed) return;
+        if (!read.equals(history)) {
+            history = read;
+            changed.run();
+        }
+        if (historyStale) readHistory();
     }
 
     /** The page started or stopped loading, and where it can go changed. */
@@ -485,15 +989,70 @@ public final class Page implements AutoCloseable {
 
     /**
      * The main frame started loading {@code url}: the page has no title until the new document gives one, whatever
-     * Chromium reports for a document without one.
+     * Chromium reports for a document without one, and no favicon until the new document names one. A favicon still
+     * being fetched for the document before is dropped, and the find's search ends.
      */
     void loadStarted(String url) {
         if (closed) return;
-        if (!title.isEmpty()) {
-            title = "";
-            changed.run();
-        }
+        if (find != null) find.dropped();
+        document++;
+        dropFaviconFetch();
+        declaredIcon = null;
+        boolean cleared = !title.isEmpty() || favicon.isPresent();
+        title = "";
+        favicon = Optional.empty();
+        if (cleared) changed.run();
         for (Consumer<String> listener : loadStarts) listener.accept(url == null ? "" : url);
+    }
+
+    /** The icon the current document named, or empty before it names one. */
+    Optional<URI> declaredFavicon() {
+        return Optional.ofNullable(declaredIcon);
+    }
+
+    /** Whether the page fetches a favicon. */
+    boolean fetchingFavicon() {
+        return iconFetch != null;
+    }
+
+    /** Which document the main frame shows, counted by its load starts. */
+    long document() {
+        return document;
+    }
+
+    /** A favicon fetched for the {@code fetchedFor}th document arrived: it is the page's while the page shows that one. */
+    void faviconArrived(long fetchedFor, Optional<PixelImage> image) {
+        if (closed || image.isEmpty() || fetchedFor != document) return;
+        favicon = image;
+        changed.run();
+    }
+
+    private void dropFaviconFetch() {
+        CompletableFuture<Optional<PixelImage>> fetch = iconFetch;
+        iconFetch = null;
+        if (fetch != null) fetch.cancel(true);
+    }
+
+    /** The HTML {@code browser}'s main frame shows, as Chromium's {@code getSource} gives it; none without a browser. */
+    private static CompletableFuture<Optional<String>> chromiumSource(PageBrowser browser) {
+        var source = new CompletableFuture<Optional<String>>();
+        if (browser == null) {
+            source.complete(Optional.empty());
+            return source;
+        }
+        source.completeOnTimeout(Optional.empty(), SOURCE_WAIT_SECONDS, TimeUnit.SECONDS);
+        browser.getSource(html -> source.complete(Optional.ofNullable(html)));
+        return source;
+    }
+
+    /** Whether two addresses are the same page: the same but for their fragments. */
+    private static boolean samePage(String one, String other) {
+        return withoutFragment(one).equals(withoutFragment(other));
+    }
+
+    private static String withoutFragment(String address) {
+        int hash = address.indexOf('#');
+        return hash < 0 ? address : address.substring(0, hash);
     }
 
     /** The address of the link under the pointer, or empty. Any thread. */

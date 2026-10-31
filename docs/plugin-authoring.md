@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets, the Browser and the Enterprise look are bundled plugins built only against the public plugin
-SDK this guide describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.26.0,
+SDK this guide describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.27.0,
 task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
@@ -65,7 +65,7 @@ id = "dev.example.tool"
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.26.0, <0.27"
+sdk = ">=0.27.0, <0.28"
 description = "Runs the tool from the command palette."
 vendor = "Example"
 homepage = "https://example.dev/tool"
@@ -91,7 +91,7 @@ summary = "Run the tool"
 | `name` | string | yes | Must show something: not only spaces, zero-width or bidi characters. It titles the plugin's row, Settings page and notification groups. |
 | `version` | string | yes | One to three numbers separated by dots, without leading zeros or a pre-release tag; missing numbers are 0, so `1.0` is `1.0.0`. |
 | `entry` | string | yes | The qualified name of the [entry class](#the-entry-point-and-lifecycle), which must be in a package. |
-| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.26.0 declares `sdk = ">=0.26.0, <0.27"`. |
+| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.27.0 declares `sdk = ">=0.27.0, <0.28"`. |
 | `description` | string | no | The Overview on the plugin's details in Settings › Plugins; searched there. |
 | `vendor` | string | no | Shown in the plugin list, its details and its review sheet. |
 | `homepage` | string | no | An absolute `http` or `https` address, linked as "Plugin homepage ↗" on the plugin's details. Anything else is ignored with a warning in the log. |
@@ -609,6 +609,8 @@ tab strip, the window and its menus, and the status bar; the plugin provides the
   key the plugin has open selects that tab and returns its handle, without mounting the view passed.
 - `setPresentation(new ContentPresentation(title, detail, icon, dirty, location, host))`: the tab shows "● " before the
   title while dirty and the detail after it; its tooltip is the location, which Jasper never treats as a local path.
+  `withImage(image)` shows a [`PixelImage`](sdk-reference.html#dev.jasper.sdk.ui.PixelImage), such as a web page's
+  favicon, in place of the icon, which stays the fallback for an image that does not decode.
 - `setCommands(List<ContentCommand>)`: commands appear in the tab's right-click menu, after Move Tab to New Window, Move
   Tab Into and Close Tab, and their shortcuts work while the tab is active. Commands with the ids `find`, `find-next`,
   `find-previous`, `copy`, `paste`, `font-bigger`, `font-smaller` and `font-reset` answer Jasper's Find, Find Next,
@@ -618,6 +620,13 @@ tab strip, the window and its menus, and the status bar; the plugin provides the
   text is empty), be `dimmed` (painted in the disabled colour, still clickable), and carry a menu of
   [`ContentStatus.MenuEntry`](sdk-reference.html#dev.jasper.sdk.ui.ContentStatus.MenuEntry) items, check items and
   separator lines, which a click opens in place of `run`.
+- `showContextMenu(at, leading, trailing, chosen)` (SDK 0.27.0) shows a right-click menu over the content at `at`, a
+  point on screen: the `leading` [`MenuItem`](sdk-reference.html#dev.jasper.sdk.ui.MenuItem)s, the pane items Jasper
+  offers for any item (Split, Move Pane to Tab and Close Pane, as a terminal's right-click menu has them), then
+  `trailing`, with a separator between groups and none for an empty group. The tab is selected first, so Jasper's items
+  act on its pane. `chosen` hears the id of the plugin's item chosen, or nothing when one of Jasper's items ran, the
+  menu was dismissed, or the tab is closed or not on screen; it hears once. Item ids must be unique across the whole
+  menu, submenus included; an item's `action` is ignored, but must not be blank.
 - `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `moveToNewWindow()` moves the tab to a new window
   (a window's only tab stays where it is) and `moveToWindow(window)` to the end of another window's strip, keeping the
   view and its state, and `window()` is the window that holds it.
@@ -1453,7 +1462,7 @@ try (var host = new FakePluginHost()) {
 | Restoring | `restoreState(tab)` (the restore state a tab gives), `restoreTab(pluginId, windowId, title, state)` (runs the plugin's restorer as Jasper does: the tab is placed in that window, not shown, and a session's tab waits, `NOT_STARTED`, until it is shown), `declinedRestores()` (the reasons restorers gave when no tab came back) |
 | Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
 | Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()` |
-| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
+| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `openedFiles()`, `browsed()`, `contentTabs()` with `contentStatus(tab)` and `contentCommands(tab)`, `contentMenu(tab)` (the right-click menu `showContextMenu` shows), `chooseFromContentMenu(tab, path...)`, `dismissContentMenu(tab)`, `contentTab(pluginId, title)` and `contentView(pluginId, title)`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor and web browser registrations win), `shellEnvironment(map)`, `edit(file, line, windowId)`, `openLink(address, origin, placement, target, windowId)`, `browserPlugin()`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
 
 Where the fake differs from Jasper:
 

@@ -9,6 +9,174 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class UiValuesTest {
+    /** The PNG signature followed by {@code length - 8} zero bytes: a PNG to the SDK, which reads only the signature. */
+    static byte[] png(int length) {
+        byte[] data = new byte[length];
+        System.arraycopy(new byte[]{(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, 0, data, 0, 8);
+        return data;
+    }
+
+    /** Plan 4b Task 1 (SDK 0.27.0): a pixel image is a PNG of at most 65,536 bytes, copied in and out. */
+    @Test void aPixelImageIsAPngOfAtMost65536BytesCopiedInAndOut() {
+        byte[] data = png(64);
+        data[20] = 7;
+        var image = new PixelImage(data);
+        data[20] = 9;
+        assertThat(image.png()[20]).as("copied in").isEqualTo((byte) 7);
+        image.png()[20] = 9;
+        assertThat(image.png()[20]).as("copied out").isEqualTo((byte) 7);
+        assertThat(image).isEqualTo(new PixelImage(image.png())).hasSameHashCodeAs(new PixelImage(image.png()));
+        assertThat(image).isNotEqualTo(new PixelImage(png(64)));
+        assertThat(image).hasToString("PixelImage[64 bytes]");
+        assertThat(new PixelImage(png(65_536)).png()).hasSize(65_536);
+        assertThatIllegalArgumentException().isThrownBy(() -> new PixelImage(png(65_537)))
+            .withMessage("A pixel image holds at most 65536 bytes, not 65537");
+        byte[] gif = {'G', 'I', 'F', '8', '9', 'a', 1, 0, 1, 0};
+        for (byte[] refused : List.of(gif, new byte[0], java.util.Arrays.copyOf(png(8), 7)))
+            assertThatIllegalArgumentException().isThrownBy(() -> new PixelImage(refused)).withMessage("A pixel image must be a PNG");
+        assertThatNullPointerException().isThrownBy(() -> new PixelImage(null));
+    }
+
+    /** Plan 4b Task 1 (SDK 0.27.0): a content tab shows its presentation's image, and the icon name stays the fallback. */
+    @Test void aContentPresentationsImageKeepsItsIconAsTheFallback() {
+        var plain = new ContentPresentation("Example", "example.com", "file", true, "https://example.com/", "example.com");
+        assertThat(plain.image()).isEmpty();
+        var image = new PixelImage(png(32));
+        var shown = plain.withImage(image);
+        assertThat(shown.image()).contains(image);
+        assertThat(shown).isEqualTo(new ContentPresentation("Example", "example.com", "file", true, "https://example.com/", "example.com",
+            Optional.of(image)));
+        assertThat(shown.icon()).isEqualTo("file");
+        assertThat(new ContentPresentation("Example", "", null, false, "", "").withImage(image).icon()).isNull();
+        assertThatNullPointerException().isThrownBy(() -> plain.withImage(null));
+        assertThatNullPointerException().isThrownBy(() -> new ContentPresentation("Example", "", "file", false, "", "", null));
+    }
+
+    /** An address field holding {@code suggestions}, loading more when {@code loading}. */
+    static Nodes.Field address(List<Nodes.Suggestion> suggestions, boolean loading) {
+        return new Nodes.Field("address", ControlState.READY, Nodes.FieldKind.TEXT, "jcef", "Search or enter website name", "Address", "go",
+            Optional.empty(), Nodes.FieldPresentation.EMBEDDED, "", "revert", "", false, Optional.empty(), "", "", Optional.empty(), true, suggestions, loading);
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a suggestion has an id and a title, and a detail that may be blank; a field holds a
+     * copy of its suggestions, with unique ids, and has none, not loading, unless it says so; a multiline or number
+     * field takes none.
+     */
+    @Test void aFieldsSuggestionsAreCopiedUniqueAndOnlyOnSingleLineTextFields() {
+        var search = new Nodes.Suggestion("search", "Search for “jcef”", "Web Search");
+        assertThat(search.detail()).isEqualTo("Web Search");
+        assertThat(new Nodes.Suggestion("host", "localhost", "").detail()).isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Suggestion(" ", "Title", "")).withMessage("id must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Suggestion("id", " ", "")).withMessage("title must not be blank");
+        assertThatNullPointerException().isThrownBy(() -> new Nodes.Suggestion("id", "Title", null));
+
+        var plain = new Nodes.Field("name", ControlState.READY, Nodes.FieldKind.TEXT, "", "", "Name", "", Optional.empty(), Nodes.FieldPresentation.STANDARD,
+            "", "", "", false, Optional.empty(), "", "", Optional.empty(), false);
+        assertThat(plain.suggestions()).isEmpty();
+        assertThat(plain.suggestionsLoading()).isFalse();
+        assertThat(new Nodes.Field("find", ControlState.READY, Nodes.FieldKind.SEARCH, "", "", "Find", "").suggestions()).isEmpty();
+
+        var rows = new ArrayList<>(List.of(new Nodes.Suggestion("navigate", "Navigate to “https://jcef”", "URL"), search));
+        var field = address(rows, true);
+        rows.clear();
+        assertThat(field.suggestions()).as("copied").extracting(Nodes.Suggestion::id).containsExactly("navigate", "search");
+        assertThatThrownBy(() -> field.suggestions().add(search)).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(field.suggestionsLoading()).isTrue();
+        assertThat(address(List.of(), true).suggestions()).as("loading before the first suggestion arrives").isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> address(List.of(search, new Nodes.Suggestion("search", "Other", "")), false))
+            .withMessage("Duplicate id: search");
+        assertThatNullPointerException().isThrownBy(() -> address(null, false));
+
+        for (boolean loading : List.of(false, true)) {
+            var offered = loading ? List.<Nodes.Suggestion>of() : List.of(search);
+            assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Field("notes", ControlState.READY, Nodes.FieldKind.TEXTAREA, "", "", "Notes", "",
+                Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), "", "", Optional.empty(), false, offered, loading))
+                .withMessage("A multiline field takes no suggestions");
+            for (var presentation : List.of(Nodes.FieldPresentation.STANDARD, Nodes.FieldPresentation.STEPPER))
+                assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Field("count", ControlState.READY, Nodes.FieldKind.NUMBER, "1", "", "Count", "",
+                    Optional.of(new Nodes.Numeric(0, 9, 1, 0)), presentation, "", "", "", false, Optional.empty(), "", "", Optional.empty(), false, offered, loading))
+                    .withMessage("A number field's arrow keys step its value, not suggestions");
+        }
+        for (var kind : List.of(Nodes.FieldKind.SEARCH, Nodes.FieldKind.PATH, Nodes.FieldKind.PORT))
+            assertThat(new Nodes.Field("f", ControlState.READY, kind, "", "", "F", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", false,
+                Optional.empty(), "", "", Optional.empty(), false, List.of(search), false).suggestions()).as("%s", kind).containsExactly(search);
+        // Both would take Up and Down: a field drives its list or offers suggestions, not both.
+        for (boolean loading : List.of(false, true))
+            assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Field("filter", ControlState.READY, Nodes.FieldKind.SEARCH, "", "", "Filter", "",
+                    Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "results", false, Optional.empty(), "", "", Optional.empty(), false,
+                    loading ? List.of() : List.of(search), loading))
+                .withMessage("A field's arrow keys move its list or its suggestions, not both");
+        assertThat(new Nodes.Field("filter", ControlState.READY, Nodes.FieldKind.SEARCH, "", "", "Filter", "", Optional.empty(),
+            Nodes.FieldPresentation.STANDARD, "", "", "results", false, Optional.empty(), "", "", Optional.empty(), false, List.of(), false).listId())
+            .as("a list without suggestions").isEqualTo("results");
+    }
+
+    /** Plan 4b Task 1 (SDK 0.27.0): a chosen suggestion names its field, which is the event's id, and the suggestion. */
+    @Test void aChosenSuggestionNamesItsFieldAndTheSuggestion() {
+        var chosen = new UiEvent.SuggestionChosen("address", "search", true);
+        assertThat(chosen.id()).isEqualTo("address").isEqualTo(chosen.fieldId());
+        assertThat(chosen.suggestionId()).isEqualTo("search");
+        assertThat(chosen.byTab()).isTrue();
+        assertThat(chosen).isEqualTo(new UiEvent.SuggestionChosen("address", "search", true)).isNotEqualTo(new UiEvent.SuggestionChosen("address", "search", false));
+        assertThatIllegalArgumentException().isThrownBy(() -> new UiEvent.SuggestionChosen(" ", "search", false));
+        assertThatIllegalArgumentException().isThrownBy(() -> new UiEvent.SuggestionChosen("address", "", false));
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): an item with children is a submenu, which reports no action and shows no shortcut; it
+     * holds a copy of its children, their ids unique among them; a separator opens none; an item without children keeps
+     * every older constructor's meaning.
+     */
+    @Test void aMenuItemWithChildrenIsASubmenu() {
+        var source = new MenuItem("source", "View Source", "", "view-source", true, false);
+        var children = new ArrayList<>(List.of(source, new MenuItem("rule", "", "", "", true, true)));
+        var tools = new MenuItem("tools", "Developer Tools", "code", "", true, false, Nodes.Hue.BLUE, "", children);
+        children.clear();
+        assertThat(tools.children()).as("copied").containsExactly(source, new MenuItem("rule", "", "", "", true, true));
+        assertThatThrownBy(() -> tools.children().add(source)).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(source.children()).isEmpty();
+        assertThat(new MenuItem("open", "Open", "", "open", true, false, Nodes.Hue.NEUTRAL, "new_tab").children()).isEmpty();
+        assertThat(tools.withShortcut("").children()).as("a copy keeps its children").containsExactly(source, new MenuItem("rule", "", "", "", true, true));
+        assertThat(new MenuItem("blank", "Blank", "", " ", true, false, Nodes.Hue.NEUTRAL, "", List.of(source)).children()).as("a blank action").hasSize(1);
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "tools", true, false, Nodes.Hue.NEUTRAL, "", List.of(source)))
+            .withMessage("A submenu reports no action");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "", true, false, Nodes.Hue.NEUTRAL, "new_tab", List.of(source)))
+            .withMessage("A submenu shows no shortcut");
+        assertThatIllegalArgumentException().isThrownBy(() -> tools.withShortcut("new_tab")).withMessage("A submenu shows no shortcut");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("rule", "", "", "", true, true, Nodes.Hue.NEUTRAL, "", List.of(source)))
+            .withMessage("A separator opens no submenu");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "", true, false, Nodes.Hue.NEUTRAL, "",
+            List.of(source, new MenuItem("source", "Again", "", "again", true, false)))).withMessage("Duplicate id: source");
+        assertThatIllegalArgumentException().as("an item without children still needs an action")
+            .isThrownBy(() -> new MenuItem("open", "Open", "", "", true, false, Nodes.Hue.NEUTRAL, "", List.of())).withMessage("action must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", " ", "", "", true, false, Nodes.Hue.NEUTRAL, "", List.of(source)))
+            .withMessage("label must not be blank");
+        assertThatNullPointerException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "", true, false, Nodes.Hue.NEUTRAL, "", null));
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a button holds a copy of its hold menu, the ids unique; the older constructors make a
+     * button without one.
+     */
+    @Test void aButtonHoldsACopyOfItsHoldMenu() {
+        var entry = new MenuItem("entry-1", "Example Domain", "", "go:1", true, false);
+        var items = new ArrayList<>(List.of(entry));
+        var back = new Nodes.Button("back", ControlState.READY, "", "back", Nodes.ButtonKind.GHOST, "back", "Back", Nodes.ButtonPresentation.STANDARD,
+            Optional.empty(), Optional.empty(), items);
+        items.clear();
+        assertThat(back.holdMenu()).as("copied").containsExactly(entry);
+        assertThatThrownBy(() -> back.holdMenu().add(entry)).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(new Nodes.Button("b", ControlState.READY, "Open", "", Nodes.ButtonKind.LINK, "open", "").holdMenu()).isEmpty();
+        assertThat(new Nodes.Button("b", ControlState.READY, "", "case", Nodes.ButtonKind.GHOST, "case", "Match case", Nodes.ButtonPresentation.STANDARD,
+            Optional.empty(), Optional.of(true)).holdMenu()).isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Button("back", ControlState.READY, "", "back", Nodes.ButtonKind.GHOST, "back", "Back",
+            Nodes.ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), List.of(entry, new MenuItem("entry-1", "Again", "", "go:2", true, false))))
+            .withMessage("Duplicate id: entry-1");
+        assertThatNullPointerException().isThrownBy(() -> new Nodes.Button("back", ControlState.READY, "", "back", Nodes.ButtonKind.GHOST, "back", "Back",
+            Nodes.ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), null));
+    }
+
     /** Vim IdeaVim keys spec 4: a status item may carry an icon, a dimmed state and a menu. */
     @Test void contentStatusCarriesAnIconADimmedStateAndACopiedMenu() {
         Runnable r = () -> {};

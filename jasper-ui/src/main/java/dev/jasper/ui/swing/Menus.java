@@ -32,8 +32,7 @@ final class Menus {
                             && mouse.getID() == MouseEvent.MOUSE_PRESSED
                             && mouse.getSource() instanceof Component source
                             && !SwingUtilities.isDescendingFrom(source, component)
-                            && !SwingUtilities.isDescendingFrom(
-                                    source, component.getComponentPopupMenu())) dismiss();
+                            && !within(source, component.getComponentPopupMenu())) dismiss();
                 };
 
         MenuControl(KitView view, Nodes.MenuButton node) {
@@ -160,20 +159,8 @@ final class Menus {
             }
             popup.setInvoker(component);
             main.setSelected(true);
-            if (component.isShowing()) {
-                Container host = SwingUtilities.getRootPane(component);
-                if (host == null) host = view;
-                Rectangle anchor =
-                        SwingUtilities.convertRectangle(
-                                component.getParent(), component.getBounds(), host);
-                Point point =
-                        anchor(
-                                anchor,
-                                popup.getPreferredSize(),
-                                new Rectangle(0, 0, host.getWidth(), host.getHeight()));
-                Point local = SwingUtilities.convertPoint(host, point, component);
-                popup.show(component, local.x, local.y);
-            } else popup.setVisible(true);
+            // Off screen (a headless test) the menu still opens, unplaced, so its items can be chosen.
+            if (!showUnder(popup, component, view)) popup.setVisible(true);
             installOutside();
         }
 
@@ -252,24 +239,15 @@ final class Menus {
                 closeItems();
                 popup.removeAll();
                 prior = menu.items();
-                for (var descriptor : prior) {
-                    if (descriptor.separator()) {
-                        popup.add(new Separator(context()));
-                        continue;
-                    }
-                    var item = new Item(context());
-                    item.describe(descriptor);
-                    ActionListener listener =
-                            e -> {
-                                if (descriptor.enabled() && interactive()) {
-                                    dismiss();
-                                    emit(new UiEvent.Action(descriptor.action()));
-                                }
-                            };
-                    item.addActionListener(listener);
-                    items.add(() -> item.removeActionListener(listener));
-                    popup.add(item);
-                }
+                fill(context(), popup, prior,
+                        descriptor -> {
+                            if (descriptor.enabled() && interactive()) {
+                                dismiss();
+                                emit(new UiEvent.Action(descriptor.action()));
+                            }
+                        },
+                        cleanup -> items.add(cleanup::run));
+                repack(popup);
             }
             int i = 0;
             for (var descriptor : prior) {
@@ -277,6 +255,10 @@ final class Menus {
                 if (raw instanceof Item item) {
                     item.describe(descriptor);
                     item.setEnabled(component.isEnabled() && descriptor.enabled());
+                } else if (raw instanceof Submenu submenu) {
+                    submenu.describe(descriptor);
+                    describe(submenu.getMenuComponents());
+                    submenu.setEnabled(component.isEnabled() && descriptor.enabled());
                 }
             }
             if (!interactive()) dismiss();
@@ -295,6 +277,83 @@ final class Menus {
         x = Math.max(available.x, Math.min(x, available.x + available.width - menu.width));
         y = Math.max(available.y, Math.min(y, available.y + available.height - menu.height));
         return new Point(x, y);
+    }
+
+    /**
+     * Shows {@code popup} under {@code anchor} as a menu button's menu opens: placed by {@link #anchor} in the anchor's
+     * root pane ({@code fallback} without one), so it lies below the anchor, or above it when there is no room below,
+     * aligned with its right edge when the anchor is right of the centre, and kept inside. Nothing shows while the anchor
+     * is not on screen.
+     *
+     * @return whether it showed
+     */
+    static boolean showUnder(JPopupMenu popup, JComponent anchor, Container fallback) {
+        if (!anchor.isShowing()) return false;
+        Container host = SwingUtilities.getRootPane(anchor);
+        if (host == null) host = fallback;
+        Rectangle bounds = SwingUtilities.convertRectangle(anchor.getParent(), anchor.getBounds(), host);
+        Point point = anchor(bounds, popup.getPreferredSize(), new Rectangle(0, 0, host.getWidth(), host.getHeight()));
+        Point local = SwingUtilities.convertPoint(host, point, anchor);
+        popup.show(anchor, local.x, local.y);
+        return true;
+    }
+
+    /** An open menu whose rows were rebuilt takes their size where it is; a closed one is sized when it opens. */
+    static void repack(JPopupMenu popup) {
+        if (popup.isVisible()) popup.pack();
+    }
+
+    /**
+     * Fills {@code menu}, a popup or a {@link Submenu}, with {@code items}: a separator line, a row, or a submenu that
+     * holds an item's children, filled the same way. Choosing a row runs {@code chosen} with its descriptor, whichever
+     * submenu holds it; {@code cleanup} hears what removes each listener.
+     */
+    static void fill(KitContext context, Container menu, java.util.List<MenuItem> items, java.util.function.Consumer<MenuItem> chosen,
+                     java.util.function.Consumer<Runnable> cleanup) {
+        for (var descriptor : items) {
+            if (descriptor.separator()) {
+                menu.add(new Separator(context));
+                continue;
+            }
+            if (descriptor.submenu()) {
+                var submenu = new Submenu(context);
+                submenu.describe(descriptor);
+                fill(context, submenu, descriptor.children(), chosen, cleanup);
+                menu.add(submenu);
+                continue;
+            }
+            var item = new Item(context);
+            item.describe(descriptor);
+            ActionListener listener = e -> chosen.accept(descriptor);
+            item.addActionListener(listener);
+            cleanup.accept(() -> item.removeActionListener(listener));
+            menu.add(item);
+        }
+    }
+
+    /** Describes a menu's rows again, a submenu's children too, in the current type and colours. */
+    static void describe(Component[] rows) {
+        for (var child : rows) {
+            if (child instanceof Item entry && entry.getClientProperty("Jasper.menu.item") instanceof MenuItem item) entry.describe(item);
+            if (child instanceof Submenu submenu && submenu.getClientProperty("Jasper.menu.item") instanceof MenuItem item) {
+                submenu.describe(item);
+                describe(submenu.getMenuComponents());
+            }
+        }
+    }
+
+    /** Whether {@code item} is one of {@code items}, or of a submenu among them. */
+    static boolean holds(java.util.List<MenuItem> items, MenuItem item) {
+        for (var candidate : items) if (candidate.equals(item) || holds(candidate.children(), item)) return true;
+        return false;
+    }
+
+    /** Whether {@code source} is in {@code menu} or in a submenu opened from it. */
+    static boolean within(Component source, JPopupMenu menu) {
+        if (menu == null) return false;
+        for (Component at = source; at != null; at = at instanceof JPopupMenu popup ? popup.getInvoker() : at.getParent())
+            if (at == menu) return true;
+        return false;
     }
 
     static class Part extends Buttons.KitButton {
@@ -524,16 +583,9 @@ final class Menus {
         }
 
         /** The icon column is there when any row of this menu has an icon; then every label starts after it. */
-        boolean iconColumn() {
-            if (getParent() == null) return getIcon() != null;
-            for (var sibling : getParent().getComponents()) if (sibling instanceof Item item && item.getIcon() != null) return true;
-            return false;
-        }
+        boolean iconColumn() { return Menus.iconColumn(this); }
 
-        int labelX() {
-            int x = getInsets().left;
-            return iconColumn() ? x + ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE) + ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE_GAP) : x;
-        }
+        int labelX() { return Menus.labelX(this, context); }
 
         @Override public Dimension getPreferredSize() {
             var fm = getFontMetrics(getFont());
@@ -546,29 +598,152 @@ final class Menus {
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D) graphics.create();
             try {
-                ThemePainting.antialias(g);
                 boolean highlighted = isEnabled() && (getModel().isArmed() || getModel().isRollover());
-                if (highlighted) {
-                    g.setColor(ThemePainting.color(context, SemanticColor.ACCENT));
-                    g.fillRect(0, 0, getWidth(), getHeight());
-                }
-                if (getIcon() != null) {
-                    var icon = highlighted && descriptor != null ? tile(true) : getIcon();
-                    icon.paintIcon(this, g, getInsets().left, (getHeight() - icon.getIconHeight()) / 2);
-                }
-                g.setFont(getFont());
-                var fm = g.getFontMetrics();
-                int baseline = (getHeight() - fm.getHeight()) / 2 + fm.getAscent();
-                g.setColor(ThemePainting.color(context, !isEnabled() ? SemanticColor.TEXT_PLACEHOLDER : highlighted ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_PRIMARY));
-                g.drawString(getText(), labelX(), baseline);
+                int baseline = paintRow(this, g, context, highlighted, getIcon() != null && highlighted && descriptor != null ? tile(true) : getIcon());
                 if (!shortcutText.isEmpty()) {
-                    g.setColor(ThemePainting.color(context, !isEnabled() ? SemanticColor.TEXT_PLACEHOLDER : highlighted ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_TERTIARY));
+                    g.setColor(ThemePainting.color(context, trailingRole(this, highlighted)));
                     g.setFont(shortcutFont());
                     g.drawString(shortcutText, getWidth() - getInsets().right - g.getFontMetrics().stringWidth(shortcutText), baseline);
                 }
             } finally {
                 g.dispose();
             }
+        }
+    }
+
+    /** Whether any row of {@code row}'s menu has an icon, so that every label of it starts after the icon column. */
+    static boolean iconColumn(JMenuItem row) {
+        if (row.getParent() == null) return row.getIcon() != null;
+        for (var sibling : row.getParent().getComponents()) if ((sibling instanceof Item || sibling instanceof Submenu) && ((JMenuItem) sibling).getIcon() != null) return true;
+        return false;
+    }
+
+    /** Where {@code row}'s label starts: after its inset, and after the icon column when its menu has one. */
+    static int labelX(JMenuItem row, KitContext context) {
+        int x = row.getInsets().left;
+        return iconColumn(row) ? x + ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE) + ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE_GAP) : x;
+    }
+
+    /** The colour of what a row shows at its end, a shortcut or a submenu's arrow. */
+    static SemanticColor trailingRole(JMenuItem row, boolean highlighted) {
+        return !row.isEnabled() ? SemanticColor.TEXT_PLACEHOLDER : highlighted ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_TERTIARY;
+    }
+
+    /**
+     * Paints a menu row: the accent fill while {@code highlighted}, {@code icon} in the icon column and the label; the
+     * label's baseline, for what the row shows at its end.
+     */
+    static int paintRow(JMenuItem row, Graphics2D g, KitContext context, boolean highlighted, javax.swing.Icon icon) {
+        ThemePainting.antialias(g);
+        if (highlighted) {
+            g.setColor(ThemePainting.color(context, SemanticColor.ACCENT));
+            g.fillRect(0, 0, row.getWidth(), row.getHeight());
+        }
+        if (icon != null) icon.paintIcon(row, g, row.getInsets().left, (row.getHeight() - icon.getIconHeight()) / 2);
+        g.setFont(row.getFont());
+        var fm = g.getFontMetrics();
+        int baseline = (row.getHeight() - fm.getHeight()) / 2 + fm.getAscent();
+        g.setColor(ThemePainting.color(context, !row.isEnabled() ? SemanticColor.TEXT_PLACEHOLDER : highlighted ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_PRIMARY));
+        g.drawString(row.getText(), labelX(row, context), baseline);
+        return baseline;
+    }
+
+    /**
+     * A submenu row (SDK 0.27.0): an item with children, drawn as a {@link Item} is, with an arrow at its end in place of
+     * a shortcut. Pointing at it, or Right or Enter on it, opens its children beside it in the menu's card, as wide as a
+     * menu at least; a disabled one does not open. It reports nothing itself.
+     */
+    static final class Submenu extends JMenu {
+        final KitContext context;
+        /** What this row shows. */
+        MenuItem descriptor;
+
+        Submenu(KitContext context) {
+            this.context = context;
+            putClientProperty("html.disable", true);
+            setOpaque(false);
+            setBorderPainted(false);
+            // The children's popup: the menu's card (painted by its border, under the rows), at least a menu's width.
+            // Neither is a UI resource, so a change of look and feel keeps both.
+            var children = getPopupMenu();
+            children.setOpaque(false);
+            children.setBorder(new Card(context));
+            children.setLayout(new Rows(children, context));
+        }
+
+        /** Shows {@code item}: its label, its category tile and its enablement, in the menu's type and insets. */
+        void describe(MenuItem item) {
+            descriptor = item;
+            putClientProperty("Jasper.menu.item", item);
+            setText(item.label());
+            setEnabled(item.enabled());
+            Composition.style(this, context, Typography.Role.BODY, SemanticColor.TEXT_PRIMARY);
+            int inset = ThemePainting.metric(context, DesignMetrics.Role.MENU_ITEM_PADDING);
+            setBorder(new EmptyBorder(0, inset, 0, inset));
+            setIcon(item.icon().isBlank() ? null : tile(false));
+            revalidate(); repaint();
+        }
+
+        javax.swing.Icon tile(boolean highlighted) {
+            return context.icons().tile(context.metrics(), descriptor.icon(), context.theme().semantic(), descriptor.hue(),
+                ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE), highlighted);
+        }
+
+        /** The arrow's half height; it is as wide. */
+        int arrow() { return com.formdev.flatlaf.util.UIScale.scale(4); }
+
+        @Override public Dimension getPreferredSize() {
+            int width = labelX(this, context) + getFontMetrics(getFont()).stringWidth(getText())
+                + ThemePainting.metric(context, DesignMetrics.Role.MENU_SHORTCUT_GAP) + arrow() + getInsets().right;
+            return new Dimension(width, ThemePainting.height(context, DesignMetrics.Role.MENU_ITEM_HEIGHT, Typography.Role.BODY));
+        }
+
+        @Override protected void paintComponent(Graphics graphics) {
+            var g = (Graphics2D) graphics.create();
+            try {
+                boolean highlighted = isEnabled() && (isSelected() || getModel().isArmed());
+                paintRow(this, g, context, highlighted, getIcon() != null && highlighted && descriptor != null ? tile(true) : getIcon());
+                g.setColor(ThemePainting.color(context, trailingRole(this, highlighted)));
+                int d = arrow(), x = getWidth() - getInsets().right - d, y = getHeight() / 2;
+                g.setStroke(new BasicStroke(com.formdev.flatlaf.util.UIScale.scale(1f)));
+                g.drawLine(x, y - d, x + d, y);
+                g.drawLine(x + d, y, x, y + d);
+            } finally {
+                g.dispose();
+            }
+        }
+    }
+
+    /** A submenu's card: the menu's surface and edge, painted under its rows, with a {@link Popup}'s padding. */
+    static final class Card implements javax.swing.border.Border {
+        final KitContext context;
+
+        Card(KitContext context) { this.context = context; }
+
+        @Override public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
+            if (c instanceof JComponent component) paintSurface(component, g, context);
+        }
+
+        @Override public Insets getBorderInsets(Component c) {
+            int padding = ThemePainting.metric(context, DesignMetrics.Role.MENU_PADDING), line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+            return new Insets(padding, line, padding, line);
+        }
+
+        @Override public boolean isBorderOpaque() { return false; }
+    }
+
+    /** A submenu's rows, top to bottom, at least a menu's minimum width, as a {@link Popup} lays its own out. */
+    static final class Rows extends BoxLayout {
+        final transient KitContext context;
+
+        Rows(Container target, KitContext context) {
+            super(target, BoxLayout.Y_AXIS);
+            this.context = context;
+        }
+
+        @Override public Dimension preferredLayoutSize(Container target) {
+            var size = super.preferredLayoutSize(target);
+            return new Dimension(Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.MENU_MIN_WIDTH)), size.height);
         }
     }
 

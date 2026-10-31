@@ -1,6 +1,7 @@
 package dev.jasper.browser.routing;
 
 import dev.jasper.browser.routing.LinkDecision.Decision;
+import dev.jasper.browser.item.SearchEngine;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.browser.settings.BrowserSettings.LinkOpening;
 import dev.jasper.browser.settings.BrowserSettings.LocalFileOpening;
@@ -127,6 +128,6 @@ class LinkDecisionTest {
     }
 
     private static BrowserSettings settings(LinkOpening links, LocalFileOpening files) {
-        return new BrowserSettings(BrowserSettings.WELCOME, links, files);
+        return new BrowserSettings(BrowserSettings.WELCOME, 100, links, files, SearchEngine.GOOGLE, "", "");
     }
 }

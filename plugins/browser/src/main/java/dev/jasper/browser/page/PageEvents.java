@@ -2,20 +2,28 @@ package dev.jasper.browser.page;
 
 import dev.jasper.browser.engine.Chromium;
 import java.awt.EventQueue;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.handler.CefDisplayHandlerAdapter;
 import org.cef.handler.CefKeyboardHandler;
 import org.cef.handler.CefKeyboardHandlerAdapter;
+import org.cef.handler.CefLoadHandler;
 import org.cef.handler.CefLoadHandlerAdapter;
 import org.cef.network.CefRequest;
 
@@ -25,11 +33,16 @@ import org.cef.network.CefRequest;
  * on its own UI thread (on macOS, AppKit's main thread), never Swing's, so what a page shows changes on the UI thread.
  * The hover address goes straight to the canvas, which takes it from any thread. A main frame's load start also goes,
  * at once and on Chromium's thread, to the hooks the {@code links} package gave the client
- * ({@link #onMainFrameLoadStart}). A page that enters fullscreen is told at once to leave it: Jasper refuses
- * fullscreen (spec section 5).
+ * ({@link #onMainFrameLoadStart}), and the main frame then runs {@code detect-favicon.js}, which names the document's
+ * icon through the opener bridge's router for the page to fetch ({@link Page#faviconDeclared}). Each main-frame load
+ * start shows the page at its own zoom again, there and then, as Chromium keeps one zoom per host. A main frame's failed
+ * load goes to its page with Chromium's name for the error ({@link Page#onLoadFailure}), for its item's error page. A
+ * page that enters fullscreen is told at once to leave it: Jasper refuses fullscreen (spec section 5). A page's
+ * {@link DevTools} browser is no page's: none of this reaches it, but for the editing keys.
  */
 public final class PageEvents {
     private static final Consumer<CefClient> INSTALL = PageEvents::install;
+    private static final Predicate<CefBrowser> PAGE_BROWSER = PageEvents::answersAbout;
     /**
      * What a page that entered fullscreen runs in its main frame: it leaves fullscreen. Chromium may tell Jasper before
      * the document's fullscreen element is set, so a document without one yet leaves on its next fullscreen change.
@@ -38,6 +51,10 @@ public final class PageEvents {
         + "document.exitFullscreen().catch(function () { }); } if (document.fullscreenElement) leave(); "
         + "else document.addEventListener('fullscreenchange', leave, { once: true }); })();";
     private static final String EXIT_FULLSCREEN_URL = "jasper-about:exit-fullscreen.js";
+    /** What each main frame runs as its document starts loading: it names the document's icon once it is parsed. */
+    private static final String DETECT_FAVICON = script("detect-favicon.js");
+    private static final String DETECT_FAVICON_URL = "jasper-about:detect-favicon.js";
+    private static final System.Logger LOG = System.getLogger(PageEvents.class.getName());
     // The hooks each client was given, which hear its pages' main-frame load starts on Chromium's thread.
     private static final Map<CefClient, List<BiConsumer<PageBrowser, CefFrame>>> LOAD_STARTS =
         Collections.synchronizedMap(new WeakHashMap<>());
@@ -60,15 +77,37 @@ public final class PageEvents {
         LOAD_STARTS.computeIfAbsent(client, any -> new CopyOnWriteArrayList<>()).add(hook);
     }
 
-    /** Has Chromium install the handlers on its client before any page is made on it; once, however often asked. */
+    /**
+     * Has Chromium install the handlers on its client before any page is made on it, once, however often asked, and
+     * answer {@code jasper-about:} for pages' browsers only (plan 4b's P47).
+     */
     static void prepare(Chromium chromium) {
         chromium.onClient(INSTALL);
+        chromium.answerAboutFor(PAGE_BROWSER);
+    }
+
+    /**
+     * Whether {@code browser} is a page's, whose main-frame requests {@code jasper-about:} answers: not a page's
+     * DevTools', which have no page of their own, nor any other. Chromium's IO thread.
+     */
+    static boolean answersAbout(CefBrowser browser) {
+        return page(browser) != null;
     }
 
     private static void install(CefClient client) {
         client.addDisplayHandler(new Display());
         client.addLoadHandler(new Load());
         client.addKeyboardHandler(new Keyboard());
+    }
+
+    /** The page script {@code name}, one of this package's resources. */
+    static String script(String name) {
+        try (InputStream in = PageEvents.class.getResourceAsStream(name)) {
+            if (in == null) throw new IllegalStateException("The Browser plugin has no " + name);
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8).strip();
+        } catch (IOException unreadable) {
+            throw new UncheckedIOException(unreadable);
+        }
     }
 
     /** The page {@code browser} shows; null for a browser that is not a page's. */
@@ -79,6 +118,17 @@ public final class PageEvents {
     private static void later(CefBrowser browser, Consumer<Page> event) {
         Page page = page(browser);
         if (page != null) EventQueue.invokeLater(() -> event.accept(page));
+    }
+
+    /**
+     * A load of {@code page} in {@code frame} failed with {@code errorCode}: a main frame's failure is handed to the UI
+     * thread through {@code ui}, for the page, by Chromium's name for the error, or empty for one it does not name; a
+     * sub-frame's, and one without a page or frame, are not. Chromium's thread.
+     */
+    static void loadError(Page page, CefFrame frame, CefLoadHandler.ErrorCode errorCode, String failedUrl, Consumer<Runnable> ui) {
+        if (page == null || frame == null || !frame.isMain()) return;
+        String code = errorCode == null ? "" : errorCode.name();
+        ui.accept(() -> page.loadFailed(failedUrl, code));
     }
 
     /**
@@ -108,44 +158,67 @@ public final class PageEvents {
     /**
      * The keys a page and its scripts left alone that are an {@link EditingCommand}: on macOS, Select All, Cut, Undo and
      * Redo, which Chromium leaves to the browser's Edit menu there. Chromium asks only after the page declined the key,
-     * so a script that takes Cmd+Z itself undoes once.
+     * so a script that takes Cmd+Z itself undoes once. So it is in a page's DevTools.
      */
-    private static final class Keyboard extends CefKeyboardHandlerAdapter {
+    static final class Keyboard extends CefKeyboardHandlerAdapter {
         @Override public boolean onKeyEvent(CefBrowser browser, CefKeyboardHandler.CefKeyEvent event) {
-            if (page(browser) == null) return false;
-            var command = EditingCommand.of(event.type == CefKeyboardHandler.CefKeyEvent.EventType.KEYEVENT_RAWKEYDOWN,
-                event.modifiers, event.windows_key_code);
-            if (command.isEmpty()) return false;
-            CefFrame frame = browser.getFocusedFrame();
-            if (frame == null) return false;
-            try {
-                switch (command.get()) {
-                    case SELECT_ALL -> frame.selectAll();
-                    case CUT -> frame.cut();
-                    case UNDO -> frame.undo();
-                    case REDO -> frame.redo();
-                }
-            } finally {
-                frame.dispose();
-            }
-            return true;
+            return edit(browser, EditingCommand.of(event.type == CefKeyboardHandler.CefKeyEvent.EventType.KEYEVENT_RAWKEYDOWN,
+                event.modifiers, event.windows_key_code), CefBrowser::getFocusedFrame);
         }
     }
 
-    /** Whether the page loads and where it can go, and each main-frame load's start. */
-    private static final class Load extends CefLoadHandlerAdapter {
+    /**
+     * Runs {@code command} on the frame {@code focused} gives as {@code browser}'s focused one, then releases only this
+     * handle to it, when {@code browser} is a page's or a page's DevTools browser. Chromium's thread.
+     *
+     * @return whether a command ran, which Chromium then does not
+     */
+    static boolean edit(CefBrowser browser, Optional<EditingCommand> command, Function<CefBrowser, CefFrame> focused) {
+        if (!(browser instanceof PageBrowser) || command.isEmpty()) return false;
+        CefFrame frame = focused.apply(browser);
+        if (frame == null) return false;
+        try {
+            switch (command.get()) {
+                case SELECT_ALL -> frame.selectAll();
+                case CUT -> frame.cut();
+                case UNDO -> frame.undo();
+                case REDO -> frame.redo();
+            }
+        } finally {
+            frame.dispose();
+        }
+        return true;
+    }
+
+    /** Whether the page loads and where it can go, and each main-frame load's start, end and failure. */
+    static final class Load extends CefLoadHandlerAdapter {
         @Override public void onLoadingStateChange(CefBrowser browser, boolean loading, boolean canGoBack, boolean canGoForward) {
             later(browser, page -> page.loadingChanged(loading, canGoBack, canGoForward));
         }
 
         @Override public void onLoadStart(CefBrowser browser, CefFrame frame, CefRequest.TransitionType transition) {
             if (frame == null || !frame.isMain()) return;
-            if (browser instanceof PageBrowser shown) {
+            if (browser instanceof PageBrowser shown && shown.owner() != null) {
                 List<BiConsumer<PageBrowser, CefFrame>> hooks = LOAD_STARTS.get(browser.getClient());
                 if (hooks != null) for (BiConsumer<PageBrowser, CefFrame> hook : hooks) hook.accept(shown, frame);
+                shown.keepZoom();
+                try {
+                    frame.executeJavaScript(DETECT_FAVICON, DETECT_FAVICON_URL, 0);
+                } catch (RuntimeException failure) {
+                    LOG.log(System.Logger.Level.WARNING, "A page's favicon script could not run", failure);
+                }
             }
             String url = frame.getURL();
             later(browser, page -> page.loadStarted(url));
+        }
+
+        @Override public void onLoadEnd(CefBrowser browser, CefFrame frame, int httpStatusCode) {
+            if (frame != null && frame.isMain()) later(browser, Page::loadEnded);
+        }
+
+        @Override public void onLoadError(CefBrowser browser, CefFrame frame, CefLoadHandler.ErrorCode errorCode, String errorText,
+                                          String failedUrl) {
+            loadError(page(browser), frame, errorCode, failedUrl, EventQueue::invokeLater);
         }
     }
 }

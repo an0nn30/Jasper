@@ -129,6 +129,82 @@ class AppContractTest extends PluginContractTest {
         return new dev.jasper.app.launch.ShellProfile(info.id(), info.name(), kind, info.detail(), List.of("sh"));
     }
 
+    /** One of a window's pane items in a plugin's right-click menu: a submenu holds children and runs nothing. */
+    record HostItem(String label, boolean enabled, Runnable run, List<HostItem> children) {}
+
+    /** A plugin's right-click menu as the scripted window shows it, its pane items between the plugin's. */
+    record ShownMenu(dev.jasper.app.contributions.ContentMenu menu, List<HostItem> host) {
+        List<String> lines() {
+            var lines = new java.util.ArrayList<String>();
+            if (!menu.leading().isEmpty()) { plugin(menu.leading(), "", lines); lines.add("---"); }
+            host(host, "", lines);
+            if (!menu.trailing().isEmpty()) { lines.add("---"); plugin(menu.trailing(), "", lines); }
+            return lines;
+        }
+        private static void plugin(List<dev.jasper.app.contributions.ContentMenu.Item> items, String indent, List<String> lines) {
+            for (var item : items) {
+                if (item.separator()) { lines.add(indent + "---"); continue; }
+                lines.add(indent + (item.children().isEmpty() ? "item:" : "submenu:") + item.id() + (item.enabled() ? "" : " (disabled)"));
+                plugin(item.children(), indent + "  ", lines);
+            }
+        }
+        private static void host(List<HostItem> items, String indent, List<String> lines) {
+            for (var item : items) {
+                lines.add(indent + "host:" + item.label() + (item.enabled() ? "" : " (disabled)"));
+                host(item.children(), indent + "  ", lines);
+            }
+        }
+        /** As a person chooses: a plugin's enabled item tells the menu its id; a pane item runs and tells it nothing. */
+        boolean choose(List<String> path) {
+            if (path.isEmpty()) return false;
+            if (path.getFirst().startsWith("host:")) {
+                List<HostItem> items = host;
+                HostItem item = null;
+                for (String step : path) {
+                    if (item != null) { if (!item.enabled()) return false; items = item.children(); }
+                    item = items.stream().filter(candidate -> step.equals("host:" + candidate.label())).findFirst().orElse(null);
+                    if (item == null) return false;
+                }
+                if (!item.enabled() || !item.children().isEmpty()) return false;
+                try { item.run().run(); } finally { menu.dismissed(); }
+                return true;
+            }
+            var items = new java.util.ArrayList<>(menu.leading());
+            items.addAll(menu.trailing());
+            List<dev.jasper.app.contributions.ContentMenu.Item> level = items;
+            dev.jasper.app.contributions.ContentMenu.Item item = null;
+            for (String step : path) {
+                if (item != null) { if (!item.enabled()) return false; level = item.children(); }
+                item = level.stream().filter(candidate -> !candidate.separator()
+                    && step.equals((candidate.children().isEmpty() ? "item:" : "submenu:") + candidate.id())).findFirst().orElse(null);
+                if (item == null) return false;
+            }
+            if (!item.enabled() || !item.children().isEmpty()) return false;
+            menu.chosen().accept(Optional.of(item.id()));
+            return true;
+        }
+    }
+
+    /**
+     * The pane items a window adds to a plugin's right-click menu over {@code tab} (WindowChrome.contentMenu): Split with
+     * Terminal Right and Down and every split item's entries, Move Pane to Tab with the window's other tabs, Close Pane.
+     */
+    static List<HostItem> paneItems(Contributions contributions, TerminalFixture terminals, UUID window, dev.jasper.app.contributions.Tab tab) {
+        UUID tabId = tab.id().value();
+        var split = new java.util.ArrayList<HostItem>(List.of(
+            new HostItem("Terminal Right", true, () -> terminals.splitBeside(tabId, dev.jasper.app.layout.Side.RIGHT), List.of()),
+            new HostItem("Terminal Down", true, () -> terminals.splitBeside(tabId, dev.jasper.app.layout.Side.DOWN), List.of())));
+        for (var item : contributions.splitItems()) {
+            for (var entry : List.of(Map.entry(item.rightLabel(), item.rightAction()), Map.entry(item.downLabel(), item.downAction())))
+                split.add(new HostItem(entry.getKey(), true, () -> contributions.action(entry.getValue())
+                    .ifPresent(action -> action.invoke(new Contributions.Invocation(window, Optional.empty()))), List.of()));
+        }
+        var moves = contributions.tabs().tabChoices(tab).stream()
+            .map(other -> new HostItem(other.label(), true, () -> contributions.tabs().moveToTab(tab, other.number()), List.of())).toList();
+        return List.of(new HostItem("Split", true, null, List.copyOf(split)), new HostItem("Move Pane to Tab", !moves.isEmpty(), null, moves),
+            new HostItem("Close Pane", true, tab::requestClose, List.of()));
+    }
+
     @Override protected ContractHarness newHarness() {
         Path data;
         try { data = Files.createTempDirectory("jasper-contract"); }
@@ -142,6 +218,8 @@ class AppContractTest extends PluginContractTest {
         // left closes, taking its workspace with it.
         // The window manager's part (full windows spec 5): no window is special; a window outlives its last tab, closes
         // when a move takes its last tab, and its only tab stays where it is when asked to move to a new window.
+        // The right-click menus plugins show over their items, by tab, with the pane items a window adds (browser plan 4b).
+        Map<UUID, ShownMenu> contentMenus = new java.util.HashMap<>();
         java.util.function.Supplier<UUID> workspace = () -> {
             UUID id = terminalFixture.addWindow();
             var tabs = contributions.tabs();
@@ -165,7 +243,16 @@ class AppContractTest extends PluginContractTest {
                     if (terminalFixture.moveToTab(tab.id().value(), number))
                         for (var other : tabs.inWindow(id)) other.active(other == tab);
                 },
-                tab -> terminalFixture.addNextContentTab(id, tab.id().value(), tab::title)));
+                tab -> terminalFixture.addNextContentTab(id, tab.id().value(), tab::title),
+                // The window's rule (WindowContent.showContentMenu): the item is selected, one menu shows at a time and
+                // its item's closing dismisses it; the pane items are the window's, as they stand when it opens.
+                (tab, menu) -> {
+                    for (var open : List.copyOf(contentMenus.values())) open.menu().dismissed();
+                    contentMenus.clear();
+                    tabs.select(tab);
+                    contentMenus.put(tab.id().value(), new ShownMenu(menu, paneItems(contributions, terminalFixture, id, tab)));
+                    tab.onClosed(() -> { var shown = contentMenus.remove(tab.id().value()); if (shown != null) shown.menu().dismissed(); });
+                }));
             terminalFixture.onWindowClosed(id, registration::close);
             return id;
         };
@@ -556,6 +643,29 @@ class AppContractTest extends PluginContractTest {
                 return onEdtValue(() -> contributions.tabs().tab(new dev.jasper.app.layout.TabId(tabId))
                     .flatMap(dev.jasper.app.contributions.Tab::restore).or(() -> terminalFixture.sessionRestore(tabId))
                     .map(saved -> new dev.jasper.sdk.RestoreState(saved.kind(), saved.state())));
+            }
+            @Override public String contentIcon(UUID tabId) {
+                return onEdtValue(() -> contributions.tabs().tab(new dev.jasper.app.layout.TabId(tabId))
+                    .filter(tab -> tab.kind() == dev.jasper.app.contributions.Tab.Kind.HOSTED && !tab.closed()).map(dev.jasper.app.contributions.Tab::icon)
+                    .map(icon -> icon instanceof dev.jasper.app.platform.PresentationIcon named ? "icon:" + named.name() : "image").orElse("-"));
+            }
+            @Override public List<String> contentMenu(UUID tabId) {
+                return onEdtValue(() -> { var shown = contentMenus.get(tabId); return shown == null ? List.<String>of() : shown.lines(); });
+            }
+            @Override public boolean chooseFromContentMenu(UUID tabId, List<String> path) {
+                return onEdtValue(() -> {
+                    var shown = contentMenus.get(tabId);
+                    if (shown == null || !shown.choose(path)) return false;
+                    contentMenus.remove(tabId, shown);
+                    return true;
+                });
+            }
+            @Override public boolean dismissContentMenu(UUID tabId) {
+                return onEdtValue(() -> {
+                    var shown = contentMenus.remove(tabId);
+                    if (shown != null) shown.menu().dismissed();
+                    return shown != null;
+                });
             }
             @Override public void closeTab(UUID tabId) { onEdt(() -> terminalFixture.closeTab(tabId)); }
             @Override public List<List<UUID>> windowTabs(UUID windowId) { return onEdtValue(() -> terminalFixture.windowTabs(windowId)); }

@@ -119,10 +119,11 @@ public final class Nodes {
      * keeps the kind's colour. A present {@code selected} makes it a toggle button (a search option such as match case):
      * the kit paints the pressed treatment while it is true and reports its pressed state to assistive technology; a
      * click reports the Action and the owner confirms the new state in its next update. Only GHOST and SECONDARY buttons
-     * take it.
+     * take it. A non-empty {@code holdMenu} opens under the button after a press held on it for 500 ms, whose
+     * release then reports nothing, and at once on a right-click or the menu keys.
      */
     public record Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,
-                         Optional<Severity> iconSeverity, Optional<Boolean> selected) implements Node {
+                         Optional<Severity> iconSeverity, Optional<Boolean> selected, List<MenuItem> holdMenu) implements Node {
         public Button {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.button(label, icon, tooltip);
@@ -133,6 +134,12 @@ public final class Nodes {
             Objects.requireNonNull(selected);
             if (selected.isPresent() && kind != ButtonKind.GHOST && kind != ButtonKind.SECONDARY)
                 throw new IllegalArgumentException("Only ghost and secondary buttons have a pressed state");
+            holdMenu = List.copyOf(holdMenu); ModelChecks.unique(holdMenu, MenuItem::id);
+        }
+        /** A button without a hold menu. */
+        public Button(String id, ControlState state, String label, String icon, ButtonKind kind, String action, String tooltip, ButtonPresentation presentation,
+                      Optional<Severity> iconSeverity, Optional<Boolean> selected) {
+            this(id, state, label, icon, kind, action, tooltip, presentation, iconSeverity, selected, List.of());
         }
         /**
          * A button whose glyph takes its kind's colour (or {@code iconSeverity}'s) and that has no pressed state.
@@ -187,6 +194,11 @@ public final class Nodes {
         }
     }
 
+    /** One of a {@link Field}'s suggestions: a row of its list, the title and then, quieter, the detail (blank for none). */
+    public record Suggestion(String id, String title, String detail) {
+        public Suggestion { ModelChecks.id(id); ModelChecks.label(title, "title"); Objects.requireNonNull(detail, "detail"); }
+    }
+
     /**
      * How a field sits in its composition. STANDARD shows the kit label (a SEARCH field never does) over a filled input.
      * EMBEDDED leaves the visible label to the host's own arrangement (the label stays the accessible name). TRANSPARENT
@@ -204,10 +216,24 @@ public final class Nodes {
      * stays in the field, and Enter stays {@code trailingAction}. A TEXTAREA takes neither {@code alternateAction} nor
      * {@code listId}, and a NUMBER field (whose arrows step it) takes no {@code listId}. A {@code readOnly} field (since
      * 0.18.0) is focusable, selectable and copyable but never edited, so it reports no {@link UiEvent.Edited}; a STEPPER
-     * or SLIDER is never read-only.
+     * or SLIDER is never read-only. The leading slot shows the {@code leadingImage} in place of the kind's glyph, in that
+     * glyph's box, under every kit, or while it has none or the image does not decode the {@code leadingIcon} in the
+     * glyph's colours; {@code leadingName} is the slot's accessible name and tooltip. Dragging the slot offers
+     * {@code leadingDrag} as a {@code java.net.URL} when Java has a handler for its scheme, as the local file a
+     * {@code file:} URL names, and as text. The name and the drag text need an image or an icon. A {@code selectOnClick}
+     * field selects all its text when a left click brings the focus into it, unless the press drags out a selection. A
+     * TEXTAREA, a STEPPER and a SLIDER take no leading image or icon and no {@code selectOnClick}. The kit shows the
+     * {@code suggestions} in a list under the field, the first selected, with "Loading suggestions…" after them while
+     * {@code suggestionsLoading}; the field keeps the focus. While the list shows suggestions, Up and Down move the
+     * selection and Tab and Enter report {@link UiEvent.SuggestionChosen} (a click reports it as Enter does); while it
+     * shows at all, Escape hides it and reports {@code cancelAction}. A choice, Escape and the focus leaving the field
+     * hide the list until the next edit; an update keeps a selection still listed, and an edit selects the first. A
+     * TEXTAREA, a NUMBER field and a field with a {@code listId} take no suggestions; their ids are unique.
      */
     public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
-                        String alternateAction, String cancelAction, String listId, boolean readOnly) implements Node {
+                        String alternateAction, String cancelAction, String listId, boolean readOnly, Optional<PixelImage> leadingImage,
+                        String leadingIcon, String leadingName, Optional<String> leadingDrag, boolean selectOnClick, List<Suggestion> suggestions,
+                        boolean suggestionsLoading) implements Node {
         public Field {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -227,6 +253,33 @@ public final class Nodes {
             if (kind == FieldKind.NUMBER && !listId.isBlank()) throw new IllegalArgumentException("A number field's arrow keys step its value, not a list");
             if (readOnly && (presentation == FieldPresentation.STEPPER || presentation == FieldPresentation.SLIDER))
                 throw new IllegalArgumentException("A stepper or slider is never read-only");
+            Objects.requireNonNull(leadingImage); Objects.requireNonNull(leadingIcon); Objects.requireNonNull(leadingName); Objects.requireNonNull(leadingDrag);
+            if (!leadingName.isEmpty()) ModelChecks.label(leadingName, "leadingName");
+            leadingDrag.ifPresent(text -> ModelChecks.label(text, "leadingDrag"));
+            boolean leading = leadingImage.isPresent() || !leadingIcon.isEmpty();
+            if (leadingDrag.isPresent() && !leading) throw new IllegalArgumentException("A field's drag text needs a leading image or icon");
+            if (!leadingName.isEmpty() && !leading) throw new IllegalArgumentException("A field's leading name needs a leading image or icon");
+            if (kind == FieldKind.TEXTAREA && (leading || selectOnClick))
+                throw new IllegalArgumentException("A multiline field takes no leading image or icon and no select-on-click");
+            if ((presentation == FieldPresentation.STEPPER || presentation == FieldPresentation.SLIDER) && (leading || selectOnClick))
+                throw new IllegalArgumentException("A stepper or slider takes no leading image or icon and no select-on-click");
+            suggestions = List.copyOf(suggestions); ModelChecks.unique(suggestions, Suggestion::id);
+            boolean suggesting = !suggestions.isEmpty() || suggestionsLoading;
+            if (kind == FieldKind.TEXTAREA && suggesting) throw new IllegalArgumentException("A multiline field takes no suggestions");
+            if (kind == FieldKind.NUMBER && suggesting) throw new IllegalArgumentException("A number field's arrow keys step its value, not suggestions");
+            if (!listId.isBlank() && suggesting) throw new IllegalArgumentException("A field's arrow keys move its list or its suggestions, not both");
+        }
+        /** A field that offers no suggestions. */
+        public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
+                     String alternateAction, String cancelAction, String listId, boolean readOnly, Optional<PixelImage> leadingImage,
+                     String leadingIcon, String leadingName, Optional<String> leadingDrag, boolean selectOnClick) {
+            this(id, state, kind, value, hint, label, trailingAction, numeric, presentation, alternateAction, cancelAction, listId, readOnly, leadingImage,
+                leadingIcon, leadingName, leadingDrag, selectOnClick, List.of(), false);
+        }
+        /** A field with an empty leading slot, whose clicks place the caret. */
+        public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
+                     String alternateAction, String cancelAction, String listId, boolean readOnly) {
+            this(id, state, kind, value, hint, label, trailingAction, numeric, presentation, alternateAction, cancelAction, listId, readOnly, Optional.empty(), "", "", Optional.empty(), false);
         }
         /** An editable field. */
         public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,

@@ -187,7 +187,8 @@ public final class PluginPresentationCheck {
                     boolean allowed = Set.of("java/awt/Color", "java/awt/Dimension").contains(type)
                         || owner.equals("dev/jasper/sdk/ui/Appearance") && type.equals("java/awt/Component")
                         || owner.equals("dev/jasper/sdk/ui/CustomContent") && type.equals("javax/swing/JComponent")
-                        || owner.equals("dev/jasper/sdk/ui/ContentCommand") && type.equals("javax/swing/KeyStroke");
+                        || owner.equals("dev/jasper/sdk/ui/ContentCommand") && type.equals("javax/swing/KeyStroke")
+                        || owner.equals("dev/jasper/sdk/ui/ContentTab") && type.equals("java/awt/Point");
                     if (!allowed) problems.add(owner + " exposes unsupported presentation type " + type + " in " + signature);
                 }
             }

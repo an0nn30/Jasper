@@ -73,8 +73,9 @@ class WebAddressItemsTest {
             host.start(INFO, Set.of(), Set.of(), plugin -> {
                 context.set(plugin);
                 recorded.context = plugin;
-                new BrowserItems(plugin, page -> { });
-                WebAddressItems.register(plugin, recorded, BrowserSettings.declare(plugin.settings()));
+                var settings = BrowserSettings.declare(plugin.settings());
+                new BrowserItems(plugin, settings::read, page -> { });
+                WebAddressItems.register(plugin, recorded, settings);
             });
             assertThat(host.contextMenu(second)).containsExactlyElementsOf(SHOWN);
             assertThat(host.chooseFromContextMenu(second, RIGHT)).isTrue();
@@ -106,8 +107,9 @@ class WebAddressItemsTest {
             var declined = new Recorder(false);
             host.start(INFO, Set.of(), Set.of(), plugin -> {
                 declined.context = plugin;
-                new BrowserItems(plugin, page -> { });
-                WebAddressItems.register(plugin, declined, BrowserSettings.declare(plugin.settings()));
+                var settings = BrowserSettings.declare(plugin.settings());
+                new BrowserItems(plugin, settings::read, page -> { });
+                WebAddressItems.register(plugin, declined, settings);
             });
             assertThat(host.chooseFromContextMenu(pane, RIGHT)).isTrue();
             assertThat(declined.links).hasSize(1);
@@ -127,7 +129,7 @@ class WebAddressItemsTest {
             var chromium = new AtomicReference<>(Chromium.State.NOT_STARTED);
             host.start(INFO, Set.of(), Set.of(), plugin -> {
                 var settings = BrowserSettings.declare(plugin.settings());
-                items.set(new BrowserItems(plugin, page -> { }));
+                items.set(new BrowserItems(plugin, settings::read, page -> { }));
                 var role = new BrowserRole(plugin, items.get(), settings, chromium::get);
                 plugin.platform().browser(role);
                 WebAddressItems.register(plugin, role, settings);

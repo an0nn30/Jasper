@@ -27,7 +27,9 @@ final class DecodedArtwork {
                     var reader=readers.next();
                     try {
                         if(!reader.getFormatName().equalsIgnoreCase("png"))throw new IOException("Not PNG");
-                        reader.setInput(input); dimensions(reader.getWidth(0),reader.getHeight(0));
+                        // Untrusted PNGs (favicons): the reader skips every chunk but the image's own, so no text or
+                        // profile chunk is inflated or kept.
+                        reader.setInput(input,true,true); dimensions(reader.getWidth(0),reader.getHeight(0));
                         image=reader.read(0);
                         aspect=(double)image.getWidth()/image.getHeight();
                     } finally {reader.dispose();}

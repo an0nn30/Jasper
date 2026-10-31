@@ -487,6 +487,24 @@ public final class TabRegistry {
     }
 
     /**
+     * Shows a plugin's right-click menu over {@code tab}, as {@code ContentTab.showContextMenu} asks (browser plan 4b;
+     * browser spec 11): its window selects it and shows the menu with its pane items between the plugin's. A closed tab,
+     * or one no window holds, shows none, and the menu hears nothing at once, as it does when the window cannot show it
+     * or fails to.
+     *
+     * @param tab the tab
+     * @param menu the plugin's items, where the menu opens and who hears the choice
+     */
+    public void showContextMenu(Tab tab, ContentMenu menu) {
+        requireEdt();
+        Objects.requireNonNull(menu, "menu");
+        var host = tab.closed() ? null : hosts.get(tab.window());
+        if (host == null) { menu.dismissed(); return; }
+        try { host.contextMenu().accept(tab, menu); }
+        catch (RuntimeException | Error failure) { menu.dismissed(); throw failure; }
+    }
+
+    /**
      * Whether Move Pane to New Tab would move {@code tab} (tabs and panes spec 9): a tab that may move ({@link #movable})
      * whose window's tab holds another pane.
      *

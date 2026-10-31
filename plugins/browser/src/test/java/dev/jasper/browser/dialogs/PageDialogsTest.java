@@ -6,10 +6,10 @@ import dev.jasper.browser.item.ItemTestAccess;
 import dev.jasper.browser.page.DialogPlace;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
+import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.files.FileChoice;
 import dev.jasper.sdk.files.FileLocation;
-import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakeKitView;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.Subscription;
@@ -508,9 +508,10 @@ class PageDialogsTest {
         var result = new AtomicReference<Shown>();
         onUiThread(() -> {
             var host = new FakePluginHost();
-            var context = new AtomicReference<PluginContext>();
-            host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), context::set);
-            var items = new BrowserItems(context.get(), page -> { });
+            var started = new AtomicReference<BrowserItems>();
+            host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
+                plugin -> started.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, page -> { })));
+            var items = started.get();
             host.activateTerminalWindow(host.addTerminalWindow());
             BrowserItem item = items.open(URI.create("https://example.com"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
             result.set(new Shown(host, items, item, ItemTestAccess.page(item)));

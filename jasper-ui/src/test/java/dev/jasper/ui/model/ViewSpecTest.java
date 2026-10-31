@@ -24,6 +24,121 @@ class ViewSpecTest {
             assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
                 Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", true)).withMessageContaining("never read-only");
     }
+    /** The PNG signature followed by {@code length - 8} zero bytes. */
+    static byte[] png(int length) {
+        byte[] data = new byte[length];
+        System.arraycopy(new byte[]{(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, 0, data, 0, 8);
+        return data;
+    }
+    /** Plan 4b Task 1: a pixel image is a PNG of at most 65,536 bytes, copied in and out and equal by its bytes. */
+    @Test void pixelImagesAreBoundedPngsComparedByTheirBytes() {
+        byte[] data = png(40);
+        var image = new PixelImage(data);
+        data[30] = 1;
+        assertThat(image.png()[30]).isZero();
+        image.png()[30] = 1;
+        assertThat(image.png()[30]).isZero();
+        assertThat(image).isEqualTo(new PixelImage(png(40))).hasSameHashCodeAs(new PixelImage(png(40))).hasToString("PixelImage[40 bytes]");
+        assertThatIllegalArgumentException().isThrownBy(() -> new PixelImage(png(65_537))).withMessage("A pixel image holds at most 65536 bytes, not 65537");
+        assertThatIllegalArgumentException().isThrownBy(() -> new PixelImage(new byte[]{'G', 'I', 'F', '8', '9', 'a', 0, 0})).withMessage("A pixel image must be a PNG");
+    }
+    private static Field leading(FieldKind kind, FieldPresentation presentation, Optional<PixelImage> image, String icon, String name,
+                                 Optional<String> drag, boolean selectOnClick) {
+        return new Field("f", ControlState.READY, kind, kind == FieldKind.NUMBER ? "1" : "", "", "Field", "",
+            kind == FieldKind.NUMBER ? Optional.of(new Numeric(0, 9, 1, 0)) : Optional.empty(), presentation, "", "", "", false,
+            image, icon, name, drag, selectOnClick);
+    }
+    /** Plan 4b Task 1: a leading image, icon, name, drag text and select-on-click, checked as the SDK checks them. */
+    @Test void leadingSlotsAndSelectOnClickAreValidatedAndDefaultToNone() {
+        var plain = new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "");
+        assertThat(plain.leadingImage()).isEmpty();
+        assertThat(plain.leadingIcon()).isEmpty();
+        assertThat(plain.leadingName()).isEmpty();
+        assertThat(plain.leadingDrag()).isEmpty();
+        assertThat(plain.selectOnClick()).isFalse();
+        var image = new PixelImage(png(32));
+        var address = leading(FieldKind.TEXT, FieldPresentation.EMBEDDED, Optional.of(image), "network", "Site icon - drag to copy URL",
+            Optional.of("https://example.com/"), true);
+        assertThat(address.leadingImage()).contains(image);
+        assertThat(address.leadingIcon()).isEqualTo("network");
+        assertThat(address.leadingName()).isEqualTo("Site icon - drag to copy URL");
+        assertThat(address.leadingDrag()).contains("https://example.com/");
+        assertThat(address.selectOnClick()).isTrue();
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.empty(), "", "",
+            Optional.of("https://example.com/"), false)).withMessage("A field's drag text needs a leading image or icon");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.empty(), "", "Site icon",
+            Optional.empty(), false)).withMessage("A field's leading name needs a leading image or icon");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.of(image), "", "",
+            Optional.of(""), false)).withMessage("leadingDrag must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXT, FieldPresentation.STANDARD, Optional.of(image), "", " ",
+            Optional.empty(), false)).withMessage("leadingName must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXTAREA, FieldPresentation.STANDARD, Optional.empty(), "", "",
+            Optional.empty(), true)).withMessage("A multiline field takes no leading image or icon and no select-on-click");
+        assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.TEXTAREA, FieldPresentation.STANDARD, Optional.empty(), "network", "",
+            Optional.empty(), false)).withMessage("A multiline field takes no leading image or icon and no select-on-click");
+        for (var presentation : List.of(FieldPresentation.STEPPER, FieldPresentation.SLIDER))
+            assertThatIllegalArgumentException().isThrownBy(() -> leading(FieldKind.NUMBER, presentation, Optional.empty(), "network", "",
+                Optional.empty(), false)).withMessage("A stepper or slider takes no leading image or icon and no select-on-click");
+    }
+    private static Field suggesting(FieldKind kind, List<Suggestion> suggestions, boolean loading) {
+        return new Field("f", ControlState.READY, kind, kind == FieldKind.NUMBER ? "1" : "", "", "Field", "",
+            kind == FieldKind.NUMBER ? Optional.of(new Numeric(0, 9, 1, 0)) : Optional.empty(), FieldPresentation.STANDARD, "", "", "", false,
+            Optional.empty(), "", "", Optional.empty(), false, suggestions, loading);
+    }
+    /** Plan 4b Task 1 (SDK 0.27.0): the model mirrors the SDK's submenus and hold menus, with the same checks. */
+    @Test void submenusAndHoldMenusAreCopiedAndValidatedAsTheSdkDoes() {
+        var source = new MenuItem("source", "View Source", "", "view-source", true, false);
+        var children = new java.util.ArrayList<>(List.of(source));
+        var tools = new MenuItem("tools", "Developer Tools", "", "", true, false, Hue.NEUTRAL, "", children);
+        children.clear();
+        assertThat(tools.children()).containsExactly(source);
+        assertThat(tools.submenu()).isTrue();
+        assertThat(source.submenu()).isFalse();
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "tools", true, false, Hue.NEUTRAL, "", List.of(source)))
+            .withMessage("A submenu reports no action");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "", true, false, Hue.NEUTRAL, "new_tab", List.of(source)))
+            .withMessage("A submenu shows no shortcut");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("rule", "", "", "", true, true, Hue.NEUTRAL, "", List.of(source)))
+            .withMessage("A separator opens no submenu");
+        assertThatIllegalArgumentException().isThrownBy(() -> new MenuItem("tools", "Tools", "", "", true, false, Hue.NEUTRAL, "", List.of(source, source)))
+            .withMessage("Duplicate id: source");
+        var items = new java.util.ArrayList<>(List.of(source, tools));
+        var back = new Button("back", ControlState.READY, "", "back", ButtonKind.GHOST, "back", "Back", ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), items);
+        items.clear();
+        assertThat(back.holdMenu()).containsExactly(source, tools);
+        assertThat(new Button("b", ControlState.READY, "Open", "", ButtonKind.LINK, "open", "").holdMenu()).isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> new Button("back", ControlState.READY, "", "back", ButtonKind.GHOST, "back", "Back",
+            ButtonPresentation.STANDARD, Optional.empty(), Optional.empty(), List.of(source, source))).withMessage("Duplicate id: source");
+    }
+
+    /** Plan 4b Task 1: a field's suggestions and their loading state, checked as the SDK checks them. */
+    @Test void suggestionsAreCopiedUniqueAndOnlyOnSingleLineTextFields() {
+        var plain = new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "");
+        assertThat(plain.suggestions()).isEmpty();
+        assertThat(plain.suggestionsLoading()).isFalse();
+        var search = new Suggestion("search", "Search for “jcef”", "Web Search");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Suggestion("", "Title", "")).withMessage("id must not be blank");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Suggestion("id", "", "")).withMessage("title must not be blank");
+        assertThatNullPointerException().isThrownBy(() -> new Suggestion("id", "Title", null));
+        var rows = new ArrayList<>(List.of(new Suggestion("navigate", "Navigate to “https://jcef”", "URL"), search));
+        var field = suggesting(FieldKind.TEXT, rows, true);
+        rows.clear();
+        assertThat(field.suggestions()).extracting(Suggestion::id).containsExactly("navigate", "search");
+        assertThat(field.suggestionsLoading()).isTrue();
+        assertThatIllegalArgumentException().isThrownBy(() -> suggesting(FieldKind.TEXT, List.of(search, search), false)).withMessage("Duplicate id: search");
+        assertThatIllegalArgumentException().isThrownBy(() -> suggesting(FieldKind.TEXTAREA, List.of(), true)).withMessage("A multiline field takes no suggestions");
+        assertThatIllegalArgumentException().isThrownBy(() -> suggesting(FieldKind.NUMBER, List.of(search), false))
+            .withMessage("A number field's arrow keys step its value, not suggestions");
+        assertThat(suggesting(FieldKind.PATH, List.of(search), false).suggestions()).containsExactly(search);
+        for (boolean loading : List.of(false, true))
+            assertThatIllegalArgumentException().isThrownBy(() -> new Field("f", ControlState.READY, FieldKind.SEARCH, "", "", "Field", "", Optional.empty(),
+                    FieldPresentation.STANDARD, "", "", "results", false, Optional.empty(), "", "", Optional.empty(), false,
+                    loading ? List.of() : List.of(search), loading))
+                .withMessage("A field's arrow keys move its list or its suggestions, not both");
+        var chosen = new UiEvent.SuggestionChosen("f", "search", false);
+        assertThat(chosen.id()).isEqualTo("f");
+        assertThatIllegalArgumentException().isThrownBy(() -> new UiEvent.SuggestionChosen("f", " ", true));
+    }
     /** Plan 3b (spec 8.2): EXCLUSIVE shows two to four options and TABS two or more, wherever the choice sits. */
     @Test void exclusiveChoicesShowTwoToFourOptionsAndTabsTwoOrMore() {
         for (int count = 0; count <= 6; count++) {

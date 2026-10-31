@@ -2,10 +2,15 @@
  * Links and popups inside a page. {@link dev.jasper.browser.links.PageNavigation} holds the client's one request handler
  * and a life span handler, which decide whether a modified click's link or a popup opens and where, through
  * {@link dev.jasper.browser.links.LinkGesture} and {@code LinkRoute}, and hand the result to the page's
- * {@link dev.jasper.browser.page.Page}: the page loads it, or its item opens an item of its own beside itself.
+ * {@link dev.jasper.browser.page.Page}: the page loads it, or its item opens an item of its own beside itself. The
+ * request handler also lets Chromium go on past a certificate it could not verify only when the page allows it, and
+ * otherwise hands the page the certificate for its error page.
  * {@code OpenerBridge}, with its page script {@code opener-bridge.js} and {@code BridgeJson}, opens a script's
  * {@code window.open} the same way and keeps the popup's {@code window.opener} working through the client's message
  * router, within the limits {@code Isolation} reads from each main frame's response: its origin, a sandbox, and its
- * opener policy. Depends on {@code engine} and {@code page}; it loads only once a page first asks for Chromium.
+ * opener policy. The router serves the {@code page} package's scripts too, each request by its op: a document's
+ * favicon goes to its {@link dev.jasper.browser.page.Page}, when {@code http} would fetch it, and what a frame's
+ * {@code find.js} found to the page's {@link dev.jasper.browser.page.PageFind}, from any frame of the page. Depends on
+ * {@code engine}, {@code http}, {@code json} and {@code page}; it loads only once a page first asks for Chromium.
  */
 package dev.jasper.browser.links;

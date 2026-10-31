@@ -54,6 +54,10 @@ final class Buttons {
     }
     static final class ButtonControl extends ControlRegistry.Control {
         final KitButton button;
+        /** Where the button's action, and its hold menu's, go. */
+        final java.util.function.Consumer<UiEvent> events;
+        /** The button's hold menu, made the first time it has one; null before. */
+        HoldMenu hold;
         /** Validated borrowed host artwork; null for ordinary named icons. */
         HostArtwork hostArtwork;
         KeycapSequence keycaps;
@@ -62,7 +66,7 @@ final class Buttons {
         }
         ButtonControl(KitView view, Nodes.Button node, java.util.function.Consumer<UiEvent> events) { this(view, node, events, null); }
         ButtonControl(KitView view, Nodes.Button node, java.util.function.Consumer<UiEvent> events, javax.swing.Icon artwork) {
-            super(view, node, new KitButton(view.context())); button = (KitButton)component;
+            super(view, node, new KitButton(view.context())); button = (KitButton)component; this.events = events;
             hostArtwork = artwork == null ? null : new HostArtwork(artwork, null, null);
             own(() -> { if (hostArtwork != null) hostArtwork.close(); });
             button.putClientProperty("html.disable", true);
@@ -76,11 +80,14 @@ final class Buttons {
                 }
             };
             button.addFocusListener(revealAction); own(() -> button.removeFocusListener(revealAction));
-            ActionListener listener = event -> {
-                if (interactive()) try { events.accept(new UiEvent.Action(((Nodes.Button)this.node).action())); }
-                catch (Throwable failure) { view.report(failure); }
-            };
+            // The release of a press that opened the hold menu is no click, whichever mouse listener ran first.
+            ActionListener listener = event -> { if (hold == null || !hold.popup.isVisible()) act(new UiEvent.Action(((Nodes.Button)this.node).action())); };
             button.addActionListener(listener); own(() -> button.removeActionListener(listener)); refresh();
+        }
+        /** Reports {@code event} while the button takes input; a handler's failure is the view's to report. */
+        void act(UiEvent event) {
+            if (interactive()) try { events.accept(event); }
+            catch (Throwable failure) { view.report(failure); }
         }
         @Override public void close() {
             keycaps = null; button.valuePresentation = ButtonValuePresentation.DEFAULT;
@@ -117,6 +124,8 @@ final class Buttons {
                 button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() || classic != null ? null : value.icon());
             }
             if(keycaps!=null){button.setText("");button.setIcon(new Keycaps(context(),keycaps));button.putClientProperty("Jasper.button.icon",null);}
+            if (hold == null && !value.holdMenu().isEmpty()) { hold = new HoldMenu(this); own(hold); }
+            if (hold != null) hold.update(value.holdMenu());
             button.setHorizontalAlignment(button.recorder() ? SwingConstants.LEFT
                     : button.orderedAction ? SwingConstants.LEADING : SwingConstants.CENTER);
             button.setDisabledIcon(button.getIcon());

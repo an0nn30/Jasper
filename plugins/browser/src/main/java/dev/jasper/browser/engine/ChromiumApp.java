@@ -3,10 +3,12 @@ package dev.jasper.browser.engine;
 import com.jetbrains.cef.JCefAppConfig;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Predicate;
 import org.cef.CefApp;
 import org.cef.CefClient;
 import org.cef.CefSettings;
 import org.cef.SystemBootstrap;
+import org.cef.browser.CefBrowser;
 import org.cef.callback.CefSchemeRegistrar;
 import org.cef.handler.CefAppHandlerAdapter;
 
@@ -27,9 +29,10 @@ final class ChromiumApp {
      *
      * @param dataDir the plugin's data directory
      * @param about the pages {@code jasper-about:} serves
+     * @param pageBrowser whether a browser is a page's, whose main-frame requests {@code jasper-about:} answers
      * @param terminated run once Chromium has ended, on the UI thread
      */
-    static ChromiumApp start(Path dataDir, AboutScheme about, Runnable terminated) {
+    static ChromiumApp start(Path dataDir, AboutScheme about, Predicate<CefBrowser> pageBrowser, Runnable terminated) {
         JCefAppConfig config = JCefAppConfig.getInstance();
         CefApp.setIsRemoteEnabled(false);
         SystemBootstrap.setLoader(config.getLoader());
@@ -40,7 +43,7 @@ final class ChromiumApp {
         CefApp.addAppHandler(new Handler(args, terminated));
         CefApp app = CefApp.getInstance(args, settings, config.getServerExe());
         // JCEF holds the factory until the app has initialized.
-        app.registerSchemeHandlerFactory(AboutScheme.NAME, "", new AboutSchemeFactory(about));
+        app.registerSchemeHandlerFactory(AboutScheme.NAME, "", new AboutSchemeFactory(about, pageBrowser));
         return new ChromiumApp(app);
     }
 

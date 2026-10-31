@@ -869,6 +869,72 @@ final class WindowChrome {
         return menu;
     }
 
+    /**
+     * A plugin's right-click menu over the window's current item (browser plan 4b; browser spec 11), in the themed popup
+     * the window's other menus use: the plugin's leading items, the pane items the terminal's right-click menu offers for
+     * a pane (Split, the Split list as the Tab menu has it; Move Pane to Tab, the window's other tabs; Close Pane), then
+     * its trailing items, with a rule between groups and none for an empty group. A plugin's item shows its label as plain
+     * text, its icon and its action's binding; choosing one tells the menu its id. Choosing a pane item runs it and then
+     * tells the menu nothing, and so does the menu closing without a choice (Escape, a click elsewhere, another menu),
+     * after the item its closing came from, if any, has run.
+     *
+     * @param menu the plugin's items and who hears the choice
+     * @return the popup, not yet shown
+     */
+    JPopupMenu contentMenu(dev.jasper.app.contributions.ContentMenu menu) {
+        owner.updateActions();
+        JPopupMenu popup = new JPopupMenu();
+        if (!menu.leading().isEmpty()) {
+            contentItems(popup, menu.leading(), menu);
+            popup.addSeparator();
+        }
+        JMenu split = new JMenu("Split");
+        fillSplit(split, PlainText::item);
+        JMenu moves = paneMoves(new JMenu("Move Pane to Tab"), PlainText::item);
+        JMenuItem close = PlainText.item(owner.action(ActionId.CLOSE_PANE));
+        for (JMenuItem paneItem : List.of(split, moves, close)) popup.add(paneItem);
+        // A pane item runs, then tells the plugin nothing: Swing tells an item's listeners last added first, so the
+        // menu hears after the item's action has run, in a later turn, as it hears when the popup closes.
+        java.awt.event.ActionListener ran = event -> SwingUtilities.invokeLater(menu::dismissed);
+        for (JMenu submenu : List.of(split, moves))
+            for (Component child : submenu.getMenuComponents()) if (child instanceof JMenuItem item) item.addActionListener(ran);
+        close.addActionListener(ran);
+        if (!menu.trailing().isEmpty()) {
+            popup.addSeparator();
+            contentItems(popup, menu.trailing(), menu);
+        }
+        // An item's choice closes the popup before its action runs; the menu hears nothing only after that.
+        popup.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
+            @Override public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent event) {}
+            @Override public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent event) { SwingUtilities.invokeLater(menu::dismissed); }
+            @Override public void popupMenuCanceled(javax.swing.event.PopupMenuEvent event) { SwingUtilities.invokeLater(menu::dismissed); }
+        });
+        NativeStyles.installed().menuTree(popup, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        return popup;
+    }
+
+    /** Adds a plugin's {@code items} to {@code into}, a popup or a submenu: rules, submenus of their children, and items. */
+    private void contentItems(Container into, List<dev.jasper.app.contributions.ContentMenu.Item> items, dev.jasper.app.contributions.ContentMenu menu) {
+        for (var item : items) {
+            if (item.separator()) { into.add(new JPopupMenu.Separator()); continue; }
+            JMenuItem entry;
+            if (!item.children().isEmpty()) {
+                JMenu submenu = PlainText.menu(item.label());
+                contentItems(submenu, item.children(), menu);
+                entry = submenu;
+            } else {
+                entry = PlainText.item(item.label());
+                if (!item.shortcut().isEmpty()) entry.setAccelerator(owner.bindings().strokeFor(item.shortcut()).orElse(null));
+                entry.addActionListener(event -> menu.chosen().accept(Optional.of(item.id())));
+            }
+            entry.setIcon(item.icon());
+            // A plugin's icon draws in the disabled colour on a disabled item, as a dimmed status item's does.
+            if (item.icon() instanceof dev.jasper.app.platform.PresentationIcon named) entry.setDisabledIcon(named.in(SemanticColor.TEXT_PLACEHOLDER));
+            entry.setEnabled(item.enabled());
+            into.add(entry);
+        }
+    }
+
     void setToolbarMode(ToolbarMode mode) {
         composition.toolbarMode(header, mode, owner.viewMode() == ViewMode.NORMAL);
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));

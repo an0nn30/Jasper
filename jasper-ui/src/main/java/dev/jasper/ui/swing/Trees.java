@@ -14,7 +14,8 @@ final class Trees {
         if(node instanceof Nodes.Custom)throw new IllegalArgumentException("Tree detail requires standard descriptors");
         switch(node) {
             case Nodes.Icon icon -> requireIcon(icon.name(),icons);
-            case Nodes.Button button -> optionalIcon(button.icon(),icons);
+            case Nodes.Button button -> {optionalIcon(button.icon(),icons);validateMenus(button.holdMenu(),icons);}
+            case Nodes.Field field -> optionalIcon(field.leadingIcon(),icons);
             case Nodes.MenuButton menu -> {optionalIcon(menu.icon(),icons);validateMenus(menu.items(),icons);}
             case Nodes.Choice choice -> {
                 optionalIcon(choice.icon(),icons);choice.face().ifPresent(face->optionalIcon(face.icon(),icons));
@@ -54,7 +55,7 @@ final class Trees {
         if(!name.isEmpty())requireIcon(name,icons);
     }
     private static void validateMenus(java.util.List<dev.jasper.ui.model.MenuItem> items,java.util.Set<String> icons) {
-        items.stream().filter(item->!item.icon().isBlank()).forEach(item->requireIcon(item.icon(),icons));
+        for(var item:items){if(!item.icon().isBlank())requireIcon(item.icon(),icons);validateMenus(item.children(),icons);}
     }
     private static void validateTreeItem(dev.jasper.ui.model.TreeItem item,java.util.Set<String> icons) {
         item.icon().ifPresent(name->requireIcon(name,icons));

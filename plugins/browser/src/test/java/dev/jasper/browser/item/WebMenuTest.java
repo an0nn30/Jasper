@@ -2,8 +2,8 @@ package dev.jasper.browser.item;
 
 import dev.jasper.browser.BrowserPlugin;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.PluginInfo;
-import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.TabPlacement;
@@ -138,9 +138,10 @@ class WebMenuTest {
 
     /** The items of a started stand-in plugin, whose pages are never made. UI thread. */
     private static BrowserItems items(FakePluginHost host) {
-        var context = new AtomicReference<PluginContext>();
-        host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), context::set);
-        return new BrowserItems(context.get(), (Page page) -> { });
+        var items = new AtomicReference<BrowserItems>();
+        host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
+            plugin -> items.set(new BrowserItems(plugin, BrowserSettings.declare(plugin.settings())::read, (Page page) -> { })));
+        return items.get();
     }
 
     /** Records each item run as its action and the address of the browser item it ran on. */

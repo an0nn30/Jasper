@@ -20,6 +20,17 @@ public abstract class KitContractTest {
     protected abstract void type(UiView view,String id,String text);
     /** Clicks what a person sees as {@code id}: a button whose action is its id, or a choice's option {@code choice.option.value}. */
     protected abstract void click(UiView view,String id);
+    /** Clicks into field {@code id} as a person would, the focus elsewhere. */
+    protected abstract void clickInto(UiView view,String id);
+    /** The titles of the suggestions field {@code id} shows, in order; empty while it shows none. */
+    protected abstract List<String> suggestions(UiView view,String id);
+    /** Presses {@code key} (UP, DOWN, TAB, ENTER or ESCAPE) in field {@code id} as a person would, the focus in the field. */
+    protected abstract void press(UiView view,String id,String key);
+    /**
+     * Chooses, as a person would, the item {@code path} names in node {@code id}'s menu (a menu button's, or a button's
+     * hold menu): item ids from the menu down, through a submenu by its id; a disabled submenu does not open.
+     */
+    protected abstract void choose(UiView view,String id,String... path);
     protected static void edt(Runnable body) throws Exception { SwingUtilities.invokeAndWait(body); }
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
@@ -105,6 +116,113 @@ public abstract class KitContractTest {
             new Nodes.Field("locked", ControlState.READY, Nodes.FieldKind.TEXT, "", "", "Login", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", locked),
             new Nodes.Field("shown", ControlState.READY, Nodes.FieldKind.TEXT, "No folder selected", "", "Folder", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", true))));
     }
+
+    /** Plan 4b Task 1 (SDK 0.27.0): a click into a select-on-click field selects all its text; a click into another field selects none. */
+    @Test void aClickIntoASelectOnClickFieldSelectsAllItsText() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        String address = "https://example.com/";
+        var spec = new ViewSpec(new Nodes.Stack("root", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Field("address", ControlState.READY, Nodes.FieldKind.TEXT, address, "Search or enter website name", "Address", "", Optional.empty(),
+                Nodes.FieldPresentation.STANDARD, "", "", "", false, Optional.empty(), "", "", Optional.empty(), true),
+            new Nodes.Field("plain", ControlState.READY, Nodes.FieldKind.TEXT, address, "", "Plain", ""))));
+        var view = kit.create(spec, events::add);
+        try {
+            clickInto(view, "address");
+            assertThat(fieldSelection(view, "address")).containsExactly(0, address.length());
+            clickInto(view, "plain");
+            var plain = fieldSelection(view, "plain");
+            assertThat(plain[1]).as("no selection").isEqualTo(plain[0]);
+            assertThat(events).isEmpty();
+            assertThatIllegalArgumentException().as("a multiline field takes no select-on-click").isThrownBy(() -> new Nodes.Field("notes",
+                ControlState.READY, Nodes.FieldKind.TEXTAREA, "", "", "Notes", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", false,
+                Optional.empty(), "", "", Optional.empty(), true));
+        } finally { view.close(); stop(kit); }
+    }); }
+
+    /** Plan 4b Task 1 (SDK 0.27.0): a field's leading slot (image, icon, name and drag text) mounts and updates as given on both runtimes. */
+    @Test void aFieldsLeadingSlotMountsAndUpdatesAsGiven() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        byte[] png = new byte[32];
+        System.arraycopy(new byte[]{(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, 0, png, 0, 8);
+        java.util.function.Function<Optional<PixelImage>, ViewSpec> spec = image -> new ViewSpec(new Nodes.Field("address", ControlState.READY,
+            Nodes.FieldKind.TEXT, "https://example.com/", "Search or enter website name", "Address", "go", Optional.empty(), Nodes.FieldPresentation.STANDARD,
+            "", "", "", false, image, "network", "Site icon - drag to copy URL", Optional.of("https://example.com/"), true));
+        var loading = spec.apply(Optional.empty());
+        var view = kit.create(loading, events::add);
+        try {
+            assertThat(view.spec()).isEqualTo(loading);
+            var shown = spec.apply(Optional.of(new PixelImage(png)));
+            view.update(shown);
+            assertThat(view.spec()).isEqualTo(shown);
+            view.update(loading);
+            assertThat(view.spec()).isEqualTo(loading);
+            assertThat(events).isEmpty();
+        } finally { view.close(); stop(kit); }
+    }); }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a field's suggestions render with the first selected, and Tab reports it as
+     * SuggestionChosen(byTab = true); after an edit Down and Enter report the next, and Escape hides them and reports the
+     * field's cancel action, on both runtimes.
+     */
+    @Test void aFieldsSuggestionsRenderAndTabReportsTheSelectedOne() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        var navigate = new Nodes.Suggestion("navigate", "Navigate to “https://exam”", "URL");
+        var search = new Nodes.Suggestion("search", "Search for “exam”", "Web Search");
+        java.util.function.Function<List<Nodes.Suggestion>, ViewSpec> spec = rows -> new ViewSpec(new Nodes.Field("address", ControlState.READY,
+            Nodes.FieldKind.TEXT, "exam", "Search or enter website name", "Address", "go", Optional.empty(), Nodes.FieldPresentation.STANDARD,
+            "", "revert", "", false, Optional.empty(), "", "", Optional.empty(), true, rows, false));
+        var view = kit.create(spec.apply(List.of(navigate, search)), events::add);
+        try {
+            assertThat(view.spec()).isEqualTo(spec.apply(List.of(navigate, search)));
+            assertThat(suggestions(view, "address")).containsExactly(navigate.title(), search.title());
+            press(view, "address", "TAB");
+            assertThat(events).containsExactly(new UiEvent.SuggestionChosen("address", "navigate", true));
+            assertThat(suggestions(view, "address")).as("choosing hides them").isEmpty();
+            type(view, "address", "exa");
+            assertThat(suggestions(view, "address")).as("an edit shows them again").containsExactly(navigate.title(), search.title());
+            press(view, "address", "DOWN");
+            press(view, "address", "ENTER");
+            type(view, "address", "ex");
+            press(view, "address", "ESCAPE");
+            assertThat(suggestions(view, "address")).isEmpty();
+            assertThat(events).filteredOn(event -> !(event instanceof UiEvent.Edited)).containsExactly(new UiEvent.SuggestionChosen("address", "navigate", true),
+                new UiEvent.SuggestionChosen("address", "search", false), new UiEvent.Action("revert"));
+            assertThat(events).filteredOn(UiEvent.Edited.class::isInstance).last().isEqualTo(new UiEvent.Edited("address", "ex"));
+            view.update(spec.apply(List.of()));
+            assertThat(view.spec()).isEqualTo(spec.apply(List.of()));
+        } finally { view.close(); stop(kit); }
+    }); }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a submenu's children are reachable on both runtimes, in a menu button's menu and in a
+     * button's hold menu: choosing one reports its action, while a submenu itself, a disabled child, a separator and the
+     * children of a disabled submenu report nothing.
+     */
+    @Test void aSubmenusChildrenAreReachable() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        var tools = new MenuItem("tools", "Developer Tools", "", "", true, false, Nodes.Hue.NEUTRAL, "", List.of(
+            new MenuItem("source", "View Source", "", "view-source", true, false), new MenuItem("rule", "", "", "", true, true),
+            new MenuItem("inspect", "Inspect Element", "", "inspect", false, false)));
+        var locked = new MenuItem("locked", "Locked", "", "", false, false, Nodes.Hue.NEUTRAL, "", List.of(new MenuItem("hidden", "Hidden", "", "hidden", true, false)));
+        var older = new MenuItem("older", "Older", "", "", true, false, Nodes.Hue.NEUTRAL, "", List.of(new MenuItem("entry-3", "Example Domain", "", "go:3", true, false)));
+        var spec = new ViewSpec(new Nodes.Stack("bar", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Button("back", ControlState.READY, "", "back", Nodes.ButtonKind.GHOST, "back", "Back", Nodes.ButtonPresentation.STANDARD, Optional.empty(),
+                Optional.empty(), List.of(new MenuItem("entry-1", "Jasper", "", "go:1", true, false), older)),
+            new Nodes.MenuButton("menu", ControlState.READY, "", "more", Nodes.ButtonKind.GHOST, "", List.of(new MenuItem("reload", "Reload", "", "reload", true, false), tools, locked), "Page"))));
+        var view = kit.create(spec, events::add);
+        try {
+            assertThat(view.spec()).isEqualTo(spec);
+            choose(view, "menu", "tools", "source");
+            choose(view, "back", "older", "entry-3");
+            choose(view, "back", "entry-1");
+            choose(view, "menu", "tools");
+            choose(view, "menu", "tools", "inspect");
+            choose(view, "menu", "tools", "rule");
+            choose(view, "menu", "locked", "hidden");
+            assertThat(events).containsExactly(new UiEvent.Action("view-source"), new UiEvent.Action("go:3"), new UiEvent.Action("go:1"));
+        } finally { view.close(); stop(kit); }
+    }); }
 
     @Test void windowPlainPathAndDiscreetInputRetainTheAdditiveContract() throws Exception { edt(()->{
         var path=new Nodes.Field("path",ControlState.READY,Nodes.FieldKind.PATH,"/synthetic/key","Hint","Path","browse",Optional.empty(),Nodes.FieldPresentation.PLAIN_PATH);
@@ -231,9 +349,16 @@ public abstract class KitContractTest {
         cases.put("picker-face",name -> new Nodes.Choice("rich",ControlState.READY,Nodes.ChoiceKind.PICKER,List.of(),"","Credential","pick","",Optional.empty(),Optional.of(new Nodes.PickerFace("Name","Caption",name,Nodes.Hue.GREEN,Nodes.PickerDensity.COMPACT))));
         cases.put("picker-menu",name -> new Nodes.PickerMenu("menu",ControlState.READY,"","Search",List.of(new Nodes.PickerItem("row","Row","Caption",name,Nodes.Hue.BLUE)),"row","row","Empty","Create","create","cancel"));
         cases.put("icon",KitContractTest::descriptorIcon);
+        cases.put("field-leading-icon",name -> new Nodes.Field("field",ControlState.READY,Nodes.FieldKind.TEXT,"","","Field","",Optional.empty(),
+            Nodes.FieldPresentation.STANDARD,"","","",false,Optional.empty(),name,"",Optional.empty(),false));
         cases.put("button",KitContractTest::descriptorButton);
         cases.put("menu-button",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu",name,Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu("")),""));
         cases.put("menu-item",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu","",Nodes.ButtonKind.GHOST,"",List.of(descriptorMenu(name)),""));
+        // SDK 0.27.0: a submenu's children and a button's hold menu are descriptor positions too.
+        cases.put("menu-child",name -> new Nodes.MenuButton("menu",ControlState.READY,"Menu","",Nodes.ButtonKind.GHOST,"",List.of(new MenuItem("more","More","","",true,false,
+            Nodes.Hue.NEUTRAL,"",List.of(descriptorMenu(name)))),""));
+        cases.put("hold-menu",name -> new Nodes.Button("button",ControlState.READY,"Button","",Nodes.ButtonKind.GHOST,"run","",Nodes.ButtonPresentation.STANDARD,Optional.empty(),
+            Optional.empty(),List.of(descriptorMenu(name))));
         cases.put("choice-option",name -> new Nodes.Choice("option",ControlState.READY,Nodes.ChoiceKind.DROPDOWN,List.of(new Option("one","One",name,"Default")),"one","Options",""));
         cases.put("choice",name -> new Nodes.Choice("choice",ControlState.READY,Nodes.ChoiceKind.PICKER,List.of(),"","Pick","pick",name));
         cases.put("header-overflow",name -> new Nodes.Header("header",ControlState.READY,"Header",OptionalInt.empty(),Optional.empty(),Optional.empty(),List.of(descriptorMenu(name))));

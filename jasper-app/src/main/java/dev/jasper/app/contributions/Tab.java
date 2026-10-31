@@ -147,6 +147,13 @@ public final class Tab implements AutoCloseable {
     public void moveToNewWindow() { registry.moveToNewWindow(this); }
     /** {@code window} takes the tab, in a new tab of its own there (full windows spec 5.4). */
     public void moveToWindow(java.util.UUID window) { registry.moveToWindow(this, window); }
+    /**
+     * Shows a plugin's right-click menu over the tab, as {@code ContentTab.showContextMenu} asks (browser plan 4b): its
+     * window selects it and adds its pane items; a closed tab, or one no window holds, shows none.
+     *
+     * @param menu the plugin's items, where the menu opens and who hears the choice
+     */
+    public void showContextMenu(ContentMenu menu) { registry.showContextMenu(this, menu); }
     /** Closes the tab once its plugin's guard allows it. */
     public CompletableFuture<Boolean> requestClose() { return registry.requestClose(List.of(this)); }
 

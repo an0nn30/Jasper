@@ -2146,6 +2146,75 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
+     * The right-click menu a content tab shows ({@code ContentTab.showContextMenu}), as Jasper shows it: the plugin's
+     * leading items, Jasper's pane items for the tab, then the trailing items. Call it on the UI thread.
+     *
+     * @param tab handle from this host
+     * @return {@code item:<id>} and {@code submenu:<id>} lines for the plugin's items, {@code host:<label>} lines for
+     *     Jasper's ({@code host:Split}, its entries such as {@code host:Terminal Right}, {@code host:Move Pane to Tab}, its
+     *     entries such as {@code host:1 zsh}, and {@code host:Close Pane}), {@code ---} for a separator, the group
+     *     separators included, a submenu's children after it indented two spaces, and {@code " (disabled)"} after a
+     *     disabled item; empty while the tab shows no menu
+     * @since 0.27.0
+     */
+    public List<String> contentMenu(dev.jasper.sdk.ui.ContentTab tab) {
+        var menu = ((FakeContent) tab).menu;
+        return menu == null ? List.of() : menu.lines();
+    }
+
+    /**
+     * Chooses from the right-click menu a content tab shows, as a person would: a plugin's enabled item tells the plugin's
+     * {@code chosen} its id; one of Jasper's runs, as Jasper runs it, and tells {@code chosen} nothing. Either closes the
+     * menu. Call it on the UI thread.
+     *
+     * @param tab handle from this host
+     * @param path the lines {@link #contentMenu} gives, without their indent, from the menu down through submenus, as
+     *     {@code "host:Split", "host:Terminal Right"}
+     * @return whether an enabled item ran; false for a disabled item, one under a disabled submenu, a submenu itself, a
+     *     separator, or a path the menu does not show
+     * @since 0.27.0
+     */
+    public boolean chooseFromContentMenu(dev.jasper.sdk.ui.ContentTab tab, String... path) {
+        var menu = ((FakeContent) tab).menu;
+        return menu != null && menu.choose(List.of(path));
+    }
+
+    /**
+     * Dismisses the right-click menu a content tab shows, as Escape or a click elsewhere does: the plugin's {@code chosen}
+     * hears nothing. Call it on the UI thread.
+     *
+     * @param tab handle from this host
+     * @return whether a menu showed
+     * @since 0.27.0
+     */
+    public boolean dismissContentMenu(dev.jasper.sdk.ui.ContentTab tab) {
+        var menu = ((FakeContent) tab).menu;
+        if (menu == null) return false;
+        menu.dismiss();
+        return true;
+    }
+
+    /** Dismisses the right-click menu any plugin's content tab shows, as another menu opening does in Jasper. */
+    void dismissContentMenus() {
+        for (FakePluginContext context : List.copyOf(contexts.values()))
+            for (FakeContent content : List.copyOf(context.ui.contents)) if (content.menu != null) content.menu.dismiss();
+    }
+
+    /** The open plugin content tab with this id, for the contract harness; empty for any other tab. */
+    java.util.Optional<dev.jasper.sdk.ui.ContentTab> content(UUID tabId) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeContent content : context.ui.contents) if (content.tab.id.equals(tabId)) return java.util.Optional.of(content);
+        return java.util.Optional.empty();
+    }
+
+    /** The presentation of the plugin content tab with this id, for the contract harness; empty for any other tab. */
+    java.util.Optional<dev.jasper.sdk.ui.ContentPresentation> contentPresentation(UUID tabId) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeContent content : context.ui.contents) if (content.tab.id.equals(tabId)) return java.util.Optional.of(content.presentation);
+        return java.util.Optional.empty();
+    }
+
+    /**
      * The restore state a plugin's content tab gives. Call it on the UI thread.
      *
      * @param tab a content tab from this host

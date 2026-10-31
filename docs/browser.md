@@ -21,9 +21,9 @@ The start page is `jasper-about:welcome` by default: Jasper's welcome page, in t
 **Settings** opens Settings › Tools › Browser. An open welcome page shows a theme change the next time it loads.
 
 Each page is the item of one pane. Its tab shows the page's title; while a page without a title loads, the tab keeps
-its previous name, and once loaded it shows the address's host, else "Web Browser". The tab's icon is a globe. The
-status bar shows the page's address, as the tab's tooltip and the address field do, without any user name and password
-in it.
+its previous name, and once loaded it shows the address's host, else "Web Browser". The tab's icon is the page's
+[site icon](#the-toolbar). The status bar shows the page's address, as the tab's tooltip and the address field do,
+without any user name and password in it.
 
 - **Close Pane** closes a browser pane at once. A page's own `window.close()` closes its pane too, as Chrome closes the
   tab; Chromium lets a page's script do so only while the page's history has a single entry, and a linked popup can
@@ -41,23 +41,71 @@ in it.
 
 Along the top of each page, from left to right:
 
-- **Back** and **Forward**, each disabled when the page has nowhere to go;
+- **Back** and **Forward**, each disabled when the page has nowhere to go. Holding either for half a second lists the
+  page's history that way, up to 12 entries, nearest first, each by its title or else its address; choosing one goes
+  there. A right-click (Control-click on macOS), Shift+F10 or the context-menu key opens the list at once.
 - **Reload**, which is **Stop** while the page loads;
-- the address field;
+- **Not secure**, in the warning colour, while the page is one you went on to past a certificate error
+  ([Certificate errors](#certificate-errors));
+- the address field, with the site icon at its left;
 - the menu button (☰), whose **Settings** opens Settings › Tools › Browser.
 
-The address field shows the page's address until you type in it. **Enter** loads what it holds and moves the keyboard
-to the page; **Escape** gives up what you typed, shows the page's address again and selects it. **Open Location…**
-moves the keyboard to the field and selects its text. The field reads what you type, without its surrounding spaces:
+The site icon, which the page's tab shows too, is the page's favicon once the page has loaded, Jasper's icon on
+Jasper's own `jasper-about:` pages, and a globe while the page loads, on an [error page](#error-pages) and whenever the
+page has no favicon Jasper can show ([Jasper's own requests](#jaspers-own-requests)). Its tooltip reads "Site icon -
+drag to copy URL": dragging it drags the page's address, as a link and as text, and for a `file:` page as the file.
+
+The address field shows the page's address until you type in it, or on a search engine's results page the search
+terms ([Search and suggestions](#search-and-suggestions)). A click that brings the keyboard into the field selects its
+text, as **Open Location…** does; a click while the field has the keyboard places the caret. While you type, a list
+under the field suggests what to load, the first suggestion selected: **Enter** or **Tab** loads the selected one and
+moves the keyboard to the page, and **Escape** gives up what you typed, shows what the field showed before and selects
+it. With no list showing, Enter loads what the field holds. The field reads its text, without its surrounding spaces:
 
 - an address that starts with `http:`, `https:`, `file:`, `about:` or `jasper-about:` loads as typed, with the
   characters an address cannot hold, such as spaces, escaped;
-- a domain (`example.com`), an IP address (`192.168.1.10`, `[::1]`), `localhost`, or a name with a port
-  (`devbox:8080`), each with or without a path, loads with `https://` before it;
+- an absolute local path, `/…`, `~/…` (in your home folder) or on Windows `C:\…`, loads its `file:` address;
+- a domain (`example.com`, also with a trailing dot), an IP address (`192.168.1.10`, `[::1]`), `localhost`, or a name
+  with a port (`devbox:8080`), each with or without a path, query or fragment, loads with `https://` before it;
+- so does a single word such as `devbox` or `my_host`, alone or with a path (`devbox/app`): ASCII letters, digits, `_`
+  and inner `-`, with a letter or `_` among them;
 - an address that starts with `chrome:` loads nothing, and the text stays in the field;
-- anything else is a Google search.
+- anything else is a search with the Default Search Engine, Google unless you [choose another](#settings).
 
 While the pointer is over a link, its address shows at the bottom left of the page.
+
+## Search and suggestions
+
+The list under the address field holds, in order:
+
+1. **Navigate to “…”** (URL): the address the text names, when it names one other than a single word;
+2. **Search for “…”** (Web Search);
+3. up to five of the search engine's suggestions (Search Suggestion), asked for once you pause typing for 150 ms, with
+   "Loading suggestions…" after the rows until they arrive;
+4. a single word's **Navigate to “https://…”**.
+
+So Enter right after typing loads `example.com`, `localhost:3000` or `10.0.0.1`, and searches for a single word such
+as `jcef`, whose address is further down. When the text is itself a results page's address, a search for its terms
+comes first; a `chrome:` address lists nothing. **Up** and **Down** move the selection, and a click on a suggestion
+loads it.
+
+| Engine | `search_engine` | Searches with | Suggestions from |
+|---|---|---|---|
+| Google, the default | `google` | `https://google.com/search?q=%s` | `https://suggestqueries.google.com/complete/search?client=firefox&q=%s` |
+| DuckDuckGo | `duckduckgo` | `https://duckduckgo.com/?q=%s` | `https://duckduckgo.com/ac/?q=%s&type=list` |
+| Bing | `bing` | `https://www.bing.com/search?q=%s` | `https://www.bing.com/osjson.aspx?query=%s` |
+| Kagi | `kagi` | `https://kagi.com/search?q=%s` | `https://kagi.com/api/autosuggest?q=%s` |
+| Custom | `custom` | Custom Search URL; Google's while it is empty | Custom Search Suggestions URL, which answers OpenSearch JSON; none while it is empty |
+
+`%s` stands for the search terms, or the typed text. The engine is asked about what you type, except text that is an
+absolute local path, starts with `file:`, `about:`, `jasper-about:` or `chrome:`, holds a user name or password
+(`name:secret@`), names an address with a port, a query or a fragment, or with a path it loads over `https`
+(`devbox:8080`, `example.com?id=7`, `example.com/docs`), or is longer than 1,000 characters
+([Jasper's own requests](#jaspers-own-requests)); a suggestion of the engine's that is a `chrome:` address is left out.
+
+While nothing is typed, the field of a results page, of any built-in engine or of Custom while it is chosen, shows the
+search terms instead of the address; the tab, the status bar, a drag of the site icon and the saved workspace keep the
+address.
 
 ## The Web menu and keys
 
@@ -86,7 +134,114 @@ them in Settings › Keymap, under Browser ([Keyboard shortcuts](keyboard-shortc
 - A Cmd+Option drag (Ctrl+Alt on Linux and Windows) moves the pane, as over any pane, and the page does not get it.
 - Files and text dropped on a page reach it. A drag that starts in the page, such as a link, an image, selected text or
   a page's own draggable item, is cancelled.
-- Find, zoom and a right-click menu on the page do nothing in a browser tab.
+- **Find**, **Find Next** and **Find Previous** search the page ([Find in page](#find-in-page)), and **Increase**,
+  **Decrease** and **Reset Font Size** zoom it ([Zoom](#zoom)).
+
+## Find in page
+
+**Find** opens the find bar below the page and searches, with the page's selection as its query when it is one line,
+else the last query. Its keys are the window's (Cmd+F; Ctrl+Shift+F on Linux and Windows) and, as in Editor tabs,
+Ctrl+F on Linux and Windows. The bar has the query field, the **Match Case** and **Regular Expression** toggles
+(JavaScript's regular expressions), the match count ("No matches", "1 match", "*n* matches" or "Invalid pattern"),
+**Previous Match**, **Next Match** and **Close**.
+
+| Key | In the find bar |
+|---|---|
+| Enter | Next match |
+| Shift+Enter | Previous match |
+| Escape | Close the bar |
+
+**Find Next** and **Find Previous** (Cmd+G and Cmd+Shift+G; F3 and Shift+F3, and the window's Ctrl+Shift+G and
+Ctrl+Alt+Shift+G, on Linux and Windows) go to the next and previous match, round the end of the page; with the bar
+closed they open it and search again from the first match.
+
+- Every match is highlighted in yellow, and the current one in orange, scrolled into view. A closed `<details>`, a
+  `hidden="until-found"` element or a section whose control has `aria-expanded="false"` opens to show it.
+- The search reads the page's visible text a block at a time, each run of white space as one space, so it finds words
+  across links, other inline elements and line breaks in the page's source; a space in a plain query matches any run
+  of white space. Text in form fields and in shadow roots is not searched.
+- It searches every frame of the page, cross-origin frames included, up to 100, and adds up their counts. A frame
+  counts at most 10,000 matches, and on a very large page those in the text it read within a quarter of a second.
+- While the bar is open, the count follows changes to the page, until a search runs out of time. The page's next
+  document ends the search, and Enter searches again.
+- The bar searches once you pause typing for a tenth of a second; Enter and the toggles search at once.
+- A query is cut to 1,000 characters.
+- Closing the bar removes every highlight and gives the keyboard back to the page; the query stays for the next Find.
+
+Find runs as a script in each of the page's frames, in the page's own JavaScript world, so the page's scripts, those of
+third-party frames included, can read what you search for and change what the bar counts. A regular expression that
+takes very long on a page's text can stop that page responding.
+
+## Zoom
+
+**Increase Font Size** and **Decrease Font Size** (View › Font Size; Cmd+= and Cmd+-, Ctrl+Shift+= and Ctrl+Shift+- on
+Linux and Windows) zoom the page in or out by 5%, from 25% to 500%; **Reset Font Size** (Cmd+0; Ctrl+Shift+0) returns
+it to **Page zoom**, 100% unless you [set another](#settings). They take the keys Settings › Keymap gives those
+actions.
+
+- A page opens at Page zoom and keeps the zoom you give it from page to page. That zoom is saved with the workspace
+  ([Restore](#restore)); after Reset the page saves none, and comes back at Page zoom.
+- On Linux and Windows, Ctrl with the mouse wheel over a page zooms it too, and that zoom is not saved. On macOS,
+  Ctrl+wheel goes to the page, and a pinch on the trackpad does not zoom.
+- Chromium keeps one zoom for each host: two pages of the same host that show at once, side by side, both show the zoom
+  set last, and each takes its own again when it next loads or shows.
+
+## The right-click menu
+
+A right-click on a page (Control-click on macOS) opens Jasper's menu for what is under the pointer, in groups:
+
+- over the page itself, **Back**, **Forward** and **Reload**;
+- over a link, **Open Link in New Tab** and **Copy Link**;
+- over an image, **Open Image in New Tab** and **Copy Image Address**;
+- in a text field, **Cut**, **Copy** and **Paste**, Cut and Copy dimmed without a selection; elsewhere, with a
+  selection, **Copy** and **Search with** *engine*;
+- **Select All**, always;
+- the pane items of a terminal's right-click menu: **Split ▸**, **Move Pane to Tab ▸** and **Close Pane**;
+- **Print…**, and **Copy Page Title**, which is dimmed while the page has no title;
+- **View Source** and **Inspect Element** ([View Source](#view-source), [Inspect Element](#inspect-element)).
+
+**Open Link in New Tab** and **Open Image in New Tab** open the address in a new browser tab right after this one. As
+the page could open it itself, they open an `http`, `https` or `about:blank` address, or a `file:` or `jasper-about:`
+address from a page of the same kind, and are dimmed for any other. **Copy Link** copies the link as the page wrote
+it. **Search with** *engine* searches for the selection, each run of white space as one space and at most 1,000
+characters of it, with the Default Search Engine, in a new tab right after this one; it names the engine, a Custom
+engine by its search URL's host, and does not show for a selection of only white space. **Print…** prints the page.
+
+## View Source
+
+**View Source**, in the page's right-click menu, shows the page's source in its pane, at
+`jasper-about:source?url=…`, in a tab titled "Page Source – *host*": the heading "Page Source", the page's address
+without any user name and password, and the HTML, its tags, attribute names, attribute values and comments in the
+workspace theme's syntax colours, with the `http` and `https` addresses in its attribute values as links. **Back**
+returns to the page.
+
+- For an `http` or `https` page, Jasper fetches the page again each time the source page loads, after a restore too
+  ([Jasper's own requests](#jaspers-own-requests)): the HTML the server sends without your cookies, which can differ
+  from what you see, for example on a page you are signed in to. Only a successful answer (200) of at most 5 MB within
+  10 seconds is shown.
+- For any other page, and when that fetch fails, it shows the page's HTML as Chromium held it when you chose View
+  Source. The pane keeps that HTML while it is open, for up to its last 20 View Sources. Without it, as after a restore
+  or once the pane keeps it no longer, another page's source page says "The source of this page is no longer
+  available.", and a web page's whose fetch failed says "Jasper can’t load the source of this page."
+- It shows at most a source's first 5,242,880 characters, and colours its first 1,000,000; past either, it says so.
+
+## Inspect Element
+
+**Inspect Element**, in the page's right-click menu, opens Chromium's DevTools in a pane below the page's, inspecting
+the element under the pointer. The pane's tab is titled "DevTools — " and the page's tab title. The pane closes with the
+page, and is not saved with the workspace. Inspect Element again shows the same pane, with DevTools opened afresh at the
+new element, so their state, such as the console's history, starts over. Inspect Element has no menu-bar item and no
+default shortcut.
+
+In the DevTools pane:
+
+- **Copy** and **Paste** act in DevTools, and on macOS so do Cmd+A, Cmd+X, Cmd+Z and Cmd+Shift+Z;
+- the Web menu and its keys act on the inspected page: Reload Page reloads it, Back and Forward move it through its
+  history, and Open Location… goes to its address field;
+- Jasper's Find and font size actions are not offered, so their keys reach DevTools, and so does Ctrl+wheel;
+- a right-click shows no menu, and DevTools' file dialogs, such as for loading a profile, open nothing;
+- a link DevTools open in a new tab, such as one in the console, opens in a new browser tab right after the page's,
+  when the page could open it itself, as for [Open Link in New Tab](#the-right-click-menu).
 
 ## Links in a page
 
@@ -101,7 +256,8 @@ A Shift-click loads the link in the same page. A link or page that downloads a f
 Alt-click, which Chromium makes a download.
 
 Links that open a new tab or pane, and popups, open only at `http`, `https`, `file`, `about` and `jasper-about`
-addresses. A `mailto:` or `tel:` link opens nothing, however it is clicked.
+addresses. A `mailto:` or `tel:` link opens nothing, however it is clicked. A `jasper-about:` address loads only as a
+page's whole document: in a frame, or as an image, a script or a style sheet, it loads nothing.
 
 ## Popups
 
@@ -163,6 +319,57 @@ Not supported:
 
 Closing a page's pane closes its dialog or chooser too.
 
+## Error pages
+
+When a page cannot load, its pane shows Jasper's error page in its place: a title, what went wrong, the address,
+**Try Again**, "Check your internet connection and try reloading the page." and Chromium's name for the error, such as
+`ERR_NAME_NOT_RESOLVED`.
+
+| Title | Errors |
+|---|---|
+| No Internet Connection | `ERR_INTERNET_DISCONNECTED` |
+| Server Not Found | `ERR_NAME_NOT_RESOLVED`, `ERR_NAME_RESOLUTION_FAILED` |
+| The Connection Timed Out | `ERR_TIMED_OUT`, `ERR_CONNECTION_TIMED_OUT` |
+| Can’t Connect to Server | `ERR_CONNECTION_REFUSED`, `ERR_CONNECTION_FAILED`, `ERR_ADDRESS_UNREACHABLE` |
+| Network Connection Lost | `ERR_CONNECTION_RESET`, `ERR_CONNECTION_CLOSED`, `ERR_NETWORK_CHANGED` |
+| Too Many Redirects | `ERR_TOO_MANY_REDIRECTS` |
+| File Not Found | `ERR_FILE_NOT_FOUND` |
+| Secure Connection Failed | Every `ERR_SSL_` and `ERR_CERT` error ([Certificate errors](#certificate-errors)) |
+| Page Unavailable | `ERR_BLOCKED_BY_CLIENT`, `ERR_BLOCKED_BY_RESPONSE`, `ERR_ACCESS_DENIED` |
+| Page Can’t Be Loaded | Any other |
+
+A load you stop, or one that would download a file (`ERR_ABORTED`), shows no error page, and neither does a
+`jasper-about:` address that fails.
+
+While the error page shows, the address field, the tab's tooltip, the status bar and the saved workspace keep the
+address that failed, and the tab is named by the error's title. **Try Again** and **Reload** load that address again,
+as Enter in the address field does; Try Again has the keyboard when the page shows, so Enter and Space press it.
+**Back** goes to the page before the failed load, and is disabled when there is none. After a Try Again that loads the
+page, **Forward** leads back to the error page.
+
+## Certificate errors
+
+Chromium checks a site's certificate against the certificate authorities your system trusts. On Linux it reads the
+authorities you add from NSS's database in your home folder, so add a corporate authority there with `certutil` (in
+the `libnss3-tools` package on Debian and Ubuntu, `nss-tools` on Fedora):
+
+```
+certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "Example Corp Root CA" -i example-corp-root.crt
+```
+
+A certificate that fails shows the "Secure Connection Failed" error page with "Jasper can’t verify the identity of the
+website “*host*”.", the reason, such as "The certificate for this website is self-signed.", and the subjects of the
+certificate chain, the site's first. **Details** then reveals "Someone may be impersonating “*host*”. If you continue,
+Jasper accepts this certificate for it until Jasper quits." and **Continue to this site (unsafe)**, which loads the
+site.
+
+- From then until Jasper quits, every browser page loads that host while it presents that same certificate; another
+  certificate for the host shows the error page again.
+- While a page is at an `https` address of such a host, the toolbar shows **Not secure** before the address field, in
+  place of the site icon.
+- A revoked certificate (`ERR_CERT_REVOKED`), `ERR_CERT_INVALID` and `ERR_CERT_CONTAINS_ERRORS` show no Details and
+  no way past.
+
 ## Links from terminals and Jasper
 
 These links come to the Browser:
@@ -213,34 +420,57 @@ have no address and do nothing.
 ## Restore
 
 When Jasper restores a window ([Saving and restoring the windows](workspace.md#saving-and-restoring-the-windows)), each
-browser page comes back in its tab and pane, at the address it last showed and for the OSC 8 target it was opened for.
+browser page comes back in its tab and pane, at the address it last showed, at its own [zoom](#zoom) and for the OSC 8
+target it was opened for.
 It loads the first time it shows, so restoring starts no Chromium; until then its tab is named after the address's host.
 Chromium starts inside Jasper the first time a page shows and runs until Jasper quits. If Jasper ends while Chromium
 starts or runs, for example in a Chromium crash or a force-quit, the pages the next launch restores wait instead: each
 says "Jasper closed while this page was open." and loads when you click **Load Page**, press Enter in its address field,
 click **Reload** or open a link in it.
 
-- An address too long for the saved state (4,096 characters, counted with the target) is saved without its query and
-  fragment, and when it is still too long, not at all.
+- An address too long for the saved state (4,096 characters, counted with the target and the zoom) is saved without
+  its query and fragment, and when it is still too long, not at all.
 - A `data:` or `blob:` page saves no address. A `jasper-about:` page saves its address.
+- A page that shows an [error page](#error-pages) saves the address that failed, and one that shows an error page's
+  [source](#view-source) saves the source page of that address.
 - An address is saved without any user name and password in it.
 - A page that saved no address, or one the address field would not load, comes back at the start page.
 
 A page's back and forward history, form contents and scroll position do not come back.
 
+## Jasper's own requests
+
+Jasper fetches these itself, apart from Chromium, without your pages' cookies or any credentials, and directly rather
+than through a proxy your system's settings name:
+
+- a page's favicon, once the page has loaded: for an `http` or `https` page, the icon its first `<link rel="icon">`
+  or `<link rel="mask-icon">` names, else `/favicon.ico` at its server, when that is an `http` or `https` address. A
+  PNG, GIF, JPEG or ICO favicon of at most 64 KiB that arrives within 5 seconds shows; any other, such as an SVG or a
+  `data:` icon, leaves the globe. A page keeps the first favicon it names;
+- the search engine's suggestions for what you type ([Search and suggestions](#search-and-suggestions)): at most 64
+  KiB, within 3 seconds;
+- View Source's copy of an `http` or `https` page ([View Source](#view-source)).
+
+On a network that reaches the web only through a proxy, these fail: pages show the globe, the address field lists no
+engine suggestions, and View Source shows the HTML Chromium holds.
+
 ## Settings
 
 The settings live in `plugins/dev.jasper.browser/dev.jasper.browser.toml` in
-[Jasper home](getting-started.md#jasper-home) and on Settings › Tools › Browser, in the sections General and Link
-Opening. Jasper creates the file, with every setting commented out, when it is missing; changes in the file or on the
-page apply without a restart. A bad value is reported and its default used
+[Jasper home](getting-started.md#jasper-home) and on Settings › Tools › Browser, in the sections General, Link Opening
+and Search Engine. Jasper creates the file, with every setting commented out, when it is missing; changes in the file
+or on the page apply without a restart. A bad value is reported and its default used
 ([Plugin settings](plugins.md#plugin-settings)).
 
 | Key | Default | Values | On the page | Applies to |
 |---|---|---|---|---|
 | `start_page` | `"jasper-about:welcome"` | What a new browser tab, window or pane loads, read as the address field reads typed text; not empty and not a `chrome:` address ("Enter a web address.") | Start page | Browser pages opened afterwards |
+| `page_zoom` | `100` | The [zoom](#zoom) pages open at and Reset Font Size returns to: a whole percent from 25 to 500 | Page zoom | Browser pages opened afterwards without a zoom of their own; Reset Font Size |
 | `open_links_from_terminal` | `"ask"` | `ask` (Always Ask), `builtin` (Built-in Browser), `default` (Default Browser) | Open Links From Terminal | The next link; the right-click items at once |
 | `open_local_web_files` | `"ask"` | `ask` (Always Ask), `builtin` (Built-in Browser), `editor` (Default Editor) | Open Local Web Files | The next local web file |
+| `search_engine` | `"google"` | `google` (Google), `duckduckgo` (DuckDuckGo), `bing` (Bing), `kagi` (Kagi), `custom` (Custom): what the address field and the right-click menu's Search with search with, and where the field's suggestions come from ([Search and suggestions](#search-and-suggestions)) | Default Search Engine | The next keystroke in the address field, search and right-click menu |
+| `custom_search_url` | `""` | With `custom`: the address of a search's results, an `http://` or `https://` address without a user name or password and with `%s` in its path, query or fragment where the terms go, such as `"https://search.example.com/?q=%s"`; empty searches with Google ("The URL must start with https:// or http:// and contain %s") | Custom Search URL | The next search |
+| `custom_suggestions_url` | `""` | With `custom`: an address of the same form that answers OpenSearch JSON, with `%s` where the typed text goes; empty shows no engine suggestions ("The URL must start with https:// or http:// and contain %s") | Custom Search Suggestions URL | The next keystroke in the address field |
 
 ## Files
 

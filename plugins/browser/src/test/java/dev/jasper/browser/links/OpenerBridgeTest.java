@@ -1,11 +1,15 @@
 package dev.jasper.browser.links;
 
+import dev.jasper.browser.json.StrictJson;
 import dev.jasper.browser.links.Isolation.OpenerPolicy;
 import dev.jasper.browser.links.Isolation.Sandbox;
 import dev.jasper.browser.links.OpenerBridge.Answer;
 import dev.jasper.browser.links.OpenerBridge.Party;
 import dev.jasper.browser.page.Activation;
+import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.page.PageFind;
+import dev.jasper.browser.page.PageTestAccess;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.net.URI;
@@ -31,6 +35,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class OpenerBridgeTest {
     private static final long NOW = 1_000_000;
+    // The pages here fetch no favicon: the bridge's part ends where a page is told its document's icon.
+    private static final Favicons NO_FAVICONS = PageTestAccess.noFavicons();
     private static final String APP = "https://app.example/start", LOGIN = "https://login.example/sign-in";
     private final OpenerBridge bridge = new OpenerBridge();
 
@@ -151,10 +157,29 @@ class OpenerBridgeTest {
             for (int each = 0; each < OpenerBridge.WAITING_LIMIT; each++) assertThat(bridge.admit(page, true, "{}")).isEmpty();
             assertThat(bridge.admit(page, true, "{}")).hasValueSatisfying(answer -> assertThat(answer.code()).isEqualTo(OpenerBridge.BUSY));
             assertThat(bridge.admit(other, true, "{}")).as("another page's queries wait apart").isEmpty();
-            bridge.settled(page);
+            bridge.settled(page, true);
             assertThat(bridge.admit(page, true, "{}")).as("one answered, one more may wait").isEmpty();
-            for (int each = 0; each < OpenerBridge.WAITING_LIMIT; each++) bridge.settled(page);
-            bridge.settled(other);
+            for (int each = 0; each < OpenerBridge.WAITING_LIMIT; each++) bridge.settled(page, true);
+            bridge.settled(other, true);
+            assertThat(bridge.waiting()).isZero();
+        });
+    }
+
+    /**
+     * A page's sub-frames, which may send only {@code find}, wait apart from its main frame: a cross-origin frame that
+     * floods the bridge keeps no {@code window.open} or {@code postMessage} of the page waiting.
+     */
+    @Test void aPagesSubFramesWaitApartFromItsMainFrame() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP).page;
+            String find = findAnswer(1, 0);
+            for (int each = 0; each < OpenerBridge.WAITING_LIMIT; each++) assertThat(bridge.admit(page, false, find)).isEmpty();
+            assertThat(bridge.admit(page, false, find)).hasValueSatisfying(answer -> assertThat(answer.code()).isEqualTo(OpenerBridge.BUSY));
+            assertThat(bridge.admit(page, true, open(LOGIN))).as("the main frame's own").isEmpty();
+            bridge.settled(page, false);
+            assertThat(bridge.admit(page, false, find)).as("a sub-frame's answered, one more may wait").isEmpty();
+            for (int each = 0; each < OpenerBridge.WAITING_LIMIT; each++) bridge.settled(page, false);
+            bridge.settled(page, true);
             assertThat(bridge.waiting()).isZero();
         });
     }
@@ -261,7 +286,7 @@ class OpenerBridgeTest {
             var link = link();
             bridge.responded(link.popup.page, LOGIN, null, List.of("sandbox allow-scripts allow-popups"));
             bridge.loadStarted(link.popup.party(), LOGIN);
-            var sandboxed = bridge.sender(link.popup.page, () -> LOGIN);
+            var sandboxed = bridge.sender(link.popup.page, "main", () -> LOGIN);
             bridge.loadStarted(link.popup.party(), LOGIN);
             assertThat(bridge.request(link.popup.party(), true, sandboxed, post(link.id, "*", "1"), NOW).ok()).isTrue();
             assertThat(link.opener.scripts).singleElement().asString().contains(",\"1\",\"null\",\"*\")");
@@ -272,7 +297,7 @@ class OpenerBridgeTest {
             var opener = new Document(APP);
             bridge.responded(opener.page, APP, null, List.of("sandbox allow-scripts allow-same-origin"));
             bridge.loadStarted(opener.party(), APP);
-            var blocked = bridge.sender(opener.page, () -> APP);
+            var blocked = bridge.sender(opener.page, "main", () -> APP);
             bridge.loadStarted(opener.party(), APP);
             opener.activation.activate(NOW - 100);
             assertThat(bridge.request(opener.party(), true, blocked, open(LOGIN), NOW).code()).isEqualTo(OpenerBridge.REFUSED);
@@ -307,16 +332,16 @@ class OpenerBridgeTest {
         onUiThread(() -> {
             var link = link();
             var answers = new java.util.ArrayList<Answer>();
-            var from = bridge.sender(link.popup.page, () -> LOGIN);
+            var from = bridge.sender(link.popup.page, "main", () -> LOGIN);
             assertThat(bridge.admit(link.popup.page, true, post(link.id, "*", "1"))).isEmpty();
-            bridge.answer(link.popup.party(), from, post(link.id, "*", "1"), NOW, answers::add);
+            bridge.answer(link.popup.party(), true, from, post(link.id, "*", "1"), NOW, answers::add);
             assertThat(answers).singleElement().satisfies(answer -> assertThat(answer.ok()).isTrue());
             assertThat(bridge.waiting()).isZero();
 
             var broken = new Error("the page's browser broke");
             link.opener.breaking = broken;
             assertThat(bridge.admit(link.popup.page, true, post(link.id, "*", "2"))).isEmpty();
-            assertThatThrownBy(() -> bridge.answer(link.popup.party(), from, post(link.id, "*", "2"), NOW, answers::add)).isSameAs(broken);
+            assertThatThrownBy(() -> bridge.answer(link.popup.party(), true, from, post(link.id, "*", "2"), NOW, answers::add)).isSameAs(broken);
             assertThat(answers).hasSize(2).last().satisfies(answer -> assertThat(answer.code()).isEqualTo(OpenerBridge.REFUSED));
             assertThat(bridge.waiting()).isZero();
         });
@@ -597,7 +622,7 @@ class OpenerBridgeTest {
             assertThat(ask(link.popup, request).ok()).isTrue();
             String data = "\"');alert(1);//\\" + (char) 0x2028 + (char) 0x2029 + (char) 0 + "\n</script>" + (char) 0xD83D;
             String literal = "\"\\\"');alert(1);//\\\\\\u2028\\u2029\\u0000\\n</script>\\ud83d\"";
-            assertThat(BridgeJson.quote(data)).isEqualTo(literal);
+            assertThat(StrictJson.quote(data)).isEqualTo(literal);
             String script = link.opener.scripts.getFirst();
             assertThat(script).contains("\"popup\"," + literal + ",");
             assertThat(script.chars().filter(c -> c < 0x20 || c == 0x7F || c == 0x2028 || c == 0x2029 || Character.isSurrogate((char) c)))
@@ -648,14 +673,153 @@ class OpenerBridgeTest {
         });
     }
 
+    /**
+     * Plan 4b's rulings P3 and P10: {@code favicon} tells the page the icon its document names, which the page then
+     * fetches; nothing else changes.
+     */
+    @Test void aFaviconRequestFromTheTopFrameTellsThePageItsDocumentsIcon() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            Answer answer = ask(page, favicon("https://app.example/static/icon.png"));
+            assertThat(answer.ok()).as(answer.toString()).isTrue();
+            assertThat(answer.text()).isEmpty();
+            assertThat(PageTestAccess.declaredFavicon(page.page)).contains(URI.create("https://app.example/static/icon.png"));
+            assertThat(page.scripts).isEmpty();
+            assertThat(page.opened).isEmpty();
+            assertThat(bridge.links()).isZero();
+            assertThat(ask(new Document(APP), favicon("HTTP://app.example/icon.png")).ok()).as("a scheme in capitals").isTrue();
+        });
+    }
+
+    /**
+     * Any script in the page can send {@code favicon}, so it is taken only from the top frame, and its address is only a
+     * request: an absolute http or https address of at most {@value OpenerBridge#ICON_LIMIT} characters, without a user
+     * name or password.
+     */
+    @Test void aFaviconRequestIsUntrusted() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            String icon = favicon("https://app.example/icon.png");
+            assertThat(bridge.admit(page.page, false, icon)).as("a sub-frame's, on Chromium's thread")
+                .hasValueSatisfying(answer -> assertThat(answer.code()).isEqualTo(OpenerBridge.REFUSED));
+            assertThat(bridge.request(page.party(), false, APP, icon, NOW).code()).as("a sub-frame's").isEqualTo(OpenerBridge.REFUSED);
+            for (String request : List.of("{\"op\":\"favicon\"}", "{\"op\":\"favicon\",\"url\":true}",
+                    "{\"op\":\"favicon\",\"url\":\"https://app.example/icon.png\",\"size\":\"32\"}"))
+                assertThat(ask(page, request).code()).as(request).isEqualTo(OpenerBridge.MALFORMED);
+            for (String url : List.of("/favicon.ico", "icon.png", "data:image/png;base64,AAAA", "file:///tmp/icon.png",
+                    "jasper-about:icon.png", "javascript:alert(1)", "ftp://app.example/icon.png", "https://user:secret@app.example/icon.png",
+                    "https:///icon.png", "https://app.example/a b", "https://app.example/" + "a".repeat(OpenerBridge.ICON_LIMIT)))
+                assertThat(ask(page, favicon(url)).code()).as(url).isEqualTo(OpenerBridge.REFUSED);
+            assertThat(PageTestAccess.declaredFavicon(page.page)).isEmpty();
+        });
+    }
+
+    /** The page takes an icon only from the document it shows: one from the document before tells it nothing. */
+    @Test void aFaviconRequestFromADocumentThePageNoLongerShowsTellsItNothing() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            assertThat(bridge.request(page.party(), true, LOGIN, favicon("https://login.example/icon.png"), NOW).ok()).isTrue();
+            assertThat(PageTestAccess.declaredFavicon(page.page)).isEmpty();
+        });
+    }
+
     @Test void aRequestIsReadAsStrictJson() {
         assertThat(BridgeJson.object(" { \"op\" : \"post\" , \"data\" : \"a\\\"b\\\\c\\/d\\b\\f\\n\\r\\t\\u00e9\\uD83D\\uDE00\" , \"x\" : true , \"y\" : false } "))
             .hasValueSatisfying(members -> assertThat(members).containsExactly(java.util.Map.entry("op", "post"),
                 java.util.Map.entry("data", "a\"b\\c/d\b\f\n\r\t\u00e9" + (char) 0xD83D + (char) 0xDE00), java.util.Map.entry("x", true),
                 java.util.Map.entry("y", false)));
         assertThat(BridgeJson.object("{}")).hasValue(java.util.Map.of());
-        for (String bad : List.of("{\"a\":null}", "{\"a\":1}", "{\"a\":tru}", "{\"a\":\"b\"", "{'a':'b'}", "{\"a\" \"b\"}", "{,}"))
+        assertThat(BridgeJson.object("{\"a\":1,\"b\":-0,\"c\":123456789012345678}")).as("integers, as find's answers carry")
+            .hasValue(java.util.Map.of("a", 1L, "b", 0L, "c", 123_456_789_012_345_678L));
+        for (String bad : List.of("{\"a\":null}", "{\"a\":1.5}", "{\"a\":1e3}", "{\"a\":1234567890123456789}", "{\"a\":[]}", "{\"a\":{}}",
+                "{\"a\":tru}", "{\"a\":\"b\"", "{'a':'b'}", "{\"a\" \"b\"}", "{,}"))
             assertThat(BridgeJson.object(bad)).as(bad).isEmpty();
+    }
+
+    /**
+     * Plan 4b's P21: whether the main frame asked, as Chromium's thread read it, reaches the request the UI thread
+     * answers, so a sub-frame's opener request or favicon is refused there too.
+     */
+    @Test void anAnsweredQueryKeepsWhetherASubFrameAsked() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            page.activation.activate(NOW - 100);
+            var answers = new java.util.ArrayList<Answer>();
+            var child = bridge.sender(page.page, "child", () -> APP);
+            bridge.answer(page.party(), false, child, open(LOGIN), NOW, answers::add);
+            bridge.answer(page.party(), false, child, favicon("https://app.example/icon.png"), NOW, answers::add);
+            assertThat(answers).extracting(Answer::code).containsExactly(OpenerBridge.REFUSED, OpenerBridge.REFUSED);
+            assertThat(page.opened).isEmpty();
+            assertThat(page.activation.active(NOW)).as("a refused frame consumes nothing").isTrue();
+            assertThat(PageTestAccess.declaredFavicon(page.page)).isEmpty();
+            bridge.answer(page.party(), true, bridge.sender(page.page, "main", () -> APP), open(LOGIN), NOW, answers::add);
+            assertThat(answers.getLast().ok()).as("the main frame's").isTrue();
+            assertThat(page.opened).containsExactly("NEXT_TAB " + LOGIN);
+        });
+    }
+
+    /**
+     * {@code find.js} runs in every frame of a page, cross-origin ones too, so {@code find} is taken from any of them,
+     * and each answer reaches the page's find for the frame Chromium names, whatever the frame's document says.
+     */
+    @Test void aFindAnswerIsTakenFromAnyFrameOfThePageAndReachesItsFind() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var ran = new java.util.ArrayList<String>();
+            PageFind find = PageTestAccess.recordingFind(List.of("main", "child"), Optional.of("child"), ran, new java.util.ArrayList<>());
+            PageTestAccess.useFind(page.page, find);
+            var result = find.find("needle", false, false);
+            long search = (Long) StrictJson.object(ran.getFirst().substring(ran.getFirst().indexOf(' ') + 1), 1).orElseThrow().get("search");
+            String fromChild = findAnswer(search, 2);
+            assertThat(bridge.admit(page.page, false, fromChild)).as("a sub-frame's, on Chromium's thread").isEmpty();
+            bridge.settled(page.page, false);
+            var child = bridge.sender(page.page, "child", () -> "https://ads.example/frame");
+            assertThat(bridge.request(page.party(), false, child, fromChild, NOW).ok()).isTrue();
+            assertThat(result).isNotDone();
+            assertThat(bridge.request(page.party(), true, bridge.sender(page.page, "main", () -> APP), findAnswer(search, 1), NOW).ok()).isTrue();
+            assertThat(result).isCompletedWithValue(new PageFind.Result(3, 1, false));
+
+            var selection = find.selection();
+            long asked = (Long) StrictJson.object(ran.getLast().substring(ran.getLast().indexOf(' ') + 1), 1).orElseThrow().get("search");
+            assertThat(bridge.request(page.party(), false, child, "{\"op\":\"find\",\"search\":" + asked + ",\"selection\":\"word\"}", NOW).ok()).isTrue();
+            assertThat(selection).isCompletedWithValue("word");
+            assertThat(page.scripts).isEmpty();
+            assertThat(page.opened).isEmpty();
+        });
+    }
+
+    /** A find answer is only shown, so it is held to its two shapes and their bounds; anything else is malformed. */
+    @Test void aFindAnswerIsUntrusted() throws Exception {
+        onUiThread(() -> {
+            var page = new Document(APP);
+            var main = bridge.sender(page.page, "main", () -> APP);
+            var child = bridge.sender(page.page, "child", () -> APP);
+            for (String request : List.of("{\"op\":\"find\"}", "{\"op\":\"find\",\"search\":1}",
+                    "{\"op\":\"find\",\"search\":\"1\",\"count\":1,\"invalid\":false}",
+                    "{\"op\":\"find\",\"search\":0,\"count\":1,\"invalid\":false}",
+                    "{\"op\":\"find\",\"search\":-1,\"count\":1,\"invalid\":false}",
+                    "{\"op\":\"find\",\"search\":1,\"count\":-1,\"invalid\":false}",
+                    "{\"op\":\"find\",\"search\":1,\"count\":" + (PageFind.MAX_MATCHES + 1) + ",\"invalid\":false}",
+                    "{\"op\":\"find\",\"search\":1,\"count\":1.5,\"invalid\":false}",
+                    "{\"op\":\"find\",\"search\":1,\"count\":\"1\",\"invalid\":false}",
+                    "{\"op\":\"find\",\"search\":1,\"count\":1,\"invalid\":\"no\"}",
+                    "{\"op\":\"find\",\"search\":1,\"count\":1}",
+                    "{\"op\":\"find\",\"search\":1,\"count\":1,\"invalid\":false,\"current\":0}",
+                    "{\"op\":\"find\",\"search\":1,\"count\":1,\"invalid\":false,\"selection\":\"x\"}",
+                    "{\"op\":\"find\",\"search\":1,\"selection\":true}",
+                    "{\"op\":\"find\",\"search\":1,\"selection\":\"" + "x".repeat(PageFind.MAX_QUERY + 1) + "\"}"))
+                assertThat(bridge.request(page.party(), true, main, request, NOW).code()).as(request).isEqualTo(OpenerBridge.MALFORMED);
+            assertThat(bridge.request(page.party(), false, child, "{\"op\":\"find\",\"search\":1,\"count\":-1,\"invalid\":false}", NOW).code())
+                .as("a sub-frame's, read as find").isEqualTo(OpenerBridge.MALFORMED);
+            assertThat(bridge.request(page.party(), false, child, "{\"op\":\"find\",\"search\":1,\"count\":1.5,\"invalid\":false}", NOW).code())
+                .as("a sub-frame's that is no request: its op is unread").isEqualTo(OpenerBridge.REFUSED);
+            String long_ = "{\"op\":\"find\",\"search\":1,\"selection\":\"" + "\\\"".repeat(2_100) + "\"}";
+            assertThat(bridge.admit(page.page, false, long_)).as("a sub-frame's request is short")
+                .hasValueSatisfying(answer -> assertThat(answer.code()).isEqualTo(OpenerBridge.REFUSED));
+            assertThat(bridge.admit(page.page, true, long_)).as("the main frame's may be longer").isEmpty();
+            bridge.settled(page.page, true);
+            assertThat(bridge.request(page.party(), false, child, findAnswer(1, 1), NOW).ok()).as("no search under way: shown nowhere").isTrue();
+        });
     }
 
     @Test void anOriginIsTheSchemeHostAndPortOfAWebAddress() {
@@ -699,7 +863,7 @@ class OpenerBridgeTest {
 
         Document(String address) {
             this.address = address;
-            page = new Page(URI.create(address), () -> { });
+            page = new Page(URI.create(address), () -> { }, NO_FAVICONS);
             page.onOpenItem((url, placement) -> {
                 opened.add(placement + " " + url);
                 var popup = new Document(url);
@@ -820,8 +984,17 @@ class OpenerBridgeTest {
         return "{\"op\":\"open\",\"url\":\"" + url + "\"}";
     }
 
+    private static String favicon(String url) {
+        return "{\"op\":\"favicon\",\"url\":" + StrictJson.quote(url) + "}";
+    }
+
+    /** What a frame's {@code find.js} answers a search: its count, the pattern valid. */
+    private static String findAnswer(long search, int count) {
+        return "{\"op\":\"find\",\"search\":" + search + ",\"count\":" + count + ",\"invalid\":false}";
+    }
+
     private static String post(String id, String targetOrigin, String data) {
-        return "{\"op\":\"post\",\"id\":\"" + id + "\",\"targetOrigin\":\"" + targetOrigin + "\",\"data\":" + BridgeJson.quote(data) + "}";
+        return "{\"op\":\"post\",\"id\":\"" + id + "\",\"targetOrigin\":\"" + targetOrigin + "\",\"data\":" + StrictJson.quote(data) + "}";
     }
 
     private static void onUiThread(Runnable test) throws Exception {

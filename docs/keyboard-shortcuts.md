@@ -162,7 +162,10 @@ The Sample plugin registers its demo actions only when its demo settings are on:
 (`dev.jasper.sample.greetings.open`, Cmd+Option+Y; Ctrl+Alt+Shift+Y).
 
 The Browser's keys win in browser tabs, so on macOS Cmd+R there reloads the page and elsewhere opens Search Shell
-History ([Browser](browser.md#the-web-menu-and-keys)).
+History ([Browser](browser.md#the-web-menu-and-keys)). In a browser tab, Find, Find Next and Find Previous search the
+page, on their keys and, on Linux and Windows, on Ctrl+F, F3 and Shift+F3 too, as in Editor tabs
+([Find in page](browser.md#find-in-page)); the window's Increase, Decrease and Reset Font Size zoom it
+([Zoom](browser.md#zoom)).
 
 While an Editor file's pane is active, the Editor's own commands take their keys, for example Cmd+S (Ctrl+S) to save.
 They are listed in the Editor tab's right-click menu and in [Editor](editor.md#commands-and-shortcuts), and are not part

@@ -66,6 +66,7 @@ control shows.
 | `Clicked` | the owner and the row | a plain left click on a row of a list, table or tree, after its `Selected` |
 | `Sorted` | the owner and the column | a click on a table's or tree's column header; the owner orders the rows |
 | `ColumnsResized` | the owner and the widths of its columns | a header boundary drag or double-click fit that has ended; the kit already shows the widths |
+| `SuggestionChosen` | the field, the suggestion and whether Tab chose it | Tab or Enter on a field's selected suggestion, or a click on one; the list has hidden |
 
 Users drag a column boundary in any table or column tree to resize and double-click it to fit the column; the kit keeps
 the widths for the open view until the plugin changes its column ids or a column's `width`. A plugin remembers them across restarts with
@@ -293,13 +294,20 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
 - An `iconSeverity` tints the button's glyph, as a favourite's warning star; a present `selected` makes a GHOST or
   SECONDARY button a toggle button, such as a search's match-case option: it shows the pressed state while true, and a
   click reports the `Action` for the owner to confirm in its next update.
+- A `holdMenu` of `MenuItem`s (SDK 0.27.0) opens under the button when a press is held on it for half a second, as a
+  browser's Back button holds its history; that press's release then reports nothing, while a shorter press reports the
+  button's `Action`, and a press that leaves the button, even to come back, opens nothing. A right-click
+  (Control-click on macOS), Shift+F10 and the context-menu key open it at once, and choosing an item reports the
+  item's `Action`.
 - [`MenuButton`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.MenuButton)`(label, icon, kind, action, items, tooltip)`:
   with a blank `action` the whole button opens the menu; otherwise its main part reports `Action(action)` and its arrow
   opens the menu. Each
   [`MenuItem`](sdk-reference.html#dev.jasper.sdk.ui.MenuItem)`(id, label, icon, action, enabled, separator)` reports its
   own `Action`; `withShortcut(actionId)` shows the current binding of one of the plugin's actions, or of a Jasper action
   such as `new_tab`, beside the label, in the platform's notation (symbols on macOS, words such as Ctrl+Shift+P on Linux
-  and Windows), following the user's rebinding, and nothing while it is unbound.
+  and Windows), following the user's rebinding, and nothing while it is unbound. An item with `children` (SDK 0.27.0)
+  is a submenu, in any menu: it shows an arrow and opens its children beside it, and it reports nothing itself, so its
+  `action` is blank and it shows no shortcut.
 
 ### Fields
 
@@ -323,6 +331,25 @@ that fill in the defaults; the [SDK reference](sdk-reference.html#dev.jasper.sdk
   a NUMBER.
 - A `readOnly` field is focusable, selectable and copyable but never edited, so it reports no `Edited`; a STEPPER or
   SLIDER is never read-only.
+- The leading slot, before the text, shows the field's own picture in place of the kind's glyph, in the glyph's box,
+  under every look ([plugin icons](sdk-icons.md)): its `leadingImage`, a
+  [`PixelImage`](sdk-reference.html#dev.jasper.sdk.ui.PixelImage) such as a web page's favicon, or, while it has none
+  or the image does not decode, its `leadingIcon` name, drawn in the glyph's colours. `leadingName` is the slot's
+  accessible name and tooltip. Dragging the slot offers `leadingDrag`: as a `java.net.URL` when it is an absolute URL
+  whose scheme Java has a handler for (such as `http`, `https`, `file` or `ftp`), as the local file a `file:` URL names,
+  and as text. The name and the drag text need an image or an icon.
+- A `selectOnClick` field selects all its text when a left click brings the focus into it, unless the press drags out
+  a selection of its own; while the field has the focus, a click places the caret. A `TEXTAREA`, a STEPPER and a SLIDER
+  take no leading image or icon and no `selectOnClick`.
+- A field's `suggestions`, each a [`Suggestion`](sdk-reference.html#dev.jasper.sdk.ui.Nodes.Suggestion)`(id, title,
+  detail)`, show in a list under it as the user types, the first selected, with "Loading suggestions…" after them while
+  `suggestionsLoading` is true; the field keeps the focus, so typing goes on in it. While the list shows suggestions, Up
+  and Down move the selection, and Tab and Enter report `SuggestionChosen` (with `byTab` for Tab) instead of moving the
+  focus or reporting `trailingAction`; a click on a suggestion reports it as Enter does. While the list shows at all,
+  Escape hides it and reports `cancelAction`. A chosen suggestion, Escape and the focus leaving the field hide the list
+  until the user next edits the field; an update keeps the selection while its suggestion's id is still listed, and an
+  edit selects the first again. A `TEXTAREA` and a `NUMBER` field take no suggestions, nor does a field with a
+  `listId`.
 
 ### Secrets
 
@@ -555,7 +582,13 @@ event dispatch thread, so run the test in `SwingUtilities.invokeAndWait`. A plug
   text)` types into a field as a person would, and a read-only, hidden, disabled or busy field takes nothing;
   `setSecret(id, chars)` fills a secret and reports `SecretChanged`.
 - `focused()`, `revealed()` and `fieldSelection(id)` show what `focus`, `reveal` and `selectAll` did;
-  `setComposing(id, true)` plays an input method.
+  `clickInto(id)` clicks into a field as a person would, which a `selectOnClick` field the click brings the focus into
+  answers by selecting all its text; `setComposing(id, true)` plays an input method.
+- `press(id, key)` presses `UP`, `DOWN`, `TAB`, `ENTER` or `ESCAPE` in a field as a person would, and
+  `suggestions(id)` and `selectedSuggestion(id)` show what its list of suggestions shows.
+- `choose(id, path...)` chooses an item of a menu button's menu or a button's hold menu as a person would, by item ids
+  from the menu down through submenus; a disabled item, a submenu, a separator and the children of a disabled submenu
+  report nothing.
 - [`FakeKit`](sdk-reference.html#dev.jasper.sdk.testing.FakeKit)'s `views()`, `icons()` and `failures()` list its views,
   registered icons and contained handler failures. `FakePluginHost` mounts views where Jasper would: `panelView`,
   `windowView`, `contentView`, `toolbarViews`, `settingsPanelView` and `popoverViews` return them.

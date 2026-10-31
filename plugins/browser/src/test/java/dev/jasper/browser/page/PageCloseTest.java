@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Chromium's {@code DoClose} for a page's browser, decided without Chromium: a close Java asked for goes ahead, and a
@@ -15,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PageCloseTest {
     private static final URI EXAMPLE = URI.create("https://example.com");
+    private static final Favicons NO_FAVICONS = PageTestAccess.noFavicons();
     private final List<Runnable> posted = new ArrayList<>();
     private final AtomicInteger itemCloses = new AtomicInteger();
 
@@ -48,11 +50,31 @@ class PageCloseTest {
         assertThat(Page.holdsClose(true, null, posted::add)).isFalse();
     }
 
+    /**
+     * A page keeps the zoom level it is given until its browser is made, which then takes it; a level that is not finite is
+     * refused, as Chromium cannot show it, and a closed page takes none.
+     */
+    @Test void aPageKeepsItsZoomLevelAndRefusesOneThatIsNotFinite() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS);
+            assertThat(page.zoomLevel()).as("100%").isEqualTo(0.0);
+            page.setZoomLevel(-1.5);
+            assertThat(page.zoomLevel()).isEqualTo(-1.5);
+            for (double level : new double[] { Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY })
+                assertThatThrownBy(() -> page.setZoomLevel(level)).as(Double.toString(level))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(page.zoomLevel()).as("unchanged").isEqualTo(-1.5);
+            page.close();
+            page.setZoomLevel(2);
+            assertThat(page.zoomLevel()).as("closed").isEqualTo(-1.5);
+        });
+    }
+
     /** The title of the document before is gone once the main frame starts loading, whatever Chromium then reports. */
     @Test void aMainFrameLoadStartClearsTheTitle() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new AtomicInteger();
-            var page = new Page(EXAMPLE, changes::incrementAndGet);
+            var page = new Page(EXAMPLE, changes::incrementAndGet, NO_FAVICONS);
             page.titleChanged("Example Domain");
             assertThat(page.title()).isEqualTo("Example Domain");
             var started = new ArrayList<String>();
@@ -71,7 +93,7 @@ class PageCloseTest {
     }
 
     private Page page() {
-        var page = new Page(EXAMPLE, () -> { });
+        var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS);
         page.onCloseItem(itemCloses::incrementAndGet);
         return page;
     }

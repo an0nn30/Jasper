@@ -49,7 +49,50 @@ class KitValuesTest {
    assertThat(((dev.jasper.ui.model.Nodes.Field)KitValues.toModule(spec).root()).readOnly()).isEqualTo(readOnly);
   }
  }
+ /** Plan 4b Task 1 (SDK 0.27.0): a field's leading image, drag text and select-on-click cross the projection unchanged. */
+ @Test void leadingImagesDragTextAndSelectOnClickProjectWithoutLoss(){
+  byte[] png=new byte[48];System.arraycopy(new byte[]{(byte)0x89,'P','N','G','\r','\n',0x1a,'\n'},0,png,0,8);png[40]=5;
+  var image=new PixelImage(png);
+  for(boolean select:List.of(false,true)){
+   var spec=new ViewSpec(new Field("address",READY,FieldKind.TEXT,"https://example.com/","Search or enter website name","Address","go",Optional.empty(),
+    FieldPresentation.EMBEDDED,"","revert","",false,Optional.of(image),select?"network":"",select?"Site icon - drag to copy URL":"",
+    select?Optional.of("https://example.com/"):Optional.empty(),select));
+   assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+   var field=(dev.jasper.ui.model.Nodes.Field)KitValues.toModule(spec).root();
+   assertThat(field.leadingImage().orElseThrow().png()).isEqualTo(png);
+   assertThat(field.leadingDrag()).isEqualTo(spec.root() instanceof Field f?f.leadingDrag():null);
+   assertThat(field.leadingIcon()).isEqualTo(select?"network":"");
+   assertThat(field.leadingName()).isEqualTo(select?"Site icon - drag to copy URL":"");
+   assertThat(field.selectOnClick()).isEqualTo(select);
+  }
+ }
+ /** Plan 4b Task 1 (SDK 0.27.0): a field's suggestions and their loading state cross the projection unchanged, and so does a chosen suggestion. */
+ @Test void suggestionsAndTheirChoiceProjectWithoutLoss(){
+  var rows=List.of(new Suggestion("navigate","Navigate to “https://jcef”","URL"),new Suggestion("search","Search for “jcef”","Web Search"),new Suggestion("host","localhost",""));
+  for(boolean loading:List.of(false,true)){
+   var spec=new ViewSpec(new Field("address",READY,FieldKind.TEXT,"jcef","Search or enter website name","Address","go",Optional.empty(),
+    FieldPresentation.EMBEDDED,"","revert","",false,Optional.empty(),"","",Optional.empty(),true,rows,loading));
+   assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+   var field=(dev.jasper.ui.model.Nodes.Field)KitValues.toModule(spec).root();
+   assertThat(field.suggestions()).extracting(dev.jasper.ui.model.Nodes.Suggestion::id).containsExactly("navigate","search","host");
+   assertThat(field.suggestionsLoading()).isEqualTo(loading);
+  }
+  assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","search",true))).isEqualTo(new UiEvent.SuggestionChosen("address","search",true));
+  assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","host",false))).isEqualTo(new UiEvent.SuggestionChosen("address","host",false));
+ }
  /** Plan 3b: a technical caption crosses the projection unchanged. */
+ /** Plan 4b Task 1 (SDK 0.27.0): submenus, in any menu, and a button's hold menu project without loss. */
+ @Test void submenusAndHoldMenusProjectWithoutLoss(){
+  var tools=new MenuItem("tools","Developer Tools","code","",true,false,Hue.BLUE,"",List.of(new MenuItem("source","View Source","","view-source",true,false).withShortcut("dev.x.source"),
+   new MenuItem("rule","","","",true,true),new MenuItem("inspect","Inspect","","inspect",false,false)));
+  var back=new Button("back",READY,"","back",ButtonKind.GHOST,"back","Back",ButtonPresentation.STANDARD,Optional.empty(),Optional.empty(),
+   List.of(new MenuItem("entry-1","Example Domain","","go:1",true,false),tools));
+  var spec=new ViewSpec(new Nodes.Stack("bar",READY,LayoutRole.INLINE,List.of(back,new MenuButton("menu",READY,"","more",ButtonKind.GHOST,"",List.of(tools),"Page"))));
+  assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+  var projected=(dev.jasper.ui.model.Nodes.Button)((dev.jasper.ui.model.Nodes.Stack)KitValues.toModule(spec).root()).children().getFirst();
+  assertThat(projected.holdMenu().get(1).children()).hasSize(3);
+  assertThat(projected.holdMenu().get(1).submenu()).isTrue();
+ }
  @Test void technicalPickerCaptionsProjectWithoutLoss(){
   for(boolean technical:List.of(false,true)){
    var face=new PickerFace("Mac","dustin@192.168.1.119:22","server",Hue.BLUE,PickerDensity.DEFAULT,technical);
@@ -101,7 +144,7 @@ class KitValuesTest {
   assertThat(new MenuItem("old","Old","key","open",true,false).hue()).isEqualTo(Hue.NEUTRAL);
  }
  @Test void everyEventProjectsItsOwnerItemAndPayload(){
-  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"),new dev.jasper.ui.model.UiEvent.Clicked("tree","leaf"),new dev.jasper.ui.model.UiEvent.ColumnsResized("files",Map.of("name",180)));
+  List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"),new dev.jasper.ui.model.UiEvent.Sorted("table","name"),new dev.jasper.ui.model.UiEvent.Clicked("tree","leaf"),new dev.jasper.ui.model.UiEvent.ColumnsResized("files",Map.of("name",180)),new dev.jasper.ui.model.UiEvent.SuggestionChosen("address","search",true));
   assertThat(events).hasSize(UiEvent.class.getPermittedSubclasses().length);for(var event:events)assertThat(KitValues.toSdk(event).toString()).isEqualTo(event.toString());
   assertThat(Arrays.stream(SemanticColor.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.theme.SemanticColor.values()).map(Enum::name).toArray(String[]::new));
  }

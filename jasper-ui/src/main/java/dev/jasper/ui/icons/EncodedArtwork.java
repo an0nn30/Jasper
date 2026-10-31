@@ -10,6 +10,10 @@ public final class EncodedArtwork {
     private final byte[] data;
     private DecodedArtwork prepared;
     private IllegalArgumentException rejected;
+    /** The icons {@link #icon(int)} made, by extent: the eight most recent. */
+    private final java.util.Map<Integer, javax.swing.Icon> icons = new java.util.LinkedHashMap<>(8, .75f, true) {
+        @Override protected boolean removeEldestEntry(java.util.Map.Entry<Integer, javax.swing.Icon> eldest) { return size() > 8; }
+    };
     public EncodedArtwork(Format format, byte[] data) {
         this.format=Objects.requireNonNull(format);
         Objects.requireNonNull(data);
@@ -37,6 +41,39 @@ public final class EncodedArtwork {
      * @throws IllegalArgumentException when the artwork is invalid or the size is out of range
      */
     public java.awt.image.BufferedImage raster(int width, int height) { return decoded().raster(width, height); }
+
+    /**
+     * The artwork drawn in an {@code extent} by {@code extent} box, as a registry draws authored artwork: scaled to fit,
+     * its aspect and colours kept, centred. It decodes first if needed and prepares every density now, so its paint
+     * allocates nothing; the icon for an extent is made once, so a caller that asks again gets the same icon.
+     *
+     * @param extent the box's side in user-space pixels (already scaled for the user's interface size), 1 to 512
+     * @return the icon
+     * @throws IllegalArgumentException when the artwork is invalid or the extent is out of range
+     */
+    public synchronized javax.swing.Icon icon(int extent) {
+        if (extent < 1 || extent > 512) throw new IllegalArgumentException("Invalid logical icon size");
+        var made = icons.get(extent);
+        if (made != null) return made;
+        made = fitted(decoded().snapshot(extent), extent);
+        icons.put(extent, made);
+        return made;
+    }
+
+    private static javax.swing.Icon fitted(java.awt.Image snapshot, int extent) {
+        int width = snapshot.getWidth(null), height = snapshot.getHeight(null);
+        return new javax.swing.Icon() {
+            @Override public int getIconWidth() { return extent; }
+            @Override public int getIconHeight() { return extent; }
+            @Override public void paintIcon(java.awt.Component component, java.awt.Graphics graphics, int x, int y) {
+                var g = (java.awt.Graphics2D) graphics.create();
+                try {
+                    g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                    g.drawImage(snapshot, x + (extent - width) / 2, y + (extent - height) / 2, width, height, null);
+                } finally { g.dispose(); }
+            }
+        };
+    }
 
     /**
      * Checks SVG bytes against the receiving rules without decoding or drawing them, so with no AWT: for a reader that

@@ -252,6 +252,214 @@ public abstract class PluginContractTest {
             }).doesNotThrowAnyException();
         });
     }
+    /** A {@code size} by {@code size} PNG in one colour. */
+    static dev.jasper.sdk.ui.PixelImage png(int size, java.awt.Color color) {
+        var image = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { g.setColor(color); g.fillRect(0, 0, size, size); } finally { g.dispose(); }
+        var out = new java.io.ByteArrayOutputStream();
+        try { javax.imageio.ImageIO.write(image, "png", out); } catch (java.io.IOException failure) { throw new AssertionError(failure); }
+        return new dev.jasper.sdk.ui.PixelImage(out.toByteArray());
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a content tab's presentation image reaches the host, which shows it in place of the
+     * icon name until a presentation without one; the name is still checked, and a closed tab takes nothing.
+     */
+    @Test void aContentTabsPresentationImageReachesTheHost() {
+        UUID main = h.addTerminalWindow();
+        var started = new AtomicReference<PluginContext>();
+        h.start(info("test.image", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), started::set);
+        var context = started.get();
+        h.ui(() -> {
+            var window = context.terminals().window(main).orElseThrow();
+            var tab = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), window, kitView(context));
+            UUID id = window.activeTab().orElseThrow().id();
+            var plain = new dev.jasper.sdk.ui.ContentPresentation("Example", "", "file", false, "https://example.com/", "");
+            tab.setPresentation(plain);
+            assertThat(h.contentIcon(id)).isEqualTo("icon:file");
+            var favicon = png(16, java.awt.Color.BLUE);
+            tab.setPresentation(plain.withImage(favicon));
+            assertThat(h.contentIcon(id)).isEqualTo("image");
+            tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Example", "", null, false, "", "").withImage(favicon));
+            assertThat(h.contentIcon(id)).as("an image without an icon name").isEqualTo("image");
+            assertThatIllegalArgumentException().as("the name is checked beside an image")
+                .isThrownBy(() -> tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Example", "", "missing", false, "", "").withImage(favicon)));
+            assertThat(h.contentIcon(id)).isEqualTo("image");
+            tab.setPresentation(plain);
+            assertThat(h.contentIcon(id)).isEqualTo("icon:file");
+            tab.setPresentation(new dev.jasper.sdk.ui.ContentPresentation("Example", "", null, false, "", ""));
+            assertThat(h.contentIcon(id)).isEqualTo("-");
+            tab.setPresentation(plain);
+            tab.close();
+            assertThatCode(() -> tab.setPresentation(plain.withImage(favicon))).doesNotThrowAnyException();
+            assertThat(h.contentIcon(id)).as("a closed tab is no plugin's content tab").isEqualTo("-");
+        });
+    }
+
+    /** A plain menu item whose action is its id. */
+    private static dev.jasper.sdk.ui.MenuItem menuItem(String id, String label, boolean enabled) {
+        return new dev.jasper.sdk.ui.MenuItem(id, label, "", id, enabled, false);
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0; browser spec 11, ruling P2): showContextMenu lists the leading items, the host's pane
+     * items for the tab (Split with every Split choice's entries, Move Pane to Tab with the window's other tabs, Close
+     * Pane), then the trailing items, a separator between groups and none for an empty group, and choosing a plugin item
+     * reaches chosen with its id, once, closing the menu. Dismissing it, or another menu opening, tells chosen nothing; a
+     * closed tab shows none and tells chosen nothing at once; ids repeated anywhere in the menu, and unknown icons, are
+     * refused.
+     */
+    @Test void showContextMenuListsTheLeadingItemsTheHostsPaneItemsThenTheTrailingItemsAndChoosingAPluginItemReachesChosen() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            context.windows().splitItem(dev.jasper.sdk.ui.SplitItemSpec.of("test.alpha.sketch", "Sketch"), (window, placement) -> { });
+        });
+        var heard = new java.util.concurrent.CopyOnWriteArrayList<Optional<String>>();
+        var page = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        var id = new AtomicReference<UUID>();
+        var at = new java.awt.Point(40, 30);
+        var back = menuItem("back", "Back", true);
+        var forward = menuItem("forward", "Forward", false);
+        var source = menuItem("source", "View Source", true);
+        h.ui(() -> {
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            page.set(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), owner, kitView(alpha.get())));
+            id.set(owner.activeTab().orElseThrow().id());
+            page.get().showContextMenu(at, List.of(back, forward), List.of(source), heard::add);
+        });
+        List<String> pane = List.of("host:Split", "  host:Terminal Right", "  host:Terminal Down", "  host:Sketch Right", "  host:Sketch Down",
+            "host:Move Pane to Tab", "  host:1 zsh", "host:Close Pane");
+        var expected = new ArrayList<String>(List.of("item:back", "item:forward (disabled)", "---"));
+        expected.addAll(pane);
+        expected.addAll(List.of("---", "item:source"));
+        h.ui(() -> {
+            assertThat(h.contentMenu(id.get())).as("leading, pane items, trailing").containsExactlyElementsOf(expected);
+            assertThat(heard).isEmpty();
+            assertThat(h.chooseFromContentMenu(id.get(), List.of("item:forward"))).as("a disabled item").isFalse();
+            assertThat(h.chooseFromContentMenu(id.get(), List.of("item:source"))).isTrue();
+            assertThat(heard).containsExactly(Optional.of("source"));
+            assertThat(h.contentMenu(id.get())).as("choosing closes the menu").isEmpty();
+            assertThat(h.chooseFromContentMenu(id.get(), List.of("item:source"))).as("once").isFalse();
+
+            page.get().showContextMenu(at, List.of(), List.of(), heard::add);
+            assertThat(h.contentMenu(id.get())).as("empty groups add no separator").containsExactlyElementsOf(pane);
+            page.get().showContextMenu(at, List.of(back), List.of(), heard::add);
+            assertThat(heard).as("another menu dismisses the first").containsExactly(Optional.of("source"), Optional.empty());
+            assertThat(h.contentMenu(id.get())).startsWith("item:back", "---", "host:Split");
+            assertThat(h.dismissContentMenu(id.get())).isTrue();
+            assertThat(h.dismissContentMenu(id.get())).isFalse();
+            assertThat(heard).containsExactly(Optional.of("source"), Optional.empty(), Optional.empty());
+
+            assertThatIllegalArgumentException().as("an id repeated in the other list").isThrownBy(() -> page.get().showContextMenu(at, List.of(back),
+                List.of(menuItem("back", "Back Again", true)), heard::add)).withMessage("Duplicate id: back");
+            var nested = new dev.jasper.sdk.ui.MenuItem("more", "More", "", "", true, false, dev.jasper.sdk.ui.Nodes.Hue.NEUTRAL, "", List.of(menuItem("source", "Source", true)));
+            assertThatIllegalArgumentException().as("an id repeated in a submenu").isThrownBy(() -> page.get().showContextMenu(at, List.of(nested),
+                List.of(source), heard::add)).withMessage("Duplicate id: source");
+            assertThatIllegalArgumentException().as("an unknown icon").isThrownBy(() -> page.get().showContextMenu(at,
+                List.of(new dev.jasper.sdk.ui.MenuItem("x", "X", "missing", "x", true, false)), List.of(), heard::add));
+            assertThat(h.contentMenu(id.get())).as("a refused menu shows nothing").isEmpty();
+            assertThat(heard).hasSize(3);
+            page.get().close();
+            page.get().showContextMenu(at, List.of(back), List.of(), heard::add);
+            assertThat(heard).as("a closed tab hears nothing at once").containsExactly(Optional.of("source"), Optional.empty(), Optional.empty(), Optional.empty());
+        });
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0; review C5): closing the tab while its right-click menu shows closes the menu and tells
+     * chosen nothing, once.
+     */
+    @Test void closingATabWhileItsMenuShowsTellsChosenNothingOnce() {
+        UUID main = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        var heard = new java.util.concurrent.CopyOnWriteArrayList<Optional<String>>();
+        h.ui(() -> {
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            var page = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), owner, kitView(alpha.get()));
+            UUID id = owner.activeTab().orElseThrow().id();
+            page.showContextMenu(new java.awt.Point(40, 30), List.of(menuItem("back", "Back", true)), List.of(), heard::add);
+            assertThat(h.contentMenu(id)).isNotEmpty();
+            page.close();
+            assertThat(heard).as("closing the tab dismisses its menu").containsExactly(Optional.empty());
+            assertThat(h.contentMenu(id)).isEmpty();
+            assertThat(h.dismissContentMenu(id)).isFalse();
+            assertThat(h.chooseFromContentMenu(id, List.of("item:back"))).isFalse();
+            assertThat(heard).as("once").hasSize(1);
+        });
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0; review C4): one right-click menu shows at a time in Jasper: another plugin's menu
+     * opening dismisses the first, whose chosen hears nothing.
+     */
+    @Test void anotherPluginsRightClickMenuDismissesTheFirst() {
+        UUID main = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        var beta = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.start(info("test.beta", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), beta::set);
+        var heardAlpha = new java.util.concurrent.CopyOnWriteArrayList<Optional<String>>();
+        var heardBeta = new java.util.concurrent.CopyOnWriteArrayList<Optional<String>>();
+        h.ui(() -> {
+            var alphaOwner = alpha.get().terminals().window(main).orElseThrow();
+            var notes = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), alphaOwner, kitView(alpha.get()));
+            UUID first = alphaOwner.activeTab().orElseThrow().id();
+            var betaOwner = beta.get().terminals().window(main).orElseThrow();
+            var page = beta.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), betaOwner, kitView(beta.get()));
+            UUID second = betaOwner.activeTab().orElseThrow().id();
+            notes.showContextMenu(new java.awt.Point(40, 30), List.of(menuItem("save", "Save", true)), List.of(), heardAlpha::add);
+            page.showContextMenu(new java.awt.Point(40, 30), List.of(menuItem("back", "Back", true)), List.of(), heardBeta::add);
+            assertThat(heardAlpha).as("the first menu is dismissed").containsExactly(Optional.empty());
+            assertThat(h.contentMenu(first)).isEmpty();
+            assertThat(h.contentMenu(second)).startsWith("item:back");
+            assertThat(h.chooseFromContentMenu(second, List.of("item:back"))).isTrue();
+            assertThat(heardBeta).containsExactly(Optional.of("back"));
+            assertThat(heardAlpha).hasSize(1);
+        });
+    }
+
+    /**
+     * Plan 4b Task 1 (SDK 0.27.0): a submenu's children are reachable in a content tab's right-click menu: a plugin
+     * submenu's child reaches chosen with its id, while the submenu itself and a disabled child report nothing; the host's
+     * Move Pane to Tab submenu moves the pane into the tab chosen, and chosen hears nothing.
+     */
+    @Test void aSubmenusChildrenAreReachableInAContentTabsRightClickMenu() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        var heard = new java.util.concurrent.CopyOnWriteArrayList<Optional<String>>();
+        var page = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        var id = new AtomicReference<UUID>();
+        var at = new java.awt.Point(40, 30);
+        var tools = new dev.jasper.sdk.ui.MenuItem("tools", "Developer Tools", "", "", true, false, dev.jasper.sdk.ui.Nodes.Hue.NEUTRAL, "",
+            List.of(menuItem("inspect", "Inspect Element", true), new dev.jasper.sdk.ui.MenuItem("rule", "", "", "", true, true), menuItem("console", "Console", false)));
+        h.ui(() -> {
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            page.set(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("page", "Page"), owner, kitView(alpha.get())));
+            id.set(owner.activeTab().orElseThrow().id());
+            page.get().showContextMenu(at, List.of(tools), List.of(), heard::add);
+            assertThat(h.contentMenu(id.get())).startsWith("submenu:tools", "  item:inspect", "  ---", "  item:console (disabled)", "---", "host:Split");
+            assertThat(h.chooseFromContentMenu(id.get(), List.of("submenu:tools"))).as("a submenu itself").isFalse();
+            assertThat(h.chooseFromContentMenu(id.get(), List.of("submenu:tools", "item:console"))).as("a disabled child").isFalse();
+            assertThat(h.contentMenu(id.get())).as("still showing").isNotEmpty();
+            assertThat(heard).isEmpty();
+            assertThat(h.chooseFromContentMenu(id.get(), List.of("submenu:tools", "item:inspect"))).isTrue();
+            assertThat(heard).containsExactly(Optional.of("inspect"));
+
+            page.get().showContextMenu(at, List.of(), List.of(), heard::add);
+            assertThat(h.chooseFromContentMenu(id.get(), List.of("host:Move Pane to Tab", "host:1 zsh"))).isTrue();
+            assertThat(heard).as("one of Jasper's items tells chosen nothing").containsExactly(Optional.of("inspect"), Optional.empty());
+            assertThat(h.contentMenu(id.get())).isEmpty();
+        });
+        assertThat(h.windowTabs(main)).as("moved beside the shell").containsExactly(List.of(shell, id.get()));
+    }
+
     private static PaletteScope iconScope(String icon) {
         return new PaletteScope() {
             public ScopeSpec spec(){return ScopeSpec.of("test.icons.scope","Scope","Search",List.of(PASTE)).withIcon(icon);}
