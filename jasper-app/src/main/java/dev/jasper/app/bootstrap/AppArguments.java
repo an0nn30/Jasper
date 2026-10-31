@@ -7,8 +7,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.stream.Stream;
@@ -129,19 +129,22 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
 
     /**
      * The launch a registered command makes, such as Windows' {@code "Jasper.exe" --url "%1"} (browser plan 4c, ruling
-     * Q13): {@code --url} first, then at most one web address, read as {@link #webAddress} reads one, and nothing after
-     * it; without one it is a plain launch. A link that breaks out of its quotes therefore adds no option or path: the
-     * whole launch is refused.
+     * Q13): {@code --url} first, then at most one argument and nothing after it: a web address, read as
+     * {@link #webAddress} reads one, or a {@code file:} URL naming a local file, which Linux's {@code Jasper --url %u}
+     * passes for Open With and a drop on the launcher and which opens as that path (ruling Q18); without one it is a
+     * plain launch. A link that breaks out of its quotes therefore adds no option or path: the whole launch is refused.
      */
     private static AppArguments link(String[] args, Path workingDirectory) {
-        if (args.length > 2) throw invalid("--url takes one web address and nothing after it.");
+        if (args.length > 2) throw invalid("--url takes one web address or file: URL and nothing after it.");
+        List<Path> paths = List.of();
         List<URI> urls = List.of();
         if (args.length == 2) {
-            if (!webScheme(args[1])) throw invalid("Not a web address: " + args[1]);
-            urls = List.of(webAddress(args[1]));
+            if (isFileUrl(args[1])) paths = List.of(positional(args[1], workingDirectory));
+            else if (webScheme(args[1])) urls = List.of(webAddress(args[1]));
+            else throw invalid("Not a web address or file: URL: " + args[1]);
         }
         return new AppArguments(null, false, false, false, null, false, false, OptionalLong.empty(), workingDirectory,
-            List.of(), urls, List.of(args));
+            paths, urls, List.of(args));
     }
 
     private static Path path(String[] args, int index, String option, String what, Path workingDirectory) {
@@ -163,8 +166,8 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
     private static boolean isFileUrl(String text) { return text.regionMatches(true, 0, "file:", 0, 5); }
 
     /**
-     * The local file a {@code file:} URL names, such as {@code file:///Users/me/x.html}, which a desktop entry may pass
-     * (browser plan 4c, Review Focus 2).
+     * The local file a {@code file:} URL names, such as {@code file:///Users/me/x.html}, given as a path or after
+     * {@code --url}, as Linux's desktop entry passes it (browser plan 4c, Review Focus 2; ruling Q18).
      *
      * @throws IllegalArgumentException for one that names no local file: an opaque one, one that does not parse, and one
      *     naming another host, except on Windows, where that is the share it names

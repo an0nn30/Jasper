@@ -166,17 +166,38 @@ class AppArgumentsTest {
     }
 
     /**
+     * Ruling Q18: Linux's {@code Jasper --url %u} also passes a {@code file:} URL, for Open With and a drop on the
+     * launcher. One that names a local file opens it as a path, as the same URL without {@code --url} does.
+     */
+    @Test void urlOpensTheOneFileUrlAfterItAsAPath() {
+        Path page = cwd.resolve("x.html");
+        AppArguments file = parse("--url", page.toUri().toString());
+        assertThat(file.paths()).containsExactly(page);
+        assertThat(file.urls()).isEmpty();
+        assertThat(file.residencyAllowed()).isTrue();
+        assertThat(parse("--url", "file://localhost" + page.toUri().getRawPath() + "#top").paths()).containsExactly(page);
+        assertThat(file.given()).containsExactly("--url", page.toUri().toString());
+    }
+
+    /**
      * Ruling Q13: a link that breaks out of the quotes in {@code "Jasper.exe" --url "%1"} must add nothing Jasper reads.
-     * Anything after {@code --url} but one web address, and {@code --url} anywhere but first, refuses the whole launch.
+     * Anything after {@code --url} but one web address or {@code file:} URL, and {@code --url} anywhere but first,
+     * refuses the whole launch.
      */
     @Test void urlRefusesAnythingButOneWebAddressAfterIt() {
         for (String[] args : new String[][]{{"--url", "https://x/", "--plugin-dir", "y"}, {"--url", "https://x/", "extra"},
-                {"--url", "--plugin-dir", "y"}, {"--url", "https://x/", "https://y/"}, {"--url", "https://x/", "--safe-mode"}})
+                {"--url", "--plugin-dir", "y"}, {"--url", "https://x/", "https://y/"}, {"--url", "https://x/", "--safe-mode"},
+                {"--url", "file:///x", "--plugin-dir", "y"}, {"--url", "file:///x", "file:///y"}})
             assertThatIllegalArgumentException().as(java.util.Arrays.toString(args)).isThrownBy(() -> AppArguments.parse(args, cwd))
-                .withMessageStartingWith("--url takes one web address and nothing after it.\n").withMessageContaining("Usage:");
-        for (String text : new String[]{"notes.txt", "file:///x", "--plugin-dir", "--help", "", "ftp://example.com/", "https://exa mple.com/"})
+                .withMessageStartingWith("--url takes one web address or file: URL and nothing after it.\n").withMessageContaining("Usage:");
+        for (String text : new String[]{"notes.txt", "--plugin-dir", "--help", "", "ftp://example.com/", "C:\\Users\\x.html"})
             assertThatIllegalArgumentException().as(text).isThrownBy(() -> AppArguments.parse(new String[]{"--url", text}, cwd))
-                .withMessageStartingWith("Not a web address: " + text + "\n").withMessageContaining("Usage:");
+                .withMessageStartingWith("Not a web address or file: URL: " + text + "\n").withMessageContaining("Usage:");
+        assertThatIllegalArgumentException().isThrownBy(() -> AppArguments.parse(new String[]{"--url", "https://exa mple.com/"}, cwd))
+            .withMessageStartingWith("Not a web address: https://exa mple.com/\n");
+        for (String text : new String[]{"file:x.html", "file:", "file:///a b.html"})
+            assertThatIllegalArgumentException().as(text).isThrownBy(() -> AppArguments.parse(new String[]{"--url", text}, cwd))
+                .withMessageStartingWith("Not a local file: " + text + "\n").withMessageContaining("Usage:");
         for (String[] args : new String[][]{{"--safe-mode", "--url", "https://x/"}, {"--plugin-dir", "y", "--url", "https://x/"},
                 {"notes.txt", "--url"}, {"https://x/", "--url", "https://y/"}, {"--help", "--url"}})
             assertThatIllegalArgumentException().as(java.util.Arrays.toString(args)).isThrownBy(() -> AppArguments.parse(args, cwd))

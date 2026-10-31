@@ -88,7 +88,8 @@ class ApplicationBootstrapTest {
                 {"--safe-mode", "--url", "https://x/"}})
             assertThat(ApplicationBootstrap.start(args, System.out, new PrintStream(error), dirs(),
                 (service, options) -> { throw new AssertionError("Unexpected startup"); })).as(java.util.Arrays.toString(args)).isEqualTo(2);
-        assertThat(error.toString()).contains("--url takes one web address and nothing after it.", "Not a web address: notes.txt",
+        assertThat(error.toString()).contains("--url takes one web address or file: URL and nothing after it.",
+            "Not a web address or file: URL: notes.txt",
             "--url must be the first argument.");
         assertThat(dirs().instanceLock()).doesNotExist();
     }
