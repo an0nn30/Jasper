@@ -40,16 +40,33 @@ class SuggestionsTest {
             .containsExactly(new Suggestion("search:3.14", "Search for “3.14”", "Web Search"));
     }
 
-    /** A single word is a host too, which ranks after the engine's suggestions, as it is most often a search. */
-    @Test void aSingleWordHostRanksAfterTheEnginesSuggestions() {
-        assertThat(Suggestions.rank("localhost", GOOGLE, List.of("localhost 8080"), List.of())).containsExactly(
-            new Suggestion("search:localhost", "Search for “localhost”", "Web Search"),
-            new Suggestion("search:localhost 8080", "localhost 8080", "Search Suggestion"),
-            new Suggestion("navigate:https://localhost", "Navigate to “https://localhost”", "URL"));
-        assertThat(Suggestions.rank("foo:8080", GOOGLE, List.of(), List.of())).extracting(Suggestion::id)
-            .containsExactly("search:foo:8080", "navigate:https://foo:8080");
+    /** A bare word is a host too, which ranks after the engine's suggestions, as it is most often a search. */
+    @Test void aBareWordHostRanksAfterTheEnginesSuggestions() {
+        assertThat(Suggestions.rank("jcef", GOOGLE, List.of("jcef maven"), List.of())).containsExactly(
+            new Suggestion("search:jcef", "Search for \u201cjcef\u201d", "Web Search"),
+            new Suggestion("search:jcef maven", "jcef maven", "Search Suggestion"),
+            new Suggestion("navigate:https://jcef", "Navigate to \u201chttps://jcef\u201d", "URL"));
         assertThat(Suggestions.rank("my_host", GOOGLE, List.of(), List.of())).extracting(Suggestion::id)
             .containsExactly("search:my_host", "navigate:https://my_host");
+        assertThat(Suggestions.rank("devbox/app", GOOGLE, List.of(), List.of())).extracting(Suggestion::id)
+            .containsExactly("search:devbox/app", "navigate:https://devbox/app");
+    }
+
+    /**
+     * Plan 4b's P27: {@code localhost}, a host with a port and an IP address rank their address first, as text with a
+     * scheme or a dot does, so Enter right after typing navigates there, as the field's Enter with no list does, and no
+     * intranet name goes to the engine.
+     */
+    @Test void localhostAHostWithAPortAndAnIpAddressRankTheirAddressFirst() {
+        for (String text : List.of("localhost", "LOCALHOST", "localhost:3000/app", "localhost/status", "foo:8080", "my_host:8080",
+                "1.2.3.4", "10.0.0.1:8443/x", "[::1]:8080", "[::1]")) {
+            Suggestion top = Suggestions.rank(text, GOOGLE, List.of("an engine suggestion"), List.of()).getFirst();
+            URI resolved = AddressInput.resolve(text, GOOGLE).orElseThrow();
+            assertThat(top).as(text).isEqualTo(new Suggestion("navigate:" + resolved, "Navigate to \u201c" + resolved + "\u201d", "URL"));
+            assertThat(Suggestions.target(top.id(), GOOGLE)).as(text).contains(resolved);
+        }
+        assertThat(Suggestions.rank("localhost:3000", GOOGLE, List.of(), List.of())).extracting(Suggestion::id)
+            .containsExactly("navigate:https://localhost:3000", "search:localhost:3000");
     }
 
     @Test void theStoresComeLastWithoutRowsAlreadyListed() {

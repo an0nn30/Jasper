@@ -31,6 +31,14 @@ class AddressInputTest {
         assertThat(resolve("42")).as("a number is no word").contains(URI.create("https://google.com/search?q=42"));
         assertThat(resolve("-x")).contains(URI.create("https://google.com/search?q=-x"));
         assertThat(resolve("~")).contains(URI.create("https://google.com/search?q=%7E"));
+        assertThat(resolve("devbox/app?x=1#top")).as("with a path").contains(URI.create("https://devbox/app?x=1#top"));
+        assertThat(resolve("devbox:3000?x=1")).as("with a port").contains(URI.create("https://devbox:3000?x=1"));
+        assertThat(resolve("localhost?x=1")).contains(URI.create("https://localhost?x=1"));
+        assertThat(resolve("c#")).as("a word and then # or ? is a search").contains(URI.create("https://google.com/search?q=c%23"));
+        assertThat(resolve("f#")).contains(URI.create("https://google.com/search?q=f%23"));
+        assertThat(resolve("why?")).contains(URI.create("https://google.com/search?q=why%3F"));
+        assertThat(resolve("jcef?")).contains(URI.create("https://google.com/search?q=jcef%3F"));
+        assertThat(AddressInput.address("c#")).isEmpty();
         assertThat(resolve("\u6771\u4eac")).as("a word in another script, often a query without spaces")
             .contains(URI.create("https://google.com/search?q=%E6%9D%B1%E4%BA%AC"));
     }

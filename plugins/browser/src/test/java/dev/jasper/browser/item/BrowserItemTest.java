@@ -1,5 +1,6 @@
 package dev.jasper.browser.item;
 
+import com.sun.net.httpserver.HttpServer;
 import dev.jasper.browser.page.NavigationHistory.Entry;
 import dev.jasper.browser.page.NavigationHistory.History;
 import dev.jasper.browser.page.Page;
@@ -15,7 +16,11 @@ import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.UiEvent;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +30,10 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -727,6 +736,115 @@ class BrowserItemTest {
         } });
     }
 
+    /** Plan 4b's P27: Enter right after typing {@code localhost} or a host with a port navigates there. */
+    @Test void enterRightAfterTypingAHostWithAPortNavigatesThere() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var item = items(host, page -> { }).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            view.type(BrowserToolbar.ADDRESS, "localhost:3000/app");
+            view.press(BrowserToolbar.ADDRESS, "ENTER");
+            assertThat(item.page().address()).isEqualTo("https://localhost:3000/app");
+            view.type(BrowserToolbar.ADDRESS, "jcef");
+            view.press(BrowserToolbar.ADDRESS, "ENTER");
+            assertThat(item.page().address()).as("a bare word searches").isEqualTo("https://google.com/search?q=jcef");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Plan 4b's S6: clearing the field while the engine is asked ends the request, and the list shows nothing. */
+    @Test void clearingTheFieldEndsTheRequestAndShowsNoRows() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var later = new Later();
+            var fetches = new Fetches();
+            items(host, page -> { }, later, fetches).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            view.type(BrowserToolbar.ADDRESS, "jc");
+            later.end();
+            assertThat(fetches.answers).singleElement().satisfies(answer -> assertThat(answer).isNotDone());
+            view.type(BrowserToolbar.ADDRESS, "");
+            assertThat(fetches.answers.getFirst()).as("its request ended").isCancelled();
+            assertThat(later.waiting()).isEmpty();
+            assertThat(view.suggestions(BrowserToolbar.ADDRESS)).isEmpty();
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).suggestions()).isEmpty();
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).suggestionsLoading()).as("no Loading suggestions").isFalse();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Plan 4b's S4: two items asking the engine through the plugin's own fetcher at once each get their own answer; one
+     * item's keystroke never ends the other's request. The engine is a local server, as the Custom engine's suggestions.
+     */
+    @Test void twoItemsAskTheEngineEachOnTheirOwn() throws Exception {
+        var release = new CountDownLatch(1);
+        var asked = new CopyOnWriteArrayList<String>();
+        var server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.setExecutor(Executors.newCachedThreadPool());
+        server.createContext("/suggest", exchange -> {
+            String query = exchange.getRequestURI().getRawQuery();
+            asked.add(query);
+            try {
+                if (query.equals("q=slow")) release.await(10, TimeUnit.SECONDS);
+                byte[] body = ("[\"q\",[\"" + query.substring(2) + " answer\"]]").getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(200, body.length);
+                try (var out = exchange.getResponseBody()) {
+                    out.write(body);
+                }
+            } catch (IOException | InterruptedException gone) {
+                // The client gave up.
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        var later = new Later();
+        var host = onUi(FakePluginHost::new);
+        try {
+            var views = onUi(() -> {
+                host.setSetting(ID, "search_engine", "custom");
+                host.setSetting(ID, "custom_search_url", "https://search.example.com/?q=%s");
+                host.setSetting(ID, "custom_suggestions_url", "http://127.0.0.1:" + server.getAddress().getPort() + "/suggest?q=%s");
+                var items = items(host, page -> { }, later, null);
+                items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+                items.open(URI.create("https://example.org"), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+                var first = host.contentView(ID, "example.com").orElseThrow();
+                var second = host.contentView(ID, "example.org").orElseThrow();
+                first.type(BrowserToolbar.ADDRESS, "slow");
+                later.end();
+                host.runBackground(); // the fake host's background work runs when the test says
+                return List.of(first, second);
+            });
+            await(() -> asked.contains("q=slow"), "the first item's request");
+            onUi(() -> {
+                views.get(1).type(BrowserToolbar.ADDRESS, "fast");
+                later.end();
+                host.runBackground();
+                return null;
+            });
+            await(() -> onUi(() -> !Views.field(views.get(1), BrowserToolbar.ADDRESS).suggestionsLoading()), "the second item's answer");
+            onUi(() -> {
+                assertThat(views.get(1).suggestions(BrowserToolbar.ADDRESS)).extracting(Nodes.Suggestion::title).contains("fast answer");
+                assertThat(Views.field(views.get(0), BrowserToolbar.ADDRESS).suggestionsLoading()).as("the first still waits").isTrue();
+                return null;
+            });
+            release.countDown();
+            await(() -> onUi(() -> !Views.field(views.get(0), BrowserToolbar.ADDRESS).suggestionsLoading()), "the first item's answer");
+            onUi(() -> {
+                assertThat(views.get(0).suggestions(BrowserToolbar.ADDRESS)).extracting(Nodes.Suggestion::title).contains("slow answer");
+                assertThat(host.failures()).isEmpty();
+                return null;
+            });
+        } finally {
+            release.countDown();
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+            server.stop(0);
+            ((ExecutorService) server.getExecutor()).shutdownNow();
+        }
+    }
+
     /** Escape and closing the item end the wait for suggestions, and an answer arriving after either is dropped. */
     @Test void escapeAndClosingEndTheSuggestions() throws Exception {
         var later = new Later();
@@ -831,6 +949,18 @@ class BrowserItemTest {
             var answer = new CompletableFuture<List<String>>();
             answers.add(answer);
             return answer;
+        }
+    }
+
+    private interface Check {
+        boolean holds() throws Exception;
+    }
+
+    private static void await(Check check, String what) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!check.holds()) {
+            if (System.nanoTime() > deadline) throw new AssertionError("timed out waiting for " + what);
+            Thread.sleep(10);
         }
     }
 

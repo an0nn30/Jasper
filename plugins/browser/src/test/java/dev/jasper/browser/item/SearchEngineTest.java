@@ -22,6 +22,18 @@ class SearchEngineTest {
             .containsExactly("google", "duckduckgo", "bing", "kagi", "custom");
     }
 
+    /** Plan 4b's P26: "Search with \u27e8engine\u27e9" names Custom by its search URL's host, and "Custom" only without one. */
+    @Test void customIsNamedByItsSearchUrlsHost() {
+        assertThat(SearchEngine.GOOGLE.displayName(GOOGLE)).isEqualTo("Google");
+        assertThat(SearchEngine.DUCKDUCKGO.displayName(settings(SearchEngine.CUSTOM, "https://x.example/?q=%s", ""))).isEqualTo("DuckDuckGo");
+        assertThat(SearchEngine.CUSTOM.displayName(settings(SearchEngine.CUSTOM, "https://search.example.com/find?q=%s", "")))
+            .isEqualTo("search.example.com");
+        assertThat(SearchEngine.CUSTOM.displayName(settings(SearchEngine.CUSTOM, "https://%s.example.com/", ""))).as("no fixed host")
+            .isEqualTo("Custom");
+        for (String template : List.of("", "https://exa mple.com/?q=%s", "%s"))
+            assertThat(SearchEngine.CUSTOM.displayName(settings(SearchEngine.CUSTOM, template, ""))).as(template).isEqualTo("Custom");
+    }
+
     @Test void eachEngineSearchesAtItsSearchUrl() {
         assertThat(search(SearchEngine.GOOGLE)).isEqualTo(URI.create("https://google.com/search?q=what+is+jcef%3F"));
         assertThat(search(SearchEngine.DUCKDUCKGO)).isEqualTo(URI.create("https://duckduckgo.com/?q=what+is+jcef%3F"));

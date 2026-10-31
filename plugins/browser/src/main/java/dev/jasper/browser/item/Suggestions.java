@@ -32,12 +32,12 @@ final class Suggestions {
     /**
      * The rows for {@code typed}, in order:
      * <ol>
-     *   <li>the typed address, "Navigate to “https://…”" with the detail "URL", when the text names an address with a
-     *       scheme, a local path or a dot in it;</li>
+     *   <li>the typed address, "Navigate to “https://…”" with the detail "URL", when the text names an address that is no
+     *       bare word: with a scheme, a local path, a dot, {@code localhost}, a port or an IP address;</li>
      *   <li>"Search for “…”", with the detail "Web Search";</li>
      *   <li>up to {@value #ENGINE_ROWS} of the engine's suggestions, with the detail "Search Suggestion", leaving out the
      *       typed text itself;</li>
-     *   <li>a single-word host such as {@code localhost} or {@code foo:8080}, as the typed address is;</li>
+     *   <li>a bare word's host, such as {@code jcef} or {@code devbox/app}, as the typed address is;</li>
      *   <li>then {@code stores}' rows.</li>
      * </ol>
      * When the typed text is itself a results page's address, a search for its terms comes first. A row whose id is
@@ -55,9 +55,9 @@ final class Suggestions {
         var rows = new Rows();
         Optional<URI> address = AddressInput.address(text);
         address.flatMap(typedAddress -> SearchEngine.queryOf(typedAddress, settings)).ifPresent(rows::search);
-        boolean host = address.isPresent() && text.indexOf('.') < 0 && AddressInput.localPath(text).isEmpty()
-            && AddressInput.scheme(text).filter(AddressInput::offered).isEmpty();
-        if (!host) address.ifPresent(rows::navigate);
+        // Plan 4b's P27: only a bare word ranks its address after the search; any other address comes first.
+        boolean bareWord = address.isPresent() && AddressInput.bareWord(text);
+        if (!bareWord) address.ifPresent(rows::navigate);
         rows.search(text);
         int engine = 0;
         for (String suggestion : engineSuggestions) {
@@ -66,7 +66,7 @@ final class Suggestions {
             if (terms.isEmpty() || terms.equalsIgnoreCase(text)) continue;
             if (rows.add(new Nodes.Suggestion(SEARCH + terms, shown(terms), "Search Suggestion"))) engine++;
         }
-        if (host) address.ifPresent(rows::navigate);
+        if (bareWord) address.ifPresent(rows::navigate);
         stores.forEach(rows::add);
         return rows.list;
     }

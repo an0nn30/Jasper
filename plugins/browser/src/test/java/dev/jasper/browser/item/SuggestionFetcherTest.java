@@ -108,16 +108,28 @@ class SuggestionFetcherTest {
         assertThat(SuggestionFetcher.TIMEOUT).isEqualTo(Duration.ofSeconds(3));
     }
 
-    /** Each keystroke's request supersedes the one before: its answer, however late, is dropped. */
-    @Test void aNewRequestDropsTheAnswerOfTheOneBefore() throws Exception {
+    /**
+     * Plan 4b's S4: the fetcher is the plugin's, shared by every item, so one fetch never ends another, which may be
+     * another item's; each item supersedes its own requests.
+     */
+    @Test void aFetchLeavesTheOthersUnderWay() throws Exception {
         fetcher = new SuggestionFetcher(STARTS, Duration.ofSeconds(5));
-        var stale = fetcher.fetch(at("/silent"));
+        var slow = fetcher.fetch(at("/silent"));
         await(() -> asked.contains("/silent"), "the first request");
-        var fresh = fetcher.fetch(at("/google"));
-        assertThat(stale.get(5, TimeUnit.SECONDS)).as("superseded").isEmpty();
+        assertThat(fetcher.fetch(at("/google")).get(5, TimeUnit.SECONDS)).containsExactly("jcef", "jcef maven", "caf\u00e9");
+        assertThat(slow).as("still under way").isNotDone();
         release.countDown();
-        assertThat(fresh.get(5, TimeUnit.SECONDS)).containsExactly("jcef", "jcef maven", "café");
-        assertThat(stale.get()).as("the late answer is dropped").isEmpty();
+        assertThat(slow.get(5, TimeUnit.SECONDS)).containsExactly("slow");
+    }
+
+    /** Cancelling a fetch ends its exchange, and the next fetch goes on as usual. */
+    @Test void aCancelledFetchEndsItsExchange() throws Exception {
+        fetcher = new SuggestionFetcher(STARTS, Duration.ofSeconds(5));
+        var cancelled = fetcher.fetch(at("/silent"));
+        await(() -> asked.contains("/silent"), "the request");
+        assertThat(cancelled.cancel(true)).isTrue();
+        assertThat(cancelled).isCancelled();
+        assertThat(fetcher.fetch(at("/google")).get(5, TimeUnit.SECONDS)).as("the next fetch").containsExactly("jcef", "jcef maven", "caf\u00e9");
     }
 
     @Test void offlineOrClosedGivesNoSuggestions() throws Exception {

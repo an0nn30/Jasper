@@ -56,12 +56,29 @@ public enum SearchEngine {
     }
 
     /**
-     * The engine's name, as Settings lists it and "Search with ⟨engine⟩" names it.
+     * The engine's name, as Settings lists it.
      *
      * @return the name, such as {@code Google}
      */
     public String displayName() {
         return displayName;
+    }
+
+    /**
+     * The engine's name as "Search with ⟨engine⟩" says it: {@link #displayName()}, and for Custom the host of its search
+     * URL, or "Custom" when that has no fixed host.
+     *
+     * @param settings the settings, which hold Custom's search URL
+     * @return the name, such as {@code Google} or {@code search.example.com}
+     */
+    public String displayName(BrowserSettings settings) {
+        if (this != CUSTOM) return displayName;
+        try {
+            String host = new URI(settings.customSearchUrl().replace(TERMS, MARK)).getHost();
+            return host == null || host.contains(MARK) ? displayName : host;
+        } catch (URISyntaxException notAUri) {
+            return displayName;
+        }
     }
 
     /**

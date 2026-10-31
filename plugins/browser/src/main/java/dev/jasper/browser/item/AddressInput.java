@@ -90,16 +90,6 @@ public final class AddressInput {
     }
 
     /**
-     * Whether the address field loads text with {@code scheme} as typed.
-     *
-     * @param scheme a scheme, in lower case
-     * @return whether it is {@code http}, {@code https}, {@code file}, {@code about} or {@code jasper-about}
-     */
-    static boolean offered(String scheme) {
-        return SCHEMES.contains(scheme);
-    }
-
-    /**
      * The {@code file:} URL of {@code text} when it is an absolute local path: {@code /…}, {@code ~/…} (the user's home
      * folder), or on Windows {@code C:\…} or {@code C:/…}. It reads no file.
      *
@@ -127,8 +117,29 @@ public final class AddressInput {
         String host = address.group(1), port = address.group(2);
         if (port != null && (Integer.parseInt(port) == 0 || Integer.parseInt(port) > 65_535)) return false;
         if (host.startsWith("[")) return true;
-        return host.equalsIgnoreCase("localhost") || ipv4(host) || domain(host.endsWith(".") ? host.substring(0, host.length() - 1) : host)
-            || word(host);
+        if (host.equalsIgnoreCase("localhost") || ipv4(host) || domain(host.endsWith(".") ? host.substring(0, host.length() - 1) : host))
+            return true;
+        // A word is a host on its own, with a port or with a path; "c#" and "why?" are searches.
+        return word(host) && (port != null || alone(address.group(3)));
+    }
+
+    /**
+     * Whether {@code text} names a bare word's host: a single word without a port, on its own or with a path, such as
+     * {@code jcef} or {@code devbox/app}, but not {@code localhost}. Such text is as often a search.
+     *
+     * @param text the field's text, trimmed
+     * @return whether it is one
+     */
+    static boolean bareWord(String text) {
+        Matcher address = ADDRESS.matcher(text);
+        if (!address.matches() || address.group(2) != null) return false;
+        String host = address.group(1);
+        return !host.equalsIgnoreCase("localhost") && word(host) && alone(address.group(3));
+    }
+
+    /** Whether what follows a host without a port leaves it a word: nothing, or a path. */
+    private static boolean alone(String rest) {
+        return rest == null || rest.startsWith("/");
     }
 
     private static boolean ipv4(String host) {
