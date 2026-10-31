@@ -47,6 +47,17 @@ public final class PageTestAccess {
     }
 
     /**
+     * Has the page's canvas follow the Ctrl+wheel rule of the platform {@code osName} names, as {@code os.name} does: a
+     * test of Windows' or macOS's on any host. UI thread.
+     *
+     * @param page a page
+     * @param osName an {@code os.name} value
+     */
+    public static void useOsName(Page page, String osName) {
+        ((PageView) page.view()).useOsName(osName);
+    }
+
+    /**
      * The page's main frame starts loading {@code url}, as the client's load handler tells it. UI thread.
      *
      * @param page a page

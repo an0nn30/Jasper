@@ -5,20 +5,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
-/** A browser item's zoom (spec section 10): steps of 5%, kept between 5% and 500%, and Chromium's level for it. */
+/**
+ * A browser item's zoom (spec section 10): steps of 5%, kept between 25% and 500%, Chromium's smallest and largest zoom
+ * (plan 4b's P33), and Chromium's level for it.
+ */
 class ZoomTest {
-    @Test void aStepMovesFivePercentAndStopsAtFiveAndFiveHundred() {
+    @Test void aStepMovesFivePercentAndStopsAtTwentyFiveAndFiveHundred() {
         assertThat(Zoom.step(100, 1)).isEqualTo(105);
         assertThat(Zoom.step(100, -1)).isEqualTo(95);
-        assertThat(Zoom.step(7, -1)).isEqualTo(5);
-        assertThat(Zoom.step(5, -1)).isEqualTo(5);
+        assertThat(Zoom.step(27, -1)).isEqualTo(25);
+        assertThat(Zoom.step(25, -1)).isEqualTo(25);
         assertThat(Zoom.step(498, 1)).isEqualTo(500);
         assertThat(Zoom.step(500, 1)).isEqualTo(500);
         assertThat(Zoom.step(133, 1)).as("a zoom off the five-percent grid steps by five").isEqualTo(138);
         assertThat(Zoom.step(100, 3)).as("one step, whatever the size of the direction").isEqualTo(105);
         assertThat(Zoom.step(100, -7)).isEqualTo(95);
         assertThat(Zoom.step(100, 0)).isEqualTo(100);
-        assertThat(Zoom.MIN).isEqualTo(5);
+        assertThat(Zoom.MIN).isEqualTo(25);
         assertThat(Zoom.MAX).isEqualTo(500);
     }
 
@@ -28,9 +31,9 @@ class ZoomTest {
         assertThat(Zoom.cefLevel(120)).isCloseTo(1.0, within(1e-12));
         assertThat(Zoom.cefLevel(144)).isCloseTo(2.0, within(1e-12));
         assertThat(Zoom.cefLevel(50)).isCloseTo(Math.log(0.5) / Math.log(1.2), within(1e-12)).isNegative();
-        assertThat(Zoom.cefLevel(5)).isFinite();
-        assertThat(Zoom.cefLevel(500)).isFinite();
-        for (int outside : new int[] { 4, 0, -100, 501 })
+        assertThat(Zoom.cefLevel(25)).isCloseTo(Math.log(0.25) / Math.log(1.2), within(1e-12));
+        assertThat(Zoom.cefLevel(500)).isCloseTo(Math.log(5) / Math.log(1.2), within(1e-12));
+        for (int outside : new int[] { 24, 5, 0, -100, 501 })
             assertThatThrownBy(() -> Zoom.cefLevel(outside)).as(Integer.toString(outside)).isInstanceOf(IllegalArgumentException.class);
     }
 }

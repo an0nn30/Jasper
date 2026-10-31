@@ -103,10 +103,10 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     }
 
     /**
-     * Shows the page at its own zoom again, as Chromium shows the zoom it keeps for the host of a document a navigation
-     * commits: at once on Chromium's thread, the thread its handlers are told on, so the document draws at the page's
-     * zoom from its first frame. A page already at its zoom is left alone, so a page that rewrites its address often
-     * does not set its host's zoom each time.
+     * Shows the page at its own zoom again as its main frame starts loading a document, which Chromium shows at the zoom
+     * it keeps for the document's host: at once on Chromium's thread, the thread its handlers are told on, so the
+     * document draws at the page's zoom from its first frame. A page already at its zoom leaves its host's zoom, and so
+     * the other pages on that host, alone.
      */
     void keepZoom() {
         Page page = owner;

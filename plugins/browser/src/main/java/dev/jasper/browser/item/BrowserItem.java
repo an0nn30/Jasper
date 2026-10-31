@@ -51,11 +51,12 @@ import javax.swing.JComponent;
  * {@code find-previous}, on the keys of Editor tabs, what Jasper's Find, Find Next and Find Previous run: its
  * {@link BrowserFindBar}, the view's last row. Its {@code font-bigger}, {@code font-smaller} and {@code font-reset},
  * what Jasper's Increase, Decrease and Reset Font Size run, as in Editor tabs, zoom the page a {@link Zoom} step up or
- * down, which the item saves as its own zoom, or back to Page zoom, which leaves it none; Ctrl+wheel over the page steps
- * the zoom too, unsaved. The mouse's back and forward buttons over the page go back and forward, and an entry chosen from
- * Back's or Forward's hold menu goes to that entry of the page's history. It saves its URL, its own zoom and its target
- * with Jasper's workspace ({@link BrowserRestore}): what it loads first until it shows, then where each committed
- * navigation takes its page.
+ * down, which the item saves as its own zoom, or back to Page zoom, which leaves it none; on Windows and Linux,
+ * Ctrl+wheel over the page steps the zoom too, unsaved. Chromium keeps one zoom per host, so two items on one host that
+ * show at once share the zoom set last (an engine-forced gap). The mouse's back and forward buttons over the page go
+ * back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's history. It
+ * saves its URL, its own zoom and its target with Jasper's workspace ({@link BrowserRestore}): what it loads first until
+ * it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
  * address field, Reload or {@link #load}. UI thread.

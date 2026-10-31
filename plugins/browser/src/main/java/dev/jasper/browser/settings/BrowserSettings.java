@@ -20,7 +20,7 @@ import java.util.function.Consumer;
  * Settings › Browser, as one snapshot (spec section 17).
  *
  * @param startPage what a new browser tab, window or pane loads, as typed into its address field
- * @param pageZoom the zoom, a whole percent from 5 to 500, that a page shows at until it is zoomed, and that Reset Font
+ * @param pageZoom the zoom, a whole percent from 25 to 500, that a page shows at until it is zoomed, and that Reset Font
  *     Size returns it to: Page zoom
  * @param links where a web link the user opens in Jasper goes: Open Links From Terminal
  * @param localFiles where a local web file the user opens from a terminal goes: Open Local Web Files
@@ -90,7 +90,7 @@ public record BrowserSettings(String startPage, int pageZoom, LinkOpening links,
     }
 
     /**
-     * Declares the Browser's settings, which Settings › Browser shows: Start page and Page zoom, a percent from 5 to 500,
+     * Declares the Browser's settings, which Settings › Browser shows: Start page and Page zoom, a percent from 25 to 500,
      * under General, Open Links From Terminal and Open Local Web Files under Link Opening, then Default Search Engine,
      * Custom Search URL and Custom Search Suggestions URL under Search Engine, each custom URL empty or an http or https
      * address with {@code %s} in it. UI thread, while the plugin starts.

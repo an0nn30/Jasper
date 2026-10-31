@@ -194,8 +194,8 @@ class BrowserRestoreTest {
             .as("beside the zoom, without its query").containsOnly(entry("url", base), entry("zoom", "150"));
 
         URI search = URI.create("https://example.com/search?q=" + "a".repeat(5_000) + "#results");
-        assertThat(BrowserRestore.state(search, Optional.of("docs"), OptionalInt.of(5)).orElseThrow().values())
-            .containsOnly(entry("url", "https://example.com/search"), entry("target", "docs"), entry("zoom", "5"));
+        assertThat(BrowserRestore.state(search, Optional.of("docs"), OptionalInt.of(25)).orElseThrow().values())
+            .containsOnly(entry("url", "https://example.com/search"), entry("target", "docs"), entry("zoom", "25"));
         URI path = URI.create(prefix + "p".repeat(5_000));
         assertThat(BrowserRestore.state(path, Optional.of("t".repeat(256)), OptionalInt.of(500)).orElseThrow().values())
             .containsOnly(entry("target", "t".repeat(256)), entry("zoom", "500"));
@@ -210,7 +210,7 @@ class BrowserRestoreTest {
         assertThat(BrowserRestore.zoom(saved(Map.of("zoom", Integer.toString(Zoom.MIN))))).hasValue(Zoom.MIN);
         assertThat(BrowserRestore.zoom(saved(Map.of("zoom", Integer.toString(Zoom.MAX))))).hasValue(Zoom.MAX);
         assertThat(BrowserRestore.zoom(saved(Map.of("zoom", "100", "url", EXAMPLE.toString())))).hasValue(100);
-        for (String zoom : List.of(Integer.toString(Zoom.MIN - 1), Integer.toString(Zoom.MAX + 1), "0", "-5", "+100", "100.0", "1e2",
+        for (String zoom : List.of(Integer.toString(Zoom.MIN - 1), Integer.toString(Zoom.MAX + 1), "5", "0", "-5", "+100", "100.0", "1e2",
                 " 100", "100 ", "", "abc", "99999999999", "\u0661\u0660\u0660"))
             assertThat(BrowserRestore.zoom(saved(Map.of("zoom", zoom)))).as(zoom).isEmpty();
         assertThat(BrowserRestore.zoom(saved(Map.of()))).isEmpty();
@@ -425,8 +425,8 @@ class BrowserRestoreTest {
         } });
     }
 
-    /** Review focus 5: 5% and 500% stop the steps. */
-    @Test void theStepsStopAtFiveAndFiveHundredPercent() throws Exception {
+    /** Review focus 5 and plan 4b's P33: 25% and 500%, Chromium's smallest and largest zoom, stop the steps. */
+    @Test void theStepsStopAtTwentyFiveAndFiveHundredPercent() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             var items = restoring(host, page -> { });
             UUID window = host.addTerminalWindow();
@@ -440,13 +440,13 @@ class BrowserRestoreTest {
             assertThat(PageTestAccess.zoomLevel(ItemTestAccess.page(item))).isEqualTo(Zoom.cefLevel(500));
 
             Optional<UUID> small = host.restoreTab(ID, window, "Small",
-                BrowserRestore.state(EXAMPLE, Optional.empty(), OptionalInt.of(7)).orElseThrow());
+                BrowserRestore.state(EXAMPLE, Optional.empty(), OptionalInt.of(27)).orElseThrow());
             item = items.items().getLast();
             command(host, item, "font-smaller");
-            assertThat(BrowserRestore.zoom(host.restoreState(small.orElseThrow()).orElseThrow())).hasValue(5);
+            assertThat(BrowserRestore.zoom(host.restoreState(small.orElseThrow()).orElseThrow())).hasValue(25);
             command(host, item, "font-smaller");
-            assertThat(BrowserRestore.zoom(host.restoreState(small.orElseThrow()).orElseThrow())).hasValue(5);
-            assertThat(PageTestAccess.zoomLevel(ItemTestAccess.page(item))).isEqualTo(Zoom.cefLevel(5));
+            assertThat(BrowserRestore.zoom(host.restoreState(small.orElseThrow()).orElseThrow())).hasValue(25);
+            assertThat(PageTestAccess.zoomLevel(ItemTestAccess.page(item))).isEqualTo(Zoom.cefLevel(25));
             assertThat(host.failures()).isEmpty();
         } });
     }
@@ -479,8 +479,9 @@ class BrowserRestoreTest {
     }
 
     /**
-     * Spec section 10: Ctrl+wheel over the page, which touchpad pinch sends on Windows, magnifies it a step for each notch
-     * and is not saved; the font size commands step from the zoom it shows.
+     * Spec sections 7 and 10: on Windows and Linux, Ctrl+wheel over the page, which touchpad pinch sends on Windows,
+     * magnifies it a step a turn and is not saved; the font size commands step from the zoom it shows. On macOS Ctrl+wheel
+     * is the page's.
      */
     @Test void ctrlWheelOverThePageStepsItsZoomWithoutSavingIt() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
@@ -489,6 +490,7 @@ class BrowserRestoreTest {
             host.activateTerminalWindow(window);
             BrowserItem item = items.open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
             Page page = ItemTestAccess.page(item);
+            PageTestAccess.useOsName(page, "Windows 11");
             command(host, item, "font-bigger");
             RestoreState saved = host.restoreState(item.tab()).orElseThrow();
             assertThat(BrowserRestore.zoom(saved)).hasValue(105);
@@ -498,16 +500,23 @@ class BrowserRestoreTest {
             assertThat(away.isConsumed()).as("never the page's").isTrue();
             assertThat(PageTestAccess.zoomLevel(page)).isEqualTo(Zoom.cefLevel(110));
             assertThat(host.restoreState(item.tab())).as("not saved").contains(saved);
-            ItemTestAccess.pageView(item).dispatchEvent(wheel(item, InputEvent.CTRL_DOWN_MASK, 2));
-            assertThat(PageTestAccess.zoomLevel(page)).isEqualTo(Zoom.cefLevel(100));
+            ItemTestAccess.pageView(item).dispatchEvent(wheel(item, InputEvent.CTRL_DOWN_MASK, -1));
+            ItemTestAccess.pageView(item).dispatchEvent(wheel(item, InputEvent.CTRL_DOWN_MASK, 3));
+            assertThat(PageTestAccess.zoomLevel(page)).as("a step a turn").isEqualTo(Zoom.cefLevel(110));
             assertThat(host.restoreState(item.tab())).contains(saved);
             MouseWheelEvent plain = wheel(item, 0, -1);
             ItemTestAccess.pageView(item).dispatchEvent(plain);
             assertThat(plain.isConsumed()).as("the page's").isFalse();
-            assertThat(PageTestAccess.zoomLevel(page)).isEqualTo(Zoom.cefLevel(100));
+            assertThat(PageTestAccess.zoomLevel(page)).isEqualTo(Zoom.cefLevel(110));
+
+            PageTestAccess.useOsName(page, "Mac OS X");
+            MouseWheelEvent mac = wheel(item, InputEvent.CTRL_DOWN_MASK, -1);
+            ItemTestAccess.pageView(item).dispatchEvent(mac);
+            assertThat(mac.isConsumed()).as("on macOS, the page's").isFalse();
+            assertThat(PageTestAccess.zoomLevel(page)).isEqualTo(Zoom.cefLevel(110));
 
             command(host, item, "font-bigger");
-            assertThat(BrowserRestore.zoom(host.restoreState(item.tab()).orElseThrow())).as("a step from the zoom shown").hasValue(105);
+            assertThat(BrowserRestore.zoom(host.restoreState(item.tab()).orElseThrow())).as("a step from the zoom shown").hasValue(115);
             assertThat(host.failures()).isEmpty();
         } });
     }

@@ -90,7 +90,7 @@ public final class BrowserItems implements AutoCloseable {
      * Opens a saved item again, as Jasper restores its windows: at once, in a new tab of {@code window} (where Jasper
      * then puts it as it was saved), at its saved address and zoom, for its saved OSC 8 target. An item that saved no
      * address, or one the address field would not load, comes back at {@code start}, and one that saved no zoom, or one
-     * outside 5% to 500%, at Page zoom; a target WebLink would refuse is dropped. Its page loads, and Chromium starts,
+     * outside 25% to 500%, at Page zoom; a target WebLink would refuse is dropped. Its page loads, and Chromium starts,
      * the first time it shows; with {@code wait}, only once the user loads it. It asks the user nothing.
      *
      * @param saved the item's saved restore state

@@ -54,10 +54,13 @@ import javax.swing.Timer;
  *
  * <p><b>Mouse.</b> An event the window consumes before the view hears it, as the pane drag's press, does not reach the
  * page. Each press the page gets is its {@link #lastPress()} and activates it. The mouse's back and forward buttons, on
- * Windows and Linux, never reach the page: releasing one tells the view's {@link #onNavigationButton listener}. Nor
- * does Ctrl+wheel, which touchpad pinch sends on Windows, so Chromium's own Ctrl+wheel zoom never applies: each whole
- * notch it turns tells the view's {@link #onMagnify magnifier} a step, away from the user bigger. A touchpad turns a
- * notch in parts, which add up, as in Chromium; turning back starts afresh.
+ * Windows and Linux, never reach the page: releasing one tells the view's {@link #onNavigationButton listener}. Nor,
+ * there, does Ctrl+wheel, which touchpad pinch sends on Windows, so Chromium's own Ctrl+wheel zoom never applies: it
+ * tells the view's {@link #onMagnify magnifier} a step, away from the user bigger, as Chromium counts the notches. They
+ * add up, a turn gives a step once they round to a whole notch, at most one step a turn, and what is left over carries
+ * to the next turn. With Shift down too, as Java reports a horizontal wheel or a tilt, the wheel is the page's, which
+ * scrolls sideways. On macOS, where trackpad pinch is the gesture (spec section 7), Ctrl+wheel is the page's, as in
+ * Chromium.
  *
  * <p><b>Showing.</b> While the view does not show (its tab is hidden, or it is out of its window) its page draws one
  * frame a second; showing again restores 60. The page itself is not told it is hidden: its scripts and network work go
@@ -68,8 +71,6 @@ public final class PageView extends JComponent {
     private static final int RESIZE_DELAY_MILLIS = 100;
     private static final int HOVER_PADDING = 4, HOVER_MAX_CHARS = 512;
     private static final String ELLIPSIS = "…";
-    // The most steps one turn of the wheel magnifies by: more than a page's whole zoom range, 99 steps of 5%.
-    private static final int MAGNIFY_STEPS = 100;
 
     private final Predicate<KeyEvent> taken;
     // Which of AWT's buttons are the mouse's back and forward buttons here.
@@ -95,7 +96,7 @@ public final class PageView extends JComponent {
     // UI thread: a press Swing's pass took, whose typed and released events are not the page's either.
     private boolean typedTaken;
     private int takenKey = KeyEvent.VK_UNDEFINED;
-    // UI thread: the notches Ctrl+wheel has turned since its last step, toward the next; negative away from the user.
+    // UI thread: the notches Ctrl+wheel has turned that no step took yet, as Chromium keeps them; negative away from the user.
     private double magnifyTurn;
 
     /** Where the view's showing state and keys go: its browser's, or before it has one, nowhere. */
@@ -198,6 +199,19 @@ public final class PageView extends JComponent {
      */
     void onNavigationButton(Consumer<NavigationButton> listener) {
         navigation = Objects.requireNonNull(listener, "listener");
+    }
+
+    // The platform whose Ctrl+wheel rule the view follows, as os.name names it; a test gives another.
+    private volatile String osName = System.getProperty("os.name", "");
+
+    /**
+     * Has the view follow the Ctrl+wheel rule of the platform {@code os} names, as {@code os.name} does, for a test of
+     * another platform than the one it runs on. UI thread.
+     *
+     * @param os an {@code os.name} value
+     */
+    void useOsName(String os) {
+        osName = Objects.requireNonNull(os, "os");
     }
 
     /**
@@ -328,7 +342,7 @@ public final class PageView extends JComponent {
     @Override protected void processMouseWheelEvent(MouseWheelEvent event) {
         super.processMouseWheelEvent(event);
         if (event.isConsumed()) return;
-        if ((event.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0) { // Jasper's zoom, never the page's
+        if (magnifies(event.getModifiersEx(), osName)) { // Jasper's zoom, never the page's
             event.consume();
             magnify(event.getPreciseWheelRotation());
             return;
@@ -370,15 +384,26 @@ public final class PageView extends JComponent {
         hooks.keys().accept(event);
     }
 
-    /** Ctrl+wheel turned {@code notches}: tells the magnifier a step for each whole notch turned one way. */
+    /**
+     * Whether a wheel turned with {@code modifiers}, AWT's extended modifiers, magnifies the page on the platform
+     * {@code osName} names: Ctrl without Shift, on Windows and Linux.
+     */
+    static boolean magnifies(int modifiers, String osName) {
+        int ctrlAndShift = InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
+        return !osName.startsWith("Mac") && (modifiers & ctrlAndShift) == InputEvent.CTRL_DOWN_MASK;
+    }
+
+    /**
+     * Ctrl+wheel turned {@code notches}, as Chromium counts them (its {@code zoom_scroll_remainder_}): they add to those
+     * no step took yet, which round, half away from zero, to whole notches; any whole notch gives one step its way, and
+     * the rest is kept.
+     */
     private void magnify(double notches) {
-        if (notches == 0 || !Double.isFinite(notches)) return;
-        if (Math.signum(notches) != Math.signum(magnifyTurn)) magnifyTurn = 0; // turning back starts afresh
+        if (!Double.isFinite(notches)) return;
         magnifyTurn += notches;
-        double whole = magnifyTurn < 0 ? Math.ceil(magnifyTurn) : Math.floor(magnifyTurn);
+        double whole = Math.signum(magnifyTurn) * Math.floor(Math.abs(magnifyTurn) + 0.5);
         magnifyTurn -= whole;
-        int step = whole < 0 ? 1 : -1, steps = (int) Math.min(Math.abs(whole), MAGNIFY_STEPS);
-        for (int i = 0; i < steps; i++) magnifier.accept(step);
+        if (whole != 0) magnifier.accept(whole < 0 ? 1 : -1);
     }
 
     /** Whether pressing {@code keyCode} activates the page: every key but Escape and the modifiers, as in Chromium. */

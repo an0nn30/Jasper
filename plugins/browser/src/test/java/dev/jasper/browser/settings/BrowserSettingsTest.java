@@ -45,7 +45,7 @@ class BrowserSettingsTest {
             assertThat(specs).extracting(SettingSpec::section).containsExactly("General", "General", "Link Opening", "Link Opening",
                 "Search Engine", "Search Engine", "Search Engine");
             assertThat(specs).allSatisfy(spec -> assertThat(spec.description()).isNotBlank());
-            assertThat(specs.get(1).kind()).isEqualTo(SettingKind.integer(5, 500));
+            assertThat(specs.get(1).kind()).isEqualTo(SettingKind.integer(25, 500));
             assertThat(specs.get(1).unit()).isEqualTo("%");
             assertThat(specs.get(1).defaultValue()).isEqualTo(100);
             assertThat(specs).filteredOn(spec -> spec != specs.get(1)).allSatisfy(spec -> assertThat(spec.unit()).isEmpty());
@@ -120,25 +120,28 @@ class BrowserSettingsTest {
         } });
     }
 
-    /** Spec sections 10 and 17: Page zoom is a whole percent from 5 to 500; anything else is refused for the default, 100. */
-    @Test void pageZoomIsAWholePercentFromFiveToFiveHundred() throws Exception {
+    /**
+     * Spec sections 10 and 17, with plan 4b's P33: Page zoom is a whole percent from 25 to 500, Chromium's smallest and
+     * largest zoom; anything else is refused for the default, 100.
+     */
+    @Test void pageZoomIsAWholePercentFromTwentyFiveToFiveHundred() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting(ID, "page_zoom", 150L);
             var declared = new AtomicReference<BrowserSettings.Declared>();
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(),
                 plugin -> declared.set(BrowserSettings.declare(plugin.settings())));
             assertThat(declared.get().read().pageZoom()).isEqualTo(150);
-            for (long zoom : new long[] { 5, 500 }) {
+            for (long zoom : new long[] { 25, 500 }) {
                 host.setSetting(ID, "page_zoom", zoom);
                 assertThat(host.settingsReports(ID)).isEmpty();
                 assertThat(declared.get().read().pageZoom()).isEqualTo((int) zoom);
             }
-            for (long zoom : new long[] { 4, 501, 0, -100 }) {
+            for (long zoom : new long[] { 24, 5, 501, 0, -100 }) {
                 host.setSetting(ID, "page_zoom", zoom);
                 assertThat(host.settingsReports(ID)).singleElement().asString().startsWith("page_zoom: ");
                 assertThat(declared.get().read().pageZoom()).as("the default").isEqualTo(100);
             }
-            assertThatThrownBy(() -> new BrowserSettings(BrowserSettings.WELCOME, 4, LinkOpening.ASK, LocalFileOpening.ASK,
+            assertThatThrownBy(() -> new BrowserSettings(BrowserSettings.WELCOME, 24, LinkOpening.ASK, LocalFileOpening.ASK,
                 SearchEngine.GOOGLE, "", "")).isInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> new BrowserSettings(BrowserSettings.WELCOME, 501, LinkOpening.ASK, LocalFileOpening.ASK,
                 SearchEngine.GOOGLE, "", "")).isInstanceOf(IllegalArgumentException.class);

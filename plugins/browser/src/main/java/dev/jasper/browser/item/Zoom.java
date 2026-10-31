@@ -1,13 +1,13 @@
 package dev.jasper.browser.item;
 
 /**
- * A browser item's zoom (spec section 10): a whole percent from 5 to 500, which Increase and Decrease Font Size move in
- * steps of 5, and the zoom level Chromium is given for it.
+ * A browser item's zoom (spec section 10): a whole percent from 25 to 500, Chromium's smallest and largest page zoom,
+ * which Increase and Decrease Font Size move in steps of 5, and the zoom level Chromium is given for it.
  */
 public final class Zoom {
-    /** The smallest zoom, in percent. */
-    public static final int MIN = 5;
-    /** The largest zoom, in percent. */
+    /** The smallest zoom, in percent: Chromium shows none smaller. */
+    public static final int MIN = 25;
+    /** The largest zoom, in percent: Chromium shows none larger. */
     public static final int MAX = 500;
     private static final int STEP = 5;
     // Chromium's zoom level is logarithmic: each level up is 1.2 times the size.

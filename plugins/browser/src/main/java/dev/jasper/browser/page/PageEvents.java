@@ -31,8 +31,8 @@ import org.cef.network.CefRequest;
  * at once and on Chromium's thread, to the hooks the {@code links} package gave the client
  * ({@link #onMainFrameLoadStart}), and the main frame then runs {@code detect-favicon.js}, which names the document's
  * icon through the opener bridge's router for the page to fetch ({@link Page#faviconDeclared}). Each main-frame load
- * start and address change shows the page at its own zoom again, there and then, as Chromium keeps one zoom per host.
- * A page that enters fullscreen is told at once to leave it: Jasper refuses fullscreen (spec section 5).
+ * start shows the page at its own zoom again, there and then, as Chromium keeps one zoom per host. A page that enters
+ * fullscreen is told at once to leave it: Jasper refuses fullscreen (spec section 5).
  */
 public final class PageEvents {
     private static final Consumer<CefClient> INSTALL = PageEvents::install;
@@ -107,9 +107,7 @@ public final class PageEvents {
      */
     private static final class Display extends CefDisplayHandlerAdapter {
         @Override public void onAddressChange(CefBrowser browser, CefFrame frame, String url) {
-            if (frame == null || !frame.isMain()) return;
-            if (browser instanceof PageBrowser shown) shown.keepZoom();
-            later(browser, page -> page.addressChanged(url));
+            if (frame != null && frame.isMain()) later(browser, page -> page.addressChanged(url));
         }
 
         @Override public void onTitleChange(CefBrowser browser, String title) {

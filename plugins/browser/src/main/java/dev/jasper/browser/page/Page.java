@@ -100,7 +100,7 @@ public final class Page implements AutoCloseable {
         this.historyJumper = Objects.requireNonNull(historyJumper, "historyJumper");
         view.onNavigationButton(this::navigationButton);
         view.onMagnify(this::magnified);
-        // Chromium keeps a zoom per host, which another page on the same host may have changed meanwhile.
+        // Chromium keeps one zoom per host, which another page on the same host may have changed meanwhile.
         view.addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && view.isShowing()) showZoom();
         });
@@ -188,9 +188,10 @@ public final class Page implements AutoCloseable {
 
     /**
      * Shows the page at {@code level}, Chromium's zoom level: 0 is 100%, and each level up is 1.2 times the size. Before
-     * the page has its browser, the level its browser takes once made. Chromium keeps one zoom per host, shared by the
-     * pages on it, and shows it as a navigation commits, so the page shows its own again then and each time its canvas
-     * shows. Nothing after {@link #close()}.
+     * the page has its browser, the level its browser takes once made. Chromium keeps one zoom per host, shared by every
+     * page on it, and shows it as a new document loads, so the page shows its own again as each main-frame load starts
+     * and each time its canvas shows. Two pages on one host that show at once share one zoom, the one set last: JCEF
+     * gives no zoom of a page's own. Nothing after {@link #close()}.
      *
      * @param level the zoom level
      * @throws IllegalArgumentException for a level that is not finite
@@ -390,8 +391,8 @@ public final class Page implements AutoCloseable {
     }
 
     /**
-     * Tells {@code listener} each step Ctrl+wheel over the page magnifies it by. The page itself never sees Ctrl+wheel,
-     * so Chromium's own Ctrl+wheel zoom never applies.
+     * Tells {@code listener} each step Ctrl+wheel over the page magnifies it by, on Windows and Linux. There the page
+     * itself never sees Ctrl+wheel, so Chromium's own Ctrl+wheel zoom never applies; on macOS it is the page's.
      *
      * @param listener told 1 for a step bigger, -1 for a step smaller, on the UI thread
      * @return the registration; the page's close ends it

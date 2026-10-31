@@ -27,7 +27,7 @@ public final class BrowserRestore {
     // WebLink's rule for a target.
     private static final int MAX_TARGET = 256;
     // The item package's Zoom range, which this package cannot use; BrowserRestoreTest holds the two to the same range.
-    private static final int MIN_ZOOM = 5, MAX_ZOOM = 500;
+    private static final int MIN_ZOOM = 25, MAX_ZOOM = 500;
 
     private BrowserRestore() { }
 
@@ -47,9 +47,9 @@ public final class BrowserRestore {
      *
      * @param url where the item is, or what it loads first
      * @param target the OSC 8 target it was opened for, or empty
-     * @param zoom the item's own zoom, a whole percent from 5 to 500, or empty for none
+     * @param zoom the item's own zoom, a whole percent from 25 to 500, or empty for none
      * @return the state; always present, as {@code ContentTab.setRestore} takes it
-     * @throws IllegalArgumentException for a zoom outside 5 to 500
+     * @throws IllegalArgumentException for a zoom outside 25 to 500
      */
     public static Optional<RestoreState> state(URI url, Optional<String> target, OptionalInt zoom) {
         Objects.requireNonNull(url, "url");
@@ -122,7 +122,7 @@ public final class BrowserRestore {
     }
 
     /**
-     * The zoom a saved item comes back at: its saved {@code zoom}, a whole percent from 5 to 500 in decimal digits, as
+     * The zoom a saved item comes back at: its saved {@code zoom}, a whole percent from 25 to 500 in decimal digits, as
      * {@link #state} writes it.
      *
      * @param state a saved item's restore state

@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Chromium's {@code DoClose} for a page's browser, decided without Chromium: a close Java asked for goes ahead, and a
@@ -47,6 +48,26 @@ class PageCloseTest {
         assertThat(Page.holdsClose(false, null, posted::add)).isTrue();
         assertThat(posted).isEmpty();
         assertThat(Page.holdsClose(true, null, posted::add)).isFalse();
+    }
+
+    /**
+     * A page keeps the zoom level it is given until its browser is made, which then takes it; a level that is not finite is
+     * refused, as Chromium cannot show it, and a closed page takes none.
+     */
+    @Test void aPageKeepsItsZoomLevelAndRefusesOneThatIsNotFinite() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var page = new Page(EXAMPLE, () -> { }, NO_FAVICONS);
+            assertThat(page.zoomLevel()).as("100%").isEqualTo(0.0);
+            page.setZoomLevel(-1.5);
+            assertThat(page.zoomLevel()).isEqualTo(-1.5);
+            for (double level : new double[] { Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY })
+                assertThatThrownBy(() -> page.setZoomLevel(level)).as(Double.toString(level))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(page.zoomLevel()).as("unchanged").isEqualTo(-1.5);
+            page.close();
+            page.setZoomLevel(2);
+            assertThat(page.zoomLevel()).as("closed").isEqualTo(-1.5);
+        });
     }
 
     /** The title of the document before is gone once the main frame starts loading, whatever Chromium then reports. */

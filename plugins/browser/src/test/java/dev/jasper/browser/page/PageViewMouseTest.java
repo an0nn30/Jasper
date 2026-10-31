@@ -12,7 +12,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * The mouse's back and forward buttons go to the page's item, never to the page; every other button is the page's.
  * The view's buttons here are Windows', whatever the host is. Headless AWT makes no event of a button above 3, so each
- * event here reports its button itself. Ctrl+wheel magnifies the page through its item, and never reaches the page.
+ * event here reports its button itself. On Windows and Linux, Ctrl+wheel magnifies the page through its item, and never
+ * reaches the page.
  */
 class PageViewMouseTest {
     private final List<NavigationButton> told = new ArrayList<>();
@@ -60,38 +61,60 @@ class PageViewMouseTest {
     }
 
     /**
-     * Spec section 10: Ctrl+wheel, which touchpad pinch sends on Windows, magnifies the page a step for each whole notch,
-     * away from the user bigger, and is never the page's, so Chromium's own Ctrl+wheel zoom never applies. A touchpad
-     * turns a notch in parts, which add up; turning back starts afresh.
+     * Spec sections 7 and 10: on Windows and Linux, Ctrl+wheel, which touchpad pinch sends on Windows, magnifies the page,
+     * away from the user bigger, and is never the page's, so Chromium's own Ctrl+wheel zoom never applies. It counts the
+     * notches as Chromium does: they add up, a turn gives a step once they round to a whole notch, at most one step a
+     * turn, and what is left over carries to the next turn, whichever way it goes.
      */
-    @Test void ctrlWheelMagnifiesAStepForEachWholeNotchAndNeverReachesThePage() throws Exception {
+    @Test void ctrlWheelMagnifiesOnWindowsAndLinuxAsChromiumCountsItAndNeverReachesThePage() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var view = view();
-            var turns = new ArrayList<MouseWheelEvent>();
-            for (double notches : new double[] { -1, 1 }) turns.add(turn(view, notches));
-            assertThat(magnified).containsExactly(1, -1);
-            magnified.clear();
-            for (double notches : new double[] { -0.4, -0.4 }) turns.add(turn(view, notches));
-            assertThat(magnified).isEmpty();
-            turns.add(turn(view, -0.4));
-            assertThat(magnified).as("1.2 notches: one step").containsExactly(1);
-            turns.add(turn(view, -2.9));
-            assertThat(magnified).as("3.1 notches in all: three more").containsExactly(1, 1, 1, 1);
-            magnified.clear();
-            turns.add(turn(view, 0.6));
-            assertThat(magnified).as("turning back starts afresh").isEmpty();
-            turns.add(turn(view, 0.5));
-            assertThat(magnified).containsExactly(-1);
-            turns.add(turn(view, 0));
-            assertThat(magnified).hasSize(1);
-            assertThat(turns).allSatisfy(turn -> assertThat(turn.isConsumed()).as(turn.paramString()).isTrue());
+            for (String os : List.of(NavigationButtonTest.WINDOWS, NavigationButtonTest.LINUX)) {
+                magnified.clear();
+                var view = view(os);
+                var turns = new ArrayList<MouseWheelEvent>();
+                for (double notches : new double[] { -1, 1 }) turns.add(turn(view, notches));
+                assertThat(magnified).as(os).containsExactly(1, -1);
+                magnified.clear();
+                turns.add(turn(view, -0.4));
+                assertThat(magnified).as("under half a notch").isEmpty();
+                turns.add(turn(view, -0.4));
+                assertThat(magnified).as("0.8 rounds to a notch").containsExactly(1);
+                turns.add(turn(view, -3));
+                assertThat(magnified).as("at most one step a turn").containsExactly(1, 1);
+                turns.add(turn(view, 0.4));
+                assertThat(magnified).as("the 0.2 left over carries: 0.6 rounds to a notch back").containsExactly(1, 1, -1);
+                turns.add(turn(view, 0));
+                assertThat(magnified).hasSize(3);
+                assertThat(turns).allSatisfy(turn -> assertThat(turn.isConsumed()).as(turn.paramString()).isTrue());
+            }
         });
     }
 
-    @Test void aWheelWithoutCtrlIsThePagesAndOneTheWindowTookIsNeither() throws Exception {
+    /**
+     * Spec section 7 and plan 4b's P32: on macOS, where trackpad pinch is the gesture, Ctrl+wheel is the page's like any
+     * wheel; Chromium itself does not zoom on it there.
+     */
+    @Test void onMacOsCtrlWheelIsThePages() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var view = view();
-            for (int modifiers : new int[] { 0, InputEvent.SHIFT_DOWN_MASK, InputEvent.META_DOWN_MASK, InputEvent.ALT_DOWN_MASK }) {
+            var view = view(NavigationButtonTest.MAC);
+            for (double notches : new double[] { -1, -3, 1 }) {
+                var turn = wheel(view, InputEvent.CTRL_DOWN_MASK, notches);
+                view.processMouseWheelEvent(turn);
+                assertThat(turn.isConsumed()).as(turn.paramString()).isFalse();
+            }
+            assertThat(magnified).isEmpty();
+        });
+    }
+
+    /**
+     * A wheel without Ctrl is the page's, and so is one with Ctrl and Shift, as Java reports a horizontal wheel or a
+     * tilt: Chromium scrolls the page sideways. A wheel the window took is neither the page's nor the item's.
+     */
+    @Test void aWheelWithoutCtrlOrWithShiftIsThePagesAndOneTheWindowTookIsNeither() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var view = view(NavigationButtonTest.WINDOWS);
+            for (int modifiers : new int[] { 0, InputEvent.SHIFT_DOWN_MASK, InputEvent.META_DOWN_MASK, InputEvent.ALT_DOWN_MASK,
+                    InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK }) {
                 var turn = wheel(view, modifiers, -3);
                 view.processMouseWheelEvent(turn);
                 assertThat(turn.isConsumed()).as(turn.paramString()).isFalse();
@@ -104,8 +127,14 @@ class PageViewMouseTest {
     }
 
     private PageView view() {
+        return view(NavigationButtonTest.WINDOWS);
+    }
+
+    /** A view whose buttons are Windows' and whose wheel follows {@code os}'s rule. */
+    private PageView view(String os) {
         var view = new PageView(event -> false, shown -> { }, rate -> { }, key -> { },
             button -> NavigationButton.of(button, NavigationButtonTest.WINDOWS, NavigationButtonTest.W_TOOLKIT));
+        view.useOsName(os);
         view.onNavigationButton(told::add);
         view.onMagnify(magnified::add);
         return view;
