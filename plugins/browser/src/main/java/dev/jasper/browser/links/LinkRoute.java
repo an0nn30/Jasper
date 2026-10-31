@@ -32,8 +32,8 @@ final class LinkRoute {
      * Whether a page at {@code sender} may open {@code url} itself, as Chromium lets a page's own links and
      * {@code window.open} load it: {@code http}, {@code https} and {@code about:blank} from any page; local addresses,
      * {@code file} and {@code jasper-about}, only from a page of the same scheme; nothing else
-     * ({@link LinkSchemes#opensFrom}). The opener bridge asks this, since it opens with Jasper's rights rather than the
-     * page's.
+     * ({@link LinkSchemes#opensFrom}). The opener bridge and {@link #link} ask this, since they open with Jasper's rights
+     * rather than the page's.
      *
      * @param sender the address of the page that asks
      * @param url the address it would open
@@ -57,17 +57,20 @@ final class LinkRoute {
     /**
      * Where a link Chromium would open elsewhere goes ({@code onOpenURLFromTab}: a modified or middle click, a dropped
      * link, a navigation to or from a {@code file:} page): where the last press says while it still activates the page
-     * or Chromium reports the user's gesture, else in the same item. It consumes no activation.
+     * or Chromium reports the user's gesture, else in the same item. It consumes no activation. Jasper loads it with its
+     * own rights, so only an address the frame it came from could open itself goes anywhere (plan 4b's P48,
+     * {@link #opensFrom}).
      *
+     * @param sender the address of the frame the link came from
      * @param url the address
      * @param press the page's last press
      * @param userGesture whether Chromium reports the navigation as the user's
      * @param nowMillis the time now, in milliseconds since the epoch
      * @param macOs whether the platform is macOS
-     * @return where it goes; empty only at a scheme the address field does not load
+     * @return where it goes; empty only for an address {@code sender} could not open
      */
-    static Optional<Where> link(String url, LastPress press, boolean userGesture, long nowMillis, boolean macOs) {
-        if (!opens(url)) return Optional.empty();
+    static Optional<Where> link(String sender, String url, LastPress press, boolean userGesture, long nowMillis, boolean macOs) {
+        if (!opensFrom(sender, url)) return Optional.empty();
         return Optional.of(userGesture || press.withinActivation(nowMillis) ? LinkGesture.of(press, macOs) : Where.SAME_ITEM);
     }
 

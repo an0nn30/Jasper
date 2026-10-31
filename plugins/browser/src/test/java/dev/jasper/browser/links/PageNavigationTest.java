@@ -2,23 +2,26 @@ package dev.jasper.browser.links;
 
 import dev.jasper.browser.page.LoadFailure;
 import dev.jasper.browser.page.Page;
+import dev.jasper.browser.page.PageBrowser;
 import dev.jasper.browser.page.PageTestAccess;
 import dev.jasper.browser.page.ServerCertificate;
 import java.awt.Point;
+import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
+import org.cef.browser.CefFrame;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Spec section 14: what the client's request handler does with a certificate error of a page's main frame; and where a
- * link a page's DevTools open goes. Chromium's side is played by the test: the certificate it reports, the browser it
- * calls about (made without Chromium, {@code PageTestAccess.devToolsBrowser}), and its thread, whose hand-offs to the
- * UI thread the test runs. No Chromium.
+ * Spec section 14: what the client's request handler does with a certificate error of a page's main frame; where a link
+ * a page's DevTools open goes; and where a link Chromium would open elsewhere comes from. Chromium's side is played by
+ * the test: the certificate it reports, the browser it calls about (made without Chromium,
+ * {@code PageTestAccess.devToolsBrowser}), and its thread, whose hand-offs to the UI thread the test runs. No Chromium.
  */
 class PageNavigationTest {
     private static final String URL = "https://self-signed.badssl.com/";
@@ -101,6 +104,56 @@ class PageNavigationTest {
             assertThat(opened).as("on the UI thread").isEmpty();
             handedOff.forEach(Runnable::run);
             assertThat(opened).as("an https page opens no local address").containsExactly("NEXT_TAB https://example.org/docs");
+        });
+    }
+
+    /**
+     * Plan 4b's W6: the page opens a DevTools link with Jasper's rights only when the document it shows could open it:
+     * its committed address decides, not one it was only asked to load.
+     */
+    @Test void aDevToolsLinkOpensFromTheDocumentThePageShows() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            var opened = new ArrayList<String>();
+            page.onOpenItem((url, placement) -> {
+                opened.add(placement + " " + url);
+                return Optional.empty();
+            });
+            PageTestAccess.addressChanged(page, "https://example.com/");
+            page.load(URI.create("file:///tmp/a.html"));
+            page.openFromDevTools("file:///etc/hosts");
+            assertThat(opened).as("asked to load a file: page, still showing a web page").isEmpty();
+            PageTestAccess.addressChanged(page, "file:///tmp/a.html");
+            page.openFromDevTools("file:///etc/hosts");
+            assertThat(opened).containsExactly("NEXT_TAB file:///etc/hosts");
+        });
+    }
+
+    /**
+     * Plan 4b's P48: a link Chromium would open elsewhere comes from the address of the frame it names, or, without one,
+     * the page's committed address, never one the page was only asked to load.
+     */
+    @Test void aLinkComesFromItsFramesAddressOrElseThePagesCommittedOne() throws Exception {
+        onUiThread(() -> {
+            Page page = page();
+            PageBrowser browser = PageTestAccess.pageBrowser(page);
+            assertThat(PageNavigation.sender(browser, frame("file:///tmp/a.html"))).isEqualTo("file:///tmp/a.html");
+            assertThat(PageNavigation.sender(browser, null)).as("before a navigation commits").isEmpty();
+            page.load(URI.create("file:///tmp/a.html"));
+            assertThat(PageNavigation.sender(browser, null)).as("asked to load, not committed").isEmpty();
+            PageTestAccess.addressChanged(page, "file:///tmp/a.html");
+            assertThat(PageNavigation.sender(browser, null)).isEqualTo("file:///tmp/a.html");
+            assertThat(PageNavigation.sender(browser, frame(""))).isEqualTo("file:///tmp/a.html");
+            PageBrowser devTools = PageTestAccess.devToolsBrowser(PageTestAccess.devTools(page, new Point()));
+            assertThat(PageNavigation.sender(devTools, null)).as("no page's").isEmpty();
+        });
+    }
+
+    /** A frame that answers only its address. */
+    private static CefFrame frame(String url) {
+        return (CefFrame) Proxy.newProxyInstance(CefFrame.class.getClassLoader(), new Class<?>[] {CefFrame.class}, (proxy, method, args) -> {
+            if (method.getName().equals("getURL")) return url;
+            throw new UnsupportedOperationException(method.getName());
         });
     }
 

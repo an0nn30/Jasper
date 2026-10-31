@@ -11,13 +11,14 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Whether a page's link or popup opens, and where (spec section 8): only at an address the address field would load; a
- * link always goes somewhere, and a popup only while the page's activation holds, which it consumes; a split goes to the
- * right of a pane wider than tall, otherwise below it. No Chromium is needed.
+ * Whether a page's link or popup opens, and where (spec section 8): only at an address the address field would load, and
+ * a link only at one its frame could open itself (plan 4b's P48); a link always goes somewhere, and a popup only while
+ * the page's activation holds, which it consumes; a split goes to the right of a pane wider than tall, otherwise below
+ * it. No Chromium is needed.
  */
 class LinkRouteTest {
     private static final long NOW = 1_000_000;
-    private static final String WEB = "https://example.com/next";
+    private static final String PAGE = "https://example.com/", WEB = "https://example.com/next";
     private static final LastPress CLICK = press(0, NOW - 100), CMD_CLICK = press(InputEvent.META_DOWN_MASK, NOW - 100),
         CMD_SHIFT_CLICK = press(InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, NOW - 100);
 
@@ -65,7 +66,10 @@ class LinkRouteTest {
         assertThat(link(WEB, press(InputEvent.META_DOWN_MASK, NOW - 5_001), false)).as("a Cmd-click 5,001 ms ago")
             .contains(Where.SAME_ITEM);
         assertThat(link(WEB, LastPress.NONE, false)).as("no press").contains(Where.SAME_ITEM);
-        assertThat(link("file:///tmp/dropped.html", LastPress.NONE, false)).contains(Where.SAME_ITEM);
+        assertThat(LinkRoute.link("file:///tmp/a.html", "file:///tmp/dropped.html", LastPress.NONE, false, NOW, true))
+            .contains(Where.SAME_ITEM);
+        assertThat(LinkRoute.link("file:///tmp/a.html", WEB, LastPress.NONE, false, NOW, true)).as("from a file: page")
+            .contains(Where.SAME_ITEM);
     }
 
     @Test void aLinkAtAnotherSchemeOpensNothing() {
@@ -73,6 +77,24 @@ class LinkRouteTest {
             assertThat(link("mailto:someone@example.com", CMD_CLICK, gesture)).isEmpty();
             assertThat(link("javascript:alert(1)", CLICK, gesture)).isEmpty();
             assertThat(link("data:text/html,hi", LastPress.NONE, gesture)).isEmpty();
+            assertThat(link("about:version", CMD_CLICK, gesture)).isEmpty();
+        }
+    }
+
+    /**
+     * Plan 4b's P48: Jasper loads the link with its own rights, so it opens only what the frame it came from could open
+     * itself (4a's R36): no {@code file:} or {@code jasper-about:} address from a web page, whatever the press.
+     */
+    @Test void aLinkOpensOnlyWhatItsFrameCouldOpenItself() {
+        for (boolean gesture : new boolean[] {true, false}) {
+            for (String local : new String[] {"file:///etc/hosts", "jasper-about:settings"}) {
+                assertThat(LinkRoute.link(WEB, local, CMD_CLICK, gesture, NOW, true)).as(local).isEmpty();
+                assertThat(LinkRoute.link("", local, LastPress.NONE, gesture, NOW, true)).as(local + " from no page").isEmpty();
+            }
+            assertThat(LinkRoute.link("file:///tmp/a.html", "jasper-about:settings", CLICK, gesture, NOW, true)).isEmpty();
+            assertThat(LinkRoute.link("jasper-about:welcome", "jasper-about:settings", CMD_CLICK, gesture, NOW, true))
+                .contains(Where.NEXT_TAB);
+            assertThat(LinkRoute.link("file:///tmp/a.html", "file:///tmp/b.html", CMD_CLICK, gesture, NOW, true)).contains(Where.NEXT_TAB);
         }
     }
 
@@ -116,13 +138,14 @@ class LinkRouteTest {
 
     @Test void theMenuKeyIsCtrlOutsideMacOs() {
         var ctrlShift = press(InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, NOW - 100);
-        assertThat(LinkRoute.link(WEB, ctrlShift, true, NOW, false)).contains(Where.SPLIT);
+        assertThat(LinkRoute.link(PAGE, WEB, ctrlShift, true, NOW, false)).contains(Where.SPLIT);
         assertThat(LinkRoute.popup(WEB, ctrlShift, activatedAt(NOW - 100), NOW, false)).contains(Where.SPLIT);
-        assertThat(LinkRoute.link(WEB, ctrlShift, true, NOW, true)).as("Ctrl+Shift on macOS").contains(Where.SAME_ITEM);
+        assertThat(LinkRoute.link(PAGE, WEB, ctrlShift, true, NOW, true)).as("Ctrl+Shift on macOS").contains(Where.SAME_ITEM);
     }
 
+    /** A link from a web page's frame. */
     private static Optional<Where> link(String url, LastPress press, boolean userGesture) {
-        return LinkRoute.link(url, press, userGesture, NOW, true);
+        return LinkRoute.link(PAGE, url, press, userGesture, NOW, true);
     }
 
     private static Optional<Where> popup(String url, LastPress press, Activation activation) {

@@ -150,7 +150,8 @@ final class PageMenu {
 
     /**
      * Shows the menu for {@code pointed} over the page's item's tab, and runs the page's item chosen. The address of
-     * the frame the pointer is in, or the page's own in the main frame, decides what a link or image may open.
+     * the frame the pointer is in, or in the main frame that of the document the page shows
+     * ({@link Page#committedAddress()}), decides what a link or image may open.
      * {@code end} runs once, as the menu closes and before that item runs, or at once when the page has no place for a
      * menu: closed, or before its item gave it a tab. UI thread.
      *
@@ -165,7 +166,7 @@ final class PageMenu {
             return;
         }
         MenuPlace place = found.get();
-        String from = pointed.frame().orElseGet(page::address);
+        String from = pointed.frame().orElseGet(page::committedAddress);
         try {
             PageMenuItems items = PageMenuItems.of(new PageMenuItems.Context(place.canGoBack().getAsBoolean(), page.canGoForward(),
                 pointed.link(), pointed.image(), pointed.selection(), pointed.editable(), place.engineName().get(), from,

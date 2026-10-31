@@ -66,6 +66,9 @@ public final class Page implements AutoCloseable {
     private URI requested;
     // Where the page is, as Chromium last reported it, or what it was last asked to load since.
     private String address;
+    // The document the main frame shows, as Chromium last reported a navigation there committed; empty before the
+    // first. Read on Chromium's thread.
+    private volatile String committed = "";
     private String title = "";
     // The favicon of the document the main frame shows; the icon that document named, null until it names one; and the
     // fetch of that icon while it runs.
@@ -290,6 +293,17 @@ public final class Page implements AutoCloseable {
      */
     public String address() {
         return address;
+    }
+
+    /**
+     * The address of the document the page's main frame shows, as Chromium last reported a navigation there committed:
+     * what the page itself may open from, which decides what Jasper opens for it with its own rights
+     * ({@link LinkSchemes#opensFrom}). Unlike {@link #address()}, never where the page was only asked to go. Any thread.
+     *
+     * @return the address, as Chromium writes it; empty before the first navigation commits
+     */
+    public String committedAddress() {
+        return committed;
     }
 
     /**
@@ -590,14 +604,15 @@ public final class Page implements AutoCloseable {
 
     /**
      * A link the page's DevTools open in a new tab, as a URL clicked in their Console: it opens in the tab next to the
-     * page's, as the page's right-click menu opens a link, when the page itself could open it ({@link LinkSchemes#opensFrom},
-     * 4a's R36), as what the DevTools show comes from the page. Nothing after {@link #close()}.
+     * page's, as the page's right-click menu opens a link, when the document the page shows could open it
+     * ({@link #committedAddress()}, {@link LinkSchemes#opensFrom}, 4a's R36), as what the DevTools show comes from the
+     * page. Nothing after {@link #close()}.
      *
      * @param url the address, as Chromium gave it
      */
     public void openFromDevTools(String url) {
         Objects.requireNonNull(url, "url");
-        if (!closed && LinkSchemes.opensFrom(address, url)) openItem(url, TabPlacement.NEXT_TAB);
+        if (!closed && LinkSchemes.opensFrom(committed, url)) openItem(url, TabPlacement.NEXT_TAB);
     }
 
     /** The page asks to close its item, as a script's {@code window.close()} does. Nothing after {@link #close()}. */
@@ -828,10 +843,11 @@ public final class Page implements AutoCloseable {
         if (!next.equals(made)) browser.loadURL(next);
     }
 
-    /** The main frame's address changed. */
+    /** The main frame's address changed: a navigation there committed. */
     void addressChanged(String url) {
         if (closed || url == null) return;
         address = url;
+        committed = url;
         changed.run();
         for (Consumer<String> listener : addressChanges) listener.accept(url);
         readHistory();

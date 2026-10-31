@@ -7,7 +7,8 @@ import java.util.regex.Pattern;
 
 /**
  * Which addresses a page's links open (4a's R36), and which a page may open with Jasper's rights: the {@code links}
- * package's links, popups and opener bridge and the page's right-click menu ask here. It names no Chromium type.
+ * package's links, popups and opener bridge, the page's DevTools' links and its right-click menu ask here. It names no
+ * Chromium type.
  */
 public final class LinkSchemes {
     /** The schemes the address field loads, in lower case: the only ones a page's links and popups open. */

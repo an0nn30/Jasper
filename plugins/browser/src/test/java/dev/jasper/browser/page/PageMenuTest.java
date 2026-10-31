@@ -159,6 +159,27 @@ class PageMenuTest {
         });
     }
 
+    /**
+     * Plan 4b's W6: in the main frame, the document the page shows decides what a link may open: its committed address,
+     * not one the page was only asked to load.
+     */
+    @Test void theMainFramesLinksOpenFromTheDocumentThePageShows() throws Exception {
+        onUiThread(() -> {
+            open();
+            PageTestAccess.addressChanged(page, PAGE + "/");
+            page.load(URI.create("file:///tmp/a.html"));
+            var local = pointed(Optional.of("file:///etc/hosts"), NONE, NONE, false);
+            show(local);
+            assertThat(host.contentMenu(item.tab())).as("still showing a web page").contains("item:page-menu.open-link (disabled)");
+            assertThat(host.dismissContentMenu(item.tab())).isTrue();
+            PageTestAccess.addressChanged(page, "file:///tmp/a.html");
+            show(local);
+            assertThat(host.chooseFromContentMenu(item.tab(), "item:page-menu.open-link")).isTrue();
+            assertThat(items.items()).extracting(BrowserItem::url).contains(URI.create("file:///etc/hosts"));
+            assertThat(host.failures()).isEmpty();
+        });
+    }
+
     /** Spec section 11: Search with ⟨engine⟩ names the chosen engine and opens its search in the next tab. */
     @Test void searchWithTheEngineOpensASearchForTheSelectionInTheNextTab() throws Exception {
         onUiThread(() -> {

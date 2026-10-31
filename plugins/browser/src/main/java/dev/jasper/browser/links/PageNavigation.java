@@ -98,10 +98,22 @@ public final class PageNavigation {
         @Override public boolean onOpenURLFromTab(CefBrowser browser, CefFrame frame, String url, boolean userGesture) {
             if (fromDevTools(browser, url, EventQueue::invokeLater)) return true;
             if (browser instanceof PageBrowser page)
-                LinkRoute.link(url, page.view().lastPress(), userGesture, System.currentTimeMillis(), MAC_OS)
+                LinkRoute.link(sender(page, frame), url, page.view().lastPress(), userGesture, System.currentTimeMillis(), MAC_OS)
                     .ifPresent(where -> EventQueue.invokeLater(() -> go(page, url, where)));
             return true;
         }
+    }
+
+    /**
+     * The address a link Chromium would open elsewhere comes from, for the scheme rule (plan 4b's P48): that of
+     * {@code frame}, which Chromium names as the navigation's source, or without one that of the document the page shows
+     * ({@link Page#committedAddress()}). Chromium's thread.
+     */
+    static String sender(PageBrowser browser, CefFrame frame) {
+        String url = frame == null ? null : frame.getURL();
+        if (url != null && !url.isEmpty()) return url;
+        Page page = browser.owner();
+        return page == null ? "" : page.committedAddress();
     }
 
     /** Popups: Jasper opens the ones the user asked for as items, and Chromium makes none. */
