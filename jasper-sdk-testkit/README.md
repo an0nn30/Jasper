@@ -53,7 +53,8 @@ The thread that calls the host plays the UI thread. Nothing happens behind the t
   `SwingUtilities.invokeAndWait`. `Appearance`'s colour, palette and opacity calls and its `onChanged` and
   `onWorkspaceChanged` subscriptions accept the thread that made the host or the event dispatch thread,
   `onTerminalTypographyChanged` only the event dispatch thread, and its variants, presentation and terminal
-  typography answer any thread.
+  typography answer any thread. `Platform.onDefaultBrowserChanged` needs the event dispatch thread too, and
+  `Platform.isDefaultBrowser` answers any thread.
 
 ## FakePluginHost
 

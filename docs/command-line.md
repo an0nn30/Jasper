@@ -31,9 +31,9 @@ Usage: jasper [--config <path>] [--background] [--no-window] [--safe-mode] [--pl
 | `--background` | Starts with no window, to stay resident; the login item starts Jasper this way. It exits without a window when a Jasper already runs, or when it would not be resident: `system.run_in_background` is off (it then removes the login item), or the launch has `--config`, `--safe-mode` or `--plugin-dir` or runs in another home. Otherwise it becomes resident and prepares its first window without showing it. On macOS a packaged app started this way shows no Dock icon until a window opens. |
 | `--no-window` | Starts with no window, to serve the `jasper` command; the command starts Jasper this way when nothing answers it. It exits without a window when a Jasper already runs, or when it cannot serve the command socket. A Jasper that becomes resident stays; any other quits once its calls have ended and no Jasper window is open, or after 30 seconds without a call. Cannot be combined with `--background`. |
 | `--help` | Prints the usage line to standard output and exits with status 0, without reading configuration or opening a window. |
-| `--url [<url>]` | The launch Jasper's web browser registration makes (`"Jasper.exe" --url "%1"` on Windows, `Jasper --url %u` on Linux; [Browser](browser.md#making-jasper-your-default-browser)). Only as the first argument, followed by at most one `http` or `https` address, which opens as a web address given without it does; anything else after it, or `--url` anywhere else, refuses the whole launch. Without an address it is a plain launch. The usage leaves it out. |
+| `--url [<url>]` | The launch Jasper's web browser registration makes (`"Jasper.exe" --url "%1"` on Windows, `Jasper --url %u` on Linux; [Browser](browser.md#making-jasper-your-default-browser)). Only as the first argument, followed by at most one `http` or `https` address, which opens as a web address given without it does, or one `file:` URL, such as Linux passes for Open With and a drop on the launcher, which opens as the path it names; anything else after it, or `--url` anywhere else, refuses the whole launch. Without an argument it is a plain launch. The usage leaves it out. |
 | `<path>...` | Files and folders to open in the most recently active window: each file in the [Editor](editor.md#opening-files), or revealed when no editor plugin runs, and each folder as a terminal tab. A relative path resolves against the working directory; a path that names nothing is skipped. A `file:` URL, such as `file:///Users/me/notes.txt` or `file://localhost/Users/me/notes.txt`, is the path of the local file it names, without its query and fragment. |
-| `<url>...` | `http` and `https` addresses, in any case, such as `https://example.com`, at most 32: each opens in a new browser tab, once Jasper's plugins have started, in the first window, or, when Jasper already runs, in its most recently active window ([Browser](browser.md#links-from-terminals-and-jasper)). As browsers do, Jasper percent-encodes the characters an address cannot hold after its host, such as a space, `"` or `\|`. |
+| `<url>...` | `http` and `https` addresses, in any case, such as `https://example.com`, at most 32: each opens in a new browser tab, once Jasper's plugins have started, in the first window, or, when Jasper already runs, in its most recently active window ([Browser](browser.md#links-from-terminals-and-jasper)). As browsers do, Jasper percent-encodes these characters after the host: a space, `"`, `<`, `>`, `\`, `^`, `` ` ``, `{`, `\|` and `}`, and a `%` that starts no escape; any other character an address cannot hold, such as `[` in its path, refuses the address. |
 
 Each option may appear once. A value follows its option as the next argument; `--config=<path>` is an unknown
 argument.
@@ -84,11 +84,12 @@ reading configuration or opening a window:
 | `--plugin-dir requires a directory path.` | The same for `--plugin-dir` |
 | `--config requires a valid path.`, `--plugin-dir requires a valid path.` | A value the operating system cannot use as a path |
 | `--no-window and --background cannot be combined.` | Both options given |
-| `Not a web address: <argument>` | An argument whose scheme is `http` or `https` that is no web address once encoded, such as `https:example.com`, `http:/notes` or one with a space in its host; also the argument after `--url` when it is not an `http` or `https` address |
+| `Not a web address: <argument>` | An argument whose scheme is `http` or `https` that is no web address once encoded, such as `https:example.com`, `http:/notes` or one with a space in its host |
 | `Not a local file: <argument>` | A `file:` URL that names no local file, such as `file:x.html`, or, except on Windows, where it names a share, one that names another host |
+| `Not a web address or file: URL: <argument>` | The argument after `--url`, when it is neither an `http` or `https` address nor a `file:` URL |
 | `Jasper opens at most 32 web addresses at once.` | More than 32 `http` and `https` arguments |
 | `--url must be the first argument.` | `--url` after another argument |
-| `--url takes one web address and nothing after it.` | More than one argument after `--url` |
+| `--url takes one web address or file: URL and nothing after it.` | More than one argument after `--url` |
 
 ## The jasper command
 

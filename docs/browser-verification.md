@@ -202,8 +202,8 @@ The user has no Windows or Linux host yet. The plan's ten lines and every line a
 5. **The Browser off:** with the Browser plugin turned off and Jasper relaunched, a link from another app shows "Web
    links can’t open in Jasper"; Turn On Browser and then Restart Now bring the Browser back, and the next link opens
    in it. Pending.
-6. **Choosing the previous default browser again:** after coming back to a Jasper window (more than 30 seconds after
-   the last check), a terminal Cmd-click asks "Open in Jasper?" again. Pending.
+6. **Choosing the previous default browser again:** after coming back to a Jasper window (more than 5 seconds after
+   the last check, ruling Q19), a terminal Cmd-click asks "Open in Jasper?" again. Pending.
 
 #### Lines the task reviews added
 
@@ -225,11 +225,16 @@ Each is pending.
   go.
 - **Copy Link** in "Web links can’t open in Jasper" puts the address on the clipboard.
 - **`jasper URL...` with the Browser off (Task 3):** `jasper https://example.com` from a Jasper terminal posts the
-  notice and the command exits 0; with no Jasper running, whether the notice of the `--no-window` Jasper it starts is
-  seen at all.
+  notice while Jasper is the default, and the command exits 0; with no Jasper running, whether the notice of the
+  `--no-window` Jasper it starts is seen at all.
 - **`ftp` and `mailto`** links in a terminal still open the system's handler while Jasper is the default.
 - **No loop (Q2, Q10):** with the Browser off, each link from another app posts one notice, and nothing opens over and
   over: no other browser, no new Jasper window, no Jasper process starting again in Activity Monitor.
+- **Restart Now opens the link (final review):** with the Browser off, Turn On Browser and then Restart Now in the
+  notice of a link from another app: the restarted Jasper opens that link in the Browser.
+- **Hosts the browser takes or cannot (Q17):** while Jasper is the default, a link from another app (for example
+  `open https://bücher.de/`) with an internationalized host opens in Jasper's browser; one with `_` in its host
+  (`open http://my_service:8080/`) shows "Jasper’s browser can’t open this address" with the address and Copy Link.
 
 ### Plan 4c on Windows (not run)
 
@@ -263,4 +268,6 @@ The user has no Linux host yet; CI's `linux-packages` job has not run (the Actio
 - Removing the package leaves no `mimeinfo.cache` line naming Jasper.
 - Without `xdg-settings`, with Jasper the default through `~/.config/mimeapps.list` (Q10): a terminal click that Jasper
   hands to the system comes back and opens in Jasper's browser, once.
+- A file opened with Jasper from the file manager (Open With), and one dropped on Jasper's launcher, open as files
+  (`--url` with a `file:` URL, Q18).
 - The plan's lines 2 to 6, on Linux.

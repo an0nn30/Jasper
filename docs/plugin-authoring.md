@@ -1186,9 +1186,9 @@ terminal pane, with the path's line and the clicked window. The Editor takes thi
 addresses with: an `http` or `https` link Cmd-clicked (Ctrl-clicked on Linux and Windows) in any terminal pane, with the
 clicked window; every plugin's `openInBrowser`, another plugin's `browse` while Jasper is the system's default browser,
 and Jasper's own web links (Settings' Help button, the Licenses window's and the plugin manager's homepages), with the
-active window; `jasper <address>…`, with the window of the pane
-it ran in ([command line](command-line.md#the-jasper-command)). A local file the user clicked in a terminal arrives too,
-as a `file:` link.
+active window; `jasper <address>…`, with the window of the pane it ran in
+([command line](command-line.md#the-jasper-command)). A local file the user clicked in a terminal arrives too, as a
+`file:` link.
 
 - [`WebBrowser`](sdk-reference.html#dev.jasper.sdk.ui.WebBrowser)`.open(link)` runs on the UI thread, must not block,
   and returns whether it opened the link. `false`, or a handler that throws, hands an `http` or `https` address to the
@@ -1477,8 +1477,9 @@ try (var host = new FakePluginHost()) {
 Where the fake differs from Jasper:
 
 - Background tasks run one at a time on the caller, at `runBackground()`; Jasper runs each on its own thread.
-- Apart from the kit and `Appearance`'s UI-thread methods, the fake does not enforce the UI thread, so Jasper's
-  `IllegalStateException` off it is not reproduced. The kit and `onTerminalTypographyChanged` need the event dispatch
+- Apart from the kit, `Appearance`'s UI-thread methods and `Platform.onDefaultBrowserChanged`, the fake does not
+  enforce the UI thread, so Jasper's `IllegalStateException` off it is not reproduced; `Platform.isDefaultBrowser`
+  answers on any thread. The kit, `onTerminalTypographyChanged` and `onDefaultBrowserChanged` need the event dispatch
   thread; `Appearance`'s other UI-thread methods also accept the thread that made the host.
 - It does not check that a service API is in an exported package, and an absent optional provider's API is still on
   the test classpath, so the `NoClassDefFoundError` path cannot be tested there.

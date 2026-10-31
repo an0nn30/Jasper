@@ -404,7 +404,7 @@ Each link goes where the first of these says:
 3. While Jasper is the system's [default web browser](#making-jasper-your-default-browser), every other link opens in
    Jasper's browser without asking, whatever **Open Links From Terminal** says: in a new browser tab right after the
    current one, or, for a split click, in a browser pane split from the clicked pane. Jasper checks this when it starts
-   and again when you come back to one of its windows, at most every 30 seconds.
+   and again when you come back to one of its windows, at most every 5 seconds.
 4. A split click, and Open URL in Split Right and Down, open the link in a browser pane split from the clicked pane,
    without asking. When **Open Links From Terminal** is **Default Browser**, a split click goes to the system browser
    instead, and the two items are not in the menu.
@@ -470,9 +470,10 @@ as GNOME, offer Jasper in their default applications settings. Choose it there, 
 xdg-settings set default-web-browser jasper-workstation-Jasper.desktop
 ```
 
-The desktop then starts Jasper with the link after `--url`. Jasper counts itself the default while
-`xdg-settings get default-web-browser` names `jasper-workstation-Jasper.desktop`; without `xdg-settings` (xdg-utils),
-it never does.
+The desktop then starts Jasper with the link after `--url`; a file opened with Jasper from the file manager, or
+dropped on its launcher, comes the same way, as a `file:` URL, and opens as that file. Jasper counts itself the
+default while `xdg-settings get default-web-browser` names `jasper-workstation-Jasper.desktop`; without `xdg-settings`
+(xdg-utils), it never does.
 
 The packages make no app the default: installing leaves the system's default applications (each `defaults.list`) as
 they were. Where neither you nor the system has chosen a default web browser, apps that ask GIO, as GNOME's do, open a
@@ -487,13 +488,17 @@ web link opens nothing: one from another app, a terminal, Jasper's own links or 
 default browser in your system settings.", with:
 
 - **Turn On Browser**, which turns the Browser on from the next launch, as Settings › Plugins does, and posts "Restart
-  Jasper to turn on the Browser" with **Restart Now**, which restarts Jasper as it was started. When Jasper cannot work
-  out how it was started, "Jasper could not restart" says to quit and reopen it; when the Browser cannot be turned on,
-  "Could not turn on the Browser" says why.
+  Jasper to turn on the Browser" with **Restart Now**, which restarts Jasper as it was started and opens the link, the
+  newest when the notice stands for several, in the Browser. When Jasper cannot work out how it was started, "Jasper
+  could not restart" says to quit and reopen it; when the Browser cannot be turned on, "Could not turn on the Browser"
+  says why.
 - **Copy Link**, which copies the link's address.
 
 `ftp` and `mailto` links still go to the system's handler. While the Browser runs but Chromium could not start, a web
-link opens nothing either; "The browser could not start" has said why.
+link opens nothing either; "The browser could not start" has said why. A web link whose host Jasper's browser cannot
+take, such as `http://my_service:8080/` (a `_` in a host), opens nothing too, while Jasper is the default: Jasper posts
+"Jasper’s browser can’t open this address" with the address, without any user name and password in it, and **Copy
+Link**.
 
 ## Restore
 

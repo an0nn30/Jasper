@@ -25,9 +25,9 @@ import java.util.function.Predicate;
  * system's default browser (browser plan 4c). They wait until {@link #ready}: the plugins run and the first answer to
  * whether Jasper is the default has come. None goes to the system browser when that would hand it back to Jasper: one
  * that comes back within {@link #COMES_BACK_WITHIN} of Jasper handing it to the system is {@link #cannotOpen}'s instead
- * (ruling Q10): with no browser provided "Web links can’t open in Jasper" offers Turn On Browser and Copy Link, and one
- * the provided browser never saw, "Jasper’s browser can’t open this address" Copy Link (ruling Q17). EDT, except
- * {@link #handedToSystem}, any thread.
+ * (ruling Q10): with no browser provided "Web links can’t open in Jasper" offers Turn On Browser and Copy Link, and for
+ * one the provided browser never saw, "Jasper’s browser can’t open this address" offers Copy Link (ruling Q17). EDT,
+ * except {@link #handedToSystem}, any thread.
  */
 final class ExternalAddresses {
     private static final System.Logger LOG = System.getLogger(ExternalAddresses.class.getName());
