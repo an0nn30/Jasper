@@ -34,7 +34,8 @@ import org.cef.network.CefRequest;
  * icon through the opener bridge's router for the page to fetch ({@link Page#faviconDeclared}). Each main-frame load
  * start shows the page at its own zoom again, there and then, as Chromium keeps one zoom per host. A main frame's failed
  * load goes to its page with Chromium's name for the error ({@link Page#onLoadFailure}), for its item's error page. A
- * page that enters fullscreen is told at once to leave it: Jasper refuses fullscreen (spec section 5).
+ * page that enters fullscreen is told at once to leave it: Jasper refuses fullscreen (spec section 5). A page's
+ * {@link DevTools} browser is no page's: none of this reaches it, but for the editing keys.
  */
 public final class PageEvents {
     private static final Consumer<CefClient> INSTALL = PageEvents::install;
@@ -141,11 +142,11 @@ public final class PageEvents {
     /**
      * The keys a page and its scripts left alone that are an {@link EditingCommand}: on macOS, Select All, Cut, Undo and
      * Redo, which Chromium leaves to the browser's Edit menu there. Chromium asks only after the page declined the key,
-     * so a script that takes Cmd+Z itself undoes once.
+     * so a script that takes Cmd+Z itself undoes once. So it is in a page's DevTools.
      */
     private static final class Keyboard extends CefKeyboardHandlerAdapter {
         @Override public boolean onKeyEvent(CefBrowser browser, CefKeyboardHandler.CefKeyEvent event) {
-            if (page(browser) == null) return false;
+            if (!(browser instanceof PageBrowser)) return false;
             var command = EditingCommand.of(event.type == CefKeyboardHandler.CefKeyEvent.EventType.KEYEVENT_RAWKEYDOWN,
                 event.modifiers, event.windows_key_code);
             if (command.isEmpty()) return false;
@@ -173,7 +174,7 @@ public final class PageEvents {
 
         @Override public void onLoadStart(CefBrowser browser, CefFrame frame, CefRequest.TransitionType transition) {
             if (frame == null || !frame.isMain()) return;
-            if (browser instanceof PageBrowser shown) {
+            if (browser instanceof PageBrowser shown && shown.owner() != null) {
                 List<BiConsumer<PageBrowser, CefFrame>> hooks = LOAD_STARTS.get(browser.getClient());
                 if (hooks != null) for (BiConsumer<PageBrowser, CefFrame> hook : hooks) hook.accept(shown, frame);
                 shown.keepZoom();

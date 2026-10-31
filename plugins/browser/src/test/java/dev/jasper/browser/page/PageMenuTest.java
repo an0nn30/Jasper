@@ -241,6 +241,22 @@ class PageMenuTest {
         });
     }
 
+    /**
+     * Spec section 10: Inspect Element is its item's, at the point on the page's canvas where the menu was asked for,
+     * which DevTools inspect.
+     */
+    @Test void inspectElementIsTheItemsAtThePointOnThePagesCanvas() throws Exception {
+        onUiThread(() -> {
+            var inspected = new ArrayList<Point>();
+            var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons());
+            var place = new MenuPlace(tab((proxy, method, args) -> null), copied -> { }, () -> "Google", terms -> URI.create(PAGE),
+                () -> false, () -> { }, () -> { }, () -> { }, inspected::add);
+            var pointed = new PageMenu.Pointed(new Point(40, 70), NONE, NONE, NONE, NONE, false, NONE);
+            PageMenu.run(page, place, pointed, PAGE, PageMenuItems.INSPECT_ELEMENT);
+            assertThat(inspected).containsExactly(new Point(40, 70));
+        });
+    }
+
     /** Spec section 14: on Jasper's error page, the menu's Back and Reload are its item's, as the toolbar's are. */
     @Test void onAnErrorPageBackGoesPastTheFailedLoadAndReloadTriesItAgain() throws Exception {
         onUiThread(() -> {
@@ -415,7 +431,7 @@ class PageMenuTest {
     private static Page placed(ContentTab tab, List<String> copies) {
         var page = new Page(URI.create(PAGE), () -> { }, PageTestAccess.noFavicons());
         page.setMenuPlace(new MenuPlace(tab, copies::add, () -> "Google", terms -> URI.create("https://google.com/search?q=" + terms),
-            page::canGoBack, page::back, page::reload, () -> { }));
+            page::canGoBack, page::back, page::reload, () -> { }, at -> { }));
         return page;
     }
 

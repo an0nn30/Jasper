@@ -1,6 +1,7 @@
 package dev.jasper.browser.item;
 
 import dev.jasper.browser.engine.AboutScheme;
+import dev.jasper.browser.page.DevTools;
 import dev.jasper.browser.page.DialogPlace;
 import dev.jasper.browser.page.MenuPlace;
 import dev.jasper.browser.page.NavigationButton;
@@ -10,6 +11,7 @@ import dev.jasper.browser.restore.BrowserRestore;
 import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.RestoreState;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ContentCommand;
 import dev.jasper.sdk.ui.ContentPresentation;
 import dev.jasper.sdk.ui.ContentSpec;
@@ -24,6 +26,7 @@ import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.sdk.ui.ViewSpec;
 import java.awt.EventQueue;
+import java.awt.Point;
 import java.awt.event.HierarchyEvent;
 import java.io.IOException;
 import java.io.InputStream;
@@ -68,7 +71,9 @@ import javax.swing.JComponent;
  * field loads the failed address as typed text would. While the page last committed is at an https address of a host
  * the user went on to past a certificate error, the toolbar says "Not secure". View Source, from the page's right-click
  * menu, shows the page's source in the item at {@code jasper-about:source} (spec section 10), as its {@link SourcePages}
- * capture it; the item saves a source page without its token. UI thread.
+ * capture it; the item saves a source page without its token. Inspect Element, from the same menu, shows the page's
+ * DevTools, inspecting the element under the pointer, in the item's one {@link DevToolsItem}, a pane below its own,
+ * which closes with it. UI thread.
  */
 public final class BrowserItem implements AutoCloseable {
     static final String ROOT = "browser", PAGE = "browser.page", CONTENT = "browser.page.content";
@@ -91,6 +96,8 @@ public final class BrowserItem implements AutoCloseable {
     private final BrowserFindBar findBar;
     private final UiView view;
     private ContentTab tab;
+    // The item's DevTools item, made by its first Inspect Element; null before.
+    private DevToolsItem devTools;
     private URI url;
     // Where the item's restore state says it is: what it loads first until it shows, then where its page committed.
     private URI saved;
@@ -186,7 +193,7 @@ public final class BrowserItem implements AutoCloseable {
         // right-click menu, which copies with the plugin's clipboard and searches with the engine chosen as it opens.
         page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
         page.setMenuPlace(new MenuPlace(tab, items.context().platform()::copy, this::engineName, this::search, errors::canGoBack,
-            this::goBack, this::reload, this::viewSource));
+            this::goBack, this::reload, this::viewSource, this::inspect));
         items.opened(this);
         present();
     }
@@ -303,6 +310,46 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     /**
+     * Inspect Element at {@code at} on the page's canvas: the page's DevTools at that point, shown in the item's DevTools
+     * item ({@link #showDevTools}); none before the page's browser is ready.
+     */
+    void inspect(Point at) {
+        if (!closed) page.inspect(at).ifPresent(this::showDevTools);
+    }
+
+    /**
+     * Shows {@code tools}, the page's DevTools: in the item's DevTools item, which is selected, or, while it has none
+     * open, in a new one below the item's pane. DevTools that no item can show close.
+     */
+    void showDevTools(DevTools tools) {
+        if (closed || tab == null) {
+            tools.close();
+            return;
+        }
+        if (devTools != null && !devTools.closed()) {
+            devTools.show(tools);
+            return;
+        }
+        try {
+            devTools = DevToolsItem.open(items.context(), tab, tools, title);
+        } catch (IllegalStateException closing) { // the windows close, or Jasper quits
+            items.context().log().log(System.Logger.Level.WARNING, "DevTools could not open: " + closing.getMessage(), closing);
+        }
+    }
+
+    /**
+     * Whether the item, or its DevTools item, is the item of the focused pane in {@code window}'s shown tab: the Web
+     * menu acts on the item from either.
+     */
+    boolean focusedIn(WindowHandle window) {
+        return focused(tab, window) || devTools != null && !devTools.closed() && focused(devTools.tab(), window);
+    }
+
+    private static boolean focused(ContentTab tab, WindowHandle window) {
+        return tab.isActive() && tab.window().id().equals(window.id());
+    }
+
+    /**
      * The HTML the item captured for View Source under {@code token} for the page at {@code address}.
      *
      * @param token the token a source page's address carries
@@ -371,6 +418,7 @@ public final class BrowserItem implements AutoCloseable {
         closed = true;
         endSuggestions();
         sources.close();
+        if (devTools != null) devTools.close();
         items.closed(this);
         view.close();
         page.close();
@@ -564,6 +612,7 @@ public final class BrowserItem implements AutoCloseable {
         if (closed || tab == null) return;
         String address = shown(errors.address());
         title = TabTitle.of(page.title(), host(address), title, page.loading());
+        if (devTools != null) devTools.retitle(title);
         String shown = address.length() <= SHOWN_ADDRESS ? address : address.substring(0, SHOWN_ADDRESS) + "…";
         // The globe stays the tab's icon under an image, for one that does not decode.
         var presentation = new ContentPresentation(title, "", BrowserItems.GLOBE, false, shown, "");

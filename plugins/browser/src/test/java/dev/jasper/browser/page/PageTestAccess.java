@@ -146,6 +146,27 @@ public final class PageTestAccess {
     }
 
     /**
+     * The page's DevTools, inspecting the element at {@code at} on its canvas, as {@link Page#inspect} makes them for a
+     * page whose browser is ready: a page without Chromium has none, so Chromium never makes their browser. UI thread.
+     *
+     * @param page a page
+     * @param at a point on its canvas
+     * @return the DevTools
+     */
+    public static DevTools devTools(Page page, java.awt.Point at) {
+        return page.devTools(at);
+    }
+
+    /**
+     * Chromium has closed the DevTools' browser, as it does once they or their page close. UI thread.
+     *
+     * @param tools the DevTools
+     */
+    public static void devToolsEnded(DevTools tools) {
+        tools.ended();
+    }
+
+    /**
      * A find for a page whose frames are {@code frames}, in that order, and whose focus is in {@code focused}: each script
      * it would run in a frame is added to {@code ran} as the frame, a space and the command {@code find.js} is called
      * with ({@link #findCommand}), and each wait for the frames' answers to {@code waits}, where it waits until the test

@@ -5,6 +5,7 @@ import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
+import java.awt.Point;
 import java.awt.event.HierarchyEvent;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -27,10 +28,11 @@ import org.cef.browser.CefFrame;
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
  * whether it loads, where it can go and its history, its find in page, its zoom, its failed loads and the certificates
- * it may go on past, the HTML it shows, and what it is asked to do. Its
+ * it may go on past, the HTML it shows, its {@link DevTools}, and what it is asked to do. Its
  * Chromium browser is made only once {@link #start} asks for it, the first time its item shows; until then the page
  * holds the address it will load and the zoom it will show at, and asks nothing of Chromium. Every method runs on the
- * UI thread, and so does every callback it makes. This is the one class that makes a {@link PageView}.
+ * UI thread, and so does every callback it makes. This is the one class that makes a {@link PageView}: the page's, and
+ * each of its DevTools'.
  */
 public final class Page implements AutoCloseable {
     /** The longest {@link #source} waits for Chromium's HTML. */
@@ -78,6 +80,8 @@ public final class Page implements AutoCloseable {
     private volatile double zoomLevel;
     // The page's find in page, made the first time it is asked for.
     private PageFind find;
+    // The DevTools made for the page last, or null before any.
+    private DevTools devTools;
     private PageBrowser browser;
     // The address the browser was made with, which it loads by itself.
     private String made;
@@ -345,6 +349,20 @@ public final class Page implements AutoCloseable {
         if (closed) return CompletableFuture.completedFuture(Optional.empty());
         CompletableFuture<Optional<String>> read = sourceReader.apply(this);
         return read == null ? CompletableFuture.completedFuture(Optional.empty()) : read;
+    }
+
+    /**
+     * Chromium's DevTools for the page, inspecting the element at {@code at} on its canvas, as Inspect Element asks (spec
+     * section 10): new DevTools, with a canvas of their own, whose browser Chromium makes once that canvas is in a window
+     * and the DevTools made for the page before have closed, which their item closes as it shows these. None before the
+     * page's browser is ready, and none after {@link #close()}.
+     *
+     * @param at the point, on the page's canvas
+     * @return the DevTools, or empty
+     */
+    public Optional<DevTools> inspect(Point at) {
+        Objects.requireNonNull(at, "at");
+        return ready && !closed ? Optional.of(devTools(at)) : Optional.empty();
     }
 
     /**
@@ -730,6 +748,7 @@ public final class Page implements AutoCloseable {
         menuPlace = null;
         dropFaviconFetch();
         if (find != null) find.close();
+        if (devTools != null) devTools.close();
         view.setHoverUrl("");
         PageBrowser page = browser;
         if (page != null) page.close(true);
@@ -855,6 +874,17 @@ public final class Page implements AutoCloseable {
     /** The page's browser once it hears what it is asked; null before. */
     PageBrowser readyBrowser() {
         return ready ? browser : null;
+    }
+
+    /**
+     * New DevTools for the page at {@code at}, on a new canvas, waiting for those made before; whether Chromium can make
+     * their browser is theirs to find out ({@link #inspect} makes them only for a ready page).
+     */
+    DevTools devTools(Point at) {
+        DevTools made = new DevTools(this, new PageView(), at, devTools);
+        devTools = made;
+        if (closed) made.close();
+        return made;
     }
 
     /** Has the page go to its history's entries with {@code replacement} from now on, as a test's recording one. */

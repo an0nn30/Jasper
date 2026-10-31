@@ -12,7 +12,8 @@
  * {@code CertificateAllowance} remembers for every item. View Source shows
  * {@link dev.jasper.browser.item.SourcePage}, a page's source fetched again through the {@code http} package or as the
  * item's {@code SourcePages} captured it, and {@link dev.jasper.browser.item.PageHtml} gives Jasper's own pages the
- * theme's colours and their tokens. Each item saves its restore
+ * theme's colours and their tokens. Inspect Element shows a page's DevTools in its item's {@code DevToolsItem}, a pane
+ * below the item's that is never saved. Each item saves its restore
  * state through the {@code restore} package, and {@code BrowserItems} opens saved ones again.
  */
 package dev.jasper.browser.item;

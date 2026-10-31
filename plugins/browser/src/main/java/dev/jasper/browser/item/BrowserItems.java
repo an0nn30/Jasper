@@ -133,14 +133,15 @@ public final class BrowserItems implements AutoCloseable {
     }
 
     /**
-     * The item {@code window} has focused: the item of its focused pane in its shown tab, when that is a browser item.
+     * The item {@code window} has focused: the item of its focused pane in its shown tab, when that is a browser item or
+     * a browser item's DevTools item, which stands for its page's.
      *
      * @param window a window
      * @return the item, or empty
      */
     public Optional<BrowserItem> focused(WindowHandle window) {
         Objects.requireNonNull(window, "window");
-        return open.stream().filter(item -> item.tab().isActive() && item.tab().window().id().equals(window.id())).findFirst();
+        return open.stream().filter(item -> item.focusedIn(window)).findFirst();
     }
 
     /** Opens Settings at the Browser's page. */

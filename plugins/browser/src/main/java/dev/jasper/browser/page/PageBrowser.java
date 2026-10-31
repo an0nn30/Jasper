@@ -15,8 +15,10 @@ import java.awt.dnd.InvalidDnDOperationException;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import org.cef.CefBrowserSettings;
 import org.cef.CefClient;
+import org.cef.browser.CefBrowser;
 import org.cef.browser.CefBrowserOsrWithHandler;
 import org.cef.browser.CefRequestContext;
 import org.cef.callback.CefDragData;
@@ -25,6 +27,11 @@ import org.cef.callback.CefDragData;
  * One page's Chromium browser, rendered off screen by its {@link PageRenderer} for its {@link PageView}. It draws 60
  * frames a second while its view shows. Closing it closes only the page, and a script that closes the page's window
  * closes the page's item. Its {@link Page} is where the client's handlers send its callbacks.
+ *
+ * <p>A page's {@link DevTools} are a browser of this class too, Chromium's DevTools browser, which JCEF has the page's
+ * browser make ({@link #createDevToolsBrowser}): drawn off screen on the DevTools' own canvas by a renderer of its own,
+ * on the page's client, whose handlers take it for no page's, as it has no {@link #owner()}. Chromium's own DevTools
+ * window, a top-level one, is never made: JCEF has none for an off-screen browser.
  */
 public final class PageBrowser extends CefBrowserOsrWithHandler {
     private static final System.Logger LOG = System.getLogger(PageBrowser.class.getName());
@@ -36,6 +43,10 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     // Chromium's tolerance for two zoom levels being the same (blink::ZoomValuesEqual).
     private static final double SAME_ZOOM = 0.001;
     private final PageView view;
+    // The DevTools this browser draws, when it is Chromium's DevTools browser; null for a page's.
+    private final DevTools devTools;
+    // UI thread: the DevTools Chromium makes while openDevTools runs.
+    private DevTools opening;
     // Set before the native browser is made, so before Chromium calls back for this browser.
     private volatile Page owner;
     // Set once Java asks the browser to close: Jasper's close of its page, or JCEF's close of its client's browsers.
@@ -53,6 +64,15 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
     public PageBrowser(CefClient client, String url, CefRequestContext context, PageRenderer renderer, PageView view) {
         super(client, url, context, renderer, view, settings());
         this.view = view;
+        devTools = null;
+    }
+
+    /** Chromium's DevTools browser for {@code tools}, inspecting {@code inspected}'s page at {@code at}. */
+    private PageBrowser(CefClient client, String url, CefRequestContext context, PageRenderer renderer, PageView view,
+                        PageBrowser inspected, Point at, DevTools tools) {
+        super(client, url, context, renderer, view, inspected, at, settings());
+        this.view = view;
+        devTools = tools;
     }
 
     /** Chromium's own default is 30 frames a second. */
@@ -73,9 +93,44 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
             new ImeAdapter(target, this), new Drops());
     }
 
-    /** Makes the native browser, unless that has begun. The view calls this once it is in a window. UI thread. */
+    /**
+     * Makes the native browser, unless that has begun. The view calls this once it is in a window. UI thread. Chromium's
+     * DevTools browser is made only as JCEF's {@code openDevTools} makes it, at once and once: asked again before Chromium
+     * made it, Chromium would only show the DevTools, and JCEF would match the next browser Chromium makes to this one.
+     */
     void create() {
-        if (!CefClient.isNativeBrowserCreationStarted(this)) createImmediately();
+        if (devTools == null && !CefClient.isNativeBrowserCreationStarted(this)) createImmediately();
+    }
+
+    /**
+     * Has Chromium make {@code tools}' DevTools browser, inspecting the element at {@code at} on the page's canvas: JCEF
+     * asks {@link #createDevToolsBrowser} for it, then makes it. UI thread.
+     */
+    void openDevTools(DevTools tools, Point at) {
+        opening = Objects.requireNonNull(tools, "tools");
+        try {
+            openDevTools(at);
+        } finally {
+            opening = null;
+        }
+    }
+
+    /**
+     * The DevTools browser for the DevTools {@link #openDevTools(DevTools, Point)} opens, which JCEF then makes: drawn on
+     * their canvas by a renderer of its own, as a page's browser is on the page's, and on {@code client}, the page's, as
+     * Chromium makes DevTools on their page's client. UI thread.
+     *
+     * @throws IllegalStateException when asked other than through {@link #openDevTools(DevTools, Point)}
+     */
+    @Override protected CefBrowser createDevToolsBrowser(CefClient client, String url, CefRequestContext context, CefBrowser parent,
+                                                         Point inspectAt) {
+        DevTools tools = opening;
+        if (tools == null) throw new IllegalStateException("A page's DevTools open only through its Inspect Element");
+        PageView canvas = tools.canvas();
+        var made = new PageBrowser(client, url, context, new PageRenderer(canvas), canvas, this, inspectAt, tools);
+        made.attach();
+        tools.made(made);
+        return made;
     }
 
     /** Device pixels per view pixel on {@code view}'s screen. */
@@ -153,12 +208,20 @@ public final class PageBrowser extends CefBrowserOsrWithHandler {
      * ahead. Any other, a script's {@code window.close()}, closes the page's item instead, as Chrome closes the tab, and
      * the item's close then closes the browser. JCEF's own answer is never asked: it holds back a close not first
      * allowed with {@code setCloseAllowed}, and lets an allowed one go ahead only after asking the view's window,
-     * Jasper's, to close.
+     * Jasper's, to close. Chromium's DevTools browser closes as Chromium closes the DevTools, as their close or their
+     * page's asks: it goes ahead.
      *
      * @return whether Chromium holds the close back
      */
     @Override public boolean doClose() {
-        return Page.holdsClose(closeAsked, owner, EventQueue::invokeLater);
+        return devTools == null && Page.holdsClose(closeAsked, owner, EventQueue::invokeLater);
+    }
+
+    /** Chromium has destroyed the browser: for its DevTools browser, the DevTools end, on the UI thread. Chromium's thread. */
+    @Override public void onBeforeClose() {
+        super.onBeforeClose();
+        DevTools tools = devTools;
+        if (tools != null) EventQueue.invokeLater(tools::ended);
     }
 
     // Adapted from JetBrains/jcef (java/org/cef/browser/CefDropTargetListener.java) at 9df0879, under JCEF's BSD-3-Clause licence.
