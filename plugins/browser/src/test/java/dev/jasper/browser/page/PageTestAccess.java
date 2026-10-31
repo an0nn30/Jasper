@@ -26,14 +26,34 @@ public final class PageTestAccess {
     }
 
     /**
-     * A favicon fetched for {@code document} arrives, as a fetch the page made completes. UI thread.
+     * A favicon fetched for the document the page shows now arrives, as a fetch the page made completes. UI thread.
      *
      * @param page a page
-     * @param document the address it was fetched for
      * @param image what the fetch gave
      */
-    public static void faviconArrived(Page page, String document, java.util.Optional<dev.jasper.sdk.ui.PixelImage> image) {
+    public static void faviconArrived(Page page, java.util.Optional<dev.jasper.sdk.ui.PixelImage> image) {
+        page.faviconArrived(page.document(), image);
+    }
+
+    /**
+     * A favicon fetched for the {@code document}th document the page's main frame showed arrives. UI thread.
+     *
+     * @param page a page
+     * @param document the document it was fetched for, as {@link #document} counted it
+     * @param image what the fetch gave
+     */
+    public static void faviconArrived(Page page, long document, java.util.Optional<dev.jasper.sdk.ui.PixelImage> image) {
         page.faviconArrived(document, image);
+    }
+
+    /**
+     * Which document the page's main frame shows, counted by its load starts. UI thread.
+     *
+     * @param page a page
+     * @return the count
+     */
+    public static long document(Page page) {
+        return page.document();
     }
 
     /**

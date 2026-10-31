@@ -157,7 +157,7 @@ class BrowserItemTest {
             assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingImage()).isEmpty();
             assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingIcon()).isEqualTo(BrowserItems.GLOBE);
             PageTestAccess.loadingChanged(page, true, false, false);
-            PageTestAccess.faviconArrived(page, "https://example.com", Optional.of(ICON));
+            PageTestAccess.faviconArrived(page, Optional.of(ICON));
             assertThat(page.favicon()).contains(ICON);
             assertThat(host.contentPresentation(item.tab()).image()).as("loading: the globe").isEmpty();
             assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingImage()).as("loading: the globe").isEmpty();

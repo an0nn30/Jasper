@@ -175,8 +175,11 @@ class FaviconsTest {
         });
     }
 
-    /** Plan 4b's ruling: a favicon never lands on a page it does not belong to. */
-    @Test void aFaviconThatArrivesAfterThePagesAddressChangedIsDropped() throws Exception {
+    /**
+     * Plan 4b's W5: a script's {@code pushState} or {@code replaceState} while the fetch runs changes the page's address,
+     * not its document, so the favicon still becomes the page's.
+     */
+    @Test void aFaviconThatArrivesAfterAPushStateStillBecomesTheDocumentsFavicon() throws Exception {
         favicons = new Favicons(FaviconDecoder::toPng, STARTS, TIMEOUT);
         var changes = new AtomicInteger();
         Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons));
@@ -193,8 +196,27 @@ class FaviconsTest {
         release.countDown();
         await(() -> onUi(() -> !page.fetchingFavicon()), "the fetch");
         onUi(() -> {
+            assertThat(page.favicon()).isPresent().isEqualTo(FaviconDecoder.toPng(png));
+            assertThat(changes.get()).as("told").isEqualTo(before + 1);
+            page.close();
+            return null;
+        });
+    }
+
+    /** Plan 4b's ruling: a favicon never lands on a document it does not belong to; a load start begins another. */
+    @Test void aFaviconForADocumentThePageNoLongerShowsIsDropped() throws Exception {
+        favicons = new Favicons(FaviconDecoder::toPng, STARTS, TIMEOUT);
+        var changes = new AtomicInteger();
+        Page page = onUi(() -> new Page(at("/page"), changes::incrementAndGet, favicons));
+        onUi(() -> {
+            long declaredIn = PageTestAccess.document(page);
+            page.loadStarted(at("/next").toString());
+            int before = changes.get();
+            PageTestAccess.faviconArrived(page, declaredIn, FaviconDecoder.toPng(png));
             assertThat(page.favicon()).as("dropped").isEmpty();
             assertThat(changes.get()).as("nothing told").isEqualTo(before);
+            PageTestAccess.faviconArrived(page, PageTestAccess.document(page), FaviconDecoder.toPng(png));
+            assertThat(page.favicon()).as("the document it shows").isPresent();
             page.close();
             return null;
         });

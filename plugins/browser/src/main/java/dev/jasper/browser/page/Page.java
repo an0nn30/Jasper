@@ -71,8 +71,10 @@ public final class Page implements AutoCloseable {
     private volatile String committed = "";
     private String title = "";
     // The favicon of the document the main frame shows; the icon that document named, null until it names one; and the
-    // fetch of that icon while it runs.
+    // fetch of that icon while it runs. The document is counted by the main frame's load starts, as a script's pushState
+    // changes the address and not the document.
     private Optional<PixelImage> favicon = Optional.empty();
+    private long document;
     private URI declaredIcon;
     private CompletableFuture<Optional<PixelImage>> iconFetch;
     // The history as last read; whether a read runs, and whether the history changed since that read began.
@@ -328,9 +330,10 @@ public final class Page implements AutoCloseable {
     /**
      * The document the page's main frame showed at {@code document} names its favicon at {@code icon}, as the page's
      * script reports through the opener bridge: the page fetches it, and the favicon is the page's if it arrives while
-     * the page is still at {@code document}, a fragment aside. Each document names one: a request after the first, one
-     * from a document the page no longer shows, and any after {@link #close()} are ignored. The bridge has checked
-     * {@code icon}, which any script in the page could have sent.
+     * the page still shows that document, whatever its scripts' {@code pushState} made of its address since (plan 4b's
+     * W5). Each document names one: a request after the first, one from an address the page is no longer at, a
+     * fragment aside, and any after {@link #close()} are ignored. The bridge has checked {@code icon}, which any script
+     * in the page could have sent.
      *
      * @param icon the icon's address
      * @param document the address of the document that named it
@@ -346,12 +349,13 @@ public final class Page implements AutoCloseable {
             return;
         }
         declaredIcon = icon;
+        long declaredIn = this.document;
         CompletableFuture<Optional<PixelImage>> fetch = favicons.fetch(icon, page);
         iconFetch = fetch;
         fetch.whenComplete((image, failure) -> EventQueue.invokeLater(() -> {
             if (fetch != iconFetch) return; // dropped by a load start or the close
             iconFetch = null;
-            faviconArrived(document, failure == null ? image : Optional.empty());
+            faviconArrived(declaredIn, failure == null ? image : Optional.empty());
         }));
     }
 
@@ -983,6 +987,7 @@ public final class Page implements AutoCloseable {
     void loadStarted(String url) {
         if (closed) return;
         if (find != null) find.dropped();
+        document++;
         dropFaviconFetch();
         declaredIcon = null;
         boolean cleared = !title.isEmpty() || favicon.isPresent();
@@ -1002,9 +1007,14 @@ public final class Page implements AutoCloseable {
         return iconFetch != null;
     }
 
-    /** A favicon fetched for {@code document} arrived: it is the page's, unless the page has gone elsewhere since. */
-    void faviconArrived(String document, Optional<PixelImage> image) {
-        if (closed || image.isEmpty() || !samePage(document, address)) return;
+    /** Which document the main frame shows, counted by its load starts. */
+    long document() {
+        return document;
+    }
+
+    /** A favicon fetched for the {@code fetchedFor}th document arrived: it is the page's while the page shows that one. */
+    void faviconArrived(long fetchedFor, Optional<PixelImage> image) {
+        if (closed || image.isEmpty() || fetchedFor != document) return;
         favicon = image;
         changed.run();
     }
