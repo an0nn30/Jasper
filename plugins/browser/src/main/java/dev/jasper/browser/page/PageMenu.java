@@ -26,13 +26,18 @@ import org.cef.handler.CefContextMenuHandlerAdapter;
  * parameters last only for the call; the menu shows on Swing's.
  *
  * <p>Every item is Jasper's to run: Back, Forward and Reload through the page; the links' and images' through the
- * page's item, which opens them in the tab next to its own, only at addresses the address field loads (R36); Cut,
- * Copy, Paste and Select All as the page's Edit menu runs them, on its focused frame, as Chrome's menu does; Search with
- * ⟨engine⟩ in the next tab with the engine the settings choose; Print… with Chromium's print dialog; and the copies with
- * the plugin's clipboard. View Source and Inspect Element show and do nothing yet: plan 4b's Tasks 9 and 10 give them
- * their pages. So Chromium's callback is always cancelled, exactly once: as the menu closes, before the item chosen runs,
- * whether one of the page's items is chosen, one of Jasper's runs or the menu is dismissed, or at once when no menu can
- * show. A page that closes while its menu shows closes with its item's tab, which dismisses the menu.
+ * page's item, which opens them in the tab next to its own with Jasper's rights, so only what the frame they are in
+ * could open itself ({@link LinkSchemes#opensFrom}, R36); Cut, Copy, Paste and Select All as the page's Edit menu runs
+ * them, on its focused frame, as Chrome's menu does; Search with ⟨engine⟩ in the next tab with the engine the settings
+ * choose; Print… with Chromium's print dialog; and the copies with the plugin's clipboard. View Source and Inspect
+ * Element show and do nothing yet: plan 4b's Tasks 9 and 10 give them their pages.
+ *
+ * <p><b>Chromium's callback is never continued</b> (P37): it is always cancelled, exactly once, as the menu closes and
+ * before the item chosen runs, whether one of the page's items is chosen, one of Jasper's runs or the menu is dismissed,
+ * or at once when no menu can show. Back, Forward and Reload, the focused frame's Cut, Copy, Paste and Select All, and
+ * the browser's {@code print()} are the same commands CEF's own menu items run, so continuing with CEF's command ids
+ * would run nothing more, and would depend on JCEF's copy of CEF's {@code MenuId} numbering matching Chromium's. A page
+ * that closes while its menu shows closes with its item's tab, which dismisses the menu.
  *
  * <p>JCEF keeps a client's first handler of each kind, so this is the only one.
  */
@@ -51,9 +56,10 @@ final class PageMenu {
      * @param image the image's address; empty for none
      * @param selection the selected text; empty for none
      * @param editable whether the pointer is in an editable field
+     * @param frame the address of the sub-frame the pointer is in; empty in the main frame, which is the page's
      */
     record Pointed(Point at, Optional<String> link, Optional<String> linkAsWritten, Optional<String> image,
-                   Optional<String> selection, boolean editable) {
+                   Optional<String> selection, boolean editable, Optional<String> frame) {
         /** Copies the point; rejects nulls. */
         Pointed {
             at = new Point(Objects.requireNonNull(at, "at"));
@@ -61,6 +67,7 @@ final class PageMenu {
             Objects.requireNonNull(linkAsWritten, "linkAsWritten");
             Objects.requireNonNull(image, "image");
             Objects.requireNonNull(selection, "selection");
+            Objects.requireNonNull(frame, "frame");
         }
 
         /** The point, copied: a {@code Point} can be changed. */
@@ -70,7 +77,8 @@ final class PageMenu {
 
         /**
          * What {@code params} report under the pointer: the link only when there is one, the address the page wrote
-         * falling back to the checked one, and the image only for an image. Chromium's thread, while it asks.
+         * falling back to the checked one, the image only for an image, and the frame's address, which Chromium gives
+         * only for a sub-frame. Chromium's thread, while it asks.
          */
         static Pointed of(CefContextMenuParams params) {
             boolean linked = (params.getTypeFlags() & CefContextMenuParams.TypeFlags.CM_TYPEFLAG_LINK) != 0;
@@ -79,7 +87,7 @@ final class PageMenu {
             Optional<String> image = params.getMediaType() == CefContextMenuParams.MediaType.CM_MEDIATYPE_IMAGE
                 ? text(params.getSourceUrl()) : Optional.empty();
             return new Pointed(new Point(params.getXCoord(), params.getYCoord()), link, written, image,
-                text(params.getSelectionText()), params.isEditable());
+                text(params.getSelectionText()), params.isEditable(), text(params.getFrameUrl()));
         }
 
         private static Optional<String> text(String value) {
@@ -138,9 +146,10 @@ final class PageMenu {
     }
 
     /**
-     * Shows the menu for {@code pointed} over the page's item's tab, and runs the page's item chosen. {@code end} runs
-     * once, as the menu closes and before that item runs, or at once when the page has no place for a menu: closed, or
-     * before its item gave it a tab. UI thread.
+     * Shows the menu for {@code pointed} over the page's item's tab, and runs the page's item chosen. The address of
+     * the frame the pointer is in, or the page's own in the main frame, decides what a link or image may open.
+     * {@code end} runs once, as the menu closes and before that item runs, or at once when the page has no place for a
+     * menu: closed, or before its item gave it a tab. UI thread.
      *
      * @param page the page the menu is for
      * @param pointed what is under the pointer
@@ -153,14 +162,15 @@ final class PageMenu {
             return;
         }
         MenuPlace place = found.get();
+        String from = pointed.frame().orElseGet(page::address);
         try {
             PageMenuItems items = PageMenuItems.of(new PageMenuItems.Context(page.canGoBack(), page.canGoForward(), pointed.link(),
-                pointed.image(), pointed.selection(), pointed.editable(), place.engineName().get()));
+                pointed.image(), pointed.selection(), pointed.editable(), place.engineName().get(), from, !page.title().isEmpty()));
             Point at = pointed.at();
             SwingUtilities.convertPointToScreen(at, page.view());
             place.tab().showContextMenu(at, items.leading(), items.trailing(), chosen -> {
                 end.run();
-                chosen.ifPresent(id -> run(page, place, pointed, id));
+                chosen.ifPresent(id -> run(page, place, pointed, from, id));
             });
         } catch (RuntimeException | Error failure) {
             end.run();
@@ -168,15 +178,18 @@ final class PageMenu {
         }
     }
 
-    /** Runs the page's item {@code id}, chosen from the menu for {@code pointed}. UI thread. */
-    private static void run(Page page, MenuPlace place, Pointed pointed, String id) {
+    /**
+     * Runs the page's item {@code id}, chosen from the menu for {@code pointed} over a frame at {@code from}. Open Link and
+     * Open Image in New Tab check again that the frame could open their address. UI thread.
+     */
+    static void run(Page page, MenuPlace place, Pointed pointed, String from, String id) {
         switch (id) {
             case PageMenuItems.BACK -> page.back();
             case PageMenuItems.FORWARD -> page.forward();
             case PageMenuItems.RELOAD -> page.reload();
-            case PageMenuItems.OPEN_LINK -> openInNextTab(page, pointed.link());
+            case PageMenuItems.OPEN_LINK -> openInNextTab(page, from, pointed.link());
             case PageMenuItems.COPY_LINK -> pointed.linkAsWritten().ifPresent(place.clipboard());
-            case PageMenuItems.OPEN_IMAGE -> openInNextTab(page, pointed.image());
+            case PageMenuItems.OPEN_IMAGE -> openInNextTab(page, from, pointed.image());
             case PageMenuItems.COPY_IMAGE_ADDRESS -> pointed.image().ifPresent(place.clipboard());
             case PageMenuItems.CUT -> page.cut();
             case PageMenuItems.COPY -> page.copy();
@@ -194,9 +207,9 @@ final class PageMenu {
         }
     }
 
-    /** Opens {@code address} in the tab next to the page's, when the address field loads it (R36). */
-    private static void openInNextTab(Page page, Optional<String> address) {
-        address.filter(PageMenuItems::opens).ifPresent(url -> page.openItem(url, TabPlacement.NEXT_TAB));
+    /** Opens {@code address} in the tab next to the page's, when a frame at {@code from} could open it itself. */
+    private static void openInNextTab(Page page, String from, Optional<String> address) {
+        address.filter(url -> LinkSchemes.opensFrom(from, url)).ifPresent(url -> page.openItem(url, TabPlacement.NEXT_TAB));
     }
 
     /** View Source: does nothing yet; plan 4b's Task 9 shows the page's source here. */

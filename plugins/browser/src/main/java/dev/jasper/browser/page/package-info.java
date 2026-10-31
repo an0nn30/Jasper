@@ -16,8 +16,9 @@
  * {@link dev.jasper.browser.page.DialogPlace} is where the {@code dialogs} package shows a page's dialogs, as its item
  * gives it. {@code PageMenu} is the client's one context-menu handler: Jasper shows the page's right-click menu,
  * {@code PageMenuItems} for what is under the pointer, at the {@link dev.jasper.browser.page.MenuPlace} the item gives,
- * over its tab, and Chromium shows none. The canvas, renderer and browser are adapted from JetBrains' JCEF test classes,
- * as {@code notices.toml} records. {@link dev.jasper.browser.page.LastPress},
+ * over its tab, and Chromium shows none. {@link dev.jasper.browser.page.LinkSchemes} decides which addresses a page's
+ * links open, and which a page may open with Jasper's rights, for the {@code links} package and the menu. The canvas,
+ * renderer and browser are adapted from JetBrains' JCEF test classes, as {@code notices.toml} records. {@link dev.jasper.browser.page.LastPress},
  * {@code Favicons} and {@code Page}'s methods name no Chromium type, and none of these classes loads until a browser
  * item opens.
  */

@@ -1,5 +1,6 @@
 package dev.jasper.browser.item;
 
+import dev.jasper.browser.page.LinkSchemes;
 import dev.jasper.browser.settings.BrowserSettings;
 import java.io.File;
 import java.net.URI;
@@ -7,13 +8,11 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** What the address field loads for the text typed into it (spec section 6, "Typed text"). */
 public final class AddressInput {
-    private static final Set<String> SCHEMES = Set.of("http", "https", "file", "about", "jasper-about");
     private static final Pattern SCHEME = Pattern.compile("([A-Za-z][A-Za-z0-9+.-]*):.*", Pattern.DOTALL);
     // A host, an optional port and an optional path, query or fragment; the host is checked on its own.
     private static final Pattern ADDRESS = Pattern.compile("(\\[[0-9A-Fa-f:.]+]|[^\\s/?#:@\\[\\]]+)(?::(\\d{1,5}))?([/?#]\\S*)?");
@@ -69,7 +68,7 @@ public final class AddressInput {
         if (path.isPresent()) return path;
         Optional<String> scheme = scheme(text);
         if (scheme.filter("chrome"::equals).isPresent()) return Optional.empty();
-        if (scheme.filter(SCHEMES::contains).isPresent()) {
+        if (scheme.filter(LinkSchemes.LOADED::contains).isPresent()) {
             Optional<URI> typedAddress = parse(text);
             if (typedAddress.isPresent()) return typedAddress;
         }
