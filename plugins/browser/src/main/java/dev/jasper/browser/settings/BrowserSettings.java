@@ -1,6 +1,7 @@
 package dev.jasper.browser.settings;
 
 import dev.jasper.browser.item.AddressInput;
+import dev.jasper.browser.item.SearchEngine;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.settings.Choice;
 import dev.jasper.sdk.settings.PluginSettings;
@@ -8,6 +9,7 @@ import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.SettingSpec;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -19,12 +21,18 @@ import java.util.function.Consumer;
  * @param startPage what a new browser tab, window or pane loads, as typed into its address field
  * @param links where a web link the user opens in Jasper goes: Open Links From Terminal
  * @param localFiles where a local web file the user opens from a terminal goes: Open Local Web Files
+ * @param searchEngine what the address field searches with, and where its suggestions come from: Default Search Engine
+ * @param customSearchUrl the Custom engine's search URL, with {@code %s} for the terms; empty for none
+ * @param customSuggestionsUrl the Custom engine's suggestion URL, with {@code %s} for the typed text; empty for none
  */
-public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpening localFiles) {
+public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpening localFiles, SearchEngine searchEngine,
+                              String customSearchUrl, String customSuggestionsUrl) {
     /** Jasper's welcome page, the default start page. */
     public static final String WELCOME = "jasper-about:welcome";
-    static final String START_PAGE = "start_page", LINKS = "open_links_from_terminal", LOCAL_FILES = "open_local_web_files";
-    private static final String GENERAL = "General", LINK_OPENING = "Link Opening";
+    static final String START_PAGE = "start_page", LINKS = "open_links_from_terminal", LOCAL_FILES = "open_local_web_files",
+        SEARCH_ENGINE = "search_engine", CUSTOM_SEARCH = "custom_search_url", CUSTOM_SUGGESTIONS = "custom_suggestions_url";
+    private static final String GENERAL = "General", LINK_OPENING = "Link Opening", SEARCH = "Search Engine";
+    private static final String NO_TERMS = "The URL must contain " + SearchEngine.TERMS;
 
     /** Open Links From Terminal: where a web link the user opens in Jasper goes. */
     public enum LinkOpening {
@@ -65,18 +73,23 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
         Objects.requireNonNull(startPage, "startPage");
         Objects.requireNonNull(links, "links");
         Objects.requireNonNull(localFiles, "localFiles");
+        Objects.requireNonNull(searchEngine, "searchEngine");
+        Objects.requireNonNull(customSearchUrl, "customSearchUrl");
+        Objects.requireNonNull(customSuggestionsUrl, "customSuggestionsUrl");
     }
 
     /**
-     * Declares the Browser's settings, which Settings › Browser shows: Start page under General, then Open Links From
-     * Terminal and Open Local Web Files under Link Opening. UI thread, while the plugin starts.
+     * Declares the Browser's settings, which Settings › Browser shows: Start page under General, Open Links From
+     * Terminal and Open Local Web Files under Link Opening, then Default Search Engine, Custom Search URL and Custom
+     * Search Suggestions URL under Search Engine, each custom URL empty or with {@code %s} in it. UI thread, while the
+     * plugin starts.
      *
      * @param settings the plugin's settings
      * @return the declared settings, which read the current values
      */
     public static Declared declare(PluginSettings settings) {
         Setting<String> startPage = settings.declare(SettingSpec.of(START_PAGE,
-                SettingKind.text(value -> AddressInput.resolve(value).isPresent(), "Enter a web address."), WELCOME)
+                SettingKind.text(AddressInput::resolves, "Enter a web address."), WELCOME)
             .label("Start page").section(GENERAL)
             .description("What a new browser tab, window or pane opens: a web address, or jasper-about:welcome for Jasper's welcome page.")
             .keywords("home", "homepage", "new tab", "browser", "welcome"));
@@ -92,7 +105,29 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
             .description("Where a local web page, image or PDF clicked in a terminal opens: ask each time, a new tab of "
                 + "Jasper's browser, or the Default editor.")
             .keywords("file", "html", "pdf", "svg", "image", "local", "editor", "ask", "prompt"));
-        return new Declared(startPage, links, localFiles);
+        var engines = Arrays.stream(SearchEngine.values()).map(value -> Choice.of(value.token(), value.displayName(), value)).toList();
+        Setting<SearchEngine> engine = settings.declare(SettingSpec.of(SEARCH_ENGINE, SettingKind.choice(engines), SearchEngine.GOOGLE)
+            .label("Default Search Engine").section(SEARCH)
+            .description("What the address field searches with, and where the search suggestions it shows as you type come "
+                + "from: Google, DuckDuckGo, Bing, Kagi, or Custom, with the URLs below.")
+            .keywords("search", "engine", "google", "duckduckgo", "bing", "kagi", "suggestions", "address bar", "omnibox"));
+        SettingKind<String> template = SettingKind.text(BrowserSettings::template, NO_TERMS);
+        Setting<String> customSearch = settings.declare(SettingSpec.of(CUSTOM_SEARCH, template, "")
+            .label("Custom Search URL").section(SEARCH)
+            .description("With Custom: the address of a search's results, with %s where the search terms go, such as "
+                + "https://search.example.com/?q=%s. Empty searches with Google.")
+            .keywords("search", "engine", "custom", "url", "template"));
+        Setting<String> customSuggestions = settings.declare(SettingSpec.of(CUSTOM_SUGGESTIONS, template, "")
+            .label("Custom Search Suggestions URL").section(SEARCH)
+            .description("With Custom: where the address field's search suggestions come from, an address that answers "
+                + "OpenSearch JSON, with %s where the typed text goes. Empty shows none.")
+            .keywords("search", "suggestions", "custom", "url", "opensearch", "autocomplete"));
+        return new Declared(startPage, links, localFiles, engine, customSearch, customSuggestions);
+    }
+
+    /** A custom URL: empty, or with {@code %s} where the terms go. */
+    private static boolean template(String value) {
+        return value.isEmpty() || value.contains(SearchEngine.TERMS);
     }
 
     private static Choice<LinkOpening> choice(LinkOpening value) {
@@ -109,7 +144,7 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
      * @return the address
      */
     public URI startAddress() {
-        return AddressInput.resolve(startPage).orElse(URI.create(WELCOME));
+        return AddressInput.resolve(startPage, this).orElse(URI.create(WELCOME));
     }
 
     /** The Browser's declared settings. */
@@ -117,11 +152,17 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
         private final Setting<String> startPage;
         private final Setting<LinkOpening> links;
         private final Setting<LocalFileOpening> localFiles;
+        private final Setting<SearchEngine> engine;
+        private final Setting<String> customSearch, customSuggestions;
 
-        private Declared(Setting<String> startPage, Setting<LinkOpening> links, Setting<LocalFileOpening> localFiles) {
+        private Declared(Setting<String> startPage, Setting<LinkOpening> links, Setting<LocalFileOpening> localFiles,
+                         Setting<SearchEngine> engine, Setting<String> customSearch, Setting<String> customSuggestions) {
             this.startPage = startPage;
             this.links = links;
             this.localFiles = localFiles;
+            this.engine = engine;
+            this.customSearch = customSearch;
+            this.customSuggestions = customSuggestions;
         }
 
         /**
@@ -130,7 +171,7 @@ public record BrowserSettings(String startPage, LinkOpening links, LocalFileOpen
          * @return the snapshot
          */
         public BrowserSettings read() {
-            return new BrowserSettings(startPage.get(), links.get(), localFiles.get());
+            return new BrowserSettings(startPage.get(), links.get(), localFiles.get(), engine.get(), customSearch.get(), customSuggestions.get());
         }
 
         /**

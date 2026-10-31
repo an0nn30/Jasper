@@ -61,7 +61,7 @@ public class BrowserPlugin implements Plugin {
         // A page is made when its item first shows: the client's handlers are installed then, before any page is made on
         // it, as naming their types loads Chromium's classes.
         Chromium engine = chromium;
-        var items = new BrowserItems(context, page -> {
+        var items = new BrowserItems(context, settings::read, page -> {
             PageNavigation.prepare(engine);
             PageDialogs.prepare(engine);
             page.start(engine);

@@ -6,6 +6,7 @@ import dev.jasper.browser.item.BrowserItems;
 import dev.jasper.browser.item.ItemTestAccess;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
+import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.RestoreState;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -126,7 +127,7 @@ class BrowserRestoreTest {
         for (String scheme : List.of("http", "https", "file", "about", "jasper-about", "HTTPS", "Jasper-About", "javascript", "chrome",
                 "data", "blob", "view-source", "mailto", "ftp", "devtools", "chrome-extension")) {
             String saved = scheme + "://example.com/x";
-            boolean field = AddressInput.resolve(saved).map(URI::getScheme).filter(scheme::equalsIgnoreCase).isPresent();
+            boolean field = AddressInput.address(saved).map(URI::getScheme).filter(scheme::equalsIgnoreCase).isPresent();
             assertThat(field).as("the address field loads " + scheme + " as typed").isEqualTo(offered.contains(scheme));
             assertThat(BrowserRestore.url(saved(Map.of("url", saved)))).as(scheme).isEqualTo(field ? Optional.of(URI.create(saved)) : Optional.empty());
         }
@@ -320,7 +321,7 @@ class BrowserRestoreTest {
         var items = new AtomicReference<BrowserItems>();
         host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), started -> {
             context.set(started);
-            items.set(new BrowserItems(started, start));
+            items.set(new BrowserItems(started, BrowserSettings.declare(started.settings())::read, start));
             started.windows().restorer(BrowserRestore.KIND, request -> {
                 items.get().restore(request.state(), START, request.window(), wait);
                 return Optional.empty();

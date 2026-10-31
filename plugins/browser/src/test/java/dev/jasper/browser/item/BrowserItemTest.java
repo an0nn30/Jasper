@@ -4,6 +4,7 @@ import dev.jasper.browser.page.NavigationHistory.Entry;
 import dev.jasper.browser.page.NavigationHistory.History;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageTestAccess;
+import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakeKit;
@@ -15,14 +16,20 @@ import dev.jasper.sdk.ui.PixelImage;
 import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.UiEvent;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
@@ -551,6 +558,211 @@ class BrowserItemTest {
         } });
     }
 
+    /** Spec section 6: the click that brings the focus into the address field selects all its text (4a's R15). */
+    @Test void theClickThatFocusesTheAddressFieldSelectsAllItsText() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            items(host, page -> { }).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).selectOnClick()).isTrue();
+            view.clickInto(BrowserToolbar.ADDRESS);
+            assertThat(view.fieldSelection(BrowserToolbar.ADDRESS)).containsExactly(0, "https://example.com".length());
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Spec section 6: typing shows the field's own rows at once, "Loading suggestions…" after them, and asks the engine
+     * 150 ms after the last keystroke; its answer joins the rows, the top one still selected.
+     */
+    @Test void typingShowsTheFieldsOwnRowsAtOnceAndAsksTheEngineOnceTheTypingPauses() throws Exception {
+        var later = new Later();
+        var fetches = new Fetches();
+        var host = onUi(FakePluginHost::new);
+        try {
+            var view = onUi(() -> {
+                items(host, page -> { }, later, fetches).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+                var shown = host.contentView(ID, "example.com").orElseThrow();
+                assertThat(Views.field(shown, BrowserToolbar.ADDRESS).suggestions()).as("nothing typed").isEmpty();
+                shown.type(BrowserToolbar.ADDRESS, "jc");
+                assertThat(shown.suggestions(BrowserToolbar.ADDRESS)).extracting(Nodes.Suggestion::id)
+                    .containsExactly("search:jc", "navigate:https://jc");
+                assertThat(Views.field(shown, BrowserToolbar.ADDRESS).suggestionsLoading()).isTrue();
+                assertThat(later.waiting()).containsExactly(Duration.ofMillis(150));
+                shown.type(BrowserToolbar.ADDRESS, "jce");
+                assertThat(later.waiting()).as("the keystroke before waits no more").containsExactly(Duration.ofMillis(150));
+                assertThat(fetches.asked).isEmpty();
+                later.end();
+                assertThat(fetches.asked).containsExactly(URI.create("https://suggestqueries.google.com/complete/search?client=firefox&q=jce"));
+                return shown;
+            });
+            fetches.answers.getFirst().complete(List.of("jcef", "jcef maven"));
+            onUi(() -> {
+                assertThat(view.suggestions(BrowserToolbar.ADDRESS)).extracting(Nodes.Suggestion::id)
+                    .containsExactly("search:jce", "search:jcef", "search:jcef maven", "navigate:https://jce");
+                assertThat(Views.field(view, BrowserToolbar.ADDRESS).suggestionsLoading()).isFalse();
+                assertThat(view.selectedSuggestion(BrowserToolbar.ADDRESS)).contains("search:jce");
+                assertThat(host.failures()).isEmpty();
+                return null;
+            });
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+        }
+    }
+
+    /** Each keystroke supersedes the request before: an answer to it, arriving after the next, is dropped. */
+    @Test void anAnswerForTextTypedBeforeIsDropped() throws Exception {
+        var later = new Later();
+        var fetches = new Fetches();
+        var host = onUi(FakePluginHost::new);
+        try {
+            var view = onUi(() -> {
+                items(host, page -> { }, later, fetches).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+                var shown = host.contentView(ID, "example.com").orElseThrow();
+                shown.type(BrowserToolbar.ADDRESS, "what");
+                later.end();
+                shown.type(BrowserToolbar.ADDRESS, "what is");
+                later.end();
+                return shown;
+            });
+            assertThat(fetches.asked).hasSize(2);
+            assertThat(fetches.answers.getFirst()).as("its request ended with the next keystroke").isCancelled();
+            fetches.answers.getFirst().complete(List.of("what time is it"));
+            onUi(() -> {
+                assertThat(view.suggestions(BrowserToolbar.ADDRESS)).extracting(Nodes.Suggestion::title).containsExactly("Search for \u201cwhat is\u201d");
+                assertThat(Views.field(view, BrowserToolbar.ADDRESS).suggestionsLoading()).as("still waiting for its own").isTrue();
+                return null;
+            });
+            fetches.answers.getLast().complete(List.of("what is jcef"));
+            onUi(() -> {
+                assertThat(view.suggestions(BrowserToolbar.ADDRESS)).extracting(Nodes.Suggestion::title)
+                    .containsExactly("Search for \u201cwhat is\u201d", "what is jcef");
+                return null;
+            });
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+        }
+    }
+
+    /**
+     * Spec section 6: Enter or Tab on a suggestion loads it, the selected one, and the field gives up the typed text; a
+     * search loads with the chosen engine, and its results page then shows its terms in the field.
+     */
+    @Test void enterOrTabOnASuggestionLoadsIt() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var later = new Later();
+            var item = items(host, page -> { }, later, new Fetches()).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            view.type(BrowserToolbar.ADDRESS, "example.org/docs");
+            view.press(BrowserToolbar.ADDRESS, "ENTER");
+            assertThat(item.page().address()).isEqualTo("https://example.org/docs");
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).value()).isEqualTo("https://example.org/docs");
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).suggestions()).isEmpty();
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).suggestionsLoading()).isFalse();
+            assertThat(later.waiting()).as("no request after the load").isEmpty();
+
+            view.type(BrowserToolbar.ADDRESS, "example.net");
+            view.press(BrowserToolbar.ADDRESS, "DOWN");
+            view.press(BrowserToolbar.ADDRESS, "TAB");
+            assertThat(item.page().address()).as("the second row, the search").isEqualTo("https://google.com/search?q=example.net");
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).value()).as("the results page's terms").isEqualTo("example.net");
+            assertThat(host.contentPresentation(item.tab()).location()).as("the tab keeps the address")
+                .isEqualTo("https://google.com/search?q=example.net");
+
+            host.setSetting(ID, "search_engine", "duckduckgo");
+            view.type(BrowserToolbar.ADDRESS, "what is jcef");
+            view.press(BrowserToolbar.ADDRESS, "ENTER");
+            assertThat(item.page().address()).isEqualTo("https://duckduckgo.com/?q=what+is+jcef");
+            view.emit(new UiEvent.SuggestionChosen(BrowserToolbar.ADDRESS, "navigate:chrome://version", false));
+            assertThat(item.page().address()).as("a row that loads nothing").isEqualTo("https://duckduckgo.com/?q=what+is+jcef");
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /**
+     * Spec section 6: a search engine's results page shows its terms in the field, while the tab, the saved state and
+     * the site icon keep its address; Escape shows the terms again.
+     */
+    @Test void aResultsPageShowsItsTermsInTheField() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            String results = "https://www.bing.com/search?q=what+is+jcef&form=QBLH";
+            var item = items(host, page -> { }).open(URI.create(results), TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var view = host.contentView(ID, "www.bing.com").orElseThrow();
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).value()).isEqualTo("what is jcef");
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).leadingDrag()).contains(results);
+            assertThat(host.contentPresentation(item.tab()).location()).isEqualTo(results);
+            assertThat(host.restoreState(item.tab()).orElseThrow().values()).containsEntry("url", results);
+            view.clickInto(BrowserToolbar.ADDRESS);
+            assertThat(view.fieldSelection(BrowserToolbar.ADDRESS)).containsExactly(0, "what is jcef".length());
+            view.type(BrowserToolbar.ADDRESS, "other");
+            view.press(BrowserToolbar.ADDRESS, "ESCAPE");
+            assertThat(Views.field(view, BrowserToolbar.ADDRESS).value()).isEqualTo("what is jcef");
+            assertThat(view.fieldSelection(BrowserToolbar.ADDRESS)).containsExactly(0, "what is jcef".length());
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Plan 4b's P24: a local path, a local scheme or a password typed into the field never reaches the search engine. */
+    @Test void typedLocalPathsAndPasswordsAskTheEngineNothing() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
+            var later = new Later();
+            items(host, page -> { }, later, new Fetches()).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+            var view = host.contentView(ID, "example.com").orElseThrow();
+            for (String text : List.of("/Users/me/secret.html", "~/notes", "file:///etc/hosts", "about:blank", "jasper-about:welcome",
+                    "https://ada:s", "https://ada:secret@example.com/")) {
+                view.type(BrowserToolbar.ADDRESS, text);
+                assertThat(later.waiting()).as(text).isEmpty();
+                assertThat(Views.field(view, BrowserToolbar.ADDRESS).suggestionsLoading()).as(text).isFalse();
+                assertThat(view.suggestions(BrowserToolbar.ADDRESS)).as(text).isNotEmpty();
+            }
+            view.type(BrowserToolbar.ADDRESS, "");
+            assertThat(view.suggestions(BrowserToolbar.ADDRESS)).isEmpty();
+            assertThat(later.waiting()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        } });
+    }
+
+    /** Escape and closing the item end the wait for suggestions, and an answer arriving after either is dropped. */
+    @Test void escapeAndClosingEndTheSuggestions() throws Exception {
+        var later = new Later();
+        var fetches = new Fetches();
+        var host = onUi(FakePluginHost::new);
+        try {
+            onUi(() -> {
+                var item = items(host, page -> { }, later, fetches).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
+                var shown = host.contentView(ID, "example.com").orElseThrow();
+                shown.type(BrowserToolbar.ADDRESS, "jc");
+                shown.press(BrowserToolbar.ADDRESS, "ESCAPE");
+                assertThat(later.waiting()).isEmpty();
+                assertThat(Views.field(shown, BrowserToolbar.ADDRESS).suggestions()).isEmpty();
+                assertThat(Views.field(shown, BrowserToolbar.ADDRESS).value()).isEqualTo("https://example.com");
+                shown.type(BrowserToolbar.ADDRESS, "jc");
+                later.end();
+                shown.press(BrowserToolbar.ADDRESS, "ESCAPE");
+                shown.type(BrowserToolbar.ADDRESS, "jcef");
+                later.end();
+                item.close();
+                return null;
+            });
+            assertThat(fetches.answers).hasSize(2).allSatisfy(answer -> assertThat(answer).as("ended").isCancelled());
+            fetches.answers.forEach(answer -> answer.complete(List.of("late")));
+            onUi(() -> {
+                assertThat(host.failures()).isEmpty();
+                return null;
+            });
+        } finally {
+            onUi(() -> {
+                host.close();
+                return null;
+            });
+        }
+    }
+
     /** A waiting item at {@code url}, as a restore after a run that ended while Chromium ran opens it. UI thread. */
     private static BrowserItem waiting(BrowserItems items, URI url) {
         var item = BrowserItem.open(items, url, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty(), true);
@@ -566,10 +778,74 @@ class BrowserItemTest {
         return parent;
     }
 
-    /** The items of a started stand-in plugin whose pages {@code start} makes. UI thread. */
-    private static BrowserItems items(FakePluginHost host, Consumer<Page> start) {
+    /**
+     * The items of a started stand-in plugin whose pages {@code start} makes, with the plugin's settings. Their address
+     * fields' suggestion delays wait for {@code later} and their engine suggestions come from {@code fetches}. UI thread.
+     */
+    private static BrowserItems items(FakePluginHost host, Consumer<Page> start, Later later, Fetches fetches) {
         var context = new AtomicReference<PluginContext>();
-        host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), context::set);
-        return new BrowserItems(context.get(), start);
+        var settings = new AtomicReference<BrowserSettings.Declared>();
+        host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of()), Set.of(), Set.of(), plugin -> {
+            context.set(plugin);
+            settings.set(BrowserSettings.declare(plugin.settings()));
+        });
+        return new BrowserItems(context.get(), settings.get()::read, start, later, fetches);
+    }
+
+    /** As {@link #items(FakePluginHost, Consumer, Later, Fetches)}, with delays that never end and fetches nobody answers. */
+    private static BrowserItems items(FakePluginHost host, Consumer<Page> start) {
+        return items(host, start, new Later(), new Fetches());
+    }
+
+    /** The UI thread's delays, which wait until the test runs them. UI thread. */
+    private static final class Later implements BiFunction<Duration, Runnable, Runnable> {
+        private final List<Delayed> waiting = new ArrayList<>();
+
+        private record Delayed(Duration delay, Runnable task) { }
+
+        @Override public Runnable apply(Duration delay, Runnable task) {
+            var delayed = new Delayed(delay, task);
+            waiting.add(delayed);
+            return () -> waiting.remove(delayed);
+        }
+
+        List<Duration> waiting() {
+            return waiting.stream().map(Delayed::delay).toList();
+        }
+
+        /** Each delay waiting ends, and its task runs. */
+        void end() {
+            var due = List.copyOf(waiting);
+            waiting.clear();
+            due.forEach(delayed -> delayed.task().run());
+        }
+    }
+
+    /** The engine's suggestions, which the test answers: each request and its answer, in order. Any thread. */
+    private static final class Fetches implements Function<URI, CompletableFuture<List<String>>> {
+        final List<URI> asked = new CopyOnWriteArrayList<>();
+        final List<CompletableFuture<List<String>>> answers = new CopyOnWriteArrayList<>();
+
+        @Override public CompletableFuture<List<String>> apply(URI request) {
+            asked.add(request);
+            var answer = new CompletableFuture<List<String>>();
+            answers.add(answer);
+            return answer;
+        }
+    }
+
+    private static <T> T onUi(Callable<T> task) throws Exception {
+        var result = new AtomicReference<T>();
+        var failure = new AtomicReference<Throwable>();
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                result.set(task.call());
+            } catch (Throwable thrown) {
+                failure.set(thrown);
+            }
+        });
+        if (failure.get() instanceof Error error) throw error;
+        if (failure.get() instanceof Exception exception) throw exception;
+        return result.get();
     }
 }

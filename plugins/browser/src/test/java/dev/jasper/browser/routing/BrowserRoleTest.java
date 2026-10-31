@@ -473,7 +473,7 @@ class BrowserRoleTest {
             host.start(new PluginInfo(ID, "Browser", "0.1.0", Set.of("browser.provide")), Set.of(), Set.of(), plugin -> {
                 context.set(plugin);
                 var settings = BrowserSettings.declare(plugin.settings());
-                items.set(new BrowserItems(plugin, page -> { }));
+                items.set(new BrowserItems(plugin, settings::read, page -> { }));
                 plugin.platform().browser(new BrowserRole(plugin, items.get(), settings, chromium::get));
             });
             result.set(new Started(host, context.get(), items.get(), shown, shell, pane, chromium));

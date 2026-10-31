@@ -3,6 +3,7 @@ package dev.jasper.browser.item;
 import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.restore.BrowserRestore;
+import dev.jasper.browser.settings.BrowserSettings;
 import dev.jasper.sdk.RestoreState;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -10,15 +11,22 @@ import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.IconAsset;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import javax.swing.Timer;
 
 /**
  * The plugin's open browser items, in every window: it opens them, finds one by the OSC 8 target it was opened for,
- * and knows each window's focused one. It registers the globe every item shows, and holds the fetcher of their pages'
- * favicons until {@link #close()}. A page is made, and Chromium so asked for, only when its item first shows. UI thread.
+ * and knows each window's focused one. It registers the globe every item shows, gives the items the settings, and holds
+ * the fetchers of their pages' favicons and their address fields' search suggestions until {@link #close()}. A page is
+ * made, and Chromium so asked for, only when its item first shows. UI thread.
  */
 public final class BrowserItems implements AutoCloseable {
     /** The globe: a browser item's tab icon, and its actions' and split item's. */
@@ -27,10 +35,15 @@ public final class BrowserItems implements AutoCloseable {
     private static final IconAsset GLOBE_ART = new IconAsset(GLOBE, "M 1.7 8 A 6.3 6.3 0 1 0 14.3 8 A 6.3 6.3 0 1 0 1.7 8 Z "
         + "M 1.7 8 L 14.3 8 M 8 1.7 A 2.7 6.3 0 1 0 8 14.3 A 2.7 6.3 0 1 0 8 1.7 Z");
     private final PluginContext context;
+    private final Supplier<BrowserSettings> settings;
     private final Consumer<Page> start;
+    private final BiFunction<Duration, Runnable, Runnable> later;
+    private final Function<URI, CompletableFuture<List<String>>> suggest;
     private final List<BrowserItem> open = new java.util.ArrayList<>();
     // Made with the first item; it makes its HTTP client only once a page names a favicon.
     private Favicons favicons;
+    // Made with the first suggestion request.
+    private SuggestionFetcher suggestions;
     private boolean closed;
 
     /**
@@ -38,11 +51,25 @@ public final class BrowserItems implements AutoCloseable {
      * records them, as a page cannot be made without Chromium.
      *
      * @param context the plugin's context; while it starts, as the globe is registered now
+     * @param settings the settings as they are now, which the items read each time they search or suggest
      * @param start makes a page, the first time its item shows
      */
-    public BrowserItems(PluginContext context, Consumer<Page> start) {
+    public BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, Consumer<Page> start) {
+        this(context, settings, start, BrowserItems::onUiAfter, null);
+    }
+
+    /**
+     * As {@link #BrowserItems(PluginContext, Supplier, Consumer)}, with {@code later} running a task on the UI thread
+     * after a delay, answering what cancels it, and {@code suggest} fetching an engine's suggestions; null fetches them
+     * with the plugin's own {@link SuggestionFetcher}.
+     */
+    BrowserItems(PluginContext context, Supplier<BrowserSettings> settings, Consumer<Page> start,
+                 BiFunction<Duration, Runnable, Runnable> later, Function<URI, CompletableFuture<List<String>>> suggest) {
         this.context = Objects.requireNonNull(context, "context");
+        this.settings = Objects.requireNonNull(settings, "settings");
         this.start = Objects.requireNonNull(start, "start");
+        this.later = Objects.requireNonNull(later, "later");
+        this.suggest = suggest == null ? this::fetchSuggestions : suggest;
         context.kit().registerIcon(GLOBE_ART);
     }
 
@@ -116,10 +143,13 @@ public final class BrowserItems implements AutoCloseable {
         context.settings().show();
     }
 
-    /** The plugin stops: the favicon fetches under way end, and no page fetches one from now on. */
+    /**
+     * The plugin stops: the favicon and suggestion fetches under way end, and no page or field fetches one from now on.
+     */
     @Override public void close() {
         closed = true;
         if (favicons != null) favicons.close();
+        if (suggestions != null) suggestions.close();
     }
 
     /** The fetcher of the items' pages' favicons; one that fetches nothing once the plugin has stopped. */
@@ -133,6 +163,42 @@ public final class BrowserItems implements AutoCloseable {
 
     PluginContext context() {
         return context;
+    }
+
+    /** The settings as they are now. */
+    BrowserSettings settings() {
+        return settings.get();
+    }
+
+    /** Whether the plugin has stopped. */
+    boolean closed() {
+        return closed;
+    }
+
+    /** Runs {@code task} on the UI thread after {@code delay}; the answer cancels it. */
+    Runnable later(Duration delay, Runnable task) {
+        return later.apply(delay, task);
+    }
+
+    /** An engine's suggestions at {@code request}; none once the plugin has stopped. */
+    CompletableFuture<List<String>> suggest(URI request) {
+        return suggest.apply(request);
+    }
+
+    private CompletableFuture<List<String>> fetchSuggestions(URI request) {
+        if (suggestions == null) {
+            suggestions = new SuggestionFetcher(context.background());
+            if (closed) suggestions.close();
+        }
+        return suggestions.fetch(request);
+    }
+
+    /** A UI-thread timer that runs {@code task} once, after {@code delay}. */
+    private static Runnable onUiAfter(Duration delay, Runnable task) {
+        var timer = new Timer((int) delay.toMillis(), event -> task.run());
+        timer.setRepeats(false);
+        timer.start();
+        return timer::stop;
     }
 
     /** An item first shows: its page is made. */

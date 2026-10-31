@@ -21,16 +21,19 @@ import dev.jasper.sdk.ui.TabPlacement;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.sdk.ui.ViewSpec;
+import java.awt.EventQueue;
 import java.awt.event.HierarchyEvent;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import javax.swing.JComponent;
 
 /**
@@ -39,10 +42,13 @@ import javax.swing.JComponent;
  * tab shows the page's title (as {@link TabTitle} gives it), its icon and, as its location and status, the page's
  * address, which the address field shows too, each without a user name or password. The icon, in the tab and at the
  * field's left, is the page's favicon once the page has loaded, Jasper's own icon on Jasper's {@code jasper-about:}
- * pages, and the globe while the page loads and whenever it has no favicon (spec sections 5 and 6). Its content
- * commands {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, the mouse's back and forward
- * buttons over the page go back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry
- * of the page's history. It saves its URL and target with Jasper's workspace
+ * pages, and the globe while the page loads and whenever it has no favicon (spec sections 5 and 6). As the user types
+ * into the address field, it lists the field's {@link Suggestions} at once and asks the chosen engine for its own 150
+ * ms after the last keystroke, each keystroke superseding the request before; Tab or Enter on a suggestion loads it,
+ * and Enter with none shown loads what the text resolves to, each then focusing the page. Its content commands
+ * {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, the mouse's back and forward buttons over
+ * the page go back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's
+ * history. It saves its URL and target with Jasper's workspace
  * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
@@ -53,6 +59,9 @@ public final class BrowserItem implements AutoCloseable {
     /** A waiting item's placeholder, and its Load Page button and the action it reports. */
     static final String WAITING = "browser.waiting", LOAD_PAGE = "browser.waiting.load";
     private static final ControlState HIDDEN = new ControlState(false, true, false, "");
+    // How long after the last keystroke the engine is asked for suggestions.
+    private static final Duration SUGGESTION_DELAY = Duration.ofMillis(150);
+    private static final Runnable NOTHING = () -> { };
     // Each item's own: reopening a content key selects the tab that has it.
     private static final String KEY = "browser:";
     // The longest address the tab's location and status show; a data: address can run to megabytes.
@@ -66,6 +75,9 @@ public final class BrowserItem implements AutoCloseable {
     private URI url;
     private String title;
     private boolean waiting, asked, closed;
+    // Cancels the wait for the typing to pause; and the engine's answer the field waits for, or null.
+    private Runnable typingPause = NOTHING;
+    private CompletableFuture<List<String>> suggestion;
 
     private BrowserItem(BrowserItems items, URI url, Optional<String> target, boolean waiting) {
         this.items = items;
@@ -170,6 +182,7 @@ public final class BrowserItem implements AutoCloseable {
         Objects.requireNonNull(url, "url");
         if (closed) return;
         toolbar.restore();
+        endSuggestions();
         page.load(url);
         if (!asked && tab != null) tab.setRestore(restore(url));
         endWait();
@@ -265,6 +278,7 @@ public final class BrowserItem implements AutoCloseable {
 
     private void closed() {
         closed = true;
+        endSuggestions();
         items.closed(this);
         view.close();
         page.close();
@@ -324,8 +338,11 @@ public final class BrowserItem implements AutoCloseable {
         switch (event) {
             case UiEvent.Edited edited when edited.id().equals(BrowserToolbar.ADDRESS) -> {
                 toolbar.edited(edited.text());
+                suggest(edited.text());
                 render();
             }
+            case UiEvent.SuggestionChosen chosen when chosen.fieldId().equals(BrowserToolbar.ADDRESS) ->
+                Suggestions.target(chosen.suggestionId(), items.settings()).ifPresent(this::loadAndFocus);
             case UiEvent.Action action -> act(action.id());
             default -> { }
         }
@@ -337,12 +354,10 @@ public final class BrowserItem implements AutoCloseable {
             case BrowserToolbar.FORWARD -> goForward();
             case BrowserToolbar.RELOAD -> reload();
             case BrowserToolbar.STOP -> stop();
-            case BrowserToolbar.ENTER -> toolbar.enter(page.address()).ifPresent(address -> {
-                load(address);
-                page.focus();
-            });
+            case BrowserToolbar.ENTER -> toolbar.enter(page.address(), items.settings()).ifPresent(this::loadAndFocus);
             case BrowserToolbar.ESCAPE -> {
                 toolbar.restore();
+                endSuggestions();
                 render();
                 view.selectAll(BrowserToolbar.ADDRESS);
             }
@@ -354,6 +369,47 @@ public final class BrowserItem implements AutoCloseable {
             // An entry of Back's or Forward's hold menu.
             default -> NavigationHistory.entryId(action).ifPresent(page::goToHistoryEntry);
         }
+    }
+
+    /** The address field loads {@code address}, and the page takes the focus. */
+    private void loadAndFocus(URI address) {
+        load(address);
+        page.focus();
+    }
+
+    /**
+     * The field's text is now {@code typed}: the request before is superseded, and unless P24 keeps the text from the
+     * engine, the engine is asked once the typing pauses.
+     */
+    private void suggest(String typed) {
+        endSuggestions();
+        Optional<URI> request = Suggestions.request(typed, items.settings());
+        if (request.isEmpty()) return;
+        toolbar.suggesting();
+        typingPause = items.later(SUGGESTION_DELAY, () -> askEngine(request.get()));
+    }
+
+    /** The typing paused: the engine is asked, and its answer, while the field still waits for it, joins the list. */
+    private void askEngine(URI request) {
+        typingPause = NOTHING;
+        if (closed || items.closed()) return;
+        CompletableFuture<List<String>> answer = items.suggest(request);
+        suggestion = answer;
+        answer.whenComplete((suggestions, failure) -> EventQueue.invokeLater(() -> {
+            if (answer != suggestion || closed) return;
+            suggestion = null;
+            toolbar.suggested(failure == null ? suggestions : List.of());
+            render();
+        }));
+    }
+
+    /** The field waits for the engine no more: the pause and the request under way end, and a late answer is dropped. */
+    private void endSuggestions() {
+        typingPause.run();
+        typingPause = NOTHING;
+        CompletableFuture<List<String>> asked = suggestion;
+        suggestion = null;
+        if (asked != null) asked.cancel(true);
     }
 
     private void render() {
@@ -384,7 +440,7 @@ public final class BrowserItem implements AutoCloseable {
 
     private ViewSpec spec() {
         Nodes.Node bar = toolbar.node(shown(page.address()), page.loading(), page.canGoBack(), page.canGoForward(), icon(),
-            page.history());
+            page.history(), items.settings());
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,

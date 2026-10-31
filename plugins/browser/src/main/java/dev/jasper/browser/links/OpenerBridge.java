@@ -1,9 +1,9 @@
 package dev.jasper.browser.links;
 
+import dev.jasper.browser.http.WebFetch;
 import dev.jasper.browser.links.Isolation.OpenerPolicy;
 import dev.jasper.browser.links.Isolation.Sandbox;
 import dev.jasper.browser.page.Activation;
-import dev.jasper.browser.page.Favicons;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
 import dev.jasper.browser.page.PageEvents;
@@ -618,7 +618,7 @@ final class OpenerBridge {
     private static Optional<URI> webAddress(String url) {
         if (url.length() > ICON_LIMIT) return Optional.empty();
         try {
-            return Optional.of(new URI(url)).filter(Favicons::fetches);
+            return Optional.of(new URI(url)).filter(WebFetch::fetches);
         } catch (URISyntaxException notAUri) {
             return Optional.empty();
         }

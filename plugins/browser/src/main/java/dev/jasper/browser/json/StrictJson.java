@@ -8,9 +8,10 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * JSON from a page or from Chromium, as the JDK reads none: one object, read whole and strictly, no deeper than its
- * reader allows. Anything else, such as a repeated name, text after the object, a trailing comma, a raw control
- * character or an escape other than JSON's, is nothing. Nesting is bounded, so no text can exhaust the stack.
+ * JSON from a page, from Chromium or from a search engine, as the JDK reads none: one object or one array, read whole
+ * and strictly, no deeper than its reader allows. Anything else, such as a repeated name, text after the value, a
+ * trailing comma, a raw control character or an escape other than JSON's, is nothing. Nesting is bounded, so no text
+ * can exhaust the stack.
  */
 public final class StrictJson {
     /** What JSON's {@code null} reads as. */
@@ -45,7 +46,29 @@ public final class StrictJson {
         }
     }
 
-    /** Not such an object. Carries no stack: it only ends the reading. */
+    /**
+     * The values of {@code text}, one JSON array, such as a search engine's OpenSearch suggestions; each value reads as
+     * {@link #object(String, int)} reads a member's.
+     *
+     * @param text the text, from the web; the caller bounds its length
+     * @param maxDepth how many arrays and objects may nest, the array itself the first: 1 takes a flat array
+     * @return the values; empty for anything else, never an exception
+     */
+    public static Optional<List<Object>> array(String text, int maxDepth) {
+        if (text == null) return Optional.empty();
+        try {
+            var reader = new Reader(text, maxDepth);
+            reader.space();
+            if (!reader.next('[')) return Optional.empty();
+            List<Object> values = reader.array();
+            reader.space();
+            return reader.at == text.length() ? Optional.of(values) : Optional.empty();
+        } catch (Malformed malformed) {
+            return Optional.empty();
+        }
+    }
+
+    /** Not such an object or array. Carries no stack: it only ends the reading. */
     private static final class Malformed extends Exception {
         Malformed() {
             super(null, null, false, false);
@@ -96,7 +119,8 @@ public final class StrictJson {
             return members;
         }
 
-        private List<Object> array() throws Malformed {
+        /** The array whose bracket is next, one level deeper. */
+        List<Object> array() throws Malformed {
             enter();
             var values = new ArrayList<>();
             space();

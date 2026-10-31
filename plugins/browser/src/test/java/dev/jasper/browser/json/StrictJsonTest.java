@@ -45,4 +45,16 @@ class StrictJsonTest {
         assertThat(StrictJson.object("{\"a\":[[{\"b\":[]}]]}", 4)).isEmpty();
         assertThat(StrictJson.object("{\"a\":" + "[".repeat(100_000), 8)).as("no stack overflow").isEmpty();
     }
+
+    /** A search engine's OpenSearch suggestions are one array, read as strictly and within the same kind of bound. */
+    @Test void oneWholeArrayReadsAsItsValues() {
+        assertThat(StrictJson.array(" [ \"jc\" , [ \"jcef\" , \"caf\\u00e9\" ] , [ ] , { \"k\" : [ 1 ] } ] ", 3))
+            .hasValue(List.of("jc", List.of("jcef", "caf\u00e9"), List.of(), Map.of("k", List.of(1L))));
+        assertThat(StrictJson.array("[]", 1)).hasValue(List.of());
+        for (String text : new String[] {null, "", "{}", "\"x\"", "[] []", "[1,]", "[1 2]", "[\"a\"", "[{\"a\":1,\"a\":2}]"})
+            assertThat(StrictJson.array(text, 8)).as(String.valueOf(text)).isEmpty();
+        assertThat(StrictJson.array("[[1]]", 1)).isEmpty();
+        assertThat(StrictJson.array("[[1]]", 2)).isPresent();
+        assertThat(StrictJson.array("[" + "[".repeat(100_000), 8)).as("no stack overflow").isEmpty();
+    }
 }
