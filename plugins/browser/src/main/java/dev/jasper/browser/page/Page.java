@@ -22,10 +22,10 @@ import org.cef.browser.CefFrame;
 
 /**
  * One page as its item drives it, in plain types: the canvas it is drawn on, where it is, its title and favicon,
- * whether it loads, where it can go and its history, and what it is asked to do. Its Chromium browser is made only
- * once {@link #start} asks for it, the first time its item shows; until then the page holds the address it will load
- * and asks nothing of Chromium. Every method runs on the UI thread, and so does every callback it makes. This is the
- * one class that makes a {@link PageView}.
+ * whether it loads, where it can go and its history, its find in page, and what it is asked to do. Its Chromium
+ * browser is made only once {@link #start} asks for it, the first time its item shows; until then the page holds the
+ * address it will load and asks nothing of Chromium. Every method runs on the UI thread, and so does every callback it
+ * makes. This is the one class that makes a {@link PageView}.
  */
 public final class Page implements AutoCloseable {
     private final PageView view = new PageView();
@@ -57,6 +57,8 @@ public final class Page implements AutoCloseable {
     private NavigationHistory.History history = NavigationHistory.History.EMPTY;
     private boolean readingHistory, historyStale;
     private boolean loading, canGoBack, canGoForward, started, ready, closed;
+    // The page's find in page, made the first time it is asked for.
+    private PageFind find;
     private PageBrowser browser;
     // The address the browser was made with, which it loads by itself.
     private String made;
@@ -267,6 +269,48 @@ public final class Page implements AutoCloseable {
             iconFetch = null;
             faviconArrived(document, failure == null ? image : Optional.empty());
         }));
+    }
+
+    /**
+     * The page's find in page, which searches the frames of its browser once it has one: none before.
+     *
+     * @return the find, made the first time it is asked for
+     */
+    public PageFind find() {
+        if (find == null) {
+            find = PageFind.of(this);
+            if (closed) find.close();
+        }
+        return find;
+    }
+
+    /**
+     * A frame of the page answers a search of its find, as {@code find.js} reports through the opener bridge, which has
+     * checked the answer's shape and bounds; the find takes it only for its search under way and from a frame it
+     * reached. Nothing before the page's find is made, or after {@link #close()}.
+     *
+     * @param frame the identifier of the frame that answered, as Chromium names it
+     * @param search the search the answer is for
+     * @param count the frame's matches
+     * @param invalid whether the frame found the query no regular expression
+     */
+    public void findAnswered(String frame, long search, int count, boolean invalid) {
+        Objects.requireNonNull(frame, "frame");
+        if (!closed && find != null) find.answered(frame, search, count, invalid);
+    }
+
+    /**
+     * A frame of the page answers its find's request for the selection, as {@code find.js} reports through the opener
+     * bridge; the find takes it only for its request under way and from the frame it asked.
+     *
+     * @param frame the identifier of the frame that answered
+     * @param search the request the answer is for
+     * @param selection the frame's selected text
+     */
+    public void findSelected(String frame, long search, String selection) {
+        Objects.requireNonNull(frame, "frame");
+        Objects.requireNonNull(selection, "selection");
+        if (!closed && find != null) find.selected(frame, search, selection);
     }
 
     /**
@@ -516,6 +560,7 @@ public final class Page implements AutoCloseable {
         itemShower = () -> { };
         dialogPlace = null;
         dropFaviconFetch();
+        if (find != null) find.close();
         view.setHoverUrl("");
         PageBrowser page = browser;
         if (page != null) page.close(true);
@@ -604,6 +649,11 @@ public final class Page implements AutoCloseable {
         return ready ? browser : null;
     }
 
+    /** Has the page find with {@code replacement} from now on, as a test's recording one. */
+    void useFind(PageFind replacement) {
+        find = Objects.requireNonNull(replacement, "replacement");
+    }
+
     /**
      * A read of the page's history gave {@code read}, or {@link NavigationHistory.History#EMPTY} when it failed: the
      * page's history from now on, and the page reads it again if it changed since the read began.
@@ -630,10 +680,11 @@ public final class Page implements AutoCloseable {
     /**
      * The main frame started loading {@code url}: the page has no title until the new document gives one, whatever
      * Chromium reports for a document without one, and no favicon until the new document names one. A favicon still
-     * being fetched for the document before is dropped.
+     * being fetched for the document before is dropped, and the find's search ends.
      */
     void loadStarted(String url) {
         if (closed) return;
+        if (find != null) find.dropped();
         dropFaviconFetch();
         declaredIcon = null;
         boolean cleared = !title.isEmpty() || favicon.isPresent();

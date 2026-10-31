@@ -7,7 +7,8 @@
  * {@code window.open} the same way and keeps the popup's {@code window.opener} working through the client's message
  * router, within the limits {@code Isolation} reads from each main frame's response: its origin, a sandbox, and its
  * opener policy. The router serves the {@code page} package's scripts too, each request by its op: a document's
- * favicon goes to its {@link dev.jasper.browser.page.Page}, when {@code http} would fetch it. Depends on {@code engine},
- * {@code http}, {@code json} and {@code page}; it loads only once a page first asks for Chromium.
+ * favicon goes to its {@link dev.jasper.browser.page.Page}, when {@code http} would fetch it, and what a frame's
+ * {@code find.js} found to the page's {@link dev.jasper.browser.page.PageFind}, from any frame of the page. Depends on
+ * {@code engine}, {@code http}, {@code json} and {@code page}; it loads only once a page first asks for Chromium.
  */
 package dev.jasper.browser.links;

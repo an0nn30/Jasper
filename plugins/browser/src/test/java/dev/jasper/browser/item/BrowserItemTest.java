@@ -308,7 +308,7 @@ class BrowserItemTest {
     @Test void itsCopyAndPasteAreContentCommandsWithNoKeyOfTheirOwn() throws Exception {
         SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             var item = items(host, page -> { }).open(EXAMPLE, TabPlacement.NEW_TAB, Optional.empty(), Optional.empty());
-            var commands = host.contentCommands(item.tab());
+            var commands = host.contentCommands(item.tab()).subList(0, 2);
             assertThat(commands).extracting(dev.jasper.sdk.ui.ContentCommand::id).containsExactly("copy", "paste");
             assertThat(commands).extracting(dev.jasper.sdk.ui.ContentCommand::title).containsExactly("Copy", "Paste");
             assertThat(commands).allSatisfy(command -> {
@@ -328,8 +328,9 @@ class BrowserItemTest {
             var root = host.contentView(ID, "example.com").orElseThrow().spec().root();
             assertThat(root).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Split.class, split -> {
                 assertThat(split.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.SplitKind.DOCUMENT);
-                assertThat(split.children()).extracting(dev.jasper.sdk.ui.Nodes.Node::id).containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE);
-                assertThat(split.children().getLast()).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Custom.class, page -> {
+                assertThat(split.children()).extracting(dev.jasper.sdk.ui.Nodes.Node::id)
+                    .containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserFindBar.ROOT);
+                assertThat(split.children().get(1)).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Custom.class, page -> {
                     assertThat(page.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.CustomKind.PREVIEW);
                     assertThat(page.contentId()).isEqualTo(BrowserItem.CONTENT);
                 });
@@ -442,9 +443,10 @@ class BrowserItemTest {
             var item = waiting(items(host, asked::add), EXAMPLE);
             var view = host.contentView(ID, "example.com").orElseThrow();
             var root = (Nodes.Split) view.spec().root();
-            assertThat(root.children()).extracting(Nodes.Node::id).containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserItem.WAITING);
+            assertThat(root.children()).extracting(Nodes.Node::id)
+                .containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserItem.WAITING, BrowserFindBar.ROOT);
             assertThat(root.children().get(1).state().visible()).as("the page's canvas").isFalse();
-            assertThat(root.children().getLast()).isInstanceOfSatisfying(Nodes.Empty.class, placeholder -> {
+            assertThat(root.children().get(2)).isInstanceOfSatisfying(Nodes.Empty.class, placeholder -> {
                 assertThat(placeholder.state().visible()).isTrue();
                 assertThat(placeholder.title()).isEqualTo("Jasper closed while this page was open.");
                 assertThat(placeholder.actions()).singleElement().isInstanceOfSatisfying(Nodes.Button.class, button -> {
@@ -485,8 +487,8 @@ class BrowserItemTest {
                 assertThat(item.waiting()).isFalse();
                 assertThat(asked).containsExactly(item.page());
                 var root = (Nodes.Split) view.spec().root();
-                assertThat(root.children()).extracting(Nodes.Node::id).containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE);
-                assertThat(root.children().getLast().state().visible()).isTrue();
+                assertThat(root.children()).extracting(Nodes.Node::id).containsExactly(BrowserToolbar.BAR, BrowserItem.PAGE, BrowserFindBar.ROOT);
+                assertThat(root.children().get(1).state().visible()).isTrue();
                 assertThat(item.page().address()).as("what it loads").isEqualTo("https://example.com");
                 parent.remove(item.pageView());
                 parent.add(item.pageView());

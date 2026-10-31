@@ -46,9 +46,11 @@ import javax.swing.JComponent;
  * into the address field, it lists the field's {@link Suggestions} at once and asks the chosen engine for its own 150
  * ms after the last keystroke, each keystroke superseding the request before; Tab or Enter on a suggestion loads it,
  * and Enter with none shown loads what the text resolves to, each then focusing the page. Its content commands
- * {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, the mouse's back and forward buttons over
- * the page go back and forward, and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's
- * history. It saves its URL and target with Jasper's workspace
+ * {@code copy} and {@code paste} are what Jasper's Copy and Paste run in it, and {@code find}, {@code find-next} and
+ * {@code find-previous}, on the keys of Editor tabs, what Jasper's Find, Find Next and Find Previous run: its
+ * {@link BrowserFindBar}, the view's last row. The mouse's back and forward buttons over the page go back and forward,
+ * and an entry chosen from Back's or Forward's hold menu goes to that entry of the page's history. It saves its URL and
+ * target with Jasper's workspace
  * ({@link BrowserRestore}): what it loads first until it shows, then where each committed navigation takes its page.
  * Restored after a run that ended while Chromium ran, an item waits: in place of the canvas it says that Jasper closed
  * while the page was open, and it asks for its page only once the user loads it, with its Load Page button, Enter in the
@@ -70,6 +72,7 @@ public final class BrowserItem implements AutoCloseable {
     private final Optional<String> target;
     private final Page page;
     private final BrowserToolbar toolbar = new BrowserToolbar();
+    private final BrowserFindBar findBar;
     private final UiView view;
     private ContentTab tab;
     private URI url;
@@ -91,6 +94,7 @@ public final class BrowserItem implements AutoCloseable {
         page.onShowItem(this::show);
         page.onAddressChange(this::committed);
         title = TabTitle.of("", host(url.toString()), "", false);
+        findBar = new BrowserFindBar(() -> closed ? Optional.empty() : Optional.of(page.find()), this::render, this::focusFind);
         view = items.context().kit().create(spec(), this::event);
         view.registerContent(new CustomContent(CONTENT, Nodes.CustomKind.PREVIEW, page.view(), page));
         page.view().addHierarchyListener(event -> {
@@ -135,9 +139,13 @@ public final class BrowserItem implements AutoCloseable {
             throw failure;
         }
         tab.setFocusTarget(this::focusContent);
-        // No key of their own: Jasper's Copy and Paste run them, on the keys the keymap gives those.
+        // Copy and Paste have no key of their own: Jasper's run them, on the keys the keymap gives those. Find's are the
+        // Editor's, which on macOS are Jasper's own.
         tab.setCommands(List.of(new ContentCommand("copy", "Copy", null, true, this::copy),
-            new ContentCommand("paste", "Paste", null, true, this::paste)));
+            new ContentCommand("paste", "Paste", null, true, this::paste),
+            new ContentCommand("find", "Find…", BrowserFindBar.findKey(), true, findBar::open),
+            new ContentCommand("find-next", "Find Next", BrowserFindBar.findAgainKey(false), true, findBar::next),
+            new ContentCommand("find-previous", "Find Previous", BrowserFindBar.findAgainKey(true), true, findBar::previous)));
         tab.onClosed(this::closed);
         // The page's alerts, confirmations and file choosers show over this item's tab, and close with it.
         page.setDialogPlace(new DialogPlace(items.context().kit(), items.context().windows(), tab));
@@ -276,6 +284,17 @@ public final class BrowserItem implements AutoCloseable {
         else page.focus();
     }
 
+    /** The find bar gives the focus to its query field, the field's text selected, or as it closes to the page. */
+    private void focusFind(String id) {
+        if (closed) return;
+        if (id.equals(PAGE)) {
+            focusContent();
+            return;
+        }
+        view.focus(id);
+        view.selectAll(id);
+    }
+
     private void closed() {
         closed = true;
         endSuggestions();
@@ -334,7 +353,7 @@ public final class BrowserItem implements AutoCloseable {
     }
 
     private void event(UiEvent event) {
-        if (closed) return;
+        if (closed || findBar.event(event)) return;
         switch (event) {
             case UiEvent.Edited edited when edited.id().equals(BrowserToolbar.ADDRESS) -> {
                 toolbar.edited(edited.text());
@@ -444,7 +463,7 @@ public final class BrowserItem implements AutoCloseable {
         // A waiting item keeps the canvas's slot, hidden: a slot that leaves the view closes its content, the page.
         Nodes.Node canvas = new Nodes.Custom(PAGE, waiting ? HIDDEN : ControlState.READY, CONTENT, Nodes.CustomKind.PREVIEW, "Web page");
         return new ViewSpec(new Nodes.Split(ROOT, ControlState.READY, Nodes.SplitKind.DOCUMENT,
-            waiting ? List.of(bar, canvas, placeholder()) : List.of(bar, canvas)));
+            waiting ? List.of(bar, canvas, placeholder(), findBar.node()) : List.of(bar, canvas, findBar.node())));
     }
 
     /** What a waiting item shows in place of its page: why it waits, and Load Page. */

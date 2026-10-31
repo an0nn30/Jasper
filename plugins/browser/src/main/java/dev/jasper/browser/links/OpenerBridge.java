@@ -1,12 +1,14 @@
 package dev.jasper.browser.links;
 
 import dev.jasper.browser.http.WebFetch;
+import dev.jasper.browser.json.StrictJson;
 import dev.jasper.browser.links.Isolation.OpenerPolicy;
 import dev.jasper.browser.links.Isolation.Sandbox;
 import dev.jasper.browser.page.Activation;
 import dev.jasper.browser.page.Page;
 import dev.jasper.browser.page.PageBrowser;
 import dev.jasper.browser.page.PageEvents;
+import dev.jasper.browser.page.PageFind;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.TabPlacement;
 import java.awt.EventQueue;
@@ -53,15 +55,18 @@ import org.cef.network.CefResponse;
  *
  * <p>The router is the one way Jasper's page scripts reach Jasper, so it serves the {@code page} package's scripts too:
  * a request's {@link Op op} says what it asks, and which of the page's frames may ask it. {@code favicon}, from
- * {@code detect-favicon.js}, tells the page the icon its document names (spec section 5).
+ * {@code detect-favicon.js}, tells the page the icon its document names (spec section 5); {@code find}, from
+ * {@code find.js}, tells the page's find what a frame found, or the text selected there (spec section 10).
  *
  * <p>Every frame and every script of a page can call the page function, so each request is untrusted, and the bridge
  * keeps the limits Chromium would:
  * <ul>
- *   <li>Each op is taken only from the frames it names. Every op so far is taken from a page's top frame alone, as the
- *   scripts live there and nowhere else (spec section 5 keeps page scripts out of challenge frames). A request from a
- *   frame its op does not take, one too long, and more than {@value #WAITING_LIMIT} waiting from one page are refused at
- *   once, on Chromium's thread.</li>
+ *   <li>Each op is taken only from the frames it names. {@code find} is taken from any frame of the page, as
+ *   {@code find.js} runs in each; every other op from a page's top frame alone, as its script lives there and nowhere
+ *   else (spec section 5 keeps page scripts out of challenge frames). A request from a frame its op does not take, one
+ *   too long, and more than {@value #WAITING_LIMIT} waiting from one page's main frame, or from its sub-frames
+ *   together, are refused at once, on Chromium's thread; the UI thread is told whether the main frame asked, and
+ *   refuses again what the frame may not ask.</li>
  *   <li>An {@code open} opens only what the page could open itself ({@link LinkRoute#opensFrom}), not from a document
  *   whose sandbox blocks popups, and needs and consumes the page's own {@link Activation}, which Jasper keeps from what
  *   it forwarded to the page.</li>
@@ -74,6 +79,9 @@ import org.cef.network.CefResponse;
  *   come from "null", and only messages for {@code "*"} reach it.</li>
  *   <li>A {@code favicon}'s icon is an absolute http or https address of at most {@value #ICON_LIMIT} characters,
  *   without a user name or password; the page takes it only from the document it still shows, and only its first.</li>
+ *   <li>A {@code find} answer is only shown: a search's id and a count of at most {@link PageFind#MAX_MATCHES}, or a
+ *   selection of at most {@link PageFind#MAX_QUERY} characters, which the page's find takes only for what it asked
+ *   under way, from a frame it asked, as Chromium names the frame.</li>
  * </ul>
  *
  * <p>A link ends as Chromium's window groups do: when the popup closes, when the user sends either page elsewhere
@@ -128,8 +136,9 @@ final class OpenerBridge {
     private final Map<Long, Link> links = new HashMap<>();
     // Each page's main frame, held weakly: its latest response until a document commits, and the document it shows.
     private final Map<Page, Frame> frames = new WeakHashMap<>();
-    // How many of each page's requests wait for the UI thread; a page leaves once none does.
-    private final Map<Page, Integer> waiting = new ConcurrentHashMap<>();
+    // How many requests of each page's main frame, and of its sub-frames together, wait for the UI thread; a queue
+    // leaves once none does.
+    private final Map<Waiters, Integer> waiting = new ConcurrentHashMap<>();
 
     /** A bridge with no links, which no page reaches until {@link #install} wires it to a client. */
     OpenerBridge() { }
@@ -202,7 +211,9 @@ final class OpenerBridge {
         /** Shows the other page of a link. */
         FOCUS("focus", false),
         /** The icon the document names. */
-        FAVICON("favicon", false);
+        FAVICON("favicon", false),
+        /** What a frame's search found, or the text selected there. */
+        FIND("find", true);
 
         private final String name;
         private final boolean subFrames;
@@ -226,6 +237,9 @@ final class OpenerBridge {
         }
     }
 
+    /** The requests of a page's main frame, or of its sub-frames together, which wait apart. */
+    private record Waiters(Page page, boolean mainFrame) { }
+
     /** What a main-frame response said that matters here, until its document commits. */
     private record Response(String url, OpenerPolicy policy, Sandbox sandbox) { }
 
@@ -238,15 +252,17 @@ final class OpenerBridge {
     }
 
     /**
-     * The document a request came from as Chromium's thread saw it when it took the request: its address, and what the
-     * bridge knew of it then. A request is judged by this, never by what the page shows by the time the UI thread
-     * answers, so a document cannot send as the one that replaces it.
+     * The document a request came from as Chromium's thread saw it when it took the request: its frame, its address, and
+     * what the bridge knew of the page's main frame's document then. A request is judged by this, never by what the page
+     * shows by the time the UI thread answers, so a document cannot send as the one that replaces it.
      *
-     * @param address the document's address
+     * @param frame the identifier of the frame that asked, as Chromium names it
+     * @param address the address of the asking frame's document
      * @param document what the bridge knew of it: its sandbox, opener policy and origin
      */
-    record Sender(String address, Document document) {
+    record Sender(String frame, String address, Document document) {
         Sender {
+            Objects.requireNonNull(frame, "frame");
             Objects.requireNonNull(document, "document");
         }
     }
@@ -293,8 +309,9 @@ final class OpenerBridge {
 
     /**
      * Whether a page's query may go on to the UI thread: one from a sub-frame whose op only a top frame may send, one too
-     * long, and one beyond the {@value #WAITING_LIMIT} the page may have waiting are answered at once. An admitted query
-     * is {@link #settled} once answered. Chromium's thread.
+     * long, and one beyond the {@value #WAITING_LIMIT} the page's main frame, or its sub-frames together, may have
+     * waiting are answered at once. The sub-frames wait apart, so a frame the page embeds keeps none of the page's own
+     * requests waiting. An admitted query is {@link #settled} once answered. Chromium's thread.
      *
      * @param page the page that asks
      * @param mainFrame whether its main frame asks
@@ -306,7 +323,7 @@ final class OpenerBridge {
         if (text == null) return Optional.of(MALFORMED_REQUEST);
         if (text.length() > REQUEST_LIMIT) return Optional.of(TOO_LONG);
         boolean[] admitted = new boolean[1];
-        waiting.compute(page, (key, count) -> {
+        waiting.compute(new Waiters(page, mainFrame), (key, count) -> {
             int now = count == null ? 0 : count;
             if (now >= WAITING_LIMIT) return count;
             admitted[0] = true;
@@ -319,9 +336,10 @@ final class OpenerBridge {
      * An admitted query of {@code page} has been answered. Any thread.
      *
      * @param page the page that asked
+     * @param mainFrame whether its main frame asked
      */
-    void settled(Page page) {
-        waiting.computeIfPresent(page, (key, count) -> count <= 1 ? null : count - 1);
+    void settled(Page page, boolean mainFrame) {
+        waiting.computeIfPresent(new Waiters(page, mainFrame), (key, count) -> count <= 1 ? null : count - 1);
     }
 
     /**
@@ -338,18 +356,19 @@ final class OpenerBridge {
      * lock a load start takes to record a new document. Chromium's thread, as it takes a request.
      *
      * @param page the page that asks
-     * @param address the main frame's address
+     * @param frame the identifier of the frame that asks
+     * @param address the asking frame's address
      * @return the sender
      */
-    Sender sender(Page page, Supplier<String> address) {
+    Sender sender(Page page, String frame, Supplier<String> address) {
         synchronized (lock) {
-            return new Sender(address.get(), document(page));
+            return new Sender(frame, address.get(), document(page));
         }
     }
 
     /**
      * Answers a page's request from the document it shows now: as {@link #request(Party, boolean, Sender, String, long)},
-     * with the sender taken at once.
+     * with the sender taken at once, from a frame without an identifier.
      *
      * @param sender the page that asked
      * @param mainFrame whether its main frame asked, rather than a sub-frame
@@ -359,7 +378,7 @@ final class OpenerBridge {
      * @return the answer
      */
     Answer request(Party sender, boolean mainFrame, String senderAddress, String text, long nowMillis) {
-        return request(sender, mainFrame, sender(sender.page(), () -> senderAddress), text, nowMillis);
+        return request(sender, mainFrame, sender(sender.page(), "", () -> senderAddress), text, nowMillis);
     }
 
     /**
@@ -383,6 +402,7 @@ final class OpenerBridge {
             case CLOSE -> close(sender, request);
             case FOCUS -> focus(sender, request, nowMillis);
             case FAVICON -> favicon(sender, from, request);
+            case FIND -> find(sender, from, request);
             case null -> MALFORMED_REQUEST;
         };
     }
@@ -433,7 +453,7 @@ final class OpenerBridge {
                     ended.add(link);
                 } else if (link.popup == page.page()) {
                     link.popupParty = page;
-                    script = SOURCE + "\n({\"opener\":" + BridgeJson.quote(Long.toString(link.id)) + ",\"closed\":" + (link.opener == null) + "});";
+                    script = SOURCE + "\n({\"opener\":" + StrictJson.quote(Long.toString(link.id)) + ",\"closed\":" + (link.opener == null) + "});";
                 }
             }
         }
@@ -480,19 +500,20 @@ final class OpenerBridge {
      * is answered as one; an {@link Error} is answered and then thrown on. UI thread.
      *
      * @param sender the page that asked
+     * @param mainFrame whether its main frame asked, as Chromium's thread read it
      * @param from the document that asked, as Chromium's thread saw it
      * @param text the request
      * @param nowMillis when it asked
      * @param reply told the answer
      */
-    void answer(Party sender, Sender from, String text, long nowMillis, Consumer<Answer> reply) {
+    void answer(Party sender, boolean mainFrame, Sender from, String text, long nowMillis, Consumer<Answer> reply) {
         Answer answer = new Answer(REFUSED, "Jasper could not answer this request.");
         try {
-            answer = request(sender, true, from, text, nowMillis);
+            answer = request(sender, mainFrame, from, text, nowMillis);
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "The opener bridge could not answer a page", failure);
         } finally {
-            settled(sender.page());
+            settled(sender.page(), mainFrame);
             reply.accept(answer);
         }
     }
@@ -624,6 +645,28 @@ final class OpenerBridge {
         }
     }
 
+    /**
+     * {@code find}: what {@code find.js} answers from one frame of the page, a search's count or the text selected
+     * there. Any script in that frame could send it, so it is held to its two shapes, a search's id and a count of at most
+     * {@link PageFind#MAX_MATCHES} with whether the pattern is invalid, or a request's id and a selection of at most
+     * {@link PageFind#MAX_QUERY} characters, and the page's find takes it only for what it asked under way, from a frame
+     * it asked, as Chromium named the frame that sent it.
+     */
+    private Answer find(Party sender, Sender asker, Map<String, Object> request) {
+        if (!(request.get("search") instanceof Long search) || search <= 0) return MALFORMED_REQUEST;
+        if (only(request, "search", "count", "invalid") && request.get("count") instanceof Long count && count >= 0
+                && count <= PageFind.MAX_MATCHES && request.get("invalid") instanceof Boolean invalid) {
+            sender.page().findAnswered(asker.frame(), search, count.intValue(), invalid);
+            return DONE;
+        }
+        if (only(request, "search", "selection") && request.get("selection") instanceof String selection
+                && selection.length() <= PageFind.MAX_QUERY) {
+            sender.page().findSelected(asker.frame(), search, selection);
+            return DONE;
+        }
+        return MALFORMED_REQUEST;
+    }
+
     /** The document {@code page}'s main frame shows, as far as the bridge has heard. The bridge's lock is held, or not needed. */
     private Document document(Page page) {
         synchronized (lock) {
@@ -748,7 +791,7 @@ final class OpenerBridge {
 
     /** A script that calls the page's bridge's {@code method} with {@code arguments}, each an escaped string literal. */
     private static String call(String method, String... arguments) {
-        return "(function(b){if(b)b." + method + "(" + Arrays.stream(arguments).map(BridgeJson::quote).collect(Collectors.joining(","))
+        return "(function(b){if(b)b." + method + "(" + Arrays.stream(arguments).map(StrictJson::quote).collect(Collectors.joining(","))
             + ");})(" + BRIDGE + ");";
     }
 
@@ -776,7 +819,7 @@ final class OpenerBridge {
         @Override public boolean onQuery(CefBrowser browser, CefFrame frame, long queryId, String request, boolean persistent,
                                          CefQueryCallback callback) {
             Page page = null;
-            boolean admitted = false;
+            boolean admitted = false, main = false;
             try {
                 PageBrowser shown = browser instanceof PageBrowser candidate ? candidate : null;
                 page = shown == null ? null : shown.owner();
@@ -784,7 +827,7 @@ final class OpenerBridge {
                     reply(callback, new Answer(REFUSED, "Jasper's opener bridge answers only a page's single requests."));
                     return true;
                 }
-                boolean main = frame != null && frame.isMain();
+                main = frame != null && frame.isMain();
                 Optional<Answer> refused = bridge.admit(page, main, request);
                 if (refused.isPresent()) {
                     reply(callback, refused.get());
@@ -792,13 +835,14 @@ final class OpenerBridge {
                 }
                 admitted = true;
                 Party sender = Party.of(shown, page);
-                Sender from = bridge.sender(page, frame::getURL);
+                Sender from = bridge.sender(page, frame.getIdentifier(), frame::getURL);
                 long now = System.currentTimeMillis();
-                EventQueue.invokeLater(() -> bridge.answer(sender, from, request, now, answer -> reply(callback, answer)));
+                boolean mainFrame = main;
+                EventQueue.invokeLater(() -> bridge.answer(sender, mainFrame, from, request, now, answer -> reply(callback, answer)));
                 return true;
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "The opener bridge could not take a page's request", failure);
-                if (admitted) bridge.settled(page);
+                if (admitted) bridge.settled(page, main);
                 reply(callback, new Answer(REFUSED, "Jasper could not answer this request."));
                 return true;
             }

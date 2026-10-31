@@ -89,4 +89,71 @@ public final class PageTestAccess {
     public static void historyRead(Page page, NavigationHistory.History history) {
         page.historyRead(history);
     }
+
+    /**
+     * A find for a page whose frames are {@code frames}, in that order, and whose focus is in {@code focused}: each script
+     * it would run in a frame is added to {@code ran} as the frame, a space and the command {@code find.js} is called
+     * with ({@link #findCommand}), and each wait for the frames' answers to {@code waits}, where it waits until the test
+     * runs it.
+     *
+     * @param frames the page's frames
+     * @param focused the frame with the focus, or empty
+     * @param ran told each script
+     * @param waits told each wait
+     * @return the find
+     */
+    public static PageFind recordingFind(java.util.List<String> frames, java.util.Optional<String> focused, java.util.List<String> ran,
+                                         java.util.List<Runnable> waits) {
+        return new PageFind(() -> frames, () -> focused, (frame, script) -> ran.add(frame + " " + findCommand(script)), (delay, task) -> {
+            waits.add(task);
+            return () -> waits.remove(task);
+        });
+    }
+
+    /**
+     * Has {@code page} find with {@code find} from now on.
+     *
+     * @param page a page
+     * @param find its find, such as a {@link #recordingFind}
+     */
+    public static void useFind(Page page, PageFind find) {
+        page.useFind(find);
+    }
+
+    /**
+     * A frame's {@code find.js} answers a search, as the message router hands it on. UI thread.
+     *
+     * @param find the page's find
+     * @param frame the frame's identifier
+     * @param search the search's id
+     * @param count the frame's matches
+     * @param invalid whether the pattern is invalid
+     */
+    public static void findAnswered(PageFind find, String frame, long search, int count, boolean invalid) {
+        find.answered(frame, search, count, invalid);
+    }
+
+    /**
+     * A frame's {@code find.js} answers the selection asked for, as the message router hands it on. UI thread.
+     *
+     * @param find the page's find
+     * @param frame the frame's identifier
+     * @param search the request's id
+     * @param selection the frame's selected text
+     */
+    public static void findSelected(PageFind find, String frame, long search, String selection) {
+        find.selected(frame, search, selection);
+    }
+
+    /**
+     * The command a script Jasper runs in a frame calls {@code find.js} with, as its JSON.
+     *
+     * @param script the script: {@code find.js}, then the call with one command
+     * @return the command
+     */
+    public static String findCommand(String script) {
+        String start = PageFind.SOURCE + "\n(";
+        if (!script.startsWith(start) || !script.endsWith(");")) throw new AssertionError("Not find.js called with one command: " + script);
+        return script.substring(start.length(), script.length() - 2);
+    }
 }

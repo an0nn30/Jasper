@@ -11,15 +11,47 @@ import java.util.Optional;
  * JSON from a page, from Chromium or from a search engine, as the JDK reads none: one object or one array, read whole
  * and strictly, no deeper than its reader allows. Anything else, such as a repeated name, text after the value, a
  * trailing comma, a raw control character or an escape other than JSON's, is nothing. Nesting is bounded, so no text
- * can exhaust the stack.
+ * can exhaust the stack. It also writes the one piece of JSON Jasper puts into a page's scripts that is not its own:
+ * a string, {@link #quote}.
  */
 public final class StrictJson {
     /** What JSON's {@code null} reads as. */
     public static final Object NULL = Marker.NULL;
     /** What a number reads as unless it is an integer of at most 18 digits, which reads as a {@link Long}. */
     public static final Object NUMBER = Marker.NUMBER;
+    private static final char[] HEX = "0123456789abcdef".toCharArray();
 
     private StrictJson() { }
+
+    /**
+     * {@code text} as a double-quoted string literal that JavaScript and JSON both read back as {@code text}: quotes,
+     * backslashes, control characters, DEL, the line and paragraph separators and every surrogate are escaped, so none
+     * can end the literal or the line it is on.
+     *
+     * @param text any text, from a page or the user
+     * @return the literal
+     */
+    public static String quote(String text) {
+        var out = new StringBuilder(text.length() + 16).append('"');
+        for (int at = 0; at < text.length(); at++) {
+            char c = text.charAt(at);
+            switch (c) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                case '\b' -> out.append("\\b");
+                case '\f' -> out.append("\\f");
+                default -> {
+                    if (c < 0x20 || c == 0x7F || c == 0x2028 || c == 0x2029 || Character.isSurrogate(c))
+                        out.append("\\u").append(HEX[c >> 12]).append(HEX[(c >> 8) & 0xF]).append(HEX[(c >> 4) & 0xF]).append(HEX[c & 0xF]);
+                    else out.append(c);
+                }
+            }
+        }
+        return out.append('"').toString();
+    }
 
     private enum Marker { NULL, NUMBER }
 
