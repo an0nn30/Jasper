@@ -1,5 +1,104 @@
 # Jasper — Status and Handoff
 
+**Browser plan 4b: page features — 2026-10-31** (`claude/browser-page-features`, worktree
+`.claude/worktrees/browser-4b-4c-e6deab`, from local `main` `bcc77624d`, which has plan 4a merged; commits `c48158883`
+to `67c9d131a`, then the docs; not merged or pushed;
+[plan](superpowers/plans/2026-10-29-browser-4b-page-features.md), whose banner lists every deviation by task,
+[spec](superpowers/specs/2026-10-26-jasper-browser-plugin-design.md) sections 3, 6, 7, 10, 11, 14, 16 and 17,
+[guide](browser.md); executed with per-task subagents and reviews, Task 1 as three slices). The Browser's items gain:
+- the site icon: the page's favicon in the tab and at the address field's left, Jasper's icon on `jasper-about:` pages,
+  the globe otherwise, and a drag of the page's address;
+- Back's and Forward's hold menus, the 12 nearest entries of the page's history each way;
+- address suggestions (Navigate to, Search for, up to five of the engine's, a single word's address) and Settings'
+  Search Engine section: Google, DuckDuckGo, Bing, Kagi or Custom, with Custom Search URL and Custom Search
+  Suggestions URL; a results page shows its terms in the field; a click into the field selects its text;
+- find in page, with Match Case and JavaScript regular expressions, across frames, on Jasper's Find keys and the
+  Editor's;
+- zoom from 25 to 500 % in 5 % steps on the font size actions, Page zoom (`page_zoom`), Ctrl+wheel on Linux and
+  Windows, saved with the item;
+- the page's right-click menu, by what is under the pointer, with the host's Split, Move Pane to Tab and Close Pane;
+- error pages, and certificate errors with Details and Continue to this site (unsafe), an in-memory allowance of the
+  host and certificate until Jasper quits, and "Not secure" in the toolbar;
+- View Source at `jasper-about:source` and Inspect Element, which opens DevTools in a pane below.
+
+SDK 0.27.0 adds `PixelImage`, `ContentPresentation.withImage`, `Nodes.Field`'s `leadingImage`, `leadingIcon`,
+`leadingName`, `leadingDrag`, `selectOnClick`, `suggestions` and `suggestionsLoading`, `Nodes.Suggestion`,
+`UiEvent.SuggestionChosen`, `Nodes.Button.holdMenu`, `MenuItem.children` and `ContentTab.showContextMenu`, with the
+testkit's `FakeKitView.clickInto`, `press`, `suggestions`, `selectedSuggestion` and `choose` and `FakePluginHost`'s
+content-menu calls; every bundled manifest declares `sdk = ">=0.27.0, <0.28"`. Docs: the [Browser guide](browser.md)
+(the toolbar, search and suggestions, find, zoom, the right-click menu, View Source, Inspect Element, error pages,
+certificate errors with the Linux NSS note, Jasper's own requests, restore and the settings), Find and zoom in browser
+tabs in keyboard shortcuts, the new settings in configuration's plugin table, and, with slices 1a-1c, plugin UI, plugin
+authoring, plugin icons, the SDK and testkit READMEs, UI architecture and the regenerated SDK reference.
+`./gradlew check --continue` (JBR 25.0.4.1 b635.75 jcef, 10m 37s): **14,459 tests, 0 failures, 0 errors, 102
+skipped** (Browser 506, jasper-app 5,175; the XML of the 16 build folders, without the example plugin's, whose one test
+Task 10's 14,460 counted); the example external plugin's `check pluginZip` against `build/sdk-release` passes (1 test,
+0 failures). Source hygiene is clean over 3,245 Java files. No GUI was launched and Chromium never started.
+
+The controller's rulings, one line each:
+- P1: Back's and Forward's hold menus hold the history read after each load end, commit and title change; the SDK has
+  no press-begin event.
+- P2: `showContextMenu` takes leading and trailing items, with the host's pane items between them, as spec section 11
+  orders them.
+- P3: the bridge dispatches by op with per-op trust: `find` from any frame, `favicon` from the main frame, the opener
+  ops as R38.
+- P4: Task 7 lists View Source and Inspect Element, which Tasks 9 and 10 fill in.
+- P5: View Source's fetch never blocks Chromium's IO thread (an asynchronous `AboutScheme` page).
+- P6: no Save Link As… or Save Image As… until plan 7 brings downloads.
+- P7: Continue carries a one-time token; the allowance is the host and certificate the item kept from Chromium.
+- P8: one in-memory certificate allowance per plugin run, shared by every item.
+- P9: Task 1 runs as three slices, 1a images, 1b suggestions, 1c hold menus and menus.
+- P10: favicons only from `http` and `https` (no cookies, 5 s, 64 KiB), as the page can forge the request.
+- P11: `CefBrowser.getSource`, not the plan's nonexistent `CefFrame.getSource`.
+- P12: `selectOnClick` selects all only on the click that brings the focus in.
+- P13: the field's leading slot has an accessible name, "Site icon - drag to copy URL" (spec section 6).
+- P14: the leading slot also takes an icon name, for the globe in the kit's colours.
+- P15: slice 1a's fix round refuses unsupported field combinations and bounds untrusted images.
+- P16: hovering a suggestion should only highlight it (left to the final fix wave).
+- P17: `showContextMenu`'s point is on screen; a plugin holds no reference to its tab's component.
+- P18: history entries have no tooltip (`MenuItem` has none); a label is the title, else the URL without user info.
+- P19: a press that leaves the button before 500 ms opens no hold menu.
+- P20: a right-click, Shift+F10 and the context-menu key open a hold menu at once; plugin items in the content menu
+  are drawn natively.
+- P21: the real main-frame flag reaches the bridge's `request()` before `find` arrives.
+- P22: the plugin's own fetches go direct until plan 6's proxy setting.
+- P23: each history menu lists at most 12 entries, nearest first, as Chrome's.
+- P24: typed local paths, local schemes and user info never reach the search engine.
+- P25: a results page's terms show in the field whenever nothing is typed; the SDK has no focus event.
+- P26: Search with names a Custom engine by its search URL's host.
+- P27: `localhost`, a host with a port and IP literals navigate first; a bare word searches first.
+- P28 (amended): Custom URLs are absolute `http` or `https` templates, with one refusal message for both.
+- P29: find highlights with the CSS Custom Highlight API, leaving the page's DOM alone.
+- P30: the find field's seed crosses the bridge as a bounded one-line string.
+- P31: no V8 regular-expression flag; a catastrophic pattern is a known gap.
+- P32: Ctrl+wheel zooms on Windows and Linux only (spec section 7).
+- P33: zoom runs 25-500 %, Chromium's range, not 5-500 %.
+- P34: same-host items that show at once share Chromium's per-host zoom (engine-forced).
+- P35: no macOS pinch; `com.apple.eawt.event` is not exported to plugins.
+- P36: Copy Image Address in place of Copy Image; JCEF has no copy-image command.
+- P37: the menu cancels Chromium's callback and runs Jasper's own commands.
+- P38: Back, Forward and Reload show only over a bare page, as in Chrome.
+- P39: Copy Page Title is disabled on an untitled page.
+- P40: Back from an error page skips the failed entry through the history read; a retry leaves a Forward entry.
+- P41: whether CEF asks about HSTS hosts is unverified; Jasper keeps no HSTS list.
+- P42: View Source fetches a web page fresh and otherwise shows a capture under a one-time token.
+- P43: a captured source is found by its token in any open item.
+- P44: a second Inspect Element reopens DevTools in the same item, after Chromium closes the old ones.
+
+Known gaps and follow-ups (the banner has them all, with the deferred minors by task): no pinch on macOS (P35) and
+Ctrl+wheel only on Linux and Windows (P32); same-host items that show at once share a zoom (P34); no Copy Image (P36)
+and no Save Link As… or Save Image As… until plan 7 (P6); 12 history entries and no Show Full History until plan 5
+(P23); find skips shadow roots and form fields, a catastrophic regular expression can hang the page's renderer (P31),
+and the page's scripts see the query and can forge their frames' counts; favicons, suggestions and View Source's fetch
+go direct with Java's User-Agent until plan 6 (P22), and SVG, WebP and `data:` favicons show the globe; a successful
+Try Again leaves a Forward entry (P40); HSTS hosts (P41); a host with an underscore gets no Continue; a non-web page's
+source does not survive a restore; DevTools' state resets on each Inspect Element (P44), and DevTools show no context
+menus and cancel their file dialogs. A deferred security minor: the page-browser branch of `onOpenURLFromTab` follows
+`file:` and `jasper-about:` without a gesture and wants `LinkSchemes.opensFrom`. Task 12 (the user's GUI check on macOS,
+with their OK): pending, the plan's ten lines and the task reviews' lines
+([checklist](browser-verification.md)); Windows and Linux are not run; benchmarks and the memory
+run are deferred.
+
 **Browser plan 4a: the browser core — 2026-10-28** (`claude/browser-core-88616a`, worktree
 `.claude/worktrees/infallible-shamir-39ac4e`, from `claude/browser-plugin-design`, which is `main` `0849270a3` plus the
 plan `ec5395f79`; commits `9f1d63fd1` to `8258e223e`, then the final review's fix wave at the head; not merged or

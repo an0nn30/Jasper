@@ -3,6 +3,213 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Execution status (2026-10-31): Tasks 1-11 executed; Task 12, the user's GUI check on macOS, is pending** (branch
+`claude/browser-page-features`, worktree `.claude/worktrees/browser-4b-4c-e6deab`, cut from local `main` `bcc77624d`,
+which has plan 4a merged; commits `c48158883` to `67c9d131a`, then the docs; not merged or pushed; see
+`docs/STATUS.md`). Executed with per-task subagents and reviews; the controller's rulings are numbered P1-P44, and
+plan 4a's R0-R48 bind. The task reviews recorded these deviations from the plan's text, each with its ruling:
+- **SDK:** the additions are `@since 0.27.0`, and every bundled range is `>=0.27.0, <0.28`.
+- **A plan-text error (P11):** Task 9's fallback reads `CefBrowser.getSource(CefStringVisitor)`; `CefFrame.getSource`,
+  which the plan names, does not exist in JBR's JCEF (checked with `javap`).
+- **Task 1 ran as three slices (P9: one dispatch was too large to review well),** each with its SDK values, testkit
+  fake, kit drawing under the default and Enterprise (classic) kits, host side, contract cases, guides and
+  `sdkReference`: 1a images (`c48158883`, fix `584a09a64`), 1b field suggestions (`19ee6a220`), 1c hold menus, submenus
+  and `showContextMenu` (`7413cff0c`, fix `923b8c1f8`):
+  - `PixelImage` checks its length on the argument and its PNG signature on its own copy, and the kit decodes PNGs
+    without their metadata (P15: favicons are untrusted input);
+  - `Nodes.Field` also gained `leadingIcon`, shown while there is no image, so the Browser shows its registered globe
+    in the kit's icon colours (P14), and `leadingName`, the slot's accessible name and tooltip, because spec section 6
+    names the favicon "Site icon - drag to copy URL" (P13); the leading icon alone can be dragged;
+  - a TEXTAREA, STEPPER or SLIDER takes no leading image or icon and no `selectOnClick`, and a TEXTAREA or NUMBER field
+    no suggestions (P15: the kit would have ignored them);
+  - `selectOnClick` selects all only on the click that brings the focus into the field, and a click in a focused field
+    places the caret, as Chrome's and Safari's address bars do (P12);
+  - a click chooses a suggestion, as a drawn list must take clicks, and hovering selects one, which P16 rules should
+    only highlight (left to the final fix wave);
+  - `showContextMenu(Point at, List<MenuItem> leading, List<MenuItem> trailing, Consumer<Optional<String>> chosen)`:
+    the host's pane items go between the two lists, as spec section 11 orders them (P2); `at` is on screen, as a plugin
+    holds no reference to its tab's component (P17); `chosen` hears `Optional.empty()` for a host item, a dismissal or
+    a tab not on screen; `PluginPresentationCheck` allows `java.awt.Point` in `ContentTab` only; the menu is the
+    terminal's themed native popup, with exactly Split ▸, Move Pane to Tab ▸ and Close Pane;
+  - a hold menu also opens at once on a right-click (Control-click on macOS), Shift+F10 and the context-menu key, as
+    Chrome opens its history on a right-click (P20); a press that leaves the button before 500 ms opens nothing, as
+    leaving cancels a click (P19); a submenu has a blank action and no shortcut;
+  - `MenuItem` has no tooltip, so Task 3's history entries have none (P18);
+  - testkit additions: `FakeKitView.clickInto`, `press`, `suggestions`, `selectedSuggestion` and `choose`, and
+    `FakePluginHost.contentMenu`, `chooseFromContentMenu` and `dismissContentMenu`.
+- **Task 2:**
+  - the bridge router dispatches by op with per-op trust (P3, as find must reach frames): `favicon` from the main frame
+    only, `find` (Task 5) from any frame of the item's own browser, the opener ops as 4a's R38;
+  - favicons are fetched only for `http` and `https` pages and icons, without cookies, within 5 s and 64 KiB, since a
+    page can forge the request (P10), so `data:` and SVG favicons show the globe; `jasper-about:` pages show Jasper's
+    icon;
+  - `Favicons(decoder, executor)` takes the decoder, which lives in `item` (a package cycle otherwise), and an
+    executor that keeps the first `HttpClient` off the UI thread; the first favicon a document declares wins; the
+    address check ignores the fragment.
+- **Task 3:**
+  - the history is read after each main-frame load end, commit and title change, one read at a time, not when a press
+    begins (P1: the SDK's hold menu is a list the plugin sets in advance);
+  - each menu lists at most 12 entries, nearest first, as Chrome's do, since Swing popups do not scroll (P23); "Show
+    Full History" comes with plan 5's history page;
+  - a label is the title, or the URL without user info, cut at 80 characters (P18);
+  - one strict JSON reader, the new JDK-only `dev.jasper.browser.json.StrictJson`, serves the history and the bridge;
+    `Page` takes a history seam.
+- **Task 4:**
+  - `SearchEngine.queryOf`, `Suggestions.rank`, `BrowserToolbar.node` and `BrowserItems` take the settings, which a
+    Custom engine's results page is recognised by;
+  - the field shows a results page's terms whenever nothing is typed, not only while focused (P25: the SDK has no focus
+    event; Safari shows them so); the tab, the saved URL and the drag keep the URL;
+  - no suggestion request for an absolute local path, a `file:`, `about:` or `jasper-about:` address, user info (P24:
+    local paths and passwords must not reach the engine), blank text or text over 1,000 characters;
+  - `localhost`, a host with a port and IP literals rank their Navigate row first, while a bare word keeps the spec's
+    search-first order (P27: Chrome navigates them, and searching them sends intranet names to the engine);
+  - a single word is ASCII with a letter or `_`, and `c#` and `why?` are searches;
+  - a Custom URL must be an absolute `http` or `https` template with `%s` after its host and no user info, refused with
+    one message for both, "The URL must start with https:// or http:// and contain %s", replacing the plan's "The URL
+    must contain %s" (P28, amended: the SDK's text rule has one message per setting); only an empty Custom search URL
+    searches with Google;
+  - Search with names a Custom engine by its search URL's host, "Custom" without one (P26);
+  - the plugin's own fetches share the new JDK-only `dev.jasper.browser.http.WebFetch` and go direct, with the JDK's
+    default proxy selector, until plan 6 brings the proxy setting (P22: routing them through Chromium is a redesign);
+  - suggestion ids say what a row loads (`navigate:…`, `search:…`); `item` and `settings` depend on each other.
+- **Task 5:**
+  - the real main-frame flag now reaches the bridge's `request()` (P21), before the `find` op arrived;
+  - `find.js` highlights with the CSS Custom Highlight API instead of wrapping text in elements, so the page's DOM and
+    scripts are untouched and `clear()` is exact (P29);
+  - matching runs a block at a time across inline elements, each run of white space as one space, within 250 ms a pass,
+    answering a partial count; re-runs are throttled (300 ms, or ten times the last pass) rather than debounced;
+  - seeding from the page's selection crosses the bridge as a bounded one-line string, as JCEF cannot read the
+    selection (P30);
+  - no V8 regular-expression flag, so a catastrophic `exec` of the user's own pattern can hang the page's renderer (P31:
+    changing every page's engine for find is out of proportion);
+  - only the main frame, listed first, says a pattern is invalid; a page's main frame and its sub-frames wait in
+    separate bridge queues; at most 10,000 matches a frame, 100 frames and a 1 s wait; `pagehide` ends a document's
+    search; Find Next with the bar closed searches again from the first match; the toggles' tooltips are the Editor's
+    "Match Case" and "Regular Expression";
+  - `find.js` has no committed tests, as the build has no JavaScript engine; Node smoke tests in the scratchpad and the
+    GUI check carry it.
+- **Task 6:**
+  - zoom runs 25-500 %, not 5-500 % (P33: Chromium's zoom factors stop at 0.25 and 5.0), so Review Focus 5's 5 % floor
+    is 25 %;
+  - Ctrl+wheel zooms on Windows and Linux only, as spec section 7's key table says, and reaches the page on macOS,
+    where momentum scrolling can carry Ctrl (P32); it steps by Chromium's rounded notch count;
+  - no pinch on macOS (P35: `com.apple.eawt.event` is not exported to plugins);
+  - Chromium keeps one zoom per host and JCEF has no zoom mode, so same-host items that show at once share the zoom set
+    last; each item re-applies its own at main-frame load start and when it shows (P34);
+  - Reset leaves the item no zoom of its own, so it comes back at Page zoom; `BrowserRestore.state(url, target, zoom)`
+    replaced the two-argument form, and `BrowserRestore` keeps its own copy of the range.
+- **Task 7:**
+  - `PageMenuItems.of` returns leading and trailing lists (P2), and its `Context` gained `frame` and `titled`; new
+    `page.MenuPlace`; the handler is installed from `Page.start`; extra `PageMenuTest`;
+  - Save Link As… and Save Image As… are left out until plan 7 brings downloads (P6: they would do nothing), and Copy
+    Image is Copy Image Address, as JCEF offers no copy-image command and no SDK image clipboard exists (P36);
+  - Chromium's callback is never continued: it is cancelled once, and Jasper runs the commands CEF's defaults run,
+    independent of JCEF's `MenuId` numbering (P37);
+  - Back, Forward and Reload show only over a bare page, as Chrome's (P38), and Copy Page Title is disabled on an
+    untitled page (P39);
+  - Open Link and Open Image in New Tab follow 4a's frame scheme rule (`page.LinkSchemes.opensFrom`, now the one copy
+    of 4a's scheme set) when enabled and when run, and Search with's terms are cut at 1,000 characters;
+  - View Source and Inspect Element were listed here and filled in by Tasks 9 and 10 (P4);
+  - Copy Link copies the link as the page wrote it, user info included, as Chrome copies its unfiltered link.
+- **Task 8:**
+  - `ErrorPage.title` takes Chromium's error name, not `CefLoadHandler.ErrorCode`, as `item` names no JCEF type; the
+    address is `jasper-about:error?token=…&code=…&url=…`; `render` and `html(URI, palette, dark)` replace the plan's
+    `html(...)`; the certificate is `page.ServerCertificate`, beside `page.LoadFailure`;
+  - Continue carries a one-time random token, and the allowance is the host and SHA-256 the item kept from Chromium,
+    never values from the address, which a `file:` page could forge (P7); one in-memory `CertificateAllowance` per
+    plugin run is shared by every item (P8);
+  - `ERR_CERT_REVOKED`, `ERR_CERT_INVALID` and `ERR_CERT_CONTAINS_ERRORS` offer no Continue, as Chrome treats them as
+    fatal;
+  - Back skips Chromium's failed entry through the history read (Chromium's own Back when the read is stale), and a
+    successful Try Again leaves the error page as a Forward entry, as JCEF offers no history replacement (P40);
+  - whether CEF asks about certificates on HSTS-pinned hosts is unverified, and Jasper keeps no HSTS list (P41);
+  - "Not secure" stands before the field, whose leading slot is then empty, for `https` pages only, following the
+    address last committed; `MenuPlace` gained `canGoBack`, `back` and `reload`; `CertificateAllowance.allowsAny`;
+    `AboutScheme.register(String, Function<URI, String>)` and `registerAction(String, Consumer<URI>)`;
+  - a failed `jasper-about:` load shows no error page; a forged or forgotten error address is never saved; per-item
+    `ErrorPages` and `item.PageHtml`; extra `BrowserItemErrorTest`, `ServerCertificateTest`, `PageNavigationTest` and
+    `PageEventsTest`.
+- **Task 9:**
+  - View Source loads `jasper-about:source?url=…[&token=…]` in the same item (P42): an `http` or `https` page's source
+    is fetched fresh (no cookies, 10 s, 5 MB, a 200 only) whenever the source page loads; otherwise, and when that
+    fails, it is the HTML captured with `CefBrowser.getSource` (P11) before the item navigates, kept under a 128-bit
+    token, so a forged address reads no cookies or local content;
+  - the token is looked up in every open item, as the scheme handler cannot tell which browser asked (P43);
+  - `AboutScheme.registerLater` and an asynchronous resource handler keep the fetch off CEF's IO thread (P5);
+  - `SourcePage.fetch` gives `CompletableFuture<Optional<String>>`, and the renderer is `html(String, String,
+    WorkspacePalette, SyntaxPalette, boolean)` with `Appearance.syntaxPalette()`; per-item `SourcePages` keep 20
+    captures within two of the longest; at most 5,242,880 characters show and the first 1,000,000 are highlighted; the
+    restore state drops the token.
+- **Task 10:**
+  - the `createDevToolsBrowser` override is the one path, as the plan asked to record: an off-screen browser has no
+    `openDevTools(point)` fallback (`CefBrowserOsrWithHandler`'s own returns `null`, and the windowed constructor is
+    private);
+  - `Page` makes the DevTools' `PageView`, as only `Page` may, and `DevToolsItem` holds a `page.DevTools` handle, as
+    `item` names no JCEF type;
+  - a second Inspect Element closes and reopens DevTools at the new point in the same item, each DevTools waiting for
+    every earlier one to end, as JCEF pairs pending browsers first in, first out (P44); DevTools' state resets;
+  - links DevTools open in a new tab open as `NEXT_TAB` under the inspected page's scheme rule; the DevTools browser
+    gets no page scripts; DevTools have Copy and Paste and no find, zoom or right-click menu.
+- **Task 11:**
+  - `docs/browser.md` documents every feature, with the settings in its Settings table, which configuration's plugin
+    table lists; `docs/keyboard-shortcuts.md` has Find and zoom in browser tabs;
+  - `docs/sdk-icons.md` (`PixelImage`), `docs/plugin-authoring.md` (`withImage`, `showContextMenu`) and
+    `docs/plugin-ui.md` (the new node components, where the SDK's nodes are documented) were written with slices 1a-1c;
+  - `./gradlew check --continue` passed: 14,459 tests, 0 failures, 0 errors, 102 skipped (Browser 506; the 16 build
+    folders without the example plugin's); the example external plugin's `check pluginZip` passed (1 test).
+
+Known gaps and follow-ups:
+- **Zoom:** no pinch on macOS (P35; a follow-up exports `com.apple.eawt.event` to the plugin); Ctrl+wheel only on
+  Windows and Linux (P32); same-host items that show at once share one zoom (P34); the floor is 25 % (P33).
+- **The right-click menu:** no Copy Image (P36), and no Save Link As… or Save Image As… until plan 7 (P6).
+- **History menus:** 12 entries, no "Show Full History" until plan 5 (P23), and no per-entry icons or tooltips (P18).
+- **Find:** shadow roots and form fields are not searched; a catastrophic regular expression can hang the page's
+  renderer (P31); the page's scripts see the query and can forge their frames' counts, which are only shown; a partial
+  count shows no sign of it; a sub-frame that navigates keeps its count until the next search.
+- **Jasper's own requests:** favicons, suggestions and View Source's fetch go direct and send Java's User-Agent until
+  plan 6's proxy setting (P22); SVG, WebP and `data:` favicons show the globe, and a page cannot change its favicon
+  later.
+- **Address field:** a scheme-less `name:secret@host` typed character by character can reach the engine before the
+  `@`; a click in the field closes its suggestion list until the next keystroke (Chrome keeps it).
+- **Error pages and certificates:** a successful Try Again leaves a Forward entry (P40); HSTS hosts (P41); a host with
+  an underscore gets no Continue, failing safe; a plain `mailto:` click may show "Page Can’t Be Loaded" (unverified).
+- **View Source:** a non-web page's source does not survive a restore (P42); the address field shows the token.
+- **DevTools:** their state resets on each Inspect Element (P44); no context menus; their file dialogs are cancelled;
+  Cmd+[ and Cmd+] (Alt+Left and Alt+Right) navigate the inspected page.
+
+Deferred minors, for the final review and its fix wave:
+- 1a: the testkit README's `clickInto` row; `HostedKit.image(EncodedArtwork)` no longer catches the >512 px refusal;
+  `TextFields` revalidates the field container on every refresh (pre-existing).
+- 1b: hovering moves the keyboard selection (P16); the temporary-focus-loss comment and test wording; a field with both
+  a `listId` and suggestions takes Up and Down for both; `KitOwnership.SUGGESTIONS`' Javadoc;
+  `HostedKitContractTest.press` bypasses the focus manager; a press inside the field closes the list.
+- 1c: a press that leaves and comes back within 500 ms still opens the hold menu, while the docs say leaving opens
+  nothing; `FakePluginHost.dismissContentMenus` iterates live values; a stray blank line.
+- 2: a `replaceState` or `pushState` during a favicon fetch drops the icon for the document; the UI thread can wait on
+  `Favicons`' monitor while the first client builds; addresses with `{}|^` show the globe; an untested BMP case;
+  `OpenerBridgeTest`'s stderr warning (4a).
+- 3: an unasserted counter in `NavigationHistoryTest`; the `json` package-info's wording.
+- 4: templates refuse underscore and IDN hosts without saying why; `AddressInput.resolve`'s Javadoc; a fetcher test
+  that cannot tell `close()` from the timeout.
+- 5: `find.js`'s final run has no deadline in its empty-match loop; a run collected at the deadline can be dropped; a
+  block inside a `display: none` ancestor ends the run; `getComputedStyle` on every visited element; ruby and math
+  count as blocks; collapsing dense white space is one uninterruptible replace.
+- 6: a zero-rotation Ctrl+wheel can step on a carried remainder; a stale "5% to 500%" test comment; a theoretical NaN;
+  a field's placement in `PageView`.
+- 7: a long `page/package-info.java` line; no direct `LinkSchemesTest`; `BrowserRestore`'s copy of the scheme set and
+  `AddressInput.SCHEME`.
+- 8: no error page for any failed `jasper-about:` address also hides real failures of Jasper's own pages.
+- 9: a local page can ask for many source pages at once (memory); captures are bounded per item, not plugin-wide;
+  charset labels; untested branches; the class doc on the IO thread; `SourcePage.java`'s size; `NOT_FOUND` twice; a
+  1 s negative wait in a test; the raw-text set lacks `plaintext` and `noscript`.
+- 10: `PageTestAccess`'s serialization-constructor helper (JEP 500); security: the page-browser branch of
+  `onOpenURLFromTab` follows `file:` and `jasper-about:` in the same item without a gesture, to be guarded with
+  `LinkSchemes.opensFrom`.
+
+Task 12 (the user's GUI check on macOS, with their OK): pending, the plan's ten lines plus those the task reviews added
+([checklist](../../browser-verification.md)); Windows and Linux are not run; memory and
+benchmarks are deferred.
+
 **Goal:** Give plan 4a's browser item iTerm2's page features:
 - the favicon in the tab and the address field;
 - long-press Back and Forward history;
